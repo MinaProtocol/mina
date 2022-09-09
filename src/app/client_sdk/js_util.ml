@@ -46,7 +46,7 @@ let payload_of_fee_payer_party_js
   in
   { Party.Fee_payer.body =
       { public_key = fee_payer_pk; fee; valid_until = None; nonce }
-  ; authorization = Signature.dummy
+  ; authorization = Signature Signature.dummy
   }
 
 let payload_common_of_js (payload_common_js : payload_common_js) =

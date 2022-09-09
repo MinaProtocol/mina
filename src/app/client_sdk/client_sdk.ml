@@ -72,7 +72,7 @@ let _ =
              Signature_lib.Schnorr.Chunked.sign sk
                (Random_oracle.Input.Chunked.field full_commitment)
            in
-           { fee_payer with authorization = fee_payer_signature_auth }
+           { fee_payer with authorization = Signature fee_payer_signature_auth }
          in
          { Parties.fee_payer; other_parties; memo }
          |> Parties.parties_to_json |> Yojson.Safe.to_string |> Js.string
