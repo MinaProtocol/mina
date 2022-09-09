@@ -242,7 +242,7 @@ let
         ulimit -s 10000
 
         # dune runtest src/app/archive src/lib src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
-        dune runtest src/app/archive --instrument-with bisect_ppx --display=short
+        dune runtest src/app/archive --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
       mina_tests_src_lib = runMinaCheck {
@@ -261,7 +261,7 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/lib --instrument-with bisect_ppx --display=short
+        dune runtest src/lib --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
       mina_tests_zkapp_test_transaction = runMinaCheck {
@@ -280,7 +280,7 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
+        dune runtest src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
