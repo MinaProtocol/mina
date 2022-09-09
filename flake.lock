@@ -131,12 +131,17 @@
       }
     },
     "nix-npm-buildPackage": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1643828355,
-        "narHash": "sha256-yeej9SblWlh5DQlLr/AGz8vVG0TrDZg38Yy2fv6wk7U=",
+        "lastModified": 1662627485,
+        "narHash": "sha256-Kg8u2ekU0+MsuLzgKqiaus3HquLLo2Qq+oGbQfIppos=",
         "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "d9acd44139f56202084bd918cdf6b945935acfd6",
+        "rev": "cab951dd024dd367511d48440de6f93664ee35aa",
         "type": "github"
       },
       "original": {
