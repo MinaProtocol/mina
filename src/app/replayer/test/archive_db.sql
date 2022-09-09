@@ -2064,7 +2064,7 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, "timestamp", chain_status) FROM stdin;
 1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	\N	3NLeQxhRU3qHv34vHNUwD2ht9gzW3ioAGqBmVwXjYhsSDHPuBDQn	1	1	1	1	2	77	3100000000000000000	jwygs7rxLrSg7hHkMcHzG66R6c1Ve9vJRyrvrVpS9bKcT4iC7Qy	1	0	0	1659993000000	canonical
-2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jxbGLVXL4TKg44kSzwyXocsTNRdSCiFrPjV9zCnDtnmiXh3W2aQ	2	22	22	1659993660000	pending
+2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jxv79AJoBRBWaT7WcvKChaqucR9BqrAzc6Ya3cZAnbxn94RCKqY	2	22	22	1659993660000	pending
 3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	3	3	1	1	4	77	3100000000000000000	jx3EPWuSmaoMGYbtEoMYHVkhbBNDr2cFuGqY1dAYrcuukQket64	3	24	24	1659993720000	pending
 4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	3	3	1	1	5	77	3100000000000000000	jwj33aFA7iunt1GuDzDBVd4tzLkHsXWXUQsq7KgNWL2GZovkaCv	4	26	26	1659993780000	pending
 5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3	1	1	6	77	3100000000000000000	jxHvVw6rNcY4DoYutEGkwBH78XqDUce4NuEzfWZxKiE7QKjfWug	5	28	28	1659993840000	pending
