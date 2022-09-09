@@ -352,6 +352,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let one = Unsigned.one
 
+    let nanomina = of_int
+
+    let centimina i = of_int (10_000_000 * i)
+
+    let mina i = of_int (1_000_000_000 * i)
+
+    let int_of_nanomina = to_int
+
+    let int_of_centimina m = to_int m / 10_000_000
+
+    let int_of_mina m = to_int m / 1_000_000_000
+
     let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
     let sub_flagged x y =
