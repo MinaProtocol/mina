@@ -4,20 +4,34 @@ module Kimchi_backend_common : sig
       type t
 
       val to_yojson : t -> Yojson.Safe.t
+
       val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+
       val t_of_sexp : Sexplib0.Sexp.t -> t
+
       val sexp_of_t : t -> Sexplib0.Sexp.t
+
       val compare : t -> t -> int
+
       val bin_size_t : t Bin_prot.Size.sizer
+
       val bin_write_t : t Bin_prot.Write.writer
+
       val bin_read_t : t Bin_prot.Read.reader
+
       val __bin_read_t__ : (int -> t) Bin_prot.Read.reader
+
       val bin_shape_t : Bin_shape_lib.Bin_shape.t
+
       val bin_writer_t : t Bin_prot.Type_class.writer0
+
       val bin_reader_t : t Bin_prot.Type_class.reader0
+
       val bin_t : t Bin_prot.Type_class.t0
+
       val hash_fold_t :
         Base_internalhash_types.state -> t -> Base_internalhash_types.state
+
       val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
       module Bigint : Kimchi_backend_common__.Bigint.Intf
@@ -128,7 +142,6 @@ module Kimchi_backend_common : sig
 
       val ( -= ) : t -> t -> unit
     end
-
   end
 
   module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
@@ -142,8 +155,7 @@ module Pasta : sig
     module Fp = Kimchi_pasta.Basic.Fp
   end
 
-
-  (** pickles required *)
+  (* pickles required *)
   module Pallas_based_plonk : sig
     (* all pickles required *)
     module Field = Kimchi_pasta.Pallas_based_plonk.Field
@@ -168,21 +180,24 @@ module Pasta : sig
 
   (* module Pasta = Kimchi_pasta.Pasta *)
   module Pasta : sig
-    (** pickles required *)
+    (* pickles required *)
     module Vesta = Kimchi_pasta.Pasta.Vesta
-    (** pickles required *)
+
+    (* pickles required *)
     module Pallas = Kimchi_pasta.Pasta.Pallas
   end
 
   module Precomputed = Kimchi_pasta.Precomputed
 
-    (** pickles required *)
+  (* pickles required *)
   module Vesta_based_plonk : sig
     (* all pickles required *)
     module Field = Kimchi_pasta.Vesta_based_plonk.Field
     module Curve = Kimchi_pasta.Vesta_based_plonk.Curve
     module Bigint = Kimchi_pasta.Vesta_based_plonk.Bigint
+
     val field_size : Pasta_bindings.BigInt256.t
+
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
     module R1CS_constraint_system =
       Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system

@@ -1,5 +1,3 @@
-(* val g : string -> string *)
-
 module Lagrange_precomputations : sig
   val index_of_domain_log2 : int -> int
 

@@ -52,13 +52,13 @@ end
 
 module Precomputed : sig
   module Lagrange_precomputations : sig
-    (** pickles required *)
+    (* pickles required *)
     val index_of_domain_log2 : int -> int
 
-    (** pickles required *)
+    (* pickles required *)
     val vesta : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) array array array
 
-    (** pickles required *)
+    (* pickles required *)
     val pallas : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) array array array
   end
 end
