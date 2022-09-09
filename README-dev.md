@@ -106,7 +106,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
-## Using the makefile
+## Using the Makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
 It also knows how to use Docker automatically. 
@@ -114,14 +114,11 @@ It also knows how to use Docker automatically.
 These are the most important `make` targets:
 
 - `build`: build everything
-- `test`: run the tests
 - `libp2p_helper`: build the libp2p helper
-- `web`: build the website, including the state explorer
+- `reformat`: automatically use `ocamlformat` to reformat the source files (use
+    it if the hook fails during a commit)
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
-
-NOTE: all of the `test-*` targets (including `test-all`) won't run in the container.
-`test` wraps them in the container.
 
 ## Steps for adding a new dependency
 
