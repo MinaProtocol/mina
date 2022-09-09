@@ -702,7 +702,7 @@ func (bs *testBitswapState) ViewBlock(key [32]byte, callback func([]byte) error)
 	}
 	return callback(b)
 }
-func (bs *testBitswapState) StoreBlock(block blocks.Block) error {
+func (bs *testBitswapState) StoreDownloadedBlock(block blocks.Block) error {
 	bs.blocks[block.Cid()] = block.RawData()
 	return nil
 }

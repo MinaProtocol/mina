@@ -60,7 +60,13 @@ module Make () = struct
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   [%%define_locally
-  T1.(of_raw_string, to_raw_string, digest_string, digest_bigstring, to_hex)]
+  T1.
+    ( of_raw_string
+    , to_raw_string
+    , digest_string
+    , digest_bigstring
+    , to_hex
+    , of_hex )]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)

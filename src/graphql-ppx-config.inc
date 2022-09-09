@@ -88,6 +88,15 @@ Graphql_lib.Scalars.VerificationKeyHash
 -custom-field
 VerificationKey
 Graphql_lib.Scalars.VerificationKey
+-custom-field
+BodyReference
+Graphql_lib.Scalars.BodyReference
+-custom-field
+StagedLedgerAuxHash
+Graphql_lib.Scalars.StagedLedgerAuxHash
+-custom-field
+PendingCoinbaseHash 
+Graphql_lib.Scalars.PendingCoinbaseHash
 -extend-query=Graphql_lib.Serializing.ExtendQuery
 -extend-mutation=Graphql_lib.Serializing.ExtendQuery
 -future-added-value=false
