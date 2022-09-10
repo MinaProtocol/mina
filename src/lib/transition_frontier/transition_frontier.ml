@@ -215,8 +215,7 @@ let rec load_with_max_length :
             ~persistent_frontier_instance ignore_consensus_local_state
         with
         | Ok _ as result ->
-            [%str_log trace] Persisted_frontier_loaded
-              ~metadata:[ ("snarked_ledger_hash", snarked_ledger_hash_json) ] ;
+            [%str_log trace] Persisted_frontier_loaded ;
             return result
         | Error err as err_result ->
             let err_str =
@@ -425,9 +424,6 @@ let add_breadcrumb_exn t breadcrumb =
     Mina_block.Validated.valid_commands
     @@ Breadcrumb.validated_transition breadcrumb
   in
-  (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
-     command or snapp command
-  *)
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"

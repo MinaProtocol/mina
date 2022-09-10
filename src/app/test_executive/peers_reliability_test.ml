@@ -153,8 +153,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
          let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
+         (* if frontier load events from the other nodes, which would be generated
+            on initialization, that will cause a failure here
+
+            earlier testing did not detect such events on initialization
+
+            if we never see such events, using the node is sufficient to identify
+            that the event is triggered by the restart of node_c
+
+            a more exacting alternative would be to issue an event on frontier closing, and capture
+            its snarked ledger hash, and compare that when the load event occurs; but the wait
+            mechanism does not appear to allow returning data in the event, like such a hash;
+            it could be added
+         *)
          let%bind () =
-           wait_for t @@ Wait_condition.persisted_frontier_loaded ()
+           wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
          in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]

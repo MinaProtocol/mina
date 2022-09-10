@@ -385,7 +385,7 @@ module Dsl = struct
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
 
-    val persisted_frontier_loaded : unit -> t
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
   end
 
   module type Util_intf = sig

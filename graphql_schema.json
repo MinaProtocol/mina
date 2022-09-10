@@ -10215,7 +10215,7 @@
             {
               "name": "consensusState",
               "description":
-                "State specific to the Codaboros Proof of Stake consensus algorithm",
+                "State specific to the minaboros Proof of Stake consensus algorithm",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -13151,7 +13151,7 @@
                 {
                   "name": "token",
                   "description":
-                    "Token of account being retrieved (defaults to CODA)",
+                    "Token of account being retrieved (defaults to MINA)",
                   "type": {
                     "kind": "SCALAR",
                     "name": "TokenId",

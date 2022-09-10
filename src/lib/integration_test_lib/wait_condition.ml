@@ -265,15 +265,22 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let persisted_frontier_loaded () =
-    let check () _node
+  let persisted_frontier_loaded node =
+    let check () event_node
         (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
-      (* the fact of loading is sufficient, nothing else to check *)
-      Predicate_passed
+      let event_node_id = Node.id event_node in
+      let node_id = Node.id node in
+      if String.equal event_node_id node_id then Predicate_passed
+      else
+        Predicate_failure
+          (Error.of_string
+             (sprintf
+                "Expected to load frontier for node %s, but got frontier for %s"
+                node_id event_node_id ) )
     in
-    let soft_timeout_in_slots = 8 in
+    let soft_timeout_in_slots = 4 in
     { id = Persisted_frontier_loaded
-    ; description = "persisted transition frontier to load"
+    ; description = "persisted transition frontier loaded"
     ; predicate =
         Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
