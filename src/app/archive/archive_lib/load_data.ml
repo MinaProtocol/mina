@@ -28,7 +28,7 @@ let account_identifier_of_id pool account_identifier_id =
 
 let get_amount_bounds pool amount_id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map amount_db_opt =
     Option.value_map amount_id ~default:(return None) ~f:(fun id ->
         let%map amount =
@@ -48,7 +48,7 @@ let get_amount_bounds pool amount_id =
 
 let get_global_slot_bounds pool id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map bounds_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map bounds =
@@ -66,7 +66,7 @@ let get_global_slot_bounds pool id =
 
 let get_length_bounds pool id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map bl_db_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map ts =
@@ -85,7 +85,7 @@ let get_length_bounds pool id =
 
 let update_of_id pool update_id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
     let open Caqti_async in
     Pool.use
@@ -274,7 +274,7 @@ let update_of_id pool update_id =
 
 let staking_data_of_id pool id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind { epoch_ledger_id
            ; epoch_seed
            ; start_checkpoint
@@ -323,7 +323,7 @@ let staking_data_of_id pool id =
 
 let protocol_state_precondition_of_id pool id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind ({ snarked_ledger_hash_id
             ; timestamp_id
             ; blockchain_length_id
@@ -390,7 +390,7 @@ let protocol_state_precondition_of_id pool id =
     : Zkapp_precondition.Protocol_state.t )
 
 let load_events pool id =
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map fields_list =
     (* each id refers to an item in 'zkapp_state_data_array' *)
     let%bind field_array_ids =
@@ -411,7 +411,7 @@ let load_events pool id =
   List.map fields_list ~f:Array.of_list
 
 let get_fee_payer_body ~pool body_id =
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind { account_identifier_id; fee; valid_until; nonce } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
@@ -430,7 +430,7 @@ let get_fee_payer_body ~pool body_id =
 
 let get_other_party_body ~pool body_id =
   let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let pk_of_id = pk_of_id pool in
   let%bind { account_identifier_id
            ; update_id
@@ -632,7 +632,7 @@ let get_other_party_body ~pool body_id =
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
     let open Caqti_async in
     Pool.use
