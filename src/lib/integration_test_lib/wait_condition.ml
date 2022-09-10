@@ -280,7 +280,7 @@ struct
     in
     let soft_timeout_in_slots = 4 in
     { id = Persisted_frontier_loaded
-    ; description = "persisted transition frontier loaded"
+    ; description = "persisted transition frontier to load"
     ; predicate =
         Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
