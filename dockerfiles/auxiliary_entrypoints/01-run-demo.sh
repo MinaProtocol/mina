@@ -31,10 +31,7 @@ if [[ -n ${RUN_DEMO} ]]; then
     echo "Contents of config file ${MINA_CONFIG_FILE}:"
     cat "${MINA_CONFIG_FILE}"
 
-    MINA_TIME_OFFSET=${MINA_TIME_OFFSET:-0}
-    MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
-
-    exec MINA_PRIVKEY_PASS mina daemon --generate-genesis-proof true --seed --demo-mode --proof-level none --config-dir ${MINA_CONFIG_DIR} --block-producer-pubkey ${PK} --run-snark-worker ${SNARK_PK} -insecure-rest-server $@
+    exec MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""} MINA_TIME_OFFSET=${MINA_TIME_OFFSET:-0} mina daemon --generate-genesis-proof true --seed --demo-mode --proof-level none --config-dir ${MINA_CONFIG_DIR} --block-producer-pubkey ${PK} --run-snark-worker ${SNARK_PK} -insecure-rest-server $@
 
     rc=$?
     echo "Exiting Mina demo." && exit $rc
