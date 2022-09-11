@@ -187,21 +187,30 @@ module Make (Inputs : Intf.Inputs_intf) :
                           then proof_parties_count + 1
                           else proof_parties_count ) )
                   in
+                  Mina_metrics.(
+                    Cryptography.(
+                      Counter.inc snark_work_zkapp_base_time_sec
+                        (Time.Span.to_sec time) ;
+                      Counter.inc_one snark_work_zkapp_base_submissions ;
+                      Counter.inc zkapp_transaction_length (Float.of_int c) ;
+                      Counter.inc zkapp_proof_updates (Float.of_int p))) ;
                   ("parties", c, p)
               | Command (Signed_command _) ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
                   ("signed command", 1, 0)
               | Coinbase _ ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
                   ("coinbase", 1, 0)
               | Fee_transfer _ ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
                   ("fee_transfer", 1, 0)
             in
-            Mina_metrics.(
-              Gauge.set Cryptography.snark_work_base_time_sec
-                (Time.Span.to_sec time) ;
-              Gauge.set Cryptography.transaction_length
-                (Float.of_int parties_count) ;
-              Gauge.set Cryptography.zkapp_proof_updates
-                (Float.of_int proof_parties_count)) ;
             [%str_log info]
               (Base_snark_generated
                  { time; transaction_type; parties_count; proof_parties_count }

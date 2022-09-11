@@ -412,20 +412,30 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       (One_or_two.zip_exn work.metrics
          (Snark_worker.Work.Result.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
-        match tag with
+        ( match tag with
         | `Merge ->
             Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
-        | `Transition ->
-            let parties_count, proof_parties_count =
-              (*should be Some in the case of `Transition*)
-              match Option.value_exn transaction_opt with
-              | Mina_transaction.Transaction.Command
-                  (Mina_base.User_command.Parties parties) ->
-                  Mina_base.Parties.Call_forest.fold parties.other_parties
-                    ~init:(1, 0) ~f:(fun (count, proof_parties_count) party ->
+        | `Transition -> (
+            (*should be Some in the case of `Transition*)
+            match Option.value_exn transaction_opt with
+            | Mina_transaction.Transaction.Command
+                (Mina_base.User_command.Parties parties) ->
+                let init =
+                  match
+                    (Mina_base.Party.of_fee_payer parties.fee_payer)
+                      .authorization
+                  with
+                  | Proof _ ->
+                      (1, 1)
+                  | _ ->
+                      (1, 0)
+                in
+                let parties_count, proof_parties_count =
+                  Mina_base.Parties.Call_forest.fold parties.other_parties ~init
+                    ~f:(fun (count, proof_parties_count) party ->
                       ( count + 1
                       , if
                           Mina_base.Control.(
@@ -433,16 +443,23 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                               (tag (Mina_base.Party.authorization party)))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
-              | _ ->
-                  (1, 0)
-            in
-            Perf_histograms.add_span ~name:"snark_worker_transition_time" total ;
-            Mina_metrics.(
-              Cryptography.(
-                Gauge.set snark_work_base_time_sec (Time.Span.to_sec total) ;
-                Gauge.set transaction_length (Float.of_int parties_count) ;
-                Gauge.set zkapp_proof_updates (Float.of_int proof_parties_count)))
-        )
+                in
+                Mina_metrics.(
+                  Cryptography.(
+                    Counter.inc snark_work_zkapp_base_time_sec
+                      (Time.Span.to_sec total) ;
+                    Counter.inc_one snark_work_zkapp_base_submissions ;
+                    Counter.inc zkapp_transaction_length
+                      (Float.of_int parties_count) ;
+                    Counter.inc zkapp_proof_updates
+                      (Float.of_int proof_parties_count)))
+            | _ ->
+                Mina_metrics.(
+                  Cryptography.(
+                    Counter.inc_one snark_work_base_submissions ;
+                    Counter.inc snark_work_base_time_sec
+                      (Time.Span.to_sec total))) ) ) ;
+        Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->

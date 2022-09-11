@@ -531,12 +531,14 @@ module Update = struct
                     then proof_parties_count + 1
                     else proof_parties_count ) )
             in
-            Mina_metrics.Gauge.set
+            Mina_metrics.Counter.inc_one
+              Mina_metrics.Transaction_pool.zkapp_transactions_added_to_pool ;
+            Mina_metrics.Counter.inc
               Mina_metrics.Transaction_pool.zkapp_transaction_size
               (Parties.Stable.Latest.bin_size_t p |> Float.of_int) ;
-            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.zkapp_updates
+            Mina_metrics.Counter.inc Mina_metrics.Transaction_pool.zkapp_updates
               (Float.of_int updates) ;
-            Mina_metrics.Gauge.set
+            Mina_metrics.Counter.inc
               Mina_metrics.Transaction_pool.zkapp_proof_updates
               (Float.of_int proof_updates)
         | Signed_command _ ->
