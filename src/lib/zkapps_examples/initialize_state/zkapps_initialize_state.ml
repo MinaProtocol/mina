@@ -6,7 +6,8 @@ let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
 let initialize public_key =
   Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun account_update ->
+    ~public_key:(Public_key.Compressed.var_of_t public_key)
+    (fun account_update ->
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
@@ -26,7 +27,8 @@ let update_state_handler (new_state : Field.Constant.t list)
 
 let update_state public_key =
   Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun account_update ->
+    ~public_key:(Public_key.Compressed.var_of_t public_key)
+    (fun account_update ->
       let new_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in

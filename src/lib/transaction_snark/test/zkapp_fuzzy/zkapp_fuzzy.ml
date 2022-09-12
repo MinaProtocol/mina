@@ -91,8 +91,8 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   (ledger, fee_payer_keypairs, keymap)
 
-let generate_zkapp_commands_and_apply_them_consecutively ~trials ~max_account_updates ()
-    =
+let generate_zkapp_commands_and_apply_them_consecutively ~trials
+    ~max_account_updates () =
   let num_of_fee_payers = 5 in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()

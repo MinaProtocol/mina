@@ -184,7 +184,9 @@ module Account_update_under_construction = struct
       ; account_condition : Account_condition.t
       ; update : Update.t
       ; rev_calls :
-          (Zkapp_call_forest.Checked.account_update * Zkapp_call_forest.Checked.t) list
+          ( Zkapp_call_forest.Checked.account_update
+          * Zkapp_call_forest.Checked.t )
+          list
       ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
@@ -306,36 +308,48 @@ end
 class account_update ~public_key ?token_id =
   object
     val mutable account_update =
-      Account_update_under_construction.In_circuit.create ~public_key ?token_id ()
+      Account_update_under_construction.In_circuit.create ~public_key ?token_id
+        ()
 
     method assert_state_proved =
-      account_update <- Account_update_under_construction.In_circuit.assert_state_proved account_update
+      account_update <-
+        Account_update_under_construction.In_circuit.assert_state_proved
+          account_update
 
     method assert_state_unproved =
-      account_update <- Account_update_under_construction.In_circuit.assert_state_unproved account_update
+      account_update <-
+        Account_update_under_construction.In_circuit.assert_state_unproved
+          account_update
 
     method set_state idx data =
-      account_update <- Account_update_under_construction.In_circuit.set_state idx data account_update
+      account_update <-
+        Account_update_under_construction.In_circuit.set_state idx data
+          account_update
 
     method set_full_state app_state =
       account_update <-
-        Account_update_under_construction.In_circuit.set_full_state app_state account_update
+        Account_update_under_construction.In_circuit.set_full_state app_state
+          account_update
 
     method set_call_data call_data =
-      account_update <- Account_update_under_construction.In_circuit.set_call_data call_data account_update
+      account_update <-
+        Account_update_under_construction.In_circuit.set_call_data call_data
+          account_update
 
     method register_call called_account_update sub_calls =
       account_update <-
-        Account_update_under_construction.In_circuit.register_call called_account_update sub_calls
-          account_update
+        Account_update_under_construction.In_circuit.register_call
+          called_account_update sub_calls account_update
 
     method add_events events =
-      account_update <- Account_update_under_construction.In_circuit.add_events events account_update
+      account_update <-
+        Account_update_under_construction.In_circuit.add_events events
+          account_update
 
     method add_sequence_events sequence_events =
       account_update <-
-        Account_update_under_construction.In_circuit.add_sequence_events sequence_events
-          account_update
+        Account_update_under_construction.In_circuit.add_sequence_events
+          sequence_events account_update
 
     method account_update_under_construction = account_update
   end
