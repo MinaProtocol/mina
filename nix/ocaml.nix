@@ -268,7 +268,10 @@ let
         #   fails with error "libp2p error: no supported interface",
         #   which may be because networking is disallowed in the sandbox.
         # crypto/proof-systems/ocaml/tests/src:
-        #    fails because it makes a call to cargo, which is not available here.
+        #   fails because it makes a call to cargo, which is not available here.
+        # crypto/kimchi_backend:
+        #   fails because it makes a call to git, nut the .git folder is
+        #   not available in the nix sandbox.
 
         LIBRARIES_TO_TEST=$(
           find src/lib -name "dune" |
