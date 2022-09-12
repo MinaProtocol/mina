@@ -31,6 +31,6 @@
    ppx_version.runtime
  )
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
+  (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Implementation of different account databases"))

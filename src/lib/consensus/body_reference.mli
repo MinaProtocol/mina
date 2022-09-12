@@ -23,4 +23,6 @@ val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
 val to_hex : t -> string
 
+val of_hex_exn : string -> t
+
 val to_raw_string : t -> string

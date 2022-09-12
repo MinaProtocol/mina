@@ -261,10 +261,10 @@
         packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
           src = ./src/lib/snarky_js_bindings/snarkyjs;
           preBuild = ''
-            BINDINGS_PATH=./dist/server/node_bindings
+            BINDINGS_PATH=./src/node_bindings
             mkdir -p "$BINDINGS_PATH"
-            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
-            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
             chmod -R 777 "$BINDINGS_PATH"
 
             # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
@@ -275,7 +275,7 @@
             sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
-          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          npmBuild = "npm run build";
           # TODO: add snarky-run
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
@@ -301,22 +301,30 @@
         packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
         packages.mina-docker = pkgs.dockerTools.buildImage {
           name = "mina";
-          contents = [ ocamlPackages.mina.out ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-image-root";
+            paths = [ ocamlPackages.mina.out ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
         };
         packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
           name = "mina-daemon";
-          contents = [
-            pkgs.dumb-init
-            pkgs.coreutils
-            pkgs.bashInteractive
-            pkgs.python3
-            pkgs.libp2p_helper
-            ocamlPackages.mina.out
-            ocamlPackages.mina.mainnet
-            ocamlPackages.mina.genesis
-            ocamlPackages.mina_build_config
-            ocamlPackages.mina_daemon_scripts
-          ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-daemon-image-root";
+            paths = [
+              pkgs.dumb-init
+              pkgs.coreutils
+              pkgs.bashInteractive
+              pkgs.python3
+              pkgs.libp2p_helper
+              ocamlPackages.mina.out
+              ocamlPackages.mina.mainnet
+              ocamlPackages.mina.genesis
+              ocamlPackages.mina_build_config
+              ocamlPackages.mina_daemon_scripts
+            ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
           config = {
             env = [ "MINA_TIME_OFFSET=0" ];
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
@@ -343,6 +351,8 @@
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          buildInputs = oa.buildInputs
+            ++ [ pkgs.go_1_18 ];
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''

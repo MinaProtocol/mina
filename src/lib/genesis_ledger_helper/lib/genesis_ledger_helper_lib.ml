@@ -576,6 +576,18 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; transaction_expiry_hr =
       Option.value ~default:default.transaction_expiry_hr
         (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
+  ; max_proof_parties =
+      Option.value ~default:default.max_proof_parties
+        (config.daemon >>= fun cfg -> cfg.max_proof_parties)
+  ; max_parties =
+      Option.value ~default:default.max_parties
+        (config.daemon >>= fun cfg -> cfg.max_parties)
+  ; max_event_elements =
+      Option.value ~default:default.max_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_event_elements)
+  ; max_sequence_event_elements =
+      Option.value ~default:default.max_sequence_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_sequence_event_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -604,6 +616,14 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           ; peer_list_url = None
           ; transaction_expiry_hr =
               Some precomputed_values.genesis_constants.transaction_expiry_hr
+          ; max_proof_parties =
+              Some precomputed_values.genesis_constants.max_proof_parties
+          ; max_parties = Some precomputed_values.genesis_constants.max_parties
+          ; max_event_elements =
+              Some precomputed_values.genesis_constants.max_event_elements
+          ; max_sequence_event_elements =
+              Some
+                precomputed_values.genesis_constants.max_sequence_event_elements
           }
     ; genesis =
         Some

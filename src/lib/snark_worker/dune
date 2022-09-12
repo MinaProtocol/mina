@@ -48,7 +48,7 @@
  (preprocess
   (pps
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_here
     ppx_custom_printf
     ppx_deriving_yojson

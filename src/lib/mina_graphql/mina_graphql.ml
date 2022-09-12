@@ -117,8 +117,9 @@ module Reflection = struct
 
     let nn_time a x =
       reflect
-        (fun t -> Block_time.to_time_exn t |> Time.to_string)
-        ~typ:(non_null string) a x
+        (fun t -> Block_time.to_time_exn t)
+        ~typ:(non_null (Graphql_lib.Scalars.Time.typ ()))
+        a x
 
     let nn_catchup_status a x =
       reflect
@@ -176,8 +177,6 @@ module Types = struct
 
     let public_key = PublicKey.typ ()
 
-    let uint64 = UInt64.typ ()
-
     let uint32 = UInt32.typ ()
 
     let token_id = TokenId.typ ()
@@ -185,6 +184,32 @@ module Types = struct
     let json = JSON.typ ()
 
     let epoch_seed = EpochSeed.typ ()
+
+    let balance = Balance.typ ()
+
+    let amount = Amount.typ ()
+
+    let fee = Fee.typ ()
+
+    let block_time = BlockTime.typ ()
+
+    let global_slot = GlobalSlot.typ ()
+
+    let length = Length.typ ()
+
+    let span = Span.typ ()
+
+    let ledger_hash = LedgerHash.typ ()
+
+    let state_hash = StateHash.typ ()
+
+    let account_nonce = AccountNonce.typ ()
+
+    let chain_hash = ChainHash.typ ()
+
+    let transaction_hash = TransactionHash.typ ()
+
+    let precomputed_block_proof = PrecomputedBlockProof.typ ()
   end
 
   let account_id : (Mina_lib.t, Account_id.t option) typ =
@@ -231,24 +256,24 @@ module Types = struct
         ; field "slot" ~typ:(non_null uint32)
             ~args:Arg.[]
             ~resolve:(fun _ global_slot -> C.slot global_slot)
-        ; field "globalSlot" ~typ:(non_null uint32)
+        ; field "globalSlot" ~typ:(non_null global_slot)
             ~args:Arg.[]
             ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
-              C.to_uint32 global_slot )
-        ; field "startTime" ~typ:(non_null string)
+              C.to_global_slot global_slot )
+        ; field "startTime" ~typ:(non_null block_time)
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string_exn @@ C.start_time ~constants global_slot )
-        ; field "endTime" ~typ:(non_null string)
+              C.start_time ~constants global_slot )
+        ; field "endTime" ~typ:(non_null block_time)
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string_exn @@ C.end_time ~constants global_slot )
+              C.end_time ~constants global_slot )
         ] )
 
   let consensus_time_with_global_slot_since_genesis =
@@ -263,7 +288,7 @@ module Types = struct
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
             ~args:Arg.[]
-            ~typ:(non_null uint32)
+            ~typ:(non_null global_slot)
             ~resolve:(fun _ (_, slot) -> slot)
         ] )
 
@@ -295,7 +320,7 @@ module Types = struct
               | Produce_now info ->
                   [ of_time ~consensus_constants info.time ] )
         ; field "globalSlotSinceGenesis"
-            ~typ:(non_null @@ list @@ non_null uint32)
+            ~typ:(non_null @@ list @@ non_null global_slot)
             ~doc:"Next block production global-slot-since-genesis "
             ~args:Arg.[]
             ~resolve:(fun _
@@ -333,23 +358,16 @@ module Types = struct
 
   let merkle_path_element :
       (_, [ `Left of Zkapp_basic.F.t | `Right of Zkapp_basic.F.t ] option) typ =
+    let field_elem = Mina_base_unix.Graphql_scalars.FieldElem.typ () in
     obj "MerklePathElement" ~fields:(fun _ ->
-        [ field "left" ~typ:string
+        [ field "left" ~typ:field_elem
             ~args:Arg.[]
             ~resolve:(fun _ x ->
-              match x with
-              | `Left h ->
-                  Some (Zkapp_basic.F.to_string h)
-              | `Right _ ->
-                  None )
-        ; field "right" ~typ:string
+              match x with `Left h -> Some h | `Right _ -> None )
+        ; field "right" ~typ:field_elem
             ~args:Arg.[]
             ~resolve:(fun _ x ->
-              match x with
-              | `Left _ ->
-                  None
-              | `Right h ->
-                  Some (Zkapp_basic.F.to_string h) )
+              match x with `Left _ -> None | `Right h -> Some h )
         ] )
 
   module DaemonStatus = struct
@@ -357,14 +375,12 @@ module Types = struct
 
     let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
       obj "Interval" ~fields:(fun _ ->
-          [ field "start" ~typ:(non_null string)
+          [ field "start" ~typ:(non_null span)
               ~args:Arg.[]
-              ~resolve:(fun _ (start, _) ->
-                Time.Span.to_ms start |> Int64.of_float |> Int64.to_string )
-          ; field "stop" ~typ:(non_null string)
+              ~resolve:(fun _ (start, _) -> start)
+          ; field "stop" ~typ:(non_null span)
               ~args:Arg.[]
-              ~resolve:(fun _ (_, end_) ->
-                Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string )
+              ~resolve:(fun _ (_, end_) -> end_)
           ] )
 
     let histogram : (_, Perf_histograms.Report.t option) typ =
@@ -477,30 +493,28 @@ module Types = struct
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
             ~resolve:(fun _ ({ Fee_transfer.receiver_pk = pk; _ }, _) -> pk)
-        ; field "fee" ~typ:(non_null uint64)
+        ; field "fee" ~typ:(non_null fee)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ ({ Fee_transfer.fee; _ }, _) ->
-              Currency.Fee.to_uint64 fee )
-        ; field "type" ~typ:(non_null string)
+            ~resolve:(fun _ ({ Fee_transfer.fee; _ }, _) -> fee)
+        ; field "type"
+            ~typ:
+              ( non_null
+              @@ Filtered_external_transition_unix.Graphql_scalars
+                 .FeeTransferType
+                 .typ () )
             ~args:Arg.[]
             ~doc:
               "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees \
                deducted from the coinbase amount are of type \
                'Fee_transfer_via_coinbase', rest are deducted from transaction \
                fees"
-            ~resolve:(fun _ (_, transfer_type) ->
-              match transfer_type with
-              | Filtered_external_transition.Fee_transfer_type
-                .Fee_transfer_via_coinbase ->
-                  "Fee_transfer_via_coinbase"
-              | Fee_transfer ->
-                  "Fee_transfer" )
+            ~resolve:(fun _ (_, transfer_type) -> transfer_type)
         ] )
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initialMinimumBalance" ~typ:uint64
+        [ field "initialMinimumBalance" ~typ:balance
             ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -508,9 +522,8 @@ module Types = struct
               | Account_timing.Untimed ->
                   None
               | Timed timing_info ->
-                  Some (Balance.to_uint64 timing_info.initial_minimum_balance)
-              )
-        ; field "cliffTime" ~typ:uint32
+                  Some timing_info.initial_minimum_balance )
+        ; field "cliffTime" ~typ:global_slot
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -519,7 +532,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_time )
-        ; field "cliffAmount" ~typ:uint64
+        ; field "cliffAmount" ~typ:amount
             ~doc:"The cliff amount for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -527,8 +540,8 @@ module Types = struct
               | Account_timing.Untimed ->
                   None
               | Timed timing_info ->
-                  Some (Currency.Amount.to_uint64 timing_info.cliff_amount) )
-        ; field "vestingPeriod" ~typ:uint32
+                  Some timing_info.cliff_amount )
+        ; field "vestingPeriod" ~typ:global_slot
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -537,7 +550,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.vesting_period )
-        ; field "vestingIncrement" ~typ:uint64
+        ; field "vestingIncrement" ~typ:amount
             ~doc:"The vesting increment for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -545,8 +558,7 @@ module Types = struct
               | Account_timing.Untimed ->
                   None
               | Timed timing_info ->
-                  Some (Currency.Amount.to_uint64 timing_info.vesting_increment)
-              )
+                  Some timing_info.vesting_increment )
         ] )
 
   let completed_work =
@@ -555,11 +567,10 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of the prover" ~typ:(non_null public_key)
             ~resolve:(fun _ { Transaction_snark_work.Info.prover; _ } -> prover)
-        ; field "fee" ~typ:(non_null uint64)
+        ; field "fee" ~typ:(non_null fee)
             ~args:Arg.[]
             ~doc:"Amount the prover is paid for the snark work"
-            ~resolve:(fun _ { Transaction_snark_work.Info.fee; _ } ->
-              Currency.Fee.to_uint64 fee )
+            ~resolve:(fun _ { Transaction_snark_work.Info.fee; _ } -> fee)
         ; field "workIds" ~doc:"Unique identifier for the snark work purchased"
             ~typ:(non_null @@ list @@ non_null int)
             ~args:Arg.[]
@@ -577,10 +588,9 @@ module Types = struct
         [ field "sign" ~typ:(non_null sign) ~doc:"+/-"
             ~args:Arg.[]
             ~resolve:(fun _ fee -> Currency.Amount.Signed.sgn fee)
-        ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Fee"
+        ; field "feeMagnitude" ~typ:(non_null amount) ~doc:"Fee"
             ~args:Arg.[]
-            ~resolve:(fun _ fee ->
-              Currency.Amount.(to_uint64 (Signed.magnitude fee)) )
+            ~resolve:(fun _ fee -> Currency.Amount.Signed.magnitude fee)
         ] )
 
   let work_statement =
@@ -588,16 +598,16 @@ module Types = struct
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
          excess and increase in supply " ~fields:(fun _ ->
-        [ field "sourceLedgerHash" ~typ:(non_null string)
+        [ field "sourceLedgerHash" ~typ:(non_null ledger_hash)
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_base58_check source.ledger )
-        ; field "targetLedgerHash" ~typ:(non_null string)
+              source.ledger )
+        ; field "targetLedgerHash" ~typ:(non_null ledger_hash)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_base58_check target.ledger )
+              target.ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -610,14 +620,14 @@ module Types = struct
               { fee_excess_l with
                 magnitude = Currency.Amount.of_fee fee_excess_l.magnitude
               } )
-        ; field "supplyIncrease" ~typ:(non_null uint64)
+        ; field "supplyIncrease" ~typ:(non_null amount)
             ~doc:"Increase in total supply"
             ~args:Arg.[]
             ~deprecated:(Deprecated (Some "Use supplyChange"))
             ~resolve:(fun _
                           ({ supply_increase; _ } :
                             Transaction_snark.Statement.t ) ->
-              Currency.Amount.to_uint64 supply_increase.magnitude )
+              supply_increase.magnitude )
         ; field "supplyChange" ~typ:(non_null signed_fee)
             ~doc:"Increase/Decrease in total supply"
             ~args:Arg.[]
@@ -646,16 +656,17 @@ module Types = struct
       ( 'context
       , (Mina_state.Blockchain_state.Value.t * State_hash.t) option )
       typ =
+    let staged_ledger_hash t =
+      let blockchain_state, _ = t in
+      Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
+    in
     obj "BlockchainState" ~fields:(fun _ ->
-        [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
+        [ field "date" ~typ:(non_null block_time) ~doc:(Doc.date "date")
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let blockchain_state, _ = t in
-              let timestamp =
-                Mina_state.Blockchain_state.timestamp blockchain_state
-              in
-              Block_time.to_string_exn timestamp )
-        ; field "utcDate" ~typ:(non_null string)
+              Mina_state.Blockchain_state.timestamp blockchain_state )
+        ; field "utcDate" ~typ:(non_null block_time)
             ~doc:
               (Doc.date
                  ~extra:
@@ -668,28 +679,37 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string_system_time_exn
+              Block_time.to_system_time
                 (Mina_lib.time_controller coda)
                 timestamp )
-        ; field "snarkedLedgerHash" ~typ:(non_null string)
+        ; field "snarkedLedgerHash" ~typ:(non_null ledger_hash)
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ t ->
-              let blockchain_state, _ = t in
-              let snarked_ledger_hash =
-                Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
-              in
-              Frozen_ledger_hash.to_base58_check snarked_ledger_hash )
-        ; field "stagedLedgerHash" ~typ:(non_null string)
-            ~doc:"Base58Check-encoded hash of the staged ledger"
+            ~resolve:(fun _ (blockchain_state, _) ->
+              Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
+              )
+        ; field "stagedLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:
+              "Base58Check-encoded hash of the staged ledger hash's main \
+               ledger hash"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              let blockchain_state, _ = t in
-              let staged_ledger_hash =
-                Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
-              in
-              Mina_base.Ledger_hash.to_base58_check
-              @@ Staged_ledger_hash.ledger_hash staged_ledger_hash )
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.ledger_hash staged_ledger_hash )
+        ; field "stagedLedgerAuxHash"
+            ~typ:(non_null @@ Graphql_lib.Scalars.StagedLedgerAuxHash.typ ())
+            ~doc:"Base58Check-encoded hash of the staged ledger hash's aux_hash"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              Staged_ledger_hash.aux_hash (staged_ledger_hash t) )
+        ; field "stagedLedgerPendingCoinbaseAux"
+            ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseHash.typ ())
+            ~doc:
+              "Base58Check-encoded hash of the staged ledger hash's \
+               pending_coinbase_hash"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              Staged_ledger_hash.pending_coinbase_hash (staged_ledger_hash t) )
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
               "Block finished a staged ledger, and a proof was emitted from it \
@@ -709,6 +729,15 @@ module Types = struct
               | Some b ->
                   Some (Transition_frontier.Breadcrumb.just_emitted_a_proof b)
               )
+        ; field "bodyReference"
+            ~typ:(non_null @@ Graphql_lib.Scalars.BodyReference.typ ())
+            ~doc:
+              "A reference to how the block header refers to the body of the \
+               block as a hex-encoded string"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              let blockchain_state, _ = t in
+              Mina_state.Blockchain_state.body_reference blockchain_state )
         ] )
 
   let protocol_state :
@@ -718,12 +747,12 @@ module Types = struct
       typ =
     let open Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
-        [ field "previousStateHash" ~typ:(non_null string)
+        [ field "previousStateHash" ~typ:(non_null state_hash)
             ~doc:"Base58Check-encoded hash of the previous state"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let protocol_state, _ = t in
-              State_hash.to_base58_check protocol_state.previous_state_hash )
+              protocol_state.previous_state_hash )
         ; field "blockchainState"
             ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
@@ -749,19 +778,19 @@ module Types = struct
 
   let genesis_constants =
     obj "GenesisConstants" ~fields:(fun _ ->
-        [ field "accountCreationFee" ~typ:(non_null uint64)
+        [ field "accountCreationFee" ~typ:(non_null fee)
             ~doc:"The fee charged to create a new account"
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } () ->
               (Mina_lib.config coda).precomputed_values.constraint_constants
-                .account_creation_fee |> Currency.Fee.to_uint64 )
-        ; field "coinbase" ~typ:(non_null uint64)
+                .account_creation_fee )
+        ; field "coinbase" ~typ:(non_null amount)
             ~doc:
               "The amount received as a coinbase reward for producing a block"
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } () ->
               (Mina_lib.config coda).precomputed_values.constraint_constants
-                .coinbase_amount |> Currency.Amount.to_uint64 )
+                .coinbase_amount )
         ] )
 
   module AccountObj = struct
@@ -801,18 +830,18 @@ module Types = struct
             "A total balance annotated with the amount that is currently \
              unknown with the invariant unknown <= total, as well as the \
              currently liquid and locked balances." ~fields:(fun _ ->
-            [ field "total" ~typ:(non_null uint64)
+            [ field "total" ~typ:(non_null balance)
                 ~doc:"The amount of MINA owned by the account"
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
-            ; field "unknown" ~typ:(non_null uint64)
+                ~resolve:(fun _ (b : t) -> b.total)
+            ; field "unknown" ~typ:(non_null balance)
                 ~doc:
                   "The amount of MINA owned by the account whose origin is \
                    currently unknown"
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
-            ; field "liquid" ~typ:uint64
+                ~resolve:(fun _ (b : t) -> b.unknown)
+            ; field "liquid" ~typ:balance
                 ~doc:
                   "The amount of MINA owned by the account which is currently \
                    available. Can be null if bootstrapping."
@@ -822,20 +851,22 @@ module Types = struct
                   Option.map (min_balance b) ~f:(fun min_balance ->
                       let total_balance : uint64 = Balance.to_uint64 b.total in
                       let min_balance_uint64 = Balance.to_uint64 min_balance in
-                      if
-                        Unsigned.UInt64.compare total_balance min_balance_uint64
-                        > 0
-                      then Unsigned.UInt64.sub total_balance min_balance_uint64
-                      else Unsigned.UInt64.zero ) )
-            ; field "locked" ~typ:uint64
+                      Balance.of_uint64
+                        ( if
+                          Unsigned.UInt64.compare total_balance
+                            min_balance_uint64
+                          > 0
+                        then
+                          Unsigned.UInt64.sub total_balance min_balance_uint64
+                        else Unsigned.UInt64.zero ) ) )
+            ; field "locked" ~typ:balance
                 ~doc:
                   "The amount of MINA owned by the account which is currently \
                    locked. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) ->
-                  Option.map (min_balance b) ~f:Balance.to_uint64 )
-            ; field "blockHeight" ~typ:(non_null uint32)
+                ~resolve:(fun _ (b : t) -> min_balance b)
+            ; field "blockHeight" ~typ:(non_null length)
                 ~doc:"Block height at which balance was measured"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) ->
@@ -846,7 +877,7 @@ module Types = struct
                       Transition_frontier.Breadcrumb.consensus_state crumb
                       |> Consensus.Data.Consensus_state.blockchain_length )
               (* TODO: Mutually recurse with "block" instead -- #5396 *)
-            ; field "stateHash" ~typ:string
+            ; field "stateHash" ~typ:state_hash
                 ~doc:
                   "Hash of block at which balance was measured. Can be null if \
                    bootstrapping. Guaranteed to be non-null for direct account \
@@ -855,8 +886,7 @@ module Types = struct
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) ->
                   Option.map b.breadcrumb ~f:(fun crumb ->
-                      State_hash.to_base58_check
-                      @@ Transition_frontier.Breadcrumb.state_hash crumb ) )
+                      Transition_frontier.Breadcrumb.state_hash crumb ) )
             ] )
     end
 
@@ -1109,14 +1139,16 @@ module Types = struct
         ~fields:(fun _ ->
           [ field "verificationKey"
               ~doc:"Verification key in Base58Check format"
-              ~typ:(non_null string)
+              ~typ:
+                (non_null @@ Pickles_unix.Graphql_scalars.VerificationKey.typ ())
               ~args:Arg.[]
-              ~resolve:(fun _ (vk : _ With_hash.t) ->
-                Pickles.Side_loaded.Verification_key.to_base58_check vk.data )
-          ; field "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
+              ~resolve:(fun _ (vk : _ With_hash.t) -> vk.data)
+          ; field "hash" ~doc:"Hash of verification key"
+              ~typ:
+                ( non_null
+                @@ Pickles_unix.Graphql_scalars.VerificationKeyHash.typ () )
               ~args:Arg.[]
-              ~resolve:(fun _ (vk : _ With_hash.t) ->
-                Pickles.Backend.Tick.Field.to_string vk.hash )
+              ~resolve:(fun _ (vk : _ With_hash.t) -> vk.hash)
           ] )
 
     let rec account =
@@ -1141,15 +1173,13 @@ module Types = struct
                  ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
-             ; field "nonce" ~typ:string
+             ; field "nonce" ~typ:account_nonce
                  ~doc:
                    "A natural number that increases with each transaction \
                     (stringified uint32)"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Account.Nonce.to_string
-                     account.Account.Poly.nonce )
-             ; field "inferredNonce" ~typ:string
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.nonce)
+             ; field "inferredNonce" ~typ:account_nonce
                  ~doc:
                    "Like the `nonce` field, except it includes the scheduled \
                     transactions (transactions not yet included in a block) \
@@ -1162,9 +1192,9 @@ module Types = struct
                      .get_inferred_nonce_from_transaction_pool_and_ledger coda
                        account_id
                    with
-                   | `Active (Some nonce) ->
-                       Some (Account.Nonce.to_string nonce)
-                   | `Active None | `Bootstrapping ->
+                   | `Active n ->
+                       n
+                   | `Bootstrapping ->
                        None )
              ; field "epochDelegateAccount" ~typ:(Lazy.force account)
                  ~doc:
@@ -1209,12 +1239,11 @@ module Types = struct
                             ledger. The account may not be in the ledger: \
                             $error" ;
                          None ) )
-             ; field "receiptChainHash" ~typ:string
+             ; field "receiptChainHash" ~typ:chain_hash
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Receipt.Chain_hash.to_base58_check
-                     account.Account.Poly.receipt_chain_hash )
+                   account.Account.Poly.receipt_chain_hash )
              ; field "delegate" ~typ:public_key
                  ~doc:
                    "The public key to which you are delegating - if you are \
@@ -1293,14 +1322,13 @@ module Types = struct
                                None )
                        } )
                      delegators )
-             ; field "votingFor" ~typ:string
+             ; field "votingFor" ~typ:chain_hash
                  ~doc:
                    "The previous epoch lock hash of the chain which you are \
                     voting for"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Mina_base.State_hash.to_base58_check
-                     account.Account.Poly.voting_for )
+                   account.Account.Poly.voting_for )
              ; field "stakingActive" ~typ:(non_null bool)
                  ~doc:
                    "True if you are actively staking with this account on the \
@@ -1354,7 +1382,9 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.zkapp_uri )
              ; field "zkappState"
-                 ~typ:(list @@ non_null string)
+                 ~typ:
+                   ( list @@ non_null
+                   @@ Mina_base_unix.Graphql_scalars.FieldElem.typ () )
                  ~doc:
                    "The 8 field elements comprising the zkApp state associated \
                     with this account encoded as bignum strings"
@@ -1362,8 +1392,7 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.zkapp
                    |> Option.map ~f:(fun zkapp_account ->
-                          zkapp_account.app_state |> Zkapp_state.V.to_list
-                          |> List.map ~f:Zkapp_basic.F.to_string ) )
+                          zkapp_account.app_state |> Zkapp_state.V.to_list ) )
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"
                  ~args:Arg.[]
@@ -1382,25 +1411,27 @@ module Types = struct
                      ~f:(fun zkapp_account -> zkapp_account.verification_key) )
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
-                 ~typ:(list (non_null string))
+                 ~typ:
+                   (list
+                      ( non_null
+                      @@ Snark_params_unix.Graphql_scalars.SequenceEvent.typ ()
+                      ) )
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map account.Account.Poly.zkapp
                      ~f:(fun zkapp_account ->
-                       List.map ~f:Snark_params.Tick.Field.to_string
-                         (Pickles_types.Vector.to_list
-                            zkapp_account.sequence_state ) ) )
+                       Pickles_types.Vector.to_list zkapp_account.sequence_state )
+                   )
              ; field "leafHash"
                  ~doc:
                    "The base58Check-encoded hash of this account to bootstrap \
                     the merklePath"
-                 ~typ:string
+                 ~typ:(Mina_base_unix.Graphql_scalars.FieldElem.typ ())
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    let open Option.Let_syntax in
                    let%map account = Partial_account.to_full_account account in
-                   Zkapp_basic.F.to_string
-                     (Ledger_hash.of_digest (Account.digest account)) )
+                   Ledger_hash.of_digest (Account.digest account) )
              ; field "merklePath"
                  ~doc:
                    "Merkle path is a list of path elements that are either the \
@@ -1428,14 +1459,16 @@ module Types = struct
 
     let failure_reasons =
       obj "PartiesFailureReason" ~fields:(fun _ ->
-          [ field "index" ~typ:string ~args:[]
-              ~doc:"List index of the party that failed"
-              ~resolve:(fun _ (index, _) -> Some (Int.to_string index))
+          [ field "index" ~typ:(Graphql_basic_scalars.Index.typ ())
+              ~args:[] ~doc:"List index of the party that failed"
+              ~resolve:(fun _ (index, _) -> Some index)
           ; field "failures"
-              ~typ:(non_null @@ list @@ non_null @@ string)
+              ~typ:
+                ( non_null @@ list @@ non_null
+                @@ Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ
+                     () )
               ~args:[] ~doc:"Failure reason for the party or any nested parties"
-              ~resolve:(fun _ (_, failures) ->
-                List.map failures ~f:Transaction_status.Failure.to_string )
+              ~resolve:(fun _ (_, failures) -> failures)
           ] )
   end
 
@@ -1464,7 +1497,7 @@ module Types = struct
       interface "UserCommand" ~doc:"Common interface for user commands"
         ~fields:(fun _ ->
           [ abstract_field "id" ~typ:(non_null guid) ~args:[]
-          ; abstract_field "hash" ~typ:(non_null string) ~args:[]
+          ; abstract_field "hash" ~typ:(non_null transaction_hash) ~args:[]
           ; abstract_field "kind" ~typ:(non_null kind) ~args:[]
               ~doc:"String describing the kind of user command"
           ; abstract_field "nonce" ~typ:(non_null int) ~args:[]
@@ -1478,19 +1511,19 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
-          ; abstract_field "validUntil" ~typ:(non_null uint32) ~args:[]
+          ; abstract_field "validUntil" ~typ:(non_null global_slot) ~args:[]
               ~doc:
                 "The global slot number after which this transaction cannot be \
                  applied"
           ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used by the command"
-          ; abstract_field "amount" ~typ:(non_null uint64) ~args:[]
+          ; abstract_field "amount" ~typ:(non_null amount) ~args:[]
               ~doc:
                 "Amount that the source is sending to receiver - 0 for \
                  commands that are not associated with an amount"
           ; abstract_field "feeToken" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used to pay the fee"
-          ; abstract_field "fee" ~typ:(non_null uint64) ~args:[]
+          ; abstract_field "fee" ~typ:(non_null fee) ~args:[]
               ~doc:
                 "Fee that the fee-payer is willing to pay for making the \
                  transaction"
@@ -1515,8 +1548,10 @@ module Types = struct
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account of the receiver"
               ~deprecated:(Deprecated (Some "use receiver field instead"))
-          ; abstract_field "failureReason" ~typ:string ~args:[]
-              ~doc:"null is no failure, reason for failure otherwise."
+          ; abstract_field "failureReason"
+              ~typ:
+                (Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ ())
+              ~args:[] ~doc:"null is no failure, reason for failure otherwise."
           ] )
 
     module With_status = struct
@@ -1537,9 +1572,8 @@ module Types = struct
       [ field_no_status "id" ~typ:(non_null guid) ~args:[]
           ~resolve:(fun _ user_command ->
             Signed_command.to_base58_check user_command.With_hash.data )
-      ; field_no_status "hash" ~typ:(non_null string) ~args:[]
-          ~resolve:(fun _ user_command ->
-            Transaction_hash.to_base58_check user_command.With_hash.hash )
+      ; field_no_status "hash" ~typ:(non_null transaction_hash) ~args:[]
+          ~resolve:(fun _ user_command -> user_command.With_hash.hash)
       ; field_no_status "kind" ~typ:(non_null kind) ~args:[]
           ~doc:"String describing the kind of user command"
           ~resolve:(fun _ cmd -> to_kind cmd.With_hash.data)
@@ -1564,7 +1598,7 @@ module Types = struct
           ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data) )
-      ; field_no_status "validUntil" ~typ:(non_null uint32) ~args:[]
+      ; field_no_status "validUntil" ~typ:(non_null global_slot) ~args:[]
           ~doc:
             "The global slot number after which this transaction cannot be \
              applied" ~resolve:(fun _ cmd ->
@@ -1572,23 +1606,23 @@ module Types = struct
       ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data )
-      ; field_no_status "amount" ~typ:(non_null uint64) ~args:[]
+      ; field_no_status "amount" ~typ:(non_null amount) ~args:[]
           ~doc:
             "Amount that the source is sending to receiver; 0 for commands \
              without an associated amount" ~resolve:(fun _ cmd ->
             match Signed_command.amount cmd.With_hash.data with
             | Some amount ->
-                Currency.Amount.to_uint64 amount
+                amount
             | None ->
-                Unsigned.UInt64.zero )
+                Currency.Amount.zero )
       ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used to pay the fee" ~resolve:(fun _ cmd ->
             Signed_command.fee_token cmd.With_hash.data )
-      ; field_no_status "fee" ~typ:(non_null uint64) ~args:[]
+      ; field_no_status "fee" ~typ:(non_null fee) ~args:[]
           ~doc:
             "Fee that the fee-payer is willing to pay for making the \
              transaction" ~resolve:(fun _ cmd ->
-            Signed_command.fee cmd.With_hash.data |> Currency.Fee.to_uint64 )
+            Signed_command.fee cmd.With_hash.data )
       ; field_no_status "memo" ~typ:(non_null string) ~args:[]
           ~doc:
             (sprintf
@@ -1634,7 +1668,9 @@ module Types = struct
           ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
             @@ Signed_command.receiver cmd.With_hash.data )
-      ; field "failureReason" ~typ:string ~args:[]
+      ; field "failureReason"
+          ~typ:(Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ ())
+          ~args:[]
           ~doc:
             "null is no failure or status unknown, reason for failure \
              otherwise." ~resolve:(fun _ uc ->
@@ -1642,8 +1678,7 @@ module Types = struct
             | Applied | Enqueued ->
                 None
             | Included_but_failed failures ->
-                List.concat failures |> List.hd
-                |> Option.map ~f:Transaction_status.Failure.to_string )
+                List.concat failures |> List.hd )
       ]
 
     let payment =
@@ -1698,12 +1733,14 @@ module Types = struct
       obj "ZkappCommand" ~fields:(fun _ ->
           [ field_no_status "id"
               ~doc:"A Base58Check string representing the command"
-              ~typ:(non_null guid) ~args:[] ~resolve:(fun _ parties ->
-                Parties.to_base58_check parties.With_hash.data )
+              ~typ:
+                (non_null @@ Mina_base_unix.Graphql_scalars.PartiesBase58.typ ())
+              ~args:[]
+              ~resolve:(fun _ parties -> parties.With_hash.data)
           ; field_no_status "hash"
               ~doc:"A cryptographic hash of the zkApp command"
-              ~typ:(non_null string) ~args:[] ~resolve:(fun _ parties ->
-                Transaction_hash.to_base58_check parties.With_hash.hash )
+              ~typ:(non_null transaction_hash) ~args:[]
+              ~resolve:(fun _ parties -> parties.With_hash.hash)
           ; field_no_status "parties"
               ~typ:(Parties.typ () |> conv)
               ~args:Arg.[]
@@ -1777,11 +1814,10 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null fee_transfer)
             ~args:Arg.[]
             ~resolve:(fun _ { fee_transfers; _ } -> fee_transfers)
-        ; field "coinbase" ~typ:(non_null uint64)
+        ; field "coinbase" ~typ:(non_null amount)
             ~doc:"Amount of MINA granted to the producer of this block"
             ~args:Arg.[]
-            ~resolve:(fun _ { coinbase; _ } ->
-              Currency.Amount.to_uint64 coinbase )
+            ~resolve:(fun _ { coinbase; _ } -> coinbase)
         ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
             ~doc:"Account to which the coinbase for this block was granted"
             ~args:Arg.[]
@@ -1793,11 +1829,12 @@ module Types = struct
 
   let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
     obj "protocolStateProof" ~fields:(fun _ ->
-        [ field "base64" ~typ:string ~doc:"Base-64 encoded proof"
+        [ field "base64" ~typ:precomputed_block_proof
+            ~doc:"Base-64 encoded proof"
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
               (* Use the precomputed block proof encoding, for consistency. *)
-              Some (Mina_block.Precomputed.Proof.to_bin_string proof) )
+              Some proof )
         ; field "json" ~typ:json ~doc:"JSON-encoded proof"
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
@@ -1827,17 +1864,18 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } { With_hash.data; _ } ->
               AccountObj.get_best_ledger_account_pk coda data.winner )
-        ; field "stateHash" ~typ:(non_null string)
+        ; field "stateHash" ~typ:(non_null state_hash)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
-            ~resolve:(fun _ { With_hash.hash; _ } ->
-              State_hash.to_base58_check hash )
-        ; field "stateHashField" ~typ:(non_null string)
+            ~resolve:(fun _ { With_hash.hash; _ } -> hash)
+        ; field "stateHashField"
+            ~typ:
+              ( non_null
+              @@ Data_hash_lib_unix.Graphql_scalars.StateHashAsDecimal.typ () )
             ~doc:
               "Experimental: Bigint field-element representation of stateHash"
             ~args:Arg.[]
-            ~resolve:(fun _ { With_hash.hash; _ } ->
-              State_hash.to_decimal_string hash )
+            ~resolve:(fun _ { With_hash.hash; _ } -> hash)
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
             ~resolve:(fun _ { With_hash.data; With_hash.hash; _ } ->
@@ -1874,11 +1912,10 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } (key, _) ->
               AccountObj.get_best_ledger_account_pk coda key )
-        ; field "fee" ~typ:(non_null uint64)
+        ; field "fee" ~typ:(non_null fee)
             ~doc:"Fee that snark worker is charging to generate a snark proof"
             ~args:Arg.[]
-            ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) ->
-              Currency.Fee.to_uint64 fee )
+            ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) -> fee)
         ] )
 
   module Payload = struct
@@ -1888,10 +1925,9 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
           ; field "host" ~doc:"IP address of the remote host"
-              ~typ:(non_null string)
+              ~typ:(non_null @@ Graphql_basic_scalars.InetAddr.typ ())
               ~args:Arg.[]
-              ~resolve:(fun _ peer ->
-                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.host)
           ; field "libp2pPort" ~typ:(non_null int)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port)
@@ -1973,29 +2009,31 @@ module Types = struct
               ~resolve:(fun _ _ -> true)
           ] )
 
-    let string_of_banned_status = function
+    let time_of_banned_status = function
       | Trust_system.Banned_status.Unbanned ->
           None
       | Banned_until tm ->
-          Some (Time.to_string tm)
+          Some tm
 
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
           let open Trust_system.Peer_status in
-          [ field "ipAddr" ~typ:(non_null string) ~doc:"IP address"
+          [ field "ipAddr"
+              ~typ:(non_null @@ Graphql_basic_scalars.InetAddr.typ ())
+              ~doc:"IP address"
               ~args:Arg.[]
-              ~resolve:(fun _ (peer, _) ->
-                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+              ~resolve:(fun _ (peer, _) -> peer.Network_peer.Peer.host)
           ; field "peerId" ~typ:(non_null string) ~doc:"libp2p Peer ID"
               ~args:Arg.[]
               ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, { trust; _ }) -> trust)
-          ; field "bannedStatus" ~typ:string ~doc:"Banned status"
+          ; field "bannedStatus"
+              ~typ:(Graphql_basic_scalars.Time.typ ())
+              ~doc:"Banned status"
               ~args:Arg.[]
-              ~resolve:(fun _ (_, { banned; _ }) ->
-                string_of_banned_status banned )
+              ~resolve:(fun _ (_, { banned; _ }) -> time_of_banned_status banned)
           ] )
 
     let send_payment =
@@ -2077,7 +2115,7 @@ module Types = struct
     let set_snark_work_fee =
       obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
           [ field "lastFee" ~doc:"Returns the last fee set to do snark work"
-              ~typ:(non_null uint64)
+              ~typ:(non_null fee)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
           ] )
@@ -2928,7 +2966,7 @@ module Types = struct
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
     let open Consensus_vrf.Layout.Message in
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
-        [ field "globalSlot" ~typ:(non_null uint32)
+        [ field "globalSlot" ~typ:(non_null global_slot)
             ~args:Arg.[]
             ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
@@ -2951,22 +2989,23 @@ module Types = struct
               "The amount of stake delegated to the vrf evaluator by the \
                delegating account. This should match the amount in the epoch's \
                staking ledger, which may be different to the amount in the \
-               current ledger." ~args:[] ~typ:(non_null uint64)
+               current ledger." ~args:[] ~typ:(non_null balance)
             ~resolve:(fun
                        _
                        { Consensus_vrf.Layout.Threshold.delegated_stake; _ }
-                     -> Currency.Balance.to_uint64 delegated_stake )
+                     -> delegated_stake )
         ; field "totalStake"
             ~doc:
               "The total amount of stake across all accounts in the epoch's \
-               staking ledger." ~args:[] ~typ:(non_null uint64)
+               staking ledger." ~args:[] ~typ:(non_null amount)
             ~resolve:(fun _ { Consensus_vrf.Layout.Threshold.total_stake; _ } ->
-              Currency.Amount.to_uint64 total_stake )
+              total_stake )
         ] )
 
   let vrf_evaluation : ('context, Consensus_vrf.Layout.Evaluation.t option) typ
       =
     let open Consensus_vrf.Layout.Evaluation in
+    let vrf_scalar = Graphql_lib.Scalars.VrfScalar.typ () in
     obj "VrfEvaluation"
       ~doc:"A witness to a vrf evaluation, which may be externally verified"
       ~fields:(fun _ ->
@@ -2976,12 +3015,12 @@ module Types = struct
         ; field "publicKey" ~typ:(non_null public_key)
             ~args:Arg.[]
             ~resolve:(fun _ { public_key; _ } -> Public_key.compress public_key)
-        ; field "c" ~typ:(non_null string)
+        ; field "c" ~typ:(non_null vrf_scalar)
             ~args:Arg.[]
-            ~resolve:(fun _ { c; _ } -> Consensus_vrf.Scalar.to_string c)
-        ; field "s" ~typ:(non_null string)
+            ~resolve:(fun _ { c; _ } -> c)
+        ; field "s" ~typ:(non_null vrf_scalar)
             ~args:Arg.[]
-            ~resolve:(fun _ { s; _ } -> Consensus_vrf.Scalar.to_string s)
+            ~resolve:(fun _ { s; _ } -> s)
         ; field "scaledMessageHash"
             ~typ:(non_null (list (non_null string)))
             ~doc:"A group element represented as 2 field elements"
@@ -2991,26 +3030,23 @@ module Types = struct
         ; field "vrfThreshold" ~typ:vrf_threshold
             ~args:Arg.[]
             ~resolve:(fun _ { vrf_threshold; _ } -> vrf_threshold)
-        ; field "vrfOutput" ~typ:string
+        ; field "vrfOutput"
+            ~typ:(Graphql_lib.Scalars.VrfOutputTruncated.typ ())
             ~doc:
               "The vrf output derived from the evaluation witness. If null, \
                the vrf witness was invalid."
             ~args:Arg.[]
             ~resolve:(fun { ctx = mina; _ } t ->
-              let vrf_opt =
-                match t.vrf_output with
-                | Some vrf ->
-                    Some (Consensus_vrf.Output.Truncated.to_base58_check vrf)
-                | None ->
-                    let constraint_constants =
-                      (Mina_lib.config mina).precomputed_values
-                        .constraint_constants
-                    in
-                    to_vrf ~constraint_constants t
-                    |> Option.map ~f:Consensus_vrf.Output.truncate
-              in
-              Option.map ~f:Consensus_vrf.Output.Truncated.to_base58_check
-                vrf_opt )
+              match t.vrf_output with
+              | Some vrf ->
+                  Some vrf
+              | None ->
+                  let constraint_constants =
+                    (Mina_lib.config mina).precomputed_values
+                      .constraint_constants
+                  in
+                  to_vrf ~constraint_constants t
+                  |> Option.map ~f:Consensus_vrf.Output.truncate )
         ; field "vrfOutputFractional" ~typ:float
             ~doc:
               "The vrf output derived from the evaluation witness, as a \
@@ -3693,8 +3729,10 @@ module Mutations = struct
           Mina_lib.add_full_transactions mina
             [ User_command.Signed_command signed_command ]
         with
-        | Ok ([ (User_command.Signed_command signed_command as transaction) ], _)
-          ->
+        | Ok
+            ( `Broadcasted
+            , [ (User_command.Signed_command signed_command as transaction) ]
+            , _ ) ->
             Ok
               (Types.User_command.mk_user_command
                  { status = Enqueued
@@ -3705,7 +3743,7 @@ module Mutations = struct
                  } )
         | Error err ->
             Error (Error.to_string_hum err)
-        | Ok ([], [ (_, diff_error) ]) ->
+        | Ok (_, [], [ (_, diff_error) ]) ->
             let diff_error =
               Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
               .to_string_hum diff_error
@@ -3779,7 +3817,7 @@ module Mutations = struct
         in
         let last_fee = Mina_lib.snark_work_fee coda in
         Mina_lib.set_snark_work_fee coda fee ;
-        Currency.Fee.to_uint64 last_fee )
+        last_fee )
 
   let set_connection_gating_config =
     io_field "setConnectionGatingConfig"

@@ -1,9 +1,12 @@
 open Snark_params.Tick.Run
 open Signature_lib
+open Mina_base
 
 let initialize public_key =
-  let public_key = Public_key.Compressed.var_of_t public_key in
-  Zkapps_examples.wrap_main ~public_key (fun _party -> ())
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key)
+    ~token_id:Token_id.(Checked.constant default)
+    ignore
 
 type _ Snarky_backendless.Request.t +=
   | Updated_events : Field.Constant.t array list Snarky_backendless.Request.t
@@ -21,8 +24,10 @@ let num_events = 5
 let event_length = 7
 
 let update_events public_key =
-  let public_key = Public_key.Compressed.var_of_t public_key in
-  Zkapps_examples.wrap_main ~public_key (fun party ->
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key)
+    ~token_id:Token_id.(Checked.constant default)
+    (fun party ->
       let events =
         exists
           ~request:(fun () -> Updated_events)

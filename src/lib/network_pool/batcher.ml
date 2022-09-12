@@ -69,64 +69,65 @@ let rec determine_outcome :
     -> (p, partial, r) t
     -> unit Deferred.Or_error.t =
  fun ps res v ->
-  (* First separate out all the known results. That information will definitely be included
-     in the outcome. *)
-  let potentially_invalid =
-    List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
-        match r with
-        | `Valid r ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Ok r)) ;
-            None
-        | `Invalid_keys keys ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
-            None
-        | `Invalid_signature keys ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
-            None
-        | `Invalid_proof ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
-            None
-        | `Missing_verification_key keys ->
-            if Ivar.is_full elt.res then
-              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-            Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
-            None
-        | `Potentially_invalid new_hint ->
-            Some (elt, new_hint) )
-  in
-  let open Deferred.Or_error.Let_syntax in
-  match potentially_invalid with
-  | [] ->
-      (* All results are known *)
-      return ()
-  | [ ({ res; _ }, _) ] ->
-      if Ivar.is_full res then
-        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-      Ivar.fill res (Ok (Error `Invalid_proof)) ;
-      (* If there is a potentially invalid proof in this batch of size 1, then
-         that proof is itself invalid. *)
-      return ()
-  | _ ->
-      let outcome xs =
-        let%bind res_xs =
-          call_verifier v
-            (List.map xs ~f:(fun (_e, new_hint) ->
-                 `Partially_validated new_hint ) )
-        in
-        determine_outcome (List.map xs ~f:fst) res_xs v
+  O1trace.thread "determining_batcher_outcome" (fun () ->
+      (* First separate out all the known results. That information will definitely be included
+         in the outcome. *)
+      let potentially_invalid =
+        List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
+            match r with
+            | `Valid r ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res (Ok (Ok r)) ;
+                None
+            | `Invalid_keys keys ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
+                None
+            | `Invalid_signature keys ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
+                None
+            | `Invalid_proof ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
+                None
+            | `Missing_verification_key keys ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
+                None
+            | `Potentially_invalid new_hint ->
+                Some (elt, new_hint) )
       in
-      let length = List.length potentially_invalid in
-      let left, right = List.split_n potentially_invalid (length / 2) in
-      let%bind () = outcome left in
-      outcome right
+      let open Deferred.Or_error.Let_syntax in
+      match potentially_invalid with
+      | [] ->
+          (* All results are known *)
+          return ()
+      | [ ({ res; _ }, _) ] ->
+          if Ivar.is_full res then
+            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+          Ivar.fill res (Ok (Error `Invalid_proof)) ;
+          (* If there is a potentially invalid proof in this batch of size 1, then
+             that proof is itself invalid. *)
+          return ()
+      | _ ->
+          let outcome xs =
+            let%bind res_xs =
+              call_verifier v
+                (List.map xs ~f:(fun (_e, new_hint) ->
+                     `Partially_validated new_hint ) )
+            in
+            determine_outcome (List.map xs ~f:fst) res_xs v
+          in
+          let length = List.length potentially_invalid in
+          let left, right = List.split_n potentially_invalid (length / 2) in
+          let%bind () = outcome left in
+          outcome right )
 
 let compare_elt ~compare t1 t2 =
   match compare t1.data t2.data with 0 -> Id.compare t1.id t2.id | x -> x
@@ -145,61 +146,62 @@ let order_proofs t =
 
 let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
  fun t ->
-  if Q.is_empty t.queue then
-    (* we looped in the else after verifier finished but no pending work. *)
-    t.state <- Waiting
-  else (
-    [%log' debug t.logger] "Verifying proofs in batch of size $num_proofs"
-      ~metadata:[ ("num_proofs", `Int (Q.length t.queue)) ] ;
-    let out_for_verification =
-      let proofs =
-        match t.max_weight_per_call with
-        | None ->
-            let proofs = Q.to_list t.queue in
-            Q.clear t.queue ; proofs
-        | Some max_weight ->
-            let rec take capacity acc =
-              match Q.first t.queue with
-              | None ->
-                  acc
-              | Some ({ weight; _ } as proof) ->
-                  if weight <= capacity then (
-                    ignore (Q.remove_first t.queue : (proof, r) elt option) ;
-                    take (capacity - weight) (proof :: acc) )
-                  else acc
-            in
-            List.rev (take max_weight [])
-      in
-      order_proofs t proofs
-    in
-    [%log' debug t.logger] "Calling verifier with $num_proofs on $ids"
-      ~metadata:
-        [ ("num_proofs", `Int (List.length out_for_verification))
-        ; ( "ids"
-          , `List
-              (List.map
-                 ~f:(fun { id; _ } -> `Int (Id.to_int_exn id))
-                 out_for_verification ) )
-        ] ;
-    let res =
-      match%bind
-        call_verifier t
-          (List.map out_for_verification ~f:(fun { data = p; _ } -> `Init p))
-      with
-      | Error e ->
-          Deferred.return (Error e)
-      | Ok res ->
-          determine_outcome out_for_verification res t
-    in
-    t.state <- Verifying { out_for_verification } ;
-    upon res (fun r ->
-        ( match r with
-        | Ok () ->
-            ()
-        | Error e ->
-            List.iter out_for_verification ~f:(fun x ->
-                Ivar.fill_if_empty x.res (Error e) ) ) ;
-        start_verifier t ) )
+  O1trace.sync_thread "running_batcher_verifier_loop" (fun () ->
+      if Q.is_empty t.queue then
+        (* we looped in the else after verifier finished but no pending work. *)
+        t.state <- Waiting
+      else (
+        [%log' debug t.logger] "Verifying proofs in batch of size $num_proofs"
+          ~metadata:[ ("num_proofs", `Int (Q.length t.queue)) ] ;
+        let out_for_verification =
+          let proofs =
+            match t.max_weight_per_call with
+            | None ->
+                let proofs = Q.to_list t.queue in
+                Q.clear t.queue ; proofs
+            | Some max_weight ->
+                let rec take capacity acc =
+                  match Q.first t.queue with
+                  | None ->
+                      acc
+                  | Some ({ weight; _ } as proof) ->
+                      if weight <= capacity then (
+                        ignore (Q.remove_first t.queue : (proof, r) elt option) ;
+                        take (capacity - weight) (proof :: acc) )
+                      else acc
+                in
+                List.rev (take max_weight [])
+          in
+          order_proofs t proofs
+        in
+        [%log' debug t.logger] "Calling verifier with $num_proofs on $ids"
+          ~metadata:
+            [ ("num_proofs", `Int (List.length out_for_verification))
+            ; ( "ids"
+              , `List
+                  (List.map
+                     ~f:(fun { id; _ } -> `Int (Id.to_int_exn id))
+                     out_for_verification ) )
+            ] ;
+        let res =
+          match%bind
+            call_verifier t
+              (List.map out_for_verification ~f:(fun { data = p; _ } -> `Init p))
+          with
+          | Error e ->
+              Deferred.return (Error e)
+          | Ok res ->
+              determine_outcome out_for_verification res t
+        in
+        t.state <- Verifying { out_for_verification } ;
+        upon res (fun r ->
+            ( match r with
+            | Ok () ->
+                ()
+            | Error e ->
+                List.iter out_for_verification ~f:(fun x ->
+                    Ivar.fill_if_empty x.res (Error e) ) ) ;
+            start_verifier t ) ) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
     (r, Verifier.invalid) Result.t Deferred.Or_error.t =
@@ -286,94 +288,96 @@ module Transaction_pool = struct
   let create verifier : t =
     let logger = Logger.create () in
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
-        [%log info]
-          "Dispatching $num_proofs transaction pool proofs to verifier"
-          ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
-        let open Deferred.Or_error.Let_syntax in
-        let result = init_result ds in
-        (* Extract all the transactions that have not yet been fully validated and hold on to their
-           position (diff index, position in diff). *)
-        let unknowns =
-          List.concat_mapi ds ~f:(fun i x ->
-              match x with
-              | `Init diff ->
-                  List.mapi diff.data ~f:(fun j c -> ((i, j), c))
-              | `Partially_validated partial ->
-                  List.filter_mapi partial ~f:(fun j c ->
-                      match c with
-                      | `Valid _ ->
-                          None
-                      | `Valid_assuming (v, _) ->
-                          (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
-                          Some ((i, j), v) ) )
-        in
-        let%map res =
-          (* Verify the unknowns *)
-          Verifier.verify_commands verifier (List.map unknowns ~f:snd)
-        in
-        (* We now iterate over the results of the unknown transactions and appropriately modify
-           the verification result of the diff that it belongs to. *)
-        List.iter2_exn unknowns res ~f:(fun ((i, j), v) r ->
-            match r with
-            | `Invalid_keys keys ->
-                (* A diff is invalid is any of the transactions it contains are invalid.
-                   Invalidate the whole diff that this transaction comes from. *)
-                result.(i) <- `Invalid_keys keys
-            | `Invalid_signature keys ->
-                (* Invalidate the whole diff *)
-                result.(i) <- `Invalid_signature keys
-            | `Missing_verification_key keys ->
-                (* Invalidate the whole diff *)
-                result.(i) <- `Missing_verification_key keys
-            | `Invalid_proof ->
-                (* Invalidate the whole diff *)
-                result.(i) <- `Invalid_proof
-            | `Valid_assuming xs -> (
-                match result.(i) with
-                | `Invalid_keys _
-                | `Invalid_signature _
-                | `Invalid_proof
-                | `Missing_verification_key _ ->
-                    (* If this diff has already been declared invalid, knowing that one of its
-                       transactions is partially valid is not useful. *)
-                    ()
-                | `In_progress a ->
-                    (* The diff may still be valid. *)
-                    a.(j) <- `Valid_assuming (v, xs) )
-            | `Valid c -> (
-                (* Similar to the above. *)
-                match result.(i) with
-                | `Invalid_keys _
-                | `Invalid_signature _
-                | `Invalid_proof
-                | `Missing_verification_key _ ->
-                    ()
-                | `In_progress a ->
-                    a.(j) <- `Valid c ) ) ;
-        list_of_array_map result ~f:(function
-          | `Invalid_keys keys ->
-              `Invalid_keys keys
-          | `Invalid_signature keys ->
-              `Invalid_signature keys
-          | `Invalid_proof ->
-              `Invalid_proof
-          | `Missing_verification_key keys ->
-              `Missing_verification_key keys
-          | `In_progress a -> (
-              (* If the diff is all valid, we're done. If not, we return a partial
-                   result. *)
-              match all_valid a with
-              | Some res ->
-                  `Valid res
-              | None ->
-                  `Potentially_invalid
-                    (list_of_array_map a ~f:(function
-                      | `Unknown ->
-                          assert false
-                      | `Valid c ->
-                          `Valid c
-                      | `Valid_assuming (v, xs) ->
-                          `Valid_assuming (v, xs) ) ) ) ) )
+        O1trace.thread "dispatching_transaction_pool_batcher_verification"
+          (fun () ->
+            [%log info]
+              "Dispatching $num_proofs transaction pool proofs to verifier"
+              ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
+            let open Deferred.Or_error.Let_syntax in
+            let result = init_result ds in
+            (* Extract all the transactions that have not yet been fully validated and hold on to their
+               position (diff index, position in diff). *)
+            let unknowns =
+              List.concat_mapi ds ~f:(fun i x ->
+                  match x with
+                  | `Init diff ->
+                      List.mapi diff.data ~f:(fun j c -> ((i, j), c))
+                  | `Partially_validated partial ->
+                      List.filter_mapi partial ~f:(fun j c ->
+                          match c with
+                          | `Valid _ ->
+                              None
+                          | `Valid_assuming (v, _) ->
+                              (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
+                              Some ((i, j), v) ) )
+            in
+            let%map res =
+              (* Verify the unknowns *)
+              Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+            in
+            (* We now iterate over the results of the unknown transactions and appropriately modify
+               the verification result of the diff that it belongs to. *)
+            List.iter2_exn unknowns res ~f:(fun ((i, j), v) r ->
+                match r with
+                | `Invalid_keys keys ->
+                    (* A diff is invalid is any of the transactions it contains are invalid.
+                       Invalidate the whole diff that this transaction comes from. *)
+                    result.(i) <- `Invalid_keys keys
+                | `Invalid_signature keys ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Invalid_signature keys
+                | `Missing_verification_key keys ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Missing_verification_key keys
+                | `Invalid_proof ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Invalid_proof
+                | `Valid_assuming xs -> (
+                    match result.(i) with
+                    | `Invalid_keys _
+                    | `Invalid_signature _
+                    | `Invalid_proof
+                    | `Missing_verification_key _ ->
+                        (* If this diff has already been declared invalid, knowing that one of its
+                           transactions is partially valid is not useful. *)
+                        ()
+                    | `In_progress a ->
+                        (* The diff may still be valid. *)
+                        a.(j) <- `Valid_assuming (v, xs) )
+                | `Valid c -> (
+                    (* Similar to the above. *)
+                    match result.(i) with
+                    | `Invalid_keys _
+                    | `Invalid_signature _
+                    | `Invalid_proof
+                    | `Missing_verification_key _ ->
+                        ()
+                    | `In_progress a ->
+                        a.(j) <- `Valid c ) ) ;
+            list_of_array_map result ~f:(function
+              | `Invalid_keys keys ->
+                  `Invalid_keys keys
+              | `Invalid_signature keys ->
+                  `Invalid_signature keys
+              | `Invalid_proof ->
+                  `Invalid_proof
+              | `Missing_verification_key keys ->
+                  `Missing_verification_key keys
+              | `In_progress a -> (
+                  (* If the diff is all valid, we're done. If not, we return a partial
+                       result. *)
+                  match all_valid a with
+                  | Some res ->
+                      `Valid res
+                  | None ->
+                      `Potentially_invalid
+                        (list_of_array_map a ~f:(function
+                          | `Unknown ->
+                              assert false
+                          | `Valid c ->
+                              `Valid c
+                          | `Valid_assuming (v, xs) ->
+                              `Valid_assuming (v, xs) ) ) ) ) ) )
 
   let verify (t : t) = verify t
 end
