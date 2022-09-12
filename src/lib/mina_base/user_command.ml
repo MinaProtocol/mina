@@ -4,7 +4,10 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('u, 's) t = Signed_command of 'u | Parties of 's
+      type ('u, 's) t =
+            ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
+        | Signed_command of 'u
+        | Parties of 's
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -183,20 +186,22 @@ let fee_payer (t : t) =
       Parties.fee_payer p
 
 (** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
-let application_nonce (t : t) =
+let applicable_at_nonce (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
   | Parties p ->
-      Parties.application_nonce p
+      Parties.applicable_at_nonce p
 
-(** The target nonce is what the nonce of the fee payer will be after a user command is applied. *)
-let target_nonce (t : t) =
+let expected_target_nonce t = Account.Nonce.succ (applicable_at_nonce t)
+
+(** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
+let target_nonce_on_success (t : t) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Parties p ->
-      Parties.target_nonce p
+      Parties.target_nonce_on_success p
 
 let fee_token (t : t) =
   match t with
@@ -270,7 +275,7 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : Stable.Latest.t -> int = function
+let weight : t -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
   | Parties parties ->
@@ -280,3 +285,9 @@ let weight : Stable.Latest.t -> int = function
 let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
+
+let valid_size ~genesis_constants = function
+  | Signed_command _ ->
+      Ok ()
+  | Parties parties ->
+      Parties.valid_size ~genesis_constants parties

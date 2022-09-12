@@ -137,11 +137,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1654786772,
-        "narHash": "sha256-Qul9GG6EJ1IFfgnZ440KAxTEPfFpbnmf54EVFM9+iZA=",
+        "lastModified": 1662627485,
+        "narHash": "sha256-Kg8u2ekU0+MsuLzgKqiaus3HquLLo2Qq+oGbQfIppos=",
         "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "ca922a16839ae62a568bcb0771e78e080b4d6059",
+        "rev": "cab951dd024dd367511d48440de6f93664ee35aa",
         "type": "github"
       },
       "original": {
@@ -152,11 +152,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1638918949,
-        "narHash": "sha256-HDAM4N7dBB0zVgoflnWyVDrGx4oiIUaEjI8YDwk0FFU=",
+        "lastModified": 1661404419,
+        "narHash": "sha256-7+xPaxDIH9TIiv1AnKe8T7G/yKER0oXvhXdF5nRw1WI=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "4d07862ea6ed637ee85f868d1bf8a833878bc05e",
+        "rev": "3bbe5c61d3b8aaa7af8bf375dce2858385607186",
         "type": "github"
       },
       "original": {
@@ -226,11 +226,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1654615390,
-        "narHash": "sha256-63C0HLSYtRuaEL6k9RRt12UUkXfVhxdr+cB8JV3HIic=",
+        "lastModified": 1661505722,
+        "narHash": "sha256-nDXkDNhFCSyByOMHUblmcDQxzfaOsFbkGg3a6vaSs0I=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "23c55a8fc0b0448ace7c8be4e1552358a3ffa14c",
+        "rev": "7147eb03812beed3019404b86735975d4f165335",
         "type": "github"
       },
       "original": {

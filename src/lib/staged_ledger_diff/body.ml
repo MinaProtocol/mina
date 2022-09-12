@@ -10,7 +10,7 @@ end
 module Stable = struct
   module V1 = struct
     type t = { staged_ledger_diff : Diff.Stable.V2.t }
-    [@@deriving compare, sexp, fields]
+    [@@deriving equal, compare, sexp, fields]
 
     let to_latest = Fn.id
 
@@ -52,9 +52,15 @@ type t = Stable.Latest.t
 
 [%%define_locally
 Stable.Latest.
-  (create, to_yojson, sexp_of_t, t_of_sexp, compare, staged_ledger_diff)]
+  (create, to_yojson, sexp_of_t, t_of_sexp, equal, compare, staged_ledger_diff)]
 
-let serializize_with_len_and_tag b =
+let to_binio_bigstring b =
+  let sz = Stable.V1.bin_size_t b in
+  let buf = Bin_prot.Common.create_buf sz in
+  ignore (Stable.V1.bin_write_t buf ~pos:0 b : int) ;
+  buf
+
+let serialize_with_len_and_tag b =
   let len = Stable.V1.bin_size_t b in
   let bs' = Bigstring.create (len + 5) in
   ignore (Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
@@ -66,4 +72,4 @@ let compute_reference =
   Fn.compose snd
   @@ Fn.compose
        (Bitswap_block.blocks_of_data ~max_block_size:262144)
-       serializize_with_len_and_tag
+       serialize_with_len_and_tag

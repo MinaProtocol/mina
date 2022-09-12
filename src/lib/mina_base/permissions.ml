@@ -50,7 +50,7 @@ module Auth_required = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
         | None
         | Either
         | Proof
@@ -85,6 +85,32 @@ module Auth_required = struct
   (* permissions such that [check permission None_given] is true *)
   let gen_for_none_given_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.return None
+
+  let to_string = function
+    | None ->
+        "None"
+    | Either ->
+        "Either"
+    | Proof ->
+        "Proof"
+    | Signature ->
+        "Signature"
+    | Impossible ->
+        "Impossible"
+
+  let of_string = function
+    | "None" ->
+        Stable.Latest.None
+    | "Either" ->
+        Either
+    | "Proof" ->
+        Proof
+    | "Signature" ->
+        Signature
+    | "Impossible" ->
+        Impossible
+    | _ ->
+        failwith "auth_required_of_string: unknown variant"
 
   (* The encoding is chosen so that it is easy to write this function
 
@@ -317,6 +343,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
         ; send : 'controller
         ; receive : 'controller
@@ -471,36 +498,11 @@ let empty : t =
   }
 
 (* deriving-fields-related stuff *)
-let auth_required_to_string = function
-  | Auth_required.Stable.Latest.None ->
-      "None"
-  | Either ->
-      "Either"
-  | Proof ->
-      "Proof"
-  | Signature ->
-      "Signature"
-  | Impossible ->
-      "Impossible"
-
-let auth_required_of_string = function
-  | "None" ->
-      Auth_required.Stable.Latest.None
-  | "Either" ->
-      Either
-  | "Proof" ->
-      Proof
-  | "Signature" ->
-      Signature
-  | "Impossible" ->
-      Impossible
-  | _ ->
-      failwith "auth_required_of_string: unknown variant"
 
 let auth_required =
   Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
     ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
-    ~to_string:auth_required_to_string ~of_string:auth_required_of_string
+    ~to_string:Auth_required.to_string ~of_string:Auth_required.of_string
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in

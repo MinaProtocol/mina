@@ -52,6 +52,7 @@ module Wrap = struct
           , Tick.Field.t )
           Plonk_types.Openings.Bulletproof.t
           t
+      | Wrap_domain_indices : (Field.Constant.t, max_proofs_verified) Vector.t t
   end
 
   type ('mb, 'ml) t =
@@ -104,6 +105,7 @@ module Wrap = struct
             , Tick.Field.t )
             Plonk_types.Openings.Bulletproof.t
             t
+        | Wrap_domain_indices : (Tock.Field.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end
@@ -143,7 +145,8 @@ module Step = struct
       | Auxiliary_value : auxiliary_value -> unit t
       | Unfinalized_proofs :
           (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
-      | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
+      | Messages_for_next_wrap_proof :
+          (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
@@ -191,7 +194,8 @@ module Step = struct
         | Auxiliary_value : auxiliary_value -> unit t
         | Unfinalized_proofs :
             (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
-        | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
+        | Messages_for_next_wrap_proof :
+            (Digest.Constant.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end

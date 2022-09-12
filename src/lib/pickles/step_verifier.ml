@@ -661,9 +661,7 @@ struct
           in
           Field.sub (go x 0) Field.one )
 
-  let shifts ~log2_size =
-    Common.tick_shifts ~log2_size
-    |> Plonk_types.Shifts.map ~f:Impl.Field.constant
+  let shifts ~log2_size = Common.tick_shifts ~log2_size
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -1090,11 +1088,11 @@ struct
       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
     sponge
 
-  let hash_me_only (type s) ~index (state_to_field_elements : s -> Field.t array)
-      =
-    let open Types.Step.Proof_state.Me_only in
+  let hash_messages_for_next_step_proof (type s) ~index
+      (state_to_field_elements : s -> Field.t array) =
+    let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
-    stage (fun (t : _ Types.Step.Proof_state.Me_only.t) ->
+    stage (fun (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -1102,9 +1100,9 @@ struct
              ~g:Inner_curve.to_field_elements ) ;
         Sponge.squeeze_field sponge )
 
-  let hash_me_only_opt (type s) ~index
+  let hash_messages_for_next_step_proof_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Step.Proof_state.Me_only in
+    let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
     , stage (fun t ~widths ~max_width ~proofs_verified_mask ->

@@ -14,7 +14,15 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
+type mina_initialization =
+  { mina : Mina_lib.t
+  ; client_trustlist : Unix.Cidr.t list option
+  ; rest_server_port : int
+  ; limited_graphql_port : int option
+  }
+
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
+    ~protocol_major_version =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -22,9 +30,13 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
     List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
+  let protocol_version_digest =
+    Int.to_string protocol_major_version |> Md5.digest_string |> Md5.to_hex
+  in
   let b2 =
     Blake2.digest_string
-      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
+      ^ protocol_version_digest )
   in
   Blake2.to_hex b2
 
@@ -261,13 +273,10 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
-  and mina_peer_exchange =
-    flag "--enable-mina-peer-exchange"
-      ~aliases:[ "enable-mina-peer-exchange" ]
-      ~doc:
-        "true|false Help keep the mesh connected when closing connections \
-         (default: true)"
-      (optional_with_default true bool)
+  and peer_protection_ratio =
+    flag "--peer-protection-rate" ~aliases:[ "peer-protection-rate" ]
+      ~doc:"float Proportion of peers to be marked as protected (default: 0.2)"
+      (optional_with_default 0.2 float)
   and min_connections =
     flag "--min-connections" ~aliases:[ "min-connections" ]
       ~doc:
@@ -606,19 +615,11 @@ let setup_daemon logger =
         Memory_stats.log_memory_stats logger ~process:"daemon" ;
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let module Coda_initialization = struct
-          type ('a, 'b, 'c) t =
-            { coda : 'a
-            ; client_trustlist : 'b
-            ; rest_server_port : 'c
-            ; limited_graphql_port : 'c option
-            }
-        end in
         let time_controller =
           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
         in
         let pids = Child_processes.Termination.create_pid_table () in
-        let coda_initialization_deferred () =
+        let mina_initialization_deferred () =
           let config_file_installed =
             (* Search for config files installed as part of a deb/brew package.
                These files are commit-dependent, to ensure that we don't clobber
@@ -1035,8 +1036,18 @@ let setup_daemon logger =
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let module Context = struct
+            let logger = logger
+
+            let precomputed_values = precomputed_values
+
+            let constraint_constants = precomputed_values.constraint_constants
+
+            let consensus_constants = precomputed_values.consensus_constants
+          end in
           let consensus_local_state =
             Consensus.Data.Local_state.create
+              ~context:(module Context)
               ~genesis_ledger:
                 (Precomputed_values.genesis_ledger precomputed_values)
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
@@ -1045,7 +1056,6 @@ let setup_daemon logger =
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
-              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -1136,10 +1146,16 @@ let setup_daemon logger =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
+            let protocol_major_version =
+              Protocol_version.of_string_exn
+                compile_time_current_protocol_version
+              |> Protocol_version.major
+            in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
+              ~protocol_major_version
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -1156,7 +1172,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; trust_system
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
-              ; mina_peer_exchange
+              ; peer_protection_ratio
               ; peer_exchange = Option.value ~default:false peer_exchange
               ; min_connections
               ; max_connections
@@ -1185,6 +1201,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+            ; precomputed_values
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
@@ -1257,7 +1274,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    submitter keyfile"
           in
           let start_time = Time.now () in
-          let%map coda =
+          let%map mina =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
@@ -1288,35 +1305,41 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
-          { Coda_initialization.coda
-          ; client_trustlist
-          ; rest_server_port
-          ; limited_graphql_port
-          }
+          { mina; client_trustlist; rest_server_port; limited_graphql_port }
         in
         (* Breaks a dependency cycle with monitor initilization and coda *)
-        let coda_ref : Mina_lib.t option ref = ref None in
+        let mina_ref : Mina_lib.t option ref = ref None in
+        Option.iter node_error_url ~f:(fun url ->
+            let get_node_state () =
+              match !mina_ref with
+              | None ->
+                  Deferred.return None
+              | Some mina ->
+                  let%map node_state = Mina_lib.get_node_state mina in
+                  Some node_state
+            in
+            Node_error_service.set_config ~get_node_state
+              ~node_error_url:(Uri.of_string url) ~contact_info ) ;
         Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-          ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info
-          coda_ref ;
+          ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
-        let%bind { Coda_initialization.coda
+        let%bind { mina
                  ; client_trustlist
                  ; rest_server_port
                  ; limited_graphql_port
                  } =
-          coda_initialization_deferred ()
+          mina_initialization_deferred ()
         in
-        coda_ref := Some coda ;
+        mina_ref := Some mina ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-             (Mina_lib.validated_transitions coda)
+             (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          coda ;
+          mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =
@@ -1330,8 +1353,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger coda plugins in
-        return coda )
+        let () = Mina_plugins.init_plugins ~logger mina plugins in
+        return mina )
 
 let daemon logger =
   Command.async ~summary:"Mina daemon"

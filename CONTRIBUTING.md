@@ -43,7 +43,13 @@ labels.
 
 ## Pull Requests
 
-Our branching workflow is [documented on the wiki](https://minaprotocol.notion.site/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
+### Branching workflow
+
+Make sure to read about the [branching workflow](README-branching.md) to
+understand on which branch (`compatible` or `develop`) you should be working,
+and how to manage simultaneous PRs to both branches.
+
+### Continuous integration
 
 All pull requests go through Buildkite CI, which makes sure the code doesn't need to
 be reformatted, builds Mina in its various configurations, and runs all the
@@ -67,6 +73,9 @@ If you are PRing from the main remote, add `ci-build-me` label when you want to 
 Once a PR has been reviewed and approved, and all CI tests have passed, it can be merged
 by a maintainer (or by you, if you have this access).
 
+If you encounter problems with the CI, read [CI FAILURES](README-ci-failures.md)
+for common troubleshooting steps.
+
 ## Documentation
 
 There are three main pieces of Mina documentation:
@@ -76,8 +85,10 @@ There are three main pieces of Mina documentation:
 2. The `README.md` files in various directories. These explain the contents of that
    directory at a high level: the purpose of the library, design constraints, anything else
    specific to that directory.
-3. Inline code comments. There are very few of these, and we don't currently run ocamldoc
-   so they won't be exposed even as we write them. This should change eventually.
+3. Inline code comments. There are unfortunately very few of these currently,
+   but this will slowly change. We are now running `ocamldoc` and the generated
+   documentation is browsable
+   [online](https://mina-docs.storage.googleapis.com/index.html).
 
 Changes to the software should come with changes to the documentation.
 

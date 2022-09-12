@@ -91,21 +91,24 @@ val get_current_nonce :
 val add_transactions :
      t
   -> User_command_input.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
 val add_full_transactions :
      t
   -> User_command.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
-val add_snapp_transactions :
+val add_zkapp_transactions :
      t
   -> Parties.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
@@ -115,6 +118,8 @@ val get_inferred_nonce_from_transaction_pool_and_ledger :
   t -> Account_id.t -> Account.Nonce.t option Participating_state.t
 
 val active_or_bootstrapping : t -> unit Participating_state.t
+
+val get_node_state : t -> Node_error_service.node_state Deferred.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
