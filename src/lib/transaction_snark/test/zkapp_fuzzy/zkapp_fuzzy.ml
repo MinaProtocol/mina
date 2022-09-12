@@ -91,8 +91,6 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   (ledger, fee_payer_keypairs, keymap)
 
-let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
-
 let generate_parties_and_apply_them_consecutively ~trials ~max_other_parties ()
     =
   let num_of_fee_payers = 5 in
