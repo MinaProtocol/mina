@@ -2161,10 +2161,10 @@ module For_tests = struct
         fst init_ledger.(i)
       in
       let gen_amount () =
-        Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Amount.(gen_incl (nanomina 1_000_000) (centimina 10))
       in
       let gen_fee () =
-        Currency.Fee.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Fee.(gen_incl (nanomina 1_000_000) (centimina 10))
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in

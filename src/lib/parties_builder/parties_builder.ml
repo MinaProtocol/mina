@@ -16,7 +16,7 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   ; token_id
   ; balance_change =
       Currency.Amount.Signed.create
-        ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
+        ~magnitude:(Currency.Amount.nanomina (Int.abs balance_change))
         ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
   ; increment_nonce = false
   ; events = []
@@ -36,7 +36,7 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
   let fee_payer : Party.Fee_payer.t =
     { body =
         { public_key = fee_payer_pk
-        ; fee = Currency.Fee.of_int fee
+        ; fee = Currency.Fee.nanomina fee
         ; valid_until = None
         ; nonce = fee_payer_nonce
         }

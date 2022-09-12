@@ -26,8 +26,8 @@ let%test_module "Fee payer tests" =
                    snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
+          let amount = Amount.mina 10 in
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
@@ -52,7 +52,7 @@ let%test_module "Fee payer tests" =
                    non-snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
           let amount = Amount.zero in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
@@ -79,8 +79,8 @@ let%test_module "Fee payer tests" =
                    account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
+          let amount = Amount.mina 10 in
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
@@ -108,8 +108,8 @@ let%test_module "Fee payer tests" =
                    non-snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
+          let amount = Amount.mina 10 in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
             { sender = spec.sender
@@ -140,8 +140,8 @@ let%test_module "Fee payer tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let spec = List.hd_exn specs in
-              let fee = Fee.of_int 1_000_000 in
-              let amount = Amount.of_int 10_000_000_000 in
+              let fee = Fee.nanomina 1_000_000 in
+              let amount = Amount.mina 10 in
               (*making new_kp the fee-payer for this to fail*)
               let test_spec : Spec.t =
                 { sender = (new_kp, Account.Nonce.zero)

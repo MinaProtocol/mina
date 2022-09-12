@@ -57,9 +57,9 @@ let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
   let%bind balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
-      Currency.Fee.to_int min_cmd_fee
+      Currency.Fee.int_of_nanomina min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000
-      |> Currency.Balance.of_int
+      |> Currency.Balance.nanomina
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =

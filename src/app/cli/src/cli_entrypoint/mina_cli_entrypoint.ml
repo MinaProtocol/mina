@@ -203,7 +203,8 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee) )
+           (Currency.Fee.int_of_nanomina
+              Mina_compile_config.default_snark_worker_fee ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -788,7 +789,7 @@ let setup_daemon logger =
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
-              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.nanomina
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:Mina_compile_config.default_snark_worker_fee

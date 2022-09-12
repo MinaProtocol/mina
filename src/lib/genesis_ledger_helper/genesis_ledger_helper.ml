@@ -264,7 +264,7 @@ module Ledger = struct
             ( None
             , Account.create
                 (Account_id.create pk Token_id.default)
-                (Currency.Balance.of_int 1000) )
+                (Currency.Balance.nanomina 1000) )
             :: accounts
       else accounts
     in

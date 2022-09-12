@@ -162,7 +162,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
            let _is_new, loc =
              let id = Account_id.create ringsig_account_pk Token_id.default in
              Ledger.get_or_create_account ledger id
-               (Account.create id Balance.(of_int 0))
+               (Account.create id Balance.zero)
              |> Or_error.ok_exn
            in
            let a = Ledger.get ledger loc |> Option.value_exn in

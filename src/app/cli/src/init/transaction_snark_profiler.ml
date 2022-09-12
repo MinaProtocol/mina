@@ -58,8 +58,8 @@ let create_ledger_and_transactions num_transactions :
     let sender_pk = Public_key.compress sender.public_key in
     let nonce = Hashtbl.find_exn nonces sender_pk in
     Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account.Nonce.succ) ;
-    let fee = Currency.Fee.of_int (1 + Random.int 100) in
-    let amount = Currency.Amount.of_int (1 + Random.int 100) in
+    let fee = Currency.Fee.nanomina (1 + Random.int 100) in
+    let amount = Currency.Amount.nanomina (1 + Random.int 100) in
     txn sender receiver amount fee nonce
   in
   match num_transactions with
@@ -95,12 +95,12 @@ let create_ledger_and_transactions num_transactions :
   | `Two_from_same ->
       let a =
         txn keys.(0) keys.(1)
-          (Currency.Amount.of_int 10)
+          (Currency.Amount.nanomina 10)
           Currency.Fee.zero Account.Nonce.zero
       in
       let b =
         txn keys.(0) keys.(1)
-          (Currency.Amount.of_int 10)
+          (Currency.Amount.nanomina 10)
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
