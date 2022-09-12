@@ -374,7 +374,7 @@ module Tick : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( square (cell (var (Witness 2, Next)))
+               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -397,7 +397,7 @@ module Tick : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( square (cell (var (Witness 3, Next)))
+               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -420,7 +420,7 @@ module Tick : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( square (cell (var (Witness 4, Next)))
+               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -444,7 +444,7 @@ module Tick : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( square (cell (var (Witness 5, Next)))
+               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -469,7 +469,7 @@ module Tick : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( square (cell (var (Witness 6, Next)))
+               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -1357,7 +1357,7 @@ module Tock : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( square (cell (var (Witness 2, Next)))
+               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -1380,7 +1380,7 @@ module Tock : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( square (cell (var (Witness 3, Next)))
+               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -1403,7 +1403,7 @@ module Tock : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( square (cell (var (Witness 4, Next)))
+               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -1427,7 +1427,7 @@ module Tock : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( square (cell (var (Witness 5, Next)))
+               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -1452,7 +1452,7 @@ module Tock : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( square (cell (var (Witness 6, Next)))
+               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -2481,7 +2481,7 @@ module Tick_with_lookup : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( square (cell (var (Witness 2, Next)))
+               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -2504,7 +2504,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( square (cell (var (Witness 3, Next)))
+               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -2527,7 +2527,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( square (cell (var (Witness 4, Next)))
+               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -2551,7 +2551,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( square (cell (var (Witness 5, Next)))
+               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -2576,7 +2576,7 @@ module Tick_with_lookup : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( square (cell (var (Witness 6, Next)))
+               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -3605,7 +3605,7 @@ module Tock_with_lookup : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( square (cell (var (Witness 2, Next)))
+               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -3628,7 +3628,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( square (cell (var (Witness 3, Next)))
+               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -3651,7 +3651,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( square (cell (var (Witness 4, Next)))
+               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -3675,7 +3675,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( square (cell (var (Witness 5, Next)))
+               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -3700,7 +3700,7 @@ module Tock_with_lookup : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( square (cell (var (Witness 6, Next)))
+               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))

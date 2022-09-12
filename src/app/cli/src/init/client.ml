@@ -454,8 +454,8 @@ let batch_send_payments =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
           ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.of_int (Random.int 100)
-          ; fee = Currency.Fee.of_int (Random.int 100)
+          ; amount = Currency.Amount.nanomina (Random.int 100)
+          ; fee = Currency.Fee.nanomina (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
@@ -1152,8 +1152,9 @@ let set_snark_work_fee =
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
-               (Currency.Fee.to_int fee)
-               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
+               (Currency.Fee.int_of_nanomina fee)
+               (Currency.Fee.int_of_nanomina response.setSnarkWorkFee.lastFee) )
+         )
 
 let import_key =
   Command.async

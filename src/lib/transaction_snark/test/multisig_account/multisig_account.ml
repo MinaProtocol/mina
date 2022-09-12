@@ -291,7 +291,7 @@ let%test_module "multisig_account" =
                    Account_id.create multisig_account_pk Token_id.default
                  in
                  Ledger.get_or_create_account ledger id
-                   (Account.create id Currency.Balance.(of_int 0))
+                   (Account.create id Currency.Balance.zero)
                  |> Or_error.ok_exn
                in
                let a = Ledger.get ledger loc |> Option.value_exn in

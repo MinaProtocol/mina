@@ -99,7 +99,7 @@ struct
 
   let%test_unit "selector shouldn't get work that it cannot outbid" =
     Backtrace.elide := false ;
-    let my_fee = Currency.Fee.of_int 2 in
+    let my_fee = Currency.Fee.nanomina 2 in
     let p = 50 in
     let logger = Logger.null () in
     let g =
@@ -112,7 +112,7 @@ struct
                   (Lazy.force precomputed_values).protocol_state_with_hashes
                     .data )
           |> Or_error.ok_exn )
-          (Currency.Fee.of_int 2)
+          (Currency.Fee.nanomina 2)
       in
       (sl, pool)
     in

@@ -34,7 +34,7 @@ let get_keys_with_details t =
   let%map accounts = get_accounts t in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_int
+      , account.Account.Poly.balance |> Currency.Balance.int_of_nanomina
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
 let get_nonce t (addr : Account_id.t) =
@@ -263,7 +263,9 @@ let get_status ~flag t =
       (Mina_lib.snark_worker_key t)
       ~f:Public_key.Compressed.to_base58_check
   in
-  let snark_work_fee = Currency.Fee.to_int @@ Mina_lib.snark_work_fee t in
+  let snark_work_fee =
+    Currency.Fee.int_of_nanomina @@ Mina_lib.snark_work_fee t
+  in
   let block_production_keys = Mina_lib.block_production_pubkeys t in
   let coinbase_receiver =
     match Mina_lib.coinbase_receiver t with

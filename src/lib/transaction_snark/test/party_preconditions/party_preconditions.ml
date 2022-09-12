@@ -60,8 +60,8 @@ let%test_module "Protocol state precondition tests" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let state_body = U.genesis_state_body in
-          let fee = Fee.of_int 1_000_000 in
-          let _amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
+          let _amount = Amount.mina 10 in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
             { sender = spec.sender
@@ -104,8 +104,7 @@ let%test_module "Protocol state precondition tests" =
       in
       Quickcheck.test ~trials:2 gen
         ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
-          let fee = Fee.of_int 1_000_000 in
-          let _amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.nanomina 1_000_000 in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
             { sender = spec.sender
@@ -148,8 +147,8 @@ let%test_module "Protocol state precondition tests" =
         ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let fee = Fee.of_int 1_000_000 in
-                  let amount = Amount.of_int 10_000_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
+                  let amount = Amount.mina 10 in
                   let spec = List.hd_exn specs in
                   let new_slot =
                     Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
@@ -393,8 +392,7 @@ let%test_module "Account precondition tests" =
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let state_body = U.genesis_state_body in
-                  let fee = Fee.of_int 1_000_000 in
-                  let _amount = Amount.of_int 10_000_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
                   let spec = List.hd_exn specs in
                   let snapp_pk =
                     Signature_lib.Public_key.compress new_kp.public_key
@@ -459,8 +457,7 @@ let%test_module "Account precondition tests" =
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let state_body = U.genesis_state_body in
-                  let fee = Fee.of_int 1_000_000 in
-                  let _amount = Amount.of_int 10_000_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
                   let spec = List.hd_exn specs in
                   let snapp_pk =
                     Signature_lib.Public_key.compress new_kp.public_key
@@ -521,8 +518,8 @@ let%test_module "Account precondition tests" =
         ~f:(fun (({ init_ledger; specs }, new_kp), account_precondition) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let fee = Fee.of_int 1_000_000 in
-                  let _amount = Amount.of_int 10_000_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
+                  let _amount = Amount.mina 10 in
                   let spec = List.hd_exn specs in
                   let test_spec : Spec.t =
                     { sender = spec.sender
@@ -572,8 +569,8 @@ let%test_module "Account precondition tests" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let fee = Fee.of_int 1_000_000 in
-              let amount = Amount.of_int 10_000_000_000 in
+              let fee = Fee.nanomina 1_000_000 in
+              let amount = Amount.mina 10 in
               let spec = List.hd_exn specs in
               let sender, sender_nonce = spec.sender in
               let sender_pk =
