@@ -281,16 +281,17 @@ module Cryptography = struct
 
   let transaction_length =
     let help =
-      "Number of parties in a parties transaction (1 for simple transactions)"
+      "Number of zkapp_command in a zkapp_command transaction (1 for simple \
+       transactions)"
     in
     Gauge.v "transaction_length" ~help ~namespace ~subsystem
 
-  let proof_parties =
+  let proof_zkapp_command =
     let help =
-      "Number of parties with proof authorization in a parties transaction (0 \
-       for simple transactions)"
+      "Number of zkapp_command with proof authorization in a zkapp_command \
+       transaction (0 for simple transactions)"
     in
-    Gauge.v "proof_parties" ~help ~namespace ~subsystem
+    Gauge.v "proof_zkapp_command" ~help ~namespace ~subsystem
 
   (* TODO:
      let transaction_proving_time_ms =
@@ -344,13 +345,15 @@ module Transaction_pool = struct
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 
-  let parties_transaction_size : Gauge.t =
-    let help = "Size of valid parties transaction received (bin_size_t)" in
-    Gauge.v "parties_transaction_size" ~help ~namespace ~subsystem
+  let zkapp_command_transaction_size : Gauge.t =
+    let help =
+      "Size of valid zkapp_command transaction received (bin_size_t)"
+    in
+    Gauge.v "zkapp_command_transaction_size" ~help ~namespace ~subsystem
 
-  let parties_count : Gauge.t =
-    let help = "Number of parties in a valid transaction received" in
-    Gauge.v "parties_count" ~help ~namespace ~subsystem
+  let zkapp_command_count : Gauge.t =
+    let help = "Number of zkapp_command in a valid transaction received" in
+    Gauge.v "zkapp_command_count" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig

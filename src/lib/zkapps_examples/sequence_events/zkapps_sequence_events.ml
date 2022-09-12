@@ -29,14 +29,14 @@ let update_sequence_events public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key)
     ~token_id:Token_id.(Checked.constant default)
-    (fun party ->
+    (fun account_update ->
       let sequence_events =
         exists
           ~request:(fun () -> Updated_sequence_events)
           (Typ.list ~length:num_events
              (Typ.array ~length:event_length Field.typ) )
       in
-      party#add_sequence_events sequence_events )
+      account_update#add_sequence_events sequence_events )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize zkApp"

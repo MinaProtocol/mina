@@ -62,7 +62,7 @@ module Cryptography : sig
 
   val transaction_length : Gauge.t
 
-  val proof_parties : Gauge.t
+  val proof_zkapp_command : Gauge.t
 end
 
 module Bootstrap : sig
@@ -84,9 +84,9 @@ module Transaction_pool : sig
 
   val transactions_added_to_pool : Counter.t
 
-  val parties_transaction_size : Gauge.t
+  val zkapp_command_transaction_size : Gauge.t
 
-  val parties_count : Gauge.t
+  val zkapp_command_count : Gauge.t
 end
 
 module Network : sig

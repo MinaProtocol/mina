@@ -259,7 +259,7 @@ CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array.
 */
-CREATE TABLE zkapp_other_party_body
+CREATE TABLE zkapp_account_update_body
 ( id                                    serial          PRIMARY KEY
 , account_identifier_id                 int             NOT NULL  REFERENCES account_identifiers(id)
 , update_id                             int             NOT NULL  REFERENCES zkapp_updates(id)
@@ -275,16 +275,16 @@ CREATE TABLE zkapp_other_party_body
 , caller                                call_type_type  NOT NULL
 );
 
-CREATE TABLE zkapp_other_party
+CREATE TABLE zkapp_account_update
 ( id                       serial                          PRIMARY KEY
-, body_id                  int                             NOT NULL REFERENCES zkapp_other_party_body(id)
+, body_id                  int                             NOT NULL REFERENCES zkapp_account_update_body(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
 
-/* a list of of failures for a party in a zkApp
-   the index is the index into the `other_parties`
+/* a list of of failures for an account update in a zkApp
+   the index is the index into the `account_updates`
 */
-CREATE TABLE zkapp_party_failures
+CREATE TABLE zkapp_account_update_failures
 ( id       serial    PRIMARY KEY
 , index    int       NOT NULL
 , failures text[]    NOT NULL

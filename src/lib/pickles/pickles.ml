@@ -1164,13 +1164,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                "0x2340A5795E22C7C923991D225400D0052B3A995C35BCCDC612E6205287419EC1"
             )
         in
-        let at_party =
+        let at_account_update =
           Backend.Tick.Field.t_of_sexp
             (Atom
                "0x2340A5795E22C7C923991D225400D0052B3A995C35BCCDC612E6205287419EC1"
             )
         in
-        [| transaction; at_party |]
+        [| transaction; at_account_update |]
       in
       let vk =
         Side_loaded.Verification_key.of_base58_check_exn

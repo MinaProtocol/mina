@@ -6,7 +6,7 @@ open Currency
 open Signature_lib
 open Mina_base
 
-module Party_under_construction = struct
+module Account_update_under_construction = struct
   module In_circuit = struct
     module Account_condition = struct
       type t = { state_proved : Boolean.var option }
@@ -26,7 +26,7 @@ module Party_under_construction = struct
         in
         let default =
           var_of_t
-            (Party.Account_precondition.typ ())
+            (Account_update.Account_precondition.typ ())
             (Full
                { balance = Ignore
                ; nonce = Ignore
@@ -81,7 +81,8 @@ module Party_under_construction = struct
       let create () =
         { app_state = [ None; None; None; None; None; None; None; None ] }
 
-      let to_parties_update ({ app_state } : t) : Party.Update.Checked.t =
+      let to_zkapp_command_update ({ app_state } : t) :
+          Account_update.Update.Checked.t =
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
@@ -92,7 +93,8 @@ module Party_under_construction = struct
           typ.var_of_fields (fields, aux)
         in
         let default =
-          var_of_t (Party.Update.typ ())
+          var_of_t
+            (Account_update.Update.typ ())
             { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
             ; delegate = Keep
             ; verification_key = Keep
@@ -147,7 +149,7 @@ module Party_under_construction = struct
 
       let add_events t events : t = { events = t.events @ events }
 
-      let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
+      let to_zkapp_command_events ({ events } : t) : Zkapp_account.Events.var =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
           exists ~compute:(fun () -> []) Zkapp_account.Events.typ
@@ -165,7 +167,7 @@ module Party_under_construction = struct
       let add_sequence_events t sequence_events : t =
         { sequence_events = t.sequence_events @ sequence_events }
 
-      let to_parties_sequence_events ({ sequence_events } : t) :
+      let to_zkapp_command_sequence_events ({ sequence_events } : t) :
           Zkapp_account.Sequence_events.var =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
@@ -182,7 +184,9 @@ module Party_under_construction = struct
       ; account_condition : Account_condition.t
       ; update : Update.t
       ; rev_calls :
-          (Zkapp_call_forest.Checked.party * Zkapp_call_forest.Checked.t) list
+          ( Zkapp_call_forest.Checked.account_update
+          * Zkapp_call_forest.Checked.t )
+          list
       ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
@@ -200,8 +204,8 @@ module Party_under_construction = struct
       ; sequence_events = Sequence_events.create ()
       }
 
-    let to_party_and_calls (t : t) :
-        Party.Body.Checked.t * Zkapp_call_forest.Checked.t =
+    let to_account_update_and_calls (t : t) :
+        Account_update.Body.Checked.t * Zkapp_call_forest.Checked.t =
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -211,19 +215,19 @@ module Party_under_construction = struct
         let fields = Array.map ~f:Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
       in
-      let party : Party.Body.Checked.t =
+      let account_update : Account_update.Body.Checked.t =
         { public_key = t.public_key
         ; token_id = t.token_id
-        ; update = Update.to_parties_update t.update
+        ; update = Update.to_zkapp_command_update t.update
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
-        ; events = Events.to_parties_events t.events
+        ; events = Events.to_zkapp_command_events t.events
         ; sequence_events =
-            Sequence_events.to_parties_sequence_events t.sequence_events
+            Sequence_events.to_zkapp_command_sequence_events t.sequence_events
         ; preconditions =
-            { Party.Preconditions.Checked.network =
+            { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
                   { snarked_ledger_hash = Ignore
                   ; timestamp = Ignore
@@ -262,10 +266,10 @@ module Party_under_construction = struct
       in
       let calls =
         List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
-          ~f:(fun acc (party, calls) ->
-            Zkapp_call_forest.Checked.push ~party ~calls acc )
+          ~f:(fun acc (account_update, calls) ->
+            Zkapp_call_forest.Checked.push ~account_update ~calls acc )
       in
-      (party, calls)
+      (account_update, calls)
 
     let assert_state_unproved (t : t) =
       { t with
@@ -285,8 +289,8 @@ module Party_under_construction = struct
     let set_state idx data (t : t) =
       { t with update = Update.set_state idx data t.update }
 
-    let register_call party calls (t : t) =
-      { t with rev_calls = (party, calls) :: t.rev_calls }
+    let register_call account_update calls (t : t) =
+      { t with rev_calls = (account_update, calls) :: t.rev_calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
 
@@ -301,41 +305,53 @@ module Party_under_construction = struct
   end
 end
 
-class party ~public_key ?token_id =
+class account_update ~public_key ?token_id =
   object
-    val mutable party =
-      Party_under_construction.In_circuit.create ~public_key ?token_id ()
+    val mutable account_update =
+      Account_update_under_construction.In_circuit.create ~public_key ?token_id
+        ()
 
     method assert_state_proved =
-      party <- Party_under_construction.In_circuit.assert_state_proved party
+      account_update <-
+        Account_update_under_construction.In_circuit.assert_state_proved
+          account_update
 
     method assert_state_unproved =
-      party <- Party_under_construction.In_circuit.assert_state_unproved party
+      account_update <-
+        Account_update_under_construction.In_circuit.assert_state_unproved
+          account_update
 
     method set_state idx data =
-      party <- Party_under_construction.In_circuit.set_state idx data party
+      account_update <-
+        Account_update_under_construction.In_circuit.set_state idx data
+          account_update
 
     method set_full_state app_state =
-      party <-
-        Party_under_construction.In_circuit.set_full_state app_state party
+      account_update <-
+        Account_update_under_construction.In_circuit.set_full_state app_state
+          account_update
 
     method set_call_data call_data =
-      party <- Party_under_construction.In_circuit.set_call_data call_data party
+      account_update <-
+        Account_update_under_construction.In_circuit.set_call_data call_data
+          account_update
 
-    method register_call called_party sub_calls =
-      party <-
-        Party_under_construction.In_circuit.register_call called_party sub_calls
-          party
+    method register_call called_account_update sub_calls =
+      account_update <-
+        Account_update_under_construction.In_circuit.register_call
+          called_account_update sub_calls account_update
 
     method add_events events =
-      party <- Party_under_construction.In_circuit.add_events events party
+      account_update <-
+        Account_update_under_construction.In_circuit.add_events events
+          account_update
 
     method add_sequence_events sequence_events =
-      party <-
-        Party_under_construction.In_circuit.add_sequence_events sequence_events
-          party
+      account_update <-
+        Account_update_under_construction.In_circuit.add_sequence_events
+          sequence_events account_update
 
-    method party_under_construction = party
+    method account_update_under_construction = account_update
   end
 
 (* TODO: Move this somewhere convenient. *)
@@ -360,39 +376,45 @@ let dummy_constraints () =
       : Field.t * Field.t )
 
 type return_type =
-  { party : Party.Body.t
-  ; party_digest : Parties.Digest.Party.t
+  { account_update : Account_update.Body.t
+  ; account_update_digest : Zkapp_command.Digest.Account_update.t
   ; calls :
-      ( ( Party.t
-        , Parties.Digest.Party.t
-        , Parties.Digest.Forest.t )
-        Parties.Call_forest.Tree.t
-      , Parties.Digest.Forest.t )
+      ( ( Account_update.t
+        , Zkapp_command.Digest.Account_update.t
+        , Zkapp_command.Digest.Forest.t )
+        Zkapp_command.Call_forest.Tree.t
+      , Zkapp_command.Digest.Forest.t )
       With_stack_hash.t
       list
   }
 
-let to_party (party : party) :
+let to_account_update (account_update : account_update) :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
-  let party, calls =
-    Party_under_construction.In_circuit.to_party_and_calls
-      party#party_under_construction
+  let account_update, calls =
+    Account_update_under_construction.In_circuit.to_account_update_and_calls
+      account_update#account_update_under_construction
   in
-  let party_digest = Parties.Call_forest.Digest.Party.Checked.create party in
+  let account_update_digest =
+    Zkapp_command.Call_forest.Digest.Account_update.Checked.create
+      account_update
+  in
   let public_output : Zkapp_statement.Checked.t =
-    { party = (party_digest :> Field.t)
+    { account_update = (account_update_digest :> Field.t)
     ; calls = (Zkapp_call_forest.Checked.hash calls :> Field.t)
     }
   in
   let auxiliary_output =
     Prover_value.create (fun () ->
-        let party = As_prover.read (Party.Body.typ ()) party in
-        let party_digest =
-          As_prover.read Parties.Call_forest.Digest.Party.typ party_digest
+        let account_update =
+          As_prover.read (Account_update.Body.typ ()) account_update
+        in
+        let account_update_digest =
+          As_prover.read Zkapp_command.Call_forest.Digest.Account_update.typ
+            account_update_digest
         in
         let calls = Prover_value.get calls.data in
-        { party; calls; party_digest } )
+        { account_update; calls; account_update_digest } )
   in
   (public_output, auxiliary_output)
 
@@ -401,10 +423,10 @@ open Hlist
 
 let wrap_main ~public_key ?token_id f
     { Pickles.Inductive_rule.public_input = () } =
-  let party = new party ~public_key ?token_id in
-  let auxiliary_output = f party in
+  let account_update = new account_update ~public_key ?token_id in
+  let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output = party
+  ; public_output = account_update
   ; auxiliary_output
   }
 
@@ -437,7 +459,7 @@ let compile :
              , heightss
              , unit
              , unit
-             , party
+             , account_update
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
@@ -458,10 +480,10 @@ let compile :
          , widthss
          , heightss
          , unit
-         , ( ( Party.t
-             , Parties.Digest.Party.t
-             , Parties.Digest.Forest.t )
-             Parties.Call_forest.Tree.t
+         , ( ( Account_update.t
+             , Zkapp_command.Digest.Account_update.t
+             , Zkapp_command.Digest.Forest.t )
+             Zkapp_command.Call_forest.Tree.t
            * auxiliary_value )
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
@@ -476,7 +498,7 @@ let compile :
            , heightss
            , unit
            , unit
-           , party
+           , account_update
            , unit
            , auxiliary_var
            , auxiliary_value )
@@ -501,17 +523,17 @@ let compile :
           ; main =
               (fun main_input ->
                 let { Pickles.Inductive_rule.previous_proof_statements
-                    ; public_output = party_under_construction
+                    ; public_output = account_update_under_construction
                     ; auxiliary_output
                     } =
                   main main_input
                 in
-                let public_output, party_tree =
-                  to_party party_under_construction
+                let public_output, account_update_tree =
+                  to_account_update account_update_under_construction
                 in
                 { previous_proof_statements
                 ; public_output
-                ; auxiliary_output = (party_tree, auxiliary_output)
+                ; auxiliary_output = (account_update_tree, auxiliary_output)
                 } )
           }
           :: go choices
@@ -540,10 +562,10 @@ let compile :
            , widthss
            , heightss
            , unit
-           , ( ( Party.t
-               , Parties.Digest.Party.t
-               , Parties.Digest.Forest.t )
-               Parties.Call_forest.Tree.t
+           , ( ( Account_update.t
+               , Zkapp_command.Digest.Account_update.t
+               , Zkapp_command.Digest.Forest.t )
+               Zkapp_command.Call_forest.Tree.t
              * auxiliary_value )
              Deferred.t )
            H3_2.T(Pickles.Prover).t = function
@@ -553,16 +575,20 @@ let compile :
           let prover ?handler () =
             let open Async_kernel in
             let%map ( _stmt
-                    , ({ party; party_digest; calls }, auxiliary_value)
+                    , ( { account_update; account_update_digest; calls }
+                      , auxiliary_value )
                     , proof ) =
               prover ?handler ()
             in
-            let party : Party.t =
-              { body = party
+            let account_update : Account_update.t =
+              { body = account_update
               ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
               }
             in
-            ( { Parties.Call_forest.Tree.party; party_digest; calls }
+            ( { Zkapp_command.Call_forest.Tree.account_update
+              ; account_update_digest
+              ; calls
+              }
             , auxiliary_value )
           in
           prover :: go provers

@@ -120,34 +120,35 @@ type _ Snarky_backendless.Request.t +=
   | Execute_call :
       Call_data.Input.Constant.t
       -> ( Call_data.Output.Constant.t
-         * Zkapp_call_forest.party
+         * Zkapp_call_forest.account_update
          * Zkapp_call_forest.t )
          Snarky_backendless.Request.t
 
 (** Helper function for executing zkApp calls.
 
-    The particular details of the called party are determined by the handler
+    The particular details of the called account update are determined by the handler
     for the [Execute_call] request.
 *)
-let execute_call party old_state =
+let execute_call account_update old_state =
   let call_inputs = { Call_data.Input.Circuit.old_state } in
-  let call_outputs, called_party, sub_calls =
+  let call_outputs, called_account_update, sub_calls =
     exists
       (Typ.tuple3 Call_data.Output.typ
-         (Zkapp_call_forest.Checked.party_typ ())
+         (Zkapp_call_forest.Checked.account_update_typ ())
          Zkapp_call_forest.typ )
       ~request:(fun () ->
         let input = As_prover.read Call_data.Input.typ call_inputs in
         Execute_call input )
   in
   let () =
-    (* Check that previous party's call data is consistent. *)
+    (* Check that previous account update's call data is consistent. *)
     let call_data_digest =
       Call_data.Circuit.digest { input = call_inputs; output = call_outputs }
     in
-    Field.Assert.equal call_data_digest called_party.party.data.call_data
+    Field.Assert.equal call_data_digest
+      called_account_update.account_update.data.call_data
   in
-  party#register_call called_party sub_calls ;
+  account_update#register_call called_account_update sub_calls ;
   call_outputs.new_state
 
 module Rules = struct
@@ -176,12 +177,12 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       Zkapps_examples.wrap_main ~public_key
-        (fun party ->
+        (fun account_update ->
           let initial_state =
             List.map ~f:Field.constant (Lazy.force initial_state)
           in
-          party#assert_state_unproved ;
-          party#set_full_state initial_state ;
+          account_update#assert_state_unproved ;
+          account_update#set_full_state initial_state ;
           None )
         input
 
@@ -205,7 +206,7 @@ module Rules = struct
         (execute_call :
              Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
-             * Zkapp_call_forest.party
+             * Zkapp_call_forest.account_update
              * Zkapp_call_forest.t )
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -223,11 +224,11 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       Zkapps_examples.wrap_main ~public_key
-        (fun party ->
+        (fun account_update ->
           let old_state = exists Field.typ ~request:(fun () -> Old_state) in
-          let new_state = execute_call party old_state in
-          party#assert_state_proved ;
-          party#set_state 0 new_state ;
+          let new_state = execute_call account_update old_state in
+          account_update#assert_state_proved ;
+          account_update#set_state 0 new_state ;
           None )
         input
 
@@ -270,7 +271,7 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       Zkapps_examples.wrap_main ~public_key
-        (fun party ->
+        (fun account_update ->
           let input =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
           in
@@ -283,7 +284,7 @@ module Rules = struct
           let new_state = Field.add input.old_state increase_amount in
           let output = { Call_data.Output.Circuit.blinding_value; new_state } in
           let call_data_digest = Call_data.Circuit.digest { input; output } in
-          party#set_call_data call_data_digest ;
+          account_update#set_call_data call_data_digest ;
           Some output )
         input
 
@@ -316,7 +317,7 @@ module Rules = struct
         (execute_call :
              Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
-             * Zkapp_call_forest.party
+             * Zkapp_call_forest.account_update
              * Zkapp_call_forest.t )
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -336,7 +337,7 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       Zkapps_examples.wrap_main ~public_key
-        (fun party ->
+        (fun account_update ->
           let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
           in
@@ -347,7 +348,7 @@ module Rules = struct
             exists Field.typ ~request:(fun () -> Increase_amount)
           in
           let intermediate_state = Field.add old_state increase_amount in
-          let new_state = execute_call party intermediate_state in
+          let new_state = execute_call account_update intermediate_state in
           let call_outputs =
             { Call_data.Output.Circuit.blinding_value; new_state }
           in
@@ -355,7 +356,7 @@ module Rules = struct
             Call_data.Circuit.digest
               { input = call_inputs; output = call_outputs }
           in
-          party#set_call_data call_data_hash ;
+          account_update#set_call_data call_data_hash ;
           Some call_outputs )
         input
 

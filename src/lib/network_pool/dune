@@ -67,7 +67,7 @@
    mina_ledger
    mina_base.import
    snark_params
-   parties_builder
+   zkapp_command_builder
    ppx_version.runtime
    random_oracle_input
    kimchi_backend

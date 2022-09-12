@@ -328,8 +328,8 @@ module Json_layout = struct
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
       ; transaction_expiry_hr : int option [@default None]
-      ; max_proof_parties : int option [@default None]
-      ; max_parties : int option [@default None]
+      ; max_proof_zkapp_command : int option [@default None]
+      ; max_zkapp_command : int option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_sequence_event_elements : int option [@default None]
       }
@@ -785,8 +785,8 @@ module Daemon = struct
     { txpool_max_size : int option
     ; peer_list_url : string option
     ; transaction_expiry_hr : int option
-    ; max_proof_parties : int option [@default None]
-    ; max_parties : int option [@default None]
+    ; max_proof_zkapp_command : int option [@default None]
+    ; max_zkapp_command : int option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_sequence_event_elements : int option [@default None]
     }
@@ -809,9 +809,11 @@ module Daemon = struct
     ; transaction_expiry_hr =
         opt_fallthrough ~default:t1.transaction_expiry_hr
           t2.transaction_expiry_hr
-    ; max_proof_parties =
-        opt_fallthrough ~default:t1.max_proof_parties t2.max_proof_parties
-    ; max_parties = opt_fallthrough ~default:t1.max_parties t2.max_parties
+    ; max_proof_zkapp_command =
+        opt_fallthrough ~default:t1.max_proof_zkapp_command
+          t2.max_proof_zkapp_command
+    ; max_zkapp_command =
+        opt_fallthrough ~default:t1.max_zkapp_command t2.max_zkapp_command
     ; max_event_elements =
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_sequence_event_elements =

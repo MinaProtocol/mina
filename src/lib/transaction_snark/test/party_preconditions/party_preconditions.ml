@@ -14,8 +14,8 @@ let%test_module "Protocol state precondition tests" =
     let memo =
       Signed_command_memo.create_from_string_exn "protocol state precondition"
 
-    let snapp_update : Party.Update.t =
-      { Party.Update.dummy with
+    let snapp_update : Account_update.Update.t =
+      { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
@@ -79,10 +79,10 @@ let%test_module "Protocol state precondition tests" =
             ; sequence_events = []
             ; preconditions =
                 Some
-                  { Party.Preconditions.network =
+                  { Account_update.Preconditions.network =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
-                  ; account = Party.Account_precondition.Accept
+                  ; account = Account_update.Account_precondition.Accept
                   }
             }
           in
@@ -96,7 +96,8 @@ let%test_module "Protocol state precondition tests" =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger = U.gen_snapp_ledger in
         let%map network_precondition =
-          Mina_generators.Parties_generators.gen_protocol_state_precondition
+          Mina_generators.Zkapp_command_generators
+          .gen_protocol_state_precondition
             (Mina_state.Protocol_state.Body.view state_body)
         in
         (ledger, network_precondition)
@@ -122,8 +123,8 @@ let%test_module "Protocol state precondition tests" =
             ; sequence_events = []
             ; preconditions =
                 Some
-                  { Party.Preconditions.network = network_precondition
-                  ; account = Party.Account_precondition.Accept
+                  { Account_update.Preconditions.network = network_precondition
+                  ; account = Account_update.Account_precondition.Accept
                   }
             }
           in
@@ -131,14 +132,15 @@ let%test_module "Protocol state precondition tests" =
             ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "invalid protocol state predicate in other parties" =
+    let%test_unit "invalid protocol state predicate in other zkapp_command" =
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       let gen =
         let open Quickcheck.Let_syntax in
         let%bind ledger = U.gen_snapp_ledger in
         let%map network_precondition =
-          Mina_generators.Parties_generators.gen_protocol_state_precondition psv
+          Mina_generators.Zkapp_command_generators
+          .gen_protocol_state_precondition psv
         in
         (ledger, network_precondition)
       in
@@ -169,7 +171,7 @@ let%test_module "Protocol state precondition tests" =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   let fee_payer =
-                    { Party.Fee_payer.body =
+                    { Account_update.Fee_payer.body =
                         { public_key = sender_pk
                         ; fee
                         ; valid_until = None
@@ -179,10 +181,10 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Signature.dummy
                     }
                   in
-                  let sender_party : Party.Simple.t =
+                  let sender_account_update : Account_update.Simple.t =
                     { body =
                         { public_key = sender_pk
-                        ; update = Party.Update.noop
+                        ; update = Account_update.Update.noop
                         ; token_id = Token_id.default
                         ; balance_change =
                             Amount.(Signed.(negate (of_unsigned amount)))
@@ -192,7 +194,7 @@ let%test_module "Protocol state precondition tests" =
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
-                            { Party.Preconditions.network =
+                            { Account_update.Preconditions.network =
                                 invalid_network_precondition
                             ; account = Nonce (Account.Nonce.succ sender_nonce)
                             }
@@ -203,7 +205,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Control.Signature Signature.dummy
                     }
                   in
-                  let snapp_party : Party.Simple.t =
+                  let snapp_account_update : Account_update.Simple.t =
                     { body =
                         { public_key = snapp_pk
                         ; update = snapp_update
@@ -222,9 +224,10 @@ let%test_module "Protocol state precondition tests" =
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
-                            { Party.Preconditions.network =
+                            { Account_update.Preconditions.network =
                                 invalid_network_precondition
-                            ; account = Party.Account_precondition.Accept
+                            ; account =
+                                Account_update.Account_precondition.Accept
                             }
                         ; use_full_commitment = true
                         ; caller = Call
@@ -235,20 +238,25 @@ let%test_module "Protocol state precondition tests" =
                     }
                   in
                   let ps =
-                    Parties.Call_forest.With_hashes.of_parties_simple_list
-                      [ sender_party; snapp_party ]
+                    Zkapp_command.Call_forest.With_hashes
+                    .of_zkapp_command_simple_list
+                      [ sender_account_update; snapp_account_update ]
                   in
-                  let other_parties_hash = Parties.Call_forest.hash ps in
+                  let account_updates_hash =
+                    Zkapp_command.Call_forest.hash ps
+                  in
                   let commitment =
-                    Parties.Transaction_commitment.create ~other_parties_hash
+                    Zkapp_command.Transaction_commitment.create
+                      ~account_updates_hash
                   in
                   let memo_hash = Signed_command_memo.hash memo in
                   let fee_payer_hash =
-                    Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
+                    Zkapp_command.Digest.Account_update.create
+                      (Account_update.of_fee_payer fee_payer)
                   in
                   let full_commitment =
-                    Parties.Transaction_commitment.create_complete commitment
-                      ~memo_hash ~fee_payer_hash
+                    Zkapp_command.Transaction_commitment.create_complete
+                      commitment ~memo_hash ~fee_payer_hash
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
@@ -257,40 +265,41 @@ let%test_module "Protocol state precondition tests" =
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
-                  let sender_party : Party.Simple.t =
+                  let sender_account_update : Account_update.Simple.t =
                     let signature_auth : Signature.t =
                       Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
                     in
-                    { sender_party with
+                    { sender_account_update with
                       authorization = Control.Signature signature_auth
                     }
                   in
-                  let snapp_party =
+                  let snapp_account_update =
                     let signature_auth =
                       Signature_lib.Schnorr.Chunked.sign new_kp.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
-                    { snapp_party with
+                    { snapp_account_update with
                       authorization = Control.Signature signature_auth
                     }
                   in
-                  let parties_with_valid_fee_payer =
+                  let zkapp_command_with_valid_fee_payer =
                     { fee_payer
                     ; memo
-                    ; other_parties = [ sender_party; snapp_party ]
+                    ; account_updates =
+                        [ sender_account_update; snapp_account_update ]
                     }
-                    |> Parties.of_simple
+                    |> Zkapp_command.of_simple
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn
+                  U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
                       Transaction_status.Failure
                       .Protocol_state_precondition_unsatisfied ~state_body
                     ledger
-                    [ parties_with_valid_fee_payer ] ) ) )
+                    [ zkapp_command_with_valid_fee_payer ] ) ) )
   end )
 
 let%test_module "Account precondition tests" =
@@ -301,8 +310,8 @@ let%test_module "Account precondition tests" =
 
     let memo = Signed_command_memo.create_from_string_exn "account precondition"
 
-    let snapp_update : Party.Update.t =
-      { Party.Update.dummy with
+    let snapp_update : Account_update.Update.t =
+      { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
@@ -374,7 +383,7 @@ let%test_module "Account precondition tests" =
         ; is_new
         }
       in
-      Party.Account_precondition.Full predicate_account
+      Account_update.Account_precondition.Full predicate_account
 
     let%test_unit "exact account predicate" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -408,7 +417,7 @@ let%test_module "Account precondition tests" =
                     ; sequence_events = []
                     ; preconditions =
                         Some
-                          { Party.Preconditions.network =
+                          { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = precondition_exact snapp_account
                           }
@@ -421,11 +430,12 @@ let%test_module "Account precondition tests" =
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
-                  let%bind parties =
+                  let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
-                  U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
+                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                    [ zkapp_command ] ) ) )
 
     let%test_unit "generated account precondition" =
       let gen =
@@ -436,7 +446,7 @@ let%test_module "Account precondition tests" =
           Transaction_snark.For_tests.trivial_zkapp_account ~vk snapp_pk
         in
         let%map account_precondition =
-          Mina_generators.Parties_generators
+          Mina_generators.Zkapp_command_generators
           .gen_account_precondition_from_account snapp_account
             ~first_use_of_account:true
         in
@@ -476,19 +486,20 @@ let%test_module "Account precondition tests" =
                     ; sequence_events = []
                     ; preconditions =
                         Some
-                          { Party.Preconditions.network =
+                          { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
                           }
                     }
                   in
-                  let%bind parties =
+                  let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
-                  U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
+                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                    [ zkapp_command ] ) ) )
 
-    let%test_unit "invalid account predicate in other parties" =
+    let%test_unit "invalid account predicate in other zkapp_command" =
       let state_body = U.genesis_state_body in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -498,7 +509,7 @@ let%test_module "Account precondition tests" =
           Transaction_snark.For_tests.trivial_zkapp_account ~vk snapp_pk
         in
         let%map account_precondition =
-          Mina_generators.Parties_generators.(
+          Mina_generators.Zkapp_command_generators.(
             gen_account_precondition_from_account ~first_use_of_account:true
               ~failure:Invalid_account_precondition snapp_account)
         in
@@ -527,14 +538,14 @@ let%test_module "Account precondition tests" =
                     ; sequence_events = []
                     ; preconditions =
                         Some
-                          { Party.Preconditions.network =
+                          { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
                           }
                     }
                   in
                   let open Async.Deferred.Let_syntax in
-                  let%bind parties =
+                  let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
@@ -547,11 +558,11 @@ let%test_module "Account precondition tests" =
                   in
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
-                  U.check_parties_with_merges_exn
+                  U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
                       Transaction_status.Failure
                       .Account_nonce_precondition_unsatisfied ~state_body ledger
-                    [ parties ] ) ) )
+                    [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
       let state_body = U.genesis_state_body in
@@ -570,7 +581,7 @@ let%test_module "Account precondition tests" =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
               let fee_payer =
-                { Party.Fee_payer.body =
+                { Account_update.Fee_payer.body =
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
@@ -580,10 +591,10 @@ let%test_module "Account precondition tests" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party : Party.Simple.t =
+              let sender_account_update : Account_update.Simple.t =
                 { body =
                     { public_key = sender_pk
-                    ; update = Party.Update.noop
+                    ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
                         Amount.(Signed.(negate (of_unsigned amount)))
@@ -593,7 +604,7 @@ let%test_module "Account precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =
-                        { Party.Preconditions.network =
+                        { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
                         }
@@ -604,7 +615,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Control.Signature Signature.dummy
                 }
               in
-              let snapp_party : Party.Simple.t =
+              let snapp_account_update : Account_update.Simple.t =
                 { body =
                     { public_key = snapp_pk
                     ; update = snapp_update
@@ -621,9 +632,9 @@ let%test_module "Account precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =
-                        { Party.Preconditions.network =
+                        { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Party.Account_precondition.Accept
+                        ; account = Account_update.Account_precondition.Accept
                         }
                     ; use_full_commitment = true
                     ; caller = Call
@@ -633,19 +644,22 @@ let%test_module "Account precondition tests" =
                 }
               in
               let ps =
-                Parties.Call_forest.With_hashes.of_parties_simple_list
-                  [ sender_party; snapp_party ]
+                Zkapp_command.Call_forest.With_hashes
+                .of_zkapp_command_simple_list
+                  [ sender_account_update; snapp_account_update ]
               in
-              let other_parties_hash = Parties.Call_forest.hash ps in
+              let account_updates_hash = Zkapp_command.Call_forest.hash ps in
               let commitment =
-                Parties.Transaction_commitment.create ~other_parties_hash
+                Zkapp_command.Transaction_commitment.create
+                  ~account_updates_hash
               in
               let memo_hash = Signed_command_memo.hash memo in
               let fee_payer_hash =
-                Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
+                Zkapp_command.Digest.Account_update.create
+                  (Account_update.of_fee_payer fee_payer)
               in
               let full_commitment =
-                Parties.Transaction_commitment.create_complete commitment
+                Zkapp_command.Transaction_commitment.create_complete commitment
                   ~memo_hash ~fee_payer_hash
               in
               let fee_payer =
@@ -655,37 +669,39 @@ let%test_module "Account precondition tests" =
                 in
                 { fee_payer with authorization = fee_payer_signature_auth }
               in
-              let sender_party =
+              let sender_account_update =
                 let signature_auth : Signature.t =
                   Signature_lib.Schnorr.Chunked.sign sender.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
-                { sender_party with
+                { sender_account_update with
                   authorization = Control.Signature signature_auth
                 }
               in
-              let snapp_party =
+              let snapp_account_update =
                 let signature_auth =
                   Signature_lib.Schnorr.Chunked.sign new_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
-                { snapp_party with
+                { snapp_account_update with
                   authorization = Control.Signature signature_auth
                 }
               in
-              let parties_with_invalid_fee_payer =
-                Parties.of_simple
+              let zkapp_command_with_invalid_fee_payer =
+                Zkapp_command.of_simple
                   { fee_payer
                   ; memo
-                  ; other_parties = [ sender_party; snapp_party ]
+                  ; account_updates =
+                      [ sender_account_update; snapp_account_update ]
                   }
               in
               Mina_transaction_logic.For_tests.Init_ledger.init
                 (module Mina_ledger.Ledger.Ledger_inner)
                 init_ledger ledger ;
               match
-                Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
-                  ~state_view:psv ledger parties_with_invalid_fee_payer
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                  ~constraint_constants ~state_view:psv ledger
+                  zkapp_command_with_invalid_fee_payer
               with
               | Error e ->
                   assert (
