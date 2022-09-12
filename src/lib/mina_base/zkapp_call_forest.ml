@@ -7,6 +7,8 @@ type t =
   , Zkapp_command.Digest.Forest.t )
   Zkapp_command.Call_forest.t
 
+type account_update = (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
+
 let empty () = []
 
 let if_ = Zkapp_command.value_if
@@ -42,25 +44,31 @@ module Checked = struct
     }
 
   let account_update_typ () :
-      ( account_update
-      , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
-      )
-      Typ.t =
-    Typ.(
-      Account_update.Body.typ () * Prover_value.typ ()
-      * Zkapp_command.Digest.Account_update.typ)
-    |> Typ.transport
-         ~back:(fun ((body, authorization), hash) ->
-           { With_hash.data = { Account_update.body; authorization }; hash } )
-         ~there:(fun { With_hash.data = { Account_update.body; authorization }
-                     ; hash
-                     } -> ((body, authorization), hash) )
-    |> Typ.transport_var
-         ~back:(fun ((account_update, control), hash) ->
-           { account_update = { hash; data = account_update }; control } )
-         ~there:(fun { account_update = { hash; data = account_update }
-                     ; control
-                     } -> ((account_update, control), hash) )
+      (account_update, (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t) Typ.t =
+    let (Typ typ) =
+      Typ.(Account_update.Body.typ () * Prover_value.typ () * Zkapp_command.Digest.Account_update.typ)
+      |> Typ.transport
+           ~back:(fun ((body, authorization), hash) ->
+             { With_hash.data = { Account_update.body; authorization }; hash } )
+           ~there:(fun { With_hash.data = { Account_update.body; authorization }; hash } ->
+             ((body, authorization), hash) )
+      |> Typ.transport_var
+           ~back:(fun ((account_update, control), hash) ->
+             { account_update = { hash; data = account_update }; control } )
+           ~there:(fun { account_update = { hash; data = account_update }; control } ->
+             ((account_update, control), hash) )
+    in
+    Typ
+      { typ with
+        check =
+          (fun ({ account_update = { hash; data = account_update }; control = _ } as x) ->
+            make_checked (fun () ->
+                run_checked (typ.check x) ;
+                Field.Assert.equal
+                  (hash :> Field.t)
+                  ( Zkapp_command.Call_forest.Digest.Account_update.Checked.create account_update
+                    :> Field.t ) ) )
+      }
 
   type t =
     ( ( Account_update.t

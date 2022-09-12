@@ -91,10 +91,8 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   (ledger, fee_payer_keypairs, keymap)
 
-let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
-
-let generate_zkapp_command_and_apply_them_consecutively ~trials
-    ~max_account_updates () =
+let generate_zkapp_commands_and_apply_them_consecutively ~trials ~max_account_updates ()
+    =
   let num_of_fee_payers = 5 in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
@@ -136,7 +134,7 @@ let generate_zkapp_command_and_apply_them_consecutively ~trials
         test i
       done )
 
-let generate_zkapp_command_and_apply_them_freshly ~trials ~max_account_updates
+let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
     () =
   let num_of_fee_payers = 5 in
   Test_util.with_randomness 123456789 (fun () ->
@@ -238,9 +236,9 @@ let () =
        fun () ->
          let num_of_fee_payers = 5 in
          let max_account_updates = 3 in
-         generate_zkapp_command_and_apply_them_consecutively ~trials
+         generate_zkapp_commands_and_apply_them_consecutively ~trials
            ~max_account_updates () ;
-         generate_zkapp_command_and_apply_them_freshly ~trials
+         generate_zkapp_commands_and_apply_them_freshly ~trials
            ~max_account_updates () ;
          let open Mina_generators.Zkapp_command_generators in
          let open Transaction_status.Failure in

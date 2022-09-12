@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
@@ -6,193 +7,6 @@ open Signature_lib
 open Mina_base
 
 module Account_update_under_construction = struct
-  module Account_condition = struct
-    type t = { state_proved : bool option }
-
-    let create () = { state_proved = None }
-
-    let to_predicate ({ state_proved } : t) : Zkapp_precondition.Account.t =
-      (* TODO: Don't do this. *)
-      let default : Zkapp_precondition.Account.t =
-        { balance = Ignore
-        ; nonce = Ignore
-        ; receipt_chain_hash = Ignore
-        ; delegate = Ignore
-        ; state =
-            [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
-        ; sequence_state = Ignore
-        ; proved_state = Ignore
-        ; is_new = Ignore
-        }
-      in
-      let proved_state =
-        match state_proved with
-        | None ->
-            default.proved_state
-        | Some state_proved ->
-            Zkapp_basic.Or_ignore.Check state_proved
-      in
-      { default with proved_state }
-
-    let assert_state_proved (t : t) =
-      match t.state_proved with
-      | None ->
-          { state_proved = Some true }
-      | Some b ->
-          if not b then failwith "State is already unproved" ;
-          t
-
-    let assert_state_unproved (t : t) =
-      match t.state_proved with
-      | None ->
-          { state_proved = Some false }
-      | Some b ->
-          if b then failwith "State is already proved" ;
-          t
-  end
-
-  module Update = struct
-    type t = { app_state : Field.Constant.t option Zkapp_state.V.t }
-
-    let create () =
-      { app_state = [ None; None; None; None; None; None; None; None ] }
-
-    let to_zkapp_command_update ({ app_state } : t) : Account_update.Update.t =
-      let default : Account_update.Update.t =
-        { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
-        ; delegate = Keep
-        ; verification_key = Keep
-        ; permissions = Keep
-        ; zkapp_uri = Keep
-        ; token_symbol = Keep
-        ; timing = Keep
-        ; voting_for = Keep
-        }
-      in
-      let app_state =
-        Pickles_types.Vector.map ~f:Zkapp_basic.Set_or_keep.of_option app_state
-      in
-      { default with app_state }
-
-    let set_full_state app_state (_t : t) =
-      match app_state with
-      | [ a0; a1; a2; a3; a4; a5; a6; a7 ] ->
-          { app_state =
-              [ Some a0
-              ; Some a1
-              ; Some a2
-              ; Some a3
-              ; Some a4
-              ; Some a5
-              ; Some a6
-              ; Some a7
-              ]
-          }
-      | _ ->
-          failwith "Incorrect length of app_state"
-  end
-
-  module Events = struct
-    type t = { events : Field.Constant.t array list }
-
-    let create () = { events = [] }
-
-    let add_events t events : t = { events = events @ t.events }
-  end
-
-  module Sequence_events = struct
-    type t = { sequence_events : Field.Constant.t array list }
-
-    let create () = { sequence_events = [] }
-
-    let add_sequence_events t events : t =
-      { sequence_events = events @ t.sequence_events }
-  end
-
-  type t =
-    { public_key : Public_key.Compressed.t
-    ; token_id : Token_id.t
-    ; account_condition : Account_condition.t
-    ; update : Update.t
-    ; events : Events.t
-    ; sequence_events : Sequence_events.t
-    }
-
-  let create ~public_key ?(token_id = Token_id.default) () =
-    { public_key
-    ; token_id
-    ; account_condition = Account_condition.create ()
-    ; update = Update.create ()
-    ; events = Events.create ()
-    ; sequence_events = Sequence_events.create ()
-    }
-
-  let to_account_update (t : t) : Account_update.Body.t =
-    { public_key = t.public_key
-    ; token_id = t.token_id
-    ; update = Update.to_zkapp_command_update t.update
-    ; balance_change = { magnitude = Amount.zero; sgn = Pos }
-    ; increment_nonce = false
-    ; events = t.events.events
-    ; sequence_events = []
-    ; call_data = Field.Constant.zero
-    ; preconditions =
-        { Account_update.Preconditions.network =
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            }
-        ; account = Full (Account_condition.to_predicate t.account_condition)
-        }
-    ; use_full_commitment = false
-    ; caller = t.token_id
-    }
-
-  let assert_state_unproved (t : t) =
-    { t with
-      account_condition =
-        Account_condition.assert_state_unproved t.account_condition
-    }
-
-  let assert_state_proved (t : t) =
-    { t with
-      account_condition =
-        Account_condition.assert_state_proved t.account_condition
-    }
-
-  let set_full_state app_state (t : t) =
-    { t with update = Update.set_full_state app_state t.update }
-
-  let add_events events (t : t) =
-    { t with events = Events.add_events t.events events }
-
-  let add_sequence_events sequence_events (t : t) =
-    { t with
-      sequence_events =
-        Sequence_events.add_sequence_events t.sequence_events sequence_events
-    }
-
   module In_circuit = struct
     module Account_condition = struct
       type t = { state_proved : Boolean.var option }
@@ -207,7 +21,7 @@ module Account_update_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -275,7 +89,7 @@ module Account_update_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -319,6 +133,13 @@ module Account_update_under_construction = struct
             }
         | _ ->
             failwith "Incorrect length of app_state"
+
+      let set_state i value (t : t) =
+        if i < 0 || i >= 8 then failwith "Incorrect index" ;
+        { app_state =
+            Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
+                if i = j then Some value else old_value )
+        }
     end
 
     module Events = struct
@@ -362,6 +183,9 @@ module Account_update_under_construction = struct
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; rev_calls :
+          (Zkapp_call_forest.Checked.account_update * Zkapp_call_forest.Checked.t) list
+      ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
       }
@@ -372,6 +196,8 @@ module Account_update_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; rev_calls = []
+      ; call_data = None
       ; events = Events.create ()
       ; sequence_events = Sequence_events.create ()
       }
@@ -384,7 +210,7 @@ module Account_update_under_construction = struct
         let open Snark_params.Tick in
         let (Typ typ) = typ in
         let fields, aux = typ.value_to_fields x in
-        let fields = Array.map Field.Var.constant fields in
+        let fields = Array.map ~f:Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
       in
       let account_update : Account_update.Body.Checked.t =
@@ -394,10 +220,10 @@ module Account_update_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
+        ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
         ; sequence_events =
             Sequence_events.to_zkapp_command_sequence_events t.sequence_events
-        ; call_data = Field.zero
         ; preconditions =
             { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -436,7 +262,11 @@ module Account_update_under_construction = struct
         ; caller = t.token_id
         }
       in
-      let calls = exists Zkapp_call_forest.typ ~compute:(fun () -> []) in
+      let calls =
+        List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
+          ~f:(fun acc (account_update, calls) ->
+            Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+      in
       (account_update, calls)
 
     let assert_state_unproved (t : t) =
@@ -454,6 +284,14 @@ module Account_update_under_construction = struct
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
 
+    let set_state idx data (t : t) =
+      { t with update = Update.set_state idx data t.update }
+
+    let register_call account_update calls (t : t) =
+      { t with rev_calls = (account_update, calls) :: t.rev_calls }
+
+    let set_call_data call_data (t : t) = { t with call_data = Some call_data }
+
     let add_events events (t : t) =
       { t with events = Events.add_events t.events events }
 
@@ -464,6 +302,43 @@ module Account_update_under_construction = struct
       }
   end
 end
+
+class account_update ~public_key ?token_id =
+  object
+    val mutable account_update =
+      Account_update_under_construction.In_circuit.create ~public_key ?token_id ()
+
+    method assert_state_proved =
+      account_update <- Account_update_under_construction.In_circuit.assert_state_proved account_update
+
+    method assert_state_unproved =
+      account_update <- Account_update_under_construction.In_circuit.assert_state_unproved account_update
+
+    method set_state idx data =
+      account_update <- Account_update_under_construction.In_circuit.set_state idx data account_update
+
+    method set_full_state app_state =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_full_state app_state account_update
+
+    method set_call_data call_data =
+      account_update <- Account_update_under_construction.In_circuit.set_call_data call_data account_update
+
+    method register_call called_account_update sub_calls =
+      account_update <-
+        Account_update_under_construction.In_circuit.register_call called_account_update sub_calls
+          account_update
+
+    method add_events events =
+      account_update <- Account_update_under_construction.In_circuit.add_events events account_update
+
+    method add_sequence_events sequence_events =
+      account_update <-
+        Account_update_under_construction.In_circuit.add_sequence_events sequence_events
+          account_update
+
+    method account_update_under_construction = account_update
+  end
 
 (* TODO: Move this somewhere convenient. *)
 let dummy_constraints () =
@@ -499,16 +374,12 @@ type return_type =
       list
   }
 
-let to_account_update account_update :
+let to_account_update (account_update : account_update) :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
   let account_update, calls =
     Account_update_under_construction.In_circuit.to_account_update_and_calls
-      account_update
-  in
-  let account_update_digest =
-    Zkapp_command.Call_forest.Digest.Account_update.Checked.create
-      account_update
+      account_update#account_update_under_construction
   in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
@@ -532,10 +403,13 @@ let to_account_update account_update :
 open Pickles_types
 open Hlist
 
-let wrap_main f { Pickles.Inductive_rule.public_input = () } =
+let wrap_main ~public_key ?token_id f
+    { Pickles.Inductive_rule.public_input = () } =
+  let account_update = new account_update ~public_key ?token_id in
+  let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output = f ()
-  ; auxiliary_output = ()
+  ; public_output = account_update
+  ; auxiliary_output
   }
 
 let compile :
@@ -567,7 +441,7 @@ let compile :
              , heightss
              , unit
              , unit
-             , Account_update_under_construction.In_circuit.t
+             , account_update
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
@@ -606,7 +480,7 @@ let compile :
            , heightss
            , unit
            , unit
-           , Account_update_under_construction.In_circuit.t
+           , account_update
            , unit
            , auxiliary_var
            , auxiliary_value )
