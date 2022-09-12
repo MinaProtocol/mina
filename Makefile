@@ -299,9 +299,6 @@ genesis-ledger-ocaml:
 test-ppx:
 	$(MAKE) -C src/lib/ppx_mina/tests
 
-web:
-	./scripts/web.sh
-
 ########################################
 ## Benchmarks
 

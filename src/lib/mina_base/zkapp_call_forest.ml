@@ -7,6 +7,8 @@ type t =
   , Parties.Digest.Forest.t )
   Parties.Call_forest.t
 
+type party = (Party.t, Parties.Digest.Party.t) With_hash.t
+
 let empty () = []
 
 let if_ = Parties.value_if
@@ -36,17 +38,30 @@ module Checked = struct
 
   let party_typ () :
       (party, (Party.t, Parties.Digest.Party.t) With_hash.t) Typ.t =
-    Typ.(Party.Body.typ () * Prover_value.typ () * Parties.Digest.Party.typ)
-    |> Typ.transport
-         ~back:(fun ((body, authorization), hash) ->
-           { With_hash.data = { Party.body; authorization }; hash } )
-         ~there:(fun { With_hash.data = { Party.body; authorization }; hash } ->
-           ((body, authorization), hash) )
-    |> Typ.transport_var
-         ~back:(fun ((party, control), hash) ->
-           { party = { hash; data = party }; control } )
-         ~there:(fun { party = { hash; data = party }; control } ->
-           ((party, control), hash) )
+    let (Typ typ) =
+      Typ.(Party.Body.typ () * Prover_value.typ () * Parties.Digest.Party.typ)
+      |> Typ.transport
+           ~back:(fun ((body, authorization), hash) ->
+             { With_hash.data = { Party.body; authorization }; hash } )
+           ~there:(fun { With_hash.data = { Party.body; authorization }; hash } ->
+             ((body, authorization), hash) )
+      |> Typ.transport_var
+           ~back:(fun ((party, control), hash) ->
+             { party = { hash; data = party }; control } )
+           ~there:(fun { party = { hash; data = party }; control } ->
+             ((party, control), hash) )
+    in
+    Typ
+      { typ with
+        check =
+          (fun ({ party = { hash; data = party }; control = _ } as x) ->
+            make_checked (fun () ->
+                run_checked (typ.check x) ;
+                Field.Assert.equal
+                  (hash :> Field.t)
+                  ( Parties.Call_forest.Digest.Party.Checked.create party
+                    :> Field.t ) ) )
+      }
 
   type t =
     ( ( Party.t
