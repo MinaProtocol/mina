@@ -28,7 +28,7 @@ let event_length = 7
 let update_events public_key =
   Zkapps_examples.wrap_main (fun () ->
       let account_update =
-        AccountUpdate_under_construction.In_circuit.create
+        Account_update_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
           ~token_id:Token_id.(Checked.constant default)
           ()
@@ -39,7 +39,7 @@ let update_events public_key =
           (Typ.list ~length:num_events
              (Typ.array ~length:event_length Field.typ) )
       in
-      AccountUpdate_under_construction.In_circuit.add_events events
+      Account_update_under_construction.In_circuit.add_events events
         account_update )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =

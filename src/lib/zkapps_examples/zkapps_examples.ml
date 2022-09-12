@@ -503,7 +503,7 @@ let to_account_update account_update :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
   let account_update, calls =
-    AccountUpdate_under_construction.In_circuit.to_account_update_and_calls
+    Account_update_under_construction.In_circuit.to_account_update_and_calls
       account_update
   in
   let account_update_digest =
@@ -567,7 +567,7 @@ let compile :
              , heightss
              , unit
              , unit
-             , AccountUpdate_under_construction.In_circuit.t
+             , Account_update_under_construction.In_circuit.t
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
@@ -606,7 +606,7 @@ let compile :
            , heightss
            , unit
            , unit
-           , AccountUpdate_under_construction.In_circuit.t
+           , Account_update_under_construction.In_circuit.t
            , unit
            , auxiliary_var
            , auxiliary_value )

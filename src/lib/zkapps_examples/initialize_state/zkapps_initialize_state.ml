@@ -19,7 +19,7 @@ let initial_state =
 let initialize public_key =
   Zkapps_examples.wrap_main (fun () ->
       let account_update =
-        AccountUpdate_under_construction.In_circuit.create
+        Account_update_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
           ~token_id:Token_id.(Checked.constant default)
           ()
@@ -28,8 +28,8 @@ let initialize public_key =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
       account_update
-      |> AccountUpdate_under_construction.In_circuit.assert_state_unproved
-      |> AccountUpdate_under_construction.In_circuit.set_full_state
+      |> Account_update_under_construction.In_circuit.assert_state_unproved
+      |> Account_update_under_construction.In_circuit.set_full_state
            initial_state )
 
 type _ Snarky_backendless.Request.t +=
@@ -46,7 +46,7 @@ let update_state_handler (new_state : Field.Constant.t list)
 let update_state public_key =
   Zkapps_examples.wrap_main (fun () ->
       let account_update =
-        AccountUpdate_under_construction.In_circuit.create
+        Account_update_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
           ~token_id:Token_id.(Checked.constant default)
           ()
@@ -55,8 +55,8 @@ let update_state public_key =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in
       account_update
-      |> AccountUpdate_under_construction.In_circuit.assert_state_proved
-      |> AccountUpdate_under_construction.In_circuit.set_full_state new_state )
+      |> Account_update_under_construction.In_circuit.assert_state_proved
+      |> Account_update_under_construction.In_circuit.set_full_state new_state )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize snapp"
@@ -73,15 +73,15 @@ let update_state_rule public_key : _ Pickles.Inductive_rule.t =
   }
 
 let generate_initialize_account_update public_key =
-  AccountUpdate_under_construction.create ~public_key ~token_id:Token_id.default
-    ()
-  |> AccountUpdate_under_construction.assert_state_unproved
-  |> AccountUpdate_under_construction.set_full_state (Lazy.force initial_state)
-  |> AccountUpdate_under_construction.to_account_update
+  Account_update_under_construction.create ~public_key
+    ~token_id:Token_id.default ()
+  |> Account_update_under_construction.assert_state_unproved
+  |> Account_update_under_construction.set_full_state (Lazy.force initial_state)
+  |> Account_update_under_construction.to_account_update
 
 let generate_update_state_account_update public_key new_state =
-  AccountUpdate_under_construction.create ~public_key ~token_id:Token_id.default
-    ()
-  |> AccountUpdate_under_construction.assert_state_proved
-  |> AccountUpdate_under_construction.set_full_state new_state
-  |> AccountUpdate_under_construction.to_account_update
+  Account_update_under_construction.create ~public_key
+    ~token_id:Token_id.default ()
+  |> Account_update_under_construction.assert_state_proved
+  |> Account_update_under_construction.set_full_state new_state
+  |> Account_update_under_construction.to_account_update
