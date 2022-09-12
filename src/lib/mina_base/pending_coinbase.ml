@@ -130,6 +130,8 @@ module type Data_hash_intf = sig
 
   val to_base58_check : t -> string
 
+  val of_base58_check_exn : string -> t
+
   val gen : t Quickcheck.Generator.t
 end
 
@@ -726,6 +728,7 @@ module T = struct
       , var_of_hash_packed
       , var_to_hash_packed
       , to_base58_check
+      , of_base58_check_exn
       , typ )]
   end
 

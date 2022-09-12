@@ -26,6 +26,8 @@ module Aux_hash = struct
 
       let to_base58_check s = Base58_check.encode s
 
+      let of_base58_check_exn s = Base58_check.decode_exn s
+
       let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
@@ -42,7 +44,8 @@ module Aux_hash = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson, to_base58_check)]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
   let of_bytes = Fn.id
 
