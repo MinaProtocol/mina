@@ -37,7 +37,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ~metadata:
         [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
         ] ;
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
@@ -45,6 +44,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
     in
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let%bind initial_connectivity_data =
       Util.fetch_connectivity_data ~logger all_nodes
     in
@@ -156,13 +156,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info]
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
-         let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
          (* we've already waited for the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)
          let%bind () =
            wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
          in
+         let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
