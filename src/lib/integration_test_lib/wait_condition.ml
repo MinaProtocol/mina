@@ -270,8 +270,6 @@ struct
         (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
       let event_node_id = Node.id event_node in
       let node_id = Node.id node in
-      let logger = Logger.create () in
-      [%log info] "EVENT NODE: %s  DESIRED NODE: %s@." event_node_id node_id ;
       if String.equal event_node_id node_id then Predicate_passed
       else Predicate_continuation ()
     in

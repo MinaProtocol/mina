@@ -156,7 +156,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info]
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
-         (* we've already waited for the loading of the node_c frontier on initialization
+         (* we've witnessed the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)
          let%bind () =
