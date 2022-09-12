@@ -2318,8 +2318,22 @@ module Ledger = struct
     ; provedState : bool_class Js.t Js.readonly_prop >
     Js.t
 
+  type permissions =
+    < editState : Js.js_string Js.t Js.readonly_prop
+    ; send : Js.js_string Js.t Js.readonly_prop
+    ; receive : Js.js_string Js.t Js.readonly_prop
+    ; setDelegate : Js.js_string Js.t Js.readonly_prop
+    ; setPermissions : Js.js_string Js.t Js.readonly_prop
+    ; setVerificationKey : Js.js_string Js.t Js.readonly_prop
+    ; setZkappUri : Js.js_string Js.t Js.readonly_prop
+    ; editSequenceState : Js.js_string Js.t Js.readonly_prop
+    ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
+    ; incrementNonce : Js.js_string Js.t Js.readonly_prop
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    Js.t
+
   type account =
-    (* TODO: permissions, timing *)
+    (* TODO: timing *)
     < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
@@ -2328,7 +2342,8 @@ module Ledger = struct
     ; receiptChainHash : field_class Js.t Js.readonly_prop
     ; delegate : public_key Js.optdef Js.readonly_prop
     ; votingFor : field_class Js.t Js.readonly_prop
-    ; zkapp : zkapp_account Js.optdef Js.readonly_prop >
+    ; zkapp : zkapp_account Js.optdef Js.readonly_prop
+    ; permissions : permissions Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2589,6 +2604,51 @@ module Ledger = struct
           new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
       end
 
+    let permissions (p : Mina_base.Permissions.t) : permissions =
+      object%js
+        val editState =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.edit_state)
+
+        val send =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.send)
+
+        val receive =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.receive)
+
+        val setDelegate =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_delegate)
+
+        val setPermissions =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_permissions)
+
+        val setVerificationKey =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string
+               p.set_verification_key )
+
+        val setZkappUri =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_zkapp_uri)
+
+        val editSequenceState =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.edit_sequence_state)
+
+        val setTokenSymbol =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_token_symbol)
+
+        val incrementNonce =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.increment_nonce)
+
+        val setVotingFor =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2608,6 +2668,8 @@ module Ledger = struct
         val votingFor = field (a.voting_for :> Impl.field)
 
         val zkapp = option zkapp_account a.zkapp
+
+        val permissions = permissions a.permissions
       end
   end
 
