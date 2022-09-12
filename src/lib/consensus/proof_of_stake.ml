@@ -885,8 +885,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                     , `Int (Mina_base.Account.Index.to_int delegator) )
                   ; ( "delegator_pk"
                     , Public_key.Compressed.to_yojson account.public_key )
-                  ; ("balance", `Int (Balance.to_int account.balance))
-                  ; ("amount", `Int (Amount.to_int total_stake))
+                  ; ("balance", `Int (Balance.int_of_nanomina account.balance))
+                  ; ("amount", `Int (Amount.int_of_nanomina total_stake))
                   ; ( "result"
                     , `String
                         (* use sexp representation; int might be too small *)
@@ -2355,7 +2355,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; curr_slot = Segment_id.to_int slot
         ; global_slot_since_genesis =
             Mina_numbers.Global_slot.to_int t.global_slot_since_genesis
-        ; total_currency = Amount.to_int t.total_currency
+        ; total_currency = Amount.int_of_nanomina t.total_currency
         }
 
       let curr_global_slot (t : Value.t) = t.curr_global_slot
@@ -3755,7 +3755,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.slot_number global_slot
         in
         let supply_increase =
-          Currency.Amount.(Signed.of_unsigned (of_int 42))
+          Currency.Amount.(Signed.of_unsigned (nanomina 42))
         in
         (* setup ledger, needed to compute producer_vrf_result here and handler below *)
         let open Mina_base in
@@ -3968,8 +3968,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; ledger = Genesis_epoch_ledger ledger
           }
         in
-        let balance = Balance.to_int account.balance in
-        let total_stake_int = Currency.Amount.to_int total_stake in
+        let balance = Balance.int_of_nanomina account.balance in
+        let total_stake_int = Currency.Amount.int_of_nanomina total_stake in
         let stake_fraction =
           float_of_int balance /. float_of_int total_stake_int
         in
@@ -4089,7 +4089,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Option.value_exn
           Amount.(
             genesis_currency
-            + of_int (height * to_int constraint_constants.coinbase_amount))
+            + nanomina (height * int_of_nanomina constraint_constants.coinbase_amount))
 
       (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
       let opt_gen opt ~gen =
@@ -4177,7 +4177,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let gen_spot ?root_epoch_position
           ?(slot_fill_rate = default_slot_fill_rate)
           ?(slot_fill_rate_delta = default_slot_fill_rate_delta)
-          ?(genesis_currency = Currency.Amount.of_int 200000)
+          ?(genesis_currency = Currency.Amount.nanomina 200000)
           ?gen_staking_epoch_length ?gen_next_epoch_length
           ?gen_curr_epoch_position ?staking_start_checkpoint
           ?staking_lock_checkpoint ?next_start_checkpoint ?next_lock_checkpoint

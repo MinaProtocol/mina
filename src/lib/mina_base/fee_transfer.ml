@@ -56,7 +56,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let open Signature_lib in
           Quickcheck_lib.of_array keys
           >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
-        and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
+        and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.nanomina
         and fee_token = token in
         { receiver_pk; fee; fee_token }
     end

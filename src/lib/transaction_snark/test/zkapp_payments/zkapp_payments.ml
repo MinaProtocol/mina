@@ -24,9 +24,9 @@ let%test_module "Zkapp payments tests" =
 
     let signed_signed ~(wallets : U.Wallet.t array) i j : Zkapp_command.t =
       let full_amount = 8_000_000_000 in
-      let fee = Fee.of_int (Random.int full_amount) in
+      let fee = Fee.nanomina (Random.int full_amount) in
       let receiver_amount =
-        Amount.sub (Amount.of_int full_amount) (Amount.of_fee fee)
+        Amount.sub (Amount.nanomina full_amount) (Amount.of_fee fee)
         |> Option.value_exn
       in
       let acct1 = wallets.(i) in
@@ -38,7 +38,7 @@ let%test_module "Zkapp payments tests" =
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
-                ; fee = Fee.of_int full_amount
+                ; fee = Fee.nanomina full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
@@ -168,8 +168,8 @@ let%test_module "Zkapp payments tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let fee = Fee.of_int 1_000_000 in
-                  let amount = Amount.of_int 1_000_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
+                  let amount = Amount.mina 1 in
                   let spec = List.hd_exn specs in
                   let receiver_count = 3 in
                   let total_amount =
@@ -220,7 +220,7 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  let fee = Fee.of_int 1_000_000 in
+                  let fee = Fee.nanomina 1_000_000 in
                   let spec = List.hd_exn specs in
                   let sender_pk =
                     (fst spec.sender).public_key
@@ -240,7 +240,7 @@ let%test_module "Zkapp payments tests" =
                   let amount =
                     Amount.add
                       Balance.(to_amount sender_balance)
-                      Amount.(of_int 1_000_000)
+                      Amount.(nanomina 1_000_000)
                     |> Option.value_exn
                   in
                   let receiver_count = 3 in

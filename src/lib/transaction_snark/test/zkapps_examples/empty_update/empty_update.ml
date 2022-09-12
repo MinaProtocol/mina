@@ -81,7 +81,7 @@ let fee_payer =
   { Account_update.Fee_payer.body =
       { Account_update.Body.Fee_payer.dummy with
         public_key = pk_compressed
-      ; fee = Currency.Fee.(of_int 100)
+      ; fee = Currency.Fee.(nanomina 100)
       }
   ; authorization = Signature.dummy
   }
@@ -144,6 +144,6 @@ let () =
         Ledger.get_or_create_account ledger account_id
           (Account.create account_id
              Currency.Balance.(
-               Option.value_exn (add_amount zero (Currency.Amount.of_int 500))) )
+               Option.value_exn (add_amount zero (Currency.Amount.nanomina 500))) )
       in
       ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) )

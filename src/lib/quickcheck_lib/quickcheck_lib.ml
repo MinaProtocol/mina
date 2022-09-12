@@ -130,6 +130,10 @@ let gen_division_currency =
       let ( + ) a b = Option.value_exn (a + b)
 
       let ( - ) a b = Option.value_exn (a - b)
+
+      let of_int = nanomina
+
+      let to_int = int_of_nanomina
     end )
 
 let imperative_fixed_point root ~f =

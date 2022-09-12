@@ -42,10 +42,6 @@ module type Basic = sig
 
   val to_formatted_string : t -> string
 
-  val of_int : int -> t
-
-  val to_int : t -> int
-
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
