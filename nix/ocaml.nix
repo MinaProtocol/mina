@@ -281,7 +281,7 @@ let
           grep -v 'crypto/kimchi_backend' |
           tr '\n' ' '
         )
-        dune runtest $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
+        dune runtest $LIBRARIES_TO_TEST --instrument-with bisect_ppx -j$NIX_BUILD_CORES || echo "failed"
       '';
 
       mina_tests_zkapp_test_transaction = runMinaCheck {
