@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
@@ -20,7 +21,7 @@ module Party_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -87,7 +88,7 @@ module Party_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -130,6 +131,13 @@ module Party_under_construction = struct
             }
         | _ ->
             failwith "Incorrect length of app_state"
+
+      let set_state i value (t : t) =
+        if i < 0 || i >= 8 then failwith "Incorrect index" ;
+        { app_state =
+            Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
+                if i = j then Some value else old_value )
+        }
     end
 
     module Events = struct
@@ -173,6 +181,9 @@ module Party_under_construction = struct
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; rev_calls :
+          (Zkapp_call_forest.Checked.party * Zkapp_call_forest.Checked.t) list
+      ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
       }
@@ -183,6 +194,8 @@ module Party_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; rev_calls = []
+      ; call_data = None
       ; events = Events.create ()
       ; sequence_events = Sequence_events.create ()
       }
@@ -195,7 +208,7 @@ module Party_under_construction = struct
         let open Snark_params.Tick in
         let (Typ typ) = typ in
         let fields, aux = typ.value_to_fields x in
-        let fields = Array.map Field.Var.constant fields in
+        let fields = Array.map ~f:Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
       in
       let party : Party.Body.Checked.t =
@@ -205,10 +218,10 @@ module Party_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
+        ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_parties_events t.events
         ; sequence_events =
             Sequence_events.to_parties_sequence_events t.sequence_events
-        ; call_data = Field.zero
         ; preconditions =
             { Party.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -247,7 +260,11 @@ module Party_under_construction = struct
         ; caller = t.token_id
         }
       in
-      let calls = exists Zkapp_call_forest.typ ~compute:(fun () -> []) in
+      let calls =
+        List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
+          ~f:(fun acc (party, calls) ->
+            Zkapp_call_forest.Checked.push ~party ~calls acc )
+      in
       (party, calls)
 
     let assert_state_unproved (t : t) =
@@ -264,6 +281,14 @@ module Party_under_construction = struct
 
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
+
+    let set_state idx data (t : t) =
+      { t with update = Update.set_state idx data t.update }
+
+    let register_call party calls (t : t) =
+      { t with rev_calls = (party, calls) :: t.rev_calls }
+
+    let set_call_data call_data (t : t) = { t with call_data = Some call_data }
 
     let add_events events (t : t) =
       { t with events = Events.add_events t.events events }
@@ -287,9 +312,20 @@ class party ~public_key ?token_id =
     method assert_state_unproved =
       party <- Party_under_construction.In_circuit.assert_state_unproved party
 
+    method set_state idx data =
+      party <- Party_under_construction.In_circuit.set_state idx data party
+
     method set_full_state app_state =
       party <-
         Party_under_construction.In_circuit.set_full_state app_state party
+
+    method set_call_data call_data =
+      party <- Party_under_construction.In_circuit.set_call_data call_data party
+
+    method register_call called_party sub_calls =
+      party <-
+        Party_under_construction.In_circuit.register_call called_party sub_calls
+          party
 
     method add_events events =
       party <- Party_under_construction.In_circuit.add_events events party
@@ -366,10 +402,10 @@ open Hlist
 let wrap_main ~public_key ?token_id f
     { Pickles.Inductive_rule.public_input = () } =
   let party = new party ~public_key ?token_id in
-  f party ;
+  let auxiliary_output = f party in
   { Pickles.Inductive_rule.previous_proof_statements = []
   ; public_output = party
-  ; auxiliary_output = ()
+  ; auxiliary_output
   }
 
 let compile :
