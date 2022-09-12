@@ -5,7 +5,7 @@ open Zkapps_examples
 
 let initialize public_key =
   Zkapps_examples.wrap_main (fun () ->
-      AccountUpdate_under_construction.In_circuit.create
+      Account_update_under_construction.In_circuit.create
         ~public_key:(Public_key.Compressed.var_of_t public_key)
         ~token_id:Token_id.(Checked.constant default)
         () )

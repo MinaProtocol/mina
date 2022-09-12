@@ -5,7 +5,7 @@ open Currency
 open Signature_lib
 open Mina_base
 
-module AccountUpdate_under_construction = struct
+module Account_update_under_construction = struct
   module Account_condition = struct
     type t = { state_proved : bool option }
 

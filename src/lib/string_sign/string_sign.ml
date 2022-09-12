@@ -77,8 +77,7 @@ let%test_module "Sign_string tests" =
 
     let%test "Sign, verify with default network" =
       let s =
-        "Now is the time for all good men to come to the aid of their \
-         account_update"
+        "Now is the time for all good men to come to the aid of their party"
       in
       let signature = sign keypair.private_key s in
       verify signature keypair.public_key s

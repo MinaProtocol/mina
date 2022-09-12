@@ -72,7 +72,7 @@ module Internal_command = struct
   end]
 end
 
-(* for fee payer, other zkapp_command, authorizations are omitted; signatures, proofs not in archive db *)
+(* for fee payer and account updates, authorizations are omitted; signatures, proofs not in archive db *)
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct

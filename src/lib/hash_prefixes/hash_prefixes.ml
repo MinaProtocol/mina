@@ -50,7 +50,8 @@ let signature_mainnet = create "MinaSignatureMainnet"
 
 let receipt_chain_user_command = create "MinaReceiptUC"
 
-let receipt_chain_zkapp = create "MinaReceiptZkapp"
+(* leaving this one with "Coda", to preserve the existing hashes *)
+let receipt_chain_zkapp = create "CodaReceiptZkapp"
 
 let epoch_seed = create "MinaEpochSeed"
 

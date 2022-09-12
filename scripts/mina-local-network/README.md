@@ -60,7 +60,7 @@
 ## SnarkyJS and zkApps
 
 - Now, if you’d like to work with the `zkApps` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using the `zkApp-CLI` like this: `zk project foo`).
-  - Suppose you’ve created `zkApp` at following path: 
+  - Suppose you’ve created `zkApp` at following path:
     - `~/projcts/zkapps/foo`
   - Go to `zkApp` project root (☝️).
   - Remove old `SnarkyJS` Node Module:
@@ -82,7 +82,7 @@
   - [http://localhost:4001/graphql](http://localhost:4001/graphql)
   - [http://localhost:4006/graphql](http://localhost:4006/graphql)
   - Etc.
-  - Depending on you environment configuration (amount of zkapp_command, starting port of ranges, etc.)
+  - Depending on you environment configuration (number of zkApp commands, starting port of ranges, etc.)
 - You might want to get `encoded private key` instead of the raw data generated for you. You can do this using the following command:
 
   ```shell
@@ -97,7 +97,7 @@
   ```
 
 - In order to start sending payments or anything else account related, you first need to import and unlock the account:
-  
+
     ```shell
     _build/default/src/app/cli/src/mina.exe \
       accounts import \
