@@ -30,7 +30,7 @@ pkgs.mkShell {
       tput bold
       printf 'opam init --bare # Only if you are running opam for the first time\n'
       printf 'opam update\n'
-      printf 'opam switch import src/opam.export --strict\n'
+      printf 'opam switch import opam.export --strict\n'
       printf 'eval $(opam env)\n'
       printf './scripts/pin-external-packages.sh\n'
       tput sgr0
