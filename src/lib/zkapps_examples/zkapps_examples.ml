@@ -395,6 +395,10 @@ let to_account_update (account_update : account_update) :
     Account_update_under_construction.In_circuit.to_account_update_and_calls
       account_update#account_update_under_construction
   in
+  let account_update_digest =
+    Zkapp_command.Call_forest.Digest.Account_update.Checked.create
+      account_update
+  in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
     ; calls = (Zkapp_call_forest.Checked.hash calls :> Field.t)
