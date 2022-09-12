@@ -208,12 +208,12 @@ struct
     ; hard_timeout = Slots 20
     }
 
-  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
-    let command_matches_parties cmd =
+  let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
+    let command_matches_zkapp_command cmd =
       let open User_command in
       match cmd with
-      | Parties p ->
-          Parties.equal p parties
+      | Zkapp_command p ->
+          Zkapp_command.equal p zkapp_command
       | Signed_command _ ->
           false
     in
@@ -221,7 +221,7 @@ struct
       let zkapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_parties )
+            |> command_matches_zkapp_command )
       in
       match zkapp_opt with
       | Some cmd_with_status ->
@@ -246,20 +246,20 @@ struct
     let is_first = ref true in
     { id = Zkapp_to_be_included_in_frontier
     ; description =
-        sprintf "zkApp with fee payer %s and other parties (%s), memo: %s"
+        sprintf "zkApp with fee payer %s and other zkapp_command (%s), memo: %s"
           (Signature_lib.Public_key.Compressed.to_base58_check
-             parties.fee_payer.body.public_key )
-          (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
-             ~f:(fun acc party ->
+             zkapp_command.fee_payer.body.public_key )
+          (Zkapp_command.Call_forest.Tree.fold_forest ~init:""
+             zkapp_command.account_updates ~f:(fun acc account_update ->
                let str =
                  Signature_lib.Public_key.Compressed.to_base58_check
-                   party.body.public_key
+                   account_update.body.public_key
                in
                if !is_first then (
                  is_first := false ;
                  str )
                else acc ^ ", " ^ str ) )
-          (Signed_command_memo.to_string_hum parties.memo)
+          (Signed_command_memo.to_string_hum zkapp_command.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

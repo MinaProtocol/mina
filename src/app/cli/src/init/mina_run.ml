@@ -373,9 +373,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Mina_lib.Config in
-          Coda_tracing.start (Mina_lib.config coda).conf_dir )
+          Mina_tracing.start (Mina_lib.config coda).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-          Coda_tracing.stop () ; Deferred.unit )
+          Mina_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
@@ -419,20 +419,23 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
         | `Transition ->
-            let parties_count, proof_parties_count =
+            let zkapp_command_count, proof_zkapp_command_count =
               (*should be Some in the case of `Transition*)
               match Option.value_exn transaction_opt with
               | Mina_transaction.Transaction.Command
-                  (Mina_base.User_command.Parties parties) ->
-                  Mina_base.Parties.Call_forest.fold parties.other_parties
-                    ~init:(1, 0) ~f:(fun (count, proof_parties_count) party ->
+                  (Mina_base.User_command.Zkapp_command zkapp_command) ->
+                  Mina_base.Zkapp_command.Call_forest.fold
+                    zkapp_command.account_updates ~init:(1, 0)
+                    ~f:(fun (count, proof_zkapp_command_count) account_update ->
                       ( count + 1
                       , if
                           Mina_base.Control.(
                             Tag.equal Proof
-                              (tag (Mina_base.Party.authorization party)))
-                        then proof_parties_count + 1
-                        else proof_parties_count ) )
+                              (tag
+                                 (Mina_base.Account_update.authorization
+                                    account_update ) ))
+                        then proof_zkapp_command_count + 1
+                        else proof_zkapp_command_count ) )
               | _ ->
                   (1, 0)
             in
@@ -441,8 +444,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Cryptography.(
                 Snark_work_histogram.observe snark_work_base_time_sec
                   (Time.Span.to_sec total) ;
-                Gauge.set transaction_length (Float.of_int parties_count) ;
-                Gauge.set proof_parties (Float.of_int proof_parties_count))) )
+                Gauge.set transaction_length (Float.of_int zkapp_command_count) ;
+                Gauge.set proof_zkapp_command
+                  (Float.of_int proof_zkapp_command_count))) )
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->

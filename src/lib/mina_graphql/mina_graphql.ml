@@ -1458,16 +1458,19 @@ module Types = struct
       | Included_but_failed of Transaction_status.Failure.Collection.t
 
     let failure_reasons =
-      obj "PartiesFailureReason" ~fields:(fun _ ->
+      obj "ZkappCommandFailureReason" ~fields:(fun _ ->
           [ field "index" ~typ:(Graphql_basic_scalars.Index.typ ())
-              ~args:[] ~doc:"List index of the party that failed"
+              ~args:[] ~doc:"List index of the account update that failed"
               ~resolve:(fun _ (index, _) -> Some index)
           ; field "failures"
               ~typ:
                 ( non_null @@ list @@ non_null
                 @@ Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ
                      () )
-              ~args:[] ~doc:"Failure reason for the party or any nested parties"
+              ~args:[]
+              ~doc:
+                "Failure reason for the account update or any nested zkapp \
+                 command"
               ~resolve:(fun _ (_, failures) -> failures)
           ] )
   end
@@ -1726,26 +1729,28 @@ module Types = struct
           resolve c cmd.With_status.data )
 
     let zkapp_command =
-      let conv (x : (Mina_lib.t, Parties.t) Fields_derivers_graphql.Schema.typ)
-          : (Mina_lib.t, Parties.t) typ =
+      let conv
+          (x : (Mina_lib.t, Zkapp_command.t) Fields_derivers_graphql.Schema.typ)
+          : (Mina_lib.t, Zkapp_command.t) typ =
         Obj.magic x
       in
-      obj "ZkappCommand" ~fields:(fun _ ->
+      obj "ZkappCommandResult" ~fields:(fun _ ->
           [ field_no_status "id"
               ~doc:"A Base58Check string representing the command"
               ~typ:
-                (non_null @@ Mina_base_unix.Graphql_scalars.PartiesBase58.typ ())
+                ( non_null
+                @@ Mina_base_unix.Graphql_scalars.ZkappCommandBase58.typ () )
               ~args:[]
-              ~resolve:(fun _ parties -> parties.With_hash.data)
+              ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
           ; field_no_status "hash"
               ~doc:"A cryptographic hash of the zkApp command"
               ~typ:(non_null transaction_hash) ~args:[]
-              ~resolve:(fun _ parties -> parties.With_hash.hash)
-          ; field_no_status "parties"
-              ~typ:(Parties.typ () |> conv)
+              ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.hash)
+          ; field_no_status "zkappCommand"
+              ~typ:(Zkapp_command.typ () |> conv)
               ~args:Arg.[]
-              ~doc:"Parties representing the transaction"
-              ~resolve:(fun _ parties -> parties.With_hash.data)
+              ~doc:"zkApp command representing the transaction"
+              ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
           ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
               ~args:[]
               ~doc:
@@ -1786,7 +1791,7 @@ module Types = struct
                       Some
                         (User_command.mk_user_command
                            { status; data = { t.data with data = c } } )
-                  | Parties _ ->
+                  | Zkapp_command _ ->
                       None ) )
         ; field "zkappCommands"
             ~doc:"List of zkApp commands included in this block"
@@ -1797,7 +1802,7 @@ module Types = struct
                   match t.data.data with
                   | Signed_command _ ->
                       None
-                  | Parties parties ->
+                  | Zkapp_command zkapp_command ->
                       let status =
                         match t.status with
                         | Applied ->
@@ -1807,7 +1812,7 @@ module Types = struct
                       in
                       Some
                         { Zkapp_command.With_status.status
-                        ; data = { t.data with data = parties }
+                        ; data = { t.data with data = zkapp_command }
                         } ) )
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
@@ -2362,16 +2367,16 @@ module Types = struct
     end
 
     module SendTestZkappInput = struct
-      type input = Mina_base.Parties.t
+      type input = Mina_base.Zkapp_command.t
 
       let arg_typ =
-        scalar "SendTestZkappInput" ~doc:"Parties for a test zkApp"
+        scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
           ~coerce:(fun json ->
             let json = to_yojson json in
-            Result.try_with (fun () -> Mina_base.Parties.of_json json)
+            Result.try_with (fun () -> Mina_base.Zkapp_command.of_json json)
             |> Result.map_error ~f:(fun ex -> Exn.to_string ex) )
           ~to_json:(fun (x : input) ->
-            Yojson.Safe.to_basic @@ Mina_base.Parties.to_json x )
+            Yojson.Safe.to_basic @@ Mina_base.Zkapp_command.to_json x )
     end
 
     module PrecomputedBlock = struct
@@ -2708,21 +2713,27 @@ module Types = struct
       type input = SendTestZkappInput.input
 
       let arg_typ =
-        let conv (x : Parties.t Fields_derivers_graphql.Schema.Arg.arg_typ) :
-            Parties.t Graphql_async.Schema.Arg.arg_typ =
+        let conv
+            (x :
+              Mina_base.Zkapp_command.t
+              Fields_derivers_graphql.Schema.Arg.arg_typ ) :
+            Mina_base.Zkapp_command.t Graphql_async.Schema.Arg.arg_typ =
           Obj.magic x
         in
         let arg_typ =
-          { arg_typ = Parties.arg_typ () |> conv
+          { arg_typ = Mina_base.Zkapp_command.arg_typ () |> conv
           ; to_json =
-              (function x -> Yojson.Safe.to_basic (Parties.parties_to_json x))
+              (function
+              | x ->
+                  Yojson.Safe.to_basic
+                    (Mina_base.Zkapp_command.zkapp_command_to_json x) )
           }
         in
         obj "SendZkappInput" ~coerce:Fn.id
           ~split:(fun f (x : input) -> f x)
           ~fields:
-            [ arg "parties"
-                ~doc:"Parties structure representing the transaction"
+            [ arg "zkappCommand"
+                ~doc:"zkApp command structure representing the transaction"
                 ~typ:arg_typ
             ]
     end
@@ -3356,20 +3367,20 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let send_zkapp_command mina parties =
-    match Mina_commands.setup_and_submit_snapp_command mina parties with
+  let send_zkapp_command mina zkapp_command =
+    match Mina_commands.setup_and_submit_snapp_command mina zkapp_command with
     | `Active f -> (
         match%map f with
-        | Ok parties ->
+        | Ok zkapp_command ->
             let cmd =
-              { Types.Zkapp_command.With_status.data = parties
+              { Types.Zkapp_command.With_status.data = zkapp_command
               ; status = Enqueued
               }
             in
             let cmd_with_hash =
               Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                   { With_hash.data = cmd
-                  ; hash = Transaction_hash.hash_command (Parties cmd)
+                  ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
                   } )
             in
             Ok cmd_with_hash
@@ -3380,13 +3391,13 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina parties :
-      ( (Parties.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina zkapp_command :
+      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
       Io.t =
-    (* instead of adding the parties to the transaction pool, as we would for an actual zkapp,
+    (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
     match Mina_lib.best_tip mina with
@@ -3449,22 +3460,23 @@ module Mutations = struct
                   |> Mina_state.Protocol_state.Body.view
                 in
                 let applied =
-                  Ledger.apply_parties_unchecked ~constraint_constants
-                    ~state_view ledger parties
+                  Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                    ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
-                    ~f:(fun (parties_applied, _local_state_and_amount) ->
-                      let ({ data = parties; status } : Parties.t With_status.t)
-                          =
-                        parties_applied.command
+                    ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
+                      let ({ data = zkapp_command; status }
+                            : Zkapp_command.t With_status.t ) =
+                        zkapp_command_applied.command
                       in
                       let hash =
-                        Transaction_hash.hash_command (Parties parties)
+                        Transaction_hash.hash_command
+                          (Zkapp_command zkapp_command)
                       in
                       let (with_hash : _ With_hash.t) =
-                        { data = parties; hash }
+                        { data = zkapp_command; hash }
                       in
                       let (status : Types.Command_status.t) =
                         match status with
@@ -3629,8 +3641,8 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.send_zkapp)
       ~args:
         Arg.[ arg "input" ~typ:(non_null Types.Input.SendZkappInput.arg_typ) ]
-      ~resolve:(fun { ctx = mina; _ } () parties ->
-        f mina parties (* TODO: error handling? *) )
+      ~resolve:(fun { ctx = mina; _ } () zkapp_command ->
+        f mina zkapp_command (* TODO: error handling? *) )
 
   let send_zkapp =
     make_zkapp_endpoint ~name:"sendZkapp" ~doc:"Send a zkApp transaction"
@@ -3646,11 +3658,12 @@ module Mutations = struct
       ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
         Arg.
-          [ arg "parties" ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
+          [ arg "zkappCommand"
+              ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
           ]
       ~typ:(non_null Types.Payload.send_zkapp)
-      ~resolve:(fun { ctx = mina; _ } () parties ->
-        send_zkapp_command mina parties )
+      ~resolve:(fun { ctx = mina; _ } () zkapp_command ->
+        send_zkapp_command mina zkapp_command )
 
   let send_test_payments =
     io_field "sendTestPayments" ~doc:"Send a series of test payments"
@@ -4070,7 +4083,7 @@ module Queries = struct
                      { status = Enqueued
                      ; data = { cmd_with_hash with data = user_cmd }
                      } )
-            | Parties _ ->
+            | Zkapp_command _ ->
                 None ) )
 
   let pooled_zkapp_commands =
@@ -4104,7 +4117,7 @@ module Queries = struct
             match cmd_with_hash.data with
             | Signed_command _ ->
                 None
-            | Parties zkapp_cmd ->
+            | Zkapp_command zkapp_cmd ->
                 Some
                   { Types.Zkapp_command.With_status.status = Enqueued
                   ; data = { cmd_with_hash with data = zkapp_cmd }
@@ -4304,13 +4317,14 @@ module Queries = struct
         let deserialize_txn serialized_txn =
           let res =
             match serialized_txn with
-            | `Signed_command x ->
+            | `Signed_command cmd ->
                 Or_error.(
-                  Signed_command.of_base58_check x
+                  Signed_command.of_base58_check cmd
                   >>| fun c -> User_command.Signed_command c)
-            | `Parties ps ->
+            | `Zkapp_command cmd ->
                 Or_error.(
-                  Parties.of_base58_check ps >>| fun c -> User_command.Parties c)
+                  Zkapp_command.of_base58_check cmd
+                  >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"
           |> Result.map ~f:(fun cmd ->
@@ -4327,7 +4341,7 @@ module Queries = struct
           | Some payment, None ->
               deserialize_txn (`Signed_command payment)
           | None, Some zkapp_txn ->
-              deserialize_txn (`Parties zkapp_txn)
+              deserialize_txn (`Zkapp_command zkapp_txn)
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in

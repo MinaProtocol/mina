@@ -4,8 +4,8 @@ let () =
   let layout = Fields_derivers_zkapps.js_layout in
   let js_layout =
     `Assoc
-      [ ("Parties", layout Parties.deriver)
-      ; ("Party", layout Party.Graphql_repr.deriver)
+      [ ("ZkappCommand", layout Zkapp_command.deriver)
+      ; ("AccountUpdate", layout Account_update.Graphql_repr.deriver)
       ]
   in
 
