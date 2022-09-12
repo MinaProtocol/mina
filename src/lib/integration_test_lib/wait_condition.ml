@@ -270,13 +270,9 @@ struct
         (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
       let event_node_id = Node.id event_node in
       let node_id = Node.id node in
+      Format.eprintf "EVENT NODE: %s  DESIRED NODE: %s@." event_node_id node_id ;
       if String.equal event_node_id node_id then Predicate_passed
-      else
-        Predicate_failure
-          (Error.of_string
-             (sprintf
-                "Expected to load frontier for node %s, but got frontier for %s"
-                node_id event_node_id ) )
+      else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 4 in
     { id = Persisted_frontier_loaded
