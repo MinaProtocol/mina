@@ -217,7 +217,7 @@ let
         done
       '') self.mina-dev.outputs);
 
-      mina_tests = runMinaCheck {
+      mina_tests_archive = runMinaCheck {
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
@@ -275,6 +275,7 @@ let
           sed 's#/dune$##' |
           grep -v 'mina_net2' |
           grep -v 'crypto/proof-systems/ocaml/tests/src' |
+          grep -v 'crypto/kimchi_backend' |
           tr '\n' ' '
         )
         dune runtest $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
@@ -316,9 +317,9 @@ let
       } ''
         mkdir coverage_files
         #TODO can coverage files have the same names ?
-        cp ${self.mina_tests}/coverage/* coverage_files
         cp ${self.mina_tests_zkapp_test_transaction}/coverage/* coverage_files
         cp ${self.mina_tests_src_lib}/coverage/* coverage_files
+        cp ${self.mina_tests_archive}/coverage/* coverage_files
         bisect-ppx-report html --coverage-path=coverage_files --tree --ignore-missing-files
         bisect-ppx-report summary --coverage-path=coverage_files --per-file > summary
       '';
