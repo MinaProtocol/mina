@@ -98,7 +98,7 @@ module Worker_state = struct
           (*possibly multiple producers per slot*)
     ; mutable current_slot : Global_slot.t option
     ; mutable epoch_data :
-        unit Ivar.t * Consensus.Data.Epoch_data_for_vrf.t option
+        (module Interruptible.F) * Consensus.Data.Epoch_data_for_vrf.t option
     ; mutable block_producer_keys : Block_producer_keys.t
     }
 
@@ -138,19 +138,16 @@ module Worker_state = struct
       ( { config
         ; slots_won
         ; block_producer_keys
-        ; epoch_data = interrupt_ivar, epoch_data
+        ; epoch_data = intr_module, epoch_data
         ; _
-        } as t ) : (unit, unit) Interruptible.t =
+        } as t ) : unit Interruptible.t =
+    let (module Intr) = intr_module in
     let (module Context) = context_of_config config in
     let open Context in
     match epoch_data with
     | None ->
-        Interruptible.return ()
+        Intr.return ()
     | Some epoch_data ->
-        let open Interruptible.Let_syntax in
-        let%bind () =
-          Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
-        in
         let module Slot = Mina_numbers.Global_slot in
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
@@ -179,7 +176,7 @@ module Worker_state = struct
               ] ;
           let rec go = function
             | [] ->
-                Interruptible.return None
+                Intr.return None
             | ((keypair : Keypair.t), public_key_compressed) :: keypairs -> (
                 let global_slot_since_genesis =
                   let slot_diff =
@@ -200,8 +197,8 @@ module Worker_state = struct
                     [ ("epoch", `Int (Epoch.to_int epoch))
                     ; ("slot", `Int (Slot.to_int slot))
                     ] ;
-                match%bind
-                  Consensus.Data.Vrf.check
+                match%bind.Intr
+                  Consensus.Data.Vrf.check ~intr_module
                     ~context:(module Context)
                     ~global_slot ~seed:epoch_data.epoch_seed
                     ~get_delegators:
@@ -226,7 +223,7 @@ module Worker_state = struct
                         ; vrf_result
                         }
                     in
-                    Interruptible.return (Some slot_won) )
+                    Intr.return (Some slot_won) )
           in
           go keypairs
         in
@@ -237,10 +234,10 @@ module Worker_state = struct
           let epoch' = Consensus_time.epoch consensus_time in
           if Epoch.(epoch' > epoch) then (
             t.current_slot <- None ;
-            Interruptible.return () )
+            Intr.return () )
           else
             let start = Time.now () in
-            match%bind evaluate_vrf ~consensus_time with
+            match%bind.Intr evaluate_vrf ~consensus_time with
             | None ->
                 [%log info] "Did not win slot $slot, took $time ms"
                   ~metadata:
@@ -260,6 +257,8 @@ module Worker_state = struct
         find_winning_slot start_consensus_time
 
   let create config =
+    let module Intr = Interruptible.Make () in
+    let intr = (module Intr : Interruptible.F) in
     { config
     ; last_checked_slot_and_epoch = Public_key.Compressed.Table.create ()
     ; slots_won =
@@ -268,7 +267,7 @@ module Worker_state = struct
             (Global_slot.to_int config.consensus_constants.slots_per_epoch)
           ()
     ; current_slot = None
-    ; epoch_data = (Ivar.create (), None)
+    ; epoch_data = (intr, None)
     ; block_producer_keys = []
     }
 end
@@ -289,11 +288,14 @@ module Functions = struct
           [%log info]
             "Updating epoch data for the VRF evaluation for epoch $epoch"
             ~metadata:[ ("epoch", Epoch.to_yojson e.epoch) ] ;
-          let interrupt_ivar, _ = w.epoch_data in
-          Ivar.fill_if_empty interrupt_ivar () ;
+          let old_intr_module, _ = w.epoch_data in
+          let (module Old_Intr) = old_intr_module in
+          Ivar.fill_if_empty Old_Intr.interrupt_ivar () ;
           Queue.clear w.slots_won ;
           w.current_slot <- None ;
-          w.epoch_data <- (Ivar.create (), Some e) ;
+          let module Intr = Interruptible.Make () in
+          let intr = (module Intr : Interruptible.F) in
+          w.epoch_data <- (intr, Some e) ;
           Interruptible.don't_wait_for (Worker_state.evaluate w) ;
           Deferred.unit
         in

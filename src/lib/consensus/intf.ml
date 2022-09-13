@@ -343,7 +343,8 @@ module type S = sig
 
     module Vrf : sig
       val check :
-           context:(module CONTEXT)
+           intr_module:(module Interruptible.F)
+        -> context:(module CONTEXT)
         -> global_slot:Mina_numbers.Global_slot.t
         -> seed:Mina_base.Epoch_seed.t
         -> producer_private_key:Signature_lib.Private_key.t
@@ -352,13 +353,12 @@ module type S = sig
         -> get_delegators:
              (   Public_key.Compressed.t
               -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
-        -> ( ( [ `Vrf_eval of string ]
-             * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
-             * [> `Delegator of
-                  Signature_lib.Public_key.Compressed.t
-                  * Mina_base.Account.Index.t ] )
-             option
-           , unit )
+        -> ( [ `Vrf_eval of string ]
+           * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
+           * [> `Delegator of
+                Signature_lib.Public_key.Compressed.t
+                * Mina_base.Account.Index.t ] )
+           option
            Interruptible.t
     end
 

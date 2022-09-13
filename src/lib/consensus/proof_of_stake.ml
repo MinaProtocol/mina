@@ -831,23 +831,23 @@ module Data = struct
                       request ) )
     end
 
-    let check ~context:(module Context : CONTEXT) ~global_slot ~seed
+    let check ~intr_module:(module Intr : Interruptible.F)
+        ~context:(module Context : CONTEXT) ~global_slot ~seed
         ~producer_private_key ~producer_public_key ~total_stake
         ~(get_delegators :
               Public_key.Compressed.t
            -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
       let open Context in
       let open Message in
-      let open Interruptible.Let_syntax in
       let delegators =
         get_delegators producer_public_key
         |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
       in
       let rec go acc = function
         | [] ->
-            Interruptible.return acc
+            Intr.return acc
         | (delegator, (account : Mina_base.Account.t)) :: delegators ->
-            let%bind () = Interruptible.return () in
+            let%bind.Intr () = Intr.return () in
             let vrf_result =
               T.eval ~constraint_constants ~private_key:producer_private_key
                 { global_slot; seed; delegator }
@@ -3877,15 +3877,23 @@ let%test_module "Proof of stake tests" =
       let samples = 1000 in
       let check i =
         let global_slot = UInt32.of_int i in
+        let module Intr = Interruptible.Make () in
         let%map result =
-          Interruptible.force
+          Intr.force
             (Vrf.check
+               ~intr_module:(module Intr)
                ~context:(module Context)
                ~global_slot ~seed ~producer_private_key:private_key
                ~producer_public_key:public_key_compressed ~total_stake
                ~get_delegators:(Local_state.Snapshot.delegators epoch_snapshot) )
         in
-        match Result.ok_exn result with Some _ -> 1 | None -> 0
+        match Result.ok result with
+        | Some None ->
+            0
+        | Some _ ->
+            1
+        | None ->
+            failwith "unexpected case"
       in
       let rec loop acc_count i =
         match i < samples with
