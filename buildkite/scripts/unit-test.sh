@@ -20,7 +20,7 @@ time make build
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed
 echo "--- Run unit tests"
-time dune runtest "${path}" --force --profile="${profile}" -j16 || \
+time dune runtest "${path}" --force --instrument-with bisect_ppx --profile="${profile}" -j16 || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
  time dune runtest "${path}" --profile="${profile}" -j16 || \
