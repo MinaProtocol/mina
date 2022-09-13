@@ -266,28 +266,23 @@ let run ~logger ~trust_system ~verifier ~transition_reader
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
                 header_hashed ;
+              let module Intr = Interruptible.Make () in
+              Deferred.upon
+                (Mina_net2.Validation_callback.await_timeout valid_cb)
+                (Ivar.fill_if_empty Intr.interrupt_ivar) ;
               let computation =
-                let open Interruptible.Let_syntax in
-                let defer f x =
-                  Interruptible.uninterruptible @@ Deferred.return (f x)
-                in
-                let%bind () =
-                  Interruptible.lift Deferred.unit
-                    (Mina_net2.Validation_callback.await_timeout valid_cb)
-                in
-                match%bind
-                  let open Interruptible.Result.Let_syntax in
+                match%bind.Intr
                   Validation.(
-                    wrap_header header_hashed
-                    |> defer
-                         (validate_time_received ~precomputed_values
-                            ~time_received )
-                    >>= defer
+                    let open Intr.Result.Let_syntax in
+                    Intr.return
+                      ( validate_time_received ~precomputed_values ~time_received
+                      @@ wrap_header header_hashed )
+                    >>= Fn.compose Intr.return
                           (validate_genesis_protocol_state ~genesis_state_hash)
-                    >>= Fn.compose Interruptible.uninterruptible
+                    >>= Fn.compose Intr.lift
                           (validate_single_proof ~verifier ~genesis_state_hash)
-                    >>= defer validate_delta_block_chain
-                    >>= defer validate_protocol_versions)
+                    >>= Fn.compose Intr.return validate_delta_block_chain
+                    >>= Fn.compose Intr.return validate_protocol_versions)
                   (* >>| Fn.flip with_body body) *)
                 with
                 | Ok verified_transition ->
@@ -315,17 +310,17 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                       ( State_hash.With_state_hashes.state_hash header_hashed
                       , sender
                       , time_received ) ;
-                    return ()
+                    Intr.return ()
                 | Error error ->
                     Mina_net2.Validation_callback.fire_if_not_already_fired
                       valid_cb `Reject ;
-                    Interruptible.uninterruptible
+                    Intr.lift
                     @@ handle_validation_error ~logger ~rejected_blocks_logger
                          ~time_received ~trust_system ~sender
                          ~header_with_hash:header_hashed
                          ~delta:genesis_constants.protocol.delta error
               in
-              Interruptible.force computation )
+              Intr.force computation )
             else Deferred.Result.fail () )
             >>| function
             | Ok () ->

@@ -42,10 +42,10 @@ let sign_blake2_hash ~private_key s =
   in
   Schnorr.Legacy.sign private_key input
 
-let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
+let send_uptime_data ~logger ~intr_module ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
-  let open Interruptible.Let_syntax in
-  let make_interruptible f = Interruptible.lift f interruptor in
+  let (module Intr : Interruptible.F) = intr_module in
+  let open Intr.Let_syntax in
   let block_data_json = block_data_to_yojson block_data in
   let block_data_string = Yojson.Safe.to_string block_data_json in
   let signature =
@@ -80,7 +80,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   let run_attempt attempt =
     let interruptible =
       match%map
-        make_interruptible
+        Intr.lift
           (Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
                Cohttp_async.Client.post ~headers
                  ~body:
@@ -159,7 +159,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
           (* retry *)
           false
     in
-    match%map.Deferred Interruptible.force interruptible with
+    match%map.Deferred Intr.force interruptible with
     | Ok succeeded ->
         succeeded
     | Error _ ->
@@ -186,7 +186,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
       go (attempt + 1) )
     else Deferred.unit
   in
-  make_interruptible (go 1)
+  Intr.lift (go 1)
 
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
@@ -198,24 +198,21 @@ let block_base64_of_breadcrumb breadcrumb =
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
 
-let send_produced_block_at ~logger ~interruptor ~url ~peer_id
+let send_produced_block_at ~logger ~intr_module ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
-  let open Interruptible.Let_syntax in
-  let make_interruptible f = Interruptible.lift f interruptor in
+  let (module Intr : Interruptible.F) = intr_module in
+  (* let open Intr.Deferred_let_syntax.Let_syntax in *)
   let timeout_min = 3.0 in
-  let%bind () = make_interruptible (at tm) in
-  match%bind
-    make_interruptible
-      (with_timeout
-         (Time.Span.of_min timeout_min)
-         (Bvar.wait block_produced_bvar) )
+  let%bind.Intr.Deferred_let_syntax () = at tm in
+  match%bind.Intr.Deferred_let_syntax
+    with_timeout (Time.Span.of_min timeout_min) (Bvar.wait block_produced_bvar)
   with
   | `Timeout ->
       [%log error]
         "Uptime service did not get a produced block within %0.1f minutes \
          after scheduled time"
         timeout_min ;
-      return ()
+      Intr.return ()
   | `Result breadcrumb ->
       let block_base64 = block_base64_of_breadcrumb breadcrumb in
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
@@ -226,23 +223,22 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ; snark_work = None
         }
       in
-      send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
+      send_uptime_data ~logger ~intr_module ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
 
-let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
+let send_block_and_transaction_snark ~logger ~intr_module ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
     ~snark_work_fee =
+  let (module Intr : Interruptible.F) = intr_module in
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
       [%log info]
         "Transition frontier not available to send a block to uptime service" ;
-      Interruptible.return ()
+      Intr.return ()
   | Some tf -> (
-      let make_interruptible f = Interruptible.lift f interruptor in
       let breadcrumb = Transition_frontier.best_tip tf in
       let block_base64 = block_base64_of_breadcrumb breadcrumb in
-      let open Interruptible.Let_syntax in
       let message =
         Sok_message.create ~fee:snark_work_fee
           ~prover:(Public_key.compress submitter_keypair.public_key)
@@ -266,7 +262,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ; snark_work = None
           }
         in
-        send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
+        send_uptime_data ~logger ~intr_module ~submitter_keypair ~url
           ~state_hash ~produced:false block_data )
       else
         let best_tip_staged_ledger =
@@ -290,7 +286,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               "Could not get SNARK work from best tip staged ledger for uptime \
                service"
               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-            Interruptible.return ()
+            Intr.return ()
         | Ok [] ->
             [%log info]
               "No SNARK jobs available for uptime service, sending just the \
@@ -305,7 +301,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; snark_work = None
               }
             in
-            send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
+            send_uptime_data ~logger ~intr_module ~submitter_keypair ~url
               ~state_hash ~produced:false block_data
         | Ok job_one_or_twos -> (
             let transitions =
@@ -347,13 +343,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; snark_work = None
                   }
                 in
-                send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
+                send_uptime_data ~logger ~intr_module ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
             | Some single_spec -> (
-                match%bind
-                  make_interruptible
-                    (Uptime_snark_worker.perform_single snark_worker
-                       (message, single_spec) )
+                match%bind.Intr.Deferred_let_syntax
+                  Uptime_snark_worker.perform_single snark_worker
+                    (message, single_spec)
                 with
                 | Error e ->
                     (* error in submitting to process *)
@@ -361,12 +356,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       "Error when running uptime service SNARK worker on a \
                        transaction"
                       ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                    Interruptible.return ()
+                    Intr.return ()
                 | Ok (Error e) ->
                     (* error in creating the SNARK work *)
                     [%log error] "Error computing SNARK work for uptime service"
                       ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                    Interruptible.return ()
+                    Intr.return ()
                 | Ok (Ok (proof, proof_time)) ->
                     let proof_data : Proof_data.t =
                       { proof; proof_time; snark_work_fee }
@@ -386,7 +381,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; snark_work = Some snark_work_base64
                       }
                     in
-                    send_uptime_data ~logger ~interruptor ~submitter_keypair
+                    send_uptime_data ~logger ~intr_module ~submitter_keypair
                       ~url ~state_hash ~produced:false block_data ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
@@ -424,11 +419,20 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
           return () )
       in
       let register_iteration =
-        let interrupt_ivar = ref (Ivar.create ()) in
+        let intr_ivar =
+          ref
+            (let module Init_Intr = Interruptible.Make () in
+            (module Init_Intr : Interruptible.F) )
+        in
         fun () ->
+          let (module Prev_intr) = !intr_ivar in
           (* terminate any Interruptible code from previous iteration *)
-          Ivar.fill_if_empty !interrupt_ivar () ;
-          Deferred.create (fun ivar -> interrupt_ivar := ivar)
+          Ivar.fill_if_empty Prev_intr.interrupt_ivar () ;
+
+          let module Intr = Interruptible.Make () in
+          let intr = (module Intr : Interruptible.F) in
+          intr_ivar := intr ;
+          intr
       in
       let run_iteration next_block_tm : Block_time.t Deferred.t =
         let get_next_producer_time_opt () =
@@ -461,9 +465,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
             ] ;
         (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in
-        let interruptor = register_iteration () in
+        let intr_module = register_iteration () in
+        let (module Intr) = intr_module in
         (* work in Interruptible monad in "background" *)
-        let open Interruptible.Let_syntax in
         Interruptible.don't_wait_for
           ( [%log trace] "Determining which action to take in uptime service" ;
             match get_peer () with
@@ -471,7 +475,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                 [%log warn]
                   "Daemon is not yet a peer in the gossip network, uptime \
                    service not sending a produced block" ;
-                Interruptible.return ()
+                Intr.return ()
             | Some ({ peer_id; _ } : Network_peer.Peer.t) -> (
                 let submitter_keypair =
                   (* daemon startup checked that a keypair was given if URL given *)
@@ -481,14 +485,14 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   [%log info]
                     "Uptime service will attempt to send the next produced \
                      block" ;
-                  send_produced_block_at ~logger ~interruptor ~url ~peer_id
+                  send_produced_block_at ~logger ~intr_module ~url ~peer_id
                     ~submitter_keypair ~block_produced_bvar next_producer_time
                 in
                 let send_block_and_snark_work () =
                   [%log info]
                     "Uptime service will attempt to send a block and SNARK work" ;
                   let snark_work_fee = get_snark_work_fee () in
-                  send_block_and_transaction_snark ~logger ~interruptor ~url
+                  send_block_and_transaction_snark ~logger ~intr_module ~url
                     ~snark_worker ~transition_frontier ~peer_id
                     ~submitter_keypair ~snark_work_fee
                 in
@@ -507,7 +511,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     in
                     if Time.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)
-                      let%bind () = send_block_and_snark_work () in
+                      let%bind.Intr () = send_block_and_snark_work () in
                       send_just_block next_producer_time
                     else send_block_and_snark_work () ) ) ;
         Deferred.return (Block_time.add next_block_tm five_slots_span)
