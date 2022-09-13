@@ -847,7 +847,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         request ) )
       end
 
-      let check ~context:(module Context : CONTEXT)
+      let check ~intr_module:(module I : Interruptible.F)
+          ~context:(module Context : CONTEXT)
           ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
           ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
@@ -855,16 +856,16 @@ module Make_str (A : Wire_types.Concrete) = struct
              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
         let open Context in
         let open Message in
-        let open Interruptible.Let_syntax in
+        let open I.Let_syntax in
         let delegators =
           get_delegators producer_public_key
           |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
         in
         let rec go acc = function
           | [] ->
-              Interruptible.return acc
+              return acc
           | (delegator, (account : Mina_base.Account.t)) :: delegators ->
-              let%bind () = Interruptible.return () in
+              let%bind () = return () in
               let vrf_result =
                 T.eval ~constraint_constants ~private_key:producer_private_key
                   { global_slot; seed; delegator }
@@ -3829,17 +3830,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         let expected = stake_fraction *. 0.75 in
         let samples = 1000 in
         let check i =
+          let module Intr = Interruptible.Make () in
           let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int i in
           let%map result =
-            Interruptible.force
+            Intr.force
               (Vrf.check
+                 ~intr_module:(module Intr)
                  ~context:(module Context)
                  ~global_slot ~seed ~producer_private_key:private_key
                  ~producer_public_key:public_key_compressed ~total_stake
                  ~get_delegators:
                    (Local_state.Snapshot.delegators epoch_snapshot) )
           in
-          match Result.ok_exn result with Some _ -> 1 | None -> 0
+          match Result.ok result with Some (Some _) -> 1 | _ -> 0
         in
         let rec loop acc_count i =
           match i < samples with
