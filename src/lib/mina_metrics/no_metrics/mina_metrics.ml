@@ -78,7 +78,7 @@ module Cryptography = struct
 
   let zkapp_proof_updates : Counter.t = ()
 
-  let zkapp_proof_updates : Counter.t = ()
+  let zkapp_transaction_length : Counter.t = ()
 end
 
 module Bootstrap = struct
