@@ -76,11 +76,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let zkapp_account_keypair = Signature_lib.Keypair.create () in
     let%bind () =
-      let wait_for_zkapp parties =
+      let wait_for_zkapp zkapp_command =
         let%map () =
           wait_for t
           @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
-               ~parties
+               ~zkapp_command
         in
         [%log info] "ZkApp transaction included in transition frontier"
       in
@@ -105,7 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; zkapp_account_keypairs = [ zkapp_account_keypair ]
              ; memo
              ; new_zkapp_account = true
-             ; snapp_update = Mina_base.Party.Update.dummy
+             ; snapp_update = Mina_base.Account_update.Update.dummy
              ; current_auth = Mina_base.Permissions.Auth_required.Signature
              ; call_data = Snark_params.Tick.Field.zero
              ; events = []
