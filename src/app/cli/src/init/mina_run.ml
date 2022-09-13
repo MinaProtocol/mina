@@ -373,9 +373,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Mina_lib.Config in
-          Coda_tracing.start (Mina_lib.config coda).conf_dir )
+          Mina_tracing.start (Mina_lib.config coda).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-          Coda_tracing.stop () ; Deferred.unit )
+          Mina_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
@@ -422,10 +422,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             (*should be Some in the case of `Transition*)
             match Option.value_exn transaction_opt with
             | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Parties parties) ->
+                (Mina_base.User_command.Zkapp_command parties) ->
                 let init =
                   match
-                    (Mina_base.Party.of_fee_payer parties.fee_payer)
+                    (Mina_base.Account_update.of_fee_payer parties.fee_payer)
                       .authorization
                   with
                   | Proof _ ->
@@ -434,13 +434,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                       (1, 0)
                 in
                 let parties_count, proof_parties_count =
-                  Mina_base.Parties.Call_forest.fold parties.other_parties ~init
+                  Mina_base.Zkapp_command.Call_forest.fold
+                    parties.account_updates ~init
                     ~f:(fun (count, proof_parties_count) party ->
                       ( count + 1
                       , if
                           Mina_base.Control.(
                             Tag.equal Proof
-                              (tag (Mina_base.Party.authorization party)))
+                              (tag
+                                 (Mina_base.Account_update.authorization party) ))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
                 in

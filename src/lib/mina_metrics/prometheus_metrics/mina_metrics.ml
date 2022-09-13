@@ -302,7 +302,7 @@ module Cryptography = struct
 
   let zkapp_proof_updates =
     let help =
-      "Number of updates with proof authorization in a parties transaction"
+      "Number of updates with proof authorization in a zkapp transaction"
     in
     Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 
@@ -365,17 +365,19 @@ module Transaction_pool = struct
     Counter.v "zkapp_transactions_added_to_pool" ~help ~namespace ~subsystem
 
   let zkapp_transaction_size : Counter.t =
-    let help = "Size of valid parties transaction received (bin_size_t)" in
+    let help = "Size of valid zkapp transaction received (bin_size_t)" in
     Counter.v "zkapp_transaction_size" ~help ~namespace ~subsystem
 
   let zkapp_updates : Counter.t =
-    let help = "Number of parties in a valid transaction received" in
+    let help =
+      "Number of account updates in a valid zkapp transaction received"
+    in
     Counter.v "zkapp_updates" ~help ~namespace ~subsystem
 
   let zkapp_proof_updates : Counter.t =
     let help =
-      "Number of parties with proof authorization in a parties transaction (0 \
-       for simple transactions)"
+      "Number of account updates with proof authorization in a zkapp \
+       transaction"
     in
     Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 end

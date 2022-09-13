@@ -1128,7 +1128,7 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
-          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+          if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
@@ -1209,12 +1209,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ~f:(fun pk -> `Other pk)
           in
           let current_protocol_version =
-            Coda_run.get_current_protocol_version
+            Mina_run.get_current_protocol_version
               ~compile_time_current_protocol_version ~conf_dir ~logger
               curr_protocol_version
           in
           let proposed_protocol_version_opt =
-            Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+            Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
               proposed_protocol_version
           in
           ( match
@@ -1320,7 +1320,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             in
             Node_error_service.set_config ~get_node_state
               ~node_error_url:(Uri.of_string url) ~contact_info ) ;
-        Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+        Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
           ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
@@ -1337,7 +1337,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
-        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
+        Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           mina ;
         let%bind () =

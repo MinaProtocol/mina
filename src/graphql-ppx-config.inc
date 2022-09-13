@@ -68,8 +68,8 @@ Graphql_lib.Scalars.SequenceEvent
 StateHashAsDecimal
 Graphql_lib.Scalars.StateHashAsDecimal
 -custom-field
-PartiesBase58
-Graphql_lib.Scalars.PartiesBase58
+ZkappCommandBase58
+Graphql_lib.Scalars.ZkappCommandBase58
 -custom-field
 TransactionStatusFailure
 Graphql_lib.Scalars.TransactionStatusFailure

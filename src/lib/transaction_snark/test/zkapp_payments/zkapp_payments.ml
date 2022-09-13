@@ -13,14 +13,14 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
-    let merkle_root_after_parties_exn t ~txn_state_view txn =
+    let merkle_root_after_zkapp_command_exn t ~txn_state_view txn =
       let hash =
-        Ledger.merkle_root_after_parties_exn
+        Ledger.merkle_root_after_zkapp_command_exn
           ~constraint_constants:U.constraint_constants ~txn_state_view t txn
       in
       Frozen_ledger_hash.of_ledger_hash hash
 
-    let signed_signed ~(wallets : U.Wallet.t array) i j : Parties.t =
+    let signed_signed ~(wallets : U.Wallet.t array) i j : Zkapp_command.t =
       let full_amount = 8_000_000_000 in
       let fee = Fee.of_int (Random.int full_amount) in
       let receiver_amount =
@@ -32,7 +32,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Parties.of_simple
+      Zkapp_command.of_simple
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
@@ -42,7 +42,7 @@ let%test_module "Zkapp payments tests" =
                 }
             ; authorization = Signature.dummy
             }
-        ; other_parties =
+        ; account_updates =
             [ { body =
                   { public_key = acct1.account.public_key
                   ; update =
@@ -66,7 +66,7 @@ let%test_module "Zkapp payments tests" =
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
-                      { Party.Preconditions.network =
+                      { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
                       ; account = Accept
                       }
@@ -77,7 +77,7 @@ let%test_module "Zkapp payments tests" =
               }
             ; { body =
                   { public_key = acct2.account.public_key
-                  ; update = Party.Update.noop
+                  ; update = Account_update.Update.noop
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
                   ; increment_nonce = false
@@ -86,7 +86,7 @@ let%test_module "Zkapp payments tests" =
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
-                      { Party.Preconditions.network =
+                      { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
                       ; account = Accept
                       }
@@ -121,9 +121,9 @@ let%test_module "Zkapp payments tests" =
                 (*Testing merkle root change*)
                 let (`If_this_is_used_it_should_have_a_comment_justifying_it t1)
                     =
-                  Parties.Valid.to_valid_unsafe t1
+                  Zkapp_command.Valid.to_valid_unsafe t1
                 in
-                merkle_root_after_parties_exn ledger ~txn_state_view t1
+                merkle_root_after_zkapp_command_exn ledger ~txn_state_view t1
               in
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post ) )
@@ -132,27 +132,31 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let parties =
-                party_send ~constraint_constants (List.hd_exn specs)
+              let zkapp_command =
+                account_update_send ~constraint_constants (List.hd_exn specs)
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ) )
+              ignore
+                ( U.apply_zkapp_command ledger [ zkapp_command ]
+                  : Sparse_ledger.t ) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let partiess =
+              let zkapp_commands =
                 List.map
                   ~f:(fun s ->
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    party_send ~constraint_constants ~use_full_commitment s )
+                    account_update_send ~constraint_constants
+                      ~use_full_commitment s )
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore (U.apply_parties ledger partiess : Sparse_ledger.t) ) )
+              ignore
+                (U.apply_zkapp_command ledger zkapp_commands : Sparse_ledger.t) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -188,7 +192,7 @@ let%test_module "Zkapp payments tests" =
                     ; zkapp_account_keypairs = []
                     ; memo
                     ; new_zkapp_account = false
-                    ; snapp_update = Party.Update.dummy
+                    ; snapp_update = Account_update.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
@@ -196,13 +200,13 @@ let%test_module "Zkapp payments tests" =
                     ; preconditions = None
                     }
                   in
-                  let parties =
+                  let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let%test_unit "zkapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
@@ -255,7 +259,7 @@ let%test_module "Zkapp payments tests" =
                     ; zkapp_account_keypairs = []
                     ; memo
                     ; new_zkapp_account = false
-                    ; snapp_update = Party.Update.dummy
+                    ; snapp_update = Account_update.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
@@ -263,10 +267,10 @@ let%test_module "Zkapp payments tests" =
                     ; preconditions = None
                     }
                   in
-                  let parties =
+                  let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
-                  U.check_parties_with_merges_exn
+                  U.check_zkapp_command_with_merges_exn
                     ~expected_failure:Transaction_status.Failure.Overflow ledger
-                    [ parties ] ) ) )
+                    [ zkapp_command ] ) ) )
   end )
