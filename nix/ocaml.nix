@@ -225,7 +225,6 @@ let
           outputs = [ "out" ];
           installPhase = ''
               mkdir -p $out/coverage
-              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
           '';
         };
         extraInputs = [ pkgs.ephemeralpg ];
@@ -241,7 +240,7 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/app/archive --instrument-with bisect_ppx --display=short || echo "failed"
+        dune runtest src/app/archive --display=short || echo "failed"
       '';
 
       mina_tests_src_lib = runMinaCheck {
@@ -252,7 +251,7 @@ let
           outputs = [ "out" ];
           installPhase = ''
               mkdir -p $out/coverage
-              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+              # find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
           '';
         };
 
@@ -281,7 +280,7 @@ let
           grep -v 'crypto/kimchi_backend' |
           tr '\n' ' '
         )
-        dune runtest $LIBRARIES_TO_TEST --instrument-with bisect_ppx -j$NIX_BUILD_CORES || echo "failed"
+        dune runtest $LIBRARIES_TO_TEST -j$NIX_BUILD_CORES || echo "failed"
       '';
 
       mina_tests_zkapp_test_transaction = runMinaCheck {
@@ -292,7 +291,7 @@ let
           outputs = [ "out" ];
           installPhase = ''
               mkdir -p $out/coverage
-              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+              # find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
           '';
         };
       } ''
@@ -300,31 +299,11 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short || echo "failed"
+        dune runtest src/app/zkapp_test_transaction --display=short || echo "failed"
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
-      '';
-
-      mina_coverage = runMinaCheck {
-        name = "build-coverage";
-        extraArgs = {
-          outputs = [ "out" ];
-          installPhase = ''
-              mkdir $out
-              mv _coverage $out/html
-              mv summary $out/summary
-          '';
-        };
-      } ''
-        mkdir coverage_files
-        #TODO can coverage files have the same names ?
-        cp ${self.mina_tests_zkapp_test_transaction}/coverage/* coverage_files
-        cp ${self.mina_tests_src_lib}/coverage/* coverage_files
-        cp ${self.mina_tests_archive}/coverage/* coverage_files
-        bisect-ppx-report html --coverage-path=coverage_files --tree --ignore-missing-files
-        bisect-ppx-report summary --coverage-path=coverage_files --per-file > summary
       '';
 
       mina_client_sdk = self.mina-dev.overrideAttrs (_: {
