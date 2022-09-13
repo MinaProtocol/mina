@@ -514,13 +514,36 @@ module Update = struct
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
         | Zkapp_command p ->
             let p = Zkapp_command.Valid.forget p in
-            Mina_metrics.Gauge.set
-              Mina_metrics.Transaction_pool.zkapp_command_transaction_size
+            let updates, proof_updates =
+              let init =
+                match
+                  (Account_update.of_fee_payer p.fee_payer).authorization
+                with
+                | Proof _ ->
+                    (1, 1)
+                | _ ->
+                    (1, 0)
+              in
+              Zkapp_command.Call_forest.fold p.account_updates ~init
+                ~f:(fun (count, proof_updates_count) account_update ->
+                  ( count + 1
+                  , if
+                      Control.(
+                        Tag.equal Proof
+                          (tag (Account_update.authorization account_update)))
+                    then proof_updates_count + 1
+                    else proof_updates_count ) )
+            in
+            Mina_metrics.Counter.inc_one
+              Mina_metrics.Transaction_pool.zkapp_transactions_added_to_pool ;
+            Mina_metrics.Counter.inc
+              Mina_metrics.Transaction_pool.zkapp_transaction_size
               (Zkapp_command.Stable.Latest.bin_size_t p |> Float.of_int) ;
-            Mina_metrics.Gauge.set
-              Mina_metrics.Transaction_pool.zkapp_command_count
-              ( List.length (Zkapp_command.to_simple p).account_updates
-              |> Float.of_int )
+            Mina_metrics.Counter.inc Mina_metrics.Transaction_pool.zkapp_updates
+              (Float.of_int updates) ;
+            Mina_metrics.Counter.inc
+              Mina_metrics.Transaction_pool.zkapp_proof_updates
+              (Float.of_int proof_updates)
         | Signed_command _ ->
             () ) ;
         { acc with

@@ -274,24 +274,37 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
       ~subsystem
 
+  let snark_work_zkapp_base_time_sec =
+    let help = "time elapsed while doing base proof for a zkapp transaction" in
+    Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
+
   let snark_work_base_time_sec =
-    let help = "time elapsed while doing base proof" in
-    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
-      ~subsystem
-
-  let transaction_length =
     let help =
-      "Number of zkapp_command in a zkapp_command transaction (1 for simple \
-       transactions)"
+      "time elapsed while doing base proof for a non-zkapp transaction"
     in
-    Gauge.v "transaction_length" ~help ~namespace ~subsystem
+    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
 
-  let proof_zkapp_command =
+  let snark_work_zkapp_base_submissions =
     let help =
-      "Number of zkapp_command with proof authorization in a zkapp_command \
-       transaction (0 for simple transactions)"
+      "Number of base transactions snarks for zkapp transactions submitted"
     in
-    Gauge.v "proof_zkapp_command" ~help ~namespace ~subsystem
+    Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
+
+  let snark_work_base_submissions =
+    let help =
+      "Number of base transactions snarks for non-zkapp transactions submitted"
+    in
+    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_length =
+    let help = "Number of updates in a zkapp transaction" in
+    Counter.v "zkapp_transaction_length" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates =
+    let help =
+      "Number of updates with proof authorization in a zkapp transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 
   (* TODO:
      let transaction_proving_time_ms =
@@ -345,15 +358,28 @@ module Transaction_pool = struct
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 
-  let zkapp_command_transaction_size : Gauge.t =
+  let zkapp_transactions_added_to_pool : Counter.t =
     let help =
-      "Size of valid zkapp_command transaction received (bin_size_t)"
+      "Number of zkapp transactions added to the pool since the node start"
     in
-    Gauge.v "zkapp_command_transaction_size" ~help ~namespace ~subsystem
+    Counter.v "zkapp_transactions_added_to_pool" ~help ~namespace ~subsystem
 
-  let zkapp_command_count : Gauge.t =
-    let help = "Number of zkapp_command in a valid transaction received" in
-    Gauge.v "zkapp_command_count" ~help ~namespace ~subsystem
+  let zkapp_transaction_size : Counter.t =
+    let help = "Size of valid zkapp transaction received (bin_size_t)" in
+    Counter.v "zkapp_transaction_size" ~help ~namespace ~subsystem
+
+  let zkapp_updates : Counter.t =
+    let help =
+      "Number of account updates in a valid zkapp transaction received"
+    in
+    Counter.v "zkapp_updates" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates : Counter.t =
+    let help =
+      "Number of account updates with proof authorization in a zkapp \
+       transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
