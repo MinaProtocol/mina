@@ -107,7 +107,7 @@ let create_ledger_and_transactions num_transactions :
       (ledger, [ Command (Signed_command a); Command (Signed_command b) ])
 
 let create_ledger_and_zkapps num_transactions :
-    Mina_ledger.Ledger.t * Parties.t list =
+    Mina_ledger.Ledger.t * Zkapp_command.t list =
   let length =
     match num_transactions with
     | `Count length ->
@@ -115,8 +115,10 @@ let create_ledger_and_zkapps num_transactions :
     | `Two_from_same ->
         failwith "Must provide a count when profiling with snapps"
   in
-  let max_other_parties =
-    let min_max = Mina_generators.Parties_generators.max_other_parties in
+  let max_account_updates =
+    let min_max =
+      Mina_generators.Zkapp_command_generators.max_account_updates
+    in
     Quickcheck.random_value (Int.gen_incl min_max 20)
   in
   let `VK vk, `Prover prover =
@@ -124,18 +126,18 @@ let create_ledger_and_zkapps num_transactions :
   in
   let cmd_infos, ledger =
     Quickcheck.random_value
-      (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~length ~vk () )
+      (Mina_generators.User_command_generators
+       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
         match user_cmd with
-        | User_command.Parties parties_valid ->
+        | User_command.Zkapp_command zkapp_command_valid ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                Parties_builder.replace_authorizations ~prover ~keymap
-                  (Parties.Valid.forget parties_valid) )
+                Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                  (Zkapp_command.Valid.forget zkapp_command_valid) )
         | User_command.Signed_command _ ->
-            failwith "Expected Parties user command" )
+            failwith "Expected Zkapp_command user command" )
   in
   (ledger, zkapps)
 
@@ -203,7 +205,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
         in
         let tm0 = Core.Unix.gettimeofday () in
         let%map proof =
-          T.of_non_parties_transaction
+          T.of_non_zkapp_command_transaction
             ~statement:
               { sok_digest = Sok_message.Digest.default
               ; source =
@@ -268,20 +270,20 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
 
-let profile_zkapps ~verifier ledger partiess =
+let profile_zkapps ~verifier ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
-    let num_partiess = List.length partiess in
-    Async.Deferred.List.iteri partiess ~f:(fun ndx parties ->
-        printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
-          num_partiess
-          (List.length @@ Parties.other_parties_list parties) ;
+    let num_zkapp_commands = List.length zkapp_commands in
+    Async.Deferred.List.iteri zkapp_commands ~f:(fun ndx zkapp_command ->
+        printf "Processing zkApp %d of %d, account_updates length: %d\n"
+          (ndx + 1) num_zkapp_commands
+          (List.length @@ Zkapp_command.account_updates_list zkapp_command) ;
         let%bind res =
           Verifier.verify_commands verifier
             [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
                 ~location_of_account:Mina_ledger.Ledger.location_of_account
-                (Parties parties)
+                (Zkapp_command zkapp_command)
             ]
         in
         let _a = Or_error.ok_exn res in
@@ -290,8 +292,8 @@ let profile_zkapps ~verifier ledger partiess =
         let%map () =
           match%map
             Async_kernel.Monitor.try_with (fun () ->
-                Transaction_snark_tests.Util.check_parties_with_merges_exn
-                  ledger [ parties ] )
+                Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
+                  ledger [ zkapp_command ] )
           with
           | Ok () ->
               ()

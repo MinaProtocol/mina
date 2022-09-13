@@ -76,12 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 ( Currency.Balance.to_formatted_string
-                 @@ Currency.Balance.of_uint64 account.balance.total )
+                 (Currency.Balance.to_formatted_string account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 ( Currency.Balance.to_formatted_string
-                 @@ Currency.Balance.of_uint64 account.balance.total )
+                 (Currency.Balance.to_formatted_string account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -975,7 +973,7 @@ let snark_pool_list =
                        ~f:(fun w ->
                          { Cli_lib.Graphql_types.Completed_works.Work.work_ids =
                              Array.to_list w.work_ids
-                         ; fee = Currency.Fee.of_uint64 w.fee
+                         ; fee = w.fee
                          ; prover = w.prover
                          } )
                        response.snarkPool ) )
@@ -1053,10 +1051,8 @@ let pending_snark_work =
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
-                              to_signed_fee_exn f.sign
-                                (Currency.Amount.of_uint64 f.fee_magnitude)
-                          ; supply_increase =
-                              Currency.Amount.of_uint64 w.supply_increase
+                              to_signed_fee_exn f.sign f.fee_magnitude
+                          ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               Mina_base.Epoch_seed.of_base58_check_exn
                                 w.source_first_pass_ledger_hash
@@ -1182,8 +1178,7 @@ let set_snark_work_fee =
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
-               ( Currency.Fee.to_int
-               @@ Currency.Fee.of_uint64 response.setSnarkWorkFee.lastFee ) ) )
+               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
 
 let import_key =
   Command.async
@@ -1434,8 +1429,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       ( Currency.Balance.to_formatted_string
-                       @@ Currency.Balance.of_uint64 w.balance.total )
+                       (Currency.Balance.to_formatted_string w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1581,35 +1575,38 @@ let lock_account =
          in
          printf "🔒 Locked account!\nPublic key: %s\n" pk_string ) )
 
+let generate_libp2p_keypair_do privkey_path =
+  Cli_lib.Exceptions.handle_nicely
+  @@ fun () ->
+  Deferred.ignore_m
+    (let open Deferred.Let_syntax in
+    (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+    let logger = Logger.null () in
+    (* Using the helper only for keypair generation requires no state. *)
+    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+        match%bind
+          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+        with
+        | Ok net ->
+            let%bind me = Mina_net2.generate_random_keypair net in
+            let%bind () = Mina_net2.shutdown net in
+            let%map () =
+              Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
+            in
+            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+        | Error e ->
+            [%log fatal] "failed to generate libp2p keypair: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            exit 20 ))
+
 let generate_libp2p_keypair =
   Command.async
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    Cli_lib.Exceptions.handle_nicely
-    @@ fun () ->
-    Deferred.ignore_m
-      (let open Deferred.Let_syntax in
-      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-      let logger = Logger.null () in
-      (* Using the helper only for keypair generation requires no state. *)
-      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind
-            Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-          with
-          | Ok net ->
-              let%bind me = Mina_net2.generate_random_keypair net in
-              let%bind () = Mina_net2.shutdown net in
-              let%map () =
-                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
-              in
-              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
-          | Error e ->
-              [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-              exit 20 )))
+    generate_libp2p_keypair_do privkey_path)
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -2267,7 +2264,6 @@ let advanced =
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
-    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
     ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
@@ -2296,3 +2292,7 @@ let ledger =
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
     ]
+
+let libp2p =
+  Command.group ~summary:"Libp2p commands"
+    [ ("generate-keypair", generate_libp2p_keypair) ]

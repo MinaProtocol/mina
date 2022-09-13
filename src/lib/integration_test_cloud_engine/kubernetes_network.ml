@@ -95,9 +95,9 @@ module Node = struct
   module Graphql = struct
     let ingress_uri node =
       let host =
-        Printf.sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
+        sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
       in
-      let path = Printf.sprintf "/%s/graphql" node.app_id in
+      let path = sprintf "/%s/graphql" node.app_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
@@ -211,7 +211,7 @@ module Node = struct
     {|
       query ($max_length: Int) @encoders(module: "Encoders"){
         bestChain (maxLength: $max_length) {
-          stateHash
+          stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
           commandTransactionCount
           creatorAccount {
             publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
@@ -245,7 +245,7 @@ module Node = struct
                     locked
                     total
                   }
-          delegate @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+          delegate
           nonce
           permissions { editSequenceState
                         editState
@@ -263,10 +263,10 @@ module Node = struct
           zkappState
           zkappUri
           timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
-                   cliffAmount @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   cliffAmount
                    vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
-                   vestingIncrement @ppxCustom(module: "Graphql_lib.Scalars.JSON")
-                   initialMinimumBalance @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingIncrement
+                   initialMinimumBalance
                  }
           token
           tokenSymbol
@@ -435,17 +435,14 @@ module Node = struct
     | Some acc ->
         return
           { nonce =
-              acc.nonce
-              |> Option.value_exn
-                   ~message:
-                     "the nonce from get_balance is None, which should be \
-                      impossible"
-              |> Mina_numbers.Account_nonce.of_string
-          ; total_balance = Currency.Balance.of_uint64 acc.balance.total
-          ; liquid_balance_opt =
-              Option.map ~f:Currency.Balance.of_uint64 acc.balance.liquid
-          ; locked_balance_opt =
-              Option.map ~f:Currency.Balance.of_uint64 acc.balance.locked
+              Option.value_exn
+                ~message:
+                  "the nonce from get_balance is None, which should be \
+                   impossible"
+                acc.nonce
+          ; total_balance = acc.balance.total
+          ; liquid_balance_opt = acc.balance.liquid
+          ; locked_balance_opt = acc.balance.locked
           }
 
   let must_get_account_data ~logger t ~account_id =
@@ -501,7 +498,7 @@ module Node = struct
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
-  (* return a Party.Update.t with all fields `Set` to the
+  (* return a Account_update.Update.t with all fields `Set` to the
      value in the account, or `Keep` if value unavailable,
      as if this update had been applied to the account
   *)
@@ -516,9 +513,7 @@ module Node = struct
           match account.zkappState with
           | Some strs ->
               let fields =
-                Array.to_list strs
-                |> Base.List.map ~f:(fun s ->
-                       Set (Pickles.Backend.Tick.Field.of_string s) )
+                Array.to_list strs |> Base.List.map ~f:(fun s -> Set s)
               in
               return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
@@ -532,25 +527,16 @@ module Node = struct
         in
         let%bind delegate =
           match account.delegate with
-          | Some (`String s) ->
-              return
-                (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
-          | Some json ->
-              fail
-                (Error.of_string
-                   (sprintf "Expected string encoding of delegate, got %s"
-                      (Yojson.Basic.to_string json) ) )
+          | Some s ->
+              return (Set s)
           | None ->
               fail (Error.of_string "Expected delegate in account")
         in
         let%bind verification_key =
           match account.verificationKey with
           | Some vk_obj ->
-              let data =
-                Pickles.Side_loaded.Verification_key.of_base58_check_exn
-                  vk_obj.verificationKey
-              in
-              let hash = Pickles.Backend.Tick.Field.of_string vk_obj.hash in
+              let data = vk_obj.verificationKey in
+              let hash = vk_obj.hash in
               return (Set ({ data; hash } : _ With_hash.t))
           | None ->
               fail
@@ -599,15 +585,7 @@ module Node = struct
           | None, None, None, None, None ->
               return @@ Keep
           | Some amt, Some tm, Some period, Some incr, Some bal ->
-              let%bind cliff_amount =
-                match amt with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for cliff amount in account timing" )
-              in
+              let cliff_amount = amt in
               let%bind cliff_time =
                 match tm with
                 | `String s ->
@@ -626,26 +604,8 @@ module Node = struct
                       (Error.of_string
                          "Expected string for vesting period in account timing" )
               in
-              let%bind vesting_increment =
-                match incr with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
-              let%bind initial_minimum_balance =
-                match bal with
-                | `String s ->
-                    return @@ Currency.Balance.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
+              let vesting_increment = incr in
+              let initial_minimum_balance = bal in
               return
                 (Set
                    ( { initial_minimum_balance
@@ -654,14 +614,14 @@ module Node = struct
                      ; vesting_period
                      ; vesting_increment
                      }
-                     : Mina_base.Party.Update.Timing_info.t ) )
+                     : Mina_base.Account_update.Update.Timing_info.t ) )
           | _ ->
               fail (Error.of_string "Some pieces of account timing are missing")
         in
         let%bind voting_for =
           match account.votingFor with
           | Some s ->
-              return @@ Set (Mina_base.State_hash.of_base58_check_exn s)
+              return @@ Set s
           | None ->
               fail (Error.of_string "Expected voting-for state hash in account")
         in
@@ -675,7 +635,7 @@ module Node = struct
             ; timing
             ; voting_for
             }
-            : Mina_base.Party.Update.t )
+            : Mina_base.Account_update.Update.t )
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
@@ -719,7 +679,7 @@ module Node = struct
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
       { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in
@@ -736,19 +696,20 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+  let send_zkapp ~logger (t : t) ~(zkapp_command : Mina_base.Zkapp_command.t) =
     [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let parties_json =
-      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
+    let zkapp_command_json =
+      Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic
     in
     let send_zkapp_graphql () =
       let send_zkapp_obj =
-        Graphql.Send_test_zkapp.(make @@ makeVariables ~parties:parties_json ())
+        Graphql.Send_test_zkapp.(
+          make @@ makeVariables ~zkapp_command:zkapp_command_json ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj
@@ -765,18 +726,16 @@ module Node = struct
                   | None ->
                       acc
                   | Some f ->
-                      ( Int.of_string (Option.value_exn f.index)
-                      , Array.map
-                          ~f:(fun s ->
-                            Mina_base.Transaction_status.Failure.of_string s
-                            |> Result.ok_or_failwith )
-                          f.failures
-                        |> Array.to_list |> List.rev )
+                      ( Option.value_exn f.index
+                      , f.failures |> Array.to_list |> List.rev )
                       :: acc )
             |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
             |> Yojson.Safe.to_string )
     in
-    let zkapp_id = sent_zkapp_obj.internalSendZkapp.zkapp.id in
+    let zkapp_id =
+      Mina_base.Zkapp_command.to_base58_check
+        sent_zkapp_obj.internalSendZkapp.zkapp.id
+    in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
 
@@ -814,7 +773,7 @@ module Node = struct
     let return_obj = result_obj.sendDelegation.delegation in
     let res =
       { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in
@@ -858,7 +817,7 @@ module Node = struct
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
       { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in

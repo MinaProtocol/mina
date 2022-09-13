@@ -47,7 +47,7 @@ module type Blockchain_state = sig
     type t =
       ( Staged_ledger_hash.t
       , Frozen_ledger_hash.t
-      , Mina_transaction_logic.Parties_logic.Local_state.Value.t
+      , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t
       , Block_time.t
       , Body_reference.t )
       Poly.t
@@ -57,7 +57,7 @@ module type Blockchain_state = sig
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
-    , Mina_transaction_logic.Parties_logic.Local_state.Checked.t
+    , Mina_transaction_logic.Zkapp_command_logic.Local_state.Checked.t
     , Block_time.Checked.t
     , Body_reference.var )
     Poly.t

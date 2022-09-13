@@ -75,7 +75,12 @@ ocaml_word_size:
 # This check is disabled in the pure nix environment (that does not use opam).
 check_opam_switch:
 ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
+    ifeq (, $(shell which check_opam_switch))
+	$(warning The check_opam_switch binary was not found in the PATH.)
+	$(error The current opam switch should likely be updated by running: "opam switch import opam.export")
+    else
 	check_opam_switch opam.export
+    endif
 endif
 
 ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
@@ -292,10 +297,7 @@ genesis-ledger-ocaml:
 ## Tests
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_coda/tests
-
-web:
-	./scripts/web.sh
+	$(MAKE) -C src/lib/ppx_mina/tests
 
 ########################################
 ## Benchmarks

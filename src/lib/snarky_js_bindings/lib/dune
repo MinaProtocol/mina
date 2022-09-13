@@ -9,6 +9,7 @@
    sexplib0
    yojson
    ;; local libraries ;;
+   mina_wire_types
    mina_base
    mina_base.import
    snarky.backendless

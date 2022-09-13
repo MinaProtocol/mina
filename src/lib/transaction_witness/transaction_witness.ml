@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Parties_segment_witness = struct
+module Zkapp_command_segment_witness = struct
   open Mina_base
   open Mina_ledger
   open Currency
@@ -14,10 +14,10 @@ module Parties_segment_witness = struct
         ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V1.t
-              , Parties.Call_forest.With_hashes.Stable.V1.t )
+              , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
             , ( ( ( Token_id.Stable.V1.t
-                  , Parties.Call_forest.With_hashes.Stable.V1.t )
+                  , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
                 With_hash.Stable.V1.t
@@ -31,11 +31,11 @@ module Parties_segment_witness = struct
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , Mina_numbers.Index.Stable.V1.t
             , Transaction_status.Failure.Collection.Stable.V1.t )
-            Mina_transaction_logic.Parties_logic.Local_state.Stable.V1.t
-        ; start_parties :
-            ( Parties.Stable.V1.t
+            Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
+        ; start_zkapp_command :
+            ( Zkapp_command.Stable.V1.t
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t )
-            Mina_transaction_logic.Parties_logic.Start_data.Stable.V1.t
+            Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
         ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t

@@ -15,7 +15,7 @@
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
-    ppx_coda
+    ppx_mina
     ppx_compare
     ppx_deriving_yojson
     ppx_hash

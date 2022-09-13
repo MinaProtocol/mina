@@ -1,5 +1,5 @@
 (library
-  (name party_precondition_tests)
+  (name account_update_precondition_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config

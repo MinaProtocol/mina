@@ -19,8 +19,8 @@ type sparse_ledger = t
 
 module Global_state : sig
   type t =
-    { fee_payment_ledger : sparse_ledger
-    ; parties_ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     }

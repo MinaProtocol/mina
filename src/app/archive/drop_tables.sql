@@ -10,7 +10,7 @@ DROP TABLE blocks_user_commands;
 
 DROP TABLE blocks_zkapp_commands;
 
-DROP TABLE zkapp_party_failures;
+DROP TABLE zkapp_account_update_failures;
 
 DROP TABLE accounts_accessed;
 
@@ -36,9 +36,9 @@ DROP TABLE zkapp_commands;
 
 DROP TABLE zkapp_fee_payer_body;
 
-DROP TABLE zkapp_other_party;
+DROP TABLE zkapp_account_update;
 
-DROP TABLE zkapp_other_party_body;
+DROP TABLE zkapp_account_update_body;
 
 DROP TYPE call_type_type;
 

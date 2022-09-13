@@ -1797,7 +1797,7 @@ module T = struct
       epoch_ledger
     |> not
 
-  let validate_party_proofs ~logger ~validating_ledger
+  let validate_account_update_proofs ~logger ~validating_ledger
       (txn : User_command.Valid.t) =
     let open Result.Let_syntax in
     let get_verification_keys account_ids =
@@ -1824,29 +1824,32 @@ module T = struct
               [%log error]
                 ~metadata:[ ("account_id", Account_id.to_yojson id) ]
                 "Staged_ledger_diff creation: Verification key not found for \
-                 party with proof authorization and account_id $account_id" ;
+                 account_update with proof authorization and account_id \
+                 $account_id" ;
               Stop Account_id.Map.empty )
         ~finish:Fn.id
     in
     match txn with
-    | Parties p ->
+    | Zkapp_command p ->
         let%map checked_verification_keys =
           Account_id.Map.of_alist_or_error p.verification_keys
         in
-        let proof_parties =
-          Parties.Call_forest.fold ~init:Account_id.Set.empty
-            p.parties.other_parties ~f:(fun acc p ->
-              if Control.(Tag.equal Proof (tag (Party.authorization p))) then
-                Account_id.Set.add acc (Party.account_id p)
+        let proof_zkapp_command =
+          Zkapp_command.Call_forest.fold ~init:Account_id.Set.empty
+            p.zkapp_command.account_updates ~f:(fun acc p ->
+              if
+                Control.(Tag.equal Proof (tag (Account_update.authorization p)))
+              then Account_id.Set.add acc (Account_update.account_id p)
               else acc )
         in
         let current_verification_keys =
-          get_verification_keys (Account_id.Set.to_list proof_parties)
+          get_verification_keys (Account_id.Set.to_list proof_zkapp_command)
         in
         if
-          Account_id.Set.length proof_parties
+          Account_id.Set.length proof_zkapp_command
           = Account_id.Map.length checked_verification_keys
-          && Account_id.Map.equal Parties.Valid.Verification_key_hash.equal
+          && Account_id.Map.equal
+               Zkapp_command.Valid.Verification_key_hash.equal
                checked_verification_keys current_verification_keys
         then true
         else (
@@ -1854,11 +1857,13 @@ module T = struct
             ~metadata:
               [ ( "checked_verification_keys"
                 , [%to_yojson:
-                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
+                    list]
                     (Account_id.Map.to_alist checked_verification_keys) )
               ; ( "current_verification_keys"
                 , [%to_yojson:
-                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
+                    list]
                     (Account_id.Map.to_alist current_verification_keys) )
               ]
             "Staged_ledger_diff creation: Verifcation keys used for verifying \
@@ -1953,7 +1958,8 @@ module T = struct
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
                     let%bind valid_proofs =
-                      validate_party_proofs ~logger ~validating_ledger txn
+                      validate_account_update_proofs ~logger ~validating_ledger
+                        txn
                     in
                     let%bind () =
                       if valid_proofs then Ok ()
@@ -2053,7 +2059,7 @@ module T = struct
               []
           | Failed ->
               [] )
-      | Command (Parties { new_accounts; _ }) ->
+      | Command (Zkapp_command { new_accounts; _ }) ->
           new_accounts
       | Fee_transfer { new_accounts; _ } ->
           new_accounts
@@ -2535,32 +2541,32 @@ let%test_module "staged ledger tests" =
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind parties_and_fee_payer_keypairs, ledger =
-        Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_zkapps ~vk ?failure ()
+      let%bind zkapp_command_and_fee_payer_keypairs, ledger =
+        Mina_generators.User_command_generators
+        .sequence_zkapp_command_with_ledger ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
-        List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties_valid, _fee_payer_keypair, keymap ->
-              let parties_with_auths =
+        List.map zkapp_command_and_fee_payer_keypairs ~f:(function
+          | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
+              let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Parties_builder.replace_authorizations ~keymap
-                      (Parties.Valid.forget parties_valid) )
+                    Zkapp_command_builder.replace_authorizations ~keymap
+                      (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
-              let valid_parties_with_auths : Parties.Valid.t =
+              let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Parties.Valid.to_valid parties_with_auths ~ledger
+                  Zkapp_command.Valid.to_valid zkapp_command_with_auths ~ledger
                     ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
                 | Some ps ->
                     ps
                 | None ->
-                    failwith "Could not create Parties.Valid.t"
+                    failwith "Could not create Zkapp_command.Valid.t"
               in
-              User_command.Parties valid_parties_with_auths
+              User_command.Zkapp_command valid_zkapp_command_with_auths
           | Signed_command _, _, _ ->
-              failwith "Expected a Parties, got a Signed command" )
+              failwith "Expected a Zkapp_command, got a Signed command" )
       in
       assert (List.length zkapps = num_zkapps) ;
       return (ledger, zkapps, List.init iters ~f:(Fn.const None))
@@ -2572,7 +2578,8 @@ let%test_module "staged ledger tests" =
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let num_zkapps = transaction_capacity * iters in
       gen_zkapps
-        ~failure:Mina_generators.Parties_generators.Invalid_account_precondition
+        ~failure:
+          Mina_generators.Zkapp_command_generators.Invalid_account_precondition
         ~num_zkapps iters
 
     let gen_zkapps_at_capacity :
@@ -3805,7 +3812,7 @@ let%test_module "staged ledger tests" =
           let amount = Amount.of_int 10_000_000_000 in
           let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
           let snapp_update =
-            { Party.Update.dummy with
+            { Account_update.Update.dummy with
               delegate = Zkapp_basic.Set_or_keep.Set snapp_pk
             }
           in
@@ -3857,15 +3864,16 @@ let%test_module "staged ledger tests" =
                       ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
                     l
                   in
-                  let%bind parties =
+                  let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
-                  let valid_parties =
+                  let valid_zkapp_command =
                     Option.value_exn
-                      (Parties.Valid.to_valid ~ledger:valid_against_ledger
+                      (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
                          ~get:Ledger.get
-                         ~location_of_account:Ledger.location_of_account parties )
+                         ~location_of_account:Ledger.location_of_account
+                         zkapp_command )
                   in
                   ignore
                     (Ledger.unregister_mask_exn valid_against_ledger
@@ -3877,11 +3885,12 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties valid_parties))
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
-                  (*Parties with incompatible vk should not be in the diff*)
+                  (*Zkapp_command with incompatible vk should not be in the diff*)
                   assert (List.is_empty commands) ;
                   (*Update the account to have correct vk*)
                   let loc =
@@ -3900,19 +3909,23 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties valid_parties))
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
                   assert (List.length commands = 1) ;
                   match List.hd_exn commands with
-                  | { With_status.data = Parties _ps; status = Applied } ->
+                  | { With_status.data = Zkapp_command _ps; status = Applied }
+                    ->
                       return ()
-                  | { With_status.data = Parties _ps; status = Failed tbl } ->
+                  | { With_status.data = Zkapp_command _ps
+                    ; status = Failed tbl
+                    } ->
                       failwith
-                        (sprintf "Parties application failed %s"
+                        (sprintf "Zkapp_command application failed %s"
                            ( Transaction_status.Failure.Collection.to_yojson tbl
                            |> Yojson.Safe.to_string ) )
                   | _ ->
-                      failwith "expecting parties transaction" ) ) )
+                      failwith "expecting zkapp_command transaction" ) ) )
   end )

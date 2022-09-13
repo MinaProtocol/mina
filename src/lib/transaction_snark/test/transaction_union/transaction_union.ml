@@ -625,7 +625,7 @@ let%test_module "Transaction union tests" =
 
     let sub_fee fee = sub_amount (Amount.of_fee fee)
 
-    (*TODO: test with parties transactions
+    (*TODO: test with zkapp_command transactions
         let%test_unit "transfer non-default tokens to a new account: fails but \
                        charges fee" =
           Test_util.with_randomness 123456789 (fun () ->

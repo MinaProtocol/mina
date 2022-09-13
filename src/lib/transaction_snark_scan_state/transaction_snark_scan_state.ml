@@ -566,7 +566,7 @@ struct
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
-          (Mina_transaction_logic.Parties_logic.Local_state.Value.equal
+          (Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.equal
              reg1.local_state reg2.local_state )
           "did not connect with local state"
       in

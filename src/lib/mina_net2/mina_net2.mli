@@ -165,7 +165,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
-  -> mina_peer_exchange:bool
+  -> peer_protection_ratio:float
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> min_connections:int
@@ -370,3 +370,5 @@ val connection_gating_config : t -> connection_gating
 
 (** List of currently banned IPs. *)
 val banned_ips : t -> Unix.Inet_addr.t list
+
+val send_heartbeat : t -> Peer.Id.t -> unit

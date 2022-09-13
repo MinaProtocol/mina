@@ -37,6 +37,6 @@
     consensus
     mina_numbers
    )
-  (preprocess (pps ppx_jane ppx_deriving.std ppx_coda ppx_version))
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_mina ppx_version))
   (instrumentation (backend bisect_ppx))
   (synopsis "Node error service library for collection error report from nodes"))

@@ -5,13 +5,13 @@ module Get_status =
 {|
   query {
     genesisBlock {
-      stateHash
+      stateHash @ppxCustom(module: "Scalars.String_json")
    }
     bestChain(maxLength: 1) {
-      stateHash
+      stateHash @ppxCustom(module: "Scalars.String_json")
       protocolState {
         blockchainState {
-          utcDate
+          utcDate @ppxCustom(module: "Serializing.Int64")
         }
         consensusState {
           blockHeight @ppxCustom(module: "Serializing.Int64")
@@ -279,7 +279,7 @@ module Status = struct
           else Some [|{
               stateHash = "STATE_HASH_TIP";
               protocolState = {
-                blockchainState = {utcDate = Int64.to_string @@ Int64.of_int_exn 1_594_854_566};
+                blockchainState = {utcDate = Int64.of_int_exn 1_594_854_566};
                 consensusState = {blockHeight = Int64.of_int_exn 4 }
               }
             }|];

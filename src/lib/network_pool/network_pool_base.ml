@@ -184,7 +184,7 @@ end)
         ~trace_label:Resource_pool.label ~logger resource_pool
     in
     log_rate_limiter_occasionally network_pool remote_rl ;
-    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    (*priority: Transition frontier diffs > local diffs > incoming diffs*)
     Deferred.don't_wait_for
       (O1trace.thread Resource_pool.label (fun () ->
            Strict_pipe.Reader.Merge.iter
@@ -255,7 +255,7 @@ end)
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
       ~expiry_ns ~frontier_broadcast_pipe ~logger ~log_gossip_heard
       ~on_remote_push =
-    (*Diffs from tansition frontier extensions*)
+    (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Network pool transition frontier diffs" Synchronous)

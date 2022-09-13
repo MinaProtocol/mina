@@ -97,10 +97,10 @@ module Statement : sig
          supply_increase:'amount
       -> fee_excess:'fee_excess
       -> sok_digest:'sok_digest
-      -> source_fee_payment_ledger:'ledger_hash
-      -> target_fee_payment_ledger:'ledger_hash
-      -> source_parties_ledger:'ledger_hash
-      -> target_parties_ledger:'ledger_hash
+      -> source_first_pass_ledger:'ledger_hash
+      -> target_first_pass_ledger:'ledger_hash
+      -> source_second_pass_ledger:'ledger_hash
+      -> target_second_pass_ledger:'ledger_hash
       -> pending_coinbase_stack_state:
            'pending_coinbase Pending_coinbase_stack_state.poly
       -> ( 'ledger_hash
@@ -108,7 +108,7 @@ module Statement : sig
          , 'pending_coinbase
          , 'fee_excess
          , 'sok_digest
-         , Mina_transaction_logic.Parties_logic.Local_state.Value.t )
+         , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
          t
   end
 
@@ -250,10 +250,10 @@ val check_transaction :
      ?preeval:bool
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
-  -> source_fee_payment_ledger:Frozen_ledger_hash.t
-  -> target_fee_payment_ledger:Frozen_ledger_hash.t
-  -> source_parties_ledger:Frozen_ledger_hash.t
-  -> target_parties_ledger:Frozen_ledger_hash.t
+  -> source_first_pass_ledger:Frozen_ledger_hash.t
+  -> target_first_pass_ledger:Frozen_ledger_hash.t
+  -> source_second_pass_ledger:Frozen_ledger_hash.t
+  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
@@ -266,10 +266,10 @@ val check_transaction :
 val check_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
-  -> source_fee_payment_ledger:Frozen_ledger_hash.t
-  -> target_fee_payment_ledger:Frozen_ledger_hash.t
-  -> source_parties_ledger:Frozen_ledger_hash.t
-  -> target_parties_ledger:Frozen_ledger_hash.t
+  -> source_first_pass_ledger:Frozen_ledger_hash.t
+  -> target_first_pass_ledger:Frozen_ledger_hash.t
+  -> source_second_pass_ledger:Frozen_ledger_hash.t
+  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> supply_increase:Amount.Signed.t
@@ -281,10 +281,10 @@ val generate_transaction_witness :
      ?preeval:bool
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
-  -> source_fee_payment_ledger:Frozen_ledger_hash.t
-  -> target_fee_payment_ledger:Frozen_ledger_hash.t
-  -> source_parties_ledger:Frozen_ledger_hash.t
-  -> target_parties_ledger:Frozen_ledger_hash.t
+  -> source_first_pass_ledger:Frozen_ledger_hash.t
+  -> target_first_pass_ledger:Frozen_ledger_hash.t
+  -> source_second_pass_ledger:Frozen_ledger_hash.t
+  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
@@ -294,7 +294,7 @@ val generate_transaction_witness :
   -> Tick.Handler.t
   -> unit
 
-module Parties_segment : sig
+module Zkapp_command_segment : sig
   module Spec : sig
     type single =
       { auth_type : Control.Tag.t
@@ -304,7 +304,7 @@ module Parties_segment : sig
     type t = single list
   end
 
-  module Witness = Transaction_witness.Parties_segment_witness
+  module Witness = Transaction_witness.Zkapp_command_segment_witness
 
   module Basic : sig
     [%%versioned:
@@ -326,7 +326,7 @@ module type S = sig
 
   val cache_handle : Pickles.Cache_handle.t
 
-  val of_non_parties_transaction :
+  val of_non_zkapp_command_transaction :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Transaction.Valid.t Transaction_protocol_state.t
@@ -347,10 +347,10 @@ module type S = sig
     -> Tick.Handler.t
     -> t Async.Deferred.t
 
-  val of_parties_segment_exn :
+  val of_zkapp_command_segment_exn :
        statement:Statement.With_sok.t
-    -> witness:Parties_segment.Witness.t
-    -> spec:Parties_segment.Basic.t
+    -> witness:Zkapp_command_segment.Witness.t
+    -> spec:Zkapp_command_segment.Basic.t
     -> t Async.Deferred.t
 
   val merge :
@@ -364,74 +364,74 @@ type local_state =
   , Currency.Amount.Signed.t
   , Mina_ledger.Sparse_ledger.t
   , bool
-  , Parties.Transaction_commitment.t
+  , Zkapp_command.Transaction_commitment.t
   , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
-  Mina_transaction_logic.Parties_logic.Local_state.t
+  Mina_transaction_logic.Zkapp_command_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
 
-(** Represents before/after pairs of states, corresponding to parties in a list of parties transactions.
+(** Represents before/after pairs of states, corresponding to zkapp_command in a list of zkapp_command transactions.
  *)
-module Parties_intermediate_state : sig
+module Zkapp_command_intermediate_state : sig
   type state = { global : global_state; local : local_state }
 
   type t =
     { kind : [ `Same | `New | `Two_new ]
-    ; spec : Parties_segment.Basic.t
+    ; spec : Zkapp_command_segment.Basic.t
     ; state_before : state
     ; state_after : state
     }
 end
 
-(** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
-    statements, corresponding to parties in [partiess] which minimize the
-    number of snark proofs needed to prove all of the parties.
+(** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
+    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+    number of snark proofs needed to prove all of the zkapp_command.
 
-    This function is intended to take the parties from multiple transactions as
-    its input, which may be converted from a [Parties.t list] using
-    [List.map ~f:Parties.parties]. The [stmtss] argument should be a list of
-    the same length, with 1 more state than the number of parties for each
+    This function is intended to take the zkapp_command from multiple transactions as
+    its input, which may be converted from a [Zkapp_command.t list] using
+    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
+    the same length, with 1 more state than the number of zkapp_command for each
     transaction.
 
-    For example, two transactions made up of parties [[p1; p2; p3]] and
+    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
     [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
     where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
     where [s0] is the initial state before any of the transactions have been
     applied.
 
     Each pair is also identified with one of [`Same], [`New], or [`Two_new],
-    indicating that the next one ([`New]) or next two ([`Two_new]) [Parties.t]s
+    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-val group_by_parties_rev :
-     Party.t list list
+val group_by_zkapp_command_rev :
+     Account_update.t list list
   -> (global_state * local_state) list list
-  -> Parties_intermediate_state.t list
+  -> Zkapp_command_intermediate_state.t list
 
-(** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
+(** [zkapp_command_witnesses_exn ledger zkapp_commands] generates the zkapp_command segment witnesses
     and corresponding statements needed to prove the application of each
-    parties transaction in [partiess] on top of ledger. If multiple parties are
+    zkapp_command transaction in [zkapp_commands] on top of ledger. If multiple zkapp_command are
     given, they are applied in order and grouped together to minimise the
     number of transaction proofs that would be required.
-    There must be at least one parties transaction in [parties].
+    There must be at least one zkapp_command transaction in [zkapp_command].
 
     The returned value is a list of tuples, each corresponding to a single
-    proof for some parts of some parties transactions, comprising:
+    proof for some parts of some zkapp_command transactions, comprising:
     * the witness information for the segment, to be passed to the prover
     * the segment kind, identifying the type of proof that will be generated
     * the proof statement, describing the transition between the states before
       and after the segment
     * the list of calculated 'snapp statements', corresponding to the expected
-      public input of any snapp parties in the current segment.
+      public input of any snapp zkapp_command in the current segment.
 
     WARNING: This function calls the transaction logic internally, and thus may
     raise an exception if the transaction logic would also do so. This function
-    should only be used on parties that are already known to pass transaction
+    should only be used on zkapp_command that are already known to pass transaction
     logic without an exception.
 *)
-val parties_witnesses_exn :
+val zkapp_command_witnesses_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
@@ -439,9 +439,11 @@ val parties_witnesses_exn :
      | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
   -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
      * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
-     * Parties.t )
+     * Zkapp_command.t )
      list
-  -> (Parties_segment.Witness.t * Parties_segment.Basic.t * Statement.With_sok.t)
+  -> ( Zkapp_command_segment.Witness.t
+     * Zkapp_command_segment.Basic.t
+     * Statement.With_sok.t )
      list
      * Mina_ledger.Sparse_ledger.t
 
@@ -494,10 +496,10 @@ module Base : sig
          Account_timing.As_record.t )
        Tick.Checked.t
 
-  module Parties_snark : sig
+  module Zkapp_command_snark : sig
     val main :
-         ?witness:Parties_segment.Witness.t
-      -> Parties_segment.Spec.t
+         ?witness:Zkapp_command_segment.Witness.t
+      -> Zkapp_command_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Statement.With_sok.var
       -> Zkapp_statement.Checked.t option
@@ -516,12 +518,12 @@ module For_tests : sig
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
-      ; snapp_update : Party.Update.t
+      ; snapp_update : Account_update.Update.t
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
-      ; preconditions : Party.Preconditions.t option
+      ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]
   end
@@ -530,7 +532,7 @@ module For_tests : sig
        ?no_auth:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
-    -> Parties.t
+    -> Zkapp_command.t
 
   val update_states :
        ?zkapp_prover:
@@ -543,7 +545,7 @@ module For_tests : sig
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
-    -> Parties.t Async.Deferred.t
+    -> Zkapp_command.t Async.Deferred.t
 
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -551,7 +553,7 @@ module For_tests : sig
     -> snapp_kp:Signature_lib.Keypair.t
     -> Mina_transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
-    -> Parties.t Async.Deferred.t
+    -> Zkapp_command.t Async.Deferred.t
 
   val trivial_zkapp_account :
        ?permissions:Permissions.t
@@ -579,5 +581,5 @@ module For_tests : sig
               Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Parties.t
+  val multiple_transfers : Spec.t -> Zkapp_command.t
 end
