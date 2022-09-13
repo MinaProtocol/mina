@@ -8650,7 +8650,7 @@
         {
           "kind": "SCALAR",
           "name": "TransactionId",
-          "description": "Base64-encoded transaction id",
+          "description": "Base64-encoded transaction",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -9013,7 +9013,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null

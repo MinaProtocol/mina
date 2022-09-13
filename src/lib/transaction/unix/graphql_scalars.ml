@@ -15,5 +15,5 @@ module TransactionId =
     (struct
       let name = "TransactionId"
 
-      let doc = "Base64-encoded transaction id"
+      let doc = "Base64-encoded transaction"
     end)

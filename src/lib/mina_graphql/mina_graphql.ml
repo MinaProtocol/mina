@@ -1501,7 +1501,7 @@ module Types = struct
         typ =
       interface "UserCommand" ~doc:"Common interface for user commands"
         ~fields:(fun _ ->
-          [ abstract_field "id" ~typ:(non_null guid) ~args:[]
+          [ abstract_field "id" ~typ:(non_null transaction_id) ~args:[]
           ; abstract_field "hash" ~typ:(non_null transaction_hash) ~args:[]
           ; abstract_field "kind" ~typ:(non_null kind) ~args:[]
               ~doc:"String describing the kind of user command"
