@@ -533,7 +533,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
              ~zkapp_command
       in
-      [%log info] "ZkApp transactions included in transition frontier"
+      [%log info] "ZkApp transaction included in transition frontier"
     in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with

@@ -95,9 +95,9 @@ module Node = struct
   module Graphql = struct
     let ingress_uri node =
       let host =
-        Printf.sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
+        sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
       in
-      let path = Printf.sprintf "/%s/graphql" node.app_id in
+      let path = sprintf "/%s/graphql" node.app_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct

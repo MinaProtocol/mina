@@ -39,6 +39,7 @@ struct
     | Ledger_proofs_emitted_since_genesis
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
+    | Persisted_frontier_loaded
 
   type t =
     { id : wait_condition_id
@@ -72,7 +73,7 @@ struct
     network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-        |> Printf.sprintf "[%s] to initialize" )
+        |> sprintf "[%s] to initialize" )
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
@@ -101,7 +102,7 @@ struct
       (2 * n) + 1
     in
     { id = Blocks_to_be_produced
-    ; description = Printf.sprintf "%d blocks to be produced" n
+    ; description = sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -116,8 +117,7 @@ struct
       else Predicate_continuation initial_height
     in
     let description =
-      Printf.sprintf "chain block height greater than equal to [%d] "
-        height_growth
+      sprintf "chain block height greater than equal to [%d] " height_growth
     in
     let soft_timeout_in_slots = (2 * height_growth) + 1 in
     { id = Block_height_growth
@@ -150,7 +150,7 @@ struct
       |> String.concat ~sep:", "
     in
     { id = Nodes_to_synchronize
-    ; description = Printf.sprintf "%s to synchronize" formatted_nodes
+    ; description = sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -185,7 +185,7 @@ struct
     let soft_timeout_in_slots = 8 in
     { id = Signed_command_to_be_included_in_frontier
     ; description =
-        Printf.sprintf "signed command with hash %s"
+        sprintf "signed command with hash %s"
           (Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
@@ -199,8 +199,7 @@ struct
       else Predicate_continuation ()
     in
     let description =
-      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
-        num_proofs
+      sprintf "[%d] snarked_ledgers to be generated since genesis" num_proofs
     in
     { id = Ledger_proofs_emitted_since_genesis
     ; description
@@ -262,6 +261,23 @@ struct
                else acc ^ ", " ^ str ) )
           (Signed_command_memo.to_string_hum zkapp_command.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let persisted_frontier_loaded node =
+    let check () event_node
+        (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
+      let event_node_id = Node.id event_node in
+      let node_id = Node.id node in
+      if String.equal event_node_id node_id then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 4 in
+    { id = Persisted_frontier_loaded
+    ; description = "persisted transition frontier to load"
+    ; predicate =
+        Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
