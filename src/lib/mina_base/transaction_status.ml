@@ -214,9 +214,8 @@ module Failure = struct
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
     | Incorrect_verification_key (`Expected_verification_key expected_key) ->
-        (* TODO: how large is the verification key? is it ok to base58? *)
         sprintf "Incorrect_verification_key_%s"
-          (Side_loaded_verification_key.to_base58_check expected_key)
+          (Side_loaded_verification_key.to_base64 expected_key)
 
   let of_string = function
     | "Predicate" ->
@@ -322,7 +321,7 @@ module Failure = struct
               , ""
               , fun str ->
                   let vk =
-                    Side_loaded_verification_key.of_base58_check_exn str
+                    Or_error.ok_exn (Side_loaded_verification_key.of_base64 str)
                   in
                   Incorrect_verification_key (`Expected_verification_key vk) )
             ]
@@ -437,7 +436,7 @@ module Failure = struct
         sprintf
           "The party's account verification key did not match the verification \
            key that the party's authorization proof was valid against (%s)"
-          (Side_loaded_verification_key.to_base58_check vk)
+          (Side_loaded_verification_key.to_base64 vk)
 end
 
 [%%versioned

@@ -276,6 +276,10 @@ module Side_loaded : sig
       end
     end]
 
+    val to_base64 : t -> string
+
+    val of_base64 : string -> t Or_error.t
+
     val to_base58_check : t -> string
 
     val of_base58_check : string -> t Or_error.t

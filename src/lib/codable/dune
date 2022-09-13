@@ -9,6 +9,7 @@
    ppx_deriving_yojson.runtime
    yojson
    result
+   base64
    ;; local libraries
    base58_check
    )

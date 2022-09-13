@@ -77,6 +77,20 @@ Make (struct
   let decode = Iso.of_string
 end)
 
+module Make_base64 (T : sig
+  type t [@@deriving bin_io]
+end) =
+struct
+  let to_base64 = Fn.compose Base64.encode_string (Binable.to_string (module T))
+
+  let of_base64 s =
+    match Base64.decode s with
+    | Ok bin ->
+        Ok (Binable.of_string (module T) bin)
+    | Error (`Msg msg) ->
+        Or_error.error_string msg
+end
+
 module Make_base58_check (T : sig
   type t [@@deriving bin_io]
 

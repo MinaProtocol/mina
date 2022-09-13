@@ -276,13 +276,16 @@ module Stable = struct
     end
 
     include T
+    include Codable.Make_base64 (T)
     include Codable.Make_base58_check (T)
   end
 end]
 
 [%%define_locally
 Stable.Latest.
-  ( to_base58_check
+  ( to_base64
+  , of_base64
+  , to_base58_check
   , of_base58_check
   , of_base58_check_exn
   , sexp_of_t
