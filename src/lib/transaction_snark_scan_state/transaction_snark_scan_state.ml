@@ -45,9 +45,9 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; fee_payment_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
               [@sexp.opaque]
-        ; parties_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
               [@sexp.opaque]
         }
       [@@deriving sexp]
@@ -181,19 +181,19 @@ let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     { Transaction_with_witness.transaction_with_info
     ; state_hash
-    ; fee_payment_ledger_witness
-    ; parties_ledger_witness
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
     ; init_stack
     ; statement
     } =
   let open Or_error.Let_syntax in
   let source_fee_payment_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
-    @@ Sparse_ledger.merkle_root fee_payment_ledger_witness
+    @@ Sparse_ledger.merkle_root first_pass_ledger_witness
   in
   let source_parties_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
-    @@ Sparse_ledger.merkle_root parties_ledger_witness
+    @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
@@ -204,7 +204,7 @@ let create_expected_statement ~constraint_constants
   let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view fee_payment_ledger_witness transaction )
+          ~txn_state_view:state_view first_pass_ledger_witness transaction )
     |> Or_error.join
   in
   let target_fee_payment_merkle_root =
@@ -236,14 +236,14 @@ let create_expected_statement ~constraint_constants
     Ledger.Transaction_applied.supply_increase applied_transaction
   in
   { Transaction_snark.Statement.source =
-      { fee_payment_ledger = source_fee_payment_merkle_root
-      ; parties_ledger = source_parties_merkle_root
+      { first_pass_ledger = source_fee_payment_merkle_root
+      ; second_pass_ledger = source_parties_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
       }
   ; target =
-      { fee_payment_ledger = target_fee_payment_merkle_root
-      ; parties_ledger = target_parties_merkle_root
+      { first_pass_ledger = target_fee_payment_merkle_root
+      ; second_pass_ledger = target_parties_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       }
@@ -551,12 +551,13 @@ struct
       let open Or_error.Let_syntax in
       let%map () =
         clarify_error
-          (Frozen_ledger_hash.equal reg1.fee_payment_ledger
-             reg2.fee_payment_ledger )
+          (Frozen_ledger_hash.equal reg1.first_pass_ledger
+             reg2.first_pass_ledger )
           "did not connect with snarked fee payment ledger hash"
       and () =
         clarify_error
-          (Frozen_ledger_hash.equal reg1.parties_ledger reg2.parties_ledger)
+          (Frozen_ledger_hash.equal reg1.second_pass_ledger
+             reg2.second_pass_ledger )
           "did not connect with snarked parties ledger hash"
       and () =
         clarify_error
@@ -694,8 +695,8 @@ let extract_from_job (job : job) =
         ( d.transaction_with_info
         , d.statement
         , d.state_hash
-        , d.fee_payment_ledger_witness
-        , d.parties_ledger_witness
+        , d.first_pass_ledger_witness
+        , d.second_pass_ledger_witness
         , d.init_stack )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
@@ -762,8 +763,8 @@ let all_work_pairs t
         ( transaction_with_info
         , statement
         , state_hash
-        , fee_payment_ledger_witness
-        , parties_ledger_witness
+        , first_pass_ledger_witness
+        , second_pass_ledger_witness
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
@@ -782,10 +783,10 @@ let all_work_pairs t
                 Or_error.error_string "init_stack was Merge"
           in
           let () =
-            let _ = parties_ledger_witness in
-            failwith "TODO (parties_ledger_witness unused)"
+            let _ = second_pass_ledger_witness in
+            failwith "TODO (second_pass_ledger_witness unused)"
           in
-          { Transaction_witness.ledger = fee_payment_ledger_witness
+          { Transaction_witness.ledger = first_pass_ledger_witness
           ; transaction
           ; protocol_state_body
           ; init_stack

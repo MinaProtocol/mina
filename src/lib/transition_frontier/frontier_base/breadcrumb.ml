@@ -405,7 +405,7 @@ module For_tests = struct
       in
       let consensus_state =
         make_next_consensus_state
-          ~snarked_ledger_hash:previous_registers.parties_ledger
+          ~snarked_ledger_hash:previous_registers.second_pass_ledger
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }

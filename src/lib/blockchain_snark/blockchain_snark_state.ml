@@ -73,8 +73,8 @@ let non_pc_registers_equal_var t1 t2 =
       let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
       let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
       Registers.Fields.fold ~init:[]
-        ~fee_payment_ledger:(f !Frozen_ledger_hash.equal_var)
-        ~parties_ledger:(f !Frozen_ledger_hash.equal_var)
+        ~first_pass_ledger:(f !Frozen_ledger_hash.equal_var)
+        ~second_pass_ledger:(f !Frozen_ledger_hash.equal_var)
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
           acc )

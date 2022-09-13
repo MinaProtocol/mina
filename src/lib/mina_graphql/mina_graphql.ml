@@ -592,22 +592,22 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_base58_check source.fee_payment_ledger )
+              Frozen_ledger_hash.to_base58_check source.first_pass_ledger )
         ; field "targetFeePaymentLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_base58_check target.fee_payment_ledger )
+              Frozen_ledger_hash.to_base58_check target.first_pass_ledger )
         ; field "sourcePartiesLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_base58_check source.parties_ledger )
+              Frozen_ledger_hash.to_base58_check source.second_pass_ledger )
         ; field "targetPartiesLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_base58_check target.parties_ledger )
+              Frozen_ledger_hash.to_base58_check target.second_pass_ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \

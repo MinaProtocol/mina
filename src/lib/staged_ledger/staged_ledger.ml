@@ -242,10 +242,10 @@ module T = struct
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
-    (* TODO: we need to keep the end fee_payment_ledger around in order to construct this register correctly *)
+    (* TODO: we need to keep the end first_pass_ledger around in order to construct this register correctly *)
     let registers_end : _ Mina_state.Registers.t =
-      { fee_payment_ledger = ledger
-      ; parties_ledger = ledger
+      { first_pass_ledger = ledger
+      ; second_pass_ledger = ledger
       ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
@@ -285,9 +285,9 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; fee_payment_ledger =
+          ; first_pass_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; parties_ledger = failwith "TODO"
+          ; second_pass_ledger = failwith "TODO"
           ; pending_coinbase_stack
           }
     in
@@ -313,9 +313,9 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; fee_payment_ledger =
+          ; first_pass_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; parties_ledger = failwith "TODO"
+          ; second_pass_ledger = failwith "TODO"
           ; pending_coinbase_stack
           }
     in
@@ -374,8 +374,8 @@ module T = struct
     in
     f ~constraint_constants
       ~snarked_registers:
-        ( { fee_payment_ledger = snarked_frozen_ledger_hash
-          ; parties_ledger = failwith "TODO"
+        ( { first_pass_ledger = snarked_frozen_ledger_hash
+          ; second_pass_ledger = failwith "TODO"
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
@@ -548,14 +548,14 @@ module T = struct
     in
     ( applied_txn
     , { Transaction_snark.Statement.source =
-          { fee_payment_ledger = source_merkle_root
-          ; parties_ledger = failwith "TODO"
+          { first_pass_ledger = source_merkle_root
+          ; second_pass_ledger = failwith "TODO"
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
           ; local_state = empty_local_state
           }
       ; target =
-          { fee_payment_ledger = target_merkle_root
-          ; parties_ledger = failwith "TODO"
+          { first_pass_ledger = target_merkle_root
+          ; second_pass_ledger = failwith "TODO"
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
@@ -585,7 +585,7 @@ module T = struct
           in
           Account_id.create c.receiver Token_id.default :: ft_receivers
     in
-    let fee_payment_ledger_witness =
+    let first_pass_ledger_witness =
       O1trace.sync_thread "create_ledger_witness" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
@@ -614,8 +614,8 @@ module T = struct
     in
     ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
       ; state_hash = state_and_body_hash
-      ; fee_payment_ledger_witness
-      ; parties_ledger_witness = failwith "TODO"
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness = failwith "TODO"
       ; init_stack = Base pending_coinbase_stack_state.init_stack
       ; statement
       }
@@ -2289,8 +2289,8 @@ let%test_module "staged ledger tests" =
       let prover_seed =
         One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
             p
-            ^ Frozen_ledger_hash.to_bytes stmt.target.fee_payment_ledger
-            ^ Frozen_ledger_hash.to_bytes stmt.target.parties_ledger )
+            ^ Frozen_ledger_hash.to_bytes stmt.target.first_pass_ledger
+            ^ Frozen_ledger_hash.to_bytes stmt.target.second_pass_ledger )
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen

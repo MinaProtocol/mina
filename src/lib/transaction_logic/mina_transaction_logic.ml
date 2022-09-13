@@ -286,8 +286,8 @@ module type S = sig
 
   module Global_state : sig
     type t =
-      { fee_payment_ledger : ledger
-      ; parties_ledger : ledger
+      { first_pass_ledger : ledger
+      ; second_pass_ledger : ledger
       ; fee_excess : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
@@ -923,23 +923,24 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module Global_state = struct
     type t =
-      { fee_payment_ledger : L.t
-      ; parties_ledger : L.t
+      { first_pass_ledger : L.t
+      ; second_pass_ledger : L.t
       ; fee_excess : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
-    let fee_payment_ledger { fee_payment_ledger; _ } =
-      L.create_masked fee_payment_ledger
+    let first_pass_ledger { first_pass_ledger; _ } =
+      L.create_masked first_pass_ledger
 
-    let set_fee_payment_ledger ~should_update t ledger =
-      if should_update then L.apply_mask t.fee_payment_ledger ~masked:ledger ;
+    let set_first_pass_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.first_pass_ledger ~masked:ledger ;
       t
 
-    let parties_ledger { parties_ledger; _ } = L.create_masked parties_ledger
+    let second_pass_ledger { second_pass_ledger; _ } =
+      L.create_masked second_pass_ledger
 
-    let set_parties_ledger ~should_update t ledger =
-      if should_update then L.apply_mask t.parties_ledger ~masked:ledger ;
+    let set_second_pass_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.second_pass_ledger ~masked:ledger ;
       t
 
     let fee_excess { fee_excess; _ } = fee_excess
@@ -1634,8 +1635,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       (* TODO *)
       ( { protocol_state = state_view
-        ; fee_payment_ledger = ledger
-        ; parties_ledger = ledger
+        ; first_pass_ledger = ledger
+        ; second_pass_ledger = ledger
         ; fee_excess
         }
       , { stack_frame =

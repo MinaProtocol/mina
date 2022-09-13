@@ -34,7 +34,7 @@ Poly.
   , to_hlist
   , of_hlist )]
 
-let snarked_ledger_hash (t : _ Poly.t) = t.registers.parties_ledger
+let snarked_ledger_hash (t : _ Poly.t) = t.registers.second_pass_ledger
 
 module Value = struct
   [%%versioned
@@ -105,16 +105,16 @@ let var_to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { fee_payment_ledger
-        ; parties_ledger
+    let { first_pass_ledger
+        ; second_pass_ledger
         ; pending_coinbase_stack = ()
         ; local_state
         } =
       registers
     in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.var_to_input fee_payment_ledger
-       ; Frozen_ledger_hash.var_to_input parties_ledger
+      [| Frozen_ledger_hash.var_to_input first_pass_ledger
+       ; Frozen_ledger_hash.var_to_input second_pass_ledger
        ; Local_state.Checked.to_input local_state
       |]
   in
@@ -140,16 +140,16 @@ let to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { fee_payment_ledger
-        ; parties_ledger
+    let { first_pass_ledger
+        ; second_pass_ledger
         ; pending_coinbase_stack = ()
         ; local_state
         } =
       registers
     in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.to_input fee_payment_ledger
-       ; Frozen_ledger_hash.to_input parties_ledger
+      [| Frozen_ledger_hash.to_input first_pass_ledger
+       ; Frozen_ledger_hash.to_input second_pass_ledger
        ; Local_state.to_input local_state
       |]
   in
@@ -171,8 +171,8 @@ let negative_one
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
   ; registers =
-      { fee_payment_ledger = genesis_ledger_hash
-      ; parties_ledger = genesis_ledger_hash
+      { first_pass_ledger = genesis_ledger_hash
+      ; second_pass_ledger = genesis_ledger_hash
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.dummy ()
       }
@@ -190,8 +190,8 @@ let display
     ({ staged_ledger_hash
      ; genesis_ledger_hash
      ; registers =
-         { fee_payment_ledger
-         ; parties_ledger
+         { first_pass_ledger
+         ; second_pass_ledger
          ; pending_coinbase_stack = ()
          ; local_state
          }
@@ -206,12 +206,12 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; registers =
-      { fee_payment_ledger =
+      { first_pass_ledger =
           Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check fee_payment_ledger
-      ; parties_ledger =
+          @@ Frozen_ledger_hash.to_base58_check first_pass_ledger
+      ; second_pass_ledger =
           Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check parties_ledger
+          @@ Frozen_ledger_hash.to_base58_check second_pass_ledger
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.display local_state
       }

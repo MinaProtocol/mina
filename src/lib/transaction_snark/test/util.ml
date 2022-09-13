@@ -199,7 +199,8 @@ let check_parties_with_merges_exn ?expected_failure
                       in
                       let p = Or_error.ok_exn p in
                       let target_ledger_root_snark =
-                        (Transaction_snark.statement p).target.parties_ledger
+                        (Transaction_snark.statement p).target
+                          .second_pass_ledger
                       in
                       let target_ledger_root = Ledger.merkle_root ledger in
                       [%test_eq: Ledger_hash.t] target_ledger_root
@@ -431,7 +432,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     | Command (Parties x) ->
         `Parties x
   in
-  let source_fee_payment_ledger = Ledger.merkle_root ledger in
+  let source_first_pass_ledger = Ledger.merkle_root ledger in
   let pending_coinbase_stack = Pending_coinbase.Stack.empty in
   let txn_unchecked = Transaction.forget txn in
   let state_body, state_body_hash =
@@ -534,8 +535,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                (Error.to_string_hum e) ) ;
         (true, None)
   in
-  let target_fee_payment_ledger = Ledger.merkle_root ledger in
-  let source_parties_ledger, target_parties_ledger = failwith "TODO" in
+  let target_first_pass_ledger = Ledger.merkle_root ledger in
+  let source_second_pass_ledger, target_second_pass_ledger = failwith "TODO" in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
@@ -545,8 +546,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
-          ~source_fee_payment_ledger ~target_fee_payment_ledger
-          ~source_parties_ledger ~target_parties_ledger
+          ~source_first_pass_ledger ~target_first_pass_ledger
+          ~source_second_pass_ledger ~target_second_pass_ledger
           ~init_stack:pending_coinbase_stack
           ~pending_coinbase_stack_state:
             { Transaction_snark.Pending_coinbase_stack_state.source =

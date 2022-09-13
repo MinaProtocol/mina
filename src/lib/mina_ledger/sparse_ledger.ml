@@ -89,11 +89,11 @@ let apply_parties_unchecked_with_states ~constraint_constants ~state_view
     (ref ledger) c ~init:[]
     ~f:(fun
          acc
-         ( { fee_payment_ledger; parties_ledger; fee_excess; protocol_state }
+         ( { first_pass_ledger; second_pass_ledger; fee_excess; protocol_state }
          , local_state )
        ->
-      ( { GS.fee_payment_ledger = !fee_payment_ledger
-        ; parties_ledger = !parties_ledger
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger = !second_pass_ledger
         ; fee_excess
         ; protocol_state
         }
