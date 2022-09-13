@@ -6390,6 +6390,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "ID",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "CompletedWork",
           "description": "Completed snark works",
@@ -8220,30 +8230,20 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "ZkappCommandBase58",
-          "description": "A Base58Check string representing the command",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "ZkappCommandResult",
           "description": null,
           "fields": [
             {
               "name": "id",
-              "description": "A Base58Check string representing the command",
+              "description": "A Base64 string representing the zkApp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "ZkappCommandBase58",
+                  "name": "TransactionId",
                   "ofType": null
                 }
               },
@@ -8317,7 +8317,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8645,8 +8649,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "ID",
-          "description": null,
+          "name": "TransactionId",
+          "description": "Base64-encoded transaction id",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -8697,7 +8701,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -11377,7 +11385,7 @@
             },
             {
               "name": "receiptChainHash",
-              "description": "Top hash of the receipt chain merkle-list",
+              "description": "Top hash of the receipt chain Merkle-list",
               "args": [],
               "type": {
                 "kind": "SCALAR",

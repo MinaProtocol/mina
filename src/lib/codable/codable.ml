@@ -125,3 +125,28 @@ module type Base58_check_intf = sig
 
   include Base58_check_base_intf with type t := t
 end
+
+module Make_base64 (T : sig
+  type t [@@deriving bin_io]
+end) =
+struct
+  let to_base64 (t : T.t) : string =
+    Binable.to_string (module T) t
+    |> (* raises only on errors from invalid optional arguments *)
+    Base64.encode_exn
+
+  let of_base64 b64 : T.t Or_error.t =
+    match Base64.decode b64 with
+    | Ok s ->
+        Ok (Binable.of_string (module T) s)
+    | Error (`Msg msg) ->
+        Error (Error.of_string msg)
+end
+
+module type Base64_intf = sig
+  type t
+
+  val to_base64 : t -> string
+
+  val of_base64 : string -> t Or_error.t
+end

@@ -209,6 +209,8 @@ module Types = struct
 
     let transaction_hash = TransactionHash.typ ()
 
+    let transaction_id = TransactionId.typ ()
+
     let precomputed_block_proof = PrecomputedBlockProof.typ ()
   end
 
@@ -1240,7 +1242,7 @@ module Types = struct
                             $error" ;
                          None ) )
              ; field "receiptChainHash" ~typ:chain_hash
-                 ~doc:"Top hash of the receipt chain merkle-list"
+                 ~doc:"Top hash of the receipt chain Merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.receipt_chain_hash )
@@ -1572,9 +1574,9 @@ module Types = struct
         , (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t )
         field
         list =
-      [ field_no_status "id" ~typ:(non_null guid) ~args:[]
+      [ field_no_status "id" ~typ:(non_null transaction_id) ~args:[]
           ~resolve:(fun _ user_command ->
-            Signed_command.to_base58_check user_command.With_hash.data )
+            Signed_command user_command.With_hash.data )
       ; field_no_status "hash" ~typ:(non_null transaction_hash) ~args:[]
           ~resolve:(fun _ user_command -> user_command.With_hash.hash)
       ; field_no_status "kind" ~typ:(non_null kind) ~args:[]
@@ -1736,12 +1738,10 @@ module Types = struct
       in
       obj "ZkappCommandResult" ~fields:(fun _ ->
           [ field_no_status "id"
-              ~doc:"A Base58Check string representing the command"
-              ~typ:
-                ( non_null
-                @@ Mina_base_unix.Graphql_scalars.ZkappCommandBase58.typ () )
-              ~args:[]
-              ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
+              ~doc:"A Base64 string representing the zkApp command"
+              ~typ:(non_null transaction_id) ~args:[]
+              ~resolve:(fun _ zkapp_command ->
+                Zkapp_command zkapp_command.With_hash.data )
           ; field_no_status "hash"
               ~doc:"A cryptographic hash of the zkApp command"
               ~typ:(non_null transaction_hash) ~args:[]
