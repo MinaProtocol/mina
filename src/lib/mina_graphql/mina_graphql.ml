@@ -4018,7 +4018,7 @@ module Queries = struct
           match txns_opt with
           | Some txns ->
               List.filter_map txns ~f:(fun serialized_txn ->
-                  Signed_command.of_base58_check serialized_txn
+                  Signed_command.of_base64 serialized_txn
                   |> Result.map ~f:(fun signed_command ->
                          (* These commands get piped through [forget_check]
                             below; this is just to make the types work
@@ -4319,11 +4319,11 @@ module Queries = struct
             match serialized_txn with
             | `Signed_command cmd ->
                 Or_error.(
-                  Signed_command.of_base58_check cmd
+                  Signed_command.of_base64 cmd
                   >>| fun c -> User_command.Signed_command c)
             | `Zkapp_command cmd ->
                 Or_error.(
-                  Zkapp_command.of_base58_check cmd
+                  Zkapp_command.of_base64 cmd
                   >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"

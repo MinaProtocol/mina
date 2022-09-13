@@ -684,7 +684,7 @@ let get_transaction_status =
     (Cli_lib.Background_daemon.rpc_init
        Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
-         match Signed_command.of_base58_check serialized_transaction with
+         match Signed_command.of_base64 serialized_transaction with
          | Ok user_command ->
              Daemon_rpcs.Client.dispatch_with_message
                Daemon_rpcs.Get_transaction_status.rpc user_command port
@@ -2033,20 +2033,22 @@ let receipt_chain_hash =
          ~doc:"Previous receipt chain hash, base58check encoded"
          (required string)
      and transaction_id =
-       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+       flag "--transaction-id" ~doc:"Transaction ID, base64-encoded"
          (required string)
      in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
        in
-       (* What we call transaction IDs in GraphQL are just base58_check-encoded
+       (* What we call transaction IDs in GraphQL are just base64-encoded
           transactions. It's easy to handle, and we return it from the
           transaction commands above, so lets use this format.
 
           TODO: handle zkApps, issue #11431
        *)
-       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let transaction =
+         Signed_command.of_base64 transaction_id |> Or_error.ok_exn
+       in
        let hash =
          Receipt.Chain_hash.cons_signed_command_payload
            (Signed_command_payload transaction.payload) previous_hash
@@ -2097,7 +2099,7 @@ let hash_transaction =
      in
      fun () ->
        let signed_command =
-         Signed_command.of_base58_check transaction |> Or_error.ok_exn
+         Signed_command.of_base64 transaction |> Or_error.ok_exn
        in
        let hash =
          Transaction_hash.hash_command (Signed_command signed_command)
