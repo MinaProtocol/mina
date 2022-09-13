@@ -1565,35 +1565,38 @@ let lock_account =
          in
          printf "🔒 Locked account!\nPublic key: %s\n" pk_string ) )
 
+let generate_libp2p_keypair_do privkey_path =
+  Cli_lib.Exceptions.handle_nicely
+  @@ fun () ->
+  Deferred.ignore_m
+    (let open Deferred.Let_syntax in
+    (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+    let logger = Logger.null () in
+    (* Using the helper only for keypair generation requires no state. *)
+    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+        match%bind
+          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+        with
+        | Ok net ->
+            let%bind me = Mina_net2.generate_random_keypair net in
+            let%bind () = Mina_net2.shutdown net in
+            let%map () =
+              Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
+            in
+            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+        | Error e ->
+            [%log fatal] "failed to generate libp2p keypair: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            exit 20 ))
+
 let generate_libp2p_keypair =
   Command.async
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    Cli_lib.Exceptions.handle_nicely
-    @@ fun () ->
-    Deferred.ignore_m
-      (let open Deferred.Let_syntax in
-      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-      let logger = Logger.null () in
-      (* Using the helper only for keypair generation requires no state. *)
-      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind
-            Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-          with
-          | Ok net ->
-              let%bind me = Mina_net2.generate_random_keypair net in
-              let%bind () = Mina_net2.shutdown net in
-              let%map () =
-                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
-              in
-              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
-          | Error e ->
-              [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-              exit 20 )))
+    generate_libp2p_keypair_do privkey_path)
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -2251,7 +2254,6 @@ let advanced =
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
-    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
     ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
@@ -2280,3 +2282,7 @@ let ledger =
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
     ]
+
+let libp2p =
+  Command.group ~summary:"Libp2p commands"
+    [ ("generate-keypair", generate_libp2p_keypair) ]

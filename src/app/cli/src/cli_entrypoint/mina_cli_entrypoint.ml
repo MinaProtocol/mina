@@ -249,12 +249,10 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--discovery-keypair" ~aliases:[ "discovery-keypair" ]
-      (optional string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (required string)
       ~doc:
-        "KEYFILE Keypair (generated from `mina advanced \
-         generate-libp2p-keypair`) to use with libp2p discovery (default: \
-         generate per-run temporary keypair)"
+        "KEYFILE Keypair (generated from `mina libp2p generate-keypair`) to \
+         use with libp2p discovery"
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
@@ -548,28 +546,23 @@ let setup_daemon logger =
         in
         let%bind libp2p_keypair =
           let libp2p_keypair_old_format =
-            Option.bind libp2p_keypair ~f:(fun s ->
-                match Mina_net2.Keypair.of_string s with
-                | Ok kp ->
-                    Some kp
-                | Error _ ->
-                    if String.contains s ',' then
-                      [%log warn]
-                        "I think -discovery-keypair is in the old format, but \
-                         I failed to parse it! Using it as a path..." ;
-                    None )
+            match Mina_net2.Keypair.of_string libp2p_keypair with
+            | Ok kp ->
+                Some kp
+            | Error _ ->
+                if String.contains libp2p_keypair ',' then
+                  [%log warn]
+                    "I think -libp2p-keypair is in the old format, but I \
+                     failed to parse it! Using it as a path..." ;
+                None
           in
-          match libp2p_keypair_old_format with
-          | Some kp ->
-              return (Some kp)
-          | None -> (
-              match libp2p_keypair with
-              | None ->
-                  return None
-              | Some s ->
-                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                    ~should_prompt_user:false ~which:"libp2p keypair" s
-                  |> Deferred.map ~f:Option.some )
+          Option.value_map
+            ~default:(fun () ->
+              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~which:"libp2p keypair" libp2p_keypair
+              )
+            ~f:(Fn.compose const Deferred.return)
+            libp2p_keypair_old_format ()
         in
         let%bind () =
           let version_filename = conf_dir ^/ "mina.version" in
@@ -1735,6 +1728,7 @@ let mina_commands logger =
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("ledger", Client.ledger)
+  ; ("libp2p", Client.libp2p)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)

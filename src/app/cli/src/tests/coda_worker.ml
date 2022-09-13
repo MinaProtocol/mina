@@ -440,7 +440,7 @@ module T = struct
               ; validation_queue_size = 150
               ; peer_exchange = true
               ; peer_protection_ratio = 0.2
-              ; keypair = Some libp2p_keypair
+              ; keypair = libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
               ; time_controller

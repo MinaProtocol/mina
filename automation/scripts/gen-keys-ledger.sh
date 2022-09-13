@@ -70,7 +70,7 @@ done
 echo "generating seeds' libp2p keys"
 mkdir "${KEYSDIR}/libp2p-keys"
 for i in $(seq 1 $SEEDS); do
-    mina advanced generate-libp2p-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
+    mina libp2p generate-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
 done
 
 
