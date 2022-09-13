@@ -496,6 +496,12 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main )
 
+let transaction_id_to_string = function
+  | `String s ->
+      s
+  | _ ->
+      "Unexpected JSON for transaction id"
+
 let send_payment_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -527,7 +533,7 @@ let send_payment_graphql =
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
-           response.sendPayment.payment.id ) )
+           (transaction_id_to_string response.sendPayment.payment.id) ) )
 
 let delegate_stake_graphql =
   let open Command.Param in
@@ -554,7 +560,7 @@ let delegate_stake_graphql =
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
-           response.sendDelegation.delegation.id ) )
+           (transaction_id_to_string response.sendDelegation.delegation.id) ) )
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -596,7 +602,8 @@ let cancel_transaction_graphql =
            Graphql_client.query_exn cancel_query graphql_endpoint
          in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
-           cancel_response.sendPayment.payment.id ) )
+           (transaction_id_to_string cancel_response.sendPayment.payment.id) )
+    )
 
 let send_rosetta_transactions_graphql =
   Command.async
@@ -621,7 +628,8 @@ let send_rosetta_transactions_graphql =
                          graphql_endpoint
                      in
                      printf "Dispatched command with TRANSACTION_ID %s\n"
-                       response.sendRosettaTransaction.userCommand.id ;
+                       (transaction_id_to_string
+                          response.sendRosettaTransaction.userCommand.id ) ;
                      `Repeat ()
                    with Yojson.End_of_input -> return (`Finished ()) ) )
          with
