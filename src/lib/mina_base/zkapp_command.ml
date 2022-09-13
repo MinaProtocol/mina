@@ -1184,7 +1184,7 @@ let%test_unit "wire embedded in graphql" =
   Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
-let zkapp_command (t : t) : _ Call_forest.t =
+let all_account_updates (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
@@ -1230,7 +1230,7 @@ let fee_payer (t : t) =
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let zkapp_command_list (t : t) : Account_update.t list =
+let all_account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)

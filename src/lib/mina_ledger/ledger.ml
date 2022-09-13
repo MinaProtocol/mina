@@ -370,10 +370,6 @@ end
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
-let apply_transaction ~constraint_constants ~txn_state_view l t =
-  O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction ~constraint_constants ~txn_state_view l t )
-
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~txn_state_view
     ledger zkapp_command =

@@ -118,18 +118,3 @@ end
 include Mina_transaction_logic.Make (Hashless_ledger)
 
 let create = Hashless_ledger.create
-
-let apply_user_command ~constraint_constants ~txn_global_slot l uc =
-  Result.map
-    ~f:(fun applied_txn ->
-      applied_txn.Transaction_applied.Signed_command_applied.common.user_command
-        .status )
-    (apply_user_command l ~constraint_constants ~txn_global_slot uc)
-
-let apply_transaction' ~constraint_constants ~txn_state_view l t =
-  O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction ~constraint_constants ~txn_state_view l t )
-
-let apply_transaction ~constraint_constants ~txn_state_view l txn =
-  Result.map ~f:Transaction_applied.transaction_status
-    (apply_transaction' l ~constraint_constants ~txn_state_view txn)

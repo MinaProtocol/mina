@@ -2197,7 +2197,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     | `Skip ->
                         []
                     | `Start p ->
-                        Zkapp_command.zkapp_command p.zkapp_command )
+                        Zkapp_command.all_account_updates p.account_updates )
                 in
                 let h =
                   exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
@@ -2205,7 +2205,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let start_data =
                   { Mina_transaction_logic.Zkapp_command_logic.Start_data
-                    .zkapp_command = { With_hash.hash = h; data = ps }
+                    .account_updates = { With_hash.hash = h; data = ps }
                   ; memo_hash =
                       exists Field.typ ~compute:(fun () ->
                           match V.get v with
@@ -3875,7 +3875,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ( []
         :: List.map
              ~f:(fun (_, _, zkapp_command) ->
-               Zkapp_command.zkapp_command_list zkapp_command )
+               Zkapp_command.all_account_updates_list zkapp_command )
              zkapp_commands )
         ([ List.hd_exn (List.hd_exn states) ] :: states)
     in
@@ -3889,13 +3889,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~f:(fun
                ( pending_coinbase_init_stack
                , pending_coinbase_stack_state
-               , zkapp_command )
+               , account_updates )
              ->
             ( pending_coinbase_init_stack
             , pending_coinbase_stack_state
             , { Mina_transaction_logic.Zkapp_command_logic.Start_data
-                .zkapp_command
-              ; memo_hash = Signed_command_memo.hash zkapp_command.memo
+                .account_updates
+              ; memo_hash = Signed_command_memo.hash account_updates.memo
               } ) )
       in
       ref zkapp_commands
@@ -3984,7 +3984,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   , zkapp_command )
                   :: rest ->
                     let commitment', full_commitment' =
-                      mk_next_commitments zkapp_command.zkapp_command
+                      mk_next_commitments zkapp_command.account_updates
                     in
                     remaining_zkapp_command := rest ;
                     commitment := commitment' ;
@@ -4010,7 +4010,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                      , zkapp_command2 )
                      :: rest ->
                     let commitment', full_commitment' =
-                      mk_next_commitments zkapp_command2.zkapp_command
+                      mk_next_commitments zkapp_command2.account_updates
                     in
                     remaining_zkapp_command := rest ;
                     commitment := commitment' ;
@@ -4207,7 +4207,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               List.iter witness.start_zkapp_command ~f:(fun s ->
                   Zkapp_command.Call_forest.iteri
                     ~f:(fun _i x -> return (Some x))
-                    s.zkapp_command.account_updates ) ;
+                    s.account_updates.account_updates ) ;
               None )
       | xs ->
           Zkapp_command.Call_forest.hd_account_update xs
