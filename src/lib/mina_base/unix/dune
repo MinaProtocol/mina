@@ -11,6 +11,7 @@
    result
    base
    ;; local libraries
+   pasta_bindings
    graphql_basic_scalars
    mina_base
    pickles

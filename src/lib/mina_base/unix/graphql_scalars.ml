@@ -45,21 +45,6 @@ module LedgerHash =
       let doc = "Base58Check-encoded ledger hash"
     end)
 
-(* TESTS *)
-let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
-
-let%test_module "StateHash" =
-  (module Make_test (StateHash) (Mina_base.State_hash))
-
-let%test_module "ChainHash" =
-  (module Make_test (ChainHash) (Mina_base.Receipt.Chain_hash))
-
-let%test_module "EpochSeed" =
-  (module Make_test (EpochSeed) (Mina_base.Epoch_seed))
-
-let%test_module "LedgerHash" =
-  (module Make_test (LedgerHash) (Mina_base.Ledger_hash))
-
 module StagedLedgerAuxHash =
   Make_scalar_using_base58_check
     (Mina_base.Staged_ledger_hash.Aux_hash)
@@ -112,3 +97,54 @@ module PartiesBase58 =
 
       let doc = "A Base58Check string representing the command"
     end)
+
+(* TESTS *)
+let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
+
+let%test_module "StateHash" =
+  (module Make_test (StateHash) (Mina_base.State_hash))
+
+let%test_module "ChainHash" =
+  (module Make_test (ChainHash) (Mina_base.Receipt.Chain_hash))
+
+let%test_module "EpochSeed" =
+  (module Make_test (EpochSeed) (Mina_base.Epoch_seed))
+
+let%test_module "LedgerHash" =
+  (module Make_test (LedgerHash) (Mina_base.Ledger_hash))
+
+module PartiesBase58_gen = struct
+  include Mina_base.Parties
+
+  let gen = Core_kernel.Quickcheck.Generator.return dummy
+end
+
+let%test_module "PartiesBase58" =
+  (module Make_test (PartiesBase58) (PartiesBase58_gen))
+
+let%test_module "TransactionStatusFailure" =
+  ( module Make_test
+             (TransactionStatusFailure)
+             (Mina_base.Transaction_status.Failure) )
+
+module FieldElem_gen = struct
+  include Mina_base.Zkapp_basic.F
+
+  let gen =
+    Core_kernel.Int.quickcheck_generator
+    |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+end
+
+let%test_module "FieldElem" = (module Make_test (FieldElem) (FieldElem_gen))
+
+let%test_module "PendingCoinbaseHash" =
+  (module Make_test (PendingCoinbaseHash) (Mina_base.Pending_coinbase.Hash))
+
+module StagedledgerAuxHash_gen = struct
+  include Mina_base.Staged_ledger_hash.Aux_hash
+
+  let gen = Core_kernel.Quickcheck.Generator.return dummy
+end
+
+let%test_module "StagedLedgerAuxHash" =
+  (module Make_test (StagedLedgerAuxHash) (StagedledgerAuxHash_gen))

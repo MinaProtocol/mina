@@ -8,3 +8,6 @@ module SequenceEvent =
 
       let doc = "sequence event"
     end)
+
+let%test_module "SequenceEvent" =
+  (module Make_test (SequenceEvent) (Snark_params.Tick.Field))

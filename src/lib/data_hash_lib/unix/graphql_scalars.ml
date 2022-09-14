@@ -15,3 +15,6 @@ module StateHashAsDecimal : Json_intf with type t = State_hash.t = struct
       ~doc:"Experimental: Bigint field-element representation of stateHash"
       ~coerce:serialize
 end
+
+let%test_module "StateHashAsDecimal" =
+  (module Make_test (StateHashAsDecimal) (State_hash))

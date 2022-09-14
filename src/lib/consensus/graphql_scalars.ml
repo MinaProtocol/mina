@@ -43,6 +43,12 @@ module VrfScalar =
       let doc = "consensus vrf scalar"
     end)
 
+module VrfScalar_gen = struct
+  include Snark_params.Tick.Inner_curve.Scalar
+end
+
+let%test_module "VrfScalar" = (module Make_test (VrfScalar) (VrfScalar_gen))
+
 module VrfOutputTruncated =
   Make_scalar_using_base58_check
     (Consensus_vrf.Output.Truncated)
@@ -51,6 +57,15 @@ module VrfOutputTruncated =
 
       let doc = "truncated vrf output"
     end)
+
+module VrfOutputTruncated_gen = struct
+  include Consensus_vrf.Output.Truncated
+
+  let gen = Core_kernel.Quickcheck.Generator.return dummy
+end
+
+let%test_module "VrfOutputTruncated" =
+  (module Make_test (VrfOutputTruncated) (VrfOutputTruncated_gen))
 
 module BodyReference = struct
   open Body_reference
@@ -68,3 +83,13 @@ module BodyReference = struct
          as a hex-encoded string"
       ~coerce:serialize
 end
+
+(*
+   No tests yet.
+   module BodyReference_gen = struct
+     include Body_reference
+     let gen = failwith ""
+   end
+
+   let%test_module "BodyReference" = (module Make_test (BodyReference) (BodyReference_gen))
+*)

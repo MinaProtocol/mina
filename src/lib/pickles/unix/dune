@@ -5,16 +5,19 @@
    ;; opam libraries
    graphql-async
    yojson
+   ppx_inline_test.config
+   sexplib0
    ; result
    core_kernel
    base
    ;; local libraries
+   pasta_bindings
    graphql_basic_scalars
    mina_base
    pickles
    pickles.backend
    kimchi_backend.pasta
  )
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
  (synopsis "Utils that depends on the unix library"))

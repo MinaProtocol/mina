@@ -5,10 +5,14 @@
    ;; opam libraries
    graphql-async
    yojson
+   ppx_inline_test.config
+   core_kernel
+   sexplib0
+   base
    ;; local libraries
    graphql_basic_scalars
    snark_params
  )
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
  (synopsis "Utils that depends on the unix library"))

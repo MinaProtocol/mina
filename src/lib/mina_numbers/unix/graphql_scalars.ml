@@ -34,5 +34,4 @@ let%test_module "GlobalSlot" =
 let%test_module "AccountNonce" =
   (module Make_test (AccountNonce) (Mina_numbers.Account_nonce))
 
-let%test_module "AccountNonce" =
-  (module Make_test (Length) (Mina_numbers.Length))
+let%test_module "Length" = (module Make_test (Length) (Mina_numbers.Length))

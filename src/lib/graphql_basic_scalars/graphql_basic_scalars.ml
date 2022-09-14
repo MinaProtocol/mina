@@ -207,6 +207,15 @@ end) : Json_intf with type t = T.t = struct
     Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
 
+module InetAddr =
+  Make_scalar_using_to_string
+    (Core.Unix.Inet_addr)
+    (struct
+      let name = "InetAddr"
+
+      let doc = "network address"
+    end)
+
 (* TESTS *)
 module UInt32_gen = struct
   include Unsigned.UInt32
@@ -231,6 +240,14 @@ module UInt64_gen = struct
 end
 
 let%test_module "UInt64" = (module Make_test (UInt64) (UInt64_gen))
+
+module Index_gen = struct
+  include Int
+
+  let gen = quickcheck_generator
+end
+
+let%test_module "Index" = (module Make_test (Index) (Index_gen))
 
 module String_gen = struct
   include String
@@ -284,11 +301,12 @@ end
 
 let%test_module "Time" = (module Make_test (Time) (Time_gen))
 
-module InetAddr =
-  Make_scalar_using_to_string
-    (Core.Unix.Inet_addr)
-    (struct
-      let name = "InetAddr"
+module InetAddr_gen = struct
+  include Core.Unix.Inet_addr
 
-      let doc = "network address"
-    end)
+  let gen =
+    Int32.gen_incl 0l Int32.max_value
+    |> Quickcheck.Generator.map ~f:inet4_addr_of_int32
+end
+
+let%test_module "InetAddr" = (module Make_test (InetAddr) (InetAddr_gen))
