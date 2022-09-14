@@ -957,7 +957,7 @@ let%test_module "account timing check" =
               (keypair, balance_as_amount, nonce, timing) )
           |> Array.of_list
         in
-        let zkapp_command_command =
+        let zkapp_command =
           let open Mina_base in
           let fee = Currency.Fee.of_int 1_000_000 in
           let amount = Currency.Amount.of_int 10_000_000_000_000 in
@@ -990,7 +990,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
         in
-        return (ledger_init_state, zkapp_command_command)
+        return (ledger_init_state, zkapp_command)
       in
       (* slot 1, well before cliffs *)
       Quickcheck.test ~seed:(`Deterministic "zkapp command, before cliff")
@@ -1036,7 +1036,7 @@ let%test_module "account timing check" =
               (keypair, balance_as_amount, nonce, timing) )
           |> Array.of_list
         in
-        let zkapp_command_command =
+        let zkapp_command =
           let open Mina_base in
           let fee = Currency.Fee.of_int 1_000_000 in
           let amount = Currency.Amount.of_int 10_000_000_000_000 in
@@ -1069,7 +1069,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
         in
-        return (ledger_init_state, zkapp_command_command)
+        return (ledger_init_state, zkapp_command)
       in
       (* slot 1, well before cliffs *)
       Quickcheck.test ~seed:(`Deterministic "zkapp command, before cliff")
@@ -1246,7 +1246,7 @@ let%test_module "account timing check" =
           |> Array.of_list
         in
         (* min balance = balance, spending anything before cliff should trigger min balance violation *)
-        let zkapp_command_command =
+        let zkapp_command =
           let open Mina_base in
           let fee = Currency.Fee.of_int 1_000_000 in
           let amount = Currency.Amount.of_int 10_000_000_000_000 in
@@ -1279,7 +1279,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
         in
-        return (ledger_init_state, zkapp_command_command)
+        return (ledger_init_state, zkapp_command)
       in
       Quickcheck.test ~seed:(`Deterministic "zkapp command, just before cliff")
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
@@ -1632,7 +1632,7 @@ let%test_module "account timing check" =
         let fee_int = 1_000_000 in
         (* the + 1 makes the balance insufficient *)
         let amount_int = balance_int - fee_int + 1 in
-        let zkapp_command_command =
+        let zkapp_command =
           let open Mina_base in
           let fee = Currency.Fee.of_int fee_int in
           let amount = Currency.Amount.of_int amount_int in
@@ -1665,7 +1665,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
         in
-        return (ledger_init_state, zkapp_command_command)
+        return (ledger_init_state, zkapp_command)
       in
       Quickcheck.test ~seed:(`Deterministic "zkapp command, after vesting")
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]

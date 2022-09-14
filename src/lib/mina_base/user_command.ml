@@ -72,6 +72,28 @@ module Stable = struct
   end
 end]
 
+let to_base64 : t -> string = function
+  | Signed_command sc ->
+      Signed_command.to_base64 sc
+  | Zkapp_command zc ->
+      Zkapp_command.to_base64 zc
+
+let of_base64 s : t Or_error.t =
+  match Signed_command.of_base64 s with
+  | Ok sc ->
+      Ok (Signed_command sc)
+  | Error err1 -> (
+      match Zkapp_command.of_base64 s with
+      | Ok zc ->
+          Ok (Zkapp_command zc)
+      | Error err2 ->
+          Error
+            (Error.of_string
+               (sprintf
+                  "Could decode Base64 neither to signed command (%s), nor to \
+                   zkApp (%s)"
+                  (Error.to_string_hum err1) (Error.to_string_hum err2) ) ) )
+
 (*
 include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
   let id = "user_command"

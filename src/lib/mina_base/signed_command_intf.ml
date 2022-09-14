@@ -198,6 +198,8 @@ module type S = sig
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
   include Codable.Base58_check_intf with type t := t
+
+  include Codable.Base64_intf with type t := t
 end
 
 module type Full = sig

@@ -31,11 +31,43 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command cmd =
-  cmd |> Signed_command.to_base58_check |> digest_string
-
-let hash_zkapp_command_command cmd =
-  cmd |> Binable.to_string (module Zkapp_command.Stable.Latest) |> digest_string
+let hash_signed_command, hash_zkapp_command =
+  let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
+      (cmd : a) =
+    cmd |> Binable.to_string (module M) |> digest_string
+  in
+  let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest) in
+  let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest) in
+  (* replace actual signatures, proofs with dummies for hashing, so we can
+     reproduce the transaction hashes if signatures, proofs omitted in
+     archive db
+  *)
+  let hash_signed_command (cmd : Signed_command.t) =
+    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+    signed_cmd_hasher cmd_dummy_signature
+  in
+  let hash_zkapp_command (cmd : Zkapp_command.t) =
+    let cmd_dummy_signatures_and_proofs =
+      { cmd with
+        fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
+      ; account_updates =
+          Zkapp_command.Call_forest.map cmd.account_updates
+            ~f:(fun (acct_update : Account_update.t) ->
+              let dummy_auth =
+                match acct_update.authorization with
+                | Control.Proof _ ->
+                    Control.Proof Proof.transaction_dummy
+                | Control.Signature _ ->
+                    Control.Signature Signature.dummy
+                | Control.None_given ->
+                    Control.None_given
+              in
+              { acct_update with authorization = dummy_auth } )
+      }
+    in
+    zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
+  in
+  (hash_signed_command, hash_zkapp_command)
 
 [%%ifdef consensus_mechanism]
 
@@ -44,7 +76,7 @@ let hash_command cmd =
   | User_command.Signed_command s ->
       hash_signed_command s
   | User_command.Zkapp_command p ->
-      hash_zkapp_command_command p
+      hash_zkapp_command p
 
 let hash_fee_transfer fee_transfer =
   fee_transfer |> Fee_transfer.Single.to_base58_check |> digest_string
