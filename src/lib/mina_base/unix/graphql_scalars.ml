@@ -89,11 +89,11 @@ module TransactionStatusFailure :
       ~doc:"transaction status failure" ~coerce:serialize
 end
 
-module PartiesBase58 =
+module ZkappCommandBase58 =
   Make_scalar_using_base58_check
-    (Mina_base.Parties)
+    (Mina_base.Zkapp_command)
     (struct
-      let name = "PartiesBase58"
+      let name = "ZkappCommandBase58"
 
       let doc = "A Base58Check string representing the command"
     end)
@@ -112,15 +112,6 @@ let%test_module "EpochSeed" =
 
 let%test_module "LedgerHash" =
   (module Make_test (LedgerHash) (Mina_base.Ledger_hash))
-
-module PartiesBase58_gen = struct
-  include Mina_base.Parties
-
-  let gen = Core_kernel.Quickcheck.Generator.return dummy
-end
-
-let%test_module "PartiesBase58" =
-  (module Make_test (PartiesBase58) (PartiesBase58_gen))
 
 let%test_module "TransactionStatusFailure" =
   ( module Make_test

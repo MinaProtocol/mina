@@ -31,11 +31,14 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command cmd =
-  cmd |> Signed_command.to_base58_check |> digest_string
-
-let hash_parties_command cmd =
-  cmd |> Binable.to_string (module Parties.Stable.Latest) |> digest_string
+let hash_signed_command, hash_zkapp_command =
+  let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
+      (cmd : a) =
+    cmd |> Binable.to_string (module M) |> digest_string
+  in
+  let hash_signed_command = mk_hasher (module Signed_command.Stable.Latest) in
+  let hash_zkapp_command = mk_hasher (module Zkapp_command.Stable.Latest) in
+  (hash_signed_command, hash_zkapp_command)
 
 [%%ifdef consensus_mechanism]
 
@@ -43,8 +46,8 @@ let hash_command cmd =
   match cmd with
   | User_command.Signed_command s ->
       hash_signed_command s
-  | User_command.Parties p ->
-      hash_parties_command p
+  | User_command.Zkapp_command p ->
+      hash_zkapp_command p
 
 let hash_fee_transfer fee_transfer =
   fee_transfer |> Fee_transfer.Single.to_base58_check |> digest_string

@@ -325,8 +325,8 @@ module T = struct
     ; txpool_max_size : int
     ; num_accounts : int option
     ; transaction_expiry_hr : int
-    ; max_proof_parties : int
-    ; max_parties : int
+    ; max_proof_zkapp_command : int
+    ; max_zkapp_command : int
     ; max_event_elements : int
     ; max_sequence_event_elements : int
     }
@@ -381,8 +381,8 @@ let compiled : t =
   ; txpool_max_size = pool_max_size
   ; num_accounts = None
   ; transaction_expiry_hr = Mina_compile_config.transaction_expiry_hr
-  ; max_proof_parties = Mina_compile_config.max_proof_parties
-  ; max_parties = Mina_compile_config.max_parties
+  ; max_proof_zkapp_command = Mina_compile_config.max_proof_zkapp_command
+  ; max_zkapp_command = Mina_compile_config.max_zkapp_command
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_sequence_event_elements =
       Mina_compile_config.max_sequence_event_elements

@@ -6,7 +6,7 @@ module Impl = Pickles.Impls.Step
 module Inner_curve = Snark_params.Tick.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
-module Parties_segment = Transaction_snark.Parties_segment
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
 let%test_module "Initialize state test" =
@@ -42,12 +42,12 @@ let%test_module "Initialize state test" =
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
-    module Deploy_party = struct
-      let party_body : Party.Body.t =
-        { Party.Body.dummy with
+    module Deploy_account_update = struct
+      let account_update_body : Account_update.Body.t =
+        { Account_update.Body.dummy with
           public_key = pk_compressed
         ; update =
-            { Party.Update.dummy with
+            { Account_update.Update.dummy with
               verification_key =
                 Set
                   { data = vk
@@ -74,40 +74,45 @@ let%test_module "Initialize state test" =
             }
         ; use_full_commitment = true
         ; preconditions =
-            { Party.Preconditions.network =
+            { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
         }
 
-      let party : Party.t =
+      let account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        { body = party_body; authorization = Signature Signature.dummy }
+        { body = account_update_body
+        ; authorization = Signature Signature.dummy
+        }
     end
 
-    module Initialize_party = struct
-      let party, () = Async.Thread_safe.block_on_async_exn initialize_prover
+    module Initialize_account_update = struct
+      let account_update, () =
+        Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
-    module Update_state_party = struct
+    module Update_state_account_update = struct
       let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
 
-      let party, () =
+      let account_update, () =
         Async.Thread_safe.block_on_async_exn
           (update_state_prover
              ~handler:(Zkapps_initialize_state.update_state_handler new_state) )
     end
 
-    let test_parties ?expected_failure parties =
+    let test_zkapp_command ?expected_failure zkapp_command =
       let memo = Signed_command_memo.empty in
-      let transaction_commitment : Parties.Transaction_commitment.t =
+      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
-        let other_parties_hash = Parties.Call_forest.hash parties in
-        Parties.Transaction_commitment.create ~other_parties_hash
+        let account_updates_hash =
+          Zkapp_command.Call_forest.hash zkapp_command
+        in
+        Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
-      let fee_payer : Party.Fee_payer.t =
+      let fee_payer : Account_update.Fee_payer.t =
         { body =
-            { Party.Body.Fee_payer.dummy with
+            { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 100)
             }
@@ -116,14 +121,14 @@ let%test_module "Initialize state test" =
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
-        Parties.Transaction_commitment.create_complete transaction_commitment
-          ~memo_hash
+        Zkapp_command.Transaction_commitment.create_complete
+          transaction_commitment ~memo_hash
           ~fee_payer_hash:
-            (Parties.Call_forest.Digest.Party.create
-               (Party.of_fee_payer fee_payer) )
+            (Zkapp_command.Call_forest.Digest.Account_update.create
+               (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
-          =
+      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+          Zkapp_command.t =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -136,30 +141,30 @@ let%test_module "Initialize state test" =
           | fee_payer ->
               fee_payer
         in
-        let other_parties =
-          Parties.Call_forest.map other_parties ~f:(function
+        let account_updates =
+          Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
-               } as party :
-                Party.t )
+               } as account_update :
+                Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
                 let commitment =
                   if use_full_commitment then full_commitment
                   else transaction_commitment
                 in
-                { party with
+                { account_update with
                   authorization =
                     Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
-            | party ->
-                party )
+            | account_update ->
+                account_update )
         in
-        { fee_payer; other_parties; memo }
+        { fee_payer; account_updates; memo }
       in
-      let parties : Parties.t =
-        sign_all { fee_payer; other_parties = parties; memo }
+      let zkapp_command : Zkapp_command.t =
+        sign_all { fee_payer; account_updates = zkapp_command; memo }
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
@@ -172,15 +177,17 @@ let%test_module "Initialize state test" =
             |> Or_error.ok_exn
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_parties_with_merges_exn ?expected_failure ledger [ parties ] ) ;
+              check_zkapp_command_with_merges_exn ?expected_failure ledger
+                [ zkapp_command ] ) ;
           Ledger.get ledger loc )
 
     let%test_unit "Initialize" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -192,10 +199,12 @@ let%test_module "Initialize state test" =
     let%test_unit "Initialize and update" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Update_state_party.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Update_state_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -207,11 +216,14 @@ let%test_module "Initialize state test" =
     let%test_unit "Initialize and multiple update" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Update_state_party.party
-        |> Parties.Call_forest.cons_tree Update_state_party.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Update_state_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Update_state_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -223,9 +235,10 @@ let%test_module "Initialize state test" =
     let%test_unit "Update without initialize fails" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Update_state_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Update_state_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -233,10 +246,12 @@ let%test_module "Initialize state test" =
     let%test_unit "Double initialize fails" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -244,11 +259,14 @@ let%test_module "Initialize state test" =
     let%test_unit "Initialize after update fails" =
       let account =
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons_tree Update_state_party.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Update_state_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -260,9 +278,11 @@ let%test_module "Initialize state test" =
                in the account.
             *)
             []
-            |> Parties.Call_forest.cons_tree Update_state_party.party
-            |> Parties.Call_forest.cons_tree Initialize_party.party
-            |> test_parties )
+            |> Zkapp_command.Call_forest.cons_tree
+                 Update_state_account_update.account_update
+            |> Zkapp_command.Call_forest.cons_tree
+                 Initialize_account_update.account_update
+            |> test_zkapp_command )
       in
       assert (Or_error.is_error account)
   end )

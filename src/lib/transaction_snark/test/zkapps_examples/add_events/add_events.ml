@@ -38,12 +38,12 @@ let%test_module "Add events test" =
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
-    module Deploy_party = struct
-      let party_body : Party.Body.t =
-        { Party.Body.dummy with
+    module Deploy_account_update = struct
+      let account_update_body : Account_update.Body.t =
+        { Account_update.Body.dummy with
           public_key = pk_compressed
         ; update =
-            { Party.Update.dummy with
+            { Account_update.Update.dummy with
               verification_key =
                 Set { data = vk; hash = Zkapp_account.digest_vk vk }
             ; permissions =
@@ -63,18 +63,21 @@ let%test_module "Add events test" =
             }
         ; use_full_commitment = true
         ; preconditions =
-            { Party.Preconditions.network =
+            { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
         }
 
-      let party : Party.t =
-        { body = party_body; authorization = Signature Signature.dummy }
+      let account_update : Account_update.t =
+        { body = account_update_body
+        ; authorization = Signature Signature.dummy
+        }
     end
 
-    module Initialize_party = struct
-      let party, () = Async.Thread_safe.block_on_async_exn initialize_prover
+    module Initialize_account_update = struct
+      let account_update, () =
+        Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
     module Add_events = struct
@@ -84,21 +87,23 @@ let%test_module "Add events test" =
             Array.init event_length ~f:(fun inner ->
                 Snark_params.Tick.Field.of_int (outer + inner) ) )
 
-      let party, () =
+      let account_update, () =
         Async.Thread_safe.block_on_async_exn
           (add_events_prover
              ~handler:(Zkapps_add_events.update_events_handler events) )
     end
 
-    let test_parties ?expected_failure parties =
+    let test_zkapp_command ?expected_failure zkapp_command =
       let memo = Signed_command_memo.empty in
-      let transaction_commitment : Parties.Transaction_commitment.t =
-        let other_parties_hash = Parties.Call_forest.hash parties in
-        Parties.Transaction_commitment.create ~other_parties_hash
+      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+        let account_updates_hash =
+          Zkapp_command.Call_forest.hash zkapp_command
+        in
+        Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
-      let fee_payer : Party.Fee_payer.t =
+      let fee_payer : Account_update.Fee_payer.t =
         { body =
-            { Party.Body.Fee_payer.dummy with
+            { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 100)
             }
@@ -107,14 +112,14 @@ let%test_module "Add events test" =
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
-        Parties.Transaction_commitment.create_complete transaction_commitment
-          ~memo_hash
+        Zkapp_command.Transaction_commitment.create_complete
+          transaction_commitment ~memo_hash
           ~fee_payer_hash:
-            (Parties.Call_forest.Digest.Party.create
-               (Party.of_fee_payer fee_payer) )
+            (Zkapp_command.Call_forest.Digest.Account_update.create
+               (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
-          =
+      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+          Zkapp_command.t =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -127,30 +132,30 @@ let%test_module "Add events test" =
           | fee_payer ->
               fee_payer
         in
-        let other_parties =
-          Parties.Call_forest.map other_parties ~f:(function
+        let account_updates =
+          Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
-               } as party :
-                Party.t )
+               } as account_update :
+                Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
                 let commitment =
                   if use_full_commitment then full_commitment
                   else transaction_commitment
                 in
-                { party with
+                { account_update with
                   authorization =
                     Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
-            | party ->
-                party )
+            | account_update ->
+                account_update )
         in
-        { fee_payer; other_parties; memo }
+        { fee_payer; account_updates; memo }
       in
-      let parties : Parties.t =
-        sign_all { fee_payer; other_parties = parties; memo }
+      let zkapp_command : Zkapp_command.t =
+        sign_all { fee_payer; account_updates = zkapp_command; memo }
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
@@ -161,8 +166,9 @@ let%test_module "Add events test" =
             |> Or_error.ok_exn
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_parties_with_merges_exn ?expected_failure ledger [ parties ] ) ;
-          (parties, Ledger.get ledger loc) )
+              check_zkapp_command_with_merges_exn ?expected_failure ledger
+                [ zkapp_command ] ) ;
+          (zkapp_command, Ledger.get ledger loc) )
 
     module Events_verifier = Merkle_list_verifier.Make (struct
       type proof_elem = Mina_base.Zkapp_account.Event.t
@@ -175,51 +181,61 @@ let%test_module "Add events test" =
     end)
 
     let%test_unit "Initialize" =
-      let parties, account =
+      let zkapp_command, account =
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       assert (Option.is_some account) ;
-      let other_parties = Parties.Call_forest.to_list parties.other_parties in
+      let account_updates =
+        Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+      in
       (* we haven't added any events, so should see default empty list *)
-      List.iter other_parties ~f:(fun party ->
-          assert (List.is_empty party.body.events) )
+      List.iter account_updates ~f:(fun account_update ->
+          assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add events" =
-      let parties, account =
+      let zkapp_command, account =
         []
-        |> Parties.Call_forest.cons_tree Add_events.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       assert (Option.is_some account) ;
-      let other_parties = Parties.Call_forest.to_list parties.other_parties in
-      List.iteri other_parties ~f:(fun i party ->
-          if i > 1 then assert (not @@ List.is_empty party.body.events)
-          else assert (List.is_empty party.body.events) )
+      let account_updates =
+        Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+      in
+      List.iteri account_updates ~f:(fun i account_update ->
+          if i > 1 then assert (not @@ List.is_empty account_update.body.events)
+          else assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add several events" =
-      let parties, account =
+      let zkapp_command, account =
         []
-        |> Parties.Call_forest.cons_tree Add_events.party
-        |> Parties.Call_forest.cons_tree Add_events.party
-        |> Parties.Call_forest.cons_tree Add_events.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties
+        |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command
       in
       assert (Option.is_some account) ;
-      let other_parties = Parties.Call_forest.to_list parties.other_parties in
-      List.iteri other_parties ~f:(fun i party ->
-          if i > 1 then assert (not @@ List.is_empty party.body.events)
-          else assert (List.is_empty party.body.events) ) ;
-      let parties_with_events = List.drop other_parties 2 in
-      (* assemble big list of events from the Partys with events *)
+      let account_updates =
+        Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+      in
+      List.iteri account_updates ~f:(fun i account_update ->
+          if i > 1 then assert (not @@ List.is_empty account_update.body.events)
+          else assert (List.is_empty account_update.body.events) ) ;
+      let zkapp_command_with_events = List.drop account_updates 2 in
+      (* assemble big list of events from the AccountUpdates with events *)
       let all_events =
-        List.concat_map parties_with_events ~f:(fun party -> party.body.events)
+        List.concat_map zkapp_command_with_events ~f:(fun account_update ->
+            account_update.body.events )
       in
       let all_events_hash = Mina_base.Zkapp_account.Events.hash all_events in
       (* verify the hash; Events.hash does a fold_right, so we use verify_right

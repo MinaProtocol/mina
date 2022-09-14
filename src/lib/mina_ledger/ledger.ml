@@ -369,15 +369,15 @@ let apply_transaction ~constraint_constants ~txn_state_view l t =
       apply_transaction ~constraint_constants ~txn_state_view l t )
 
 (* use mask to restore ledger after application *)
-let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
-    parties =
+let merkle_root_after_zkapp_command_exn ~constraint_constants ~txn_state_view
+    ledger zkapp_command =
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_parties_unchecked ~constraint_constants ~state_view:txn_state_view
-         masked_ledger
-         (Parties.Valid.forget parties) )
+      (apply_zkapp_command_unchecked ~constraint_constants
+         ~state_view:txn_state_view masked_ledger
+         (Zkapp_command.Valid.forget zkapp_command) )
   in
   let root = merkle_root masked_ledger in
   ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
@@ -450,7 +450,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
-  let open Parties_builder in
+  let open Zkapp_command_builder in
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
@@ -470,18 +470,20 @@ let%test_unit "tokens test" =
     Public_key.compress kp.public_key
   in
   let main (ledger : t) =
-    let execute_parties_transaction
-        (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) :
-        unit =
+    let execute_zkapp_command_transaction
+        (zkapp_command :
+          (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t
+          ) : unit =
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
           (Account_id.create pk Token_id.default)
         |> Or_error.ok_exn
       in
       match
-        apply_parties_unchecked ~constraint_constants ~state_view:view ledger
-          (mk_parties_transaction ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
-             parties )
+        apply_zkapp_command_unchecked ~constraint_constants ~state_view:view
+          ledger
+          (mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+             zkapp_command )
       with
       | Ok ({ command = { status; _ }; _ }, _) -> (
           match status with
@@ -511,14 +513,15 @@ let%test_unit "tokens test" =
     let account_creation_fee =
       Currency.Fee.to_int constraint_constants.account_creation_fee
     in
-    let create_token : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+    let create_token :
+        (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_funder Token_id.default
+            (mk_account_update_body Call token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_account_update_body Call token_owner Token_id.default
                (3 * account_creation_fee) )
             []
         ]
@@ -533,29 +536,37 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_account_update_body Call token_owner Token_id.default
                (-account_creation_fee) )
-            [ mk_node (mk_party_body Call token_account1 custom_token_id 100) []
+            [ mk_node
+                (mk_account_update_body Call token_account1 custom_token_id 100)
+                []
             ]
         ]
     in
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_account_update_body Call token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_party_body Call token_account1 custom_token_id (-30))
+                (mk_account_update_body Call token_account1 custom_token_id (-30))
                 []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 30) []
             ; mk_node
-                (mk_party_body Call token_account1 custom_token_id (-10))
+                (mk_account_update_body Call token_account2 custom_token_id 30)
                 []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 10) []
             ; mk_node
-                (mk_party_body Call token_account2 custom_token_id (-5))
+                (mk_account_update_body Call token_account1 custom_token_id (-10))
                 []
-            ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
+            ; mk_node
+                (mk_account_update_body Call token_account2 custom_token_id 10)
+                []
+            ; mk_node
+                (mk_account_update_body Call token_account2 custom_token_id (-5))
+                []
+            ; mk_node
+                (mk_account_update_body Call token_account1 custom_token_id 5)
+                []
             ]
         ]
     in
@@ -567,15 +578,15 @@ let%test_unit "tokens test" =
           .balance
         (Currency.Balance.of_int balance)
     in
-    execute_parties_transaction create_token ;
+    execute_zkapp_command_transaction create_token ;
     (* Check that token_owner exists *)
     ledger_get_exn ledger
       (Public_key.compress token_owner.public_key)
       Token_id.default
     |> ignore ;
-    execute_parties_transaction token_minting ;
+    execute_zkapp_command_transaction token_minting ;
     check_token_balance token_account1 100 ;
-    execute_parties_transaction token_transfers ;
+    execute_zkapp_command_transaction token_transfers ;
     check_token_balance token_account1 65 ;
     check_token_balance token_account2 35
   in
@@ -586,7 +597,7 @@ let%test_unit "tokens test" =
         ledger ;
       main ledger )
 
-let%test_unit "parties payment test" =
+let%test_unit "zkapp_command payment test" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
@@ -596,12 +607,12 @@ let%test_unit "parties payment test" =
   in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
-      let ts2 : Parties.t list =
+      let ts2 : Zkapp_command.t list =
         List.map specs ~f:(fun s ->
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            party_send ~constraint_constants ~use_full_commitment s )
+            account_update_send ~constraint_constants ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
@@ -615,13 +626,15 @@ let%test_unit "parties payment test" =
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
-                    apply_parties_unchecked l2 t ~constraint_constants
+                    apply_zkapp_command_unchecked l2 t ~constraint_constants
                       ~state_view:view )
               in
-              let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
+              let accounts =
+                List.concat_map ~f:Zkapp_command.accounts_accessed ts2
+              in
               (* TODO: Hack. The nonces are inconsistent between the 2
                  versions. See the comment in
-                 [Mina_transaction_logic.For_tests.party_send] for more info.
+                 [Mina_transaction_logic.For_tests.account_update_send] for more info.
               *)
               L.iteri l1 ~f:(fun index account ->
                   L.set_at_index_exn l1 index

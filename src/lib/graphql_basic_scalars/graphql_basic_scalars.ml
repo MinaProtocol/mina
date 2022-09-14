@@ -207,6 +207,29 @@ end) : Json_intf with type t = T.t = struct
     Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
 
+module Make_scalar_using_base64 (T : sig
+  type t
+
+  val to_base64 : t -> string
+
+  val of_base64 : string -> t Core_kernel.Or_error.t
+end) (Scalar : sig
+  val name : string
+
+  val doc : string
+end) : Json_intf with type t = T.t = struct
+  type t = T.t
+
+  let parse json =
+    Yojson.Basic.Util.to_string json
+    |> T.of_base64 |> Core_kernel.Or_error.ok_exn
+
+  let serialize x = `String (T.to_base64 x)
+
+  let typ () =
+    Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
+end
+
 module InetAddr =
   Make_scalar_using_to_string
     (Core.Unix.Inet_addr)
