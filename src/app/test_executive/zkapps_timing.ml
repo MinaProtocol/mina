@@ -65,7 +65,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo
@@ -83,9 +82,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
         }
       in
@@ -116,7 +112,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo
@@ -135,9 +130,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; sequence_events = []
-        ; events = []
-        ; call_data = Snark_params.Tick.Field.zero
         ; preconditions = None
         }
       in

@@ -101,15 +101,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              { sender = (sender_kp, nonce)
              ; fee
              ; fee_payer = None
-             ; receivers = []
              ; amount
              ; zkapp_account_keypairs = [ zkapp_account_keypair ]
              ; memo
              ; new_zkapp_account = true
              ; snapp_update = Mina_base.Account_update.Update.dummy
-             ; call_data = Snark_params.Tick.Field.zero
-             ; events = []
-             ; sequence_events = []
              ; preconditions = None
              }
            in

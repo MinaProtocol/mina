@@ -307,15 +307,11 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     { Transaction_snark.For_tests.Deploy_snapp_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
-    ; receivers = []
     ; amount
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
     ; new_zkapp_account = true
     ; snapp_update = Account_update.Update.dummy
-    ; call_data = Snark_params.Tick.Field.zero
-    ; events = []
-    ; sequence_events = []
     ; preconditions = None
     }
   in

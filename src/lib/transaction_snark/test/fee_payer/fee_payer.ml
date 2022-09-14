@@ -147,15 +147,11 @@ let%test_module "Fee payer tests" =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
                 ; fee_payer = None
-                ; receivers = []
                 ; amount
                 ; zkapp_account_keypairs = [ fst spec.sender ]
                 ; memo
                 ; new_zkapp_account = true
                 ; snapp_update
-                ; call_data = Snark_params.Tick.Field.zero
-                ; events = []
-                ; sequence_events = []
                 ; preconditions = None
                 }
               in

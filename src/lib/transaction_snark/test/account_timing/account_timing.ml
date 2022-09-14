@@ -1117,7 +1117,6 @@ let%test_module "account timing check" =
         { sender = (sender_keypair, Account.Nonce.zero)
         ; fee = Currency.Fee.of_int fee
         ; fee_payer = None
-        ; receivers = []
         ; amount =
             Option.value_exn
               Currency.Amount.(
@@ -1141,9 +1140,6 @@ let%test_module "account timing check" =
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
         }
       in
@@ -1701,7 +1697,6 @@ let%test_module "account timing check" =
         { sender = (sender_keypair, Account.Nonce.zero)
         ; fee = Currency.Fee.of_int 1_000_000
         ; fee_payer = None
-        ; receivers = []
         ; amount = Currency.Amount.of_int 50_000_000_000_000
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo =
@@ -1721,9 +1716,6 @@ let%test_module "account timing check" =
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
         }
       in

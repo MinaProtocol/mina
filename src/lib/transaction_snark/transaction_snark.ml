@@ -4658,17 +4658,12 @@ module For_tests = struct
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
       ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-      ; receivers :
-          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
       ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]
@@ -4677,28 +4672,24 @@ module For_tests = struct
         { fee
         ; sender
         ; fee_payer
-        ; receivers
         ; amount
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
         ; snapp_update = _
-        ; sequence_events
-        ; events
-        ; call_data
         ; preconditions
         } : Spec.t =
       { fee
       ; sender
       ; fee_payer
-      ; receivers
+      ; receivers = []
       ; amount
       ; zkapp_account_keypairs
       ; memo
       ; new_zkapp_account
-      ; sequence_events
-      ; events
-      ; call_data
+      ; sequence_events = []
+      ; events = []
+      ; call_data = Tick.Field.zero
       ; preconditions
       }
   end

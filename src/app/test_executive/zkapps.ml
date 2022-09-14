@@ -152,15 +152,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { sender = (fish1_kp, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = true
         ; snapp_update = Account_update.Update.dummy
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
         }
       in
