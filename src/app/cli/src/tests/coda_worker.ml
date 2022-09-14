@@ -361,13 +361,22 @@ module T = struct
         >>| Or_error.ok_exn
       in
       let constraint_constants = precomputed_values.constraint_constants in
+      let module Context = struct
+        let logger = logger
+
+        let precomputed_values = precomputed_values
+
+        let constraint_constants = precomputed_values.constraint_constants
+
+        let consensus_constants = precomputed_values.consensus_constants
+      end in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d )
+            Mina_tracing.start d )
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -400,11 +409,11 @@ module T = struct
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
-            Consensus.Data.Local_state.create block_production_pubkeys
-              ~genesis_ledger:Genesis_ledger.t
+            Consensus.Data.Local_state.create
+              ~context:(module Context)
+              block_production_pubkeys ~genesis_ledger:Genesis_ledger.t
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
-              ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -430,8 +439,8 @@ module T = struct
               ; pubsub_v0 = RW
               ; validation_queue_size = 150
               ; peer_exchange = true
-              ; mina_peer_exchange = true
-              ; keypair = Some libp2p_keypair
+              ; peer_protection_ratio = 0.2
+              ; keypair = libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
               ; time_controller
@@ -456,6 +465,7 @@ module T = struct
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            ; precomputed_values
             }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
@@ -496,16 +506,15 @@ module T = struct
                  ~log_precomputed_blocks:false ~stop_time:48 () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger ~node_error_url:None
-            ~contact_info:None coda_ref ;
+          Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+            ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
-                Coda_run.setup_local_server coda ;
+                Mina_run.setup_local_server coda ;
                 coda )
               ()
           in

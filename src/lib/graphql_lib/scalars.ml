@@ -13,3 +13,6 @@ include Block_time_unix.Graphql_scalars
 include Filtered_external_transition_unix.Graphql_scalars
 include Consensus.Graphql_scalars
 include Mina_transaction_unix.Graphql_scalars
+include Snark_params_unix.Graphql_scalars
+include Data_hash_lib_unix.Graphql_scalars
+include Pickles_unix.Graphql_scalars
