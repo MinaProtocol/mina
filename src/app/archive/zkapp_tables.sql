@@ -146,7 +146,7 @@ CREATE TABLE zkapp_nonce_bounds
 CREATE TYPE zkapp_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
-CREATE TABLE zkapp_precondition_accounts
+CREATE TABLE account_precondition_values
 ( id                       serial                 PRIMARY KEY
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
@@ -164,7 +164,7 @@ CREATE TABLE zkapp_precondition_accounts
 CREATE TABLE zkapp_account_precondition
 ( id                       serial                            PRIMARY KEY
 , kind                     zkapp_precondition_type           NOT NULL
-, precondition_account_id  int                               REFERENCES zkapp_precondition_accounts(id)
+, account_precondition_values_id  int                               REFERENCES account_precondition_values(id)
 , nonce                    bigint
 );
 

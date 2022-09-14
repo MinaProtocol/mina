@@ -504,7 +504,7 @@ let get_account_update_body ~pool body_id =
                  ; is_new
                  } =
           query_db ~f:(fun db ->
-              Processor.Zkapp_precondition_account.load db
+              Processor.Account_precondition_values.load db
                 (Option.value_exn precondition_account_id) )
         in
         let%bind balance =

@@ -48,7 +48,7 @@ DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
-DROP TABLE zkapp_precondition_accounts;
+DROP TABLE account_precondition_values;
 
 DROP TABLE zkapp_accounts;
 
