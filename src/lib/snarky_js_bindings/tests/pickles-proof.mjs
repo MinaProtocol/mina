@@ -85,13 +85,13 @@ function createDummyRule(name, func, witnessTypes) {
 
 function emptyWitness(typ) {
   return Circuit.witness(typ, () =>
-    typ.ofFields(Array(typ.sizeInFields()).fill(Field.zero))
+    typ.fromFields(Array(typ.sizeInFields()).fill(Field.zero))
   );
 }
 
 let FieldTyp = {
   sizeInFields: () => 1,
   toFields: (f) => [f],
-  ofFields: ([f]) => f,
+  fromFields: ([f]) => f,
   check: () => {},
 };

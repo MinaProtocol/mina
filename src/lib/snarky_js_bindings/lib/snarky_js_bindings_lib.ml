@@ -403,7 +403,7 @@ let () =
     Js.wrap_callback
       (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
         (As_field.to_field_obj x)##toFields ) ;
-  field_class##.ofFields :=
+  field_class##.fromFields :=
     Js.wrap_callback
       (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
         array_check_length xs 1 ; array_get_exn xs 0 ) ;
@@ -417,7 +417,7 @@ let () =
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean (Field.equal (As_field.value x) Field.zero)) ) ;
-  field_class##.ofBits :=
+  field_class##.fromBits :=
     Js.wrap_callback
       (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
         try
@@ -624,7 +624,7 @@ let () =
     (fun (x : As_bool.t) : field_class Js.t Js.js_array Js.t ->
       singleton_array
         (new%js field_constr (As_field.of_field (As_bool.value x :> Field.t))) ) ;
-  static_method "ofFields"
+  static_method "fromFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : bool_class Js.t ->
       if xs##.length = 1 then
         Js.Optdef.case (Js.array_get xs 0)
@@ -863,7 +863,7 @@ let () =
     (fun (x : scalar_class Js.t) : field_class Js.t Js.js_array Js.t ->
       (Js.Unsafe.coerce x)##toFields ) ;
   static_method "sizeInFields" (fun () : int -> num_bits) ;
-  static_method "ofFields"
+  static_method "fromFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array xs) ~f:(fun x ->
@@ -871,7 +871,7 @@ let () =
   static_method "random" (fun () : scalar_class Js.t ->
       let x = Other_backend.Field.random () in
       new%js scalar_constr_const (bits x) x ) ;
-  static_method "ofBits"
+  static_method "fromBits"
     (fun (bits : bool_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array bits) ~f:(fun b ->
@@ -1004,7 +1004,7 @@ let () =
       arr##push p1##.y |> ignore ;
       arr ) ;
   static_method "toFields" (fun (p1 : group_class Js.t) -> p1##toFields) ;
-  static_method "ofFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
+  static_method "fromFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
       array_check_length xs 2 ;
       new%js group_constr
         (As_field.of_field_obj (array_get_exn xs 0))
@@ -1037,7 +1037,7 @@ class type ['a] as_field_elements =
   object
     method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
 
-    method ofFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
+    method fromFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
 
     method sizeInFields : int Js.meth
   end
@@ -1282,7 +1282,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let has_methods ctor =
            let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
-           has "toFields" && has "ofFields"
+           has "toFields" && has "fromFields"
          in
          match Js.Optdef.(to_option ctor1) with
          | Some ctor1 when has_methods ctor1 ->
@@ -1360,7 +1360,7 @@ module Circuit = struct
         let t1 = ctor##toFields x1 in
         let t2 = ctor##toFields x2 in
         let arr = if_array b t1 t2 in
-        ctor##ofFields arr
+        ctor##fromFields arr
 
   let rec if_magic : type a. As_bool.t -> a Js.t -> a Js.t -> a Js.t =
     fun (type a) (b : As_bool.t) (t1 : a Js.t) (t2 : a Js.t) : a Js.t ->
@@ -1380,7 +1380,7 @@ module Circuit = struct
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
            let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
-           has "toFields" && has "ofFields"
+           has "toFields" && has "fromFields"
          in
          if not (js_equal ctor1 ctor2) then
            raise_error "if: Mismatched argument types" ;
@@ -1421,7 +1421,7 @@ module Circuit = struct
       Js.to_array (typ##toFields a) |> Array.map ~f:(fun x -> conv x##.value)
     in
     let of_array conv xs =
-      typ##ofFields
+      typ##fromFields
         (Js.array
            (Array.map xs ~f:(fun x ->
                 new%js field_constr (As_field.of_field (conv x)) ) ) )
