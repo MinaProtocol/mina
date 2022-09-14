@@ -792,7 +792,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Account_precondition_values = struct
+module Zkapp_account_precondition_values = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -918,7 +918,9 @@ module Zkapp_account_precondition = struct
     let%bind account_precondition_values_id =
       match account_precondition with
       | Account_update.Account_precondition.Full acct ->
-          Account_precondition_values.add_if_doesn't_exist (module Conn) acct
+          Zkapp_account_precondition_values.add_if_doesn't_exist
+            (module Conn)
+            acct
           >>| Option.some
       | _ ->
           return None
