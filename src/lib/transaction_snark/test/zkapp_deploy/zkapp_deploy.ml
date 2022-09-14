@@ -1,7 +1,7 @@
 open Core
 open Mina_ledger
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Deploy_snapp_spec
 open Mina_base
 
 let%test_module "Snapp deploy tests" =

@@ -4,7 +4,7 @@ open Currency
 open Snark_params
 open Tick
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 open Mina_base
 
 let%test_module "Zkapp payments tests" =

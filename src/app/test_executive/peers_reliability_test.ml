@@ -96,7 +96,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            let sender_kp =
              (Option.value_exn (Node.network_keypair node_c)).keypair
            in
-           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+           let (parties_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+               =
              { sender = (sender_kp, nonce)
              ; fee
              ; fee_payer = None

@@ -4657,7 +4657,62 @@ module For_tests = struct
     , `Txn_commitment commitment
     , `Full_txn_commitment full_commitment )
 
-  let deploy_snapp ?(no_auth = false) ~constraint_constants (spec : Spec.t) =
+  module Deploy_snapp_spec = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      ; preconditions : Account_update.Preconditions.t option
+      }
+    [@@deriving sexp]
+
+    let spec_of_t
+        { fee
+        ; sender
+        ; fee_payer
+        ; receivers
+        ; amount
+        ; zkapp_account_keypairs
+        ; memo
+        ; new_zkapp_account
+        ; snapp_update
+        ; current_auth
+        ; sequence_events
+        ; events
+        ; call_data
+        ; preconditions
+        } : Spec.t =
+      { fee
+      ; sender
+      ; fee_payer
+      ; receivers
+      ; amount
+      ; zkapp_account_keypairs
+      ; memo
+      ; new_zkapp_account
+      ; snapp_update
+      ; current_auth
+      ; sequence_events
+      ; events
+      ; call_data
+      ; preconditions
+      }
+  end
+
+  let deploy_snapp ?(no_auth = false) ~constraint_constants
+      (spec : Deploy_snapp_spec.t) =
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
@@ -4686,7 +4741,9 @@ module For_tests = struct
         , `Proof_zkapp_command snapp_zkapp_command
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_zkapp_command ~constraint_constants spec ~update:update_vk
+      create_zkapp_command ~constraint_constants
+        (Deploy_snapp_spec.spec_of_t spec)
+        ~update:update_vk
     in
     assert (List.is_empty account_updates) ;
     (* invariant: same number of keypairs, snapp_zkapp_command *)
@@ -4739,13 +4796,70 @@ module For_tests = struct
     in
     zkapp_command
 
-  let update_states ?zkapp_prover ~constraint_constants (spec : Spec.t) =
+  module Update_states_spec = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      ; preconditions : Account_update.Preconditions.t option
+      }
+    [@@deriving sexp]
+
+    let spec_of_t
+        { fee
+        ; sender
+        ; fee_payer
+        ; receivers
+        ; amount
+        ; zkapp_account_keypairs
+        ; memo
+        ; new_zkapp_account
+        ; snapp_update
+        ; current_auth
+        ; sequence_events
+        ; events
+        ; call_data
+        ; preconditions
+        } : Spec.t =
+      { fee
+      ; sender
+      ; fee_payer
+      ; receivers
+      ; amount
+      ; zkapp_account_keypairs
+      ; memo
+      ; new_zkapp_account
+      ; snapp_update
+      ; current_auth
+      ; sequence_events
+      ; events
+      ; call_data
+      ; preconditions
+      }
+  end
+
+  let update_states ?zkapp_prover ~constraint_constants
+      (spec : Update_states_spec.t) =
     let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
         , `Sender_account_update sender_account_update
         , `Proof_zkapp_command snapp_zkapp_command
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_zkapp_command ~constraint_constants spec ~update:spec.snapp_update
+      create_zkapp_command ~constraint_constants
+        (Update_states_spec.spec_of_t spec)
+        ~update:spec.snapp_update
     in
     assert (List.is_empty account_updates) ;
     assert (Option.is_none sender_account_update) ;
@@ -4823,7 +4937,61 @@ module For_tests = struct
     in
     zkapp_command
 
-  let multiple_transfers (spec : Spec.t) =
+  module Multiple_transfers_spec = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      ; preconditions : Account_update.Preconditions.t option
+      }
+    [@@deriving sexp]
+
+    let spec_of_t
+        { fee
+        ; sender
+        ; fee_payer
+        ; receivers
+        ; amount
+        ; zkapp_account_keypairs
+        ; memo
+        ; new_zkapp_account
+        ; snapp_update
+        ; current_auth
+        ; sequence_events
+        ; events
+        ; call_data
+        ; preconditions
+        } : Spec.t =
+      { fee
+      ; sender
+      ; fee_payer
+      ; receivers
+      ; amount
+      ; zkapp_account_keypairs
+      ; memo
+      ; new_zkapp_account
+      ; snapp_update
+      ; current_auth
+      ; sequence_events
+      ; events
+      ; call_data
+      ; preconditions
+      }
+  end
+
+  let multiple_transfers (spec : Multiple_transfers_spec.t) =
     let ( `Zkapp_command zkapp_command
         , `Sender_account_update sender_account_update
         , `Proof_zkapp_command snapp_zkapp_command
@@ -4831,7 +4999,8 @@ module For_tests = struct
         , `Full_txn_commitment _full_commitment ) =
       create_zkapp_command
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-        spec ~update:spec.snapp_update
+        (Multiple_transfers_spec.spec_of_t spec)
+        ~update:spec.snapp_update
     in
     assert (Option.is_some sender_account_update) ;
     assert (List.is_empty snapp_zkapp_command) ;

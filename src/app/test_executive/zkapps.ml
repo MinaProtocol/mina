@@ -147,7 +147,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
       let fee = Currency.Fee.of_int 20_000_000 in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
         { sender = (fish1_kp, nonce)
         ; fee
         ; fee_payer = None
@@ -189,7 +190,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; send = Proof
         }
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
         { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
@@ -265,7 +267,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; voting_for = Set new_voting_for
         }
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
         { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
@@ -297,14 +300,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { zkapp_command_spec with fee = Currency.Fee.max_int }
       in
       let%bind.Deferred zkapp_command_insufficient_replace_fee =
-        let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
+        let spec_insufficient_replace_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with fee = Currency.Fee.of_int 5_000_000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_replace_fee
       in
       let%map.Deferred zkapp_command_insufficient_fee =
-        let spec_insufficient_fee : Transaction_snark.For_tests.Spec.t =
+        let spec_insufficient_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with fee = Currency.Fee.of_int 1000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
@@ -348,7 +353,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Non-existent account"
       in
       let fee = Currency.Fee.of_int 10_000_000 in
-      let spec : Transaction_snark.For_tests.Spec.t =
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
         { sender = (new_kp, Account.Nonce.zero)
         ; fee
         ; fee_payer = None

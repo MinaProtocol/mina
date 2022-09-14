@@ -6,7 +6,6 @@ open Snark_params
 open Tick
 open Pickles_types
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
 module Impl = Pickles.Impls.Step
 
 let%test_module "multisig_account" =

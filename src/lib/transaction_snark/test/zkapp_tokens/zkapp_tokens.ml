@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_ledger
 open Signature_lib
 open Mina_base
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 module U = Transaction_snark_tests.Util
 
