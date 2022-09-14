@@ -153,7 +153,6 @@ let%test_module "Fee payer tests" =
                 ; memo
                 ; new_zkapp_account = true
                 ; snapp_update
-                ; current_auth = Permissions.Auth_required.Signature
                 ; call_data = Snark_params.Tick.Field.zero
                 ; events = []
                 ; sequence_events = []

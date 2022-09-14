@@ -313,7 +313,6 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     ; memo = Util.memo memo
     ; new_zkapp_account = true
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
@@ -390,7 +389,6 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Proof
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []

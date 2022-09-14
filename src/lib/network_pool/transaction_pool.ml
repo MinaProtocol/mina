@@ -1777,7 +1777,6 @@ let%test_module _ =
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []

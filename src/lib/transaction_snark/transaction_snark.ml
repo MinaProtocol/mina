@@ -4360,9 +4360,6 @@ module For_tests = struct
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
-      ; snapp_update : Account_update.Update.t
-            (* Authorization for the update being performed *)
-      ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -4458,7 +4455,6 @@ module For_tests = struct
         ; events
         ; call_data
         ; preconditions
-        ; _
         } =
       spec
     in
@@ -4670,7 +4666,6 @@ module For_tests = struct
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -4687,8 +4682,7 @@ module For_tests = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; snapp_update
-        ; current_auth
+        ; snapp_update = _
         ; sequence_events
         ; events
         ; call_data
@@ -4702,8 +4696,6 @@ module For_tests = struct
       ; zkapp_account_keypairs
       ; memo
       ; new_zkapp_account
-      ; snapp_update
-      ; current_auth
       ; sequence_events
       ; events
       ; call_data
@@ -4826,8 +4818,8 @@ module For_tests = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; snapp_update
-        ; current_auth
+        ; snapp_update = _
+        ; current_auth = _
         ; sequence_events
         ; events
         ; call_data
@@ -4841,8 +4833,6 @@ module For_tests = struct
       ; zkapp_account_keypairs
       ; memo
       ; new_zkapp_account
-      ; snapp_update
-      ; current_auth
       ; sequence_events
       ; events
       ; call_data
@@ -4950,7 +4940,6 @@ module For_tests = struct
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -4967,8 +4956,7 @@ module For_tests = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; snapp_update
-        ; current_auth
+        ; snapp_update = _
         ; sequence_events
         ; events
         ; call_data
@@ -4982,8 +4970,6 @@ module For_tests = struct
       ; zkapp_account_keypairs
       ; memo
       ; new_zkapp_account
-      ; snapp_update
-      ; current_auth
       ; sequence_events
       ; events
       ; call_data

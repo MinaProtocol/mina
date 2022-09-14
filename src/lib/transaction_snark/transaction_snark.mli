@@ -512,7 +512,6 @@ module For_tests : sig
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -609,7 +608,6 @@ module For_tests : sig
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t

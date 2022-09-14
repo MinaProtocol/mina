@@ -83,7 +83,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
@@ -136,7 +135,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Signature
         ; sequence_events = []
         ; events = []
         ; call_data = Snark_params.Tick.Field.zero
@@ -171,7 +169,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
@@ -205,7 +202,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []

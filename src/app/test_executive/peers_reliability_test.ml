@@ -107,7 +107,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; memo
              ; new_zkapp_account = true
              ; snapp_update = Mina_base.Account_update.Update.dummy
-             ; current_auth = Mina_base.Permissions.Auth_required.Signature
              ; call_data = Snark_params.Tick.Field.zero
              ; events = []
              ; sequence_events = []

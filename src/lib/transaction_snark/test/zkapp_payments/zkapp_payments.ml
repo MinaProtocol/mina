@@ -195,7 +195,6 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
@@ -262,7 +261,6 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
