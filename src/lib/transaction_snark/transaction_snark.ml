@@ -1825,6 +1825,12 @@ module Base = struct
             ( `Proof_verifies proof_verifies
             , `Signature_verifies signature_verifies )
 
+          let is_proved ({ account_update; _ } : t) =
+            account_update.data.authorization_kind.is_proved
+
+          let is_signed ({ account_update; _ } : t) =
+            account_update.data.authorization_kind.is_signed
+
           module Update = struct
             open Zkapp_basic
 
