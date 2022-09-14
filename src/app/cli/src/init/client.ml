@@ -679,26 +679,6 @@ module Export_logs = struct
        run ~tarfile ~conf_dir )
 end
 
-let get_transaction_status =
-  Command.async ~summary:"Get the status of a transaction"
-    (Cli_lib.Background_daemon.rpc_init
-       Command.Param.(anon @@ ("txn-id" %: string))
-       ~f:(fun port serialized_transaction ->
-         match Signed_command.of_base64 serialized_transaction with
-         | Ok user_command ->
-             Daemon_rpcs.Client.dispatch_with_message
-               Daemon_rpcs.Get_transaction_status.rpc user_command port
-               ~success:(fun status ->
-                 sprintf !"Transaction status : %s\n"
-                 @@ Transaction_inclusion_status.State.to_string status )
-               ~error:(fun e ->
-                 sprintf "Failed to get transaction status : %s"
-                   (Error.to_string_hum e) )
-               ~join_error:Or_error.join
-         | Error _e ->
-             eprintf "Could not deserialize user command" ;
-             exit 16 ) )
-
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
