@@ -122,6 +122,9 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
+
+  export GITHASH=$(git rev-parse --short=7 HEAD)
+  docker tag "${GITHASH}" "$1"
   docker push "$1"
 }
 
@@ -129,8 +132,3 @@ if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
   docker push "${TAG}"
   tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
 fi
-
-
-export GITHASH=$(git rev-parse --short=7 HEAD)
-docker tag "${GITHASH}" "gcr.io/o1labs-192920/$SERVICE:$VERSION"
-docker push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
