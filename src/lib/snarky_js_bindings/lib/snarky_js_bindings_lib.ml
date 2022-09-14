@@ -1042,6 +1042,13 @@ class type ['a] as_field_elements =
     method sizeInFields : int Js.meth
   end
 
+class type ['a] as_field_elements_minimal =
+  object
+    method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
+
+    method sizeInFields : int Js.meth
+  end
+
 let array_iter t1 ~f =
   for i = 0 to t1##.length - 1 do
     f (array_get_exn t1 i)
@@ -1443,6 +1450,17 @@ module Circuit = struct
     else failwith "Circuit.witness: input does not have a `check` method" ;
     a
 
+  let typ_minimal (type a) (typ : a as_field_elements_minimal Js.t) =
+    Typ.array ~length:typ##sizeInFields Field.typ
+
+  let witness_minimal (type a) (typ : a as_field_elements_minimal Js.t)
+      (f : (unit -> a) Js.callback) =
+    Impl.exists (typ_minimal typ) ~compute:(fun () ->
+        typ##toFields (Js.Unsafe.fun_call f [||])
+        |> Js.to_array
+        |> Array.map ~f:of_js_field_unchecked )
+    |> Array.map ~f:to_js_field |> Js.array
+
   module Circuit_main = struct
     type ('w, 'p) t =
       < snarkyMain : ('w -> 'p -> unit) Js.callback Js.prop
@@ -1522,7 +1540,6 @@ module Circuit = struct
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
-    circuit##.witness := Js.wrap_callback witness ;
     circuit##.generateKeypair :=
       Js.wrap_meth_callback
         (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
@@ -1546,6 +1563,8 @@ module Circuit = struct
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
     Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
+    Js.Unsafe.set circuit (Js.string "_witness")
+      (Js.wrap_callback witness_minimal) ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
