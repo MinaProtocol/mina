@@ -818,7 +818,7 @@ module Account_precondition_values = struct
         ; option bool
         ]
 
-  let table_name = "account_precondition_values"
+  let table_name = "zkapp_account_precondition_values"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -879,7 +879,7 @@ end
 module Zkapp_account_precondition = struct
   type t =
     { kind : Account_update.Account_precondition.Tag.t
-    ; precondition_account_id : int option
+    ; account_precondition_values_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
@@ -915,7 +915,7 @@ module Zkapp_account_precondition = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (account_precondition : Account_update.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind precondition_account_id =
+    let%bind account_precondition_values_id =
       match account_precondition with
       | Account_update.Account_precondition.Full acct ->
           Account_precondition_values.add_if_doesn't_exist (module Conn) acct
@@ -934,7 +934,7 @@ module Zkapp_account_precondition = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      { kind; precondition_account_id; nonce }
+      { kind; account_precondition_values_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1547,7 +1547,7 @@ module Zkapp_account_update_body = struct
         | "events_ids" | "sequence_events_ids" ->
             Some "int[]"
         | "caller" ->
-            Some "call_type_type"
+            Some "call_type"
         | _ ->
             None )
       (module Conn)

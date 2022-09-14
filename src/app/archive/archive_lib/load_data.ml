@@ -476,7 +476,7 @@ let get_account_update_body ~pool body_id =
     protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let%bind account_precondition =
-    let%bind ({ kind; precondition_account_id; nonce }
+    let%bind ({ kind; account_precondition_values_id; nonce }
                : Processor.Zkapp_account_precondition.t ) =
       query_db ~f:(fun db ->
           Processor.Zkapp_account_precondition.load db
@@ -493,7 +493,7 @@ let get_account_update_body ~pool body_id =
     | Accept ->
         return Account_update.Account_precondition.Accept
     | Full ->
-        assert (Option.is_some precondition_account_id) ;
+        assert (Option.is_some account_precondition_values_id) ;
         let%bind { balance_id
                  ; nonce_id
                  ; receipt_chain_hash
@@ -505,7 +505,7 @@ let get_account_update_body ~pool body_id =
                  } =
           query_db ~f:(fun db ->
               Processor.Account_precondition_values.load db
-                (Option.value_exn precondition_account_id) )
+                (Option.value_exn account_precondition_values_id) )
         in
         let%bind balance =
           let%map balance_opt =
