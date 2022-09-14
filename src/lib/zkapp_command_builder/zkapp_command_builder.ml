@@ -56,7 +56,17 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
       account_updates
       |> Zkapp_command.Call_forest.map
            ~f:(fun (p : Account_update.Body.Simple.t) : Account_update.Simple.t
-              -> { body = p; authorization = Signature Signature.dummy } )
+              ->
+             let authorization =
+               match p.authorization_kind with
+               | None_given ->
+                   Control.None_given
+               | Proof ->
+                   Control.Proof Mina_base.Proof.blockchain_dummy
+               | Signature ->
+                   Control.Signature Signature.dummy
+             in
+             { body = p; authorization } )
       |> Zkapp_command.Call_forest.add_callers_simple
       |> Zkapp_command.Call_forest.accumulate_hashes_predicated
   }
