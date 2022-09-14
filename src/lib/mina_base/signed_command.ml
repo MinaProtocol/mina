@@ -354,6 +354,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   [%%define_locally
   Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
+  include Codable.Make_base64 (Stable.Latest)
+
   let check_signature ?signature_kind ({ payload; signer; signature } : t) =
     Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
       (Snark_params.Tick.Inner_curve.of_affine signer)

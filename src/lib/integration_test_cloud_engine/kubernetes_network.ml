@@ -645,6 +645,12 @@ module Node = struct
     ; nonce : Mina_numbers.Account_nonce.t
     }
 
+  let transaction_id_to_string = function
+    | `String s ->
+        s
+    | _ ->
+        failwith "Unexpected JSON for transaction ID"
+
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment" ~metadata:(logger_metadata t) ;
@@ -678,7 +684,7 @@ module Node = struct
     let%map sent_payment_obj = send_payment_graphql () in
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj.id
+      { id = transaction_id_to_string return_obj.id
       ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
@@ -733,8 +739,7 @@ module Node = struct
             |> Yojson.Safe.to_string )
     in
     let zkapp_id =
-      Mina_base.Zkapp_command.to_base58_check
-        sent_zkapp_obj.internalSendZkapp.zkapp.id
+      transaction_id_to_string sent_zkapp_obj.internalSendZkapp.zkapp.id
     in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
@@ -772,7 +777,7 @@ module Node = struct
     let%map result_obj = send_delegation_graphql () in
     let return_obj = result_obj.sendDelegation.delegation in
     let res =
-      { id = return_obj.id
+      { id = transaction_id_to_string return_obj.id
       ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
@@ -816,7 +821,7 @@ module Node = struct
     let%map sent_payment_obj = send_payment_graphql () in
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj.id
+      { id = transaction_id_to_string return_obj.id
       ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }

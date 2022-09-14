@@ -1518,6 +1518,8 @@ include Codable.Make_base58_check (Stable.Latest)
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
+include Codable.Make_base64 (Stable.Latest)
+
 type account_updates =
   (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
 
