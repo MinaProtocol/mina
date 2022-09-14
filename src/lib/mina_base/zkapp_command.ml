@@ -1478,6 +1478,14 @@ struct
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
+          let%bind () =
+            match (p.authorization, p.body.authorization_kind) with
+            | None_given, None_given | Proof _, Proof | Signature _, Signature
+              ->
+                Some ()
+            | _ ->
+                None
+          in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
             let%map { With_hash.hash; _ } = vk_opt in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
