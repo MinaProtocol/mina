@@ -297,6 +297,8 @@
         inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_coverage = ocamlPackages.mina_coverage;
+        packages.mina_tests_transaction_snark_1 = ocamlPackages.mina_tests_transaction_snark_1;
+        packages.mina_tests_transaction_snark_2 = ocamlPackages.mina_tests_transaction_snark_2;
         packages.mina_tests_archive = ocamlPackages.mina_tests_archive;
         packages.mina_tests_src_lib = ocamlPackages.mina_tests_src_lib;
         packages.mina_tests_zkapp_test_transaction = ocamlPackages.mina_tests_zkapp_test_transaction;

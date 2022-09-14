@@ -88,6 +88,68 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
+
+      transaction_snark_1_libs = [
+        "src/lib/transaction_snark/test/app_state"
+        "src/lib/transaction_snark/test/verification_key"
+        "src/lib/transaction_snark/test/voting_for"
+        "src/lib/transaction_snark/test/transaction_union"
+        "src/lib/transaction_snark/test/zkapp_uri"
+        "src/lib/transaction_snark/test/zkapp_tokens"
+        "src/lib/transaction_snark/test/token_symbol"
+        "src/lib/transaction_snark/test/permissions"
+      ];
+
+      transaction_snark_2_libs = [
+        "src/lib/transaction_snark"
+        "src/lib/transaction_snark/test"
+        "src/lib/transaction_snark/test/fee_payer"
+        "src/lib/transaction_snark/test/zkapp_payments"
+        "src/lib/transaction_snark/test/account_timing"
+        "src/lib/transaction_snark/test/zkapps_examples/add_events"
+        "src/lib/transaction_snark/test/zkapps_examples/sequence_events"
+        "src/lib/transaction_snark/test/zkapps_examples/empty_update"
+        "src/lib/transaction_snark/test/zkapps_examples/initialize_state"
+        "src/lib/transaction_snark/test/delegate"
+        "src/lib/transaction_snark/test/multisig_account"
+        "src/lib/transaction_snark/test/zkapp_deploy"
+        "src/lib/transaction_snark/test/party_preconditions"
+      ];
+
+      build_coverage = {libraries_to_test, name}: runMinaCheck {
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find coverage_output -name "*.coverage" | xargs -i -t cp {} $out/coverage
+              cp times $out/times
+              cp output_stderr $out/output_stderr
+          '';
+        };
+        # git is used in src/lib/crypto/kimchi_backend/common/gen_version.sh
+        extraInputs = [ pkgs.git ];
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        LIBRARIES_TO_TEST="${pkgs.lib.strings.concatStringsSep "\n" libraries_to_test}"
+
+        mkdir coverage_output
+        export BISECT_FILE=$(pwd)/coverage_output/bisect
+
+        while IFS= read -r line; do
+            start=`date +%s`
+            echo "starting $line" >> output_stderr
+            dune build @@$line/runtest --instrument-with bisect_ppx --display=quiet 2>> output_stderr && status=success || status=failure
+            end=`date +%s`
+            runtime=$((end-start))
+            echo "$line $runtime $status" >> times
+        done <<< "$LIBRARIES_TO_TEST"
+      '';
+
     in {
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs (oa: {
@@ -244,6 +306,16 @@ let
         dune runtest src/app/archive --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
+      mina_tests_transaction_snark_1 = build_coverage {
+        name = "tests_transaction_snark_1";
+        libraries_to_test = transaction_snark_1_libs;
+      };
+
+      mina_tests_transaction_snark_2 = build_coverage {
+        name = "tests_transaction_snark_2";
+        libraries_to_test = transaction_snark_2_libs;
+      };
+
       mina_tests_src_lib = runMinaCheck {
         name = "tests_src_lib";
         extraArgs = {
@@ -277,7 +349,7 @@ let
         #   not available in the nix sandbox.
 
         LIBRARIES_TO_TEST=$(
-          find src/lib -name "dune" |
+          find src/lib -not \( -path src/lib/transaction_snark -prune \) -name "dune" |
           sed 's#/dune$##' |
           grep -v 'mina_net2' |
           grep -v 'crypto/proof-systems/ocaml/tests/src' |
@@ -285,7 +357,7 @@ let
         )
 
         mkdir coverage_output
-        export BISECT_FILE=coverage_output/bisect
+        export BISECT_FILE=$(pwd)/coverage_output/bisect
 
         while IFS= read -r line; do
             start=`date +%s`
@@ -333,6 +405,8 @@ let
       } ''
         mkdir coverage_files
         #TODO can coverage files have the same names ?
+        cp ${self.mina_tests_transaction_snark_1}/coverage/* coverage_files
+        cp ${self.mina_tests_transaction_snark_2}/coverage/* coverage_files
         cp ${self.mina_tests_zkapp_test_transaction}/coverage/* coverage_files
         cp ${self.mina_tests_src_lib}/coverage/* coverage_files
         cp ${self.mina_tests_archive}/coverage/* coverage_files
