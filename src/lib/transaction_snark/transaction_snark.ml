@@ -4718,7 +4718,24 @@ module For_tests = struct
       Option.to_list sender_account_update @ snapp_zkapp_command
     in
     let zkapp_command : Zkapp_command.t =
-      Zkapp_command.of_simple { fee_payer; account_updates; memo }
+      { fee_payer
+      ; memo
+      ; account_updates =
+          Zkapp_command.Call_forest.of_account_updates account_updates
+            ~account_update_depth:(fun (p : Account_update.Simple.t) ->
+              p.body.call_depth )
+          |> Zkapp_command.Call_forest.add_callers
+               ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
+               ~add_caller:Zkapp_command.add_caller_simple
+               ~null_id:Token_id.default
+               ~account_update_id:(fun (p : Account_update.Simple.t) ->
+                 Account_id.(
+                   derive_token_id
+                     ~owner:(create p.body.public_key p.body.token_id)) )
+          |> Zkapp_command.Call_forest.accumulate_hashes
+               ~hash_account_update:(fun (p : Account_update.t) ->
+                 Zkapp_command.Digest.Account_update.create p )
+      }
     in
     zkapp_command
 
