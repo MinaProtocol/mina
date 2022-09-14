@@ -22,8 +22,8 @@ let to_preunion (t : Transaction.t) =
       `Transaction (Fee_transfer x)
   | Coinbase x ->
       `Transaction (Coinbase x)
-  | Command (Parties x) ->
-      `Parties x
+  | Command (Zkapp_command x) ->
+      `Zkapp_command x
 
 let with_top_hash_logging f =
   let old = !top_hash_logging_enabled in
@@ -411,7 +411,7 @@ let chain if_ b ~then_ ~else_ =
   let%bind then_ = then_ and else_ = else_ in
   if_ b ~then_ ~else_
 
-module Parties_segment = struct
+module Zkapp_command_segment = struct
   module Spec = struct
     type single =
       { auth_type : Control.Tag.t
@@ -444,7 +444,8 @@ module Parties_segment = struct
         ] ->
           Opt_signed_opt_signed
       | _ ->
-          failwith "Parties_segment.Basic.of_controls: Unsupported combination"
+          failwith
+            "Zkapp_command_segment.Basic.of_controls: Unsupported combination"
 
     let opt_signed ~is_start : Spec.single = { auth_type = Signature; is_start }
 
@@ -481,7 +482,7 @@ module Parties_segment = struct
           [ { auth_type = Proof; is_start = `No } ]
   end
 
-  module Witness = Transaction_witness.Parties_segment_witness
+  module Witness = Transaction_witness.Zkapp_command_segment_witness
 end
 
 (* Currently, a circuit must have at least 1 of every type of constraint. *)
@@ -919,8 +920,8 @@ module Base = struct
     Schnorr.Chunked.Checked.verifies shifted signature pk
       (Random_oracle.Input.Chunked.field payload_digest)
 
-  module Parties_snark = struct
-    open Parties_segment
+  module Zkapp_command_snark = struct
+    open Zkapp_command_segment
     open Spec
 
     module Global_state = struct
@@ -949,9 +950,11 @@ module Base = struct
       val set_zkapp_input : Zkapp_statement.Checked.t -> unit
     end
 
-    type party = Zkapp_call_forest.Checked.party =
-      { party :
-          (Party.Body.Checked.t, Parties.Digest.Party.Checked.t) With_hash.t
+    type account_update = Zkapp_call_forest.Checked.account_update =
+      { account_update :
+          ( Account_update.Body.Checked.t
+          , Zkapp_command.Digest.Account_update.Checked.t )
+          With_hash.t
       ; control : Control.t Prover_value.t
       }
 
@@ -964,15 +967,17 @@ module Base = struct
 
         let if_ = Field.if_
 
-        let empty = Field.constant Parties.Transaction_commitment.empty
+        let empty = Field.constant Zkapp_command.Transaction_commitment.empty
 
-        let commitment ~other_parties:{ With_hash.hash = other_parties_hash; _ }
-            =
-          Parties.Transaction_commitment.Checked.create ~other_parties_hash
+        let commitment
+            ~account_updates:{ With_hash.hash = account_updates_hash; _ } =
+          Zkapp_command.Transaction_commitment.Checked.create
+            ~account_updates_hash
 
-        let full_commitment ~party:{ party; _ } ~memo_hash ~commitment =
-          Parties.Transaction_commitment.Checked.create_complete commitment
-            ~memo_hash ~fee_payer_hash:party.hash
+        let full_commitment ~account_update:{ account_update; _ } ~memo_hash
+            ~commitment =
+          Zkapp_command.Transaction_commitment.Checked.create_complete
+            commitment ~memo_hash ~fee_payer_hash:account_update.hash
       end
 
       module Bool = struct
@@ -1074,13 +1079,14 @@ module Base = struct
         type nonrec t = t
 
         module Elt = struct
-          type t = Parties_elt.t
+          type t = Zkapp_command_elt.t
 
-          let of_transaction_commitment tc = Parties_elt.Parties_commitment tc
+          let of_transaction_commitment tc =
+            Zkapp_command_elt.Zkapp_command_commitment tc
         end
 
-        let cons_parties_commitment index elt t =
-          run_checked (cons_parties_commitment index elt t)
+        let cons_zkapp_command_commitment index elt t =
+          run_checked (cons_zkapp_command_commitment index elt t)
 
         let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
       end
@@ -1101,9 +1107,10 @@ module Base = struct
       module Sequence_events = struct
         type t = Zkapp_account.Sequence_events.var
 
-        let is_empty x = run_checked (Party.Sequence_events.is_empty_var x)
+        let is_empty x =
+          run_checked (Account_update.Sequence_events.is_empty_var x)
 
-        let push_events = Party.Sequence_events.push_events_checked
+        let push_events = Account_update.Sequence_events.push_events_checked
       end
 
       module Zkapp_uri = struct
@@ -1331,7 +1338,8 @@ module Base = struct
           ; hash =
               lazy
                 (Stack_frame.Digest.Checked.create
-                   ~hash_parties:(fun (calls : Call_forest.t) -> calls.hash)
+                   ~hash_zkapp_command:(fun (calls : Call_forest.t) ->
+                     calls.hash )
                    frame )
           }
 
@@ -1343,7 +1351,7 @@ module Base = struct
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
               ( Mina_base.Token_id.Stable.V1.t
-              , Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
+              , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =
           with_label "unhash" (fun () ->
@@ -1356,10 +1364,10 @@ module Base = struct
                         (V.get frame).caller_caller )
                 ; calls =
                     { hash =
-                        exists Mina_base.Parties.Digest.Forest.typ
+                        exists Mina_base.Zkapp_command.Digest.Forest.typ
                           ~compute:(fun () ->
                             (V.get frame).calls
-                            |> Mina_base.Parties.Call_forest.hash )
+                            |> Mina_base.Zkapp_command.Call_forest.hash )
                     ; data = V.map frame ~f:(fun frame -> frame.calls)
                     }
                 }
@@ -1377,10 +1385,10 @@ module Base = struct
 
           type frame =
             ( caller
-            , ( Party.t
-              , Parties.Digest.Party.t
-              , Parties.Digest.Forest.t )
-              Parties.Call_forest.t )
+            , ( Account_update.t
+              , Zkapp_command.Digest.Account_update.t
+              , Zkapp_command.Digest.Forest.t )
+              Zkapp_command.Call_forest.t )
             Stack_frame.t
         end
 
@@ -1425,9 +1433,10 @@ module Base = struct
           let elt : Stack_frame.frame =
             let calls : Call_forest.t =
               { hash =
-                  exists Mina_base.Parties.Digest.Forest.typ ~compute:(fun () ->
+                  exists Mina_base.Zkapp_command.Digest.Forest.typ
+                    ~compute:(fun () ->
                       (V.get elt_ref).data.calls
-                      |> Mina_base.Parties.Call_forest.hash )
+                      |> Mina_base.Zkapp_command.Call_forest.hash )
               ; data = V.map elt_ref ~f:(fun frame -> frame.data.calls)
               }
             and caller =
@@ -1583,7 +1592,7 @@ module Base = struct
           , Transaction_commitment.t
           , Index.t
           , Bool.failure_status_tbl )
-          Mina_transaction_logic.Parties_logic.Local_state.t
+          Mina_transaction_logic.Zkapp_command_logic.Local_state.t
 
         let add_check (t : t) _failure b =
           { t with success = Bool.(t.success &&& b) }
@@ -1675,14 +1684,16 @@ module Base = struct
 
           let idx ledger id = Sparse_ledger.find_index_exn ledger id
 
-          let body_id (body : Party.Body.Checked.t) =
+          let body_id (body : Account_update.Body.Checked.t) =
             let open As_prover in
             Mina_base.Account_id.create
               (read Signature_lib.Public_key.Compressed.typ body.public_key)
               (read Mina_base.Token_id.typ body.token_id)
 
-          let get_account { party; _ } ((_root, ledger) : t) =
-            let idx = V.map ledger ~f:(fun l -> idx l (body_id party.data)) in
+          let get_account { account_update; _ } ((_root, ledger) : t) =
+            let idx =
+              V.map ledger ~f:(fun l -> idx l (body_id account_update.data))
+            in
             let account =
               exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
                   Sparse_ledger.get_exn (V.get ledger) (V.get idx) )
@@ -1745,8 +1756,8 @@ module Base = struct
             `Is_new is_new
         end
 
-        module Party = struct
-          type t = party
+        module Account_update = struct
+          type t = account_update
 
           type call_forest = Call_forest.t
 
@@ -1754,31 +1765,32 @@ module Base = struct
 
           type transaction_commitment = Transaction_commitment.t
 
-          let balance_change (t : t) = t.party.data.balance_change
+          let balance_change (t : t) = t.account_update.data.balance_change
 
           let protocol_state_precondition (t : t) =
-            t.party.data.preconditions.network
+            t.account_update.data.preconditions.network
 
-          let token_id (t : t) = t.party.data.token_id
+          let token_id (t : t) = t.account_update.data.token_id
 
-          let public_key (t : t) = t.party.data.public_key
+          let public_key (t : t) = t.account_update.data.public_key
 
-          let caller (t : t) = t.party.data.caller
+          let caller (t : t) = t.account_update.data.caller
 
           let account_id (t : t) = Account_id.create (public_key t) (token_id t)
 
-          let use_full_commitment (t : t) = t.party.data.use_full_commitment
+          let use_full_commitment (t : t) =
+            t.account_update.data.use_full_commitment
 
-          let increment_nonce (t : t) = t.party.data.increment_nonce
+          let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
           let check_authorization ~commitment
               ~calls:({ hash = calls; _ } : Call_forest.t)
-              ({ party; control; _ } : t) =
+              ({ account_update; control; _ } : t) =
             let proof_verifies =
               match auth_type with
               | Proof ->
                   set_zkapp_input
-                    { party = (party.hash :> Field.t)
+                    { account_update = (account_update.hash :> Field.t)
                     ; calls = (calls :> Field.t)
                     } ;
                   Boolean.true_
@@ -1808,7 +1820,7 @@ module Base = struct
                      signature_verifies
                        ~shifted:(module S)
                        ~payload_digest:commitment signature
-                       party.data.public_key )
+                       account_update.data.public_key )
             in
             ( `Proof_verifies proof_verifies
             , `Signature_verifies signature_verifies )
@@ -1818,32 +1830,40 @@ module Base = struct
 
             type 'a set_or_keep = 'a Set_or_keep.Checked.t
 
-            let timing ({ party; _ } : t) : Account.timing set_or_keep =
+            let timing ({ account_update; _ } : t) : Account.timing set_or_keep
+                =
               Set_or_keep.Checked.map
-                ~f:Party.Update.Timing_info.Checked.to_account_timing
-                party.data.update.timing
+                ~f:Account_update.Update.Timing_info.Checked.to_account_timing
+                account_update.data.update.timing
 
-            let app_state ({ party; _ } : t) = party.data.update.app_state
+            let app_state ({ account_update; _ } : t) =
+              account_update.data.update.app_state
 
-            let verification_key ({ party; _ } : t) =
-              party.data.update.verification_key
+            let verification_key ({ account_update; _ } : t) =
+              account_update.data.update.verification_key
 
-            let sequence_events ({ party; _ } : t) = party.data.sequence_events
+            let sequence_events ({ account_update; _ } : t) =
+              account_update.data.sequence_events
 
-            let zkapp_uri ({ party; _ } : t) = party.data.update.zkapp_uri
+            let zkapp_uri ({ account_update; _ } : t) =
+              account_update.data.update.zkapp_uri
 
-            let token_symbol ({ party; _ } : t) = party.data.update.token_symbol
+            let token_symbol ({ account_update; _ } : t) =
+              account_update.data.update.token_symbol
 
-            let delegate ({ party; _ } : t) = party.data.update.delegate
+            let delegate ({ account_update; _ } : t) =
+              account_update.data.update.delegate
 
-            let voting_for ({ party; _ } : t) = party.data.update.voting_for
+            let voting_for ({ account_update; _ } : t) =
+              account_update.data.update.voting_for
 
-            let permissions ({ party; _ } : t) = party.data.update.permissions
+            let permissions ({ account_update; _ } : t) =
+              account_update.data.update.permissions
           end
 
           module Account_precondition = struct
-            let nonce ({ party; _ } : t) =
-              party.data.preconditions.account.nonce
+            let nonce ({ account_update; _ } : t) =
+              account_update.data.preconditions.account.nonce
           end
         end
 
@@ -1882,7 +1902,7 @@ module Base = struct
         open Inputs
 
         type t =
-          < party : Party.t
+          < account_update : Account_update.t
           ; account : Account.t
           ; ledger : Ledger.t
           ; amount : Amount.t
@@ -1891,7 +1911,7 @@ module Base = struct
           ; token_id : Token_id.t
           ; global_state : Global_state.t
           ; inclusion_proof : (Bool.t * Field.t) list
-          ; parties : Parties.t
+          ; zkapp_command : Zkapp_command.t
           ; local_state :
               ( Stack_frame.t
               , Call_stack.t
@@ -1902,7 +1922,7 @@ module Base = struct
               , Transaction_commitment.t
               , Index.t
               , unit )
-              Mina_transaction_logic.Parties_logic.Local_state.t
+              Mina_transaction_logic.Zkapp_command_logic.Local_state.t
           ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
@@ -1911,29 +1931,30 @@ module Base = struct
           ; failure : unit >
       end
 
-      include Mina_transaction_logic.Parties_logic.Make (Inputs)
+      include Mina_transaction_logic.Zkapp_command_logic.Make (Inputs)
 
       let perform (type r)
-          (eff : (r, Env.t) Mina_transaction_logic.Parties_logic.Eff.t) : r =
+          (eff : (r, Env.t) Mina_transaction_logic.Zkapp_command_logic.Eff.t) :
+          r =
         match eff with
         | Check_protocol_state_precondition
             (protocol_state_predicate, global_state) ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
         | Check_account_precondition
-            ({ party; _ }, account, new_account, local_state) ->
+            ({ account_update; _ }, account, new_account, local_state) ->
             let local_state = ref local_state in
             let check failure b =
               local_state := Inputs.Local_state.add_check !local_state failure b
             in
             Zkapp_precondition.Account.Checked.check ~new_account ~check
-              party.data.preconditions.account account.data ;
+              account_update.data.preconditions.account account.data ;
             !local_state
-        | Init_account { party = { party; _ }; account } ->
+        | Init_account { account_update = { account_update; _ }; account } ->
             let account' : Account.Checked.Unhashed.t =
               { account.data with
-                public_key = party.data.public_key
-              ; token_id = party.data.token_id
+                public_key = account_update.data.public_key
+              ; token_id = account_update.data.token_id
               }
             in
             Inputs.Account.account_with_hash account'
@@ -1996,8 +2017,8 @@ module Base = struct
            ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
            state_body ) ;
       let init :
-          Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
-          =
+          Global_state.t
+          * _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
         let g : Global_state.t =
           { ledger =
               ( statement.source.ledger
@@ -2007,7 +2028,7 @@ module Base = struct
               Mina_state.Protocol_state.Body.view_checked state_body
           }
         in
-        let l : _ Mina_transaction_logic.Parties_logic.Local_state.t =
+        let l : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
           { stack_frame =
               Inputs.Stack_frame.unhash statement.source.local_state.stack_frame
                 (V.create (fun () -> !witness.local_state_init.stack_frame))
@@ -2025,41 +2046,43 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
-          ; party_index = statement.source.local_state.party_index
+          ; account_update_index =
+              statement.source.local_state.account_update_index
           ; failure_status_tbl = ()
           }
         in
         (g, l)
       in
-      let start_parties =
-        As_prover.Ref.create (fun () -> !witness.start_parties)
+      let start_zkapp_command =
+        As_prover.Ref.create (fun () -> !witness.start_zkapp_command)
       in
       let zkapp_input = ref None in
       let global, local =
-        List.fold_left spec ~init ~f:(fun ((_, local) as acc) party_spec ->
+        List.fold_left spec ~init
+          ~f:(fun ((_, local) as acc) account_update_spec ->
             let module S = Single (struct
               let constraint_constants = constraint_constants
 
-              let spec = party_spec
+              let spec = account_update_spec
 
               let set_zkapp_input x = zkapp_input := Some x
             end) in
             let finish v =
-              let open Mina_transaction_logic.Parties_logic.Start_data in
+              let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
               let ps =
                 V.map v ~f:(function
                   | `Skip ->
                       []
                   | `Start p ->
-                      Parties.parties p.parties )
+                      Zkapp_command.zkapp_command p.zkapp_command )
               in
               let h =
-                exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                    Parties.Call_forest.hash (V.get ps) )
+                exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
+                    Zkapp_command.Call_forest.hash (V.get ps) )
               in
               let start_data =
-                { Mina_transaction_logic.Parties_logic.Start_data.parties =
-                    { With_hash.hash = h; data = ps }
+                { Mina_transaction_logic.Zkapp_command_logic.Start_data
+                  .zkapp_command = { With_hash.hash = h; data = ps }
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
                         match V.get v with
@@ -2073,7 +2096,7 @@ module Base = struct
                 with_label "apply" (fun () ->
                     S.apply ~constraint_constants
                       ~is_start:
-                        ( match party_spec.is_start with
+                        ( match account_update_spec.is_start with
                         | `No ->
                             `No
                         | `Yes ->
@@ -2087,7 +2110,7 @@ module Base = struct
               (global_state, { local_state with failure_status_tbl = () })
             in
             let acc' =
-              match party_spec.is_start with
+              match account_update_spec.is_start with
               | `No ->
                   let global_state, local_state =
                     S.apply ~constraint_constants ~is_start:`No
@@ -2098,30 +2121,30 @@ module Base = struct
                   (global_state, { local_state with failure_status_tbl = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
-                      match As_prover.Ref.get start_parties with
+                      match As_prover.Ref.get start_zkapp_command with
                       | [] ->
                           `Skip
                       | p :: ps ->
                           let should_pop =
-                            Mina_base.Parties.Call_forest.is_empty
+                            Mina_base.Zkapp_command.Call_forest.is_empty
                               (V.get local.stack_frame.data.calls.data)
                           in
                           if should_pop then (
-                            As_prover.Ref.set start_parties ps ;
+                            As_prover.Ref.set start_zkapp_command ps ;
                             `Start p )
                           else `Skip )
                   |> finish
               | `Yes ->
                   as_prover (fun () ->
                       assert (
-                        Mina_base.Parties.Call_forest.is_empty
+                        Mina_base.Zkapp_command.Call_forest.is_empty
                           (V.get local.stack_frame.data.calls.data) ) ) ;
                   V.create (fun () ->
-                      match As_prover.Ref.get start_parties with
+                      match As_prover.Ref.get start_zkapp_command with
                       | [] ->
                           assert false
                       | p :: ps ->
-                          As_prover.Ref.set start_parties ps ;
+                          As_prover.Ref.set start_zkapp_command ps ;
                           `Start p )
                   |> finish
             in
@@ -3350,14 +3373,14 @@ let system ~proof_level ~constraint_constants =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self ->
-          let parties x =
-            Base.Parties_snark.rule ~constraint_constants ~proof_level x
+          let zkapp_command x =
+            Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
           in
           [ Base.rule ~constraint_constants
           ; Merge.rule ~proof_level self
-          ; parties Opt_signed_opt_signed
-          ; parties Opt_signed
-          ; parties Proved
+          ; zkapp_command Opt_signed_opt_signed
+          ; zkapp_command Opt_signed
+          ; zkapp_command Proved
           ] ) )
 
 module Verification = struct
@@ -3383,7 +3406,7 @@ module type S = sig
 
   val cache_handle : Pickles.Cache_handle.t
 
-  val of_non_parties_transaction :
+  val of_non_zkapp_command_transaction :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Transaction.Valid.t Transaction_protocol_state.t
@@ -3404,10 +3427,10 @@ module type S = sig
     -> Tick.Handler.t
     -> t Async.Deferred.t
 
-  val of_parties_segment_exn :
+  val of_zkapp_command_segment_exn :
        statement:Statement.With_sok.t
-    -> witness:Parties_segment.Witness.t
-    -> spec:Parties_segment.Basic.t
+    -> witness:Zkapp_command_segment.Witness.t
+    -> spec:Zkapp_command_segment.Basic.t
     -> t Async.Deferred.t
 
   val merge :
@@ -3451,8 +3474,9 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   in
   let state_body = Transaction_protocol_state.block_data transaction_in_block in
   match to_preunion (Transaction.forget transaction) with
-  | `Parties _ ->
-      failwith "Called non-party transaction with parties transaction"
+  | `Zkapp_command _ ->
+      failwith
+        "Called non-account_update transaction with zkapp_command transaction"
   | `Transaction t ->
       check_transaction_union ?preeval ~constraint_constants ~supply_increase
         sok_message source target init_stack pending_coinbase_stack_state
@@ -3503,8 +3527,9 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       (Transaction.forget
          (Transaction_protocol_state.transaction transaction_in_block) )
   with
-  | `Parties _ ->
-      failwith "Called non-party transaction with parties transaction"
+  | `Zkapp_command _ ->
+      failwith
+        "Called non-account_update transaction with zkapp_command transaction"
   | `Transaction t ->
       generate_transaction_union_witness ?preeval ~constraint_constants
         ~supply_increase sok_message source target
@@ -3551,262 +3576,295 @@ type local_state =
   , Currency.Amount.Signed.t
   , Sparse_ledger.t
   , bool
-  , Parties.Transaction_commitment.t
+  , Zkapp_command.Transaction_commitment.t
   , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
-  Mina_transaction_logic.Parties_logic.Local_state.t
+  Mina_transaction_logic.Zkapp_command_logic.Local_state.t
 
 type global_state = Sparse_ledger.Global_state.t
 
-module Parties_intermediate_state = struct
+module Zkapp_command_intermediate_state = struct
   type state = { global : global_state; local : local_state }
 
   type t =
     { kind : [ `Same | `New | `Two_new ]
-    ; spec : Parties_segment.Basic.t
+    ; spec : Zkapp_command_segment.Basic.t
     ; state_before : state
     ; state_after : state
     }
 end
 
-(** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
-    statements, corresponding to parties in [partiess] which minimize the
-    number of snark proofs needed to prove all of the parties.
+(** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
+    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+    number of snark proofs needed to prove all of the zkapp_command.
 
-    This function is intended to take the parties from multiple transactions as
-    its input, which may be converted from a [Parties.t list] using
-    [List.map ~f:Parties.parties]. The [stmtss] argument should be a list of
-    the same length, with 1 more state than the number of parties for each
+    This function is intended to take the zkapp_command from multiple transactions as
+    its input, which may be converted from a [Zkapp_command.t list] using
+    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
+    the same length, with 1 more state than the number of zkapp_command for each
     transaction.
 
-    For example, two transactions made up of parties [[p1; p2; p3]] and
+    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
     [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
     where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
     where [s0] is the initial state before any of the transactions have been
     applied.
 
     Each pair is also identified with one of [`Same], [`New], or [`Two_new],
-    indicating that the next one ([`New]) or next two ([`Two_new]) [Parties.t]s
+    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-let group_by_parties_rev (partiess : Party.t list list)
+let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
     (stmtss : (global_state * local_state) list list) :
-    Parties_intermediate_state.t list =
+    Zkapp_command_intermediate_state.t list =
   let intermediate_state ~kind ~spec ~before ~after =
-    { Parties_intermediate_state.kind
+    { Zkapp_command_intermediate_state.kind
     ; spec
     ; state_before = { global = fst before; local = snd before }
     ; state_after = { global = fst after; local = snd after }
     }
   in
-  let rec group_by_parties_rev (partiess : Party.t list list) stmtss acc =
-    match (partiess, stmtss) with
+  let rec group_by_zkapp_command_rev
+      (zkapp_commands : Account_update.t list list) stmtss acc =
+    match (zkapp_commands, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
-        (* We've associated statements with all given parties. *)
+        (* We've associated statements with all given zkapp_command. *)
         acc
     | [ [ { authorization = a1; _ } ] ], [ [ before; after ] ] ->
-        (* There are no later parties to pair this one with. Prove it on its
+        (* There are no later zkapp_command to pair this one with. Prove it on its
            own.
         *)
         intermediate_state ~kind:`Same
-          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
     | [ []; [ { authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ] ->
-        (* This party is part of a new transaction, and there are no later
-           parties to pair it with. Prove it on its own.
+        (* This account_update is part of a new transaction, and there are no later
+           zkapp_command to pair it with. Prove it on its own.
         *)
         intermediate_state ~kind:`New
-          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
-    | ( ({ authorization = Proof _ as a1; _ } :: parties) :: partiess
+    | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command) :: zkapp_commands
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
-        (* This party contains a proof, don't pair it with other parties. *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`Same
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( [] :: ({ authorization = Proof _ as a1; _ } :: parties) :: partiess
+    | ( []
+        :: ({ authorization = Proof _ as a1; _ } :: zkapp_command)
+           :: zkapp_commands
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
-        (* This party is part of a new transaction, and contains a proof, don't
-           pair it with other parties.
+        (* This account_update is part of a new transaction, and contains a proof, don't
+           pair it with other zkapp_command.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`New
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( ({ authorization = a1; _ }
-        :: ({ authorization = Proof _; _ } :: _ as parties) )
-        :: partiess
+        :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+        :: zkapp_commands
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
-        (* The next party contains a proof, don't pair it with this party. *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        (* The next account_update contains a proof, don't pair it with this account_update. *)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`Same
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( ({ authorization = a1; _ } :: ([] as parties))
-        :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
+    | ( ({ authorization = a1; _ } :: ([] as zkapp_command))
+        :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
-        (* The next party is in the next transaction and contains a proof,
-           don't pair it with this party.
+        (* The next account_update is in the next transaction and contains a proof,
+           don't pair it with this account_update.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`Same
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( ({ authorization = (Signature _ | None_given) as a1; _ }
-        :: { authorization = (Signature _ | None_given) as a2; _ } :: parties )
-        :: partiess
+        :: { authorization = (Signature _ | None_given) as a2; _ }
+           :: zkapp_command )
+        :: zkapp_commands
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
-        (* The next two parties do not contain proofs, and are within the same
+        (* The next two zkapp_command do not contain proofs, and are within the same
            transaction. Pair them.
            Ok to get "use_full_commitment" of [a1] because neither of them
            contain a proof.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`Same
-              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | ( []
         :: ({ authorization = a1; _ }
-           :: ({ authorization = Proof _; _ } :: _ as parties) )
-           :: partiess
+           :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+           :: zkapp_commands
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
-        (* This party is in the next transaction, and the next party contains a
-           proof, don't pair it with this party.
+        (* This account_update is in the next transaction, and the next account_update contains a
+           proof, don't pair it with this account_update.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`New
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( []
         :: ({ authorization = (Signature _ | None_given) as a1; _ }
-           :: { authorization = (Signature _ | None_given) as a2; _ } :: parties
-           )
-           :: partiess
+           :: { authorization = (Signature _ | None_given) as a2; _ }
+              :: zkapp_command )
+           :: zkapp_commands
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
-        (* The next two parties do not contain proofs, and are within the same
+        (* The next two zkapp_command do not contain proofs, and are within the same
            new transaction. Pair them.
            Ok to get "use_full_commitment" of [a1] because neither of them
            contain a proof.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`New
-              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
-        :: ({ authorization = (Signature _ | None_given) as a2; _ } :: parties)
-           :: partiess
+        :: ({ authorization = (Signature _ | None_given) as a2; _ }
+           :: zkapp_command )
+           :: zkapp_commands
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
-        (* The next two parties do not contain proofs, and the second is within
+        (* The next two zkapp_command do not contain proofs, and the second is within
            a new transaction. Pair them.
            Ok to get "use_full_commitment" of [a1] because neither of them
            contain a proof.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`New
-              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | ( []
-        :: ({ authorization = a1; _ } :: parties)
-           :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
+        :: ({ authorization = a1; _ } :: zkapp_command)
+           :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
       , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
-        (* The next transaction contains a proof, and this party is in a new
-           transaction, don't pair it with the next party.
+        (* The next transaction contains a proof, and this account_update is in a new
+           transaction, don't pair it with the next account_update.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`New
-              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( []
         :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
            :: ({ authorization = (Signature _ | None_given) as a2; _ }
-              :: parties )
-              :: partiess
+              :: zkapp_command )
+              :: zkapp_commands
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
       ) ->
-        (* The next two parties do not contain proofs, the first is within a
+        (* The next two zkapp_command do not contain proofs, the first is within a
            new transaction, and the second is within another new transaction.
            Pair them.
            Ok to get "use_full_commitment" of [a1] because neither of them
            contain a proof.
         *)
-        group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
+        group_by_zkapp_command_rev
+          (zkapp_command :: zkapp_commands)
+          (stmts :: stmtss)
           ( intermediate_state ~kind:`Two_new
-              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~spec:(Zkapp_command_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | [ [ { authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
-        (* This party is the final party given. Prove it on its own. *)
+        (* This account_update is the final account_update given. Prove it on its own. *)
         intermediate_state ~kind:`Same
-          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
     | ( [] :: [ { authorization = a1; _ } ] :: [] :: _
       , [ _ ] :: (before :: after :: _) :: _ ) ->
-        (* This party is the final party given, in a new transaction. Prove it
+        (* This account_update is the final account_update given, in a new transaction. Prove it
            on its own.
         *)
         intermediate_state ~kind:`New
-          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~spec:(Zkapp_command_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
     | _, [] ->
-        failwith "group_by_parties_rev: No statements remaining"
+        failwith "group_by_zkapp_command_rev: No statements remaining"
     | ([] | [ [] ]), _ ->
-        failwith "group_by_parties_rev: Unmatched statements remaining"
+        failwith "group_by_zkapp_command_rev: Unmatched statements remaining"
     | [] :: _, [] :: _ ->
         failwith
-          "group_by_parties_rev: No final statement for current transaction"
+          "group_by_zkapp_command_rev: No final statement for current \
+           transaction"
     | [] :: _, (_ :: _ :: _) :: _ ->
         failwith
-          "group_by_parties_rev: Unmatched statements for current transaction"
+          "group_by_zkapp_command_rev: Unmatched statements for current \
+           transaction"
     | [] :: [ _ ] :: _, [ _ ] :: (_ :: _ :: _ :: _) :: _ ->
         failwith
-          "group_by_parties_rev: Unmatched statements for next transaction"
+          "group_by_zkapp_command_rev: Unmatched statements for next \
+           transaction"
     | [ []; [ _ ] ], [ _ ] :: [ _; _ ] :: _ :: _ ->
         failwith
-          "group_by_parties_rev: Unmatched statements after next transaction"
+          "group_by_zkapp_command_rev: Unmatched statements after next \
+           transaction"
     | (_ :: _) :: _, ([] | [ _ ]) :: _ | (_ :: _ :: _) :: _, [ _; _ ] :: _ ->
         failwith
-          "group_by_parties_rev: Too few statements remaining for the current \
-           transaction"
+          "group_by_zkapp_command_rev: Too few statements remaining for the \
+           current transaction"
     | ([] | [ _ ]) :: [] :: _, _ ->
-        failwith "group_by_parties_rev: The next transaction has no parties"
+        failwith
+          "group_by_zkapp_command_rev: The next transaction has no \
+           zkapp_command"
     | [] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _
     | [] :: (_ :: _ :: _) :: _, _ :: [ _; _ ] :: _ ->
         failwith
-          "group_by_parties_rev: Too few statements remaining for the next \
-           transaction"
+          "group_by_zkapp_command_rev: Too few statements remaining for the \
+           next transaction"
     | [ _ ] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _ ->
         failwith
-          "group_by_parties_rev: Too few statements remaining for the next \
-           transaction"
+          "group_by_zkapp_command_rev: Too few statements remaining for the \
+           next transaction"
     | [] :: [ _ ] :: (_ :: _) :: _, _ :: _ :: ([] | [ _ ]) :: _ ->
         failwith
-          "group_by_parties_rev: Too few statements remaining for the \
+          "group_by_zkapp_command_rev: Too few statements remaining for the \
            transaction after next"
     | ([] | [ _ ]) :: (_ :: _) :: _, [ _ ] ->
         failwith
-          "group_by_parties_rev: No statements given for the next transaction"
+          "group_by_zkapp_command_rev: No statements given for the next \
+           transaction"
     | [] :: [ _ ] :: (_ :: _) :: _, [ _; _ :: _ :: _ ] ->
         failwith
-          "group_by_parties_rev: No statements given for transaction after next"
+          "group_by_zkapp_command_rev: No statements given for transaction \
+           after next"
   in
-  group_by_parties_rev partiess stmtss []
+  group_by_zkapp_command_rev zkapp_commands stmtss []
 
 let rec accumulate_call_stack_hashes
     ~(hash_frame : 'frame -> Stack_frame.Digest.t) (frames : 'frame list) :
@@ -3822,29 +3880,31 @@ let rec accumulate_call_stack_hashes
       in
       { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
-    (partiess :
+let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
+    ledger
+    (zkapp_commands :
       ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
       * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
-      * Parties.t )
+      * Zkapp_command.t )
       list ) =
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
         Sparse_ledger.of_ledger_subset_exn ledger
           (List.concat_map
-             ~f:(fun (_, _, parties) -> Parties.accounts_accessed parties)
-             partiess )
+             ~f:(fun (_, _, zkapp_command) ->
+               Zkapp_command.accounts_accessed zkapp_command )
+             zkapp_commands )
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
   in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let _, _, states_rev =
-    List.fold_left ~init:(fee_excess, sparse_ledger, []) partiess
-      ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, parties) ->
+    List.fold_left ~init:(fee_excess, sparse_ledger, []) zkapp_commands
+      ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, zkapp_command) ->
         let _, states =
-          Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
-            ~constraint_constants ~state_view ~fee_excess parties
+          Sparse_ledger.apply_zkapp_command_unchecked_with_states sparse_ledger
+            ~constraint_constants ~state_view ~fee_excess zkapp_command
           |> Or_error.ok_exn
         in
         let final_state = fst (List.last_exn states) in
@@ -3852,30 +3912,34 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
   in
   let states = List.rev states_rev in
   let states_rev =
-    group_by_parties_rev
+    group_by_zkapp_command_rev
       ( []
       :: List.map
-           ~f:(fun (_, _, parties) -> Parties.parties_list parties)
-           partiess )
+           ~f:(fun (_, _, zkapp_command) ->
+             Zkapp_command.zkapp_command_list zkapp_command )
+           zkapp_commands )
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
   let commitment = ref (Local_state.dummy ()).transaction_commitment in
   let full_commitment =
     ref (Local_state.dummy ()).full_transaction_commitment
   in
-  let remaining_parties =
-    let partiess =
-      List.map partiess
+  let remaining_zkapp_command =
+    let zkapp_commands =
+      List.map zkapp_commands
         ~f:(fun
-             (pending_coinbase_init_stack, pending_coinbase_stack_state, parties)
+             ( pending_coinbase_init_stack
+             , pending_coinbase_stack_state
+             , zkapp_command )
            ->
           ( pending_coinbase_init_stack
           , pending_coinbase_stack_state
-          , { Mina_transaction_logic.Parties_logic.Start_data.parties
-            ; memo_hash = Signed_command_memo.hash parties.memo
+          , { Mina_transaction_logic.Zkapp_command_logic.Start_data
+              .zkapp_command
+            ; memo_hash = Signed_command_memo.hash zkapp_command.memo
             } ) )
     in
-    ref partiess
+    ref zkapp_commands
   in
   let pending_coinbase_init_stack = ref Pending_coinbase.Stack.empty in
   let pending_coinbase_stack_state =
@@ -3888,7 +3952,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
     match states_rev with
     | [] ->
         sparse_ledger
-    | { Parties_intermediate_state.state_after = { global = { ledger; _ }; _ }
+    | { Zkapp_command_intermediate_state.state_after =
+          { global = { ledger; _ }; _ }
       ; _
       }
       :: _ ->
@@ -3896,7 +3961,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
   in
   ( List.fold_right states_rev ~init:[]
       ~f:(fun
-           { Parties_intermediate_state.kind
+           { Zkapp_command_intermediate_state.kind
            ; spec
            ; state_before = { global = source_global; local = source_local }
            ; state_after = { global = target_global; local = target_local }
@@ -3908,7 +3973,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
         let target_local = { target_local with failure_status_tbl = [] } in
         let current_commitment = !commitment in
         let current_full_commitment = !full_commitment in
-        let ( start_parties
+        let ( start_zkapp_command
             , next_commitment
             , next_full_commitment
             , pending_coinbase_init_stack
@@ -3917,23 +3982,23 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
             match (target_local.stack_frame.calls, target_local.call_stack) with
             | [], [] ->
                 (* The commitment will be cleared, because this is the last
-                   party.
+                   account_update.
                 *)
-                Parties.Transaction_commitment.(empty, empty)
+                Zkapp_command.Transaction_commitment.(empty, empty)
             | _ ->
                 mk ()
           in
-          let mk_next_commitments (parties : Parties.t) =
+          let mk_next_commitments (zkapp_command : Zkapp_command.t) =
             empty_if_last (fun () ->
-                let next_commitment = Parties.commitment parties in
-                let memo_hash = Signed_command_memo.hash parties.memo in
+                let next_commitment = Zkapp_command.commitment zkapp_command in
+                let memo_hash = Signed_command_memo.hash zkapp_command.memo in
                 let fee_payer_hash =
-                  Parties.Digest.Party.create
-                    (Party.of_fee_payer parties.fee_payer)
+                  Zkapp_command.Digest.Account_update.create
+                    (Account_update.of_fee_payer zkapp_command.fee_payer)
                 in
                 let next_full_commitment =
-                  Parties.Transaction_commitment.create_complete next_commitment
-                    ~memo_hash ~fee_payer_hash
+                  Zkapp_command.Transaction_commitment.create_complete
+                    next_commitment ~memo_hash ~fee_payer_hash
                 in
                 (next_commitment, next_full_commitment) )
           in
@@ -3949,43 +4014,43 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               , !pending_coinbase_init_stack
               , !pending_coinbase_stack_state )
           | `New -> (
-              match !remaining_parties with
+              match !remaining_zkapp_command with
               | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
                 , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-                , parties )
+                , zkapp_command )
                 :: rest ->
                   let commitment', full_commitment' =
-                    mk_next_commitments parties.parties
+                    mk_next_commitments zkapp_command.zkapp_command
                   in
-                  remaining_parties := rest ;
+                  remaining_zkapp_command := rest ;
                   commitment := commitment' ;
                   full_commitment := full_commitment' ;
                   pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
                   pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
-                  ( [ parties ]
+                  ( [ zkapp_command ]
                   , commitment'
                   , full_commitment'
                   , !pending_coinbase_init_stack
                   , !pending_coinbase_stack_state )
               | _ ->
-                  failwith "Not enough remaining parties" )
+                  failwith "Not enough remaining zkapp_command" )
           | `Two_new -> (
-              match !remaining_parties with
+              match !remaining_zkapp_command with
               | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
                 , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-                , parties1 )
+                , zkapp_command1 )
                 :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
                    , `Pending_coinbase_of_statement
                        pending_coinbase_stack_state2
-                   , parties2 )
+                   , zkapp_command2 )
                    :: rest ->
                   let commitment', full_commitment' =
-                    mk_next_commitments parties2.parties
+                    mk_next_commitments zkapp_command2.zkapp_command
                   in
-                  remaining_parties := rest ;
+                  remaining_zkapp_command := rest ;
                   commitment := commitment' ;
                   full_commitment := full_commitment' ;
-                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
+                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for zkapp_command2 if it is in a different scan state tree*)
                   pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
                   pending_coinbase_stack_state :=
                     { pending_coinbase_stack_state1 with
@@ -3993,13 +4058,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                         pending_coinbase_stack_state2
                           .Pending_coinbase_stack_state.target
                     } ;
-                  ( [ parties1; parties2 ]
+                  ( [ zkapp_command1; zkapp_command2 ]
                   , commitment'
                   , full_commitment'
                   , !pending_coinbase_init_stack
                   , !pending_coinbase_stack_state )
               | _ ->
-                  failwith "Not enough remaining parties" )
+                  failwith "Not enough remaining zkapp_command" )
         in
         let hash_local_state
             (local :
@@ -4012,7 +4077,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               , _
               , _
               , _ )
-              Mina_transaction_logic.Parties_logic.Local_state.t ) =
+              Mina_transaction_logic.Zkapp_command_logic.Local_state.t ) =
           { local with
             stack_frame = local.stack_frame
           ; call_stack =
@@ -4034,10 +4099,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           ; full_transaction_commitment = next_full_commitment
           }
         in
-        let w : Parties_segment.Witness.t =
+        let w : Zkapp_command_segment.Witness.t =
           { global_ledger = source_global.ledger
           ; local_state_init = source_local
-          ; start_parties
+          ; start_zkapp_command
           ; state_body
           ; init_stack = pending_coinbase_init_stack
           }
@@ -4072,10 +4137,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
         let statement : Statement.With_sok.t =
           (* empty ledger hash in the local state at the beginning of each
              transaction
-             `parties` in local state is empty for the first segment*)
+             `zkapp_command` in local state is empty for the first segment*)
           let source_local_ledger =
-            if Parties.Call_forest.is_empty source_local.stack_frame.calls then
-              Frozen_ledger_hash.empty_hash
+            if Zkapp_command.Call_forest.is_empty source_local.stack_frame.calls
+            then Frozen_ledger_hash.empty_hash
             else Sparse_ledger.merkle_root source_local.ledger
           in
           { source =
@@ -4143,30 +4208,31 @@ struct
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
-  let first_party (witness : Transaction_witness.Parties_segment_witness.t) =
+  let first_account_update
+      (witness : Transaction_witness.Zkapp_command_segment_witness.t) =
     match witness.local_state_init.stack_frame.calls with
     | [] ->
         with_return (fun { return } ->
-            List.iter witness.start_parties ~f:(fun s ->
-                Parties.Call_forest.iteri
+            List.iter witness.start_zkapp_command ~f:(fun s ->
+                Zkapp_command.Call_forest.iteri
                   ~f:(fun _i x -> return (Some x))
-                  s.parties.other_parties ) ;
+                  s.zkapp_command.account_updates ) ;
             None )
     | xs ->
-        Parties.Call_forest.hd_party xs
+        Zkapp_command.Call_forest.hd_account_update xs
 
-  let party_proof (p : Party.t) =
+  let account_update_proof (p : Account_update.t) =
     match p.authorization with
     | Proof p ->
         Some p
     | Signature _ | None_given ->
         None
 
-  let snapp_proof_data ~(witness : Transaction_witness.Parties_segment_witness.t)
-      =
+  let snapp_proof_data
+      ~(witness : Transaction_witness.Zkapp_command_segment_witness.t) =
     let open Option.Let_syntax in
-    let%bind p = first_party witness in
-    let%map pi = party_proof p in
+    let%bind p = first_account_update witness in
+    let%map pi = account_update_proof p in
     let vk =
       let account_id = Account_id.create p.body.public_key p.body.token_id in
       let account : Account.t =
@@ -4185,9 +4251,9 @@ struct
     in
     (pi, vk)
 
-  let of_parties_segment_exn ~statement ~witness
-      ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
-    Base.Parties_snark.witness := Some witness ;
+  let of_zkapp_command_segment_exn ~statement ~witness
+      ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
+    Base.Zkapp_command_snark.witness := Some witness ;
     let res =
       match spec with
       | Opt_signed ->
@@ -4197,16 +4263,16 @@ struct
       | Proved -> (
           match snapp_proof_data ~witness with
           | None ->
-              failwith "of_parties_segment: Expected exactly one proof"
+              failwith "of_zkapp_command_segment: Expected exactly one proof"
           | Some (p, v) ->
               Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
               proved
-                ~handler:(Base.Parties_snark.handle_zkapp_proof p)
+                ~handler:(Base.Zkapp_command_snark.handle_zkapp_proof p)
                 statement )
     in
     let open Async in
     let%map (), (), proof = res in
-    Base.Parties_snark.witness := None ;
+    Base.Zkapp_command_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
@@ -4221,8 +4287,8 @@ struct
     in
     { statement; proof }
 
-  let of_non_parties_transaction ~statement ~init_stack transaction_in_block
-      handler =
+  let of_non_zkapp_command_transaction ~statement ~init_stack
+      transaction_in_block handler =
     let transaction : Transaction.t =
       Transaction.forget
         (Transaction_protocol_state.transaction transaction_in_block)
@@ -4231,15 +4297,16 @@ struct
       Transaction_protocol_state.block_data transaction_in_block
     in
     match to_preunion transaction with
-    | `Parties _ ->
-        failwith "Called Non-parties transaction with parties transaction"
+    | `Zkapp_command _ ->
+        failwith
+          "Called Non-zkapp_command transaction with zkapp_command transaction"
     | `Transaction t ->
         of_transaction_union ~statement ~init_stack
           (Transaction_union.of_transaction t)
           state_body handler
 
   let of_user_command ~statement ~init_stack user_command_in_block handler =
-    of_non_parties_transaction ~statement ~init_stack
+    of_non_zkapp_command_transaction ~statement ~init_stack
       { user_command_in_block with
         transaction =
           Command
@@ -4249,7 +4316,7 @@ struct
       handler
 
   let of_fee_transfer ~statement ~init_stack transfer_in_block handler =
-    of_non_parties_transaction ~statement ~init_stack
+    of_non_zkapp_command_transaction ~statement ~init_stack
       { transfer_in_block with
         transaction =
           Fee_transfer
@@ -4287,13 +4354,13 @@ module For_tests = struct
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
-      ; snapp_update : Party.Update.t
+      ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
-      ; preconditions : Party.Preconditions.t option
+      ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]
   end
@@ -4370,7 +4437,7 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties
+  let create_zkapp_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
       ~update =
     let { Spec.fee
@@ -4390,7 +4457,7 @@ module For_tests = struct
       spec
     in
     let sender_pk = sender.public_key |> Public_key.compress in
-    let fee_payer : Party.Fee_payer.t =
+    let fee_payer : Account_update.Fee_payer.t =
       let public_key, nonce =
         match fee_payer_opt with
         | None ->
@@ -4416,7 +4483,7 @@ module For_tests = struct
     let preconditions' =
       Option.value preconditions
         ~default:
-          { Party.Preconditions.network =
+          { Account_update.Preconditions.network =
               Option.value_map preconditions
                 ~f:(fun { network; _ } -> network)
                 ~default:Zkapp_precondition.Protocol_state.accept
@@ -4427,10 +4494,10 @@ module For_tests = struct
           }
     in
 
-    let sender_party : Party.Simple.t option =
-      let sender_party_body : Party.Body.Simple.t =
+    let sender_account_update : Account_update.Simple.t option =
+      let sender_account_update_body : Account_update.Body.Simple.t =
         { public_key = sender_pk
-        ; update = Party.Update.noop
+        ; update = Account_update.Update.noop
         ; token_id = Token_id.default
         ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
         ; increment_nonce = true
@@ -4446,13 +4513,13 @@ module For_tests = struct
       in
       Option.some_if
         ((not (List.is_empty receivers)) || new_zkapp_account)
-        ( { body = sender_party_body
+        ( { body = sender_account_update_body
           ; authorization =
               Control.Signature Signature.dummy (*To be updated later*)
           }
-          : Party.Simple.t )
+          : Account_update.Simple.t )
     in
-    let snapp_parties : Party.Simple.t list =
+    let snapp_zkapp_command : Account_update.Simple.t list =
       let num_keypairs = List.length zkapp_account_keypairs in
       let account_creation_fee =
         Amount.of_fee constraint_constants.account_creation_fee
@@ -4512,10 +4579,10 @@ module For_tests = struct
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
             }
-            : Party.Simple.t ) )
+            : Account_update.Simple.t ) )
     in
     let other_receivers =
-      List.map receivers ~f:(fun (receiver, amt) : Party.Simple.t ->
+      List.map receivers ~f:(fun (receiver, amt) : Account_update.Simple.t ->
           { body =
               { public_key = receiver
               ; update
@@ -4534,22 +4601,24 @@ module For_tests = struct
           ; authorization = Control.None_given
           } )
     in
-    let other_parties_data =
-      Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
-      @ snapp_parties @ other_receivers
+    let account_updates_data =
+      Option.value_map ~default:[] sender_account_update ~f:(fun p -> [ p ])
+      @ snapp_zkapp_command @ other_receivers
     in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_simple_list other_parties_data
+      Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+        account_updates_data
     in
-    let other_parties_hash = Parties.Call_forest.hash ps in
-    let commitment : Parties.Transaction_commitment.t =
-      Parties.Transaction_commitment.create ~other_parties_hash
+    let account_updates_hash = Zkapp_command.Call_forest.hash ps in
+    let commitment : Zkapp_command.Transaction_commitment.t =
+      Zkapp_command.Transaction_commitment.create ~account_updates_hash
     in
     let full_commitment =
-      Parties.Transaction_commitment.create_complete commitment
+      Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash memo)
         ~fee_payer_hash:
-          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+          (Zkapp_command.Digest.Account_update.create
+             (Account_update.of_fee_payer fee_payer) )
     in
     let fee_payer =
       let fee_payer_signature_auth =
@@ -4563,8 +4632,8 @@ module For_tests = struct
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
-    let sender_party =
-      Option.map sender_party ~f:(fun s : Party.Simple.t ->
+    let sender_account_update =
+      Option.map sender_account_update ~f:(fun s : Account_update.Simple.t ->
           let commitment =
             if s.body.use_full_commitment then full_commitment else commitment
           in
@@ -4574,10 +4643,11 @@ module For_tests = struct
           in
           { body = s.body; authorization = Signature sender_signature_auth } )
     in
-    ( `Parties
-        (Parties.of_simple { fee_payer; other_parties = other_receivers; memo })
-    , `Sender_party sender_party
-    , `Proof_parties snapp_parties
+    ( `Zkapp_command
+        (Zkapp_command.of_simple
+           { fee_payer; account_updates = other_receivers; memo } )
+    , `Sender_account_update sender_account_update
+    , `Proof_zkapp_command snapp_zkapp_command
     , `Txn_commitment commitment
     , `Full_txn_commitment full_commitment )
 
@@ -4605,66 +4675,75 @@ module For_tests = struct
               }
         }
     in
-    let ( `Parties { Parties.fee_payer; other_parties; memo }
-        , `Sender_party sender_party
-        , `Proof_parties snapp_parties
+    let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+        , `Sender_account_update sender_account_update
+        , `Proof_zkapp_command snapp_zkapp_command
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties ~constraint_constants spec ~update:update_vk
+      create_zkapp_command ~constraint_constants spec ~update:update_vk
     in
-    assert (List.is_empty other_parties) ;
-    (* invariant: same number of keypairs, snapp_parties *)
-    let snapp_parties_keypairs =
-      List.zip_exn snapp_parties spec.zkapp_account_keypairs
+    assert (List.is_empty account_updates) ;
+    (* invariant: same number of keypairs, snapp_zkapp_command *)
+    let snapp_zkapp_command_keypairs =
+      List.zip_exn snapp_zkapp_command spec.zkapp_account_keypairs
     in
-    let snapp_parties =
-      List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
+    let snapp_zkapp_command =
+      List.map snapp_zkapp_command_keypairs
+        ~f:(fun (snapp_account_update, keypair) ->
           if no_auth then
-            ( { body = snapp_party.body; authorization = None_given }
-              : Party.Simple.t )
+            ( { body = snapp_account_update.body; authorization = None_given }
+              : Account_update.Simple.t )
           else
             let commitment =
-              if snapp_party.body.use_full_commitment then full_commitment
+              if snapp_account_update.body.use_full_commitment then
+                full_commitment
               else commitment
             in
             let signature =
               Signature_lib.Schnorr.Chunked.sign keypair.private_key
                 (Random_oracle.Input.Chunked.field commitment)
             in
-            ( { body = snapp_party.body; authorization = Signature signature }
-              : Party.Simple.t ) )
+            ( { body = snapp_account_update.body
+              ; authorization = Signature signature
+              }
+              : Account_update.Simple.t ) )
     in
-    let other_parties = Option.to_list sender_party @ snapp_parties in
-    let parties : Parties.t =
-      Parties.of_simple { fee_payer; other_parties; memo }
+    let account_updates =
+      Option.to_list sender_account_update @ snapp_zkapp_command
     in
-    parties
+    let zkapp_command : Zkapp_command.t =
+      Zkapp_command.of_simple { fee_payer; account_updates; memo }
+    in
+    zkapp_command
 
   let update_states ?zkapp_prover ~constraint_constants (spec : Spec.t) =
-    let ( `Parties { Parties.fee_payer; other_parties; memo }
-        , `Sender_party sender_party
-        , `Proof_parties snapp_parties
+    let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+        , `Sender_account_update sender_account_update
+        , `Proof_zkapp_command snapp_zkapp_command
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties ~constraint_constants spec ~update:spec.snapp_update
+      create_zkapp_command ~constraint_constants spec ~update:spec.snapp_update
     in
-    assert (List.is_empty other_parties) ;
-    assert (Option.is_none sender_party) ;
-    assert (not @@ List.is_empty snapp_parties) ;
-    let snapp_parties =
-      snapp_parties
+    assert (List.is_empty account_updates) ;
+    assert (Option.is_none sender_account_update) ;
+    assert (not @@ List.is_empty snapp_zkapp_command) ;
+    let snapp_zkapp_command =
+      snapp_zkapp_command
       |> List.map ~f:(fun p -> (p, p))
-      |> Parties.Call_forest.With_hashes_and_data.of_parties_simple_list
+      |> Zkapp_command.Call_forest.With_hashes_and_data
+         .of_zkapp_command_simple_list
       |> Zkapp_statement.zkapp_statements_of_forest
-      |> Parties.Call_forest.to_parties_list
+      |> Zkapp_command.Call_forest.to_account_updates
     in
-    let snapp_parties_keypairs =
-      List.zip_exn snapp_parties spec.zkapp_account_keypairs
+    let snapp_zkapp_command_keypairs =
+      List.zip_exn snapp_zkapp_command spec.zkapp_account_keypairs
     in
-    let%map.Async.Deferred snapp_parties =
-      Async.Deferred.List.map snapp_parties_keypairs
+    let%map.Async.Deferred snapp_zkapp_command =
+      Async.Deferred.List.map snapp_zkapp_command_keypairs
         ~f:(fun
-             (((snapp_party, simple_snapp_party), tx_statement), snapp_keypair)
+             ( ( (snapp_account_update, simple_snapp_account_update)
+               , tx_statement )
+             , snapp_keypair )
            ->
           match spec.current_auth with
           | Permissions.Auth_required.Proof ->
@@ -4686,11 +4765,14 @@ module For_tests = struct
                   =
                 prover ~handler tx_statement
               in
-              ( { body = simple_snapp_party.body; authorization = Proof pi }
-                : Party.Simple.t )
+              ( { body = simple_snapp_account_update.body
+                ; authorization = Proof pi
+                }
+                : Account_update.Simple.t )
           | Signature ->
               let commitment =
-                if snapp_party.body.use_full_commitment then full_commitment
+                if snapp_account_update.body.use_full_commitment then
+                  full_commitment
                 else commitment
               in
               let signature =
@@ -4698,43 +4780,45 @@ module For_tests = struct
                   (Random_oracle.Input.Chunked.field commitment)
               in
               Async.Deferred.return
-                ( { body = simple_snapp_party.body
+                ( { body = simple_snapp_account_update.body
                   ; authorization = Signature signature
                   }
-                  : Party.Simple.t )
+                  : Account_update.Simple.t )
           | None ->
               Async.Deferred.return
-                ( { body = simple_snapp_party.body; authorization = None_given }
-                  : Party.Simple.t )
+                ( { body = simple_snapp_account_update.body
+                  ; authorization = None_given
+                  }
+                  : Account_update.Simple.t )
           | _ ->
               failwith
                 "Current authorization not Proof or Signature or None_given" )
     in
-    let other_parties = snapp_parties in
-    let parties : Parties.t =
-      Parties.of_simple { fee_payer; other_parties; memo }
+    let account_updates = snapp_zkapp_command in
+    let zkapp_command : Zkapp_command.t =
+      Zkapp_command.of_simple { fee_payer; account_updates; memo }
     in
-    parties
+    zkapp_command
 
   let multiple_transfers (spec : Spec.t) =
-    let ( `Parties parties
-        , `Sender_party sender_party
-        , `Proof_parties snapp_parties
+    let ( `Zkapp_command zkapp_command
+        , `Sender_account_update sender_account_update
+        , `Proof_zkapp_command snapp_zkapp_command
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
-      create_parties
+      create_zkapp_command
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
         spec ~update:spec.snapp_update
     in
-    assert (Option.is_some sender_party) ;
-    assert (List.is_empty snapp_parties) ;
-    let other_parties =
-      let sender_party = Option.value_exn sender_party in
-      Parties.Call_forest.cons
-        (Parties.add_caller_simple sender_party Token_id.default)
-        parties.other_parties
+    assert (Option.is_some sender_account_update) ;
+    assert (List.is_empty snapp_zkapp_command) ;
+    let account_updates =
+      let sender_account_update = Option.value_exn sender_account_update in
+      Zkapp_command.Call_forest.cons
+        (Zkapp_command.add_caller_simple sender_account_update Token_id.default)
+        zkapp_command.account_updates
     in
-    { parties with other_parties }
+    { zkapp_command with account_updates }
 
   let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
     let id = Account_id.create pk Token_id.default in
@@ -4794,10 +4878,10 @@ module For_tests = struct
         { Permissions.user_default with send = Permissions.Auth_required.Proof }
         |> Zkapp_basic.Set_or_keep.Set
       in
-      { Party.Update.dummy with permissions }
+      { Account_update.Update.dummy with permissions }
     in
     let sender_pk = sender.public_key |> Public_key.compress in
-    let fee_payer : Party.Fee_payer.t =
+    let fee_payer : Account_update.Fee_payer.t =
       { body =
           { public_key = sender_pk
           ; fee
@@ -4808,10 +4892,10 @@ module For_tests = struct
       ; authorization = Signature.dummy
       }
     in
-    let sender_party_data : Party.Simple.t =
+    let sender_account_update_data : Account_update.Simple.t =
       { body =
           { public_key = sender_pk
-          ; update = Party.Update.noop
+          ; update = Account_update.Update.noop
           ; token_id = Token_id.default
           ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
           ; increment_nonce = true
@@ -4830,7 +4914,7 @@ module For_tests = struct
       ; authorization = Signature Signature.dummy
       }
     in
-    let snapp_party_data : Party.Simple.t =
+    let snapp_account_update_data : Account_update.Simple.t =
       { body =
           { public_key = trivial_account_pk
           ; update = update_empty_permissions
@@ -4854,25 +4938,25 @@ module For_tests = struct
     in
     let memo = Signed_command_memo.empty in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_simple_list
-        [ sender_party_data; snapp_party_data ]
+      Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+        [ sender_account_update_data; snapp_account_update_data ]
     in
-    let other_parties_hash = Parties.Call_forest.hash ps in
-    let transaction : Parties.Transaction_commitment.t =
+    let account_updates_hash = Zkapp_command.Call_forest.hash ps in
+    let transaction : Zkapp_command.Transaction_commitment.t =
       (*FIXME: is this correct? *)
-      Parties.Transaction_commitment.create ~other_parties_hash
+      Zkapp_command.Transaction_commitment.create ~account_updates_hash
     in
-    let proof_party =
+    let proof_account_update =
       let tree =
-        Parties.Call_forest.With_hashes.of_parties_simple_list
-          [ snapp_party_data ]
+        Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+          [ snapp_account_update_data ]
         |> List.hd_exn
       in
-      tree.elt.party_digest
+      tree.elt.account_update_digest
     in
     let tx_statement : Zkapp_statement.t =
-      { party = (proof_party :> Field.t)
-      ; calls = (Parties.Digest.Forest.empty :> Field.t)
+      { account_update = (proof_account_update :> Field.t)
+      ; calls = (Zkapp_command.Digest.Forest.empty :> Field.t)
       }
     in
     let handler (Snarky_backendless.Request.With { request; respond }) =
@@ -4883,10 +4967,11 @@ module For_tests = struct
     in
     let fee_payer_signature_auth =
       let txn_comm =
-        Parties.Transaction_commitment.create_complete transaction
+        Zkapp_command.Transaction_commitment.create_complete transaction
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+            (Zkapp_command.Digest.Account_update.create
+               (Account_update.of_fee_payer fee_payer) )
       in
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field txn_comm)
@@ -4898,14 +4983,18 @@ module For_tests = struct
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field transaction)
     in
-    let sender : Party.Simple.t =
-      { sender_party_data with authorization = Signature sender_signature_auth }
+    let sender : Account_update.Simple.t =
+      { sender_account_update_data with
+        authorization = Signature sender_signature_auth
+      }
     in
-    let other_parties =
-      [ sender; { body = snapp_party_data.body; authorization = Proof pi } ]
+    let account_updates =
+      [ sender
+      ; { body = snapp_account_update_data.body; authorization = Proof pi }
+      ]
     in
-    let parties : Parties.t =
-      Parties.of_simple { fee_payer; other_parties; memo }
+    let zkapp_command : Zkapp_command.t =
+      Zkapp_command.of_simple { fee_payer; account_updates; memo }
     in
-    parties
+    zkapp_command
 end

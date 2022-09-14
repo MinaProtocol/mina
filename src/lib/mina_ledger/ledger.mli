@@ -126,10 +126,10 @@ module Transaction_applied : sig
     [@@deriving sexp]
   end
 
-  module Parties_applied : sig
-    type t = Transaction_applied.Parties_applied.t =
+  module Zkapp_command_applied : sig
+    type t = Transaction_applied.Zkapp_command_applied.t =
       { accounts : (Account_id.t * Account.t option) list
-      ; command : Parties.t With_status.t
+      ; command : Zkapp_command.t With_status.t
       ; new_accounts : Account_id.t list
       }
     [@@deriving sexp]
@@ -138,7 +138,7 @@ module Transaction_applied : sig
   module Command_applied : sig
     type t = Transaction_applied.Command_applied.t =
       | Signed_command of Signed_command_applied.t
-      | Parties of Parties_applied.t
+      | Zkapp_command of Zkapp_command_applied.t
     [@@deriving sexp]
   end
 
@@ -215,7 +215,7 @@ val apply_transaction :
   -> Transaction_applied.t Or_error.t
 
 (** update sequence state, returned slot is new last sequence slot
-    made available here so we can use this logic in the Parties generators
+    made available here so we can use this logic in the Zkapp_command generators
 *)
 val update_sequence_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
@@ -225,22 +225,22 @@ val update_sequence_state :
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
      * Mina_numbers.Global_slot.t
 
-val apply_parties_unchecked :
+val apply_zkapp_command_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
-  -> Parties.t
-  -> ( Transaction_applied.Parties_applied.t
+  -> Zkapp_command.t
+  -> ( Transaction_applied.Zkapp_command_applied.t
      * ( ( Stack_frame.value
          , Stack_frame.value list
          , Token_id.t
          , Currency.Amount.Signed.t
          , t
          , bool
-         , Parties.Transaction_commitment.t
+         , Zkapp_command.Transaction_commitment.t
          , Mina_numbers.Index.t
          , Transaction_status.Failure.Collection.t )
-         Mina_transaction_logic.Parties_logic.Local_state.t
+         Mina_transaction_logic.Zkapp_command_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
 
@@ -250,11 +250,11 @@ val has_locked_tokens :
   -> t
   -> bool Or_error.t
 
-val merkle_root_after_parties_exn :
+val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
-  -> Parties.Valid.t
+  -> Zkapp_command.Valid.t
   -> Ledger_hash.t
 
 val merkle_root_after_user_command_exn :

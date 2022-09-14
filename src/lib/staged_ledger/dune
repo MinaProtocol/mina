@@ -61,7 +61,7 @@
    random_oracle
    kimchi_backend
    pickles.backend
-   parties_builder
+   zkapp_command_builder
    ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)

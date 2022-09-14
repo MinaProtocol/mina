@@ -1,6 +1,6 @@
 (library
- (name parties_builder)
- (public_name parties_builder)
+ (name zkapp_command_builder)
+ (public_name zkapp_command_builder)
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -26,4 +26,4 @@
  (preprocess
   (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_mina ppx_version))
  (instrumentation (backend bisect_ppx))
- (synopsis "Builder Parties.t via combinators"))
+ (synopsis "Builder Zkapp_command.t via combinators"))

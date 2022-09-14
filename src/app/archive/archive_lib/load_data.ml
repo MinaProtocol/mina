@@ -247,7 +247,7 @@ let update_of_id pool update_id =
               ; vesting_period
               ; vesting_increment
               }
-              : Party.Update.Timing_info.t ) )
+              : Account_update.Update.Timing_info.t ) )
     in
     Set_or_keep.of_option tm_opt
   in
@@ -270,7 +270,7 @@ let update_of_id pool update_id =
       ; timing
       ; voting_for
       }
-      : Party.Update.t )
+      : Account_update.Update.t )
 
 let staking_data_of_id pool id =
   let open Zkapp_basic in
@@ -426,9 +426,10 @@ let get_fee_payer_body ~pool body_id =
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
   in
-  return ({ public_key; fee; valid_until; nonce } : Party.Body.Fee_payer.t)
+  return
+    ({ public_key; fee; valid_until; nonce } : Account_update.Body.Fee_payer.t)
 
-let get_other_party_body ~pool body_id =
+let get_account_update_body ~pool body_id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
   let pk_of_id = pk_of_id pool in
@@ -446,7 +447,7 @@ let get_other_party_body ~pool body_id =
            ; caller
            ; authorization_kind
            } =
-    query_db ~f:(fun db -> Processor.Zkapp_other_party_body.load db body_id)
+    query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
@@ -489,9 +490,9 @@ let get_other_party_body ~pool body_id =
           Option.value_exn nonce |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Account_nonce.of_uint32
         in
-        return @@ Party.Account_precondition.Nonce nonce
+        return @@ Account_update.Account_precondition.Nonce nonce
     | Accept ->
-        return Party.Account_precondition.Accept
+        return Account_update.Account_precondition.Accept
     | Full ->
         assert (Option.is_some precondition_account_id) ;
         let%bind { balance_id
@@ -600,7 +601,7 @@ let get_other_party_body ~pool body_id =
         let proved_state = Or_ignore.of_option proved_state in
         let is_new = Or_ignore.of_option is_new in
         return
-          (Party.Account_precondition.Full
+          (Account_update.Account_precondition.Full
              { balance
              ; nonce
              ; receipt_chain_hash
@@ -611,9 +612,9 @@ let get_other_party_body ~pool body_id =
              ; is_new
              } )
   in
-  let caller = Party.Call_type.of_string caller in
+  let caller = Account_update.Call_type.of_string caller in
   let authorization_kind =
-    Party.Authorization_kind.of_string_exn authorization_kind
+    Account_update.Authorization_kind.of_string_exn authorization_kind
   in
   return
     ( { public_key
@@ -626,14 +627,14 @@ let get_other_party_body ~pool body_id =
       ; call_data
       ; call_depth
       ; preconditions =
-          { Party.Preconditions.network = protocol_state_precondition
+          { Account_update.Preconditions.network = protocol_state_precondition
           ; account = account_precondition
           }
       ; use_full_commitment
       ; caller
       ; authorization_kind
       }
-      : Party.Body.Simple.t )
+      : Account_update.Body.Simple.t )
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =

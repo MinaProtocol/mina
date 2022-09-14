@@ -789,7 +789,7 @@ let update_metrics_with_diff (type mutant)
                (List.fold ~init:0
                   ~f:(fun c cmd ->
                     match cmd.data with
-                    | Mina_base.User_command.Poly.Parties _ ->
+                    | Mina_base.User_command.Poly.Zkapp_command _ ->
                         c + 1
                     | _ ->
                         c )
