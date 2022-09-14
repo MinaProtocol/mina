@@ -200,6 +200,7 @@ let%test_module "Protocol state precondition tests" =
                             }
                         ; use_full_commitment = false
                         ; caller = Call
+                        ; authorization_kind = Signature
                         }
                         (*To be updated later*)
                     ; authorization = Control.Signature Signature.dummy
@@ -231,6 +232,7 @@ let%test_module "Protocol state precondition tests" =
                             }
                         ; use_full_commitment = true
                         ; caller = Call
+                        ; authorization_kind = Signature
                         }
                     ; authorization =
                         Control.Signature Signature.dummy
@@ -610,6 +612,7 @@ let%test_module "Account precondition tests" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
+                    ; authorization_kind = Signature
                     }
                     (*To be updated later*)
                 ; authorization = Control.Signature Signature.dummy
@@ -638,6 +641,7 @@ let%test_module "Account precondition tests" =
                         }
                     ; use_full_commitment = true
                     ; caller = Call
+                    ; authorization_kind = Signature
                     }
                 ; authorization =
                     Control.Signature Signature.dummy (*To be updated later*)

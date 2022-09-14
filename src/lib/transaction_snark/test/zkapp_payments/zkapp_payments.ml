@@ -72,6 +72,7 @@ let%test_module "Zkapp payments tests" =
                       }
                   ; use_full_commitment = false
                   ; caller = Call
+                  ; authorization_kind = Signature
                   }
               ; authorization = Signature Signature.dummy
               }
@@ -92,6 +93,7 @@ let%test_module "Zkapp payments tests" =
                       }
                   ; use_full_commitment = false
                   ; caller = Call
+                  ; authorization_kind = None_given
                   }
               ; authorization = None_given
               }
