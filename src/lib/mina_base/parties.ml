@@ -14,6 +14,7 @@ let add_caller (p : Party.Wire.t) caller : Party.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -31,6 +32,7 @@ let add_caller_simple (p : Party.Simple.t) caller : Party.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -1046,6 +1048,7 @@ let to_simple (t : t) : Simple.t =
               ; use_full_commitment = b.use_full_commitment
               ; caller = call_type
               ; call_depth = 0
+              ; authorization_kind = b.authorization_kind
               }
           } )
         ~null_id:Token_id.default

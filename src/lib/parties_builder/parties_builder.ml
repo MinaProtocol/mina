@@ -9,7 +9,8 @@ let mk_forest ps : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
 let mk_node party calls =
   { Parties.Call_forest.Tree.party; party_digest = (); calls = mk_forest calls }
 
-let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
+let mk_party_body authorization_kind caller kp token_id balance_change :
+    Party.Body.Simple.t =
   let open Signature_lib in
   { update = Party.Update.noop
   ; public_key = Public_key.compress kp.Keypair.public_key
@@ -29,6 +30,7 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
       }
   ; use_full_commitment = true
   ; caller
+  ; authorization_kind
   }
 
 let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce

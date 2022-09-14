@@ -4441,6 +4441,7 @@ module For_tests = struct
         ; preconditions = preconditions'
         ; use_full_commitment = false
         ; caller = Call
+        ; authorization_kind = Signature
         }
       in
       Option.some_if
@@ -4506,6 +4507,7 @@ module For_tests = struct
                     }
                 ; use_full_commitment = true
                 ; caller = Call
+                ; authorization_kind = Signature
                 }
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
@@ -4527,6 +4529,7 @@ module For_tests = struct
               ; preconditions = { preconditions' with account = Accept }
               ; use_full_commitment = false
               ; caller = Call
+              ; authorization_kind = None_given
               }
           ; authorization = Control.None_given
           } )
@@ -4822,6 +4825,7 @@ module For_tests = struct
               }
           ; use_full_commitment = false
           ; caller = Call
+          ; authorization_kind = Signature
           }
       ; authorization = Signature Signature.dummy
       }
@@ -4843,6 +4847,7 @@ module For_tests = struct
               }
           ; use_full_commitment = false
           ; caller = Call
+          ; authorization_kind = Proof
           }
       ; authorization = Proof Mina_base.Proof.blockchain_dummy
       }

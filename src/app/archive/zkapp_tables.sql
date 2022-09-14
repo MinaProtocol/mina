@@ -256,6 +256,8 @@ CREATE TABLE zkapp_fee_payer_body
 
 CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
 
+CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
+
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array.
 */
@@ -273,6 +275,7 @@ CREATE TABLE zkapp_other_party_body
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , caller                                call_type_type  NOT NULL
+, authorization_kind                    authorization_kind_type NOT NULL
 );
 
 CREATE TABLE zkapp_other_party

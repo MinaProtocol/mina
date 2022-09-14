@@ -2276,6 +2276,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment
+                ; authorization_kind = Signature
                 }
             ; authorization = None_given
             }
@@ -2303,6 +2304,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = None_given
                 }
             ; authorization = None_given
             }

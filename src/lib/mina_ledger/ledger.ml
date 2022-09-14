@@ -514,11 +514,11 @@ let%test_unit "tokens test" =
     let create_token : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_funder Token_id.default
+            (mk_party_body Signature Call token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_party_body Proof Call token_owner Token_id.default
                (3 * account_creation_fee) )
             []
         ]
@@ -533,29 +533,40 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_party_body Proof Call token_owner Token_id.default
                (-account_creation_fee) )
-            [ mk_node (mk_party_body Call token_account1 custom_token_id 100) []
+            [ mk_node
+                (mk_party_body None_given Call token_account1 custom_token_id
+                   100 )
+                []
             ]
         ]
     in
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_party_body Call token_owner Token_id.default
+            (mk_party_body Proof Call token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_party_body Call token_account1 custom_token_id (-30))
+                (mk_party_body Signature Call token_account1 custom_token_id
+                   (-30) )
                 []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 30) []
             ; mk_node
-                (mk_party_body Call token_account1 custom_token_id (-10))
+                (mk_party_body Signature Call token_account2 custom_token_id 30)
                 []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 10) []
             ; mk_node
-                (mk_party_body Call token_account2 custom_token_id (-5))
+                (mk_party_body Signature Call token_account1 custom_token_id
+                   (-10) )
                 []
-            ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
+            ; mk_node
+                (mk_party_body Signature Call token_account2 custom_token_id 10)
+                []
+            ; mk_node
+                (mk_party_body Signature Call token_account2 custom_token_id (-5))
+                []
+            ; mk_node
+                (mk_party_body Signature Call token_account1 custom_token_id 5)
+                []
             ]
         ]
     in

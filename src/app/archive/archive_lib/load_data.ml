@@ -444,6 +444,7 @@ let get_other_party_body ~pool body_id =
            ; zkapp_account_precondition_id
            ; use_full_commitment
            ; caller
+           ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_other_party_body.load db body_id)
   in
@@ -611,6 +612,9 @@ let get_other_party_body ~pool body_id =
              } )
   in
   let caller = Party.Call_type.of_string caller in
+  let authorization_kind =
+    Party.Authorization_kind.of_string_exn authorization_kind
+  in
   return
     ( { public_key
       ; token_id
@@ -627,6 +631,7 @@ let get_other_party_body ~pool body_id =
           }
       ; use_full_commitment
       ; caller
+      ; authorization_kind
       }
       : Party.Body.Simple.t )
 
