@@ -166,8 +166,8 @@ let%test_module "Zkapp payments tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let fee = Fee.nanomina 1_000_000 in
-                  let amount = Amount.mina 1 in
+                  let fee = Fee.nanomina_unsafe 1_000_000 in
+                  let amount = Amount.mina_unsafe 1 in
                   let spec = List.hd_exn specs in
                   let receiver_count = 3 in
                   let total_amount =
@@ -218,7 +218,7 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  let fee = Fee.nanomina 1_000_000 in
+                  let fee = Fee.nanomina_unsafe 1_000_000 in
                   let spec = List.hd_exn specs in
                   let sender_pk =
                     (fst spec.sender).public_key
@@ -238,7 +238,7 @@ let%test_module "Zkapp payments tests" =
                   let amount =
                     Amount.add
                       Balance.(to_amount sender_balance)
-                      Amount.(nanomina 1_000_000)
+                      Amount.(nanomina_unsafe 1_000_000)
                     |> Option.value_exn
                   in
                   let receiver_count = 3 in

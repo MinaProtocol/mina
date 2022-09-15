@@ -454,8 +454,8 @@ let batch_send_payments =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
           ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.nanomina (Random.int 100)
-          ; fee = Currency.Fee.nanomina (Random.int 100)
+          ; amount = Currency.Amount.nanomina_unsafe (Random.int 100)
+          ; fee = Currency.Fee.nanomina_unsafe (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;

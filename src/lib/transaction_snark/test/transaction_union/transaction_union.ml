@@ -87,7 +87,9 @@ let%test_module "Transaction union tests" =
       let other_id = Account_id.create other Token_id.default in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
-        Coinbase.create ~amount:(Currency.Amount.mina 10) ~receiver
+        Coinbase.create
+          ~amount:(Currency.Amount.mina_unsafe 10)
+          ~receiver
           ~fee_transfer:
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
@@ -908,12 +910,12 @@ let%test_module "Transaction union tests" =
               (Test_util.arbitrary_string
                  ~len:Signed_command_memo.max_digestible_string_length )
           in
-          let balance = Balance.mina 100_000 in
-          let initial_minimum_balance = Balance.mina 80_000 in
+          let balance = Balance.mina_unsafe 100_000 in
+          let initial_minimum_balance = Balance.mina_unsafe 80_000 in
           let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-          let cliff_amount = Amount.nanomina 10_000 in
+          let cliff_amount = Amount.nanomina_unsafe 10_000 in
           let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-          let vesting_increment = Amount.nanomina 1 in
+          let vesting_increment = Amount.nanomina_unsafe 1 in
           let txn_global_slot = Mina_numbers.Global_slot.of_int 1002 in
           let sender =
             { sender with
@@ -1849,12 +1851,12 @@ let%test_module "Transaction union tests" =
           in
           let timed_account pk =
             let account_id = Account_id.create pk Token_id.default in
-            let balance = Balance.mina 100_000 in
-            let initial_minimum_balance = Balance.mina 80 in
+            let balance = Balance.mina_unsafe 100_000 in
+            let initial_minimum_balance = Balance.mina_unsafe 80 in
             let cliff_time = Mina_numbers.Global_slot.of_int 2 in
-            let cliff_amount = Amount.mina 5 in
+            let cliff_amount = Amount.mina_unsafe 5 in
             let vesting_period = Mina_numbers.Global_slot.of_int 2 in
-            let vesting_increment = Amount.mina 40 in
+            let vesting_increment = Amount.mina_unsafe 40 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
                  ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
@@ -1881,10 +1883,12 @@ let%test_module "Transaction union tests" =
               Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
                 ~fee:(Currency.Fee.nanomina fee)
             in
-            ( Coinbase.create ~amount:(Currency.Amount.mina 10)
+            ( Coinbase.create
+                ~amount:(Currency.Amount.mina_unsafe 10)
                 ~receiver:receivers.(1) ~fee_transfer:(Some ft)
               |> Or_error.ok_exn
-            , Coinbase.create ~amount:(Currency.Amount.mina 10)
+            , Coinbase.create
+                ~amount:(Currency.Amount.mina_unsafe 10)
                 ~receiver:receivers.(1) ~fee_transfer:None
               |> Or_error.ok_exn )
           in
@@ -1932,7 +1936,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let txn_fee = Fee.nanomina 1_000_000 in
+      let txn_fee = Fee.nanomina_unsafe 1_000_000 in
       let amount = 100 in
       (*send from a zkApp account*)
       let signed_command1 =
@@ -2083,7 +2087,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let txn_fee = Fee.nanomina 1_000_000 in
+      let txn_fee = Fee.nanomina_unsafe 1_000_000 in
       let sender_kp, sender_nonce = spec.sender in
       (*Delegator is a zkapp account*)
       let stake_delegation1 =
@@ -2204,7 +2208,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let fee = Fee.nanomina 1_000_000 in
+      let fee = Fee.nanomina_unsafe 1_000_000 in
       let amount = U.constraint_constants.coinbase_amount in
       (*send coinbase reward to a zkApp account*)
       let coinbase1 =

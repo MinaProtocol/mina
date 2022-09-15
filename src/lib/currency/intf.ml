@@ -46,11 +46,11 @@ module type Basic = sig
 
   val of_uint64 : uint64 -> t
 
-  val mina : int -> t
+  val mina_unsafe : int -> t
 
-  val centimina : int -> t
+  val centimina_unsafe : int -> t
 
-  val nanomina : int -> t
+  val nanomina_unsafe : int -> t
 
   val int_of_mina : t -> int
 
