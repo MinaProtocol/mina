@@ -389,9 +389,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           (z, `Overflow b)
 
     let scale u64 i =
-      let i = Unsigned.of_int i in
-      let max_val = Unsigned.(div max_int i) in
-      if max_val >= u64 then Some (Unsigned.mul u64 i) else None
+      if Int.(i = 0) then Some zero
+      else
+        let i = Unsigned.of_int i in
+        let max_val = Unsigned.(div max_int i) in
+        if max_val >= u64 then Some (Unsigned.mul u64 i) else None
 
     let ( + ) = add
 
