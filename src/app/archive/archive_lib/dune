@@ -21,6 +21,7 @@
    ppx_inline_test.config
    uri
    ;;local libraries
+   mina_wire_types
    kimchi_backend
    child_processes
    precomputed_values
@@ -30,6 +31,7 @@
    mina_base.util
    kimchi_backend.pasta
    pickles
+   random_oracle
    pipe_lib
    block_time
    currency
@@ -70,4 +72,4 @@
  (inline_tests)
  (modes native)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))

@@ -36,9 +36,9 @@
    with_hash
    random_oracle
    sexplib0
-   parties_builder
+   zkapp_command_builder
    )
   (link_flags (-linkall))
   (preprocess
-    (pps ppx_coda ppx_snarky ppx_version ppx_jane))
+    (pps ppx_mina ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

@@ -42,7 +42,7 @@ let sample_block_sexp =
            (token_id
             0x0000000000000000000000000000000000000000000000000000000000000001)
            (excess ((magnitude 0) (sgn Pos))) (ledger 0) (success true)
-           (party_index 0)
+           (account_update_index 0)
            (failure_status_tbl ())))))
        (timestamp 1655382227041)
        (body_reference
@@ -497,7 +497,7 @@ let sample_block_json =
               },
               "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
               "success": true,
-              "party_index": "0",
+              "account_update_index": "0",
               "failure_status_tbl": []
             }
           },

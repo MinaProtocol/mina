@@ -64,7 +64,7 @@ if (command === "deploy") {
   });
 
   let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
-  let partiesJson = await deploy(SimpleZkapp, {
+  let zkappCommandJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
     initialBalance,
@@ -79,12 +79,12 @@ if (command === "deploy") {
     fee: transactionFee,
     nonce: feePayerNonce,
   };
-  let parties = JSON.parse(partiesJson);
+  let zkappCommand = JSON.parse(zkappCommandJson);
   let { data } = client.signTransaction(
-    { parties, feePayer },
+    { zkappCommand, feePayer },
     feePayerKeyBase58
   );
-  console.log(data.parties);
+  console.log(data.zkappCommand);
 }
 
 if (command === "update") {
@@ -98,7 +98,7 @@ if (command === "update") {
     new SimpleZkapp(zkappAddress).update(Field(2));
   });
   let [proof] = await transaction.prove();
-  let partiesJson = transaction.toJSON();
+  let zkappCommandJson = transaction.toJSON();
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
@@ -108,15 +108,15 @@ if (command === "update") {
     fee: transactionFee,
     nonce: feePayerNonce,
   };
-  let parties = JSON.parse(partiesJson);
+  let zkappCommand = JSON.parse(zkappCommandJson);
   let { data } = client.signTransaction(
-    { parties, feePayer },
+    { zkappCommand, feePayer },
     feePayerKeyBase58
   );
   let ok = await verify(proof, verificationKey.data);
   if (!ok) throw Error("verification failed");
 
-  console.log(data.parties);
+  console.log(data.zkappCommand);
 }
 
 shutdown();

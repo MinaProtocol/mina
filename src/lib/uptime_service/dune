@@ -59,5 +59,5 @@
    kimchi_backend.pasta
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
  (synopsis "Uptime service library for delegation program"))

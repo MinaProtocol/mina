@@ -59,6 +59,18 @@ let gating_config_to_helper_format (config : connection_gating) =
   Libp2p_ipc.create_gating_config ~banned_ips ~banned_peers ~trusted_ips
     ~trusted_peers ~isolate:config.isolate
 
+module For_tests = struct
+  module Helper = Libp2p_helper
+
+  let generate_random_keypair = Keypair.generate_random
+
+  let multiaddr_to_libp2p_ipc = Multiaddr.to_libp2p_ipc
+
+  let empty_libp2p_ipc_gating_config =
+    gating_config_to_helper_format
+      { banned_peers = []; trusted_peers = []; isolate = false }
+end
+
 type protocol_handler =
   { protocol_name : string
   ; mutable closed : bool
@@ -192,7 +204,7 @@ let bandwidth_info t =
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~mina_peer_exchange ~seed_peers ~initial_gating_config ~min_connections
+    ~peer_protection_ratio ~seed_peers ~initial_gating_config ~min_connections
     ~max_connections ~validation_queue_size ~known_private_ip_nets ~topic_config
     =
   let open Deferred.Or_error.Let_syntax in
@@ -207,7 +219,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~seed_peers:(List.map ~f:Multiaddr.to_libp2p_ipc seed_peers)
       ~known_private_ip_nets:
         (List.map ~f:Core.Unix.Cidr.to_string known_private_ip_nets)
-      ~peer_exchange ~mina_peer_exchange ~min_connections ~max_connections
+      ~peer_exchange ~peer_protection_ratio ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
       ~topic_config
@@ -589,3 +601,5 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
                       , `List (List.map ~f:Peer_without_id.to_yojson batch) )
                     ] ) ) ) ) ;
   Deferred.Or_error.return t
+
+let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper

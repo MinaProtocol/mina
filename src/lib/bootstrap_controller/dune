@@ -3,7 +3,7 @@
  (public_name bootstrap_controller)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_register_event))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_register_event))
  (libraries
    ;; opam libraries
    sexplib0
@@ -31,6 +31,7 @@
    sync_handler
    transition_frontier
    pipe_lib
+   mina_intf
    mina_block
    mina_base
    mina_ledger
