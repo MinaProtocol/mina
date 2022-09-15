@@ -30,5 +30,5 @@ popd > /dev/null
     printf 'let marlin_commit_id_short = "%s"\n' "$marlin_commit_id_short"
     printf 'let marlin_commit_date = "%s"\n' "$marlin_commit_date"
 
-    printf 'let print_version () = Core_kernel.printf "Commit %%s on branch %%s\\n" commit_id branch\n'
+    printf 'let print_version () = Core_kernel.printf "Commit %%s on branch %%s\\n%%!" commit_id branch\n'
 } > "$1"
