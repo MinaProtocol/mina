@@ -2871,7 +2871,8 @@ let%test_module "staged ledger tests" =
         let prover = stmt_to_prover stmts in
         Some
           { Transaction_snark_work.Checked.fee =
-              Currency.Fee.(sub work_fee (nanomina 1)) |> Option.value_exn
+              Currency.Fee.(sub work_fee (nanomina_unsafe 1))
+              |> Option.value_exn
           ; proofs = proofs stmts
           ; prover
           }
@@ -3199,7 +3200,7 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (nanomina 1) (nanomina 20))
+                  Fee.(gen_incl (nanomina_unsafe 1) (nanomina_unsafe 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3223,7 +3224,7 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (nanomina 1) (nanomina 20))
+                  Fee.(gen_incl (nanomina_unsafe 1) (nanomina_unsafe 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3395,14 +3396,14 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.mina 100 in
+      let balance = Balance.mina_unsafe 100 in
       (*Should fully vest by slot = 7*)
       let acc =
         Account.create_timed account_id balance ~initial_minimum_balance:balance
           ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
           ~cliff_amount:Amount.zero
           ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
-          ~vesting_increment:(Amount.mina 50)
+          ~vesting_increment:(Amount.mina_unsafe 50)
         |> Or_error.ok_exn
       in
       (keypair, acc)
@@ -3418,7 +3419,7 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.mina 100 in
+      let balance = Balance.mina_unsafe 100 in
       let acc = Account.create account_id balance in
       (keypair, acc)
 
@@ -3620,7 +3621,7 @@ let%test_module "staged ledger tests" =
       let insufficient_account_creation_fee =
         Currency.Fee.int_of_nanomina constraint_constants.account_creation_fee
         / 2
-        |> Currency.Amount.nanomina
+        |> Currency.Amount.nanomina_unsafe
       in
       let source_pk = Public_key.compress kp.public_key in
       let body =
@@ -3691,7 +3692,7 @@ let%test_module "staged ledger tests" =
                 ( Currency.Fee.int_of_nanomina
                     constraint_constants.account_creation_fee
                   / 2
-                  |> Currency.Amount.nanomina
+                  |> Currency.Amount.nanomina_unsafe
                 , Currency.Amount.to_fee balance )
           in
           let source_pk = Public_key.compress kp.public_key in
@@ -3796,8 +3797,8 @@ let%test_module "staged ledger tests" =
       in
       Quickcheck.test ~trials:1 gen
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.nanomina 1_000_000 in
-          let amount = Amount.mina 10 in
+          let fee = Fee.nanomina_unsafe 1_000_000 in
+          let amount = Amount.mina_unsafe 10 in
           let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
           let snapp_update =
             { Account_update.Update.dummy with

@@ -4928,7 +4928,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
       let id = Account_id.create pk Token_id.default in
-      { (Account.create id Balance.(mina 1_000_000)) with
+      { (Account.create id Balance.(mina_unsafe 1_000_000)) with
         permissions
       ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
       }
@@ -4972,7 +4972,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           |> fun pk -> Account_id.create pk Token_id.default
         in
         Ledger.get_or_create_account ledger id
-          (Account.create id Balance.(of_int 888_888))
+          (Account.create id Balance.(nanomina_unsafe 888_888))
         |> Or_error.ok_exn
       in
       let () =

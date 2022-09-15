@@ -65,7 +65,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
     let min_balance =
       Currency.Fee.int_of_nanomina min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000
-      |> Currency.Balance.nanomina
+      |> Currency.Balance.nanomina_unsafe
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =

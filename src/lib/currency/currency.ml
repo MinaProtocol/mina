@@ -353,11 +353,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let one = Unsigned.one
 
-    let nanomina = of_int
+    let nanomina_unsafe = of_int
 
-    let centimina i = of_int (10_000_000 * i)
+    let centimina_unsafe i = of_int (10_000_000 * i)
 
-    let mina i = of_int (1_000_000_000 * i)
+    let mina_unsafe i = of_int (1_000_000_000 * i)
 
     let int_of_nanomina = to_int
 

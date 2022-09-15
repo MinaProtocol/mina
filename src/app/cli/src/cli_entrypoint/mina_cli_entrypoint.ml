@@ -782,7 +782,8 @@ let setup_daemon logger =
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
-              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.nanomina
+              YJ.Util.to_int_option json
+              |> Option.map ~f:Currency.Fee.nanomina_unsafe
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:Mina_compile_config.default_snark_worker_fee

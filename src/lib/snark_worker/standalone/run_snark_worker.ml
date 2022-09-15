@@ -25,7 +25,7 @@ let command =
            ~proof_level ()
        in
        let public_key = fst (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
-       let fee = Currency.Fee.of_int 10 in
+       let fee = Currency.Fee.nanomina_unsafe 10 in
        let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
        match%bind Prod.perform_single worker_state ~message spec with
        | Ok (proof, time) ->
