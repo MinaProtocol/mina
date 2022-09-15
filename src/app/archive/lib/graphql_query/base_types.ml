@@ -56,13 +56,17 @@ module User_command_type = struct
 end
 
 module Fee = Make_numeric (struct
-                 include Currency.Fee
-                 let of_int = nanomina_unsafe
-               end)
+  include Currency.Fee
+
+  let of_int = nanomina_unsafe
+end)
+
 module Amount = Make_numeric (struct
-                    include Currency.Amount
-                    let of_int = nanomina_unsafe
-                  end)
+  include Currency.Amount
+
+  let of_int = nanomina_unsafe
+end)
+
 module Nonce = Make_numeric (Account.Nonce)
 module Length = Make_numeric (Mina_numbers.Length)
 

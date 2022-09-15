@@ -22,9 +22,9 @@ let%test_module "Zkapp payments tests" =
 
     let signed_signed ~(wallets : U.Wallet.t array) i j : Zkapp_command.t =
       let full_amount = 8_000_000_000 in
-      let fee = Fee.nanomina (Random.int full_amount) in
+      let fee = Fee.nanomina_unsafe (Random.int full_amount) in
       let receiver_amount =
-        Amount.sub (Amount.nanomina full_amount) (Amount.of_fee fee)
+        Amount.sub (Amount.nanomina_unsafe full_amount) (Amount.of_fee fee)
         |> Option.value_exn
       in
       let acct1 = wallets.(i) in
@@ -36,7 +36,7 @@ let%test_module "Zkapp payments tests" =
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
-                ; fee = Fee.nanomina full_amount
+                ; fee = Fee.nanomina_unsafe full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }

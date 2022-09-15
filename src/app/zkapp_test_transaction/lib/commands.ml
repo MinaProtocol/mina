@@ -38,7 +38,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
-      (Account.create id Currency.Balance.(of_int 1000000000000))
+      (Account.create id Currency.Balance.(mina_unsafe 1000))
     |> Or_error.ok_exn
   in
   let _v =
@@ -46,7 +46,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
         let `VK vk, `Prover _ = Lazy.force vk_and_prover in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
-          { (Account.create id Currency.Balance.(of_int 1000000000000)) with
+          { (Account.create id Currency.Balance.(mina_unsafe 1000)) with
             permissions =
               { Permissions.user_default with
                 edit_state = Proof
@@ -122,9 +122,9 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let spec =
     { Mina_transaction_logic.For_tests.Transaction_spec.sender =
         (keypair, Account.Nonce.zero)
-    ; fee = Currency.Fee.of_int 10000000000 (*1 Mina*)
+    ; fee = Currency.Fee.mina_unsafe 10
     ; receiver
-    ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
+    ; amount = Currency.Amount.mina_unsafe 10 (*10 Mina*)
     ; receiver_is_new = false
     }
   in
