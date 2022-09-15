@@ -399,6 +399,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let ( - ) = sub
 
+    let nanomina i = if Int.(i >= 0) then Some (of_int i) else None
+
+    let centimina i = Option.(nanomina i >>= Fn.flip scale 10_000_000)
+
+    let mina i = Option.(nanomina i >>= Fn.flip scale 1_000_000_000)
+
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
     let to_input (t : t) =
