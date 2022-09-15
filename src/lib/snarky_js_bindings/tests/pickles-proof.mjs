@@ -43,7 +43,7 @@ async function picklesProof() {
   console.log("verify...");
   let ok = await verify(publicInput, proof);
 
-  console.log("ok?", ok === 1);
+  console.log("ok?", ok === 1 || ok === true);
   if (!ok) throw Error(`${name} failed`);
 }
 
@@ -73,7 +73,8 @@ function createDummyRule(name, func, witnessTypes) {
     let { witnesses } = mainContext;
     witnesses = witnessTypes.map(
       witnesses
-        ? (type, i) => Circuit.witness(type, () => witnesses[i])
+        ? (type, i) =>
+            type.fromFields(Circuit._witness(type, () => witnesses[i]))
         : emptyWitness
     );
     func(...witnesses);
@@ -84,8 +85,10 @@ function createDummyRule(name, func, witnessTypes) {
 }
 
 function emptyWitness(typ) {
-  return Circuit.witness(typ, () =>
-    typ.fromFields(Array(typ.sizeInFields()).fill(Field.zero))
+  return typ.fromFields(
+    Circuit._witness(typ, () =>
+      typ.fromFields(Array(typ.sizeInFields()).fill(Field.zero))
+    )
   );
 }
 
