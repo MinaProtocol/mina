@@ -22,6 +22,19 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      initContainers:
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       containers:
       - name: mina
         resources:
@@ -46,6 +59,7 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
@@ -82,6 +96,8 @@ spec:
           value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
           value: {{$.Values.workSelectionAlgorithm | quote }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -100,13 +116,19 @@ spec:
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-      {{- if $.Values.mina.runtimeConfig }}
         volumeMounts:
+        {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
+        {{- end }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
       volumes:
+      {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
           name: {{$.Values.coordinatorName }}-daemon-config
       {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}

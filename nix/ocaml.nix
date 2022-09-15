@@ -221,6 +221,8 @@ let
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_PASS = "naughty blue worm";
+          MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
         };
         extraInputs = [ pkgs.ephemeralpg ];

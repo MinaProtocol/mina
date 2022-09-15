@@ -44,7 +44,7 @@
    user_command_input
    participating_state
    sgn
-   parties_builder
+   zkapp_command_builder
    network_pool
  )
  (instrumentation (backend bisect_ppx))
