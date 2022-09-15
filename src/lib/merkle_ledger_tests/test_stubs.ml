@@ -202,7 +202,15 @@ module Base_inputs = struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
-  module Balance = Balance
+
+  module Balance = struct
+    include Balance
+
+    let of_int = nanomina_unsafe
+
+    let to_int = int_of_nanomina
+  end
+
   module Account = Account
   module Hash = Hash
 end

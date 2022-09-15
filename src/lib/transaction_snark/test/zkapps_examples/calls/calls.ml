@@ -280,7 +280,14 @@ let%test_module "Composability test" =
           let account =
             Account.create account_id
               Currency.Balance.(
+<<<<<<< HEAD
                 Option.value_exn (add_amount zero (Currency.Amount.nanomina_unsafe 500)))
+||||||| parent of b41c2fe812 (Fix compilation errors in apps.)
+                Option.value_exn (add_amount zero (Currency.Amount.of_int 500)))
+=======
+                Option.value_exn
+                  (add_amount zero (Currency.Amount.nanomina_unsafe 500)))
+>>>>>>> b41c2fe812 (Fix compilation errors in apps.)
           in
           let _, loc =
             Ledger.get_or_create_account ledger account_id account

@@ -27,11 +27,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-        { initial_minimum_balance = Balance.of_int min_balance
+        { initial_minimum_balance = Balance.nanomina_unsafe min_balance
         ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount = Amount.of_int cliff_amount
+        ; cliff_amount = Amount.nanomina_unsafe cliff_amount
         ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment = Amount.of_int vesting_increment
+        ; vesting_increment = Amount.nanomina_unsafe vesting_increment
         }
     in
     { default with
@@ -230,11 +230,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with account balances.  receiver balance is %d and should \
               be %d, sender balance is %d and should be %d.  and txn_amount is \
               %d"
-             (Currency.Balance.to_int receiver_balance)
-             (Currency.Amount.to_int receiver_expected)
-             (Currency.Balance.to_int sender_balance)
-             (Currency.Amount.to_int sender_expected)
-             (Currency.Amount.to_int amount) )
+             (Currency.Balance.int_of_nanomina receiver_balance)
+             (Currency.Amount.int_of_nanomina receiver_expected)
+             (Currency.Balance.int_of_nanomina sender_balance)
+             (Currency.Amount.int_of_nanomina sender_expected)
+             (Currency.Amount.int_of_nanomina amount) )
     in
     let%bind () =
       section
@@ -331,7 +331,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+        (let amount = Currency.Amount.mina_unsafe 1_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
@@ -371,7 +371,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
-        (let amount = Currency.Amount.of_int 25_000_000_000_000 in
+        (let amount = Currency.Amount.mina_unsafe 25_000 in
          let receiver = untimed_node_b in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in

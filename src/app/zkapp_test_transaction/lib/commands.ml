@@ -122,9 +122,9 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let spec =
     { Mina_transaction_logic.For_tests.Transaction_spec.sender =
         (keypair, Account.Nonce.zero)
-    ; fee = Currency.Fee.of_int 10000000000 (*1 Mina*)
+    ; fee = Currency.Fee.mina_unsafe 10
     ; receiver
-    ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
+    ; amount = Currency.Amount.mina_unsafe 10 (*10 Mina*)
     ; receiver_is_new = false
     }
   in

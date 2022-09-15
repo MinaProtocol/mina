@@ -514,7 +514,7 @@ module Make (Test : Test_intf) = struct
         let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let total =
           List.fold balances ~init:0 ~f:(fun accum balance ->
-              Balance.to_int balance + accum )
+              Balance.int_of_nanomina balance + accum )
         in
         let parent_accounts, mask_accounts =
           List.split_n accounts num_accounts_parent
@@ -529,7 +529,7 @@ module Make (Test : Test_intf) = struct
         let retrieved_total =
           Mask.Attached.foldi attached_mask ~init:0
             ~f:(fun _addr total account ->
-              Balance.to_int (Account.balance account) + total )
+              Balance.int_of_nanomina (Account.balance account) + total )
         in
         assert (Int.equal retrieved_total total) )
 
@@ -540,7 +540,7 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+          List.init num_accounts ~f:(fun n -> Balance.nanomina_unsafe (n + 1))
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -580,7 +580,7 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+          List.init num_accounts ~f:(fun n -> Balance.nanomina_unsafe (n + 1))
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -589,7 +589,7 @@ module Make (Test : Test_intf) = struct
         List.iter parent_accounts ~f:(fun account ->
             ignore @@ parent_create_new_account_exn maskable account ) ;
         let balance_summer _addr accum acct =
-          accum + Balance.to_int (Account.balance acct)
+          accum + Balance.int_of_nanomina (Account.balance acct)
         in
         let parent_sum = Maskable.foldi maskable ~init:0 ~f:balance_summer in
         (* non-zero sum of parent account balances *)
@@ -720,12 +720,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let k = Account_id.gen_accounts 1 |> List.hd_exn in
-        let acct1 = Account.create k (Balance.of_int 10) in
+        let acct1 = Account.create k (Balance.nanomina_unsafe 10) in
         let loc =
           Mask.Attached.get_or_create_account attached_mask k acct1
           |> Or_error.ok_exn |> snd
         in
-        let acct2 = Account.create k (Balance.of_int 5) in
+        let acct2 = Account.create k (Balance.nanomina_unsafe 5) in
         Maskable.set maskable loc acct2 ;
         [%test_result: Account.t] ~message:"account in mask should be unchanged"
           ~expect:acct1

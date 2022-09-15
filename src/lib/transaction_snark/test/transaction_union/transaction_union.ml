@@ -245,7 +245,15 @@ let%test_module "Transaction union tests" =
                     let uc =
                       U.Wallet.user_command ~fee_payer:sender
                         ~receiver_pk:(Account.public_key receiver.account)
+<<<<<<< HEAD
                         amount (Fee.nanomina_unsafe txn_fee) nonce memo
+||||||| parent of b41c2fe812 (Fix compilation errors in apps.)
+                        amount (Fee.nanomina txn_fee) nonce memo
+=======
+                        amount
+                        (Fee.nanomina_unsafe txn_fee)
+                        nonce memo
+>>>>>>> b41c2fe812 (Fix compilation errors in apps.)
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
@@ -577,7 +585,15 @@ let%test_module "Transaction union tests" =
         ~carryforward1:false ~carryforward2:false
 
     let create_account pk token balance =
+<<<<<<< HEAD
       Account.create (Account_id.create pk token) (Balance.nanomina_unsafe balance)
+||||||| parent of b41c2fe812 (Fix compilation errors in apps.)
+      Account.create (Account_id.create pk token) (Balance.nanomina balance)
+=======
+      Account.create
+        (Account_id.create pk token)
+        (Balance.nanomina_unsafe balance)
+>>>>>>> b41c2fe812 (Fix compilation errors in apps.)
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
         ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
@@ -883,7 +899,7 @@ let%test_module "Transaction union tests" =
                  ; create_account receiver_pk token_id 30_000_000_000
                 |]
               in
-              let fee = Fee.mina @@ random_int_incl 2 15 in
+              let fee = Fee.mina_unsafe @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
@@ -948,7 +964,9 @@ let%test_module "Transaction union tests" =
                   ~f:(fun (nonce, txns) receiver ->
                     let uc =
                       U.Wallet.user_command_with_wallet wallets ~sender:0
-                        ~receiver amount (Fee.nanomina txn_fee) nonce memo
+                        ~receiver amount
+                        (Fee.nanomina_unsafe txn_fee)
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
@@ -1874,12 +1892,12 @@ let%test_module "Transaction union tests" =
           let ft1, ft2 =
             let single1 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.nanomina fee)
+                ~fee:(Currency.Fee.nanomina_unsafe fee)
                 ~fee_token:Token_id.default
             in
             let single2 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(1)
-                ~fee:(Currency.Fee.nanomina fee)
+                ~fee:(Currency.Fee.nanomina_unsafe fee)
                 ~fee_token:Token_id.default
             in
             ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
@@ -1888,7 +1906,7 @@ let%test_module "Transaction union tests" =
           let coinbase_with_ft, coinbase_wo_ft =
             let ft =
               Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.nanomina fee)
+                ~fee:(Currency.Fee.nanomina_unsafe fee)
             in
             ( Coinbase.create
                 ~amount:(Currency.Amount.mina_unsafe 10)

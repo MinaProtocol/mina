@@ -501,7 +501,15 @@ let%test_module "test functor on in memory databases" =
                 ~f:(fun total account ->
                   let current_balance = Account.balance account in
                   let current_account_id = Account.identifier account in
+<<<<<<< HEAD
                   let new_total = Balance.int_of_nanomina current_balance + total in
+||||||| parent of b41c2fe812 (Fix compilation errors in apps.)
+                  let new_total = Balance.to_int current_balance + total in
+=======
+                  let new_total =
+                    Balance.int_of_nanomina current_balance + total
+                  in
+>>>>>>> b41c2fe812 (Fix compilation errors in apps.)
                   if Account_id.equal current_account_id last_account_id then
                     Stop new_total
                   else Continue new_total )
