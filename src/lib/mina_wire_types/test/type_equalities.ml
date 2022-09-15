@@ -230,6 +230,14 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
   include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
+  include
+    Assert_equal0V1
+      (O.Pending_coinbase.State_stack.Stable)
+      (W.Pending_coinbase.State_stack)
+  include
+    Assert_equal0V1
+      (O.Pending_coinbase.Stack_versioned.Stable)
+      (W.Pending_coinbase.Stack_versioned)
 end
 
 module One_or_two = struct
