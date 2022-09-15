@@ -124,8 +124,6 @@ let
           installPhase = ''
               mkdir -p $out/coverage
               find coverage_output -name "*.coverage" | xargs -i -t cp {} $out/coverage
-              cp times $out/times
-              cp output_stderr $out/output_stderr
           '';
         };
         # git is used in src/lib/crypto/kimchi_backend/common/gen_version.sh
@@ -135,19 +133,11 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        LIBRARIES_TO_TEST="${pkgs.lib.strings.concatStringsSep "\n" libraries_to_test}"
+        LIBRARIES_TO_TEST="${pkgs.lib.strings.concatStringsSep " " (map (lib: "@@"+lib+"/runtest") libraries_to_test)}"
 
         mkdir coverage_output
         export BISECT_FILE=$(pwd)/coverage_output/bisect
-
-        while IFS= read -r line; do
-            start=`date +%s`
-            echo "starting $line" >> output_stderr
-            dune build @@$line/runtest --instrument-with bisect_ppx --display=quiet 2>> output_stderr && status=success || status=failure
-            end=`date +%s`
-            runtime=$((end-start))
-            echo "$line $runtime $status" >> times
-        done <<< "$LIBRARIES_TO_TEST"
+        dune build $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
       '';
 
     in {
@@ -324,10 +314,7 @@ let
           outputs = [ "out" ];
           installPhase = ''
               mkdir -p $out/coverage
-              # find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
               find coverage_output -name "*.coverage" | xargs -i -t cp {} $out/coverage
-              cp times $out/times
-              cp output_stderr $out/output_stderr
           '';
         };
 
@@ -353,20 +340,14 @@ let
           sed 's#/dune$##' |
           grep -v 'mina_net2' |
           grep -v 'crypto/proof-systems/ocaml/tests/src' |
-          grep -v 'crypto/kimchi_backend'
+          grep -v 'crypto/kimchi_backend' |
+          awk '{print "@@"$1"/runtest"}' |
+          tr '\n' ' '
         )
 
         mkdir coverage_output
         export BISECT_FILE=$(pwd)/coverage_output/bisect
-
-        while IFS= read -r line; do
-            start=`date +%s`
-            echo "starting $line" >> output_stderr
-            dune build @@$line/runtest --instrument-with bisect_ppx --display=quiet 2>> output_stderr && status=success || status=failure
-            end=`date +%s`
-            runtime=$((end-start))
-            echo "$line $runtime $status" >> times
-        done <<< "$LIBRARIES_TO_TEST"
+        dune build $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
       '';
 
       mina_tests_zkapp_test_transaction = runMinaCheck {
