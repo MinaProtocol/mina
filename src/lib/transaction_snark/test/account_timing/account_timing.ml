@@ -829,6 +829,220 @@ let%test_module "account timing check" =
                            describe Source_insufficient_balance) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
+    let%test_module "test user commands on timed accounts" =
+      ( module struct
+        (* This represents the initial conditions of a test
+           scenario. Defines the account's timing and the transaction
+           details. This is generally randomised by Quickcheck, but
+           there are also a couple of fixed cases.
+
+           Check out how available_funds are computed in order to learn
+           the mechanics of a timed account. *)
+        type t =
+          { balance : Currency.Balance.t
+          ; init_min_bal : Currency.Balance.t
+          ; cliff_time : Mina_numbers.Global_slot.t
+          ; cliff_amt : Currency.Amount.t
+          ; vest_period : Mina_numbers.Global_slot.t
+          ; vest_incr : Currency.Amount.t
+          ; slot : Mina_numbers.Global_slot.t
+          ; available_funds : Currency.Amount.t
+          ; cmd : Signed_command.t
+          }
+        [@@deriving sexp]
+
+        let gen ?balance ?init_min_bal ?cliff_time ?cliff_amt ?vest_period
+            ?vest_incr ?slot ?amount () : t Quickcheck.Generator.t =
+          let open Mina_numbers in
+          let open Currency in
+          let open Quickcheck.Generator.Let_syntax in
+          let unless_fixed (type a) ?(fixed : a option)
+              (gen : a Quickcheck.Generator.t) =
+            match fixed with Some value -> return value | None -> gen
+          in
+          let%bind balance =
+            unless_fixed ?fixed:balance
+              Balance.(gen_incl (mina_unsafe 1_000) (mina_unsafe 50_000))
+          in
+          let%bind init_min_bal =
+            unless_fixed ?fixed:init_min_bal
+              Balance.(gen_incl (mina_unsafe 1_000) balance)
+          in
+          let init_min_amt = Currency.Balance.to_amount init_min_bal in
+          let%bind cliff_time =
+            unless_fixed ?fixed:cliff_time
+              Global_slot.(gen_incl (of_int 100) (of_int 1_000))
+          in
+          let%bind cliff_amt =
+            unless_fixed ?fixed:cliff_amt Amount.(gen_incl zero init_min_amt)
+          in
+          let%bind vest_period =
+            unless_fixed ?fixed:vest_period
+              Global_slot.(gen_incl (of_int 1) (of_int 20))
+          in
+          let to_vest =
+            Amount.(
+              Option.value ~default:zero @@ (init_min_amt - cliff_amt)
+              |> int_of_nanomina)
+          in
+          (* A numeric trick to get the division result rounded up instead of down. *)
+          let div_rnd_up num denom = (num + denom - 1) / denom in
+          let%bind vest_incr =
+            unless_fixed ?fixed:vest_incr
+              Amount.(
+                gen_incl
+                  (nanomina_unsafe @@ div_rnd_up to_vest 100)
+                  (nanomina_unsafe @@ div_rnd_up to_vest 10))
+          in
+          let vest_time =
+            Global_slot.to_int vest_period
+            * (to_vest / Amount.int_of_nanomina vest_incr)
+          in
+          let%bind slot =
+            unless_fixed ?fixed:slot
+              Global_slot.(
+                gen_incl
+                  (of_int @@ Int.max 0 (to_int cliff_time - vest_time))
+                  (of_int @@ (to_int cliff_time + (2 * vest_time))))
+          in
+          let available_funds =
+            let open Currency in
+            let slot_int = Mina_numbers.Global_slot.to_int slot in
+            let cliff_int = Mina_numbers.Global_slot.to_int cliff_time in
+            let vested_cliff_amt =
+              if slot_int < cliff_int then Amount.zero else cliff_amt
+            in
+            let vested =
+              max 0 (slot_int - cliff_int)
+              / Mina_numbers.Global_slot.to_int vest_period
+              |> Amount.scale vest_incr
+              |> Option.value ~default:Amount.max_int
+            in
+            let total =
+              let open Option.Let_syntax in
+              let open Amount in
+              let%bind init = Balance.to_amount balance - init_min_amt in
+              let%bind with_cliff = init + vested_cliff_amt in
+              with_cliff + vested
+            in
+            Amount.min
+              (Balance.to_amount balance)
+              (Option.value ~default:Amount.zero total)
+          in
+          let min_amount, max_amount =
+            match amount with
+            | None ->
+                Amount.
+                  ( available_funds - mina_unsafe 100
+                    |> Option.value ~default:zero |> int_of_nanomina
+                  , available_funds + mina_unsafe 100
+                    |> Option.value ~default:zero |> int_of_nanomina )
+            | Some a ->
+                let i = Amount.int_of_nanomina a in
+                (i, i)
+          in
+          let%bind cmd =
+            Signed_command.Gen.payment ~sign_type:`Real
+              ~key_gen:(return @@ List.hd_exn keypairss)
+              ~min_amount ~max_amount ~fee_range:0 ()
+          in
+          return
+            { balance
+            ; init_min_bal
+            ; cliff_time
+            ; cliff_amt
+            ; vest_period
+            ; vest_incr
+            ; slot
+            ; available_funds
+            ; cmd
+            }
+
+        (* Examine the initial conditions in order to determine
+           whether we should expect the transaction to succeed or
+           fail. Note that we first check that the fee alone can be
+           spent and only then we check the amount + fee. This is
+           because apparently the fee gets spent first and can fail
+           independently from the main transaction amount (which
+           results in a different error message). *)
+        let expected_failure { available_funds; balance; cmd; _ } =
+          let open Currency.Amount in
+          let amount =
+            Option.value ~default:zero @@ Signed_command.amount cmd
+          in
+          let fee =
+            Currency.Fee.to_uint64 Mina_compile_config.minimum_user_command_fee
+            |> of_uint64
+          in
+          let total = Option.value ~default:max_int (amount + fee) in
+          let bal = Balance.to_amount balance in
+          if fee > bal || total > bal then
+            Some Transaction_status.Failure.Source_insufficient_balance
+          else if fee > available_funds || total > available_funds then
+            Some Transaction_status.Failure.Source_minimum_balance_violation
+          else None
+
+        (* A dirty hack to unify different errors being thrown from different
+           locations in the codebase. *)
+        let extract_error_message e =
+          try
+            Mina_transaction_logic.timing_error_to_user_command_status e
+            |> Transaction_status.Failure.describe
+          with _ -> Error.to_string_hum e
+
+        (* Execute a transaction based on initial conditions given by input.
+           Check transaction status and compare to the expectation. *)
+        let execute_test (input : t) =
+          let nonce = Mina_numbers.Account_nonce.zero in
+          let ledger_init_state =
+            List.map keypairs ~f:(fun keypair ->
+                let (timing : Account_timing.t) =
+                  Timed
+                    { initial_minimum_balance = input.init_min_bal
+                    ; cliff_time = input.cliff_time
+                    ; cliff_amount = input.cliff_amt
+                    ; vesting_period = input.vest_period
+                    ; vesting_increment = input.vest_incr
+                    }
+                in
+                ( keypair
+                , Currency.Balance.to_amount input.balance
+                , nonce
+                , timing ) )
+            |> Array.of_list
+          in
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let validated_uc = validate_user_command input.cmd in
+              (* slot well past cliff *)
+              match
+                ( expected_failure input
+                , Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                    ~txn_global_slot:input.slot ledger validated_uc )
+              with
+              | None, Ok _txn_applied ->
+                  ()
+              | Some _, Ok _txn_applied ->
+                  failwith
+                    "Transaction succeeded where it was expected to fail."
+              | expected, Error err ->
+                  let err_str = extract_error_message err in
+                  let expected_err_str =
+                    Option.value_map ~default:""
+                      ~f:Transaction_status.Failure.describe expected
+                  in
+                  if not (String.equal err_str expected_err_str) then
+                    failwithf
+                      "Unexpected transaction error: %s.\nExpected error: %s"
+                      err_str expected_err_str () )
+
+        let%test_unit "generic user transaction" =
+          Quickcheck.test ~seed:(`Deterministic "generic, timed account")
+            ~sexp_of:sexp_of_t ~trials:1000 (gen ()) ~f:execute_test
+      end )
+
     (* zkApps with timings *)
     let apply_zkapp_commands_at_slot ledger slot
         (zkapp_commands : Zkapp_command.t list) =

@@ -8,6 +8,7 @@
    async_unix
    core
    base
+   base.caml
    core_kernel
    sexplib0
    yojson
