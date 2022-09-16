@@ -1,0 +1,44 @@
+(library
+ (name sequence_events)
+ (libraries
+   ;; opam libraries
+   async
+   async_kernel
+   async_unix
+   core
+   core_kernel
+   ppx_inline_test.config
+   ;; local libraries
+   cache_dir
+   consensus
+   currency
+   data_hash_lib
+   genesis_constants
+   kimchi_backend
+   kimchi_pasta
+   merkle_ledger
+   merkle_list_verifier
+   mina_base
+   mina_base.import
+   mina_ledger
+   mina_numbers
+   mina_state
+   pickles
+   pickles.backend
+   pickles_types
+   random_oracle_input
+   random_oracle
+   signature_lib
+   snark_params
+   transaction_protocol_state
+   transaction_snark
+   transaction_snark_tests
+   with_hash
+   zkapps_sequence_events
+   zkapps_examples
+   yojson
+   )
+  (inline_tests)
+  (preprocess
+    (pps ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))

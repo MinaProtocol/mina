@@ -4,6 +4,7 @@
  (libraries
    ;; opam libraries
    async_kernel
+   base
    core_kernel
    core
    async
@@ -46,8 +47,10 @@
    mina_ledger
    kimchi_backend.pasta
    pickles
+   protocol_version
    random_oracle
    transition_frontier_base
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare)))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_custom_printf ppx_compare)))

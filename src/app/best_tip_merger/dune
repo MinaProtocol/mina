@@ -34,7 +34,7 @@
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-    ppx_coda
+    ppx_mina
     ppx_deriving.show
     ppx_deriving_yojson
     ppx_jane

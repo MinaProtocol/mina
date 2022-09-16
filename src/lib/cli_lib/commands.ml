@@ -148,7 +148,7 @@ module Vrf = struct
         "Generate a vrf evaluation witness. This may be used to calculate \
          whether a given private key will win a given slot (by checking \
          threshold_met = true in the JSON output), or to generate a witness \
-         that a 3rd party can use to verify a vrf evaluation."
+         that a 3rd account_update can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =

@@ -1,3 +1,4 @@
+# A set defining OCaml parts&dependencies of Mina
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
@@ -14,7 +15,7 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam ../src/opam.export;
+  export = opam-nix.importOpam ../opam.export;
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
@@ -88,6 +89,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -123,6 +129,7 @@ let
         nativeBuildInputs = [
           self.dune
           self.ocamlfind
+          self.odoc
           lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
@@ -137,6 +144,7 @@ let
         # and copy it from within a dune rule
         # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        DISABLE_CHECK_OPAM_SWITCH = "true";
 
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
@@ -161,13 +169,14 @@ let
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
             -j$NIX_BUILD_CORES
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          dune build @doc || true
         '';
 
         outputs =
           [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
+          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
           mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
           mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
@@ -179,6 +188,7 @@ let
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           #mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          mv _build/default/_doc/_html $out/share/doc/html
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
@@ -211,6 +221,8 @@ let
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_PASS = "naughty blue worm";
+          MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
         };
         extraInputs = [ pkgs.ephemeralpg ];

@@ -1,20 +1,22 @@
+module Scalars = Graphql_lib.Scalars
+
 module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
     genesisBlock {
       creatorAccount {
-        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+        publicKey @ppxCustom(module: "Scalars.String_json")
       }
       winnerAccount {
-        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+        publicKey @ppxCustom(module: "Scalars.String_json")
       }
       protocolState {
         blockchainState {
-          date
+          date @ppxCustom(module: "Scalars.String_json")
         }
       }
-      stateHash
+      stateHash @ppxCustom(module: "Scalars.String_json")
     }
     daemonStatus {
       chainId
