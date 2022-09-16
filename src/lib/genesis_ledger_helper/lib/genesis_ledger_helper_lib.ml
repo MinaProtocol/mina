@@ -630,7 +630,7 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
                   .zkapp_signed_single_update_cost
           ; zkapp_signed_pair_update_cost =
               Some
-                precomputed_values.genesis_constant
+                precomputed_values.genesis_constants
                   .zkapp_signed_pair_update_cost
           ; zkapp_transaction_cost_limit =
               Some
