@@ -255,3 +255,9 @@ module Mina_transaction = struct
   include Assert_equal0V2 (O.Stable) (W)
   include Assert_equal0V2 (O.Valid.Stable) (W.Valid)
 end
+
+module Mina_state = struct
+  module O = Mina_state
+  module W = WT.Mina_state
+  include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
+end
