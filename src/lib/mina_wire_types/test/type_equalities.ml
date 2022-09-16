@@ -102,6 +102,7 @@ module Mina_numbers = struct
   include Assert_equal0V1 (O.Account_nonce.Stable) (W.Account_nonce)
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
   include Assert_equal0V1 (O.Length.Stable) (W.Length)
+  include Assert_equal0V1 (O.Index.Stable) (W.Index)
 end
 
 module Pickles_base = struct
