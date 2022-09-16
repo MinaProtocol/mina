@@ -1587,71 +1587,409 @@ let dummy =
   ; memo = Signed_command_memo.empty
   }
 
+module Make_update_group (Input : sig
+  type global_state
+
+  type local_state
+
+  type spec
+
+  val zkapp_segment_of_controls : Control.t list -> spec
+end) : sig
+  module Zkapp_command_intermediate_state : sig
+    type state = { global : Input.global_state; local : Input.local_state }
+
+    type t =
+      { kind : [ `Same | `New | `Two_new ]
+      ; spec : Input.spec
+      ; state_before : state
+      ; state_after : state
+      }
+  end
+
+  val group_by_zkapp_command_rev :
+       Account_update.t list list
+    -> (Input.global_state * Input.local_state) list list
+    -> Zkapp_command_intermediate_state.t list
+end = struct
+  open Input
+
+  module Zkapp_command_intermediate_state = struct
+    type state = { global : global_state; local : local_state }
+
+    type t =
+      { kind : [ `Same | `New | `Two_new ]
+      ; spec : spec
+      ; state_before : state
+      ; state_after : state
+      }
+  end
+
+  (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
+    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+    number of snark proofs needed to prove all of the zkapp_command.
+
+    This function is intended to take the zkapp_command from multiple transactions as
+    its input, which may be converted from a [Zkapp_command.t list] using
+    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
+    the same length, with 1 more state than the number of zkapp_command for each
+    transaction.
+
+    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
+    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
+    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
+    where [s0] is the initial state before any of the transactions have been
+    applied.
+
+    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
+    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
+    will need to be passed as part of the snark witness while applying that
+    pair.
+*)
+  let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
+      (stmtss : (global_state * local_state) list list) :
+      Zkapp_command_intermediate_state.t list =
+    let intermediate_state ~kind ~spec ~before ~after =
+      { Zkapp_command_intermediate_state.kind
+      ; spec
+      ; state_before = { global = fst before; local = snd before }
+      ; state_after = { global = fst after; local = snd after }
+      }
+    in
+    let rec group_by_zkapp_command_rev
+        (zkapp_commands : Account_update.t list list) stmtss acc =
+      match (zkapp_commands, stmtss) with
+      | ([] | [ [] ]), [ _ ] ->
+          (* We've associated statements with all given zkapp_command. *)
+          acc
+      | [ [ { authorization = a1; _ } ] ], [ [ before; after ] ] ->
+          (* There are no later zkapp_command to pair this one with. Prove it on its
+             own.
+          *)
+          intermediate_state ~kind:`Same
+            ~spec:(zkapp_segment_of_controls [ a1 ])
+            ~before ~after
+          :: acc
+      | [ []; [ { authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ] ->
+          (* This account_update is part of a new transaction, and there are no later
+             zkapp_command to pair it with. Prove it on its own.
+          *)
+          intermediate_state ~kind:`New
+            ~spec:(zkapp_segment_of_controls [ a1 ])
+            ~before ~after
+          :: acc
+      | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command)
+          :: zkapp_commands
+        , (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: ({ authorization = Proof _ as a1; _ } :: zkapp_command)
+             :: zkapp_commands
+        , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* This account_update is part of a new transaction, and contains a proof, don't
+             pair it with other zkapp_command.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( ({ authorization = a1; _ }
+          :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+          :: zkapp_commands
+        , (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next account_update contains a proof, don't pair it with this account_update. *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( ({ authorization = a1; _ } :: ([] as zkapp_command))
+          :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+        , (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next account_update is in the next transaction and contains a proof,
+             don't pair it with this account_update.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( ({ authorization = (Signature _ | None_given) as a1; _ }
+          :: { authorization = (Signature _ | None_given) as a2; _ }
+             :: zkapp_command )
+          :: zkapp_commands
+        , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next two zkapp_command do not contain proofs, and are within the same
+             transaction. Pair them.
+             Ok to get "use_full_commitment" of [a1] because neither of them
+             contain a proof.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1; a2 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: ({ authorization = a1; _ }
+             :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+             :: zkapp_commands
+        , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* This account_update is in the next transaction, and the next account_update contains a
+             proof, don't pair it with this account_update.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: ({ authorization = (Signature _ | None_given) as a1; _ }
+             :: { authorization = (Signature _ | None_given) as a2; _ }
+                :: zkapp_command )
+             :: zkapp_commands
+        , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next two zkapp_command do not contain proofs, and are within the same
+             new transaction. Pair them.
+             Ok to get "use_full_commitment" of [a1] because neither of them
+             contain a proof.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1; a2 ])
+                ~before ~after
+            :: acc )
+      | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
+          :: ({ authorization = (Signature _ | None_given) as a2; _ }
+             :: zkapp_command )
+             :: zkapp_commands
+        , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
+        ->
+          (* The next two zkapp_command do not contain proofs, and the second is within
+             a new transaction. Pair them.
+             Ok to get "use_full_commitment" of [a1] because neither of them
+             contain a proof.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1; a2 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: ({ authorization = a1; _ } :: zkapp_command)
+             :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+        , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
+          (* The next transaction contains a proof, and this account_update is in a new
+             transaction, don't pair it with the next account_update.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
+             :: ({ authorization = (Signature _ | None_given) as a2; _ }
+                :: zkapp_command )
+                :: zkapp_commands
+        , [ _ ]
+          :: [ before; _after1 ]
+             :: (_before2 :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next two zkapp_command do not contain proofs, the first is within a
+             new transaction, and the second is within another new transaction.
+             Pair them.
+             Ok to get "use_full_commitment" of [a1] because neither of them
+             contain a proof.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Two_new
+                ~spec:(zkapp_segment_of_controls [ a1; a2 ])
+                ~before ~after
+            :: acc )
+      | [ [ { authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
+          (* This account_update is the final account_update given. Prove it on its own. *)
+          intermediate_state ~kind:`Same
+            ~spec:(zkapp_segment_of_controls [ a1 ])
+            ~before ~after
+          :: acc
+      | ( [] :: [ { authorization = a1; _ } ] :: [] :: _
+        , [ _ ] :: (before :: after :: _) :: _ ) ->
+          (* This account_update is the final account_update given, in a new transaction. Prove it
+             on its own.
+          *)
+          intermediate_state ~kind:`New
+            ~spec:(zkapp_segment_of_controls [ a1 ])
+            ~before ~after
+          :: acc
+      | _, [] ->
+          failwith "group_by_zkapp_command_rev: No statements remaining"
+      | ([] | [ [] ]), _ ->
+          failwith "group_by_zkapp_command_rev: Unmatched statements remaining"
+      | [] :: _, [] :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: No final statement for current \
+             transaction"
+      | [] :: _, (_ :: _ :: _) :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Unmatched statements for current \
+             transaction"
+      | [] :: [ _ ] :: _, [ _ ] :: (_ :: _ :: _ :: _) :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Unmatched statements for next \
+             transaction"
+      | [ []; [ _ ] ], [ _ ] :: [ _; _ ] :: _ :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Unmatched statements after next \
+             transaction"
+      | (_ :: _) :: _, ([] | [ _ ]) :: _ | (_ :: _ :: _) :: _, [ _; _ ] :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Too few statements remaining for the \
+             current transaction"
+      | ([] | [ _ ]) :: [] :: _, _ ->
+          failwith
+            "group_by_zkapp_command_rev: The next transaction has no \
+             zkapp_command"
+      | [] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _
+      | [] :: (_ :: _ :: _) :: _, _ :: [ _; _ ] :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Too few statements remaining for the \
+             next transaction"
+      | [ _ ] :: (_ :: _) :: _, _ :: ([] | [ _ ]) :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Too few statements remaining for the \
+             next transaction"
+      | [] :: [ _ ] :: (_ :: _) :: _, _ :: _ :: ([] | [ _ ]) :: _ ->
+          failwith
+            "group_by_zkapp_command_rev: Too few statements remaining for the \
+             transaction after next"
+      | ([] | [ _ ]) :: (_ :: _) :: _, [ _ ] ->
+          failwith
+            "group_by_zkapp_command_rev: No statements given for the next \
+             transaction"
+      | [] :: [ _ ] :: (_ :: _) :: _, [ _; _ :: _ :: _ ] ->
+          failwith
+            "group_by_zkapp_command_rev: No statements given for transaction \
+             after next"
+    in
+    group_by_zkapp_command_rev zkapp_commands stmtss []
+end
+
+(*Transaction_snark.Zkapp_command_segment.Basic.t*)
+type possible_segments = Proved | Signed_single | Signed_pair
+
+module Update_group = Make_update_group (struct
+  type local_state = unit
+
+  type global_state = unit
+
+  type spec = possible_segments
+
+  let zkapp_segment_of_controls controls : spec =
+    match controls with
+    | [ Control.Proof _ ] ->
+        Proved
+    | [ (Control.Signature _ | Control.None_given) ] ->
+        Signed_single
+    | [ Control.(Signature _ | None_given); Control.(Signature _ | None_given) ]
+      ->
+        Signed_pair
+    | _ ->
+        failwith "zkapp_segment_of_controls: Unsupported combination"
+end)
+
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
    - in incoming blocks
 *)
-let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
+let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
+    unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let ( num_proof_updates
-      , num_updates
-      , num_event_elements
-      , num_sequence_event_elements ) =
-    Call_forest.fold t.account_updates ~init:(0, 0, 0, 0)
-      ~f:(fun
-           (num_proof_zkapp_command, num_zkapp_command, evs_size, seq_evs_size)
-           account_update
-         ->
-        let num_proof_zkapp_command' =
-          if Control.(Tag.equal (tag account_update.authorization) Tag.Proof)
-          then num_proof_zkapp_command + 1
-          else num_proof_zkapp_command
-        in
+  let all_updates, num_event_elements, num_sequence_event_elements =
+    Call_forest.fold t.account_updates
+      ~init:([ Account_update.of_fee_payer (fee_payer_account_update t) ], 0, 0)
+      ~f:(fun (acc, num_event_elements, num_sequence_event_elements)
+              (account_update : Account_update.t) ->
         let account_update_evs_elements =
           events_elements account_update.body.events
         in
         let account_update_seq_evs_elements =
           events_elements account_update.body.sequence_events
         in
-        ( num_proof_zkapp_command'
-        , num_zkapp_command + 1
-        , evs_size + account_update_evs_elements
-        , seq_evs_size + account_update_seq_evs_elements ) )
+        ( account_update :: acc
+        , num_event_elements + account_update_evs_elements
+        , num_sequence_event_elements + account_update_seq_evs_elements ) )
+    |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
-  let max_proof_zkapp_command = genesis_constants.max_proof_zkapp_command in
-  let max_zkapp_command = genesis_constants.max_zkapp_command in
+  let groups =
+    Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
+      ([ ((), ()) ] :: [ List.map all_updates ~f:(fun _ -> ((), ())) ])
+  in
+  let proof_segments, signed_singles, signed_pairs =
+    List.fold ~init:(0, 0, 0) groups
+      ~f:(fun (proof_segments, signed_singles, signed_pairs) { spec; _ } ->
+        match spec with
+        | Proved ->
+            (proof_segments + 1, signed_singles, signed_pairs)
+        | Signed_single ->
+            (proof_segments, signed_singles + 1, signed_pairs)
+        | Signed_pair ->
+            (proof_segments, signed_singles, signed_pairs + 1) )
+  in
+  let proof_cost = 10.26 in
+  let signed_pair_cost = 10.08 in
+  let signed_single_cost = 9.14 in
+  let cost_limit = 69.45 in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_sequence_event_elements =
     genesis_constants.max_sequence_event_elements
   in
-  let valid_proof_zkapp_command =
-    num_proof_updates <= max_proof_zkapp_command
+  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
+  let zkapp_cost_within_limit =
+    Float.(
+      (proof_cost * of_int proof_segments)
+      + (signed_pair_cost * of_int signed_pairs)
+      + (signed_single_cost * of_int signed_singles)
+      < cost_limit)
   in
-  let valid_zkapp_command = num_updates <= max_zkapp_command in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_sequence_event_elements =
     num_sequence_event_elements <= max_sequence_event_elements
   in
   if
-    valid_proof_zkapp_command && valid_zkapp_command && valid_event_elements
+    zkapp_cost_within_limit && valid_event_elements
     && valid_sequence_event_elements
   then Ok ()
   else
     let proof_zkapp_command_err =
-      if valid_proof_zkapp_command then None
-      else
-        Some
-          (sprintf "too many proof zkapp_command (%d, max allowed is %d)"
-             num_proof_updates max_proof_zkapp_command )
-    in
-    let zkapp_command_err =
-      if valid_zkapp_command then None
-      else
-        Some
-          (sprintf "too many zkapp_command (%d, max allowed is %d)" num_updates
-             max_zkapp_command )
+      if zkapp_cost_within_limit then None
+      else Some (sprintf "zkapp transaction too expensive")
     in
     let events_err =
       if valid_event_elements then None
@@ -1669,11 +2007,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
     in
     let err_msg =
       List.filter
-        [ proof_zkapp_command_err
-        ; zkapp_command_err
-        ; events_err
-        ; sequence_events_err
-        ]
+        [ proof_zkapp_command_err; events_err; sequence_events_err ]
         ~f:Option.is_some
       |> List.map ~f:(fun opt -> Option.value_exn opt)
       |> String.concat ~sep:"; "
