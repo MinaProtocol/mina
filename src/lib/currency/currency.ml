@@ -353,17 +353,28 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let one = Unsigned.one
 
+    (* The number of nanounits in a centiunit. User for unit transformations. *)
+    let centi_to_nano = 10_000_000
+
+    (* The number of nanounits in a unit. User for unit transformations. *)
+    let unit_to_nano = 1_000_000_000
+
+    (* The functions below are unsafe, because they don't guard
+       against overflows or underflows. Still, they're useful when we
+       need to introduce a constant amount of mina that we know for
+       sure will be fine (e.g. in tests). For variables the safe
+       functions defined further below should be used instead. *)
     let nanomina_unsafe = of_int
 
-    let centimina_unsafe i = of_int (10_000_000 * i)
+    let centimina_unsafe i = of_int (centi_to_nano * i)
 
-    let mina_unsafe i = of_int (1_000_000_000 * i)
+    let mina_unsafe i = of_int (unit_to_nano * i)
 
     let int_of_nanomina = to_int
 
-    let int_of_centimina m = to_int m / 10_000_000
+    let int_of_centimina m = to_int m / centi_to_nano
 
-    let int_of_mina m = to_int m / 1_000_000_000
+    let int_of_mina m = to_int m / unit_to_nano
 
     let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
@@ -401,9 +412,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let nanomina i = if Int.(i >= 0) then Some (of_int i) else None
 
-    let centimina i = Option.(nanomina i >>= Fn.flip scale 10_000_000)
+    let centimina i = Option.(nanomina i >>= Fn.flip scale centi_to_nano)
 
-    let mina i = Option.(nanomina i >>= Fn.flip scale 1_000_000_000)
+    let mina i = Option.(nanomina i >>= Fn.flip scale unit_to_nano)
 
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
