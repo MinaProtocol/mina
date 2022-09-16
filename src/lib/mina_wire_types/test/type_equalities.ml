@@ -240,6 +240,14 @@ module Mina_base = struct
       (W.Pending_coinbase.Stack_versioned)
   include Assert_equal2V1 (O.Fee_excess.Poly.Stable) (W.Fee_excess.Poly)
   include Assert_equal0V1 (O.Fee_excess.Stable) (W.Fee_excess)
+  include
+    Assert_equal0V2
+      (O.Transaction_status.Failure.Stable)
+      (W.Transaction_status.Failure)
+  include
+    Assert_equal0V1
+      (O.Transaction_status.Failure.Collection.Stable)
+      (W.Transaction_status.Failure.Collection)
 end
 
 module One_or_two = struct

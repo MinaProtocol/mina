@@ -6,7 +6,7 @@ module Failure = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
