@@ -31,3 +31,4 @@ module User_command = Mina_base_user_command
 module Pending_coinbase = Mina_base_pending_coinbase
 module Fee_excess = Mina_base_fee_excess
 module Transaction_status = Mina_base_transaction_status
+module Call_stack_digest = Mina_base_call_stack_digest
