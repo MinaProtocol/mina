@@ -254,6 +254,7 @@ module Mina_base = struct
       (O.Zkapp_command.Transaction_commitment.Stable)
       (W.Zkapp_command.Transaction_commitment)
   include Assert_equal0V1 (O.Call_stack_digest.Stable) (W.Call_stack_digest)
+  include Assert_equal0V1 (O.Stack_frame.Digest.Stable) (W.Stack_frame.Digest)
 end
 
 module One_or_two = struct
