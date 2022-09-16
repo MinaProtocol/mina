@@ -238,6 +238,8 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Pending_coinbase.Stack_versioned.Stable)
       (W.Pending_coinbase.Stack_versioned)
+  include Assert_equal2V1 (O.Fee_excess.Poly.Stable) (W.Fee_excess.Poly)
+  include Assert_equal0V1 (O.Fee_excess.Stable) (W.Fee_excess)
 end
 
 module One_or_two = struct
