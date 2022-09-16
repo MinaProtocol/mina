@@ -1955,7 +1955,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   in
   let groups =
     Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
-      ([ ((), ()) ] :: [ List.map all_updates ~f:(fun _ -> ((), ())) ])
+      ( [ ((), ()) ]
+      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
   in
   let proof_segments, signed_singles, signed_pairs =
     List.fold ~init:(0, 0, 0) groups
