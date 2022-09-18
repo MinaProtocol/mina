@@ -2999,6 +2999,30 @@ module Ledger = struct
       (Js.to_string account_creation_fee)
       network_state
 
+  let check_account_update_signature (account_update_json : Js.js_string Js.t) (x : field_class Js.t) =
+    let account_update = account_update_of_json account_update_json  in
+    let check_signature s pk msg =
+      match Signature_lib.Public_key.decompress pk with
+      | None ->
+          false
+      | Some pk_ ->
+          if
+            not
+              (Signature_lib.Schnorr.Chunked.verify s
+                 (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+                 (Random_oracle_input.Chunked.field msg) )
+          then
+            false
+          else true
+    in
+    let isValid = match account_update.authorization with
+      | Signature s ->
+          check_signature s account_update.body.public_key (x |> of_js_field |> to_unchecked)
+      | Proof _ | None_given ->
+          false
+      in 
+    Js.bool isValid
+
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key
     |> Signature_lib.Public_key.Compressed.to_string |> Js.string
@@ -3096,6 +3120,8 @@ module Ledger = struct
     static_method "memoToBase58" memo_to_base58 ;
 
     static_method "verificationKeyToBase58" verification_key_to_base58 ;
+
+    static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
     let version_bytes =
       let open Base58_check.Version_bytes in
