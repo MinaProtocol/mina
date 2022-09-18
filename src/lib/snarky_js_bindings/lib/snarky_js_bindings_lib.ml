@@ -2890,6 +2890,9 @@ module Ledger = struct
   let memo_to_base58 (memo : Js.js_string Js.t) : Js.js_string Js.t =
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
+   
+  let verification_key_to_base58 (vr : Pickles.Side_loaded.Verification_key.t) : Js.js_string Js.t =
+    Js.string (Pickles.Side_loaded.Verification_key.to_base58_check vr) 
 
   (* low-level building blocks for encoding *)
   let binary_string_to_base58_check bin_string (version_byte : int) :
@@ -3090,6 +3093,8 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
+
+    static_method "verificationKeyToBase58" verification_key_to_base58 ;
 
     let version_bytes =
       let open Base58_check.Version_bytes in
