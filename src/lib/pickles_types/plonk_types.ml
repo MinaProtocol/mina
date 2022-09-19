@@ -36,7 +36,7 @@ module Opt = struct
     | Maybe (_, x) ->
         x
     | None ->
-        failwith "Opt.value_exn"
+        invalid_arg "Opt.value_exn"
 
   let of_option (t : 'a option) : ('a, 'bool) t =
     match t with None -> None | Some x -> Some x
@@ -54,7 +54,7 @@ module Opt = struct
     | Maybe (b, x) ->
         Maybe (b, f x)
 
-  let map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
+  let _map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
       ~(f : a -> b -> c) =
     match (t1, t2) with
     | None, None ->
@@ -163,6 +163,8 @@ module Opt = struct
   module Early_stop_sequence = struct
     (* A sequence that should be considered to have stopped at
        the first No flag *)
+    (* TODO: The documentation above makes it sound like the type below is too
+       generic: we're not guaranteed to have flags in there *)
     type nonrec ('a, 'bool) t = ('a, 'bool) t list
 
     let fold (type a bool acc res)
@@ -393,8 +395,6 @@ module Evals = struct
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
     }
 
-  let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
-
   (*
       This is in the same order as the evaluations in the opening proof:
      added later:
@@ -575,12 +575,12 @@ module Poly_comm = struct
       end
     end]
 
-    let map { unshifted; shifted } ~f =
+    let _map { unshifted; shifted } ~f =
       { unshifted = Array.map ~f unshifted; shifted = f shifted }
 
     let padded_array_typ0 = padded_array_typ
 
-    let padded_array_typ elt ~length ~dummy ~bool =
+    let _padded_array_typ elt ~length ~dummy ~bool =
       let open Snarky_backendless.Typ in
       array ~length (tuple2 bool elt)
       |> transport
@@ -620,7 +620,7 @@ module Poly_comm = struct
       end
     end]
 
-    let typ g ~length = Snarky_backendless.Typ.array ~length g
+    let _typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -655,13 +655,13 @@ module Messages = struct
       ; runtime = Option.some_if runtime z
       }
 
-    let map { sorted; aggreg; runtime } ~f =
+    let _map { sorted; aggreg; runtime } ~f =
       { sorted = Array.map ~f sorted
       ; aggreg = f aggreg
       ; runtime = Option.map ~f runtime
       }
 
-    let map2 t1 t2 ~f =
+    let _map2 t1 t2 ~f =
       { sorted = Array.map2_exn ~f t1.sorted t2.sorted
       ; aggreg = f t1.aggreg t2.aggreg
       ; runtime = Option.map2 ~f t1.runtime t2.runtime
@@ -753,6 +753,4 @@ module Shifts = struct
       type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
     end
   end]
-
-  let map = Array.map
 end
