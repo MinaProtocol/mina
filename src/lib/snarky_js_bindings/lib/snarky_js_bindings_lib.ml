@@ -2306,11 +2306,9 @@ module Ledger = struct
 
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
-    ; verificationKey :
-        < hash : field_class Js.t Js.readonly_prop
-        ; data : Mina_base.Side_loaded_verification_key.t Js.readonly_prop >
-        Js.t
-        Js.optdef
+    ; verificationKey : Js.js_string
+        Js.t       
+        Js.optdef 
         Js.readonly_prop
     ; zkappVersion : int Js.readonly_prop
     ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
@@ -2579,18 +2577,14 @@ module Ledger = struct
       xs
 
     let verification_key
-        (vk : (Mina_base.Side_loaded_verification_key.t, Impl.field) With_hash.t)
+        (vk : Mina_base__Verification_key_wire.Stable.V1.t)
         =
-      object%js
-        val hash = field (With_hash.hash vk)
-
-        val data = With_hash.data vk
-      end
+      Js.string (Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
 
     let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
       object%js
         val appState = app_state a.app_state
-
+        
         val verificationKey = option verification_key a.verification_key
 
         val zkappVersion = Mina_numbers.Zkapp_version.to_int a.zkapp_version
@@ -2891,10 +2885,6 @@ module Ledger = struct
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
-  let verification_key_to_base58 (vr : Pickles.Side_loaded.Verification_key.t) :
-      Js.js_string Js.t =
-    Js.string (Pickles.Side_loaded.Verification_key.to_base58_check vr)
-
   (* low-level building blocks for encoding *)
   let binary_string_to_base58_check bin_string (version_byte : int) :
       Js.js_string Js.t =
@@ -3120,8 +3110,6 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
-
-    static_method "verificationKeyToBase58" verification_key_to_base58 ;
 
     static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
