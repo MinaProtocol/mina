@@ -110,7 +110,11 @@ if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
-TAG="minaprotocol/$SERVICE:$VERSION"
+MINAPROTOCOL="minaprotocol"
+TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
+
+GITHASH=$(git rev-parse --short=7 HEAD)
+HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -122,9 +126,7 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
-
-  export GITHASH=$(git rev-parse --short=7 HEAD)
-  docker tag "${GITHASH}" "$1"
+  docker tag "${HASHTAG}" "$1"
   docker push "$1"
 }
 
