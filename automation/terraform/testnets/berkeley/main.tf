@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "berkeley"
-  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-release-2.0.0-c160fce-bullseye-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-release-2.0.0-c160fce-bullseye"
+  mina_image = "minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -96,7 +96,7 @@ module "berkeley" {
 
   archive_node_count  = 3
   mina_archive_schema = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://github.com/MinaProtocol/mina/blob/6f9d956890ef3f4beb5b4cb1a58a62352f33e5d1/src/app/archive/create_schema.sql", "https://github.com/MinaProtocol/mina/blob/6f9d956890ef3f4beb5b4cb1a58a62352f33e5d1/src/app/archive/zkapp_tables.sql"]
 
   archive_configs       = [
     {
@@ -138,6 +138,11 @@ module "berkeley" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
+  worker_cpu_request=4
+  cpu_request=12
+  worker_mem_request="6Gi"
+  mem_request="16Gi"
+
   snark_coordinators = [
     {
       snark_worker_replicas = 5
@@ -166,13 +171,14 @@ module "berkeley" {
   
 
 
-  upload_blocks_to_gcloud         = false
+  upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
   make_reports                    = true
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
+
 }
 
