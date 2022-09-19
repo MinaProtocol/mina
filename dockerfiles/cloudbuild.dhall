@@ -212,9 +212,11 @@ let kanikoBuild
                 { Some = λ(n : Text) → "-${n}", None = "" }
                 serviceDesc.network
 
-        let tag =
-                  "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
-              ++  network
+        let imageTag = "${serviceDesc.version}${network}"
+
+        let imageName = "gcr.io/\${PROJECT_ID}/${desc.service}"
+
+        let image = "${imageName}:${imageTag}"
 
         let context =
               merge
@@ -247,11 +249,11 @@ let kanikoBuild
               , args = Some
                   (   [ "--dockerfile=Dockerfile"
                       , "--context=dir://${context}"
-                      , "--destination=${tag}"
+                      , "--destination=${image}"
                       , "--cache=true"
                       , "--cache-ttl=24h"
                       ]
-                    # mkArgs tag desc serviceDesc
+                    # mkArgs image desc serviceDesc
                   )
               , timeout = desc.timeout
               }

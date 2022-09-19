@@ -106,6 +106,10 @@ if [[ -n "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO=", repo = Some \"${BUILDKITE_PULL_REQUEST_REPO}\""
 fi
 
+if [ "${SERVICE}" != "mina-daemon" ]; then
+  NETWORK=", network = None Text"
+fi
+
 pushd "$ROOT"
 
 dhall="
