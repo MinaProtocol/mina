@@ -53,9 +53,13 @@ let transaction_expiry_hr = 2
 
 (* limits on Zkapp_command.t size *)
 
-let max_proof_zkapp_command = 4
+let zkapp_proof_update_cost = 10.26
 
-let max_zkapp_command = 8
+let zkapp_signed_single_update_cost = 10.08
+
+let zkapp_signed_pair_update_cost = 9.14
+
+let zkapp_transaction_cost_limit = 69.45
 
 let max_event_elements = 16
 
