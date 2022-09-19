@@ -15,6 +15,7 @@
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
+  inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
@@ -261,22 +262,30 @@
         packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
         packages.mina-docker = pkgs.dockerTools.buildImage {
           name = "mina";
-          contents = [ ocamlPackages.mina.out ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-image-root";
+            paths = [ ocamlPackages.mina.out ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
         };
         packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
           name = "mina-daemon";
-          contents = [
-            pkgs.dumb-init
-            pkgs.coreutils
-            pkgs.bashInteractive
-            pkgs.python3
-            pkgs.libp2p_helper
-            ocamlPackages.mina.out
-            ocamlPackages.mina.mainnet
-            ocamlPackages.mina.genesis
-            ocamlPackages.mina_build_config
-            ocamlPackages.mina_daemon_scripts
-          ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-daemon-image-root";
+            paths = [
+              pkgs.dumb-init
+              pkgs.coreutils
+              pkgs.bashInteractive
+              pkgs.python3
+              pkgs.libp2p_helper
+              ocamlPackages.mina.out
+              ocamlPackages.mina.mainnet
+              ocamlPackages.mina.genesis
+              ocamlPackages.mina_build_config
+              ocamlPackages.mina_daemon_scripts
+            ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
           config = {
             env = [ "MINA_TIME_OFFSET=0" ];
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
