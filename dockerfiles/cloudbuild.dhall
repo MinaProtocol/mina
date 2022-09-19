@@ -207,14 +207,7 @@ let kanikoBuild
         Schema.Cloudbuild.Type
     = λ(desc : DockerfileDescription.Type) →
       λ(serviceDesc : ServiceDescription.Type) →
-        let network =
-              merge
-                { Some = λ(n : Text) → "-${n}", None = "" }
-                serviceDesc.network
-
-        let tag =
-                  "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
-              ++  network
+        let tag = "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
 
         let context =
               merge

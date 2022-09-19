@@ -106,6 +106,12 @@ if [[ -n "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO=", repo = Some \"${BUILDKITE_PULL_REQUEST_REPO}\""
 fi
 
+case "${SERVICE}" in
+mina-daemon)
+  VERSION="${VERSION}-${NETWORK##*=}"
+  ;;
+esac
+
 pushd "$ROOT"
 
 dhall="
