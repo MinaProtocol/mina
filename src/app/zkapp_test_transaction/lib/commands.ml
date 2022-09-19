@@ -26,8 +26,9 @@ let parse_field_element_or_hash_string s ~f =
   | Error e1 ->
       Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
-let `VK vk, `Prover zkapp_prover =
-  Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+let vk_and_prover =
+  lazy
+    (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
@@ -42,6 +43,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let _v =
     Option.value_map zkapp_account ~default:() ~f:(fun pk ->
+        let `VK vk, `Prover _ = Lazy.force vk_and_prover in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_int 1000000000000)) with
@@ -357,6 +359,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
@@ -425,6 +428,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
@@ -461,6 +465,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
@@ -499,6 +504,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
@@ -535,6 +541,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
@@ -572,6 +579,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind zkapp_command =
+    let `VK _, `Prover zkapp_prover = Lazy.force vk_and_prover in
     Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in

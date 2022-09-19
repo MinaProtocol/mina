@@ -39,10 +39,10 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: call_type_type; Type: TYPE; Schema: public;
+-- Name: call_type; Type: TYPE; Schema: public;
 --
 
-CREATE TYPE public.call_type_type AS ENUM (
+CREATE TYPE public.call_type AS ENUM (
     'call',
     'delegate_call'
 );
@@ -645,7 +645,7 @@ ALTER SEQUENCE public.voting_for_id_seq OWNED BY public.voting_for.id;
 CREATE TABLE public.zkapp_account_precondition (
     id integer NOT NULL,
     kind public.zkapp_precondition_type NOT NULL,
-    precondition_account_id integer,
+    account_precondition_values_id integer,
     nonce bigint
 );
 
@@ -1142,7 +1142,7 @@ CREATE TABLE public.zkapp_account_update_body (
     zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
-    caller public.call_type_type NOT NULL
+    caller public.call_type NOT NULL
 );
 
 
@@ -1272,10 +1272,10 @@ ALTER SEQUENCE public.zkapp_permissions_id_seq OWNED BY public.zkapp_permissions
 
 
 --
--- Name: zkapp_precondition_accounts; Type: TABLE; Schema: public;
+-- Name: zkapp_account_precondition_values; Type: TABLE; Schema: public;
 --
 
-CREATE TABLE public.zkapp_precondition_accounts (
+CREATE TABLE public.zkapp_account_precondition_values (
     id integer NOT NULL,
     balance_id integer,
     nonce_id integer,
@@ -1291,10 +1291,10 @@ CREATE TABLE public.zkapp_precondition_accounts (
 
 
 --
--- Name: zkapp_precondition_accounts_id_seq; Type: SEQUENCE; Schema: public;
+-- Name: zkapp_account_precondition_values_id_seq; Type: SEQUENCE; Schema: public;
 --
 
-CREATE SEQUENCE public.zkapp_precondition_accounts_id_seq
+CREATE SEQUENCE public.zkapp_account_precondition_values_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1306,10 +1306,10 @@ CREATE SEQUENCE public.zkapp_precondition_accounts_id_seq
 
 
 --
--- Name: zkapp_precondition_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
+-- Name: zkapp_account_precondition_values_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
 --
 
-ALTER SEQUENCE public.zkapp_precondition_accounts_id_seq OWNED BY public.zkapp_precondition_accounts.id;
+ALTER SEQUENCE public.zkapp_account_precondition_values_id_seq OWNED BY public.zkapp_account_precondition_values.id;
 
 
 --
@@ -1914,10 +1914,10 @@ ALTER TABLE ONLY public.zkapp_permissions ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
--- Name: zkapp_precondition_accounts id; Type: DEFAULT; Schema: public;
+-- Name: zkapp_account_precondition_values id; Type: DEFAULT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_precondition_accounts ALTER COLUMN id SET DEFAULT nextval('public.zkapp_precondition_accounts_id_seq'::regclass);
+ALTER TABLE ONLY public.zkapp_account_precondition_values ALTER COLUMN id SET DEFAULT nextval('public.zkapp_account_precondition_values_id_seq'::regclass);
 
 
 --
@@ -2453,7 +2453,7 @@ COPY public.voting_for (id, value) FROM stdin;
 -- Data for Name: zkapp_account_precondition; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_account_precondition (id, kind, precondition_account_id, nonce) FROM stdin;
+COPY public.zkapp_account_precondition (id, kind, account_precondition_values_id, nonce) FROM stdin;
 1	nonce	\N	1
 2	accept	\N	\N
 \.
@@ -2609,10 +2609,10 @@ COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_
 
 
 --
--- Data for Name: zkapp_precondition_accounts; Type: TABLE DATA; Schema: public;
+-- Data for Name: zkapp_account_precondition_values; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_precondition_accounts (id, balance_id, nonce_id, receipt_chain_hash, delegate_id, state_id, sequence_state_id, proved_state, is_new) FROM stdin;
+COPY public.zkapp_account_precondition_values (id, balance_id, nonce_id, receipt_chain_hash, delegate_id, state_id, sequence_state_id, proved_state, is_new) FROM stdin;
 \.
 
 
@@ -2922,10 +2922,10 @@ SELECT pg_catalog.setval('public.zkapp_permissions_id_seq', 5, true);
 
 
 --
--- Name: zkapp_precondition_accounts_id_seq; Type: SEQUENCE SET; Schema: public;
+-- Name: zkapp_account_precondition_values_id_seq; Type: SEQUENCE SET; Schema: public;
 --
 
-SELECT pg_catalog.setval('public.zkapp_precondition_accounts_id_seq', 1, false);
+SELECT pg_catalog.setval('public.zkapp_account_precondition_values_id_seq', 1, false);
 
 
 --
@@ -3342,11 +3342,11 @@ ALTER TABLE ONLY public.zkapp_permissions
 
 
 --
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_pkey; Type: CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_pkey; Type: CONSTRAINT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_pkey PRIMARY KEY (id);
 
 
 --
@@ -3866,11 +3866,11 @@ ALTER TABLE ONLY public.user_commands
 
 
 --
--- Name: zkapp_account_precondition zkapp_account_precondition_precondition_account_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition zkapp_account_precondition_account_precondition_values_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
 ALTER TABLE ONLY public.zkapp_account_precondition
-    ADD CONSTRAINT zkapp_account_precondition_precondition_account_id_fkey FOREIGN KEY (precondition_account_id) REFERENCES public.zkapp_precondition_accounts(id);
+    ADD CONSTRAINT zkapp_account_precondition_account_precondition_values_id_fkey FOREIGN KEY (account_precondition_values_id) REFERENCES public.zkapp_account_precondition_values(id);
 
 
 --
@@ -4090,43 +4090,43 @@ ALTER TABLE ONLY public.zkapp_account_update_body
 
 
 --
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_balance_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_balance_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_balance_id_fkey FOREIGN KEY (balance_id) REFERENCES public.zkapp_balance_bounds(id);
-
-
---
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_delegate_id_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_delegate_id_fkey FOREIGN KEY (delegate_id) REFERENCES public.public_keys(id);
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_balance_id_fkey FOREIGN KEY (balance_id) REFERENCES public.zkapp_balance_bounds(id);
 
 
 --
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_nonce_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_delegate_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_nonce_id_fkey FOREIGN KEY (nonce_id) REFERENCES public.zkapp_nonce_bounds(id);
-
-
---
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_sequence_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_sequence_state_id_fkey FOREIGN KEY (sequence_state_id) REFERENCES public.zkapp_state_data(id);
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_delegate_id_fkey FOREIGN KEY (delegate_id) REFERENCES public.public_keys(id);
 
 
 --
--- Name: zkapp_precondition_accounts zkapp_precondition_accounts_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_nonce_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_state_id_fkey FOREIGN KEY (state_id) REFERENCES public.zkapp_states_nullable(id);
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_nonce_id_fkey FOREIGN KEY (nonce_id) REFERENCES public.zkapp_nonce_bounds(id);
+
+
+--
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_sequence_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
+--
+
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_sequence_state_id_fkey FOREIGN KEY (sequence_state_id) REFERENCES public.zkapp_state_data(id);
+
+
+--
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
+--
+
+ALTER TABLE ONLY public.zkapp_account_precondition_values
+    ADD CONSTRAINT zkapp_account_precondition_values_state_id_fkey FOREIGN KEY (state_id) REFERENCES public.zkapp_states_nullable(id);
 
 
 --
