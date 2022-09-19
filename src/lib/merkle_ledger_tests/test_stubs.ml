@@ -1,5 +1,12 @@
 open Core
-module Balance = Currency.Balance
+
+module Balance = struct
+  include Currency.Balance
+
+  let to_int = int_of_nanomina
+
+  let of_int = nanomina_unsafe
+end
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
