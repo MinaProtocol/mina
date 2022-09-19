@@ -1,8 +1,6 @@
 open Core_kernel
 module H_list = Snarky_backendless.H_list
 
-let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
-
 [%%versioned
 module Stable = struct
   module V2 = struct
@@ -17,8 +15,11 @@ module Stable = struct
       ; endomul_scalar_comm : 'comm
       }
     [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+    (* TODO: Remove unused annotations *)
   end
 end]
+
+(* TODO: Remove unused functions *)
 
 let map
     { sigma_comm
