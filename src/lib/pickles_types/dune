@@ -1,18 +1,27 @@
 (library
-  (inline_tests)
-  (name pickles_types)
-  (public_name pickles_types)
-  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.std h_list.ppx))
-  (instrumentation (backend bisect_ppx))
-  (libraries
-   ;;opam libraries
-   bin_prot.shape
-   base.caml
-   core_kernel
-   result
-   sexplib0
+ (inline_tests)
+ (name pickles_types)
+ (public_name pickles_types)
+ (preprocess
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_deriving_yojson
+   ppx_jane
+   ppx_deriving.std
+   h_list.ppx))
+ (instrumentation
+  (backend bisect_ppx))
+ (libraries
+   ;; opam libraries
    ppx_inline_test.config
-   ;;local libraries
+   sexplib0
+   result
+   core_kernel
+   base.caml
+   bin_prot.shape
+   ;; local libraries
    snarky.backendless
-   marlin_plonk_bindings_types
+   tuple_lib
+   ppx_version.runtime
 ))

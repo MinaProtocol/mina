@@ -8,13 +8,13 @@ module Snark_tables = struct
   module Serializable = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+          ( Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
             Priced_proof.Stable.V1.t
           * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
             | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V1.Table.t
+          Transaction_snark_work.Statement.Stable.V2.Table.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -103,6 +103,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
@@ -382,7 +383,8 @@ struct
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+          ~expiry_ns:_ ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer
+          =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -502,22 +504,47 @@ struct
                   Error e )
           in
           let work = One_or_two.map proofs ~f:snd in
-          let prover_account_exists =
+          let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            Option.is_some
-              (let%bind ledger = t.best_tip_ledger () in
-               if Deferred.is_determined (Base_ledger.detached_signal ledger)
-               then None
-               else
-                 Account_id.create prover Token_id.default
-                 |> Base_ledger.location_of_account ledger )
+            let%bind ledger = t.best_tip_ledger () in
+            if Deferred.is_determined (Base_ledger.detached_signal ledger) then
+              None
+            else
+              let%bind loc =
+                Account_id.create prover Token_id.default
+                |> Base_ledger.location_of_account ledger
+              in
+              Base_ledger.get ledger loc
+          in
+          let prover_account_exists = Option.is_some account_opt in
+          let prover_permitted_to_receive =
+            let open Option.Let_syntax in
+            let%map account = account_opt in
+            Mina_base.Account.has_permission ~to_:`Receive account
           in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
-              "Prover $prover did not have sufficient balance" ~metadata ;
+              "Snark work did not have sufficient fee to create prover $prover \
+               acccount"
+              ~metadata ;
+            return false )
+          else if
+            Option.value_map ~default:false ~f:not prover_permitted_to_receive
+          then (
+            [%log' warn t.logger]
+              "Snark work prover $prover not permitted to receive fees. \
+               Required permission to receive is $receive_permission"
+              ~metadata:
+                ( ( "receive_permission"
+                  , Mina_base.Permissions.Auth_required.to_yojson
+                      (Option.value_map account_opt
+                         ~default:Mina_base.Permissions.user_default
+                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
+                        .receive )
+                :: metadata ) ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
@@ -645,7 +672,7 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
+      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
       ~on_remote_push =
     if !loaded then
       failwith
@@ -674,8 +701,8 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
-            ~on_remote_push
+            ~time_controller ~expiry_ns ~frontier_broadcast_pipe
+            ~log_gossip_heard ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -683,7 +710,7 @@ end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include
-  Make (Mina_base.Ledger) (Staged_ledger)
+  Make (Mina_ledger.Ledger) (Staged_ledger)
     (struct
       include Transition_frontier
 
@@ -701,11 +728,11 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, to_yojson, hash]
@@ -748,6 +775,10 @@ let%test_module "random set test" =
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int precomputed_values.genesis_constants.transaction_expiry_hr)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -798,7 +829,7 @@ let%test_module "random set test" =
       let open Deferred.Let_syntax in
       let mock_pool, _r_sink, _l_sink =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller
+          ~consensus_constants ~time_controller ~expiry_ns
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         (* |>  *)
@@ -975,7 +1006,7 @@ let%test_module "random set test" =
           in
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~logger
+              ~consensus_constants ~time_controller ~expiry_ns ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
@@ -1046,7 +1077,7 @@ let%test_module "random set test" =
             in
             let network_pool, remote_sink, local_sink =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+                ~consensus_constants ~time_controller ~expiry_ns
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             in
@@ -1131,7 +1162,7 @@ let%test_module "random set test" =
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
@@ -1152,7 +1183,8 @@ let%test_module "random set test" =
           in
           ignore
             ( ok_exn res1
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1163,7 +1195,8 @@ let%test_module "random set test" =
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1176,7 +1209,8 @@ let%test_module "random set test" =
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1203,7 +1237,8 @@ let%test_module "random set test" =
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

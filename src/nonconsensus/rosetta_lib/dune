@@ -15,11 +15,12 @@
    base.caml
    result
    ;;local libraries
+   mina_wire_types
    rosetta_models
    random_oracle_input
    mina_numbers_nonconsensus
    mina_compile_config_nonconsensus
-   ; mina_base_nonconsensus
+   mina_base_nonconsensus.import
    hex_nonconsensus
    signature_lib_nonconsensus
    mina_base_nonconsensus
@@ -29,7 +30,7 @@
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv
+ (preprocess (pps ppx_mina ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv
                   ppx_compare ppx_deriving.std ppx_custom_printf
                   ppx_deriving_yojson ppx_inline_test))
  (synopsis "Rosetta-related support code for nonconsensus"))

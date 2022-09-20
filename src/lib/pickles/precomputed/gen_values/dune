@@ -14,13 +14,11 @@
    base.caml
    ;; local libraries
    pickles_types
-   zexe_backend
-   pasta
-   marlin_plonk_bindings
-   marlin_plonk_bindings_pasta_fp_urs
-   marlin_plonk_bindings_pasta_vesta
-   marlin_plonk_bindings_pasta_fq_urs
-   marlin_plonk_bindings_pasta_pallas
+   kimchi_backend
+   kimchi_pasta
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
  )
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))

@@ -1,0 +1,10 @@
+(library
+ (name logger_file_system)
+ (public_name logger.file_system)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core yojson logger core_kernel)
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Logging library"))

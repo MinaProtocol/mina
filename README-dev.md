@@ -26,7 +26,7 @@ The short version:
 1.  Start with Ubuntu 18 or run it in a virtual machine
 2.  Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
     - To push branches to repos in the MinaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
-3.  Pull in our submodules: `git submodule update --init`
+3.  Pull in our submodules: `git submodule update --init --recursive`
     - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 4.  Run `git config --local --add submodule.recurse true`
@@ -40,9 +40,10 @@ Refer to [/dev](/dev).
 
 - Invoke `make macos-setup`
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup toolchain install 1.52.1`
+- Invoke `rustup toolchain install 1.58.1`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
+- Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
 
 ### Developer Setup (Linux)
 
@@ -105,7 +106,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
-## Using the makefile
+## Using the Makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
 It also knows how to use Docker automatically. 
@@ -113,14 +114,11 @@ It also knows how to use Docker automatically.
 These are the most important `make` targets:
 
 - `build`: build everything
-- `test`: run the tests
 - `libp2p_helper`: build the libp2p helper
-- `web`: build the website, including the state explorer
+- `reformat`: automatically use `ocamlformat` to reformat the source files (use
+    it if the hook fails during a commit)
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
-
-NOTE: all of the `test-*` targets (including `test-all`) won't run in the container.
-`test` wraps them in the container.
 
 ## Steps for adding a new dependency
 

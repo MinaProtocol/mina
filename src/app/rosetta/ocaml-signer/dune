@@ -13,6 +13,7 @@
    async_unix
    async.async_command
    ;;local libraries
+   kimchi_backend.pasta
    pickles
    rosetta_coding
    rosetta_lib
@@ -21,12 +22,11 @@
    mina_base
    snark_params
    pickles.backend
-   zexe_backend.pasta
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -46,7 +46,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -66,7 +66,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -86,7 +86,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base

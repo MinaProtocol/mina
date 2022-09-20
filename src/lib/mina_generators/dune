@@ -1,0 +1,40 @@
+(library
+ (name mina_generators)
+ (public_name mina_generators)
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_optcomp))
+ (libraries
+   ;; opam libraries
+   yojson
+   core_kernel
+   base_quickcheck
+   core
+   async
+   async_unix
+   base
+   sexplib0
+   ;; local libraries
+   genesis_constants
+   sgn
+   pickles_types
+   pickles
+   data_hash_lib
+   kimchi_backend.pasta
+   mina_numbers
+   mina_compile_config
+   zkapp_command_builder
+   signature_lib
+   mina_ledger
+   mina_base
+   random_oracle
+   with_hash
+   mina_base.import
+   block_time
+   currency
+   kimchi_backend
+   pickles.backend
+   random_oracle_input
+   snark_params
+   snarky.backendless
+))

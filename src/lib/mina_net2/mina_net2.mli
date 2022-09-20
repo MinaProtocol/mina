@@ -54,8 +54,6 @@ exception Libp2p_helper_died_unexpectedly
 (** Handle to all network functionality. *)
 type t
 
-module Bitswap_block = Bitswap_block
-
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol
@@ -112,6 +110,16 @@ end
 module Validation_callback = Validation_callback
 module Sink = Sink
 
+module For_tests : sig
+  module Helper = Libp2p_helper
+
+  val generate_random_keypair : Helper.t -> Keypair.t Deferred.t
+
+  val multiaddr_to_libp2p_ipc : Multiaddr.t -> Libp2p_ipc.multiaddr
+
+  val empty_libp2p_ipc_gating_config : Libp2p_ipc.gating_config
+end
+
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
   * The new [net] isn't connected to any network until [configure] is called.
@@ -157,7 +165,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
-  -> mina_peer_exchange:bool
+  -> peer_protection_ratio:float
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> min_connections:int
@@ -362,3 +370,5 @@ val connection_gating_config : t -> connection_gating
 
 (** List of currently banned IPs. *)
 val banned_ips : t -> Unix.Inet_addr.t list
+
+val send_heartbeat : t -> Peer.Id.t -> unit

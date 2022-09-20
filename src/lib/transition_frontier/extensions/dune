@@ -9,7 +9,6 @@
    sexplib0
    result
    base.base_internalhash_types
-   core
    ;;local libraries
    with_hash
    mina_block
@@ -19,9 +18,10 @@
    mina_base
    transition_frontier_base
    transition_frontier_full_frontier
+   mina_ledger
    logger
    mina_state
    staged_ledger
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version)))

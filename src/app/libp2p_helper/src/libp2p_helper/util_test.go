@@ -46,9 +46,12 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 func testStreamHandler(_ net.Stream) {}
 
 func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, port uint16) *app {
-	return newTestAppWithMaxConnsAndCtx(t, newTestKey(t), seeds, noUpcalls, minConns, maxConns, true, port, context.Background())
+	return newTestAppWithMaxConnsAndCtx(t, newTestKey(t), seeds, noUpcalls, minConns, maxConns, .2, port, context.Background())
 }
-func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, minaPeerExchange bool, port uint16, ctx context.Context) *app {
+func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, peerProtectionRatio float32, port uint16, ctx context.Context) *app {
+	return newTestAppWithMaxConnsAndCtxAndGrace(t, privkey, seeds, noUpcalls, minConns, maxConns, peerProtectionRatio, port, ctx, 10*time.Second)
+}
+func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, peerProtectionRatio float32, port uint16, ctx context.Context, gracePeriod time.Duration) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -65,8 +68,8 @@ func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []
 		&codanet.CodaGatingConfig{},
 		minConns,
 		maxConns,
-		minaPeerExchange,
-		10*time.Second,
+		peerProtectionRatio,
+		gracePeriod,
 		nil,
 	)
 	require.NoError(t, err)
@@ -249,4 +252,21 @@ func withCustomTimeoutAsync(registerDone func(done chan interface{}), timeout ti
 	case <-done:
 		return true
 	}
+}
+
+func handleErrChan(t *testing.T, errChan chan error, ctxCancel context.CancelFunc) {
+	go func() {
+		err, has := <-errChan
+		if has {
+			ctxCancel()
+			errChan <- err
+		}
+	}()
+	t.Cleanup(func() {
+		ctxCancel()
+		close(errChan)
+		for err := range errChan {
+			t.Errorf("failed with %s", err)
+		}
+	})
 }

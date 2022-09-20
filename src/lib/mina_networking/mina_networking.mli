@@ -29,9 +29,9 @@ module Rpcs : sig
   end
 
   module Answer_sync_ledger_query : sig
-    type query = Ledger_hash.t * Sync_ledger.Query.t
+    type query = Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t
 
-    type response = Sync_ledger.Answer.t Core.Or_error.t
+    type response = Mina_ledger.Sync_ledger.Answer.t Core.Or_error.t
   end
 
   module Get_transition_chain : sig
@@ -164,6 +164,7 @@ module Config : sig
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; precomputed_values : Precomputed_values.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
@@ -250,10 +251,10 @@ val broadcast_transaction_pool_diff :
 val glue_sync_ledger :
      t
   -> preferred:Peer.t list
-  -> (Ledger_hash.t * Sync_ledger.Query.t) Linear_pipe.Reader.t
+  -> (Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
-     * Sync_ledger.Query.t
-     * Sync_ledger.Answer.t Envelope.Incoming.t )
+     * Mina_ledger.Sync_ledger.Query.t
+     * Mina_ledger.Sync_ledger.Answer.t Envelope.Incoming.t )
      Linear_pipe.Writer.t
   -> unit
 
@@ -264,7 +265,7 @@ val query_peer :
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
-  -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+  -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
 
 val restart_helper : t -> unit
 
