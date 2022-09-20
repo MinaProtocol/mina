@@ -554,7 +554,7 @@ struct
             ~f:(fun set cmd ->
               let set' =
                 With_status.data cmd |> User_command.forget_check
-                |> User_command.accounts_accessed |> Account_id.Set.of_list
+                |> User_command.accounts_referenced |> Account_id.Set.of_list
               in
               Set.union set set' )
         in
