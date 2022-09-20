@@ -54,28 +54,6 @@ module Opt = struct
     | Maybe (b, x) ->
         Maybe (b, f x)
 
-  let _map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
-      ~(f : a -> b -> c) =
-    match (t1, t2) with
-    | None, None ->
-        None
-    | Some x1, Some x2 ->
-        Some (f x1 x2)
-    | Some x1, Maybe (b2, x2) ->
-        Maybe (b2, f x1 x2)
-    | Maybe (b1, x1), Some x2 ->
-        Maybe (b1, f x1 x2)
-    | Maybe (_b1, _x1), Maybe (_b2, _x2) ->
-        failwith "Opt.map2_exn: (Maybe, Maybe)"
-    | Some _, None ->
-        failwith "Opt.map2_exn: (Some, None)"
-    | None, Some _ ->
-        failwith "Opt.map2_exn: (None, Some)"
-    | Maybe _, None ->
-        failwith "Opt.map2_exn: (Maybe, None)"
-    | None, Maybe _ ->
-        failwith "Opt.map2_exn: (None, Maybe)"
-
   open Snarky_backendless
 
   let some_typ (type a a_var f bool_var) (t : (a_var, a, f) Typ.t) :
@@ -575,22 +553,7 @@ module Poly_comm = struct
       end
     end]
 
-    let _map { unshifted; shifted } ~f =
-      { unshifted = Array.map ~f unshifted; shifted = f shifted }
-
     let padded_array_typ0 = padded_array_typ
-
-    let _padded_array_typ elt ~length ~dummy ~bool =
-      let open Snarky_backendless.Typ in
-      array ~length (tuple2 bool elt)
-      |> transport
-           ~there:(fun a ->
-             let a = Array.map a ~f:(fun x -> (true, x)) in
-             let n = Array.length a in
-             if n > length then failwithf "Expected %d <= %d" n length () ;
-             Array.append a (Array.create ~len:(length - n) (false, dummy)) )
-           ~back:(fun a ->
-             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
 
     let typ (type f g g_var bool_var)
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
@@ -619,8 +582,6 @@ module Poly_comm = struct
         type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
-
-    let _typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -653,18 +614,6 @@ module Messages = struct
       { aggreg = z
       ; sorted = Array.create ~len:sorted_length z
       ; runtime = Option.some_if runtime z
-      }
-
-    let _map { sorted; aggreg; runtime } ~f =
-      { sorted = Array.map ~f sorted
-      ; aggreg = f aggreg
-      ; runtime = Option.map ~f runtime
-      }
-
-    let _map2 t1 t2 ~f =
-      { sorted = Array.map2_exn ~f t1.sorted t2.sorted
-      ; aggreg = f t1.aggreg t2.aggreg
-      ; runtime = Option.map2 ~f t1.runtime t2.runtime
       }
 
     let typ bool_typ e ~runtime ~dummy =
