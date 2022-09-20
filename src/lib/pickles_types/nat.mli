@@ -72,7 +72,8 @@ end
 
 module type I = Add.Intf_transparent
 
-(** {2 Naturals}*)
+(** {2 Module encoding naturals} *)
+
 module N0 : I with type 'a plus_n = 'a
 
 module N1 : I with type 'a plus_n = 'a s
@@ -98,7 +99,15 @@ module N9 : I with type 'a plus_n = 'a N8.plus_n s
 
 module N10 : I with type 'a plus_n = 'a N9.plus_n s
 
-module N15 : I with type 'a plus_n = 'a N8.plus_n N7.plus_n
+module N11 : I with type 'a plus_n = 'a N10.plus_n s
+
+module N12 : I with type 'a plus_n = 'a N11.plus_n s
+
+module N13 : I with type 'a plus_n = 'a N12.plus_n s
+
+module N14 : I with type 'a plus_n = 'a N13.plus_n s
+
+module N15 : I with type 'a plus_n = 'a N14.plus_n s
 
 module N16 : I with type 'a plus_n = 'a N15.plus_n s
 
@@ -107,6 +116,8 @@ module N17 : I with type 'a plus_n = 'a N16.plus_n s
 module N18 : I with type 'a plus_n = 'a N17.plus_n s
 
 module N19 : I with type 'a plus_n = 'a N18.plus_n s
+
+module N20 : I with type 'a plus_n = 'a N19.plus_n s
 
 module N26 : I with type 'a plus_n = 'a N18.plus_n N8.plus_n
 
