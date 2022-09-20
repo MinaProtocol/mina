@@ -114,7 +114,9 @@ MINAPROTOCOL="minaprotocol"
 TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-${NETWORK##*=}"
+HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-$VERSION"
+
+echo "VERSION IS" $VERSION
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
