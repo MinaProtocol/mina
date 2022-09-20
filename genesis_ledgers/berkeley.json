@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-09-14T22:00:01Z"
+    "genesis_state_timestamp": "2022-09-20T16:00:01Z"
   },
   "ledger": {
     "name": "berkeley",
@@ -39421,7 +39421,7 @@
   "balance": "66000"
 },
 {
-  "publicKey": "B62qjVay8oPUw7zC3ifyKNYNv3qJujVWGjCuCsyQVzyJnJHkmoFTg8h",
+  "publicKey": "B62qo1CwWp18WhM5toS9D76WL7NxXNxKx2biESNk68AGrqKjRaFf8ks",
   "balance": "66000"
 }
 
