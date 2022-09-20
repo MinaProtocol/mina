@@ -150,6 +150,7 @@ let
           dune build --display=short \
             src/app/logproc/logproc.exe \
             src/app/cli/src/mina.exe \
+            src/app/batch_txn_tool/batch_txn_tool.exe \
             src/app/cli/src/mina_testnet_signatures.exe \
             src/app/cli/src/mina_mainnet_signatures.exe \
             src/app/rosetta/rosetta.exe \
@@ -163,13 +164,14 @@ let
         '';
 
         outputs =
-          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
+          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
+          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
           mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
           mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
+          mv _build/default/src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           mv _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
           mv _build/default/src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
           mv _build/default/src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
