@@ -126,7 +126,7 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
-  docker tag "${HASHTAG}" "$1"
+  docker tag "${TAG}" "${HASHTAG}"
   docker push "$1"
 }
 
