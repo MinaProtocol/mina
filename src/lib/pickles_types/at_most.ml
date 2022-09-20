@@ -8,8 +8,6 @@ let rec to_list : type a n. (a, n) t -> a list = function
   | x :: xs ->
       x :: to_list xs
 
-let _to_array v = Array.of_list (to_list v)
-
 let rec _length : type a n. (a, n) t -> int = function
   | [] ->
       0
@@ -22,20 +20,6 @@ let rec to_vector : type a n. (a, n) t -> a Vector.e = function
   | x :: xs ->
       let (T xs) = to_vector xs in
       T (x :: xs)
-
-let rec _map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
- fun xs ~f -> match xs with [] -> [] | x :: xs -> f x :: _map xs ~f
-
-let rec extend_to_vector : type a n. (a, n) t -> a -> n Nat.t -> (a, n) Vector.t
-    =
- fun v a n ->
-  match (v, n) with
-  | [], Z ->
-      []
-  | [], S n ->
-      a :: extend_to_vector [] a n
-  | x :: xs, S n ->
-      x :: extend_to_vector xs a n
 
 let rec of_vector : type a n m. (a, n) Vector.t -> (n, m) Nat.Lte.t -> (a, m) t
     =
@@ -122,12 +106,6 @@ struct
   include Make.Sexpable (N)
   include Make.Yojson (N)
 end
-
-let _typ ~padding elt n =
-  let lte = Nat.Lte.refl n in
-  let there v = extend_to_vector v padding n in
-  let back v = of_vector v lte in
-  Vector.typ elt n |> Snarky_backendless.Typ.transport ~there ~back
 
 module At_most_2 = struct
   [%%versioned_binable

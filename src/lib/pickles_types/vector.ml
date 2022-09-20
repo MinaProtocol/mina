@@ -12,8 +12,6 @@ end
 
 include T
 
-let _hd (type a n) (t : (a, n s) t) : a = match t with x :: _ -> x
-
 let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
 
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
@@ -106,9 +104,6 @@ let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
 
 let unzip ts = (map ts ~f:fst, map ts ~f:snd)
 
-let _unzip3 ts =
-  (map ts ~f:Tuple3.get1, map ts ~f:Tuple3.get2, map ts ~f:Tuple3.get3)
-
 type _ e = T : ('a, 'n) t -> 'a e
 
 let rec of_list : type a. a list -> a e = function
@@ -117,11 +112,6 @@ let rec of_list : type a. a list -> a e = function
   | x :: xs ->
       let (T xs) = of_list xs in
       T (x :: xs)
-
-let _to_sequence : type a n. (a, n) t -> a Sequence.t =
- fun t ->
-  Sequence.unfold ~init:(T t) ~f:(fun (T t) ->
-      match t with [] -> None | x :: xs -> Some (x, T xs) )
 
 let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
  fun xs n ->
@@ -132,9 +122,6 @@ let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
       x :: of_list_and_length_exn xs n
   | _ ->
       failwith "Vector: Length mismatch"
-
-let _of_list_and_length xs n =
-  Option.try_with (fun () -> of_list_and_length_exn xs n)
 
 let of_array_and_length_exn : type a n. a array -> n Nat.t -> (a, n) t =
  fun xs n ->
@@ -171,8 +158,6 @@ let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
 
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
-
-let _reduce (init :: xs) ~f = fold xs ~f ~init
 
 let reduce_exn (type n) (t : (_, n) t) ~f =
   match t with
