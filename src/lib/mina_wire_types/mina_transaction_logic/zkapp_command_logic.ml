@@ -22,4 +22,20 @@ module Local_state = struct
       ; failure_status_tbl : 'failure_status_tbl
       }
   end
+
+  module Value = struct
+    module V1 = struct
+      type t =
+        ( Mina_base.Stack_frame.Digest.V1.t
+        , Mina_base.Call_stack_digest.V1.t
+        , Mina_base.Token_id.V1.t
+        , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+        , Mina_base.Ledger_hash.V1.t
+        , bool
+        , Mina_base.Zkapp_command.Transaction_commitment.V1.t
+        , Mina_numbers.Index.V1.t
+        , Mina_base.Transaction_status.Failure.Collection.V1.t )
+        V1.t
+    end
+  end
 end

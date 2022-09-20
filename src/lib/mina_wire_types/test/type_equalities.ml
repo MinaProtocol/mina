@@ -298,4 +298,8 @@ module Mina_transaction_logic = struct
     Assert_equal9V1
       (O.Zkapp_command_logic.Local_state.Stable)
       (W.Zkapp_command_logic.Local_state)
+  include
+    Assert_equal0V1
+      (O.Zkapp_command_logic.Local_state.Value.Stable)
+      (W.Zkapp_command_logic.Local_state.Value)
 end
