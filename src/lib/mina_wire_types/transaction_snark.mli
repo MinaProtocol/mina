@@ -1,6 +1,6 @@
 open Utils
 
-module Types = struct
+module Types : sig
   module type S = sig
     module Statement : sig
       module Poly : sig
@@ -84,10 +84,10 @@ module type Concrete = sig
   end
 end
 
-module M = struct
-  module Statement = struct
-    module Poly = struct
-      module V2 = struct
+module M : sig
+  module Statement : sig
+    module Poly : sig
+      module V2 : sig
         type ( 'ledger_hash
              , 'amount
              , 'pending_coinbase
@@ -112,7 +112,7 @@ module M = struct
       end
     end
 
-    module V2 = struct
+    module V2 : sig
       type t =
         ( Mina_base.Ledger_hash.V1.t
         , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
@@ -128,6 +128,7 @@ end
 module type Local_sig = Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
-  F (M)
-include M
+    (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
+  Signature(M).S
+
+include Types.S with module Statement = M.Statement

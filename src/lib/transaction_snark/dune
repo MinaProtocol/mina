@@ -2,6 +2,7 @@
  (name transaction_snark)
  (public_name transaction_snark)
  (library_flags -linkall)
+ (flags -w -22) ; Silence ppx_version's warnings
  (inline_tests)
  (libraries
    ;; opam libraries
