@@ -304,3 +304,9 @@ module Mina_transaction_logic = struct
       (O.Zkapp_command_logic.Local_state.Value.Stable)
       (W.Zkapp_command_logic.Local_state.Value)
 end
+
+module Transaction_snark = struct
+  module O = Transaction_snark
+  module W = WT.Transaction_snark
+  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
+end

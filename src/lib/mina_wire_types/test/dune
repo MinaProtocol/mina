@@ -15,6 +15,7 @@
     mina_transaction
     mina_state
     mina_transaction_logic
+    transaction_snark
     ; Necessary for the type equality
     sgn
     sgn_type
