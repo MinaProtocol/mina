@@ -55,6 +55,20 @@ module Assert_equal3V2
     (W : V2S3 with type ('a, 'b, 'c) V2.t = ('a, 'b, 'c) O.V2.t) =
 struct end
 
+module Assert_equal9V1
+    (O : V1S9)
+    (W : V1S9
+           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V1.t =
+             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V1.t) =
+struct end
+
+module Assert_equal9V2
+    (O : V2S9)
+    (W : V2S9
+           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V2.t =
+             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V2.t) =
+struct end
+
 (** {2 Actual tests}
 
     Remember than in this library, the [Stable] layer is omitted in versioned
@@ -275,4 +289,13 @@ module Mina_state = struct
   module O = Mina_state
   module W = WT.Mina_state
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
+end
+
+module Mina_transaction_logic = struct
+  module O = Mina_transaction_logic
+  module W = WT.Mina_transaction_logic
+  include
+    Assert_equal9V1
+      (O.Zkapp_command_logic.Local_state.Stable)
+      (W.Zkapp_command_logic.Local_state)
 end

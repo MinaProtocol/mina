@@ -28,6 +28,10 @@ module type S3 = sig
   type ('a, 'b, 'c) t
 end
 
+module type S9 = sig
+  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) t
+end
+
 (** {2 Same, for versioned types} *)
 
 module type V1S0 = sig
@@ -46,6 +50,10 @@ module type V1S3 = sig
   module V1 : S3
 end
 
+module type V1S9 = sig
+  module V1 : S9
+end
+
 module type V2S0 = sig
   module V2 : S0
 end
@@ -60,4 +68,8 @@ end
 
 module type V2S3 = sig
   module V2 : S3
+end
+
+module type V2S9 = sig
+  module V2 : S9
 end
