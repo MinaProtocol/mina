@@ -310,3 +310,9 @@ module Transaction_snark = struct
   module W = WT.Transaction_snark
   include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
 end
+
+module Transaction_snark_work = struct
+  module O = Transaction_snark_work
+  module W = WT.Transaction_snark_work
+  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
+end
