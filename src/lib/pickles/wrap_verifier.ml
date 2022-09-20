@@ -465,7 +465,7 @@ struct
         (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
     in
     let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
-    let (T max) = Nat.of_int max in
+    let (T max) = Nat.of_int_exn max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk

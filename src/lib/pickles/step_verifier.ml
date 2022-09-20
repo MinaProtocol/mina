@@ -670,7 +670,7 @@ struct
     let open Side_loaded_verification_key in
     fun ~(log2_size : Field.t) ->
       let domain ~max =
-        let (T max_n) = Nat.of_int max in
+        let (T max_n) = Nat.of_int_exn max in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
         let log2_sizes =
           (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
@@ -727,7 +727,7 @@ struct
     open Plonk_types
 
     let mask' { Bounded.max; actual } : Boolean.var array =
-      let (T max) = Nat.of_int max in
+      let (T max) = Nat.of_int_exn max in
       Vector.to_array (ones_vector (module Impl) ~first_zero:actual max)
 
     let mask (type n) ~(lengths : (int, n) Vector.t)

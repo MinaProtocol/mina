@@ -347,7 +347,7 @@ let%test_unit "input_size" =
     ~f:(fun n ->
       [%test_eq: int]
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
-        (let (T a) = Nat.of_int n in
+        (let (T a) = Nat.of_int_exn n in
          let (T (typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No

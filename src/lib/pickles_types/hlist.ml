@@ -1134,7 +1134,7 @@ module Maxes = struct
         T ([], Length.Z)
     | v :: vs ->
         let (T (maxes, len)) = f vs in
-        let (T n) = Nat.of_int (Vector.reduce_exn v ~f:Int.max) in
+        let (T n) = Nat.of_int_exn (Vector.reduce_exn v ~f:Int.max) in
         T (n :: maxes, S len)
 
   let m (type length) (vs : (_, length) Vector.t) :

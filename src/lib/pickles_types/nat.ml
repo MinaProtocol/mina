@@ -14,13 +14,23 @@ let to_int : type n. n t -> int =
   in
   fun x -> go 0 x
 
-let rec of_int : int -> e =
- fun n ->
-  if n < 0 then failwith "of_int: negative"
-  else if n = 0 then T Z
+let of_int n =
+  if n < 0 then None
   else
-    let (T n) = of_int (n - 1) in
-    T (S n)
+    let rec loop n =
+      if n = 0 then T Z
+      else
+        let (T n) = loop (pred n) in
+        T (S n)
+    in
+    Some (loop n)
+
+let of_int_exn n =
+  match of_int n with
+  | None ->
+      invalid_arg "of_int: negative_argument"
+  | Some n ->
+      n
 
 module type Intf = sig
   type n

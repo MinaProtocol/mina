@@ -16,10 +16,18 @@ module type Intf = sig
   val n : n t
 end
 
-(** {2 Constructor} *)
-val to_int : 'n. 'n t -> int
+(** {2 Constructors} *)
 
-val of_int : int -> e
+(** [of_int n] returns [None] when n is negative, [Some e] otherwise. *)
+val of_int : int -> e option
+
+(** [of_int_exn n]
+
+ @raise [Invalid_argument] if n is negative n*)
+val of_int_exn : int -> e
+
+(** {2 Projections} *)
+val to_int : 'n. 'n t -> int
 
 (** [Adds] *)
 module Adds : sig
