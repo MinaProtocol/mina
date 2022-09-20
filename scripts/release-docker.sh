@@ -128,6 +128,7 @@ tag-and-push() {
   docker tag "${TAG}" "$1"
   docker tag "${TAG}" "${HASHTAG}"
   docker push "$1"
+  docker push "${HASHTAG}"
 }
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
