@@ -496,11 +496,8 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main )
 
-let transaction_id_to_string = function
-  | `String s ->
-      s
-  | _ ->
-      "Unexpected JSON for transaction id"
+let transaction_id_to_string id =
+  Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
 let send_payment_graphql =
   let open Command.Param in
