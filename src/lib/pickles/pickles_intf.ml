@@ -79,11 +79,7 @@ module type S = sig
     val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
     module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
-      type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
-
-      val to_base64 : t -> string
-
-      val of_base64 : string -> (t, string) Result.t
+      type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, hash]
     end
 
     module Proofs_verified_2 : sig
@@ -93,11 +89,13 @@ module type S = sig
           type t = Make(Nat.N2)(Nat.N2).t
           [@@deriving sexp, compare, equal, yojson, hash]
 
-          val to_yojson_full : t -> Yojson.Safe.t
+          include Codable.Base64_intf with type t := t
         end
       end]
 
       val to_yojson_full : t -> Yojson.Safe.t
+
+      include Codable.Base64_intf with type t := t
     end
   end
 
@@ -283,6 +281,7 @@ module type S = sig
         end
       end]
 
+      (* TODO: remove Base58Check code when SnarkyJS uses Base64 *)
       include Codable.Base58_check_intf with type t := t
 
       include Codable.Base64_intf with type t := t
@@ -317,17 +316,13 @@ module type S = sig
             (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
-          val to_base64 : t -> string
-
-          val of_base64 : string -> (t, string) Result.t
+          include Codable.Base64_intf with type t := t
         end
       end]
 
       val of_proof : _ Proof.t -> t
 
-      val to_base64 : t -> string
-
-      val of_base64 : string -> (t, string) Result.t
+      include Codable.Base64_intf with type t := t
     end
 
     val create :

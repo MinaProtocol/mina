@@ -302,30 +302,18 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
         let of_sexpable = of_repr
       end)
+end
 
-  let to_base64 t =
-    (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
-    let sexp = sexp_of_t t in
-    (* raises only on invalid optional arguments *)
-    Base64.encode_exn (Sexp.to_string sexp)
-
-  let of_base64 b64 =
-    match Base64.decode b64 with
-    | Ok t -> (
-        try Ok (t_of_sexp (Sexp.of_string t))
-        with exn -> Error (Exn.to_string exn) )
-    | Error (`Msg s) ->
-        Error s
-
-  let to_yojson_full x = Repr.to_yojson (to_repr x)
+module Make_serializers (M : Bin_prot.Binable.S) = struct
+  include Codable.Make_base64 (M)
 
   let to_yojson x = `String (to_base64 x)
 
   let of_yojson = function
-    | `String x ->
-        of_base64 x
+    | `String s ->
+        Result.map_error (of_base64 s) ~f:Error.to_string_hum
     | _ ->
-        Error "Invalid json for proof. Expecting base64 encoded string"
+        Error "Invalid JSON for proof. Expecting base64 encoded string"
 end
 
 module Proofs_verified_2 = struct
@@ -392,10 +380,29 @@ module Proofs_verified_2 = struct
 
             let of_binable = of_repr
           end)
+
+      let to_yojson_full x = Repr.to_yojson (to_repr x)
+
+      include Make_serializers (struct
+        type nonrec t = t
+
+        [%%define_from_scope
+        bin_write_t
+        , bin_writer_t
+        , bin_read_t
+        , bin_reader_t
+        , __bin_read_t__
+        , bin_shape_t
+        , bin_size_t
+        , bin_t]
+      end)
     end
   end]
 
   include (T : module type of T with module Repr := T.Repr)
+
+  [%%define_locally
+  Stable.Latest.(to_yojson_full, to_base64, of_base64, to_yojson, of_yojson)]
 end
 
 module Proofs_verified_max = struct
@@ -466,8 +473,27 @@ module Proofs_verified_max = struct
 
             let of_binable = of_repr
           end)
+
+      let to_yojson_full x = Repr.to_yojson (to_repr x)
+
+      include Make_serializers (struct
+        type nonrec t = t
+
+        [%%define_from_scope
+        bin_write_t
+        , bin_writer_t
+        , bin_read_t
+        , bin_reader_t
+        , __bin_read_t__
+        , bin_shape_t
+        , bin_size_t
+        , bin_t]
+      end)
     end
   end]
 
   include (T : module type of T with module Repr := T.Repr)
+
+  [%%define_locally
+  Stable.Latest.(to_yojson_full, to_base64, of_base64, to_yojson, of_yojson)]
 end

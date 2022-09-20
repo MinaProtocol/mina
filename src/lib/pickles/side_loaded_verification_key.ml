@@ -276,6 +276,8 @@ module Stable = struct
     end
 
     include T
+
+    (* TODO: remove Base58Check code when SnarkyJS uses Base64 *)
     include Codable.Make_base58_check (T)
     include Codable.Make_base64 (T)
   end
