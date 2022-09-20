@@ -23,6 +23,10 @@ module Auth_required : sig
 
   val check : t -> Control.Tag.t -> bool
 
+  val to_string : t -> string
+
+  val of_string : string -> t
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig

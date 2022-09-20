@@ -34,6 +34,7 @@
    transition_frontier
    coda_runtime_config
    mina_base
+   mina_lib
    genesis_constants
    transition_router
    signature_lib

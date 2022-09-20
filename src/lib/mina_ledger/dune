@@ -24,7 +24,7 @@
    sgn
    syncable_ledger
    snark_params
-   parties_builder
+   zkapp_command_builder
    pickles
    pickles.backend
    pickles_types

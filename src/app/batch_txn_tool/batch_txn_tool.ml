@@ -206,7 +206,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       in
       match querry_result with
       | Ok n ->
-          return (UInt32.of_int n)
+          return n
       | Error _ ->
           Format.printf "txn burst tool: could not get nonce of pk= %s@."
             (pk_to_str pk) ;

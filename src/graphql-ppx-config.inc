@@ -68,8 +68,8 @@ Graphql_lib.Scalars.SequenceEvent
 StateHashAsDecimal
 Graphql_lib.Scalars.StateHashAsDecimal
 -custom-field
-PartiesBase58
-Graphql_lib.Scalars.PartiesBase58
+ZkappCommandBase58
+Graphql_lib.Scalars.ZkappCommandBase58
 -custom-field
 TransactionStatusFailure
 Graphql_lib.Scalars.TransactionStatusFailure
@@ -100,6 +100,9 @@ Graphql_lib.Scalars.PendingCoinbaseHash
 -custom-field
 PendingCoinbaseAuxHash
 Graphql_lib.Scalars.PendingCoinbaseAuxHash
+-custom-field
+TransactionId
+Graphql_lib.Scalars.TransactionId
 -extend-query=Graphql_lib.Serializing.ExtendQuery
 -extend-mutation=Graphql_lib.Serializing.ExtendQuery
 -future-added-value=false
