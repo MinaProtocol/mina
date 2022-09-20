@@ -1,4 +1,4 @@
-(** Type definitions for library Pickles_types *)
+(** Type definitions and module signatures for library Pickles_types *)
 
 (** {1 Serialization} *)
 
