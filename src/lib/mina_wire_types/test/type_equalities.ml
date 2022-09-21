@@ -315,6 +315,7 @@ module Transaction_snark = struct
   module W = WT.Transaction_snark
   include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
   include Assert_equal0V2 (O.Statement.With_sok.Stable) (W.Statement.With_sok)
+  include Assert_equal0V2 (O.Stable) (W)
 end
 
 module Transaction_snark_work = struct

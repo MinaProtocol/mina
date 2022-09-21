@@ -26,6 +26,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'sok_digest
         , 'local_state )
         A.Statement.Poly.V2.t
+       and type Stable.V2.t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -420,7 +421,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = A.V2.t =
         { statement : Statement.With_sok.Stable.V2.t
         ; proof : Proof.Stable.V2.t
         }

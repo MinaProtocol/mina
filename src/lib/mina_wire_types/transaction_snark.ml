@@ -53,6 +53,8 @@ module Types = struct
         end
       end
     end
+
+    module V2 : S0
   end
 end
 
@@ -114,6 +116,10 @@ module type Concrete = sig
       type t = Pickles.Proof.Proofs_verified_2.V2.t
     end
   end
+
+  module V2 : sig
+    type t = { statement : Statement.With_sok.V2.t; proof : Proof.V2.t }
+  end
 end
 
 module M = struct
@@ -173,6 +179,10 @@ module M = struct
     module V2 = struct
       type t = Pickles.Proof.Proofs_verified_2.V2.t
     end
+  end
+
+  module V2 = struct
+    type t = { statement : Statement.With_sok.V2.t; proof : Proof.V2.t }
   end
 end
 

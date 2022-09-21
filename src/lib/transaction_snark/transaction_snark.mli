@@ -14,3 +14,4 @@ include
       , 'sok_digest
       , 'local_state )
       Mina_wire_types.Transaction_snark.Statement.Poly.V2.t
+     and type Stable.V2.t = Mina_wire_types.Transaction_snark.V2.t

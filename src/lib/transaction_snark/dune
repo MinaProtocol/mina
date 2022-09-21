@@ -41,6 +41,7 @@
    cache_dir
    snarky.backendless
    sgn
+   sgn_type
    mina_state
    o1trace
    pickles
