@@ -2223,7 +2223,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
         let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
         object%js
           val data =
-            Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
+            Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
 
           val hash =
             Mina_base.Zkapp_account.digest_vk vk
@@ -2269,7 +2269,12 @@ let verify (public_input : public_input_js) (proof : proof)
   let typ = public_input_typ (Array.length public_input) in
   let proof = Pickles.Side_loaded.Proof.of_proof proof in
   let vk =
-    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+    match Pickles.Side_loaded.Verification_key.of_base64 (Js.to_string vk) with
+    | Ok vk_ ->
+        vk_
+    | Error err ->
+        failwithf "Could not decode base64 verification key: %s"
+          (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
   |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
@@ -2581,8 +2586,7 @@ module Ledger = struct
     let verification_key (vk : Mina_base__Verification_key_wire.Stable.V1.t) =
       object%js
         val data =
-          Js.string
-            (Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+          Js.string (Pickles.Side_loaded.Verification_key.to_base64 vk.data)
 
         val hash = vk.hash |> Field.Constant.to_string |> Js.string
       end
