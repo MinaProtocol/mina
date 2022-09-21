@@ -82,6 +82,12 @@ module type Concrete = sig
         Poly.V2.t
     end
   end
+
+  module Proof : sig
+    module V2 : sig
+      type t = Pickles.Proof.Proofs_verified_2.V2.t
+    end
+  end
 end
 
 module M = struct
@@ -121,6 +127,12 @@ module M = struct
         , unit
         , Mina_state.Local_state.V1.t )
         Poly.V2.t
+    end
+  end
+
+  module Proof = struct
+    module V2 = struct
+      type t = Pickles.Proof.Proofs_verified_2.V2.t
     end
   end
 end
