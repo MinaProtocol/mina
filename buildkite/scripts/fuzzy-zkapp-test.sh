@@ -11,7 +11,7 @@ profile=$1
 path=$2
 trials=$3
 
-if [ "$NIGHTLY" = false ]
+if [ "$NIGHTLY" != true ]
 then
   source ~/.profile
 
