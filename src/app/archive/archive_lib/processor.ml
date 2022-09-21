@@ -464,10 +464,7 @@ module Zkapp_verification_keys = struct
         , Pickles.Backend.Tick.Field.t )
         With_hash.t ) =
     let verification_key =
-      Binable.to_string
-        (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-        vk.data
-      |> Base64.encode_exn
+      Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
     let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
     let value = { hash; verification_key } in
