@@ -274,6 +274,7 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Call_stack_digest.Stable) (W.Call_stack_digest)
   include Assert_equal0V1 (O.Stack_frame.Digest.Stable) (W.Stack_frame.Digest)
   include Assert_equal0V1 (O.Sok_message.Digest.Stable) (W.Sok_message.Digest)
+  include Assert_equal0V1 (O.Fee_with_prover.Stable) (W.Fee_with_prover)
 end
 
 module One_or_two = struct

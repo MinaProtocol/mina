@@ -34,3 +34,4 @@ module Transaction_status = Mina_base_transaction_status
 module Call_stack_digest = Mina_base_call_stack_digest
 module Stack_frame = Mina_base_stack_frame
 module Sok_message = Mina_base_sok_message
+module Fee_with_prover = Mina_base_fee_with_prover
