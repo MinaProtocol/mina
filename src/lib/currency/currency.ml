@@ -14,6 +14,12 @@ open Let_syntax
 
 open Intf
 
+(** [Currency_oveflow] is being thrown to signal an overflow
+    or underflow during conversions from [int] to currency.
+    The exception contains the [int] value that caused the
+    misbehaviour. *)
+exception Currency_overflow of int
+
 type uint64 = Unsigned.uint64
 
 (** See documentation of the {!Mina_wire_types} library *)
@@ -358,17 +364,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* The number of nanounits in a unit. User for unit transformations. *)
     let unit_to_nano = 1_000_000_000
 
-    (* The functions below are unsafe, because they don't guard
-       against overflows or underflows. Still, they're useful when we
-       need to introduce a constant amount of mina that we know for
-       sure will be fine (e.g. in tests). For variables the safe
-       functions defined further below should be used instead. *)
-    let nanomina_unsafe = of_int
-
-    let centimina_unsafe i = of_int (centi_to_nano * i)
-
-    let mina_unsafe i = of_int (unit_to_nano * i)
-
     let int_of_nanomina = to_int
 
     let int_of_centimina m = to_int m / centi_to_nano
@@ -409,11 +404,29 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let ( - ) = sub
 
+    (* The functions below are unsafe, because they could overflow or
+       underflow. They perform appropriate checks to guard against this
+       and either raise Currency_overflow exception or return None
+       depending on the error-handling strategy.
+
+       It is advisable to use nanomina, centimina and mina wherever
+       possible and limit the use of _exn veriants to places where
+       a fixed value is being converted and hence overflow cannot
+       happen. *)
     let nanomina i = if Int.(i >= 0) then Some (of_int i) else None
 
     let centimina i = Option.(nanomina i >>= Fn.flip scale centi_to_nano)
 
     let mina i = Option.(nanomina i >>= Fn.flip scale unit_to_nano)
+
+    let nanomina_exn i =
+      match nanomina i with None -> raise (Currency_overflow i) | Some m -> m
+
+    let centimina_exn i =
+      match centimina i with None -> raise (Currency_overflow i) | Some m -> m
+
+    let mina_exn i =
+      match mina i with None -> raise (Currency_overflow i) | Some m -> m
 
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
 

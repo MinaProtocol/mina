@@ -34,9 +34,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
     let%bind (predicate_account : Zkapp_precondition.Account.t) =
       let%bind balance =
         let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
-        let balance_change =
-          Currency.Amount.nanomina_unsafe balance_change_int
-        in
+        let balance_change = Currency.Amount.nanomina_exn balance_change_int in
         let lower =
           match Currency.Balance.sub_amount balance balance_change with
           | None ->
@@ -407,8 +405,8 @@ let gen_protocol_state_precondition
   in
   let%bind total_currency =
     let open Currency in
-    let%bind epsilon1 = Amount.gen_incl Amount.zero (Amount.mina_unsafe 1) in
-    let%bind epsilon2 = Amount.gen_incl Amount.zero (Amount.mina_unsafe 1) in
+    let%bind epsilon1 = Amount.gen_incl Amount.zero (Amount.mina_exn 1) in
+    let%bind epsilon2 = Amount.gen_incl Amount.zero (Amount.mina_exn 1) in
     { lower =
         Amount.sub psv.total_currency epsilon1
         |> Option.value ~default:Amount.zero
@@ -547,9 +545,7 @@ let gen_invalid_protocol_state_precondition
   | Total_currency ->
       let open Currency in
       let%map total_currency =
-        let%map epsilon =
-          Amount.(gen_incl (nanomina_unsafe 1_000) (mina_unsafe 1))
-        in
+        let%map epsilon = Amount.(gen_incl (nanomina_exn 1_000) (mina_exn 1)) in
         if lower || Amount.(psv.total_currency > epsilon) then
           { lower = Amount.zero
           ; upper =

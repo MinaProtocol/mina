@@ -228,7 +228,7 @@ module Db = struct
       let load_ledger num_accounts (balance : int) =
         let ledger = create ~depth:Depth.depth () in
         let account_ids = Account_id.gen_accounts num_accounts in
-        let currency_balance = Currency.Balance.nanomina_unsafe balance in
+        let currency_balance = Currency.Balance.nanomina_exn balance in
         List.iter account_ids ~f:(fun aid ->
             let account = Account.create aid currency_balance in
             ignore
@@ -333,7 +333,7 @@ module Mask = struct
         List.iter account_ids ~f:(fun account_id ->
             let account =
               Account.create account_id
-                (Currency.Balance.nanomina_unsafe
+                (Currency.Balance.nanomina_exn
                    (initial_balance_multiplier * 2) )
             in
             let action, _ =

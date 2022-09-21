@@ -86,8 +86,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     let num_payments = 3 in
-    let fee = Currency.Fee.centimina_unsafe 1 in
-    let amount = Currency.Amount.centimina_unsafe 1 in
+    let fee = Currency.Fee.centimina_exn 1 in
+    let amount = Currency.Amount.centimina_exn 1 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
     let%bind hashlist =

@@ -131,7 +131,7 @@ let gen_division_currency =
 
       let ( - ) a b = Option.value_exn (a - b)
 
-      let of_int = nanomina_unsafe
+      let of_int = nanomina_exn
 
       let to_int = int_of_nanomina
     end )

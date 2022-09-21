@@ -58,7 +58,7 @@ let%test_module "Zkapp tokens tests" =
                      (Public_key.compress keypair.public_key)
                      token_id )
                     .balance
-                  (Currency.Balance.nanomina_unsafe balance)
+                  (Currency.Balance.nanomina_exn balance)
               in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let open Async.Deferred.Let_syntax in
