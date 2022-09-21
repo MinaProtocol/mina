@@ -330,3 +330,9 @@ module Ledger_proof = struct
   module W = WT.Ledger_proof
   include Assert_equal0V2 (O.Stable) (W)
 end
+
+module Network_pool = struct
+  module O = Network_pool
+  module W = WT.Network_pool
+  include Assert_equal1V1 (O.Priced_proof.Stable) (W.Priced_proof)
+end

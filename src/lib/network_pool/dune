@@ -75,6 +75,7 @@
    kimchi_backend.pasta
    genesis_ledger
    staged_ledger_diff
+   mina_wire_types
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

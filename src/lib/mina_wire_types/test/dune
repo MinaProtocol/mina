@@ -18,6 +18,7 @@
     transaction_snark
     transaction_snark_work
     ledger_proof
+    network_pool
     ; Necessary for the type equality
     sgn
     sgn_type
