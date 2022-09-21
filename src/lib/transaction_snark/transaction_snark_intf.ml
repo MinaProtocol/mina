@@ -79,13 +79,6 @@ module type Full = sig
                , 'sok_digest
                , 'local_state )
                t =
-                ( 'ledger_hash
-                , 'amount
-                , 'pending_coinbase
-                , 'fee_excess
-                , 'sok_digest
-                , 'local_state )
-                Mina_wire_types.Transaction_snark.Statement.Poly.V2.t =
             { source :
                 ( 'ledger_hash
                 , 'pending_coinbase

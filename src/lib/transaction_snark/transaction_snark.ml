@@ -10,7 +10,22 @@ open Pickles_types
 module Wire_types = Mina_wire_types.Transaction_snark
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Transaction_snark_intf.Full
+  module type S =
+    Transaction_snark_intf.Full
+      with type ( 'ledger_hash
+                , 'amount
+                , 'pending_coinbase
+                , 'fee_excess
+                , 'sok_digest
+                , 'local_state )
+                Statement.Poly.Stable.V2.t =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        A.Statement.Poly.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -143,7 +158,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , 'fee_excess
                 , 'sok_digest
                 , 'local_state )
-                Mina_wire_types.Transaction_snark.Statement.Poly.V2.t =
+                A.Statement.Poly.V2.t =
             { source :
                 ( 'ledger_hash
                 , 'pending_coinbase
