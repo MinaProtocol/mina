@@ -2958,7 +2958,7 @@ module Ledger = struct
       (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_account_update_signatures txn ;
     let ledger = l##.value in
-    let applied_exn =
+    let application_result =
       T.apply_zkapp_command_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
@@ -2966,7 +2966,13 @@ module Ledger = struct
           }
         ledger txn
     in
-    let applied, _ = Or_error.ok_exn applied_exn in
+    let applied, _ =
+      match application_result with
+      | Ok res ->
+          res
+      | Error err ->
+          raise_error (Error.to_string_hum err)
+    in
     let T.Transaction_applied.Zkapp_command_applied.{ accounts; command; _ } =
       applied
     in
