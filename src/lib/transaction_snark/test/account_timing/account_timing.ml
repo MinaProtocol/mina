@@ -962,6 +962,59 @@ let%test_module "account timing check" =
             ; cmd
             }
 
+        (* We want to preset a couple of specific testing scenarios to
+           be extra sure that everything is working. *)
+        let examples =
+          let open Mina_numbers in
+          let balance = Balance.of_mina_int_exn 10_000 in
+          let cliff_time = Global_slot.of_int 10_000 in
+          [ (* Before cliff only balance in excess of the initial minimum may be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~init_min_bal:(Balance.of_mina_int_exn 50)
+                 ~slot:(Global_slot.of_int 1)
+                 ~amount:(Amount.of_mina_int_exn 10)
+                 ()
+          ; (* Before cliff time funds below the minimum balance cannot be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 1)
+                 ~amount:(Amount.of_mina_int_exn 100)
+                 ()
+          ; (* Just before cliff the balance still can't fall below the minimum. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 9_999)
+                 ~amount:(Amount.of_mina_int_exn 100)
+                 ()
+          ; (* At cliff time the cliff amount may immediately be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:cliff_time
+                 ~amount:(Amount.of_mina_int_exn 100)
+                 ()
+          ; (* After vesting is finished, everything may be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 20_000)
+                 ~amount:(Amount.of_mina_int_exn 9_000)
+                 ()
+          ; (* After vesting, still can't spend more than the current balance. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time
+                 ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 200_000)
+                 ~amount:(Amount.of_mina_int_exn 100_000)
+                 ()
+          ]
+
         (* Examine the initial conditions in order to determine
            whether we should expect the transaction to succeed or
            fail. Note that we first check that the fee alone can be
@@ -1044,7 +1097,7 @@ let%test_module "account timing check" =
 
         let%test_unit "generic user transaction" =
           Quickcheck.test ~seed:(`Deterministic "generic, timed account")
-            ~sexp_of:sexp_of_t ~trials:1000 (gen ()) ~f:execute_test
+            ~sexp_of:sexp_of_t ~examples ~trials:1000 (gen ()) ~f:execute_test
       end )
 
     (* zkApps with timings *)
