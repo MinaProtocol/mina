@@ -92,8 +92,7 @@ let%test_module "account timing check" =
       let account =
         account_with_default_vesting_schedule
           ~initial_minimum_balance:(Balance.of_mina_int_exn 80_000)
-          ~cliff_amount:(Amount.of_centimina_int_exn 50)
-          (Balance.of_mina_int_exn 100_000)
+          ~cliff_amount:(Amount.of_centimina_int_exn 50) (Balance.of_mina_int_exn 100_000)
       in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
@@ -149,8 +148,7 @@ let%test_module "account timing check" =
     let%test "curr min balance of zero" =
       let account =
         account_with_default_vesting_schedule
-          ~cliff_amount:(Amount.of_centimina_int_exn 90)
-          (Balance.of_mina_int_exn 100_000)
+          ~cliff_amount:(Amount.of_centimina_int_exn 90) (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 2_000 in
@@ -241,8 +239,7 @@ let%test_module "account timing check" =
           ~cliff_amount:(Amount.of_mina_int_exn 10_000)
             (* The same as initial minimum balance. *)
           ~vesting_period:(Mina_numbers.Global_slot.of_int 1)
-          ~vesting_increment:Amount.zero
-          (Balance.of_mina_int_exn 100_000)
+          ~vesting_increment:Amount.zero (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100_000 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int slot in
@@ -862,11 +859,11 @@ let%test_module "account timing check" =
           in
           let%bind balance =
             unless_fixed ?fixed:balance
-              Balance.(gen_incl (mina_unsafe 1_000) (mina_unsafe 50_000))
+              Balance.(gen_incl (of_mina_int_exn 1_000) (of_mina_int_exn 50_000))
           in
           let%bind init_min_bal =
             unless_fixed ?fixed:init_min_bal
-              Balance.(gen_incl (mina_unsafe 1_000) balance)
+              Balance.(gen_incl (of_mina_int_exn 1_000) balance)
           in
           let init_min_amt = Currency.Balance.to_amount init_min_bal in
           let%bind cliff_time =
@@ -883,7 +880,7 @@ let%test_module "account timing check" =
           let to_vest =
             Amount.(
               Option.value ~default:zero @@ (init_min_amt - cliff_amt)
-              |> int_of_nanomina)
+              |> to_nanomina_int)
           in
           (* A numeric trick to get the division result rounded up instead of down. *)
           let div_rnd_up num denom = (num + denom - 1) / denom in
@@ -891,12 +888,14 @@ let%test_module "account timing check" =
             unless_fixed ?fixed:vest_incr
               Amount.(
                 gen_incl
-                  (nanomina_unsafe @@ div_rnd_up to_vest 100)
-                  (nanomina_unsafe @@ div_rnd_up to_vest 10))
+                  (of_nanomina_int_exn @@ div_rnd_up to_vest 100)
+                  (of_nanomina_int_exn @@ div_rnd_up to_vest 10))
           in
           let vest_time =
-            Global_slot.to_int vest_period
-            * (to_vest / Amount.int_of_nanomina vest_incr)
+            if Amount.(vest_incr = zero) then 0
+            else
+              Global_slot.to_int vest_period
+              * (to_vest / Amount.to_nanomina_int vest_incr)
           in
           let%bind slot =
             unless_fixed ?fixed:slot
@@ -933,12 +932,12 @@ let%test_module "account timing check" =
             match amount with
             | None ->
                 Amount.
-                  ( available_funds - mina_unsafe 100
-                    |> Option.value ~default:zero |> int_of_nanomina
-                  , available_funds + mina_unsafe 100
-                    |> Option.value ~default:zero |> int_of_nanomina )
+                  ( available_funds - of_mina_int_exn 100
+                    |> Option.value ~default:zero |> to_nanomina_int
+                  , available_funds + of_mina_int_exn 100
+                    |> Option.value ~default:zero |> to_nanomina_int )
             | Some a ->
-                let i = Amount.int_of_nanomina a in
+                let i = Amount.to_nanomina_int a in
                 (i, i)
           in
           let%bind cmd =
@@ -957,6 +956,44 @@ let%test_module "account timing check" =
             ; available_funds
             ; cmd
             }
+
+        (* We want to preset a couple of specific testing scenarios to
+           be extra sure that everything is working. *)
+        let examples =
+          let open Mina_numbers in
+          let balance = Balance.of_mina_int_exn 10_000 in
+          let cliff_time = Global_slot.of_int 10_000 in
+          [ (* Before cliff only balance in excess of the initial minimum may be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~init_min_bal:(Balance.of_mina_int_exn 50)
+                 ~slot:(Global_slot.of_int 1) ~amount:(Amount.of_mina_int_exn 10) ()
+          ; (* Before cliff time funds below the minimum balance cannot be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 1) ~amount:(Amount.of_mina_int_exn 100) ()
+          ; (* Just before cliff the balance still can't fall below the minimum. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 9_999) ~amount:(Amount.of_mina_int_exn 100)
+                 ()
+          ; (* At cliff time the cliff amount may immediately be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995) ~slot:cliff_time
+                 ~amount:(Amount.of_mina_int_exn 100) ()
+          ; (* After vesting is finished, everything may be spent. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 20_000)
+                 ~amount:(Amount.of_mina_int_exn 9_000) ()
+          ; (* After vesting, still can't spend more than the current balance. *)
+            Quickcheck.random_value
+            @@ gen ~balance ~cliff_time ~cliff_amt:(Amount.of_mina_int_exn 9_995)
+                 ~init_min_bal:(Balance.of_mina_int_exn 9_995)
+                 ~slot:(Global_slot.of_int 200_000)
+                 ~amount:(Amount.of_mina_int_exn 100_000) ()
+          ]
 
         (* Examine the initial conditions in order to determine
            whether we should expect the transaction to succeed or
@@ -1040,7 +1077,7 @@ let%test_module "account timing check" =
 
         let%test_unit "generic user transaction" =
           Quickcheck.test ~seed:(`Deterministic "generic, timed account")
-            ~sexp_of:sexp_of_t ~trials:1000 (gen ()) ~f:execute_test
+            ~sexp_of:sexp_of_t ~examples ~trials:1000 (gen ()) ~f:execute_test
       end )
 
     (* zkApps with timings *)
