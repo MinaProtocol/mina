@@ -2,7 +2,7 @@
 
 Mina is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
-- [Developer homepage](https://docs.minaprotocol.com/en/developers)
+- [Node Developer homepage](https://docs.minaprotocol.com/en/node-developers)
 - [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
