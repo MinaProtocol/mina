@@ -187,7 +187,7 @@ module Update = struct
         Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
       in
       let%map vesting_increment =
-        Amount.gen_incl Amount.one (Amount.nanomina_unsafe 100)
+        Amount.gen_incl Amount.one (Amount.nanomina_exn 100)
       in
       { initial_minimum_balance
       ; cliff_time

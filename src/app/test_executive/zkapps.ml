@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let memo = "" in
     let valid_until = Mina_numbers.Global_slot.max_value in
-    let fee = Currency.Fee.nanomina_unsafe 1_000_000 in
+    let fee = Currency.Fee.nanomina_exn 1_000_000 in
     let payload =
       let common =
         { Signed_command_payload.Common.Poly.fee
@@ -141,12 +141,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_create_accounts =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction create-zkapp-account *)
-      let amount = Currency.Amount.mina_unsafe 10 in
+      let amount = Currency.Amount.mina_exn 10 in
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
-      let fee = Currency.Fee.centimina_unsafe 2 in
+      let fee = Currency.Fee.centimina_exn 2 in
       let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
           =
         { sender = (fish1_kp, nonce)
@@ -172,7 +172,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
       (* Lower fee so that zkapp_command_create_accounts gets applied first *)
-      let fee = Currency.Fee.centimina_unsafe 1 in
+      let fee = Currency.Fee.centimina_exn 1 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
@@ -226,7 +226,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update all"
       in
-      let fee = Currency.Fee.centimina_unsafe 1 in
+      let fee = Currency.Fee.centimina_exn 1 in
       let app_state =
         let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
@@ -298,9 +298,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind.Deferred zkapp_command_insufficient_replace_fee =
         let spec_insufficient_replace_fee :
             Transaction_snark.For_tests.Update_states_spec.t =
-          { zkapp_command_spec with
-            fee = Currency.Fee.nanomina_unsafe 5_000_000
-          }
+          { zkapp_command_spec with fee = Currency.Fee.nanomina_exn 5_000_000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_replace_fee
@@ -308,7 +306,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%map.Deferred zkapp_command_insufficient_fee =
         let spec_insufficient_fee :
             Transaction_snark.For_tests.Update_states_spec.t =
-          { zkapp_command_spec with fee = Currency.Fee.nanomina_unsafe 1000 }
+          { zkapp_command_spec with fee = Currency.Fee.nanomina_exn 1000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_fee
@@ -350,7 +348,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Non-existent account"
       in
-      let fee = Currency.Fee.centimina_unsafe 1 in
+      let fee = Currency.Fee.centimina_exn 1 in
       let spec : Transaction_snark.For_tests.Update_states_spec.t =
         { sender = (new_kp, Account.Nonce.zero)
         ; fee
@@ -813,7 +811,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let needed = 36 in
         if !transactions_sent >= needed then 0 else needed - !transactions_sent
       in
-      let fee = Currency.Fee.nanomina_unsafe 1_000_000 in
+      let fee = Currency.Fee.nanomina_exn 1_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
         ~n:padding_payments
     in

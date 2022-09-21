@@ -67,8 +67,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind { hash = txn_hash; _ } =
            Node.must_send_payment ~logger node_c ~sender_pub_key
              ~receiver_pub_key
-             ~amount:(Currency.Amount.nanomina_unsafe 1_000_000)
-             ~fee:(Currency.Fee.centimina_unsafe 1)
+             ~amount:(Currency.Amount.nanomina_exn 1_000_000)
+             ~fee:(Currency.Fee.centimina_exn 1)
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
@@ -86,13 +86,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       section_hard "send a zkApp to create an account"
         (let%bind parties_create_accounts =
-           let amount = Currency.Amount.mina_unsafe 10 in
+           let amount = Currency.Amount.mina_exn 10 in
            let nonce = Mina_base.Account.Nonce.(succ zero) in
            let memo =
              Mina_base.Signed_command_memo.create_from_string_exn
                "Zkapp create account"
            in
-           let fee = Currency.Fee.centimina_unsafe 2 in
+           let fee = Currency.Fee.centimina_exn 2 in
            let sender_kp =
              (Option.value_exn (Node.network_keypair node_c)).keypair
            in

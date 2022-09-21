@@ -540,7 +540,7 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.nanomina_unsafe (n + 1))
+          List.init num_accounts ~f:(fun n -> Balance.nanomina_exn (n + 1))
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -580,7 +580,7 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.nanomina_unsafe (n + 1))
+          List.init num_accounts ~f:(fun n -> Balance.nanomina_exn (n + 1))
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -720,12 +720,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let k = Account_id.gen_accounts 1 |> List.hd_exn in
-        let acct1 = Account.create k (Balance.nanomina_unsafe 10) in
+        let acct1 = Account.create k (Balance.nanomina_exn 10) in
         let loc =
           Mask.Attached.get_or_create_account attached_mask k acct1
           |> Or_error.ok_exn |> snd
         in
-        let acct2 = Account.create k (Balance.nanomina_unsafe 5) in
+        let acct2 = Account.create k (Balance.nanomina_exn 5) in
         Maskable.set maskable loc acct2 ;
         [%test_result: Account.t] ~message:"account in mask should be unchanged"
           ~expect:acct1

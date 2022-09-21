@@ -27,11 +27,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-        { initial_minimum_balance = Balance.nanomina_unsafe min_balance
+        { initial_minimum_balance = Balance.nanomina_exn min_balance
         ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount = Amount.nanomina_unsafe cliff_amount
+        ; cliff_amount = Amount.nanomina_exn cliff_amount
         ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment = Amount.nanomina_unsafe vesting_increment
+        ; vesting_increment = Amount.nanomina_exn vesting_increment
         }
     in
     { default with
@@ -331,7 +331,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.mina_unsafe 1_000 in
+        (let amount = Currency.Amount.mina_exn 1_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
@@ -371,7 +371,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
-        (let amount = Currency.Amount.mina_unsafe 25_000 in
+        (let amount = Currency.Amount.mina_exn 25_000 in
          let receiver = untimed_node_b in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in

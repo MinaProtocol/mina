@@ -46,11 +46,20 @@ module type Basic = sig
 
   val of_uint64 : uint64 -> t
 
-  val mina_unsafe : int -> t
+  (* The functions below are unsafe, because they could overflow or
+     underflow. They perform appropriate checks to guard against this
+     and either raise Currency_overflow exception or return None
+     depending on the error-handling strategy.
 
-  val centimina_unsafe : int -> t
+     It is advisable to use nanomina, centimina and mina wherever
+     possible and limit the use of _exn veriants to places where
+     a fixed value is being converted and hence overflow cannot
+     happen. *)
+  val mina_exn : int -> t
 
-  val nanomina_unsafe : int -> t
+  val centimina_exn : int -> t
+
+  val nanomina_exn : int -> t
 
   val mina : int -> t option
 
