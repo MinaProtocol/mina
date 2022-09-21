@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types
 
 [%%versioned
 module Stable = struct
@@ -37,7 +36,7 @@ let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 
 type proofs_verified = t
 
-let of_nat (type n) (n : n Nat.t) : t =
+let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
   match n with
   | Z ->
       N0
@@ -46,16 +45,18 @@ let of_nat (type n) (n : n Nat.t) : t =
   | S (S Z) ->
       N2
   | _ ->
-      failwithf "Proofs_verified.of_nat: got %d" (Nat.to_int n) ()
+      failwithf "Proofs_verified.of_nat: got %d" (Pickles_types.Nat.to_int n) ()
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 
+type 'a vec2 = ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+
 module Prefix_mask = struct
   module Checked = struct
-    type 'f t = ('f boolean, Nat.N2.n) Vector.t
+    type 'f t = 'f boolean vec2
   end
 
-  let there : proofs_verified -> (bool, Nat.N2.n) Vector.t = function
+  let there : proofs_verified -> bool vec2 = function
     | N0 ->
         [ false; false ]
     | N1 ->
@@ -63,7 +64,7 @@ module Prefix_mask = struct
     | N2 ->
         [ true; true ]
 
-  let back : (bool, Nat.N2.n) Vector.t -> proofs_verified = function
+  let back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
         N0
     | [ true; false ] ->
@@ -79,17 +80,19 @@ module Prefix_mask = struct
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
       (f Checked.t, proofs_verified) Impl.Typ.t =
     let open Impl in
-    Typ.transport (Vector.typ Boolean.typ Nat.N2.n) ~there ~back
+    Typ.transport
+      (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
+      ~there ~back
 end
 
 module One_hot = struct
   module Checked = struct
-    type 'f t = ('f, Nat.N3.n) One_hot_vector.t
+    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
 
     let to_input (type f) (t : f t) =
       Random_oracle_input.Chunked.packeds
         (Array.map
-           (Vector.to_array (t :> (f boolean, Nat.N3.n) Vector.t))
+           Pickles_types.(Vector.to_array (t :> (f boolean, Nat.N3.n) Vector.t))
            ~f:(fun b -> ((b :> f Snarky_backendless.Cvar.t), 1)) )
   end
 
@@ -122,5 +125,5 @@ module One_hot = struct
       (f Checked.t, proofs_verified) Impl.Typ.t =
     let module M = One_hot_vector.Make (Impl) in
     let open Impl in
-    Typ.transport (M.typ Nat.N3.n) ~there ~back
+    Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
 end
