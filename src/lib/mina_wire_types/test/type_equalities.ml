@@ -323,3 +323,9 @@ module Transaction_snark_work = struct
   module W = WT.Transaction_snark_work
   include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
 end
+
+module Ledger_proof = struct
+  module O = Ledger_proof
+  module W = WT.Ledger_proof
+  include Assert_equal0V2 (O.Stable) (W)
+end

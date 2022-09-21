@@ -17,6 +17,7 @@
     mina_transaction_logic
     transaction_snark
     transaction_snark_work
+    ledger_proof
     ; Necessary for the type equality
     sgn
     sgn_type
