@@ -39,6 +39,19 @@ module Types : sig
           , Mina_state.Local_state.V1.t )
           Poly.V2.t
       end
+
+      module With_sok : sig
+        module V2 : sig
+          type t =
+            ( Mina_base.Ledger_hash.V1.t
+            , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+            , Mina_base.Pending_coinbase.Stack_versioned.V1.t
+            , Mina_base.Fee_excess.V1.t
+            , Mina_base.Sok_message.Digest.V1.t
+            , Mina_state.Local_state.V1.t )
+            Poly.V2.t
+        end
+      end
     end
   end
 end
@@ -80,6 +93,19 @@ module type Concrete = sig
         , unit
         , Mina_state.Local_state.V1.t )
         Poly.V2.t
+    end
+
+    module With_sok : sig
+      module V2 : sig
+        type t =
+          ( Mina_base.Ledger_hash.V1.t
+          , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+          , Mina_base.Pending_coinbase.Stack_versioned.V1.t
+          , Mina_base.Fee_excess.V1.t
+          , Mina_base.Sok_message.Digest.V1.t
+          , Mina_state.Local_state.V1.t )
+          Poly.V2.t
+      end
     end
   end
 
@@ -127,6 +153,19 @@ module M : sig
         , unit
         , Mina_state.Local_state.V1.t )
         Poly.V2.t
+    end
+
+    module With_sok : sig
+      module V2 : sig
+        type t =
+          ( Mina_base.Ledger_hash.V1.t
+          , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+          , Mina_base.Pending_coinbase.Stack_versioned.V1.t
+          , Mina_base.Fee_excess.V1.t
+          , Mina_base.Sok_message.Digest.V1.t
+          , Mina_state.Local_state.V1.t )
+          Poly.V2.t
+      end
     end
   end
 end
