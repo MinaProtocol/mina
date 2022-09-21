@@ -7,7 +7,7 @@ let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
 
 let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
 
-let receipt_chain_parties = salt receipt_chain_user_command
+let receipt_chain_zkapp_command = salt receipt_chain_user_command
 
 let receipt_chain_zkapp = salt receipt_chain_zkapp
 
@@ -102,17 +102,18 @@ let zkapp_precondition_account = salt zkapp_precondition_account
 
 let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
 
-let party = salt party
+let account_update = salt account_update
 
-let party_account_precondition = salt party_account_precondition
+let account_update_account_precondition =
+  salt account_update_account_precondition
 
-let party_cons = salt party_cons
+let account_update_cons = salt account_update_cons
 
-let party_node = salt party_node
+let account_update_node = salt account_update_node
 
-let party_stack_frame = salt party_stack_frame
+let account_update_stack_frame = salt account_update_stack_frame
 
-let party_stack_frame_cons = salt party_stack_frame_cons
+let account_update_stack_frame_cons = salt account_update_stack_frame_cons
 
 let zkapp_uri = salt zkapp_uri
 

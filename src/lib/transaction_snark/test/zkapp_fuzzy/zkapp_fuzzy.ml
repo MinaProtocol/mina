@@ -91,10 +91,8 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   (ledger, fee_payer_keypairs, keymap)
 
-let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
-
-let generate_parties_and_apply_them_consecutively ~trials ~max_other_parties ()
-    =
+let generate_zkapp_commands_and_apply_them_consecutively ~trials
+    ~max_account_updates () =
   let num_of_fee_payers = 5 in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
@@ -103,20 +101,20 @@ let generate_parties_and_apply_them_consecutively ~trials ~max_other_parties ()
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
+          (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
              ~protocol_state_view:U.genesis_state_view ~account_state_tbl
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~max_other_parties ~keymap ~ledger ~vk () )
-          ~f:(fun parties_dummy_auths ->
+             ~max_account_updates ~keymap ~ledger ~vk () )
+          ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
-                let%bind.Deferred parties =
-                  Parties_builder.replace_authorizations ~prover ~keymap
-                    parties_dummy_auths
+                let%bind.Deferred zkapp_command =
+                  Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                    zkapp_command_dummy_auths
                 in
                 [%log info]
                   ~metadata:
-                    [ ("parties", Parties.to_yojson parties)
+                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
                     ; ( "accounts"
                       , `List
                           (List.map
@@ -128,14 +126,16 @@ let generate_parties_and_apply_them_consecutively ~trials ~max_other_parties ()
                                |> Mina_ledger.Ledger.get ledger
                                |> Option.value_exn |> Account.to_yojson ) ) )
                     ]
-                  "generated parties" ;
-                U.check_parties_with_merges_exn ledger [ parties ] ) )
+                  "generated zkapp_command" ;
+                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
+            )
       in
       for i = 0 to trials - 1 do
         test i
       done )
 
-let generate_parties_and_apply_them_freshly ~trials ~max_other_parties () =
+let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
+    () =
   let num_of_fee_payers = 5 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
@@ -143,24 +143,25 @@ let generate_parties_and_apply_them_freshly ~trials ~max_other_parties () =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
+          (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~max_other_parties ~keymap ~ledger ~vk () )
-          ~f:(fun parties_dummy_auths ->
+             ~max_account_updates ~keymap ~ledger ~vk () )
+          ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
-                let%bind.Deferred parties =
-                  Parties_builder.replace_authorizations ~prover ~keymap
-                    parties_dummy_auths
+                let%bind.Deferred zkapp_command =
+                  Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                    zkapp_command_dummy_auths
                 in
-                U.check_parties_with_merges_exn ledger [ parties ] ) )
+                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
+            )
       in
       for i = 0 to trials - 1 do
         test i
       done )
 
-let mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+let mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
     ~type_of_failure ~expected_failure_status =
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
@@ -168,29 +169,30 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
+          (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
              ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~max_other_parties ~keymap ~ledger ~vk () )
-          ~f:(fun parties_dummy_auths ->
+             ~max_account_updates ~keymap ~ledger ~vk () )
+          ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
-                let%bind.Deferred parties =
-                  Parties_builder.replace_authorizations ~prover ~keymap
-                    parties_dummy_auths
+                let%bind.Deferred zkapp_command =
+                  Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                    zkapp_command_dummy_auths
                 in
                 [%log info]
-                  ~metadata:[ ("parties", Parties.to_yojson parties) ]
-                  "generated parties" ;
-                U.check_parties_with_merges_exn
-                  ~expected_failure:expected_failure_status ledger [ parties ]
-                  ~state_body:U.genesis_state_body ) )
+                  ~metadata:
+                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ]
+                  "generated zkapp_command" ;
+                U.check_zkapp_command_with_merges_exn
+                  ~expected_failure:expected_failure_status ledger
+                  [ zkapp_command ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
       done )
 
-let test_timed_account ~trials ~max_other_parties () =
+let test_timed_account ~trials ~max_account_updates () =
   let num_of_fee_payers = 5 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
@@ -198,24 +200,25 @@ let test_timed_account ~trials ~max_other_parties () =
           mk_ledgers_and_fee_payers ~is_timed:true ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
+          (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~max_other_parties ~keymap ~ledger ~vk () )
-          ~f:(fun parties_dummy_auths ->
+             ~max_account_updates ~keymap ~ledger ~vk () )
+          ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
-                let%bind.Deferred parties =
-                  Parties_builder.replace_authorizations ~prover ~keymap
-                    parties_dummy_auths
+                let%bind.Deferred zkapp_command =
+                  Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                    zkapp_command_dummy_auths
                 in
                 [%log info]
-                  ~metadata:[ ("parties", Parties.to_yojson parties) ]
-                  "generated parties" ;
-                U.check_parties_with_merges_exn
+                  ~metadata:
+                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ]
+                  "generated zkapp_command" ;
+                U.check_zkapp_command_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Source_minimum_balance_violation
-                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
+                  ledger [ zkapp_command ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -232,31 +235,32 @@ let () =
        in
        fun () ->
          let num_of_fee_payers = 5 in
-         let max_other_parties = 3 in
-         generate_parties_and_apply_them_consecutively ~trials
-           ~max_other_parties () ;
-         generate_parties_and_apply_them_freshly ~trials ~max_other_parties () ;
-         let open Mina_generators.Parties_generators in
+         let max_account_updates = 3 in
+         generate_zkapp_commands_and_apply_them_consecutively ~trials
+           ~max_account_updates () ;
+         generate_zkapp_commands_and_apply_them_freshly ~trials
+           ~max_account_updates () ;
+         let open Mina_generators.Zkapp_command_generators in
          let open Transaction_status.Failure in
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:Invalid_protocol_state_precondition
            ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `App_state)
            ~expected_failure_status:Update_not_permitted_app_state ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Verification_key)
            ~expected_failure_status:Update_not_permitted_verification_key ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Zkapp_uri)
            ~expected_failure_status:Update_not_permitted_zkapp_uri ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Token_symbol)
            ~expected_failure_status:Update_not_permitted_token_symbol ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Voting_for)
            ~expected_failure_status:Update_not_permitted_voting_for ;
-         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Balance)
            ~expected_failure_status:Update_not_permitted_balance ;
-         test_timed_account ~trials ~max_other_parties ())
+         test_timed_account ~trials ~max_account_updates ())

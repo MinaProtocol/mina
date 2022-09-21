@@ -61,7 +61,7 @@ let%test_module "Archive node unit tests" =
       Mina_state.Protocol_state.Body.view genesis_state_body
 
     let user_command_zkapp_gen :
-        ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
+        ('a, Zkapp_command.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind initial_balance =
         Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
@@ -108,11 +108,12 @@ let%test_module "Archive node unit tests" =
           Mina_ledger.Ledger.get_or_create_account ledger account_id account
           |> Or_error.ok_exn )
       |> fun _ ->
-      let%map (parties : Parties.t) =
-        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
+      let%map (zkapp_command : Zkapp_command.t) =
+        Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
+          ~fee_payer_keypair ~keymap ~ledger
+          ~protocol_state_view:genesis_state_view ()
       in
-      User_command.Parties parties
+      User_command.Zkapp_command zkapp_command
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0 ~max_fee:10

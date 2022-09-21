@@ -1362,8 +1362,8 @@ module Data = struct
                   in
                   if_
                     (prev_relative_sub_window < next_relative_sub_window)
-                    ~then_:Boolean.(gt_prev_sub_window && lt_next_sub_window)
-                    ~else_:Boolean.(gt_prev_sub_window || lt_next_sub_window))
+                    ~then_:Boolean.(gt_prev_sub_window &&& lt_next_sub_window)
+                    ~else_:Boolean.(gt_prev_sub_window ||| lt_next_sub_window))
               in
               if_
                 (Checked.return same_sub_window)
@@ -1386,7 +1386,7 @@ module Data = struct
                     (Length.Checked.to_field constants.grace_period_end) ) )
           in
           if_
-            Boolean.(same_sub_window || in_grace_period)
+            Boolean.(same_sub_window ||| in_grace_period)
             ~then_:(Checked.return prev_min_window_density)
             ~else_:
               (Length.Checked.min current_window_density prev_min_window_density)

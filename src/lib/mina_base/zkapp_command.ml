@@ -1,8 +1,9 @@
 open Core_kernel
 open Signature_lib
 
-let add_caller (p : Party.Wire.t) caller : Party.t =
-  let add_caller_body (p : Party.Body.Wire.t) caller : Party.Body.t =
+let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
+  let add_caller_body (p : Account_update.Body.Wire.t) caller :
+      Account_update.Body.t =
     { public_key = p.public_key
     ; token_id = p.token_id
     ; update = p.update
@@ -18,8 +19,9 @@ let add_caller (p : Party.Wire.t) caller : Party.t =
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
 
-let add_caller_simple (p : Party.Simple.t) caller : Party.t =
-  let add_caller_body (p : Party.Body.Simple.t) caller : Party.Body.t =
+let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
+  let add_caller_body (p : Account_update.Body.Simple.t) caller :
+      Account_update.Body.t =
     { public_key = p.public_key
     ; token_id = p.token_id
     ; update = p.update
@@ -42,15 +44,15 @@ module Call_forest = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('party, 'party_digest, 'digest) t =
-              ( 'party
-              , 'party_digest
+        type ('account_update, 'account_update_digest, 'digest) t =
+              ( 'account_update
+              , 'account_update_digest
               , 'digest )
-              Mina_wire_types.Mina_base.Parties.Call_forest.Tree.V1.t =
-          { party : 'party
-          ; party_digest : 'party_digest
+              Mina_wire_types.Mina_base.Zkapp_command.Call_forest.Tree.V1.t =
+          { account_update : 'account_update
+          ; account_update_digest : 'account_update_digest
           ; calls :
-              ( ('party, 'party_digest, 'digest) t
+              ( ('account_update, 'account_update_digest, 'digest) t
               , 'digest )
               With_stack_hash.Stable.V1.t
               list
@@ -65,8 +67,8 @@ module Call_forest = struct
       List.fold ts ~init ~f:(fun acc { elt; stack_hash = _ } ->
           fold elt ~init:acc ~f )
 
-    and fold { party; calls; party_digest = _ } ~f ~init =
-      fold_forest calls ~f ~init:(f init party)
+    and fold { account_update; calls; account_update_digest = _ } ~f ~init =
+      fold_forest calls ~f ~init:(f init account_update)
 
     let rec fold_forest2_exn (ts1 : (_ t, _) With_stack_hash.t list)
         (ts2 : (_ t, _) With_stack_hash.t list) ~f ~init =
@@ -77,9 +79,17 @@ module Call_forest = struct
              { elt = elt2; stack_hash = _ }
            -> fold2_exn elt1 elt2 ~init:acc ~f )
 
-    and fold2_exn { party = party1; calls = calls1; party_digest = _ }
-        { party = party2; calls = calls2; party_digest = _ } ~f ~init =
-      fold_forest2_exn calls1 calls2 ~f ~init:(f init party1 party2)
+    and fold2_exn
+        { account_update = account_update1
+        ; calls = calls1
+        ; account_update_digest = _
+        }
+        { account_update = account_update2
+        ; calls = calls2
+        ; account_update_digest = _
+        } ~f ~init =
+      fold_forest2_exn calls1 calls2 ~f
+        ~init:(f init account_update1 account_update2)
 
     let iter_forest2_exn ts1 ts2 ~f =
       fold_forest2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
@@ -89,7 +99,11 @@ module Call_forest = struct
 
     let rec mapi_with_trees' ~i (t : _ t) ~f =
       let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
-      (l, { calls; party = f i t.party t; party_digest = t.party_digest })
+      ( l
+      , { calls
+        ; account_update = f i t.account_update t
+        ; account_update_digest = t.account_update_digest
+        } )
 
     and mapi_forest_with_trees' ~i x ~f =
       let rec go i acc = function
@@ -105,18 +119,24 @@ module Call_forest = struct
 
     let mapi_forest_with_trees t ~f = mapi_forest_with_trees' ~i:0 t ~f |> snd
 
-    let mapi' ~i t ~f = mapi_with_trees' ~i t ~f:(fun i party _ -> f i party)
+    let mapi' ~i t ~f =
+      mapi_with_trees' ~i t ~f:(fun i account_update _ -> f i account_update)
 
     let mapi_forest' ~i t ~f =
-      mapi_forest_with_trees' ~i t ~f:(fun i party _ -> f i party)
+      mapi_forest_with_trees' ~i t ~f:(fun i account_update _ ->
+          f i account_update )
 
     let rec deferred_mapi_with_trees' ~i (t : _ t) ~f =
       let open Async_kernel.Deferred.Let_syntax in
       let%bind l, calls =
         deferred_mapi_forest_with_trees' ~i:(i + 1) t.calls ~f
       in
-      let%map party = f i t.party t in
-      (l, { calls; party; party_digest = t.party_digest })
+      let%map account_update = f i t.account_update t in
+      ( l
+      , { calls
+        ; account_update
+        ; account_update_digest = t.account_update_digest
+        } )
 
     and deferred_mapi_forest_with_trees' ~i x ~f =
       let open Async_kernel.Deferred.Let_syntax in
@@ -143,29 +163,29 @@ module Call_forest = struct
       let open Async_kernel.Deferred in
       deferred_mapi_forest_with_trees' ~i:0 ~f t >>| snd
 
-    let hash { party = _; calls; party_digest } =
+    let hash { account_update = _; calls; account_update_digest } =
       let stack_hash =
         match calls with [] -> empty | e :: _ -> e.stack_hash
       in
-      Random_oracle.hash ~init:Hash_prefix_states.party_node
-        [| party_digest; stack_hash |]
+      Random_oracle.hash ~init:Hash_prefix_states.account_update_node
+        [| account_update_digest; stack_hash |]
   end
 
   type ('a, 'b, 'c) tree = ('a, 'b, 'c) Tree.t
 
   module type Digest_intf = sig
-    module Party : sig
+    module Account_update : sig
       include Digest_intf.S
 
       module Checked : sig
         include Digest_intf.S_checked
 
-        val create : Party.Checked.t -> t
+        val create : Account_update.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Party.t -> t
+      val create : Account_update.t -> t
     end
 
     module rec Forest : sig
@@ -191,24 +211,28 @@ module Call_forest = struct
         include Digest_intf.S_checked
 
         val create :
-          party:Party.Checked.t -> calls:Forest.Checked.t -> Tree.Checked.t
+             account_update:Account_update.Checked.t
+          -> calls:Forest.Checked.t
+          -> Tree.Checked.t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : (_, Party.t, Forest.t) tree -> Tree.t
+      val create : (_, Account_update.t, Forest.t) tree -> Tree.t
     end
   end
 
-  module Make_digest_sig (T : Mina_wire_types.Mina_base.Parties.Digest_types.S) =
+  module Make_digest_sig
+      (T : Mina_wire_types.Mina_base.Zkapp_command.Digest_types.S) =
   struct
     module type S =
       Digest_intf
-        with type Party.Stable.V1.t = T.Party.V1.t
+        with type Account_update.Stable.V1.t = T.Account_update.V1.t
          and type Forest.Stable.V1.t = T.Forest.V1.t
   end
 
-  module Make_digest_str (T : Mina_wire_types.Mina_base.Parties.Digest_concrete) :
+  module Make_digest_str
+      (T : Mina_wire_types.Mina_base.Zkapp_command.Digest_concrete) :
     Make_digest_sig(T).S = struct
     module M = struct
       open Pickles.Impls.Step.Field
@@ -219,7 +243,7 @@ module Call_forest = struct
       let constant = constant
     end
 
-    module Party = struct
+    module Account_update = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -235,10 +259,10 @@ module Call_forest = struct
       module Checked = struct
         include Checked
 
-        let create = Party.Checked.digest
+        let create = Account_update.Checked.digest
       end
 
-      let create : Party.t -> t = Party.digest
+      let create : Account_update.t -> t = Account_update.digest
     end
 
     module Forest = struct
@@ -258,14 +282,15 @@ module Call_forest = struct
         include Checked
 
         let cons hash h_tl =
-          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
-            [| hash; h_tl |]
+          Random_oracle.Checked.hash
+            ~init:Hash_prefix_states.account_update_cons [| hash; h_tl |]
       end
 
       let empty = empty
 
       let cons hash h_tl =
-        Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
+        Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
+          [| hash; h_tl |]
     end
 
     module Tree = struct
@@ -284,22 +309,25 @@ module Call_forest = struct
       module Checked = struct
         include Checked
 
-        let create ~(party : Party.Checked.t) ~(calls : Forest.Checked.t) =
-          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
-            [| (party :> t); (calls :> t) |]
+        let create ~(account_update : Account_update.Checked.t)
+            ~(calls : Forest.Checked.t) =
+          Random_oracle.Checked.hash
+            ~init:Hash_prefix_states.account_update_node
+            [| (account_update :> t); (calls :> t) |]
       end
 
-      let create ({ party = _; calls; party_digest } : _ tree) =
+      let create ({ account_update = _; calls; account_update_digest } : _ tree)
+          =
         let stack_hash =
           match calls with [] -> empty | e :: _ -> e.stack_hash
         in
-        Random_oracle.hash ~init:Hash_prefix_states.party_node
-          [| party_digest; stack_hash |]
+        Random_oracle.hash ~init:Hash_prefix_states.account_update_node
+          [| account_update_digest; stack_hash |]
     end
   end
 
   module Digest =
-    Mina_wire_types.Mina_base.Parties.Digest_make
+    Mina_wire_types.Mina_base.Zkapp_command.Digest_make
       (Make_digest_sig)
       (Make_digest_str)
 
@@ -312,8 +340,8 @@ module Call_forest = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('party, 'party_digest, 'digest) t =
-        ( ('party, 'party_digest, 'digest) Tree.Stable.V1.t
+      type ('account_update, 'account_update_digest, 'digest) t =
+        ( ('account_update, 'account_update_digest, 'digest) Tree.Stable.V1.t
         , 'digest )
         With_stack_hash.Stable.V1.t
         list
@@ -365,47 +393,56 @@ module Call_forest = struct
         ; stack_hash = ()
         } )
 
-  let rec of_parties_list_map ~(f : 'p1 -> 'p2) ~(party_depth : 'p1 -> int)
-      (parties : 'p1 list) : ('p2, unit, unit) t =
-    match parties with
+  let rec of_account_updates_map ~(f : 'p1 -> 'p2)
+      ~(account_update_depth : 'p1 -> int) (account_updates : 'p1 list) :
+      ('p2, unit, unit) t =
+    match account_updates with
     | [] ->
         []
     | p :: ps ->
-        let depth = party_depth p in
+        let depth = account_update_depth p in
         let children, siblings =
-          List.split_while ps ~f:(fun p' -> party_depth p' > depth)
+          List.split_while ps ~f:(fun p' -> account_update_depth p' > depth)
         in
         { With_stack_hash.elt =
-            { Tree.party = f p
-            ; party_digest = ()
-            ; calls = of_parties_list_map ~f ~party_depth children
+            { Tree.account_update = f p
+            ; account_update_digest = ()
+            ; calls = of_account_updates_map ~f ~account_update_depth children
             }
         ; stack_hash = ()
         }
-        :: of_parties_list_map ~f ~party_depth siblings
+        :: of_account_updates_map ~f ~account_update_depth siblings
 
-  let of_parties_list ~party_depth parties =
-    of_parties_list_map ~f:Fn.id ~party_depth parties
+  let of_account_updates ~account_update_depth account_updates =
+    of_account_updates_map ~f:Fn.id ~account_update_depth account_updates
 
-  let to_parties_list_map ~f (xs : _ t) =
+  let to_account_updates_map ~f (xs : _ t) =
     let rec collect depth (xs : _ t) acc =
       match xs with
       | [] ->
           acc
-      | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
-          f ~depth party :: acc |> collect (depth + 1) calls |> collect depth xs
+      | { elt = { account_update; calls; account_update_digest = _ }
+        ; stack_hash = _
+        }
+        :: xs ->
+          f ~depth account_update :: acc
+          |> collect (depth + 1) calls
+          |> collect depth xs
     in
     List.rev (collect 0 xs [])
 
-  let to_parties_list xs =
-    to_parties_list_map ~f:(fun ~depth:_ party -> party) xs
+  let to_account_updates xs =
+    to_account_updates_map ~f:(fun ~depth:_ account_update -> account_update) xs
 
-  let hd_party (xs : _ t) =
+  let hd_account_update (xs : _ t) =
     match xs with
     | [] ->
         None
-    | { elt = { party; calls = _; party_digest = _ }; stack_hash = _ } :: _ ->
-        Some party
+    | { elt = { account_update; calls = _; account_update_digest = _ }
+      ; stack_hash = _
+      }
+      :: _ ->
+        Some account_update
 
   let map = Tree.map_forest
 
@@ -415,88 +452,109 @@ module Call_forest = struct
 
   let deferred_mapi = Tree.deferred_mapi_forest
 
-  let%test_unit "Party_or_stack.of_parties_list" =
-    let parties_list_1 = [ 0; 0; 0; 0 ] in
+  let%test_unit "Account_update_or_stack.of_zkapp_command_list" =
+    let zkapp_command_list_1 = [ 0; 0; 0; 0 ] in
     let node i calls =
-      { With_stack_hash.elt = { Tree.calls; party = i; party_digest = () }
+      { With_stack_hash.elt =
+          { Tree.calls; account_update = i; account_update_digest = () }
       ; stack_hash = ()
       }
     in
-    let parties_list_1_res : (int, unit, unit) t =
+    let zkapp_command_list_1_res : (int, unit, unit) t =
       let n0 = node 0 [] in
       [ n0; n0; n0; n0 ]
     in
     let f_index = mapi ~f:(fun i _p -> i) in
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_1)
-      parties_list_1_res ;
-    let parties_list1_index : (int, unit, unit) t =
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1)
+      zkapp_command_list_1_res ;
+    let zkapp_command_list1_index : (int, unit, unit) t =
       let n i = node i [] in
       [ n 0; n 1; n 2; n 3 ]
     in
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_1 |> f_index)
-      parties_list1_index ;
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1
+      |> f_index )
+      zkapp_command_list1_index ;
     [%test_eq: int list]
-      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_1))
-      parties_list_1 ;
-    let parties_list_2 = [ 0; 0; 1; 1 ] in
-    let parties_list_2_res = [ node 0 []; node 0 [ node 1 []; node 1 [] ] ] in
-    let parties_list_2_index = [ node 0 []; node 1 [ node 2 []; node 3 [] ] ] in
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1) )
+      zkapp_command_list_1 ;
+    let zkapp_command_list_2 = [ 0; 0; 1; 1 ] in
+    let zkapp_command_list_2_res =
+      [ node 0 []; node 0 [ node 1 []; node 1 [] ] ]
+    in
+    let zkapp_command_list_2_index =
+      [ node 0 []; node 1 [ node 2 []; node 3 [] ] ]
+    in
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_2)
-      parties_list_2_res ;
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2)
+      zkapp_command_list_2_res ;
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_2 |> f_index)
-      parties_list_2_index ;
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2
+      |> f_index )
+      zkapp_command_list_2_index ;
     [%test_eq: int list]
-      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_2))
-      parties_list_2 ;
-    let parties_list_3 = [ 0; 0; 1; 0 ] in
-    let parties_list_3_res = [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ] in
-    let parties_list_3_index = [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ] in
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2) )
+      zkapp_command_list_2 ;
+    let zkapp_command_list_3 = [ 0; 0; 1; 0 ] in
+    let zkapp_command_list_3_res =
+      [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ]
+    in
+    let zkapp_command_list_3_index =
+      [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ]
+    in
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_3)
-      parties_list_3_res ;
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3)
+      zkapp_command_list_3_res ;
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_3 |> f_index)
-      parties_list_3_index ;
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3
+      |> f_index )
+      zkapp_command_list_3_index ;
     [%test_eq: int list]
-      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_3))
-      parties_list_3 ;
-    let parties_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
-    let parties_list_4_res =
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3) )
+      zkapp_command_list_3 ;
+    let zkapp_command_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
+    let zkapp_command_list_4_res =
       [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 2 [] ]; node 1 [] ]
       ; node 0 []
       ]
     in
-    let parties_list_4_index =
+    let zkapp_command_list_4_index =
       [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 4 [] ]; node 5 [] ]
       ; node 6 []
       ]
     in
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_4)
-      parties_list_4_res ;
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4)
+      zkapp_command_list_4_res ;
     [%test_eq: (int, unit, unit) t]
-      (of_parties_list ~party_depth:Fn.id parties_list_4 |> f_index)
-      parties_list_4_index ;
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4
+      |> f_index )
+      zkapp_command_list_4_index ;
     [%test_eq: int list]
-      (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_4))
-      parties_list_4
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4) )
+      zkapp_command_list_4
 
-  let to_parties_with_hashes_list (xs : _ t) =
+  let to_zkapp_command_with_hashes_list (xs : _ t) =
     let rec collect (xs : _ t) acc =
       match xs with
       | [] ->
           acc
-      | { elt = { party; calls; party_digest = _ }; stack_hash } :: xs ->
-          (party, stack_hash) :: acc |> collect calls |> collect xs
+      | { elt = { account_update; calls; account_update_digest = _ }
+        ; stack_hash
+        }
+        :: xs ->
+          (account_update, stack_hash) :: acc |> collect calls |> collect xs
     in
     List.rev (collect xs [])
 
   let hash_cons hash h_tl =
-    Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
+    Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
+      [| hash; h_tl |]
 
   let hash = function
     | [] ->
@@ -510,50 +568,64 @@ module Call_forest = struct
     }
     :: forest
 
-  let cons_aux (type p) ~(digest_party : p -> _) ?(calls = []) (party : p)
-      (xs : _ t) : _ t =
-    let party_digest = digest_party party in
-    let tree : _ Tree.t = { party; party_digest; calls } in
+  let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
+      (account_update : p) (xs : _ t) : _ t =
+    let account_update_digest = digest_account_update account_update in
+    let tree : _ Tree.t = { account_update; account_update_digest; calls } in
     cons_tree tree xs
 
-  let cons ?calls (party : Party.t) xs =
-    cons_aux ~digest_party:Digest.Party.create ?calls party xs
+  let cons ?calls (account_update : Account_update.t) xs =
+    cons_aux ~digest_account_update:Digest.Account_update.create ?calls
+      account_update xs
 
-  let rec accumulate_hashes ~hash_party (xs : _ t) =
-    let go = accumulate_hashes ~hash_party in
+  let rec accumulate_hashes ~hash_account_update (xs : _ t) =
+    let go = accumulate_hashes ~hash_account_update in
     match xs with
     | [] ->
         []
-    | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
+    | { elt = { account_update; calls; account_update_digest = _ }
+      ; stack_hash = _
+      }
+      :: xs ->
         let calls = go calls in
         let xs = go xs in
-        let node = { Tree.party; calls; party_digest = hash_party party } in
+        let node =
+          { Tree.account_update
+          ; calls
+          ; account_update_digest = hash_account_update account_update
+          }
+        in
         let node_hash = Digest.Tree.create node in
         { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) }
         :: xs
 
-  let accumulate_hashes' (type a b) (xs : (Party.t, a, b) t) :
-      (Party.t, Digest.Party.t, Digest.Forest.t) t =
-    let hash_party (p : Party.t) = Digest.Party.create p in
-    accumulate_hashes ~hash_party xs
+  let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
+      (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+    let hash_account_update (p : Account_update.t) =
+      Digest.Account_update.create p
+    in
+    accumulate_hashes ~hash_account_update xs
 
   let accumulate_hashes_predicated xs =
-    accumulate_hashes ~hash_party:Digest.Party.create xs
+    accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
   (* Delegate_call means, preserve the current caller.
   *)
-  let add_callers (type party party_with_caller party_digest digest id)
-      (ps : (party, party_digest, digest) t)
-      ~(call_type : party -> Party.Call_type.t)
-      ~(add_caller : party -> id -> party_with_caller) ~(null_id : id)
-      ~(party_id : party -> id) : (party_with_caller, party_digest, digest) t =
+  let add_callers
+      (type account_update account_update_with_caller account_update_digest
+      digest id ) (ps : (account_update, account_update_digest, digest) t)
+      ~(call_type : account_update -> Account_update.Call_type.t)
+      ~(add_caller : account_update -> id -> account_update_with_caller)
+      ~(null_id : id) ~(account_update_id : account_update -> id) :
+      (account_update_with_caller, account_update_digest, digest) t =
     let module Context = struct
       type t = { caller : id; self : id }
     end in
     let open Context in
     let rec go curr_context ps =
       match ps with
-      | { With_stack_hash.elt = { Tree.party = p; party_digest; calls }
+      | { With_stack_hash.elt =
+            { Tree.account_update = p; account_update_digest; calls }
         ; stack_hash
         }
         :: ps ->
@@ -563,11 +635,11 @@ module Call_forest = struct
               | Delegate_call ->
                   curr_context
               | Call ->
-                  { caller = curr_context.self; self = party_id p }
+                  { caller = curr_context.self; self = account_update_id p }
             in
-            let party_caller = child_context.caller in
-            { Tree.party = add_caller p party_caller
-            ; party_digest
+            let account_update_caller = child_context.caller in
+            { Tree.account_update = add_caller p account_update_caller
+            ; account_update_digest
             ; calls = go child_context calls
             }
           in
@@ -577,63 +649,72 @@ module Call_forest = struct
     in
     go { self = null_id; caller = null_id } ps
 
-  let add_callers' (type h1 h2) (ps : (Party.Wire.t, h1, h2) t) :
-      (Party.t, h1, h2) t =
+  let add_callers' (type h1 h2) (ps : (Account_update.Wire.t, h1, h2) t) :
+      (Account_update.t, h1, h2) t =
     add_callers ps
       ~call_type:(fun p -> p.body.caller)
       ~add_caller ~null_id:Token_id.default
-      ~party_id:(fun p ->
+      ~account_update_id:(fun p ->
         Account_id.(
           derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
 
-  let add_callers_simple (type h1 h2) (ps : (Party.Simple.t, h1, h2) t) :
-      (Party.t, h1, h2) t =
+  let add_callers_simple (type h1 h2) (ps : (Account_update.Simple.t, h1, h2) t)
+      : (Account_update.t, h1, h2) t =
     add_callers ps
       ~call_type:(fun p -> p.body.caller)
       ~add_caller:add_caller_simple ~null_id:Token_id.default
-      ~party_id:(fun p ->
+      ~account_update_id:(fun p ->
         Account_id.(
           derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
 
   let remove_callers
-      (type party_with_caller party_without_sender h1 h2 h1' h2' id)
-      ~(map_party_digest : h1 -> h1') ~(map_stack_hash : h2 -> h2')
-      (ps : (party_with_caller, h1, h2) t) ~(equal_id : id -> id -> bool)
+      (type account_update_with_caller account_update_without_sender h1 h2 h1'
+      h2' id ) ~(map_account_update_digest : h1 -> h1')
+      ~(map_stack_hash : h2 -> h2')
+      (ps : (account_update_with_caller, h1, h2) t)
+      ~(equal_id : id -> id -> bool)
       ~(add_call_type :
-         party_with_caller -> Party.Call_type.t -> party_without_sender )
-      ~(null_id : id) ~(party_caller : party_with_caller -> id) :
-      (party_without_sender, h1', h2') t =
-    let rec go ~top_level_party parent_caller ps =
-      let call_type_for_party p : Party.Call_type.t =
-        if top_level_party then Call
-        else if equal_id parent_caller (party_caller p) then Delegate_call
+            account_update_with_caller
+         -> Account_update.Call_type.t
+         -> account_update_without_sender ) ~(null_id : id)
+      ~(account_update_caller : account_update_with_caller -> id) :
+      (account_update_without_sender, h1', h2') t =
+    let rec go ~top_level_account_update parent_caller ps =
+      let call_type_for_account_update p : Account_update.Call_type.t =
+        if top_level_account_update then Call
+        else if equal_id parent_caller (account_update_caller p) then
+          Delegate_call
         else Call
       in
       match ps with
-      | { With_stack_hash.elt = { Tree.party = p; party_digest; calls }
+      | { With_stack_hash.elt =
+            { Tree.account_update = p; account_update_digest; calls }
         ; stack_hash
         }
         :: ps ->
-          let ty = call_type_for_party p in
+          let ty = call_type_for_account_update p in
           { With_stack_hash.elt =
-              { Tree.party = add_call_type p ty
-              ; party_digest = map_party_digest party_digest
-              ; calls = go ~top_level_party:false (party_caller p) calls
+              { Tree.account_update = add_call_type p ty
+              ; account_update_digest =
+                  map_account_update_digest account_update_digest
+              ; calls =
+                  go ~top_level_account_update:false (account_update_caller p)
+                    calls
               }
           ; stack_hash = map_stack_hash stack_hash
           }
-          :: go ~top_level_party parent_caller ps
+          :: go ~top_level_account_update parent_caller ps
       | [] ->
           []
     in
-    go ~top_level_party:true null_id ps
+    go ~top_level_account_update:true null_id ps
 
   let%test_unit "add_callers and remove_callers" =
     let module P = struct
       type 'a t = { id : int; caller : 'a } [@@deriving compare, sexp]
     end in
     let module With_call_type = struct
-      type tmp = (Party.Call_type.t P.t, unit, unit) t
+      type tmp = (Account_update.Call_type.t P.t, unit, unit) t
       [@@deriving compare, sexp]
 
       type t = tmp [@@deriving compare, sexp]
@@ -648,15 +729,15 @@ module Call_forest = struct
       [ { With_stack_hash.elt = tree; stack_hash = () } ]
     in
     let node id caller calls =
-      { Tree.party = { P.id; caller }
-      ; party_digest = ()
+      { Tree.account_update = { P.id; caller }
+      ; account_update_digest = ()
       ; calls =
           List.map calls ~f:(fun elt ->
               { With_stack_hash.elt; stack_hash = () } )
       }
     in
     let t : With_call_type.t =
-      let open Party.Call_type in
+      let open Account_update.Call_type in
       node 0 Call
         [ node 1 Call
             [ node 11 Call [ node 111 Call []; node 112 Delegate_call [] ]
@@ -690,14 +771,14 @@ module Call_forest = struct
          ~call_type:(fun p -> p.caller)
          ~add_caller:(fun p caller : int P.t -> { p with caller })
          ~null_id
-         ~party_id:(fun p -> p.id) )
+         ~account_update_id:(fun p -> p.id) )
       expected_output ;
     [%test_eq: With_call_type.t]
       (remove_callers expected_output ~equal_id:Int.equal
-         ~map_party_digest:Fn.id ~map_stack_hash:Fn.id
+         ~map_account_update_digest:Fn.id ~map_stack_hash:Fn.id
          ~add_call_type:(fun p call_type -> { p with caller = call_type })
          ~null_id
-         ~party_caller:(fun p -> p.caller) )
+         ~account_update_caller:(fun p -> p.caller) )
       t
 
   module With_hashes_and_data = struct
@@ -705,8 +786,8 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type 'data t =
-          ( Party.Stable.V1.t * 'data
-          , Digest.Party.Stable.V1.t
+          ( Account_update.Stable.V1.t * 'data
+          , Digest.Account_update.Stable.V1.t
           , Digest.Forest.Stable.V1.t )
           Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -717,38 +798,44 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_party ((p : Party.t), _) = Digest.Party.create p
+    let hash_account_update ((p : Account_update.t), _) =
+      Digest.Account_update.create p
 
-    let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
+    let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
 
-    let of_parties_simple_list (xs : (Party.Simple.t * 'a) list) : _ t =
-      of_parties_list xs ~party_depth:(fun ((p : Party.Simple.t), _) ->
+    let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list)
+        : _ t =
+      of_account_updates xs
+        ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
           p.body.call_depth )
       |> add_callers
-           ~call_type:(fun ((p : Party.Simple.t), _) -> p.body.caller)
+           ~call_type:(fun ((p : Account_update.Simple.t), _) -> p.body.caller)
            ~add_caller:(fun (p, x) id -> (add_caller_simple p id, x))
            ~null_id:Token_id.default
-           ~party_id:(fun ((p : Party.Simple.t), _) ->
+           ~account_update_id:(fun ((p : Account_update.Simple.t), _) ->
              Account_id.(
                derive_token_id ~owner:(create p.body.public_key p.body.token_id))
              )
       |> accumulate_hashes
 
-    let of_parties_list (xs : (Party.Graphql_repr.t * 'a) list) : _ t =
-      of_parties_list_map
-        ~party_depth:(fun ((p : Party.Graphql_repr.t), _) -> p.body.call_depth)
-        ~f:(fun (p, x) -> (Party.of_graphql_repr p, x))
+    let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) :
+        _ t =
+      of_account_updates_map
+        ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
+          p.body.call_depth )
+        ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
         xs
       |> accumulate_hashes
 
-    let to_parties_list (x : _ t) = to_parties_list x
+    let to_account_updates (x : _ t) = to_account_updates x
 
-    let to_parties_with_hashes_list (x : _ t) = to_parties_with_hashes_list x
+    let to_zkapp_command_with_hashes_list (x : _ t) =
+      to_zkapp_command_with_hashes_list x
 
-    let other_parties_hash' xs = of_parties_list xs |> hash
+    let account_updates_hash' xs = of_account_updates xs |> hash
 
-    let other_parties_hash xs =
-      List.map ~f:(fun x -> (x, ())) xs |> other_parties_hash'
+    let account_updates_hash xs =
+      List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
   end
 
   module With_hashes = struct
@@ -756,8 +843,8 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Party.Stable.V1.t
-          , Digest.Party.Stable.V1.t
+          ( Account_update.Stable.V1.t
+          , Digest.Account_update.Stable.V1.t
           , Digest.Forest.Stable.V1.t )
           Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -768,38 +855,42 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_party (p : Party.t) = Digest.Party.create p
+    let hash_account_update (p : Account_update.t) =
+      Digest.Account_update.create p
 
-    let accumulate_hashes xs : t = accumulate_hashes ~hash_party xs
+    let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
 
-    let of_parties_simple_list (xs : Party.Simple.t list) : t =
-      of_parties_list xs ~party_depth:(fun (p : Party.Simple.t) ->
+    let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
+      of_account_updates xs
+        ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> add_callers
-           ~call_type:(fun (p : Party.Simple.t) -> p.body.caller)
+           ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
            ~add_caller:(fun p id -> add_caller_simple p id)
            ~null_id:Token_id.default
-           ~party_id:(fun (p : Party.Simple.t) ->
+           ~account_update_id:(fun (p : Account_update.Simple.t) ->
              Account_id.(
                derive_token_id ~owner:(create p.body.public_key p.body.token_id))
              )
       |> accumulate_hashes
 
-    let of_parties_list (xs : Party.Graphql_repr.t list) : t =
-      of_parties_list_map
-        ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-        ~f:(fun p -> Party.of_graphql_repr p)
+    let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
+      of_account_updates_map
+        ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
+          p.body.call_depth )
+        ~f:(fun p -> Account_update.of_graphql_repr p)
         xs
       |> accumulate_hashes
 
-    let to_parties_list (x : t) = to_parties_list x
+    let to_account_updates (x : t) = to_account_updates x
 
-    let to_parties_with_hashes_list (x : t) = to_parties_with_hashes_list x
+    let to_zkapp_command_with_hashes_list (x : t) =
+      to_zkapp_command_with_hashes_list x
 
-    let other_parties_hash' xs = of_parties_list xs |> hash
+    let account_updates_hash' xs = of_account_updates xs |> hash
 
-    let other_parties_hash xs =
-      List.map ~f:(fun x -> x) xs |> other_parties_hash'
+    let account_updates_hash xs =
+      List.map ~f:(fun x -> x) xs |> account_updates_hash'
   end
 
   let is_empty : _ t -> bool = List.is_empty
@@ -818,8 +909,8 @@ module Graphql_repr = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer : Party.Fee_payer.Stable.V1.t
-        ; other_parties : Party.Graphql_repr.Stable.V1.t list
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Graphql_repr.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -835,8 +926,8 @@ module Simple = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer : Party.Fee_payer.Stable.V1.t
-        ; other_parties : Party.Simple.Stable.V1.t list
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Simple.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -852,11 +943,11 @@ module T = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Parties.V1.t =
-        { fee_payer : Party.Fee_payer.Stable.V1.t
-        ; other_parties :
-            ( Party.Stable.V1.t
-            , Digest.Party.Stable.V1.t
+      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Account_update.Stable.V1.t
+            , Digest.Account_update.Stable.V1.t
             , Digest.Forest.Stable.V1.t )
             Call_forest.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
@@ -867,16 +958,19 @@ module T = struct
 
       let version_byte = Base58_check.Version_bytes.zkapp_command
 
-      let description = "Parties"
+      let description = "Zkapp_command"
 
       module Wire = struct
         [%%versioned
         module Stable = struct
           module V1 = struct
             type t =
-              { fee_payer : Party.Fee_payer.Stable.V1.t
-              ; other_parties :
-                  (Party.Wire.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+              { fee_payer : Account_update.Fee_payer.Stable.V1.t
+              ; account_updates :
+                  ( Account_update.Wire.Stable.V1.t
+                  , unit
+                  , unit )
+                  Call_forest.Stable.V1.t
               ; memo : Signed_command_memo.Stable.V1.t
               }
             [@@deriving sexp, compare, equal, hash, yojson]
@@ -886,37 +980,42 @@ module T = struct
         end]
 
         let check (t : t) : unit =
-          List.iter t.other_parties ~f:(fun p ->
-              assert (Party.Call_type.equal p.elt.party.body.caller Call) )
+          List.iter t.account_updates ~f:(fun p ->
+              assert (
+                Account_update.Call_type.equal p.elt.account_update.body.caller
+                  Call ) )
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
           ; memo = t.memo
-          ; other_parties =
-              Call_forest.of_parties_list_map t.other_parties
-                ~f:Party.of_graphql_repr
-                ~party_depth:(fun (p : Party.Graphql_repr.t) ->
-                  p.body.call_depth )
+          ; account_updates =
+              Call_forest.of_account_updates_map t.account_updates
+                ~f:Account_update.of_graphql_repr
+                ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
+                                      -> p.body.call_depth )
               |> Call_forest.remove_callers ~equal_id:Token_id.equal
-                   ~map_party_digest:ignore ~map_stack_hash:ignore
-                   ~add_call_type:Party.to_wire ~null_id:Token_id.default
-                   ~party_caller:(fun p -> p.body.caller)
+                   ~map_account_update_digest:ignore ~map_stack_hash:ignore
+                   ~add_call_type:Account_update.to_wire
+                   ~null_id:Token_id.default ~account_update_caller:(fun p ->
+                     p.body.caller )
           }
 
         let to_graphql_repr (t : t) : Graphql_repr.t =
           { fee_payer = t.fee_payer
           ; memo = t.memo
-          ; other_parties =
-              t.other_parties
+          ; account_updates =
+              t.account_updates
               |> Call_forest.add_callers
-                   ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
+                   ~call_type:(fun (p : Account_update.Wire.t) -> p.body.caller)
                    ~add_caller ~null_id:Token_id.default
-                   ~party_id:(fun (p : Party.Wire.t) ->
+                   ~account_update_id:(fun (p : Account_update.Wire.t) ->
                      Account_id.(
                        derive_token_id
                          ~owner:(create p.body.public_key p.body.token_id)) )
-              |> Call_forest.to_parties_list_map ~f:(fun ~depth party ->
-                     Party.to_graphql_repr party ~call_depth:depth )
+              |> Call_forest.to_account_updates_map
+                   ~f:(fun ~depth account_update ->
+                     Account_update.to_graphql_repr account_update
+                       ~call_depth:depth )
           }
 
         let gen =
@@ -927,67 +1026,73 @@ module T = struct
               fixed_point (fun self ->
                   let%bind calls_length = small_non_negative_int in
                   list_with_length calls_length
-                    (let%map party = Party.Wire.gen and calls = self in
+                    (let%map account_update = Account_update.Wire.gen
+                     and calls = self in
                      { With_stack_hash.stack_hash = ()
                      ; elt =
-                         { Call_forest.Tree.party; party_digest = (); calls }
+                         { Call_forest.Tree.account_update
+                         ; account_update_digest = ()
+                         ; calls
+                         }
                      } ) )
             in
-            (* All top level parties should be "Call" not "Delegate_call" *)
+            (* All top level zkapp_command should be "Call" not "Delegate_call" *)
             List.map xs
               ~f:
                 (With_stack_hash.map
-                   ~f:(fun (t : (Party.Wire.t, _, _) Call_forest.Tree.t) ->
+                   ~f:(fun (t : (Account_update.Wire.t, _, _) Call_forest.Tree.t)
+                      ->
                      { t with
-                       party =
-                         { t.party with
-                           body = { t.party.body with caller = Call }
+                       account_update =
+                         { t.account_update with
+                           body = { t.account_update.body with caller = Call }
                          }
                      } ) )
           in
           let open Quickcheck.Let_syntax in
-          let%map fee_payer = Party.Fee_payer.gen
-          and other_parties = gen_call_forest
+          let%map fee_payer = Account_update.Fee_payer.gen
+          and account_updates = gen_call_forest
           and memo = Signed_command_memo.gen in
-          { fee_payer; other_parties; memo }
+          { fee_payer; account_updates; memo }
 
         let shrinker : t Quickcheck.Shrinker.t =
           Quickcheck.Shrinker.create (fun t ->
-              let shape = Call_forest.shape t.other_parties in
+              let shape = Call_forest.shape t.account_updates in
               Sequence.map
                 (Quickcheck.Shrinker.shrink
                    Call_forest.Shape.quickcheck_shrinker shape )
                 ~f:(fun shape' ->
                   { t with
-                    other_parties = Call_forest.mask t.other_parties shape'
+                    account_updates = Call_forest.mask t.account_updates shape'
                   } ) )
       end
 
       let of_wire (w : Wire.t) : t =
         { fee_payer = w.fee_payer
         ; memo = w.memo
-        ; other_parties =
-            w.other_parties
+        ; account_updates =
+            w.account_updates
             |> Call_forest.add_callers
-                 ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
+                 ~call_type:(fun (p : Account_update.Wire.t) -> p.body.caller)
                  ~add_caller ~null_id:Token_id.default
-                 ~party_id:(fun (p : Party.Wire.t) ->
+                 ~account_update_id:(fun (p : Account_update.Wire.t) ->
                    Account_id.(
                      derive_token_id
                        ~owner:(create p.body.public_key p.body.token_id)) )
-            |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-                   Digest.Party.create p )
+            |> Call_forest.accumulate_hashes
+                 ~hash_account_update:(fun (p : Account_update.t) ->
+                   Digest.Account_update.create p )
         }
 
       let to_wire (t : t) : Wire.t =
         { fee_payer = t.fee_payer
         ; memo = t.memo
-        ; other_parties =
+        ; account_updates =
             Call_forest.remove_callers ~equal_id:Token_id.equal
-              ~map_party_digest:ignore ~map_stack_hash:ignore
-              ~add_call_type:Party.to_wire ~null_id:Token_id.default
-              ~party_caller:(fun p -> p.body.caller)
-              t.other_parties
+              ~map_account_update_digest:ignore ~map_stack_hash:ignore
+              ~add_call_type:Account_update.to_wire ~null_id:Token_id.default
+              ~account_update_caller:(fun p -> p.body.caller)
+              t.account_updates
         }
 
       include
@@ -1011,28 +1116,30 @@ include T
 let of_simple (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
-  ; other_parties =
-      Call_forest.of_parties_list w.other_parties
-        ~party_depth:(fun (p : Party.Simple.t) -> p.body.call_depth)
+  ; account_updates =
+      Call_forest.of_account_updates w.account_updates
+        ~account_update_depth:(fun (p : Account_update.Simple.t) ->
+          p.body.call_depth )
       |> Call_forest.add_callers
-           ~call_type:(fun (p : Party.Simple.t) -> p.body.caller)
+           ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
            ~add_caller:add_caller_simple ~null_id:Token_id.default
-           ~party_id:(fun (p : Party.Simple.t) ->
+           ~account_update_id:(fun (p : Account_update.Simple.t) ->
              Account_id.(
                derive_token_id ~owner:(create p.body.public_key p.body.token_id))
              )
-      |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-             Digest.Party.create p )
+      |> Call_forest.accumulate_hashes
+           ~hash_account_update:(fun (p : Account_update.t) ->
+             Digest.Account_update.create p )
   }
 
 let to_simple (t : t) : Simple.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
-  ; other_parties =
+  ; account_updates =
       Call_forest.remove_callers ~equal_id:Token_id.equal
-        ~map_party_digest:ignore ~map_stack_hash:ignore
+        ~map_account_update_digest:ignore ~map_stack_hash:ignore
         ~add_call_type:(fun { body = b; authorization } call_type ->
-          { Party.Simple.authorization
+          { Account_update.Simple.authorization
           ; body =
               { public_key = b.public_key
               ; token_id = b.token_id
@@ -1049,9 +1156,10 @@ let to_simple (t : t) : Simple.t =
               }
           } )
         ~null_id:Token_id.default
-        ~party_caller:(fun (p : Party.t) -> p.body.caller)
-        t.other_parties
-      |> Call_forest.to_parties_list_map ~f:(fun ~depth (p : Party.Simple.t) ->
+        ~account_update_caller:(fun (p : Account_update.t) -> p.body.caller)
+        t.account_updates
+      |> Call_forest.to_account_updates_map
+           ~f:(fun ~depth (p : Account_update.Simple.t) ->
              { p with body = { p.body with call_depth = depth } } )
   }
 
@@ -1065,40 +1173,41 @@ let%test_unit "wire embedded in graphql" =
   Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
-let parties (t : t) : _ Call_forest.t =
+let zkapp_command (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
-  let body = Party.Body.of_fee_payer p.body in
-  let fee_payer : Party.t =
+  let body = Account_update.Body.of_fee_payer p.body in
+  let fee_payer : Account_update.t =
     let p = t.fee_payer in
     { authorization = Control.Signature p.authorization; body }
   in
-  Call_forest.cons fee_payer t.other_parties
+  Call_forest.cons fee_payer t.account_updates
 
 let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
-let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
+let fee_payer_account_update ({ fee_payer; _ } : t) = fee_payer
 
 let applicable_at_nonce (t : t) : Account.Nonce.t =
-  (fee_payer_party t).body.nonce
+  (fee_payer_account_update t).body.nonce
 
 let target_nonce_on_success (t : t) : Account.Nonce.t =
   let base_nonce = Account.Nonce.succ (applicable_at_nonce t) in
   let fee_payer_pubkey = t.fee_payer.body.public_key in
-  let fee_payer_party_increments =
-    List.count (Call_forest.to_list t.other_parties) ~f:(fun p ->
+  let fee_payer_account_update_increments =
+    List.count (Call_forest.to_list t.account_updates) ~f:(fun p ->
         Public_key.Compressed.equal p.body.public_key fee_payer_pubkey
         && p.body.increment_nonce )
   in
-  Account.Nonce.add base_nonce (Account.Nonce.of_int fee_payer_party_increments)
+  Account.Nonce.add base_nonce
+    (Account.Nonce.of_int fee_payer_account_update_increments)
 
 let nonce_increments (t : t) : int Public_key.Compressed.Map.t =
   let base_increments =
     Public_key.Compressed.Map.of_alist_exn [ (t.fee_payer.body.public_key, 1) ]
   in
-  List.fold_left (Call_forest.to_list t.other_parties) ~init:base_increments
-    ~f:(fun incr_map party ->
-      if party.body.increment_nonce then
-        Map.update incr_map party.body.public_key
+  List.fold_left (Call_forest.to_list t.account_updates) ~init:base_increments
+    ~f:(fun incr_map account_update ->
+      if account_update.body.increment_nonce then
+        Map.update incr_map account_update.body.public_key
           ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
       else incr_map )
 
@@ -1107,12 +1216,12 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
-let other_parties_list (t : t) : Party.t list =
-  Call_forest.fold t.other_parties ~init:[] ~f:(Fn.flip List.cons) |> List.rev
+let account_updates_list (t : t) : Account_update.t list =
+  Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let parties_list (t : t) : Party.t list =
-  Call_forest.fold t.other_parties
-    ~init:[ Party.of_fee_payer (fee_payer_party t) ]
+let zkapp_command_list (t : t) : Account_update.t list =
+  Call_forest.fold t.account_updates
+    ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
   |> List.rev
 
@@ -1120,9 +1229,9 @@ let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let accounts_accessed (t : t) =
-  Call_forest.fold t.other_parties
+  Call_forest.fold t.account_updates
     ~init:[ fee_payer t ]
-    ~f:(fun acc p -> Party.account_id p :: acc)
+    ~f:(fun acc p -> Account_update.account_id p :: acc)
   |> List.rev |> List.stable_dedup
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
@@ -1182,12 +1291,12 @@ module Virtual = struct
     let if_ = value_if
   end
 
-  module Parties = struct
-    type t = Party.t list
+  module Zkapp_command = struct
+    type t = Account_update.t list
 
     let if_ = value_if
 
-    type party = Party.t
+    type account_update = Account_update.t
 
     let empty = []
 
@@ -1202,8 +1311,8 @@ module Verifiable = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer : Party.Fee_payer.Stable.V1.t
-        ; other_parties :
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
             ( Side_loaded_verification_key.Stable.V2.t
             , Zkapp_basic.F.Stable.V1.t )
             With_hash.Stable.V1.t
@@ -1220,7 +1329,7 @@ end
 
 let of_verifiable (t : Verifiable.t) : t =
   { fee_payer = t.fee_payer
-  ; other_parties = Call_forest.map t.other_parties ~f:fst
+  ; account_updates = Call_forest.map t.account_updates ~f:fst
   ; memo = t.memo
   }
 
@@ -1237,50 +1346,51 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~(other_parties_hash : Digest.Forest.t) : t =
-    (other_parties_hash :> t)
+  let create ~(account_updates_hash : Digest.Forest.t) : t =
+    (account_updates_hash :> t)
 
-  let create_complete (t : t) ~memo_hash ~(fee_payer_hash : Digest.Party.t) =
-    Random_oracle.hash ~init:Hash_prefix.party_cons
+  let create_complete (t : t) ~memo_hash
+      ~(fee_payer_hash : Digest.Account_update.t) =
+    Random_oracle.hash ~init:Hash_prefix.account_update_cons
       [| memo_hash; (fee_payer_hash :> t); t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~(other_parties_hash : Digest.Forest.Checked.t) =
-      (other_parties_hash :> t)
+    let create ~(account_updates_hash : Digest.Forest.Checked.t) =
+      (account_updates_hash :> t)
 
     let create_complete (t : t) ~memo_hash
-        ~(fee_payer_hash : Digest.Party.Checked.t) =
-      Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
+        ~(fee_payer_hash : Digest.Account_update.Checked.t) =
+      Random_oracle.Checked.hash ~init:Hash_prefix.account_update_cons
         [| memo_hash; (fee_payer_hash :> t); t |]
   end
 end
 
-let other_parties_hash (t : t) = Call_forest.hash t.other_parties
+let account_updates_hash (t : t) = Call_forest.hash t.account_updates
 
 let commitment (t : t) : Transaction_commitment.t =
-  Transaction_commitment.create ~other_parties_hash:(other_parties_hash t)
+  Transaction_commitment.create ~account_updates_hash:(account_updates_hash t)
 
-(** This module defines weights for each component of a `Parties.t` element. *)
+(** This module defines weights for each component of a `Zkapp_command.t` element. *)
 module Weight = struct
-  let party : Party.t -> int = fun _ -> 1
+  let account_update : Account_update.t -> int = fun _ -> 1
 
-  let fee_payer (_fp : Party.Fee_payer.t) : int = 1
+  let fee_payer (_fp : Account_update.Fee_payer.t) : int = 1
 
-  let other_parties : (Party.t, _, _) Call_forest.t -> int =
-    Call_forest.fold ~init:0 ~f:(fun acc p -> acc + party p)
+  let account_updates : (Account_update.t, _, _) Call_forest.t -> int =
+    Call_forest.fold ~init:0 ~f:(fun acc p -> acc + account_update p)
 
   let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
-let weight (parties : t) : int =
-  let { fee_payer; other_parties; memo } = parties in
+let weight (zkapp_command : t) : int =
+  let { fee_payer; account_updates; memo } = zkapp_command in
   List.sum
     (module Int)
     ~f:Fn.id
     [ Weight.fee_payer fee_payer
-    ; Weight.other_parties other_parties
+    ; Weight.account_updates account_updates
     ; Weight.memo memo
     ]
 
@@ -1299,7 +1409,7 @@ module type Valid_intf = sig
   module Stable : sig
     module V1 : sig
       type t = private
-        { parties : T.Stable.V1.t
+        { zkapp_command : T.Stable.V1.t
         ; verification_keys :
             (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
         }
@@ -1324,7 +1434,7 @@ end
 
 module Valid :
   Valid_intf
-    with type Stable.V1.t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
+    with type Stable.V1.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
 struct
   module S = Stable
 
@@ -1343,8 +1453,8 @@ struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
-        { parties : S.V1.t
+      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
+        { zkapp_command : S.V1.t
         ; verification_keys :
             (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
         }
@@ -1354,22 +1464,23 @@ struct
     end
   end]
 
-  let create ~verification_keys parties : t = { parties; verification_keys }
+  let create ~verification_keys zkapp_command : t =
+    { zkapp_command; verification_keys }
 
   let of_verifiable (t : Verifiable.t) : t option =
     let open Option.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.other_parties ~init:(Some ())
+      Call_forest.fold t.account_updates ~init:(Some ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
-          let account_id = Party.account_id p in
+          let account_id = Account_update.account_id p in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
             let%map { With_hash.hash; _ } = vk_opt in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
           else acc )
     in
-    { parties = of_verifiable t
+    { zkapp_command = of_verifiable t
     ; verification_keys = Account_id.Table.to_alist tbl
     }
 
@@ -1378,7 +1489,7 @@ struct
     `If_this_is_used_it_should_have_a_comment_justifying_it
       (create t ~verification_keys:[])
 
-  let forget (t : t) : T.t = t.parties
+  let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
     let open Option.Let_syntax in
@@ -1390,9 +1501,9 @@ struct
     in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.other_parties ~init:(Some ()) ~f:(fun acc p ->
+      Call_forest.fold t.account_updates ~init:(Some ()) ~f:(fun acc p ->
           let%bind _ok = acc in
-          let account_id = Party.account_id p in
+          let account_id = Account_update.account_id p in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
             Option.map (find_vk account_id) ~f:(fun vk ->
                 Account_id.Table.update tbl account_id ~f:(fun _ ->
@@ -1407,30 +1518,38 @@ include Codable.Make_base58_check (Stable.Latest)
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-type other_parties = (Party.t, Digest.Party.t, Digest.Forest.t) Call_forest.t
+include Codable.Make_base64 (Stable.Latest)
 
-let other_parties_deriver obj =
-  let of_parties_with_depth (ps : Party.Graphql_repr.t list) : other_parties =
-    Call_forest.of_parties_list ps
-      ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-    |> Call_forest.map ~f:Party.of_graphql_repr
+type account_updates =
+  (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
+
+let account_updates_deriver obj =
+  let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) :
+      account_updates =
+    Call_forest.of_account_updates ps
+      ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
+        p.body.call_depth )
+    |> Call_forest.map ~f:Account_update.of_graphql_repr
     |> Call_forest.accumulate_hashes'
-  and to_parties_with_depth (ps : other_parties) : Party.Graphql_repr.t list =
+  and to_zkapp_command_with_depth (ps : account_updates) :
+      Account_update.Graphql_repr.t list =
     ps
-    |> Call_forest.to_parties_list_map ~f:(fun ~depth p ->
-           Party.to_graphql_repr ~call_depth:depth p )
+    |> Call_forest.to_account_updates_map ~f:(fun ~depth p ->
+           Account_update.to_graphql_repr ~call_depth:depth p )
   in
   let open Fields_derivers_zkapps.Derivers in
-  let inner = (list @@ Party.Graphql_repr.deriver @@ o ()) @@ o () in
-  iso ~map:of_parties_with_depth ~contramap:to_parties_with_depth inner obj
+  let inner = (list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ o () in
+  iso ~map:of_zkapp_command_with_depth ~contramap:to_zkapp_command_with_depth
+    inner obj
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
-  Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
-    ~other_parties:!.other_parties_deriver
+  Fields.make_creator obj
+    ~fee_payer:!.Account_update.Fee_payer.deriver
+    ~account_updates:!.account_updates_deriver
     ~memo:!.Signed_command_memo.deriver
-  |> finish "Parties" ~t_toplevel_annots
+  |> finish "ZkappCommand" ~t_toplevel_annots
 
 let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
 
@@ -1440,30 +1559,35 @@ let to_json x = Fields_derivers_zkapps.(to_json (deriver @@ Derivers.o ())) x
 
 let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 
-let other_parties_of_json x =
+let account_updates_of_json x =
   Fields_derivers_zkapps.(
-    of_json ((list @@ Party.Graphql_repr.deriver @@ o ()) @@ derivers ()))
+    of_json
+      ((list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ derivers ()))
     x
 
-let parties_to_json x =
+let zkapp_command_to_json x =
   Fields_derivers_zkapps.(to_json (deriver @@ derivers ())) x
 
 let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
-  let party : Party.t =
-    { body = Party.Body.dummy; authorization = Control.dummy_of_tag Signature }
+  let account_update : Account_update.t =
+    { body = Account_update.Body.dummy
+    ; authorization = Control.dummy_of_tag Signature
+    }
   in
-  let fee_payer : Party.Fee_payer.t =
-    { body = Party.Body.Fee_payer.dummy; authorization = Signature.dummy }
+  let fee_payer : Account_update.Fee_payer.t =
+    { body = Account_update.Body.Fee_payer.dummy
+    ; authorization = Signature.dummy
+    }
   in
   { fee_payer
-  ; other_parties = Call_forest.cons party []
+  ; account_updates = Call_forest.cons account_update []
   ; memo = Signed_command_memo.empty
   }
 
-(* Parties transactions are filtered using this predicate
+(* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
    - in incoming blocks
 *)
@@ -1471,56 +1595,63 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let ( num_proof_parties
-      , num_parties
+  let ( num_proof_updates
+      , num_updates
       , num_event_elements
       , num_sequence_event_elements ) =
-    Call_forest.fold t.other_parties ~init:(0, 0, 0, 0)
-      ~f:(fun (num_proof_parties, num_parties, evs_size, seq_evs_size) party ->
-        let num_proof_parties' =
-          if Control.(Tag.equal (tag party.authorization) Tag.Proof) then
-            num_proof_parties + 1
-          else num_proof_parties
+    Call_forest.fold t.account_updates ~init:(0, 0, 0, 0)
+      ~f:(fun
+           (num_proof_zkapp_command, num_zkapp_command, evs_size, seq_evs_size)
+           account_update
+         ->
+        let num_proof_zkapp_command' =
+          if Control.(Tag.equal (tag account_update.authorization) Tag.Proof)
+          then num_proof_zkapp_command + 1
+          else num_proof_zkapp_command
         in
-        let party_evs_elements = events_elements party.body.events in
-        let party_seq_evs_elements =
-          events_elements party.body.sequence_events
+        let account_update_evs_elements =
+          events_elements account_update.body.events
         in
-        ( num_proof_parties'
-        , num_parties + 1
-        , evs_size + party_evs_elements
-        , seq_evs_size + party_seq_evs_elements ) )
+        let account_update_seq_evs_elements =
+          events_elements account_update.body.sequence_events
+        in
+        ( num_proof_zkapp_command'
+        , num_zkapp_command + 1
+        , evs_size + account_update_evs_elements
+        , seq_evs_size + account_update_seq_evs_elements ) )
   in
-  let max_proof_parties = genesis_constants.max_proof_parties in
-  let max_parties = genesis_constants.max_parties in
+  let max_proof_zkapp_command = genesis_constants.max_proof_zkapp_command in
+  let max_zkapp_command = genesis_constants.max_zkapp_command in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_sequence_event_elements =
     genesis_constants.max_sequence_event_elements
   in
-  let valid_proof_parties = num_proof_parties <= max_proof_parties in
-  let valid_parties = num_parties <= max_parties in
+  let valid_proof_zkapp_command =
+    num_proof_updates <= max_proof_zkapp_command
+  in
+  let valid_zkapp_command = num_updates <= max_zkapp_command in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_sequence_event_elements =
     num_sequence_event_elements <= max_sequence_event_elements
   in
   if
-    valid_proof_parties && valid_parties && valid_event_elements
+    valid_proof_zkapp_command && valid_zkapp_command && valid_event_elements
     && valid_sequence_event_elements
   then Ok ()
   else
-    let proof_parties_err =
-      if valid_proof_parties then None
+    let proof_zkapp_command_err =
+      if valid_proof_zkapp_command then None
       else
         Some
-          (sprintf "too many proof parties (%d, max allowed is %d)"
-             num_proof_parties max_proof_parties )
+          (sprintf "too many proof zkapp_command (%d, max allowed is %d)"
+             num_proof_updates max_proof_zkapp_command )
     in
-    let parties_err =
-      if valid_parties then None
+    let zkapp_command_err =
+      if valid_zkapp_command then None
       else
         Some
-          (sprintf "too many parties (%d, max allowed is %d)" num_parties
-             max_parties )
+          (sprintf "too many zkapp_command (%d, max allowed is %d)" num_updates
+             max_zkapp_command )
     in
     let events_err =
       if valid_event_elements then None
@@ -1538,7 +1669,11 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
     in
     let err_msg =
       List.filter
-        [ proof_parties_err; parties_err; events_err; sequence_events_err ]
+        [ proof_zkapp_command_err
+        ; zkapp_command_err
+        ; events_err
+        ; sequence_events_err
+        ]
         ~f:Option.is_some
       |> List.map ~f:(fun opt -> Option.value_exn opt)
       |> String.concat ~sep:"; "

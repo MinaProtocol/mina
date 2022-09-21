@@ -10,14 +10,14 @@ import {
   shutdown,
   Mina,
   Permissions,
-  Party,
+  AccountUpdate,
   UInt64,
   Ledger,
   Token,
 } from "snarkyjs";
 
 function sendTransaction(tx) {
-  // console.log("DEBUG -- TXN\n", JSON.stringify(partiesToJson(tx.transaction)));
+  // console.log("DEBUG -- TXN\n", JSON.stringify(zkappCommandToJson(tx.transaction)));
   tx.send();
 }
 
@@ -117,7 +117,7 @@ let tx;
 
 console.log("deploy");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer, { initialBalance });
+  Account_update.fundNewAccount(feePayer, { initialBalance });
   zkapp.deploy({ zkappKey });
 });
 sendTransaction(tx);
@@ -143,7 +143,7 @@ console.log(
 
 console.log("----------token minting----------");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer);
+  Account_update.fundNewAccount(feePayer);
   zkapp.mint(tokenAccount1);
   zkapp.sign(zkappKey);
 });
@@ -173,7 +173,7 @@ console.log(
 
 console.log("----------token transfer----------");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer);
+  Account_update.fundNewAccount(feePayer);
   zkapp.send(tokenAccount1, tokenAccount2);
   zkapp.sign(zkappKey);
 });
