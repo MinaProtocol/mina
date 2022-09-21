@@ -2306,7 +2306,12 @@ module Ledger = struct
 
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
-    ; verificationKey : Js.js_string Js.t Js.optdef Js.readonly_prop
+    ; verificationKey :
+        < hash : Js.js_string Js.t Js.readonly_prop
+        ; data : Js.js_string Js.t Js.readonly_prop >
+        Js.t
+        Js.optdef
+        Js.readonly_prop
     ; zkappVersion : int Js.readonly_prop
     ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
     ; lastSequenceSlot : int Js.readonly_prop
@@ -2574,7 +2579,13 @@ module Ledger = struct
       xs
 
     let verification_key (vk : Mina_base__Verification_key_wire.Stable.V1.t) =
-      Js.string (Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+      object%js
+        val data =
+          Js.string
+            (Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+
+        val hash = vk.hash |> Field.Constant.to_string |> Js.string
+      end
 
     let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
       object%js
