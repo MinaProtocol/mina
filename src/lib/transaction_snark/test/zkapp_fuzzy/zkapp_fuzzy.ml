@@ -94,7 +94,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
 let generate_zkapp_commands_and_apply_them_consecutively ~trials
     ~max_account_updates () =
   let ledger, fee_payer_keypairs, keymap =
-    mk_ledgers_and_fee_payers ~num_of_fee_payers:trails ()
+    mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
   in
   let account_state_tbl = Account_id.Table.create () in
   Test_util.with_randomness 123456789 (fun () ->
