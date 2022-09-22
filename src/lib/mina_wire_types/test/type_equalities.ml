@@ -339,4 +339,8 @@ module Network_pool = struct
     Assert_equal0V2
       (O.Snark_pool.Diff_versioned.Stable)
       (W.Snark_pool.Diff_versioned)
+  include
+    Assert_equal0V2
+      (O.Transaction_pool.Diff_versioned.Stable)
+      (W.Transaction_pool.Diff_versioned)
 end
