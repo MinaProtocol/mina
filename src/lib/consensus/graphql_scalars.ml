@@ -84,11 +84,11 @@ module BodyReference = struct
       ~coerce:serialize
 end
 
-(*
-TODO: add tests for this type
 module BodyReference_gen = struct
- include Body_reference
-end
- *)
+  include Body_reference
 
-(* let%test_module "BodyReference" = (module Make_test (BodyReference) (BodyReference_gen)) *)
+  let gen = Blake2.gen
+end
+
+let%test_module "BodyReference" =
+  (module Make_test (BodyReference) (BodyReference_gen))
