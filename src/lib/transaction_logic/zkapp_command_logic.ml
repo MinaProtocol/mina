@@ -834,7 +834,19 @@ module Make (Inputs : Inputs_intf) = struct
     Stack_frame.make ~caller:default_caller ~caller_caller:default_caller
       ~calls:(Call_forest.empty ())
 
-  let assert_ = Bool.Assert.is_true
+  let assert_ b pos =
+    try Bool.Assert.is_true b with
+    | Assert_failure _ ->
+        (* OCaml assert *)
+        let file, line, col, _ = pos in
+        raise (Assert_failure (file, line, col))
+    | Failure msg ->
+        (* Snarky *)
+        let file, line, col, ecol = pos in
+        raise
+          (Failure
+             (sprintf "File %S, line %d, characters %d-%d: %s" file line col
+                ecol msg ) )
 
   (* Pop from the call stack, returning dummy values if the stack is empty. *)
   let pop_call_stack (s : Call_stack.t) : Stack_frame.t * Call_stack.t =
@@ -885,13 +897,15 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.equal account_update_caller (Stack_frame.caller current_forest)
     in
     let () =
-      with_label ~label:"check valid caller" (fun () ->
+      with_label ~label:"check valid caller"
+        (fun () ->
           let is_delegate_call =
             Token_id.equal account_update_caller
               (Stack_frame.caller_caller current_forest)
           in
           (* Check that account_update has a valid caller. *)
           assert_ Bool.(is_normal_call ||| is_delegate_call) )
+        __POS__
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -990,9 +1004,9 @@ module Make (Inputs : Inputs_intf) = struct
       | `Compute _ ->
           ()
       | `Yes _ ->
-          assert_ is_start'
+          assert_ is_start' __POS__
       | `No ->
-          assert_ (Bool.not is_start') ) ;
+          assert_ (Bool.not is_start') __POS__ ) ;
       match is_start with
       | `Yes _ ->
           Bool.true_
@@ -1193,7 +1207,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
-      assert_ Global_slot.(vesting_period > zero) ;
+      assert_ Global_slot.(vesting_period > zero) __POS__ ;
       let a = Account.set_timing a timing in
       (a, local_state)
     in
@@ -1538,12 +1552,13 @@ module Make (Inputs : Inputs_intf) = struct
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
       (* We only allow the default token for fees. *)
-      assert_ curr_is_default ;
+      assert_ curr_is_default __POS__ ;
       Bool.(
         assert_
           ( (not is_start')
           ||| ( account_update_token_is_default
-              &&& Amount.Signed.is_pos local_delta ) )) ;
+              &&& Amount.Signed.is_pos local_delta ) )
+          __POS__) ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.Signed.add_flagged local_state.excess local_delta
       in
