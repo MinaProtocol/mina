@@ -1021,9 +1021,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self =
       match self with
       | None ->
-          { Tag.id = Type_equal.Id.create ~name sexp_of_opaque
-          ; kind = Compiled
-          }
+          Tag.(create ~kind:Compiled name)
       | Some self ->
           self
     in
@@ -1924,9 +1922,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -2849,9 +2846,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
