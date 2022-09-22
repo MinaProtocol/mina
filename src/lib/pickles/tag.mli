@@ -1,11 +1,19 @@
-open Core_kernel
+(* Tags*)
+(** *)
+type ('var, 'value, 'n1, 'n2) id =
+  ('var * 'value * 'n1 * 'n2) Core_kernel.Type_equal.Id.t
 
-type ('var, 'value, 'n1, 'n2) tag = ('var * 'value * 'n1 * 'n2) Type_equal.Id.t
-
+(** *)
 type kind = Side_loaded | Compiled
 
-type ('var, 'value, 'n1, 'n2) t =
-  { kind : kind; id : ('var, 'value, 'n1, 'n2) tag }
+(** Base type *)
+type ('var, 'value, 'n1, 'n2) t = private
+  { kind : kind; id : ('var, 'value, 'n1, 'n2) id }
 [@@deriving fields]
 
-val create : name:string -> ('var, 'value, 'n1, 'n2) t
+(** [create ?kind name] creates a tag with kind [kind] and id derived from
+    [name].
+
+    @param kind defaults to {!Compiled}
+ *)
+val create : ?kind:kind -> string -> ('var, 'value, 'n1, 'n2) t

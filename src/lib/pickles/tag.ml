@@ -1,12 +1,11 @@
-open Core_kernel
-
-type ('var, 'value, 'n1, 'n2) tag = ('var * 'value * 'n1 * 'n2) Type_equal.Id.t
+type ('var, 'value, 'n1, 'n2) id =
+  ('var * 'value * 'n1 * 'n2) Core_kernel.Type_equal.Id.t
 
 type kind = Side_loaded | Compiled
 
 type ('var, 'value, 'n1, 'n2) t =
-  { kind : kind; id : ('var, 'value, 'n1, 'n2) tag }
+  { kind : kind; id : ('var, 'value, 'n1, 'n2) id }
 [@@deriving fields]
 
-let create ~name =
-  { kind = Compiled; id = Type_equal.Id.create ~name sexp_of_opaque }
+let create ?(kind = Compiled) name =
+  { kind; id = Core_kernel.(Type_equal.Id.create ~name sexp_of_opaque) }
