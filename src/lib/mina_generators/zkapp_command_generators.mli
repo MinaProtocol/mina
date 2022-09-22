@@ -18,7 +18,7 @@ type role =
 
 val max_account_updates : int
 
-val max_token_parties : int
+val max_token_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure

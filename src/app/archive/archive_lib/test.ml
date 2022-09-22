@@ -163,17 +163,19 @@ let%test_module "Archive node unit tests" =
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
-          | Parties p -> (
+          | Zkapp_command p -> (
               let rec add_token_owners
                   (forest :
-                    ( Party.t
-                    , Parties.Digest.Party.t
-                    , Parties.Digest.Forest.t )
-                    Parties.Call_forest.t ) =
+                    ( Account_update.t
+                    , Zkapp_command.Digest.Account_update.t
+                    , Zkapp_command.Digest.Forest.t )
+                    Zkapp_command.Call_forest.t ) =
                 List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
                     if List.is_empty tree.calls then ()
                     else
-                      let acct_id = Party.account_id tree.party in
+                      let acct_id =
+                        Account_update.account_id tree.account_update
+                      in
                       let token_id =
                         Account_id.derive_token_id ~owner:acct_id
                       in
@@ -181,7 +183,7 @@ let%test_module "Archive node unit tests" =
                         acct_id ;
                       add_token_owners tree.calls )
               in
-              add_token_owners p.other_parties ;
+              add_token_owners p.account_updates ;
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =

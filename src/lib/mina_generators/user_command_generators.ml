@@ -29,8 +29,9 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
     Option.value max_account_updates
       ~default:Zkapp_command_generators.max_account_updates
   in
-  let max_token_parties =
-    Option.value max_token_parties ~default:Parties_generators.max_token_parties
+  let max_token_updates =
+    Option.value max_token_updates
+      ~default:Zkapp_command_generators.max_token_updates
   in
   let num_keypairs =
     Option.value num_keypairs
@@ -157,7 +158,7 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
       ~default:Zkapp_command_generators.max_account_updates
   in
   let max_token_updates =
-    Option.value max_token_parties
+    Option.value max_token_updates
       ~default:Zkapp_command_generators.max_token_updates
   in
   let num_keypairs = length * max_account_updates * 2 in
