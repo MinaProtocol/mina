@@ -1737,7 +1737,7 @@ let () =
      use the Jane Street scripts that generate their version information
   *)
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
-   let is_version_cmd = make_list_mem [ "version"; "-version" ] in
+   let is_version_cmd = make_list_mem [ "version"; "-version"; "--version" ] in
    let is_help_flag = make_list_mem [ "-help"; "-?" ] in
    match Sys.get_argv () with
    | [| _coda_exe; version |] when is_version_cmd version ->
