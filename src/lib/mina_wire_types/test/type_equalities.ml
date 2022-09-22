@@ -335,4 +335,8 @@ module Network_pool = struct
   module O = Network_pool
   module W = WT.Network_pool
   include Assert_equal1V1 (O.Priced_proof.Stable) (W.Priced_proof)
+  include
+    Assert_equal0V2
+      (O.Snark_pool.Diff_versioned.Stable)
+      (W.Snark_pool.Diff_versioned)
 end

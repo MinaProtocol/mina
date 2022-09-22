@@ -23,6 +23,7 @@
    mina_compile_config
    mina_generators
    sgn
+   sgn_type
    transition_frontier_base
    staged_ledger
    child_processes
