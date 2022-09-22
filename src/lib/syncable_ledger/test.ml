@@ -357,7 +357,7 @@ module Mask = struct
             List.iter account_ids ~f:(fun account_id ->
                 let account =
                   Account.create account_id
-                    (Currency.Balance.of_int child_balance)
+                    (Currency.Balance.nanomina_exn child_balance)
                 in
                 let action, location =
                   Mask.Attached.get_or_create_account attached_mask account_id
