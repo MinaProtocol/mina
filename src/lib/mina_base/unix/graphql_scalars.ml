@@ -133,8 +133,6 @@ let%test_module "PendingCoinbaseHash" =
 
 module StagedledgerAuxHash_gen = struct
   include Mina_base.Staged_ledger_hash.Aux_hash
-
-  let gen = Core_kernel.Quickcheck.Generator.return dummy
 end
 
 let%test_module "StagedLedgerAuxHash" =

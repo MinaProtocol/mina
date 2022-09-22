@@ -56,6 +56,8 @@ module Aux_hash : sig
   val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
 
   val dummy : t
+
+  val gen : t Quickcheck.Generator.t
 end
 
 val ledger_hash : t -> Ledger_hash.t

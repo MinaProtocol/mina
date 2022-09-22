@@ -58,6 +58,31 @@ module Aux_hash = struct
   let to_bytes = Fn.id
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
+
+  let gen : t Quickcheck.Generator.t =
+    let char_generator =
+      Base_quickcheck.Generator.of_list
+        [ '0'
+        ; '1'
+        ; '2'
+        ; '3'
+        ; '4'
+        ; '5'
+        ; '6'
+        ; '7'
+        ; '8'
+        ; '9'
+        ; 'A'
+        ; 'B'
+        ; 'C'
+        ; 'D'
+        ; 'E'
+        ; 'F'
+        ]
+    in
+    let digest_size_in_bits = 256 in
+    let digest_size_in_bytes = digest_size_in_bits / 8 in
+    String.gen_with_length (digest_size_in_bytes * 2) char_generator
 end
 
 module Pending_coinbase_aux = struct
