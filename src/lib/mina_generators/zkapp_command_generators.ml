@@ -1176,7 +1176,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
     List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
   in
   let mk_node p calls =
-    { Zkapp_call_forest.Tree.account_update = p
+    { Zkapp_command.Call_forest.Tree.account_update = p
     ; account_update_digest = ()
     ; calls = mk_forest calls
     }
@@ -1468,8 +1468,8 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
   let zkapp_command_dummy_authorizations : Zkapp_command.t =
     { fee_payer
     ; account_updates =
-        account_updates |> Zkapp_call_forest.add_callers_simple
-        |> Zkapp_call_forest.accumulate_hashes_predicated
+        account_updates |> Zkapp_command.Call_forest.add_callers_simple
+        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
     ; memo
     }
   in
