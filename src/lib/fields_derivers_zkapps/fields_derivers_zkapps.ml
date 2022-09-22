@@ -544,9 +544,7 @@ let verification_key_with_hash obj =
     in
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~js_type:String
-        ~to_string:to_base64
-        ~of_string
-        ~doc:"Verification key in Base64 format")
+        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format")
   in
   let ( !. ) =
     ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
