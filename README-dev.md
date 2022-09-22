@@ -106,6 +106,66 @@ let g:syntastic_ocaml_checkers=['merlin']
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
+## Running a node
+
+The source code for the Mina node is located in src/app/cli/. Once it is compiled, it can be run like this:
+
+```shell
+$ dune exec src/app/cli/src/mina.exe -- daemon --libp2p-keypair /path/to/key
+```
+
+Please note, that default configuration of the node depends on the build profile
+used during compilation, so in order to connect to some networks it might be
+necessary to compile the daemon with a specific profile.
+
+Before this can be done, however, some setup is required. First a key pair needs to be generated so that the
+daemon can sign blocks that it produces. This can be done using the same `mina.exe` binary:
+
+```shell
+$ dune exec src/app/cli/src/mina.exe -- libp2p generate-keypair --privkey-path /path/to/key
+```
+
+The program will ask you for a passphrase, which can be left blank for convenience (of course this is
+highly discouraged when running a real node!). The running daemon expects to find this passphrase in
+an environment variable `MINA_LIBP2P_PASS`, which needs to be defined even if the passphrase is empty.
+Furthermore, `/path/to/key` needs to belong to the user running the daemon and to have filesystem
+permissions set to `0600`. Also the directory containing the file (`/path/to`) needs its permissions
+set to `0700`.
+
+```shell
+$ chmod 0600 /path/to/key
+$ chmod 0700 /path/to
+```
+
+Additionally, it's necessary to provide a list of peers to connect to to bootstrap the node.
+The list of peers depends on the network one wants to connect to and is announces when the
+network is being launched. For mainnet the list can be found at:
+https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt .
+
+Moreover, `daemon.json` config file also contains some bootstrap data specific to the network
+the node is trying to connect to. Therefore it also needs to be tailored specifically for
+a particular network. This file can also override some of the configuration options selected
+during compilation (see above). At the moment it can be extracted from the docker image
+dedicated to running a particular network. If it's not located in the config directory,
+it can be pointed to with `--config-file` option.
+
+When all of this setup is complete, the daemon can be launched (assuming the key passphrase was set to "pass"):
+
+```shell
+$ MINA_LIBP2P_PASS=pass dune exec src/app/cli/src/mina.exe -- daemon --libp2p-keypair /path/to/key --peer-list-url https://example.peer.list --config-file /custom/path/to/daemon.json
+```
+
+The `--seed` flag tells the daemon to run a fresh network of its own. In that case specifying
+a peer list is not necessary, but still possible. With `--seed` option the node will
+not crash, even if it does not manage to connect to any peers. See:
+
+```shell
+$ dune exec src/app/cli/src/mina.exe -- -help
+```
+
+to learn about other options to the CLI app and how to connect to an existing network, such
+as mainnet.
+
 ## Using the Makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
