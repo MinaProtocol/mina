@@ -85,11 +85,10 @@ module BodyReference = struct
 end
 
 (*
-   No tests yet.
-   module BodyReference_gen = struct
-     include Body_reference
-     let gen = failwith ""
-   end
+TODO: add tests for this type
+module BodyReference_gen = struct
+ include Body_reference
+end
+ *)
 
-   let%test_module "BodyReference" = (module Make_test (BodyReference) (BodyReference_gen))
-*)
+(* let%test_module "BodyReference" = (module Make_test (BodyReference) (BodyReference_gen)) *)

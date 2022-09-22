@@ -32,14 +32,10 @@ end
 
 module TransactionId_gen = struct
   include Mina_transaction.Transaction_id.User_command
-
-  let gen = Gen.to_signed_command
 end
 
 let%test_module "TransactionHash" =
   (module Make_test (TransactionHash) (TransactionHash_gen))
 
-(*
-   let%test_module "TransactionId" =
-     (module Make_test (TransactionId) (TransactionId_gen))
-*)
+let%test_module "TransactionId" =
+  (module Make_test (TransactionId) (TransactionId_gen))
