@@ -1,4 +1,5 @@
 module Scalars = Graphql_lib.Scalars
+module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
 [%graphql
@@ -9,7 +10,7 @@ module Get_all_transactions =
         chainId
       }
       pooledUserCommands(publicKey: null) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -24,11 +25,11 @@ module Get_transactions_by_hash =
         peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
         amount @ppxCustom(module: "Scalars.UInt64")
         fee @ppxCustom(module: "Scalars.UInt64")
         kind
-        feeToken @ppxCustom(module: "Scalars.UInt64")
+        feeToken @ppxCustom(module: "Serializing.Token_s")
         validUntil @ppxCustom(module: "Scalars.UInt32")
         memo
         feePayer {
@@ -41,7 +42,7 @@ module Get_transactions_by_hash =
         source {
           publicKey @ppxCustom(module: "Scalars.JSON")
         }
-        token   @ppxCustom(module: "Scalars.UInt64")
+        token @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
@@ -159,12 +160,6 @@ module Transaction = struct
               `String "PAYMENT"
           | `Delegation ->
               `String "STAKE_DELEGATION"
-          | `Create_token ->
-              `String "CREATE_NEW_TOKEN"
-          | `Create_token_account ->
-              `String "CREATE_TOKEN_ACCOUNT"
-          | `Mint_tokens ->
-              `String "MINT_TOKENS"
 
         method feeToken = user_command_info.fee_token
 
@@ -231,12 +226,6 @@ module Transaction = struct
             M.return `Payment
         | `String "STAKE_DELEGATION" ->
             M.return `Delegation
-        | `String "CREATE_NEW_TOKEN" ->
-            M.return `Create_token
-        | `String "CREATE_TOKEN_ACCOUNT" ->
-            M.return `Create_token_account
-        | `String "MINT_TOKENS" ->
-            M.return `Mint_tokens
         | kind ->
             M.fail
               (Errors.create

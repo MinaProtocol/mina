@@ -64,9 +64,9 @@ let validate_keypair =
         Mina_base.Signed_command.sign_payload keypair.Keypair.private_key
           dummy_payload
       in
-      let message = Mina_base.Signed_command.to_input dummy_payload in
+      let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
       let verified =
-        Schnorr.verify signature
+        Schnorr.Legacy.verify signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in
@@ -148,7 +148,7 @@ module Vrf = struct
         "Generate a vrf evaluation witness. This may be used to calculate \
          whether a given private key will win a given slot (by checking \
          threshold_met = true in the JSON output), or to generate a witness \
-         that a 3rd party can use to verify a vrf evaluation."
+         that a 3rd account_update can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =

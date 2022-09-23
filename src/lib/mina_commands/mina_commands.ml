@@ -1,3 +1,5 @@
+[%%import "/src/config.mlh"]
+
 open Core
 open Async
 open Signature_lib
@@ -11,13 +13,13 @@ let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_account ledger addr in
-  Ledger.get ledger loc
+  let%bind loc = Mina_ledger.Ledger.location_of_account ledger addr in
+  Mina_ledger.Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
-  Ledger.to_list ledger
+  Mina_ledger.Ledger.to_list ledger
 
 let string_of_public_key =
   Fn.compose Public_key.Compressed.to_base58_check Account.public_key
@@ -69,22 +71,29 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   let%map result = Mina_lib.add_transactions t [ user_command_input ] in
   txn_count := !txn_count + 1 ;
   match result with
-  | Ok ([], [ failed_txn ]) ->
+  | Ok (_, [], [ failed_txn ]) ->
       Error
         (Error.of_string
            (sprintf !"%s"
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string ) ) )
-  | Ok ([ Signed_command txn ], []) ->
+  | Ok (`Broadcasted, [ Signed_command txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled payment $command" ;
+        "Scheduled command $command" ;
       Ok txn
-  | Ok (valid_commands, invalid_commands) ->
+  | Ok (decision, valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:
-          [ ( "valid_commands"
+          [ ( "decision"
+            , `String
+                ( match decision with
+                | `Broadcasted ->
+                    "broadcasted"
+                | `Not_broadcasted ->
+                    "not_broadcasted" ) )
+          ; ( "valid_commands"
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
           ; ( "invalid_commands"
             , `List
@@ -96,8 +105,8 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                         .to_yojson snd )
                    invalid_commands ) )
           ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
+        "Invalid result from scheduling a user command" ;
+      Error (Error.of_string "Internal error while scheduling a user command")
   | Error e ->
       Error e
 
@@ -110,22 +119,78 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
+let setup_and_submit_snapp_command t (zkapp_command : Zkapp_command.t) =
+  let open Participating_state.Let_syntax in
+  (* hack to get types to work out *)
+  let%map () = return () in
+  let open Deferred.Let_syntax in
+  let%map result = Mina_lib.add_zkapp_transactions t [ zkapp_command ] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok (_, [], [ failed_txn ]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string ) ) )
+  | Ok (`Broadcasted, [ User_command.Zkapp_command txn ], []) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson txn) ]
+        "Scheduled zkApp $zkapp_command" ;
+      Ok txn
+  | Ok (decision, valid_commands, invalid_commands) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:
+          [ ( "decision"
+            , `String
+                ( match decision with
+                | `Broadcasted ->
+                    "broadcasted"
+                | `Not_broadcasted ->
+                    "not_broadcasted" ) )
+          ; ( "valid_snapp_commands"
+            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+          ; ( "invalid_zkapp_commands"
+            , `List
+                (List.map
+                   ~f:
+                     (Fn.compose
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .Diff_error
+                        .to_yojson snd )
+                   invalid_commands ) )
+          ]
+        "Invalid result from scheduling a zkApp command" ;
+      Error (Error.of_string "Internal error while scheduling a zkApp command")
+  | Error e ->
+      Error e
+
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
 
   type hash = Receipt.Chain_hash.t [@@deriving equal]
 
   let hash parent_hash (proof_elem : User_command.t) =
-    let p =
-      match proof_elem with
-      | Signed_command c ->
-          Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Snapp_command x ->
-          Receipt.Elt.Snapp_command
-            Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
-    in
-    Receipt.Chain_hash.cons p parent_hash
+    match proof_elem with
+    | Signed_command cmd ->
+        let elt =
+          Receipt.Signed_command_elt.Signed_command_payload
+            (Signed_command.payload cmd)
+        in
+        Receipt.Chain_hash.cons_signed_command_payload elt parent_hash
+    | Zkapp_command _zkapp_command ->
+        failwith "Not implemented for zkApps"
+  (* TODO: apply cons_zkapp_command_commitment operation for all occurrences of fee payer
+
+     issue #11495
+
+     let elt = Receipt.Zkapp_command_elt.Zkapp_command_commitment (Zkapp_command.commitment zkapp_command) in
+     let fee_payer_index = Mina_numbers.Index.zero in
+     Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
+
+[%%inject "compile_time_current_protocol_version", current_protocol_version]
 
 let chain_id_inputs (t : Mina_lib.t) =
   (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
@@ -139,7 +204,11 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  (genesis_state_hash, genesis_constants, snark_keys)
+  let protocol_major_version =
+    Protocol_version.of_string_exn compile_time_current_protocol_version
+    |> Protocol_version.major
+  in
+  (genesis_state_hash, genesis_constants, snark_keys, protocol_major_version)
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
@@ -275,9 +344,9 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
+      Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
     in
-    let num_accounts = Ledger.num_accounts ledger in
+    let num_accounts = Mina_ledger.Ledger.num_accounts ledger in
     let%bind best_tip = Mina_lib.best_tip t in
     let state_hash =
       Transition_frontier.Breadcrumb.state_hash best_tip

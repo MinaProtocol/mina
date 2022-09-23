@@ -58,6 +58,7 @@ module "kubernetes_testnet" {
   archive_configs = local.archive_node_configs
 
   mina_archive_schema = var.mina_archive_schema
+  mina_archive_schema_aux_files = var.mina_archive_schema_aux_files
 
   snark_coordinators = var.snark_coordinators
 
@@ -71,8 +72,8 @@ module "kubernetes_testnet" {
       private_key_secret     = "${bp.class}-${bp.unique_node_index}-key"
       libp2p_secret          = ""
       enable_gossip_flooding = false
-      run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
-      # run_with_user_agent = bp.class =="whale" ? false : true
+      # run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
+      run_with_user_agent = bp.class =="whale" ? false : true
       run_with_bots          = false
       enable_peer_exchange   = true
       isolated               = false
@@ -100,6 +101,11 @@ module "kubernetes_testnet" {
       name               = "plain-node-${i+1}"
     }
   ]
+
+  cpu_request = var.cpu_request
+  mem_request= var.mem_request
+  worker_cpu_request = var.worker_cpu_request
+  worker_mem_request= var.worker_mem_request
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

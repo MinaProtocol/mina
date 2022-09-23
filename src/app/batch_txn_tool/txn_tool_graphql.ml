@@ -102,7 +102,7 @@ let get_account_data ~public_key ~graphql_target_node =
   | Some acc -> (
       match acc.nonce with
       | Some s ->
-          return (int_of_string s)
+          return s
       | None ->
           Deferred.Or_error.errorf "Account with %s somehow doesnt have a nonce"
             (Public_key.Compressed.to_string pk) )
@@ -119,19 +119,12 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
     Mina_base.Signed_command.sign_payload sender_priv_key
       { common =
           { fee
-          ; fee_token = Mina_base.Token_id.default
           ; fee_payer_pk = sender_pub_key
           ; nonce
           ; valid_until = Mina_numbers.Global_slot.max_value
           ; memo = Mina_base.Signed_command_memo.empty
           }
-      ; body =
-          Payment
-            { source_pk = sender_pub_key
-            ; receiver_pk
-            ; token_id = Mina_base.Token_id.default
-            ; amount
-            }
+      ; body = Payment { source_pk = sender_pub_key; receiver_pk; amount }
       }
   in
   let graphql_query =

@@ -42,7 +42,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
     end
 
     include T
@@ -57,3 +57,7 @@ module Stable = struct
 end]
 
 type _unused = unit constraint t = Stable.Latest.t
+
+let deriver obj =
+  Fields_derivers_zkapps.iso_string obj ~name:"StateHash" ~js_type:Field
+    ~to_string:to_base58_check ~of_string:of_base58_check_exn

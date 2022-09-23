@@ -4,13 +4,15 @@ final: prev: {
 
   go-capnproto2 = final.buildGo118Module rec {
     pname = "capnpc-go";
-    version = "v3.0.0-alpha.1";
-    vendorSha256 = "sha256-jbX/nnlnQoItFXFL/MZZKe4zAjM/EA3q+URJG8I3hok=";
+    version = "v3.0.0-alpha.5";
+    vendorSha256 = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
+    # Don't understand the problem, but it seems to build fine without examples
+    excludedPackages = [ "./example/books/ex1" "./example/books/ex2" "./example/hashes" ];
     src = final.fetchFromGitHub {
       owner = "capnproto";
       repo = "go-capnproto2";
-      rev = "v3.0.0-alpha.1";
-      hash = "sha256-afdLw7of5AksR4ErCMqXqXCOnJ/nHK2Lo4xkC5McBfM";
+      rev = "v3.0.0-alpha.5";
+      hash = "sha256-geKqYjPUyJ7LT01NhJc9y8oO1hyhktTx1etAK4cXBec=";
     };
   };
 
@@ -34,17 +36,22 @@ final: prev: {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
-    vendorSha256 =
+    vendorSha256 = let hashes = final.lib.importJSON ./libp2p_helper.json; in
       # sanity check, to make sure the fixed output drv doesn't keep working
       # when the inputs change
       if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-      == "4ce9e2efa7e35cce9b7b131bef15652830756f6f6da250afefd4751efa1d6565"
+      == hashes."go.mod"
       && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-      == "8b90b3cee4be058eeca0bc9a5a2ee88d62cada9fb09785e0ced5e5cea7893192" then
-        "sha256-MXLfE122UCNizqvGUu6WlThh1rnZueTqirCzaEWmbno="
+      == hashes."go.sum" then
+        hashes.vendorSha256
       else
         final.lib.warn
-        "Please update the hashes in ${__curPos.file}#${toString __curPos.line}"
+        ''
+          Below, you will find an error about a hash mismatch.
+          This is likely because you have updated go.mod and/or go.sum in libp2p_helper.
+          Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
+          Then, run [37;1m./nix/update-libp2p-hashes.sh [35;1m"<got hash here>"[31;0m
+        ''
         final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {

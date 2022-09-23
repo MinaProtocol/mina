@@ -550,7 +550,7 @@ let%test_module "all-ipc test" =
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
         configure node ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config

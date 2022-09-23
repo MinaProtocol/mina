@@ -176,7 +176,9 @@
           ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
+        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
+          nodejs = pkgs.nodejs-16_x;
+        };
 
         submodules = map builtins.head (builtins.filter lib.isList
           (map (builtins.match "	path = (.*)")
@@ -192,6 +194,8 @@
           '';
 
         checks = import ./nix/checks.nix inputs pkgs;
+
+        dockerImages = pkgs.callPackage ./nix/docker.nix { };
 
         ocamlPackages = pkgs.ocamlPackages_mina;
       in {
@@ -255,7 +259,7 @@
             patchelf \
               --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
               --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
-              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
+              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux ./node_modules/gentype/vendor-linux/gentype.exe
           '';
           yarnBuildMore = ''
             cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
@@ -265,6 +269,43 @@
             mkdir -p $out/share/client_sdk
             mv src/*.js $out/share/client_sdk
           '';
+        };
+
+        # snarkyjs
+        packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
+          src = ./src/lib/snarky_js_bindings/snarkyjs;
+          preBuild = ''
+            BINDINGS_PATH=./src/node_bindings
+            mkdir -p "$BINDINGS_PATH"
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
+            chmod -R 777 "$BINDINGS_PATH"
+
+            # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
+            # better error messages
+            # TODO: find a less hacky way to make adjustments to jsoo compiler output
+            # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
+            sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+          '';
+          npmBuild = "npm run build";
+          # TODO: add snarky-run
+          # TODO
+          # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
+        };
+
+        packages.mina-signer = nix-npm-buildPackage.buildNpmPackage {
+          src = ./frontend/mina-signer;
+          preBuild = ''
+            cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
+            chmod 0666 src/client_sdk.bc.js
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
+            chmod 0666 src/plonk_wasm{.js,_bg.wasm}
+          '';
+          npmBuild = "npm run build";
+          doCheck = true;
+          checkPhase = "npm test";
         };
 
         inherit ocamlPackages;
@@ -313,6 +354,20 @@
 
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
+
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
+          ];
+          MARLIN_PLONK_STUBS = "n";
+          PLONK_WASM_WEB = "n";
+          PLONK_WASM_NODEJS = "n";
+        });
 
         inherit checks;
       });

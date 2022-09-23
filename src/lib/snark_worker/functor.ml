@@ -1,34 +1,61 @@
 open Core
 open Async
-open Mina_base
+
+module Time_span_with_json = struct
+  type t = Time.Span.t
+
+  let to_yojson total = `String (Time.Span.to_string_hum total)
+
+  let of_yojson = function
+    | `String time ->
+        Ok (Time.Span.of_string time)
+    | _ ->
+        Error "Snark_worker.Functor: Could not parse timespan"
+end
+
+(*FIX: register_event fails when adding base types to the constructors*)
+module String_with_json = struct
+  type t = string
+
+  let to_yojson s = `String s
+
+  let of_yojson = function
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Snark_worker.Functor: Could not parse string"
+end
+
+module Int_with_json = struct
+  type t = int
+
+  let to_yojson s = `Int s
+
+  let of_yojson = function
+    | `Int s ->
+        Ok s
+    | _ ->
+        Error "Snark_worker.Functor: Could not parse int"
+end
 
 type Structured_log_events.t +=
-  | Merge_snark_generated of
-      { time :
-          (Time.Span.t
-          [@to_yojson fun total -> `String (Time.Span.to_string_hum total)]
-          [@of_yojson
-            function
-            | `String time ->
-                Ok (Time.Span.of_string time)
-            | _ ->
-                Error "Snark_worker.Functor: Could not parse timespan"] )
-      }
+  | Merge_snark_generated of { time : Time_span_with_json.t }
   [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
 
 type Structured_log_events.t +=
   | Base_snark_generated of
-      { time :
-          (Time.Span.t
-          [@to_yojson fun total -> `String (Time.Span.to_string_hum total)]
-          [@of_yojson
-            function
-            | `String time ->
-                Ok (Time.Span.of_string time)
-            | _ ->
-                Error "Snark_worker.Functor: Could not parse timespan"] )
+      { time : Time_span_with_json.t
+      ; transaction_type : String_with_json.t
+      ; zkapp_command_count : Int_with_json.t
+      ; proof_zkapp_command_count : Int_with_json.t
       }
-  [@@deriving register_event { msg = "Base SNARK generated in $time" }]
+  [@@deriving
+    register_event
+      { msg =
+          "Base SNARK generated in $time for $transaction_type transaction \
+           with $zkapp_command_count zkapp_command and \
+           $proof_zkapp_command_count proof zkapp_command"
+      }]
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
@@ -40,12 +67,12 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t =
-          ( Transaction.t
-          , Transaction_witness.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
+        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
         [@@deriving sexp, to_yojson]
+
+        let transaction t =
+          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
+              w.Transaction_witness.transaction )
 
         let statement = Work.Single.Spec.statement
       end
@@ -59,6 +86,9 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Result = struct
       type t = (Spec.t, Ledger_proof.t) Work.Result.t
+
+      let transactions (t : t) =
+        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
     end
   end
 
@@ -120,8 +150,9 @@ module Make (Inputs : Intf.Inputs_intf) :
     | Ok res ->
         res
 
-  let emit_proof_metrics metrics logger =
-    One_or_two.iter metrics ~f:(fun (time, tag) ->
+  let emit_proof_metrics metrics instances logger =
+    One_or_two.iter (One_or_two.zip_exn metrics instances)
+      ~f:(fun ((time, tag), single) ->
         match tag with
         | `Merge ->
             Mina_metrics.(
@@ -129,10 +160,68 @@ module Make (Inputs : Intf.Inputs_intf) :
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
             [%str_log info] (Merge_snark_generated { time })
         | `Transition ->
-            Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
-            [%str_log info] (Base_snark_generated { time }) )
+            let transaction_type, zkapp_command_count, proof_zkapp_command_count
+                =
+              (*should be Some in the case of `Transition*)
+              match Option.value_exn single with
+              | Mina_transaction.Transaction.Command
+                  (Mina_base.User_command.Zkapp_command zkapp_command) ->
+                  let init =
+                    match
+                      (Mina_base.Account_update.of_fee_payer
+                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                        .authorization
+                    with
+                    | Proof _ ->
+                        (1, 1)
+                    | _ ->
+                        (1, 0)
+                  in
+                  let c, p =
+                    Mina_base.Zkapp_command.Call_forest.fold
+                      zkapp_command.account_updates ~init
+                      ~f:(fun (count, proof_updates_count) account_update ->
+                        ( count + 1
+                        , if
+                            Mina_base.Control.(
+                              Tag.equal Proof
+                                (tag
+                                   (Mina_base.Account_update.authorization
+                                      account_update ) ))
+                          then proof_updates_count + 1
+                          else proof_updates_count ) )
+                  in
+                  Mina_metrics.(
+                    Cryptography.(
+                      Counter.inc snark_work_zkapp_base_time_sec
+                        (Time.Span.to_sec time) ;
+                      Counter.inc_one snark_work_zkapp_base_submissions ;
+                      Counter.inc zkapp_transaction_length (Float.of_int c) ;
+                      Counter.inc zkapp_proof_updates (Float.of_int p))) ;
+                  ("zkapp_command", c, p)
+              | Command (Signed_command _) ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
+                  ("signed command", 1, 0)
+              | Coinbase _ ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
+                  ("coinbase", 1, 0)
+              | Fee_transfer _ ->
+                  Mina_metrics.(
+                    Counter.inc Cryptography.snark_work_base_time_sec
+                      (Time.Span.to_sec time)) ;
+                  ("fee_transfer", 1, 0)
+            in
+            [%str_log info]
+              (Base_snark_generated
+                 { time
+                 ; transaction_type
+                 ; zkapp_command_count
+                 ; proof_zkapp_command_count
+                 } ) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
@@ -213,9 +302,23 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match%bind perform state public_key work with
           | Error e ->
+              let%bind () =
+                match%map
+                  dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+                    shutdown_on_disconnect (work, public_key) daemon_address
+                with
+                | Error e ->
+                    [%log error]
+                      "Couldn't inform the daemon about the snark work failure"
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                | Ok () ->
+                    ()
+              in
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
-              emit_proof_metrics result.metrics logger ;
+              emit_proof_metrics result.metrics
+                (Work.Result.transactions result)
+                logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ("address", `String (Host_and_port.to_string daemon_address))
@@ -258,11 +361,20 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      in
+      and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+            let logrotate_max_size = 1024 * 10 in
+            let logrotate_num_rotate = 1 in
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+              ~processor:(Logger.Processor.raw ())
+              ~transport:
+                (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                   ~log_filename:"mina-snark-worker.log"
+                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;

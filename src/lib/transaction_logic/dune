@@ -1,0 +1,61 @@
+(library
+ (name mina_transaction_logic)
+ (public_name mina_transaction_logic)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   result
+   bin_prot.shape
+   ppx_inline_test.config
+   sexplib0
+   yojson
+   sexp_diff_kernel
+   core_kernel
+   base.caml
+   base
+   base.base_internalhash_types
+   integers
+   base_quickcheck
+   ;; local libraries
+   mina_wire_types
+   block_time
+   currency
+   data_hash_lib
+   debug_assert
+   genesis_constants
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.common
+   kimchi_backend
+   kimchi_pasta
+   mina_base
+   mina_base.import
+   mina_numbers
+   mina_transaction
+   one_or_two
+   pickles_types
+   pickles
+   pickles.backend
+   random_oracle
+   random_oracle_input
+   signature_lib
+   sgn
+   snarky.backendless
+   snark_params
+   unsigned_extended
+   ppx_version.runtime
+   with_hash)
+ (instrumentation (backend bisect_ppx))
+ (preprocess
+  (pps
+   h_list.ppx
+   ppx_assert
+   ppx_compare
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_let
+   ppx_hash
+   ppx_sexp_conv
+   ppx_version)))

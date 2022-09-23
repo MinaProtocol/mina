@@ -2,7 +2,7 @@
  (name transition_router)
  (public_name transition_router)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare))
  (libraries
    ;; opam libraries
    integers
@@ -47,4 +47,5 @@
    proof_carrying_data
    ledger_catchup
    data_hash_lib
+   mina_wire_types
 ))

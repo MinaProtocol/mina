@@ -1,6 +1,7 @@
-[%%import "../../config.mlh"]
+[%%import "/src/config.mlh"]
 
-open Core
+open Core_kernel
+open Mina_base_util
 open Fold_lib
 open Snark_params.Tick
 
@@ -23,7 +24,11 @@ module Aux_hash = struct
           Base58_check.Version_bytes.staged_ledger_hash_aux_hash
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let of_base58_check_exn s = Base58_check.decode_exn s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
@@ -39,7 +44,8 @@ module Aux_hash = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
   let of_bytes = Fn.id
 
@@ -67,7 +73,11 @@ module Pending_coinbase_aux = struct
           Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let of_base58_check_exn s = Base58_check.decode_exn s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
@@ -83,7 +93,8 @@ module Pending_coinbase_aux = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
@@ -97,7 +108,7 @@ module Non_snark = struct
         ; aux_hash : Aux_hash.Stable.V1.t
         ; pending_coinbase_aux : Pending_coinbase_aux.Stable.V1.t
         }
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson, fields]
 
       let to_latest = Fn.id
     end
@@ -131,7 +142,12 @@ module Non_snark = struct
 
   let fold t = Fold.string_bits (digest t)
 
-  let to_input t = Random_oracle.Input.bitstring (Fold.to_list (fold t))
+  let to_input t =
+    let open Random_oracle.Input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map
+         (Fold.to_list (fold t))
+         ~f:(fun b -> packed (field_of_bool b, 1)) )
 
   let ledger_hash ({ ledger_hash; _ } : t) = ledger_hash
 
@@ -141,7 +157,10 @@ module Non_snark = struct
       =
     { aux_hash; ledger_hash; pending_coinbase_aux }
 
-  let var_to_input = Random_oracle.Input.bitstring
+  let var_to_input (t : var) =
+    let open Random_oracle.Input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map t ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
 
   let var_of_t t : var =
     List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
@@ -210,6 +229,9 @@ let ledger_hash ({ non_snark; _ } : t) = Non_snark.ledger_hash non_snark
 
 let aux_hash ({ non_snark; _ } : t) = Non_snark.aux_hash non_snark
 
+let pending_coinbase_aux ({ non_snark; _ } : t) =
+  Non_snark.pending_coinbase_aux non_snark
+
 let pending_coinbase_hash ({ pending_coinbase_hash; _ } : t) =
   pending_coinbase_hash
 
@@ -242,13 +264,13 @@ let var_of_t ({ pending_coinbase_hash; non_snark } : t) : var =
   { non_snark; pending_coinbase_hash }
 
 let to_input ({ non_snark; pending_coinbase_hash } : t) =
-  Random_oracle.Input.(
+  Random_oracle.Input.Chunked.(
     append
       (Non_snark.to_input non_snark)
       (field (pending_coinbase_hash :> Field.t)))
 
 let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
-  Random_oracle.Input.(
+  Random_oracle.Input.Chunked.(
     append
       (Non_snark.var_to_input non_snark)
       (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))

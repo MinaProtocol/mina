@@ -7,8 +7,10 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@with_top_version_tag]
+
     module V1 : sig
-      type t [@@deriving sexp, compare, hash, equal]
+      type t [@@deriving sexp, compare, hash, equal, yojson]
     end
   end]
 
@@ -25,6 +27,8 @@ module type S = sig
   val to_raw_string : t -> string
 
   val to_hex : t -> string
+
+  val of_hex : string -> t
 
   val digest_string : ?off:int -> ?len:int -> String.t -> t
 

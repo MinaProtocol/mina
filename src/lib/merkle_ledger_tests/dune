@@ -15,7 +15,6 @@
    ppx_inline_test.config
    result
    async_kernel
-   async
    core_kernel
    ;; local libraries
    merkle_ledger
@@ -26,11 +25,13 @@
    base58_check
    direction
    codable
+   mina_base_import
    mina_numbers
    data_hash_lib
    key_value_database
    merkle_address
-)
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

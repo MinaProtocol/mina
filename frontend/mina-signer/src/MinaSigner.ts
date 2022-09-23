@@ -2,7 +2,7 @@
 const JSOfOCaml_SDK = require("./client_sdk.bc.js");
 const minaSDK = JSOfOCaml_SDK.minaSDK;
 
-import {
+import type {
   Network,
   PublicKey,
   Keypair,
@@ -11,9 +11,27 @@ import {
   Payment,
   StakeDelegation,
   Message,
+  ZkappCommand,
+  AccountUpdates,
+  SignableData,
 } from "./TSTypes";
 
+import {
+  isPayment,
+  isMessage,
+  isStakeDelegation,
+  isZkappCommand,
+} from "./Utils";
+
 const defaultValidUntil = "4294967295";
+
+// Shut down wasm workers, which are not needed here
+if (globalThis.wasm_rayon_poolbuilder) {
+  globalThis.wasm_rayon_poolbuilder.free();
+  for (let worker of globalThis.wasm_workers) {
+    worker.terminate();
+  }
+}
 
 class Client {
   private network: Network;
@@ -317,6 +335,62 @@ class Client {
   }
 
   /**
+   * Sign a zkapp command transaction using a private key.
+   *
+   * This type of transaction allows a user to update state on a given
+   * Smart Contract running on Mina.
+   *
+   * @param zkappCommand A object representing a zkApp command tx
+   * @param privateKey The fee payer private key
+   * @returns Signed ZkappCommand
+   */
+  public signZkappCommand(
+    zkappCommand: ZkappCommand,
+    privateKey: PrivateKey
+  ): Signed<ZkappCommand> {
+    const account_updates = JSON.stringify(
+      zkappCommand.zkappCommand.accountUpdates
+    );
+    if (
+      zkappCommand.feePayer.fee === undefined ||
+      zkappCommand.feePayer.fee <
+        this.getAccountUpdateMinimumFee(
+          zkappCommand.zkappCommand.accountUpdates
+        )
+    ) {
+      throw `Fee must be greater than ${this.getAccountUpdateMinimumFee(
+        zkappCommand.zkappCommand.accountUpdates
+      )}`;
+    }
+    const memo = zkappCommand.feePayer.memo ?? "";
+    const fee = String(zkappCommand.feePayer.fee);
+    const nonce = String(zkappCommand.feePayer.nonce);
+    const feePayer = String(zkappCommand.feePayer.feePayer);
+    const signedZkappCommand = minaSDK.signZkappCommand(
+      account_updates,
+      {
+        feePayer,
+        fee,
+        nonce,
+        memo,
+      },
+      privateKey
+    );
+    return {
+      signature: JSON.parse(signedZkappCommand).feePayer.authorization,
+      data: {
+        zkappCommand: signedZkappCommand,
+        feePayer: {
+          feePayer,
+          fee,
+          nonce,
+          memo,
+        },
+      },
+    };
+  }
+
+  /**
    * Converts a Rosetta signed transaction to a JSON string that is
    * compatible with GraphQL. The JSON string is a representation of
    * a `Signed_command` which is what our GraphQL expects.
@@ -339,6 +413,50 @@ class Client {
    */
   public publicKeyToRaw(publicKey: string): string {
     return minaSDK.rawPublicKeyOfPublicKey(publicKey);
+  }
+
+  /**
+   * Signs an arbitrary payload using a private key. This function can sign messages,
+   * payments, stake delegations, and zkapp commands. If the payload is unrecognized, an Error
+   * is thrown.
+   *
+   * @param payload A signable payload
+   * @param key A valid keypair
+   * @returns A signed payload
+   */
+  public signTransaction(
+    payload: SignableData,
+    privateKey: PrivateKey
+  ): Signed<SignableData> {
+    if (isMessage(payload)) {
+      return this.signMessage(payload.message, {
+        publicKey: payload.publicKey,
+        privateKey,
+      });
+    }
+    if (isPayment(payload)) {
+      return this.signPayment(payload, privateKey);
+    }
+    if (isStakeDelegation(payload)) {
+      return this.signStakeDelegation(payload, privateKey);
+    }
+    if (isZkappCommand(payload)) {
+      return this.signZkappCommand(payload, privateKey);
+    } else {
+      throw new Error(`Expected signable payload, got '${payload}'.`);
+    }
+  }
+
+  /**
+   * Calculates the minimum fee of a zkapp command transaction. A fee for a zkapp command transaction is
+   * the sum of all account updates plus the specified fee amount. If no fee is passed in, `0.001`
+   * is used (according to the Mina spec) by default.
+   * @param p An accountUpdates object
+   * @param fee The fee per accountUpdate amount
+   * @returns  The fee to be paid by the fee payer accountUpdate
+   */
+  public getAccountUpdateMinimumFee(p: AccountUpdates, fee: number = 0.001) {
+    return p.reduce((accumulatedFee, _) => accumulatedFee + fee, 0);
   }
 }
 

@@ -10,13 +10,14 @@
    base
    sexplib0
    yojson
-   ppx_version.runtime
    core_kernel
    bin_prot.shape
    base.caml
    result
    ;; local libraries
+   mina_wire_types
    crypto_params
+   kimchi_backend.pasta
    random_oracle_input
    bitstring_lib
    codable
@@ -33,13 +34,15 @@
    pickles
    fold_lib
    pickles.backend
-   pasta
-   zexe_backend
+   kimchi_backend
+   h_list
+   test_util
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_snarky ppx_coda ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv
+               ppx_snarky ppx_mina ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv
                ppx_bin_prot ppx_hash ppx_compare ppx_compare ppx_deriving_yojson
                ppx_inline_test ppx_let))
  (synopsis "Schnorr signatures using the tick and tock curves"))
