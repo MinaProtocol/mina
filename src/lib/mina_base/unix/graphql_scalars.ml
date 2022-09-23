@@ -115,9 +115,11 @@ end
 module ZkappCommandBase58_gen = struct
   include Mina_base.Zkapp_command
 
-  let gen = Stable.Latest.Wire.gen |> Core_kernel.Quickcheck.Generator.map ~f:Stable.Latest.of_wire 
+  let gen =
+    Stable.Latest.Wire.gen
+    |> Core_kernel.Quickcheck.Generator.map ~f:Stable.Latest.of_wire
 end
-                              
+
 let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
 
 let%test_module "StateHash" =
@@ -147,4 +149,3 @@ let%test_module "StagedLedgerAuxHash" =
 
 let%test_module "ZkappCommandBase58" =
   (module Make_test (ZkappCommandBase58) (ZkappCommandBase58_gen))
-

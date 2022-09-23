@@ -52,7 +52,7 @@ module BodyReference = struct
          as a hex-encoded string"
       ~coerce:serialize
 end
-  
+
 (* TESTS *)
 module Slot_gen = struct
   include Slot
