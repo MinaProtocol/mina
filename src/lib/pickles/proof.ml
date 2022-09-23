@@ -7,20 +7,21 @@ open Backend
 let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
 
 module Base = struct
-  module Me_only = Reduced_me_only
+  module Messages_for_next_proof_over_same_field =
+    Reduced_messages_for_next_proof_over_same_field
 
   module Step = struct
     type ( 's
          , 'unfinalized_proofs
          , 'sgs
          , 'bp_chals
-         , 'dlog_me_onlys
+         , 'messages_for_next_wrap_proof
          , 'prev_evals )
          t =
       { statement :
           ( 'unfinalized_proofs
-          , ('s, 'sgs, 'bp_chals) Me_only.Step.t
-          , 'dlog_me_onlys )
+          , ('s, 'sgs, 'bp_chals) Messages_for_next_proof_over_same_field.Step.t
+          , 'messages_for_next_wrap_proof )
           Types.Step.Statement.t
       ; index : int
       ; prev_evals : 'prev_evals
@@ -43,7 +44,10 @@ module Base = struct
       [@@@no_toplevel_latest_type]
 
       module V2 = struct
-        type ('dlog_me_only, 'step_me_only) t =
+        type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+              ( 'messages_for_next_wrap_proof
+              , 'messages_for_next_step_proof )
+              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
@@ -51,9 +55,9 @@ module Base = struct
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
               , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
-              , 'dlog_me_only
+              , 'messages_for_next_wrap_proof
               , Digest.Constant.Stable.V1.t
-              , 'step_me_only
+              , 'messages_for_next_step_proof
               , Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
@@ -71,15 +75,17 @@ module Base = struct
       end
     end]
 
-    type ('dlog_me_only, 'step_me_only) t =
-          ('dlog_me_only, 'step_me_only) Stable.Latest.t =
+    type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+          ( 'messages_for_next_wrap_proof
+          , 'messages_for_next_step_proof )
+          Stable.Latest.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
           , Tick.Field.t Shifted_value.Type1.t
-          , 'dlog_me_only
+          , 'messages_for_next_wrap_proof
           , Digest.Constant.t
-          , 'step_me_only
+          , 'messages_for_next_step_proof
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
           , Branch_data.t )
@@ -91,9 +97,10 @@ module Base = struct
   end
 end
 
-type ('s, 'mlmb, _) with_data =
+type ('s, 'mlmb, 'c) with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
   | T :
-      ( 'mlmb Base.Me_only.Wrap.t
+      ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's
         , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
@@ -101,7 +108,7 @@ type ('s, 'mlmb, _) with_data =
             Step_bp_vec.t
           , 'most_recent_width )
           Vector.t )
-        Base.Me_only.Step.t )
+        Base.Messages_for_next_proof_over_same_field.Step.t )
       Base.Wrap.t
       -> ('s, 'mlmb, _) with_data
 
@@ -150,13 +157,13 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 }
             ; sponge_digest_before_evaluations =
                 Digest.Constant.of_tock_field Tock.Field.zero
-            ; me_only =
+            ; messages_for_next_wrap_proof =
                 { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
                 ; old_bulletproof_challenges =
                     Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
                 }
             }
-        ; pass_through =
+        ; messages_for_next_step_proof =
             { app_state = ()
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
@@ -209,14 +216,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module Repr = struct
     type t =
       ( ( Tock.Inner_curve.Affine.t
-        , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
-        Types.Wrap.Proof_state.Me_only.t
+        , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
+          .t
+          MLMB_vec.t )
+        Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
       , ( unit
         , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
           Max_proofs_verified_at_most.t )
-        Base.Me_only.Step.t )
+        Base.Messages_for_next_proof_over_same_field.Step.t )
       Base.Wrap.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
@@ -226,20 +235,24 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let to_repr (T t) : Repr.t =
     let lte =
       Nat.lte_exn
-        (Vector.length t.statement.pass_through.challenge_polynomial_commitments)
+        (Vector.length
+           t.statement.messages_for_next_step_proof
+             .challenge_polynomial_commitments )
         W.n
     in
     { t with
       statement =
         { t.statement with
-          pass_through =
-            { t.statement.pass_through with
+          messages_for_next_step_proof =
+            { t.statement.messages_for_next_step_proof with
               challenge_polynomial_commitments =
                 At_most.of_vector
-                  t.statement.pass_through.challenge_polynomial_commitments lte
+                  t.statement.messages_for_next_step_proof
+                    .challenge_polynomial_commitments lte
             ; old_bulletproof_challenges =
                 At_most.of_vector
-                  t.statement.pass_through.old_bulletproof_challenges lte
+                  t.statement.messages_for_next_step_proof
+                    .old_bulletproof_challenges lte
             }
         }
     }
@@ -247,10 +260,12 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let of_repr (r : Repr.t) : t =
     let (Vector.T challenge_polynomial_commitments) =
       At_most.to_vector
-        r.statement.pass_through.challenge_polynomial_commitments
+        r.statement.messages_for_next_step_proof
+          .challenge_polynomial_commitments
     in
     let (Vector.T old_bulletproof_challenges) =
-      At_most.to_vector r.statement.pass_through.old_bulletproof_challenges
+      At_most.to_vector
+        r.statement.messages_for_next_step_proof.old_bulletproof_challenges
     in
     let T =
       Nat.eq_exn
@@ -261,8 +276,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
       { r with
         statement =
           { r.statement with
-            pass_through =
-              { r.statement.pass_through with
+            messages_for_next_step_proof =
+              { r.statement.messages_for_next_step_proof with
                 challenge_polynomial_commitments
               ; old_bulletproof_challenges
               }
@@ -324,9 +339,13 @@ module Proofs_verified_2 = struct
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
+            , Reduced_messages_for_next_proof_over_same_field.Wrap
+              .Challenges_vector
+              .Stable
+              .V2
+              .t
               Vector.Vector_2.Stable.V1.t )
-            Types.Wrap.Proof_state.Me_only.Stable.V1.t
+            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -334,7 +353,7 @@ module Proofs_verified_2 = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
-            Base.Me_only.Step.Stable.V1.t )
+            Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -393,9 +412,13 @@ module Proofs_verified_max = struct
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
+            , Reduced_messages_for_next_proof_over_same_field.Wrap
+              .Challenges_vector
+              .Stable
+              .V2
+              .t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
-            Types.Wrap.Proof_state.Me_only.Stable.V1.t
+            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
@@ -404,7 +427,7 @@ module Proofs_verified_max = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
-            Base.Me_only.Step.Stable.V1.t )
+            Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 

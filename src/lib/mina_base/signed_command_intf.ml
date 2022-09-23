@@ -12,10 +12,10 @@ module type Gen_intf = sig
 
   module Gen : sig
     (** Generate a single transaction between
-    * Generate random keys for sender and receiver
-    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-    * Mina_compile_config.minimum_user_command_fee+fee_range]$
-    * and an amount $\in [1,max_amount]$
+     * Generate random keys for sender and receiver
+     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * and an amount $\in [1,max_amount]$
     *)
     val payment :
          ?sign_type:[ `Fake | `Real ]
@@ -29,10 +29,10 @@ module type Gen_intf = sig
       -> t Quickcheck.Generator.t
 
     (** Generate a single transaction between
-    * $a, b \in keys$
-    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-    * Mina_compile_config.minimum_user_command_fee+fee_range]$
-    * and an amount $\in [1,max_amount]$
+     * $a, b \in keys$
+     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
          ?sign_type:[ `Fake | `Real ]
@@ -132,7 +132,7 @@ module type S = sig
   module With_valid_signature : sig
     module Stable : sig
       module Latest : sig
-        type nonrec t = private t
+        type nonrec t
         [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
 
         include Gen_intf with type t := t
@@ -198,4 +198,49 @@ module type S = sig
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
   include Codable.Base58_check_intf with type t := t
+
+  include Codable.Base64_intf with type t := t
+end
+
+module type Full = sig
+  module Payload = Signed_command_payload
+
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ('payload, 'pk, 'signature) t =
+              ( 'payload
+              , 'pk
+              , 'signature )
+              Mina_wire_types.Mina_base.Signed_command.Poly.V1.t =
+          { payload : 'payload; signer : 'pk; signature : 'signature }
+        [@@deriving sexp, hash, yojson, equal, compare]
+      end
+    end]
+  end
+
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t =
+        ( Payload.Stable.V2.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, hash, yojson, version]
+
+      val version_byte : char (* for base58_check *)
+
+      include Comparable.S with type t := t
+
+      include Hashable.S with type t := t
+
+      val accounts_accessed : t -> Account_id.t list
+    end
+  end]
+
+  include S with type t = Stable.V2.t
 end

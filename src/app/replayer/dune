@@ -24,6 +24,7 @@
    integers
    async_unix
    ;; local libraries
+   mina_wire_types
    with_hash
    snark_params
    crypto_params
@@ -56,5 +57,5 @@
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_sexp_conv
                   ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))

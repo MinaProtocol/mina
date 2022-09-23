@@ -13,6 +13,10 @@ module Make (Inputs : Inputs_intf) :
     with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
+  module type CONTEXT = sig
+    val logger : Logger.t
+  end
+
   module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
     type value = Mina_block.Validated.t
 
@@ -43,7 +47,8 @@ module Make (Inputs : Inputs_intf) :
         .state_hash
   end)
 
-  let prove ~logger frontier =
+  let prove ~context:(module Context : CONTEXT) frontier =
+    let open Context in
     let open Option.Let_syntax in
     let genesis_constants = Transition_frontier.genesis_constants frontier in
     let root = Transition_frontier.root frontier in

@@ -32,6 +32,7 @@
    perf_histograms
    mina_metrics
    mina_block
+   mina_transaction
    network_peer
    with_hash
    logger
@@ -47,4 +48,4 @@
    mina_numbers
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))

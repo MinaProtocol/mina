@@ -10,15 +10,14 @@ import {
   shutdown,
   Mina,
   Permissions,
-  Party,
+  AccountUpdate,
   UInt64,
   Ledger,
   Token,
-  getDefaultTokenId,
 } from "snarkyjs";
 
 function sendTransaction(tx) {
-  // console.log("DEBUG -- TXN\n", JSON.stringify(partiesToJson(tx.transaction)));
+  // console.log("DEBUG -- TXN\n", JSON.stringify(zkappCommandToJson(tx.transaction)));
   tx.send();
 }
 
@@ -118,7 +117,7 @@ let tx;
 
 console.log("deploy");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer, { initialBalance });
+  Account_update.fundNewAccount(feePayer, { initialBalance });
   zkapp.deploy({ zkappKey });
 });
 sendTransaction(tx);
@@ -135,18 +134,16 @@ console.log("---TOKEN ACCOUNT1", tokenAccount1.toBase58());
 console.log("---TOKEN ACCOUNT2", tokenAccount2.toBase58());
 console.log(
   "---CUSTOM TOKEN CHECKED",
-  Ledger.fieldToBase58(
-    Ledger.customTokenIdChecked(zkappAddress, getDefaultTokenId())
-  )
+  Token.Id.toBase58(Ledger.customTokenIdChecked(zkappAddress, Token.Id.default))
 );
 console.log(
   "---CUSTOM TOKEN UNCHECKED",
-  Ledger.fieldToBase58(Ledger.customTokenId(zkappAddress, getDefaultTokenId()))
+  Token.Id.toBase58(Ledger.customTokenId(zkappAddress, Token.Id.default))
 );
 
 console.log("----------token minting----------");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer);
+  Account_update.fundNewAccount(feePayer);
   zkapp.mint(tokenAccount1);
   zkapp.sign(zkappKey);
 });
@@ -176,7 +173,7 @@ console.log(
 
 console.log("----------token transfer----------");
 tx = await Local.transaction(feePayer, () => {
-  Party.fundNewAccount(feePayer);
+  Account_update.fundNewAccount(feePayer);
   zkapp.send(tokenAccount1, tokenAccount2);
   zkapp.sign(zkappKey);
 });

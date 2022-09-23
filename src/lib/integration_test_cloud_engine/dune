@@ -5,7 +5,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
  (preprocess (pps
-               ppx_coda ppx_version ppx_let ppx_inline_test ppx_pipebang
+               ppx_mina ppx_version ppx_let ppx_inline_test ppx_pipebang
                ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
                ppx_sexp_conv
                graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))

@@ -151,13 +151,6 @@ let field_constr = As_field.field_constr
 
 open Core_kernel
 
-let bool_constant (b : Impl.Boolean.var) =
-  match (b :> Impl.Field.t) with
-  | Constant b ->
-      Some Impl.Field.Constant.(equal one b)
-  | _ ->
-      None
-
 module As_bool = struct
   (* boolean | bool_class | Boolean.var *)
   type t
@@ -270,6 +263,9 @@ let to_unchecked (x : Field.t) =
   match x with Constant y -> y | y -> Impl.As_prover.read_var y
 
 let of_js_field_unchecked (x : field_class Js.t) = to_unchecked @@ of_js_field x
+
+let bool_to_unchecked (x : Boolean.var) =
+  (x :> Field.t) |> to_unchecked |> Field.Constant.(equal one)
 
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
@@ -1146,9 +1142,9 @@ let poseidon =
 
         val body = Js.string (zkapp_body :> string)
 
-        val partyCons = Js.string (party_cons :> string)
+        val accountUpdateCons = Js.string (account_update_cons :> string)
 
-        val partyNode = Js.string (party_node :> string)
+        val accountUpdateNode = Js.string (account_update_node :> string)
       end
   end
 
@@ -2128,7 +2124,6 @@ let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
         ~auxiliary_typ:Typ.unit
         ~branches:(module Branches)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
-          (* ^ TODO make max_branching configurable -- needs refactor in party types *)
         ~name ~constraint_constants
     in
     failwith "Unexpected: The exception will always fire"
@@ -2152,7 +2147,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
-        (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name ~constraint_constants
   in
   let module Proof = (val p) in
@@ -2305,18 +2299,51 @@ module Ledger = struct
 
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
-  type public_key = < g : group_class Js.t Js.prop > Js.t
+  type public_key =
+    < x : field_class Js.t Js.readonly_prop
+    ; isOdd : bool_class Js.t Js.readonly_prop >
+    Js.t
 
   type zkapp_account =
-    < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop > Js.t
+    < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; verificationKey :
+        < hash : field_class Js.t Js.readonly_prop
+        ; data : Mina_base.Side_loaded_verification_key.t Js.readonly_prop >
+        Js.t
+        Js.optdef
+        Js.readonly_prop
+    ; zkappVersion : int Js.readonly_prop
+    ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; lastSequenceSlot : int Js.readonly_prop
+    ; provedState : bool_class Js.t Js.readonly_prop >
+    Js.t
+
+  type permissions =
+    < editState : Js.js_string Js.t Js.readonly_prop
+    ; send : Js.js_string Js.t Js.readonly_prop
+    ; receive : Js.js_string Js.t Js.readonly_prop
+    ; setDelegate : Js.js_string Js.t Js.readonly_prop
+    ; setPermissions : Js.js_string Js.t Js.readonly_prop
+    ; setVerificationKey : Js.js_string Js.t Js.readonly_prop
+    ; setZkappUri : Js.js_string Js.t Js.readonly_prop
+    ; editSequenceState : Js.js_string Js.t Js.readonly_prop
+    ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
+    ; incrementNonce : Js.js_string Js.t Js.readonly_prop
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    Js.t
 
   type account =
-    < publicKey : group_class Js.t Js.readonly_prop
+    (* TODO: timing *)
+    < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
-    ; zkapp : zkapp_account Js.readonly_prop >
+    ; receiptChainHash : field_class Js.t Js.readonly_prop
+    ; delegate : public_key Js.optdef Js.readonly_prop
+    ; votingFor : field_class Js.t Js.readonly_prop
+    ; zkapp : zkapp_account Js.optdef Js.readonly_prop
+    ; permissions : permissions Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2435,13 +2462,11 @@ module Ledger = struct
 
   let public_key_checked (pk : public_key) :
       Signature_lib.Public_key.Compressed.var =
-    let x = pk##.g##.x##.value in
-    let y = pk##.g##.y##.value in
-    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+    { x = pk##.x##.value; is_odd = pk##.isOdd##.value }
 
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
-    { x = to_unchecked pk##.g##.x##.value
-    ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
+    { x = to_unchecked pk##.x##.value
+    ; is_odd = bool_to_unchecked pk##.isOdd##.value
     }
 
   let private_key (key : private_key) : Signature_lib.Private_key.t =
@@ -2523,21 +2548,14 @@ module Ledger = struct
           Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
       end
 
-    let app_state (a : Mina_base.Account.t) =
-      let xs = new%js Js.array_empty in
-      ( match a.zkapp with
-      | Some s ->
-          Pickles_types.Vector.iter s.app_state ~f:(fun x ->
-              ignore (xs##push (field x)) )
-      | None ->
-          for _ = 0 to max_state_size - 1 do
-            xs##push (field Field.Constant.zero) |> ignore
-          done ) ;
-      xs
+    let public_key (pk : Signature_lib.Public_key.Compressed.t) : public_key =
+      object%js
+        val x = to_js_field_unchecked pk.x
 
-    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
-      let x, y = Signature_lib.Public_key.decompress_exn pk in
-      to_js_group (Field.constant x) (Field.constant y)
+        val isOdd =
+          new%js bool_constr
+            (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
+      end
 
     let token_id (token_id : Mina_base.Token_id.t) =
       token_id |> Mina_base.Token_id.to_field_unsafe |> field
@@ -2552,6 +2570,85 @@ module Ledger = struct
         val s = to_js_scalar s
       end
 
+    let option (transform : 'a -> 'b) (x : 'a option) =
+      Js.Optdef.option (Option.map x ~f:transform)
+
+    let app_state s =
+      let xs = new%js Js.array_empty in
+      Pickles_types.Vector.iter s ~f:(fun x -> ignore (xs##push (field x))) ;
+      xs
+
+    let verification_key
+        (vk : (Mina_base.Side_loaded_verification_key.t, Impl.field) With_hash.t)
+        =
+      object%js
+        val hash = field (With_hash.hash vk)
+
+        val data = With_hash.data vk
+      end
+
+    let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
+      object%js
+        val appState = app_state a.app_state
+
+        val verificationKey = option verification_key a.verification_key
+
+        val zkappVersion = Mina_numbers.Zkapp_version.to_int a.zkapp_version
+
+        val sequenceState = app_state a.sequence_state
+
+        val lastSequenceSlot =
+          Mina_numbers.Global_slot.to_int a.last_sequence_slot
+
+        val provedState =
+          new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
+      end
+
+    let permissions (p : Mina_base.Permissions.t) : permissions =
+      object%js
+        val editState =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.edit_state)
+
+        val send =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.send)
+
+        val receive =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.receive)
+
+        val setDelegate =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_delegate)
+
+        val setPermissions =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_permissions)
+
+        val setVerificationKey =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string
+               p.set_verification_key )
+
+        val setZkappUri =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_zkapp_uri)
+
+        val editSequenceState =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.edit_sequence_state)
+
+        val setTokenSymbol =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_token_symbol)
+
+        val incrementNonce =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.increment_nonce)
+
+        val setVotingFor =
+          Js.string
+            (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2564,75 +2661,84 @@ module Ledger = struct
 
         val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
 
-        val zkapp =
-          object%js
-            val appState = app_state a
-          end
-      end
+        val receiptChainHash = field (a.receipt_chain_hash :> Impl.field)
 
-    let option (transform : 'a -> 'b) (x : 'a option) =
-      Js.Optdef.option (Option.map x ~f:transform)
+        val delegate = option public_key a.delegate
+
+        val votingFor = field (a.voting_for :> Impl.field)
+
+        val zkapp = option zkapp_account a.zkapp
+
+        val permissions = permissions a.permissions
+      end
   end
 
-  module Party = Mina_base.Party
-  module Parties = Mina_base.Parties
+  module Account_update = Mina_base.Account_update
+  module Zkapp_command = Mina_base.Zkapp_command
 
-  let party_of_json =
+  let account_update_of_json =
     let deriver =
-      Party.Graphql_repr.deriver @@ Fields_derivers_zkapps.Derivers.o ()
+      Account_update.Graphql_repr.deriver
+      @@ Fields_derivers_zkapps.Derivers.o ()
     in
-    let party_of_json (party : Js.js_string Js.t) : Party.t =
+    let account_update_of_json (account_update : Js.js_string Js.t) :
+        Account_update.t =
       Fields_derivers_zkapps.of_json deriver
-        (party |> Js.to_string |> Yojson.Safe.from_string)
-      |> Party.of_graphql_repr
+        (account_update |> Js.to_string |> Yojson.Safe.from_string)
+      |> Account_update.of_graphql_repr
     in
-    party_of_json
+    account_update_of_json
 
-  (* TODO hash two parties together in the correct way *)
+  (* TODO hash two zkapp_command together in the correct way *)
 
-  let hash_party (p : Js.js_string Js.t) =
-    Party.digest (p |> party_of_json) |> Field.constant |> to_js_field
+  let hash_account_update (p : Js.js_string Js.t) =
+    Account_update.digest (p |> account_update_of_json)
+    |> Field.constant |> to_js_field
 
-  let forest_digest_of_field : Field.Constant.t -> Parties.Digest.Forest.t =
+  let forest_digest_of_field : Field.Constant.t -> Zkapp_command.Digest.Forest.t
+      =
     Obj.magic
 
   let forest_digest_of_field_checked :
-      Field.t -> Parties.Digest.Forest.Checked.t =
+      Field.t -> Zkapp_command.Digest.Forest.Checked.t =
     Obj.magic
 
-  let hash_transaction other_parties_hash =
-    let other_parties_hash =
-      other_parties_hash |> of_js_field |> to_unchecked
+  let hash_transaction account_updates_hash =
+    let account_updates_hash =
+      account_updates_hash |> of_js_field |> to_unchecked
       |> forest_digest_of_field
     in
-    Parties.Transaction_commitment.create ~other_parties_hash
+    Zkapp_command.Transaction_commitment.create ~account_updates_hash
     |> Field.constant |> to_js_field
 
-  let hash_transaction_checked other_parties_hash =
-    let other_parties_hash =
-      other_parties_hash |> of_js_field |> forest_digest_of_field_checked
+  let hash_transaction_checked account_updates_hash =
+    let account_updates_hash =
+      account_updates_hash |> of_js_field |> forest_digest_of_field_checked
     in
-    Parties.Transaction_commitment.Checked.create ~other_parties_hash
+    Zkapp_command.Transaction_commitment.Checked.create ~account_updates_hash
     |> to_js_field
 
-  type party_index = Fee_payer | Other_party of int
+  type account_update_index = Fee_payer | Other_account_update of int
 
   let transaction_commitment
-      ({ fee_payer; other_parties; memo } as tx : Parties.t)
-      (party_index : party_index) =
-    let commitment = Parties.commitment tx in
+      ({ fee_payer; account_updates; memo } as tx : Zkapp_command.t)
+      (account_update_index : account_update_index) =
+    let commitment = Zkapp_command.commitment tx in
     let full_commitment =
-      Parties.Transaction_commitment.create_complete commitment
+      Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
         ~fee_payer_hash:
-          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+          (Zkapp_command.Digest.Account_update.create
+             (Account_update.of_fee_payer fee_payer) )
     in
     let use_full_commitment =
-      match party_index with
+      match account_update_index with
       | Fee_payer ->
           true
-      | Other_party i ->
-          (List.nth_exn (Parties.Call_forest.to_parties_list other_parties) i)
+      | Other_account_update i ->
+          (List.nth_exn
+             (Zkapp_command.Call_forest.to_account_updates account_updates)
+             i )
             .body
             .use_full_commitment
     in
@@ -2640,14 +2746,15 @@ module Ledger = struct
 
   let transaction_commitments (tx_json : Js.js_string Js.t) =
     let tx =
-      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+      Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    let commitment = Parties.commitment tx in
+    let commitment = Zkapp_command.commitment tx in
     let full_commitment =
-      Parties.Transaction_commitment.create_complete commitment
+      Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
         ~fee_payer_hash:
-          (Parties.Digest.Party.create (Party.of_fee_payer tx.fee_payer))
+          (Zkapp_command.Digest.Account_update.create
+             (Account_update.of_fee_payer tx.fee_payer) )
     in
     object%js
       val commitment = to_js_field_unchecked commitment
@@ -2655,17 +2762,20 @@ module Ledger = struct
       val fullCommitment = to_js_field_unchecked full_commitment
     end
 
-  let zkapp_public_input (tx_json : Js.js_string Js.t) (party_index : int) =
+  let zkapp_public_input (tx_json : Js.js_string Js.t)
+      (account_update_index : int) =
     let tx =
-      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+      Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    let party = List.nth_exn tx.other_parties party_index in
+    let account_update = List.nth_exn tx.account_updates account_update_index in
     object%js
-      val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
+      val accountUpdate =
+        to_js_field_unchecked
+          (account_update.elt.account_update_digest :> Impl.field)
 
       val calls =
         to_js_field_unchecked
-          (Parties.Call_forest.hash party.elt.calls :> Impl.field)
+          (Zkapp_command.Call_forest.hash account_update.elt.calls :> Impl.field)
     end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
@@ -2676,41 +2786,45 @@ module Ledger = struct
   let dummy_signature () =
     Mina_base.Signature.(dummy |> to_base58_check) |> Js.string
 
-  let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
-      (party_index : party_index) =
+  let sign_account_update (tx_json : Js.js_string Js.t) (key : private_key)
+      (account_update_index : account_update_index) =
     let tx =
-      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+      Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let signature =
       Signature_lib.Schnorr.Chunked.sign (private_key key)
         (Random_oracle.Input.Chunked.field
-           (transaction_commitment tx party_index) )
+           (transaction_commitment tx account_update_index) )
     in
-    ( match party_index with
+    ( match account_update_index with
     | Fee_payer ->
         { tx with fee_payer = { tx.fee_payer with authorization = signature } }
-    | Other_party i ->
+    | Other_account_update i ->
         { tx with
-          other_parties =
-            Parties.Call_forest.mapi tx.other_parties
-              ~f:(fun i' (p : Party.t) ->
+          account_updates =
+            Zkapp_command.Call_forest.mapi tx.account_updates
+              ~f:(fun i' (p : Account_update.t) ->
                 if i' = i then { p with authorization = Signature signature }
                 else p )
         } )
-    |> Parties.to_json |> Yojson.Safe.to_string |> Js.string
+    |> Zkapp_command.to_json |> Yojson.Safe.to_string |> Js.string
 
-  let sign_fee_payer tx_json key = sign_party tx_json key Fee_payer
+  let sign_fee_payer tx_json key = sign_account_update tx_json key Fee_payer
 
-  let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
+  let sign_other_account_update tx_json key i =
+    sign_account_update tx_json key (Other_account_update i)
 
-  let check_party_signatures parties =
-    let ({ fee_payer; other_parties; memo } : Parties.t) = parties in
-    let tx_commitment = Parties.commitment parties in
+  let check_account_update_signatures zkapp_command =
+    let ({ fee_payer; account_updates; memo } : Zkapp_command.t) =
+      zkapp_command
+    in
+    let tx_commitment = Zkapp_command.commitment zkapp_command in
     let full_tx_commitment =
-      Parties.Transaction_commitment.create_complete tx_commitment
+      Zkapp_command.Transaction_commitment.create_complete tx_commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
         ~fee_payer_hash:
-          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+          (Zkapp_command.Digest.Account_update.create
+             (Account_update.of_fee_payer fee_payer) )
     in
     let key_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     let check_signature who s pk msg =
@@ -2734,7 +2848,7 @@ module Ledger = struct
 
     check_signature "fee payer" fee_payer.authorization
       fee_payer.body.public_key full_tx_commitment ;
-    List.iteri (Parties.Call_forest.to_parties_list other_parties)
+    List.iteri (Zkapp_command.Call_forest.to_account_updates account_updates)
       ~f:(fun i p ->
         let commitment =
           if p.body.use_full_commitment then full_tx_commitment
@@ -2742,8 +2856,9 @@ module Ledger = struct
         in
         match p.authorization with
         | Signature s ->
-            check_signature (sprintf "party %d" i) s p.body.public_key
-              commitment
+            check_signature
+              (sprintf "account_update %d" i)
+              s p.body.public_key commitment
         | Proof _ | None_given ->
             () )
 
@@ -2751,7 +2866,7 @@ module Ledger = struct
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
 
-  let public_key_of_string (pk_base58 : Js.js_string Js.t) : group_class Js.t =
+  let public_key_of_string (pk_base58 : Js.js_string Js.t) : public_key =
     pk_base58 |> Js.to_string
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
     |> To_js.public_key
@@ -2775,6 +2890,27 @@ module Ledger = struct
   let memo_to_base58 (memo : Js.js_string Js.t) : Js.js_string Js.t =
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
+
+  (* low-level building blocks for encoding *)
+  let binary_string_to_base58_check bin_string (version_byte : int) :
+      Js.js_string Js.t =
+    let module T = struct
+      let version_byte = Char.of_int_exn version_byte
+
+      let description = "any"
+    end in
+    let module B58 = Base58_check.Make (T) in
+    bin_string |> B58.encode |> Js.string
+
+  let binary_string_of_base58_check (base58 : Js.js_string Js.t)
+      (version_byte : int) =
+    let module T = struct
+      let version_byte = Char.of_int_exn version_byte
+
+      let description = "any"
+    end in
+    let module B58 = Base58_check.Make (T) in
+    base58 |> Js.to_string |> B58.decode_exn
 
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk default_token_id_js in
@@ -2807,44 +2943,37 @@ module Ledger = struct
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
 
-  let dummy_state_view : Mina_base.Zkapp_precondition.Protocol_state.View.t =
-    let epoch_data =
-      { Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
-          { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
-          ; total_currency = Currency.Amount.zero
-          }
-      ; seed = Field.Constant.zero
-      ; start_checkpoint = Field.Constant.zero
-      ; lock_checkpoint = Field.Constant.zero
-      ; epoch_length = Mina_numbers.Length.zero
-      }
+  let protocol_state_of_json =
+    let deriver =
+      Mina_base.Zkapp_precondition.Protocol_state.View.deriver
+      @@ Fields_derivers_zkapps.o ()
     in
-    { snarked_ledger_hash = Field.Constant.zero
-    ; timestamp = Block_time.zero
-    ; blockchain_length = Mina_numbers.Length.zero
-    ; min_window_density = Mina_numbers.Length.zero
-    ; last_vrf_output = ()
-    ; total_currency = Currency.Amount.zero
-    ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-    ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-    ; staking_epoch_data = epoch_data
-    ; next_epoch_data = epoch_data
-    }
+    let of_json = Fields_derivers_zkapps.of_json deriver in
+    fun (json : Js.js_string Js.t) :
+        Mina_base.Zkapp_precondition.Protocol_state.View.t ->
+      json |> Js.to_string |> Yojson.Safe.from_string |> of_json
 
-  let apply_parties_transaction l (txn : Parties.t)
-      (account_creation_fee : string) =
-    check_party_signatures txn ;
+  let apply_zkapp_command_transaction l (txn : Zkapp_command.t)
+      (account_creation_fee : string)
+      (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
+    check_account_update_signatures txn ;
     let ledger = l##.value in
-    let applied_exn =
-      T.apply_parties_unchecked ~state_view:dummy_state_view
+    let application_result =
+      T.apply_zkapp_command_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
           }
         ledger txn
     in
-    let applied, _ = Or_error.ok_exn applied_exn in
-    let T.Transaction_applied.Parties_applied.{ accounts; command; _ } =
+    let applied, _ =
+      match application_result with
+      | Ok res ->
+          res
+      | Error err ->
+          raise_error (Error.to_string_hum err)
+    in
+    let T.Transaction_applied.Zkapp_command_applied.{ accounts; command; _ } =
       applied
     in
     let () =
@@ -2862,11 +2991,15 @@ module Ledger = struct
     Js.array @@ Array.of_list account_list
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
-      (account_creation_fee : Js.js_string Js.t) =
+      (account_creation_fee : Js.js_string Js.t)
+      (network_json : Js.js_string Js.t) =
     let txn =
-      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+      Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn (Js.to_string account_creation_fee)
+    let network_state = protocol_state_of_json network_json in
+    apply_zkapp_command_transaction l txn
+      (Js.to_string account_creation_fee)
+      network_state
 
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key
@@ -2951,48 +3084,75 @@ module Ledger = struct
     static_method "signFieldElement" sign_field_element ;
     static_method "dummySignature" dummy_signature ;
     static_method "signFeePayer" sign_fee_payer ;
-    static_method "signOtherParty" sign_other_party ;
+    static_method "signOtherAccountUpdate" sign_other_account_update ;
 
     static_method "publicKeyToString" public_key_to_string ;
     static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
     static_method "privateKeyOfString" private_key_of_string ;
+
+    (* these are implemented in JS, but kept here for consistency tests *)
     static_method "fieldToBase58" field_to_base58 ;
     static_method "fieldOfBase58" field_of_base58 ;
+
     static_method "memoToBase58" memo_to_base58 ;
 
-    static_method "hashPartyFromJson" hash_party ;
-    static_method "hashPartyFromFields"
+    let version_bytes =
+      let open Base58_check.Version_bytes in
+      object%js
+        val tokenIdKey = Char.to_int token_id_key
+
+        val receiptChainHash = Char.to_int receipt_chain_hash
+
+        val ledgerHash = Char.to_int ledger_hash
+
+        val epochSeed = Char.to_int epoch_seed
+
+        val stateHash = Char.to_int state_hash
+      end
+    in
+    static "encoding"
+      (object%js
+         val toBase58 = binary_string_to_base58_check
+
+         val ofBase58 = binary_string_of_base58_check
+
+         val versionBytes = version_bytes
+      end ) ;
+
+    static_method "hashAccountUpdateFromJson" hash_account_update ;
+    static_method "hashAccountUpdateFromFields"
       (Checked.fields_to_hash
-         (Mina_base.Party.Body.typ ())
-         Mina_base.Party.Checked.digest ) ;
+         (Mina_base.Account_update.Body.typ ())
+         Mina_base.Account_update.Checked.digest ) ;
 
     (* TODO this is for debugging, maybe remove later *)
     let body_deriver =
-      Mina_base.Party.Body.Graphql_repr.deriver @@ Fields_derivers_zkapps.o ()
+      Mina_base.Account_update.Body.Graphql_repr.deriver
+      @@ Fields_derivers_zkapps.o ()
     in
     let body_to_json value =
       value
-      |> Party.Body.to_graphql_repr ~call_depth:0
+      |> Account_update.Body.to_graphql_repr ~call_depth:0
       |> Fields_derivers_zkapps.to_json body_deriver
     in
     let body_of_json json =
       json
       |> Fields_derivers_zkapps.of_json body_deriver
-      |> Party.Body.of_graphql_repr
+      |> Account_update.Body.of_graphql_repr
     in
     static_method "fieldsToJson"
-      (fields_to_json (Mina_base.Party.Body.typ ()) body_to_json) ;
+      (fields_to_json (Mina_base.Account_update.Body.typ ()) body_to_json) ;
     static_method "fieldsOfJson"
-      (fields_of_json (Mina_base.Party.Body.typ ()) body_of_json) ;
+      (fields_of_json (Mina_base.Account_update.Body.typ ()) body_of_json) ;
 
-    (* hash inputs for various party subtypes *)
+    (* hash inputs for various account_update subtypes *)
     (* TODO: this is for testing against JS impl, remove eventually *)
     let timing_input (json : Js.js_string Js.t) : random_oracle_input_js =
-      let deriver = Party.Update.Timing_info.deriver in
+      let deriver = Account_update.Update.Timing_info.deriver in
       let json = json |> Js.to_string |> Yojson.Safe.from_string in
       let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
-      let input = Party.Update.Timing_info.to_input value in
+      let input = Account_update.Update.Timing_info.to_input value in
       random_oracle_input_to_js input
     in
     let permissions_input (json : Js.js_string Js.t) : random_oracle_input_js =
@@ -3003,10 +3163,10 @@ module Ledger = struct
       random_oracle_input_to_js input
     in
     let update_input (json : Js.js_string Js.t) : random_oracle_input_js =
-      let deriver = Party.Update.deriver in
+      let deriver = Account_update.Update.deriver in
       let json = json |> Js.to_string |> Yojson.Safe.from_string in
       let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
-      let input = Party.Update.to_input value in
+      let input = Account_update.Update.to_input value in
       random_oracle_input_to_js input
     in
     let account_precondition_input (json : Js.js_string Js.t) :
@@ -3028,7 +3188,7 @@ module Ledger = struct
     let body_input (json : Js.js_string Js.t) : random_oracle_input_js =
       let json = json |> Js.to_string |> Yojson.Safe.from_string in
       let value = body_of_json json in
-      let input = Party.Body.to_input value in
+      let input = Account_update.Body.to_input value in
       random_oracle_input_to_js input
     in
 

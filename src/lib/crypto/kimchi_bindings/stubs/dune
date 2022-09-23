@@ -17,6 +17,31 @@
   (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
 
 ;;
+;; Rules to set the optimisation flags for the rust compiler.
+;;
+;; By default, we compile with optimisations enabled. The instructions that
+;; these generate may not be available on all CPU architectures; to build a
+;; slower version that does not use these instructions, set the environment
+;; variable `RUST_TARGET_FEATURE_OPTIMISATIONS=n`.
+;;
+
+(rule
+ (enabled_if
+  (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=+bmi2,+adx"))))
+
+(rule
+ (enabled_if
+  (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=-bmi2,-adx"))))
+
+;;
 ;; rules to build the static library for kimchi
 ;;
 
@@ -40,7 +65,7 @@
     "%{read:dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
-     "-C target-feature=+bmi2,+adx"
+     %{read:rustflags.sexp}
      (run cargo build --release)))
    (run
     cp
