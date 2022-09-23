@@ -1390,9 +1390,9 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                        .account_creation_fee )
                   num_new_accounts
               |> Option.value_exn )) )
-      ~f:(fun acc account_update ->
+      ~f:(fun acc node ->
         match
-          Currency.Amount.Signed.add acc account_update.body.balance_change
+          Currency.Amount.Signed.add acc node.account_update.body.balance_change
         with
         | Some sum ->
             sum
