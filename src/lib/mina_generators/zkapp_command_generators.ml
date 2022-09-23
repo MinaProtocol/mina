@@ -1181,8 +1181,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
     ; calls = mk_forest calls
     }
   in
-  let gen_zkapp_command_with_dynamic_balance ~new_zkapp_command
-      num_zkapp_command =
+  let gen_zkapp_command_with_dynamic_balance ~new_account num_zkapp_command =
     let rec go acc n =
       let open Zkapp_basic in
       let open Permissions in
