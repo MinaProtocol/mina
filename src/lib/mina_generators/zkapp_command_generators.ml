@@ -1430,7 +1430,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                       Genesis_constants.Constraint_constants.compiled
                         .account_creation_fee ) ))
           in
-          gen_zkapp_command_from ~zkapp_account_ids ~account_ids_seen
+          gen_account_update_from ~zkapp_account_ids ~account_ids_seen
             ~authorization ~permissions_auth ~available_public_keys ~caller
             ~account_state_tbl ~required_balance_change ?protocol_state_view ?vk
             ()
@@ -1441,7 +1441,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
               (Account_id.create parent.body.public_key parent.body.token_id)
         in
         let%bind child =
-          gen_zkapp_command_from ~zkapp_account_ids ~account_ids_seen
+          gen_account_update_from ~zkapp_account_ids ~account_ids_seen
             ~new_account:true ~token_id ~caller ~authorization ~permissions_auth
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
             ()
