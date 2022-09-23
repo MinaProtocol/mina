@@ -152,6 +152,7 @@
           inherit (nixpkgs) lib;
           dockerUrl = package: tag:
             "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
+
           pushToRegistry = package: {
             command = runInEnv self.devShells.x86_64-linux.operations ''
               ${self.packages.x86_64-linux.${package}} | gzip --fast | \
@@ -187,6 +188,30 @@
             branches = [ "develop" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
+          runIntegrationTest = test:
+            { with-archive ? false }: {
+              command =
+                runInEnv self.devShells.x86_64-linux.integration-tests ''
+                  export GOOGLE_CLOUD_KEYFILE_JSON=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT
+                  export GCLOUD_API_KEY=$(cat $INTEGRATION_TEST_LOGS_GCLOUD_API_KEY_PATH)
+                  source $INTEGRATION_TEST_CREDENTIALS
+                  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+                  export KUBE_CONFIG_PATH=$$HOME/.kube/config
+                  gcloud auth activate-service-account --key-file=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT automated-validation@o1labs-192920.iam.gserviceaccount.com --project o1labs-192920
+                  gcloud container clusters get-credentials --region us-west1 mina-integration-west1
+                  kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
+                  test_executive cloud ${test} \
+                  --mina-image=${
+                    dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
+                  } \
+                  ${lib.optionalString with-archive "--archive-image=${
+                    dockerUrl "mina-archive-image-full" "$BUILDKITE_COMMIT"
+                  }"}
+                '';
+              label = "Run ${test} integration test";
+              depends_on = [ "push_mina-image-full" ]
+                ++ lib.optional with-archive "push_mina-archive-image-full";
+            };
         in {
           steps = flakeSteps {
             derivationCache = "https://storage.googleapis.com/mina-nix-cache";
@@ -200,6 +225,15 @@
             (pushToRegistry "mina-image-full")
             (pushToRegistry "mina-archive-image-full")
             publishDocs
+            (runIntegrationTest "peers-reliability" { })
+            (runIntegrationTest "chain-reliability" { })
+            (runIntegrationTest "payment" { with-archive = true; })
+            (runIntegrationTest "delegation" { with-archive = true; })
+            (runIntegrationTest "gossip-consis" { })
+            (runIntegrationTest "opt-block-prod" { })
+            (runIntegrationTest "medium-bootstrap" { })
+            (runIntegrationTest "zkapps" { with-archive = true; })
+            (runIntegrationTest "zkapps-timing" { with-archive = true; })
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
@@ -275,6 +309,22 @@
           packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
         };
 
+        # TODO: think about rust toolchain in the dev shell
+        devShells.integration-tests = pkgs.mkShell {
+          name = "mina-integration-tests";
+          shellHook = ''
+            export MINA_BRANCH=$()
+          '';
+          buildInputs = [
+            self.packages.${system}.test_executive
+            pkgs.kubectl
+            pkgs.google-cloud-sdk
+            pkgs.terraform
+            pkgs.curl
+          ];
+        };
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
 
         # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
         devShells.impure = import ./nix/impure-shell.nix pkgs;
