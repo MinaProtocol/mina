@@ -257,6 +257,9 @@ let () =
            ~type_of_failure:(Update_not_permitted `Voting_for)
            ~expected_failure_status:Update_not_permitted_voting_for ;
          mk_invalid_test ~trials ~max_account_updates
-           ~type_of_failure:(Update_not_permitted `Balance)
+           ~type_of_failure:(Update_not_permitted `Send)
+           ~expected_failure_status:Update_not_permitted_balance ;
+         mk_invalid_test ~trials ~max_account_updates
+           ~type_of_failure:(Update_not_permitted `Receive)
            ~expected_failure_status:Update_not_permitted_balance ;
          test_timed_account ~trials ~max_account_updates ())

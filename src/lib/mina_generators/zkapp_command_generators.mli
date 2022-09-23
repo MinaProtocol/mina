@@ -11,7 +11,8 @@ type failure =
       | `Verification_key
       | `Zkapp_uri
       | `Token_symbol
-      | `Balance ]
+      | `Send
+      | `Receive ]
 
 type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
 
