@@ -98,13 +98,15 @@ binaries available, and show you the instructions for building Mina.
 
 ### Building a docker image
 
-Since a "pure" build can happen entirely inside the Nix sandbox, we
-can use its result to produce other useful artifacts with Nix. For
-example, you can build a slim docker image. Run `nix-build packages.x86_64-linux.mina-docker` (or `nix build mina#mina-docker` if
-you're using flakes). You will get a `result` symlink in the current
-directory, which links to a tarball containing the docker image. You
-can load the image using `docker load -i result`, then note the tag it
-outputs. You can then run Mina from this docker image with `docker run mina:<tag> mina.exe <args>`.
+Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
+result to produce other useful artifacts with Nix. For example, you can build a
+slim docker image. Run `nix-build packages.x86_64-linux.mina-image-slim` (or
+`nix build mina#mina-image-slim` if you're using flakes). You will get a
+`result` symlink in the current directory, which links to a script which
+generates the docker image. You can load the image using `./result | docker
+load`, then note the tag it outputs. You can then run Mina from this docker
+image with `docker run mina:<tag> mina.exe <args>`. You can also build and load
+`mina-image-full` and `mina-archive-image-full` this way.
 
 ### Demo nixos-container
 

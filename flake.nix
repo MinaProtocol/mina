@@ -115,19 +115,33 @@
       };
       pipeline = with flake-buildkite-pipeline.lib;
         let
+          inherit (nixpkgs) lib;
+          dockerUrl = package: tag:
+            "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
+
           pushToRegistry = package: {
             command = runInEnv self.devShells.x86_64-linux.operations ''
-              skopeo \
-              copy \
-              --insecure-policy \
-              --dest-registry-token $(gcloud auth application-default print-access-token) \
-              docker-archive:${self.packages.x86_64-linux.${package}} \
-              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+              ${self.packages.x86_64-linux.${package}} | gzip --fast | \
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker-archive:/dev/stdin \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"}
+              if [[ develop == "$BUILDKITE_BRANCH" ]]; then
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"} \
+                  docker://${dockerUrl package "$BUILDKITE_BRANCH"}
+              fi
             '';
-            label = "Upload ${package} to Google Artifact Registry";
+            label =
+              "Assemble and upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            branches = [ "compatible" "develop" ];
+            key = "push_${package}";
           };
           publishDocs = {
             command = runInEnv self.devShells.x86_64-linux.operations ''
@@ -147,8 +161,9 @@
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
           } self ++ [
-            (pushToRegistry "mina-docker")
-            (pushToRegistry "mina-daemon-docker")
+            (pushToRegistry "mina-image-slim")
+            (pushToRegistry "mina-image-full")
+            (pushToRegistry "mina-archive-image-full")
             publishDocs
           ];
         };
@@ -180,6 +195,8 @@
           '';
 
         checks = import ./nix/checks.nix inputs pkgs;
+
+        dockerImages = pkgs.callPackage ./nix/docker.nix { };
 
         ocamlPackages = pkgs.ocamlPackages_mina;
       in {
@@ -261,38 +278,8 @@
           inherit (ocamlPackages)
             mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs) libp2p_helper marlin_plonk_bindings_stubs;
-        };
-
-        packages.mina-docker = pkgs.dockerTools.buildImage {
-          name = "mina";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-image-root";
-            paths = [ ocamlPackages.mina.out ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
-        };
-        packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
-          name = "mina-daemon";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-daemon-image-root";
-            paths = [
-              pkgs.dumb-init
-              pkgs.coreutils
-              pkgs.bashInteractive
-              pkgs.python3
-              pkgs.libp2p_helper
-              ocamlPackages.mina.out
-              ocamlPackages.mina.mainnet
-              ocamlPackages.mina.genesis
-              ocamlPackages.mina_build_config
-              ocamlPackages.mina_daemon_scripts
-            ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
-          config = {
-            env = [ "MINA_TIME_OFFSET=0" ];
-            cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-          };
+          inherit (dockerImages)
+            mina-image-slim mina-image-full mina-archive-image-full;
         };
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -311,6 +298,7 @@
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-with-lsp";
+          buildInputs = oa.buildInputs ++ [ pkgs.go_1_18 ];
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
@@ -323,8 +311,11 @@
           '';
         });
 
-        devShells.operations =
-          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+        devShells.operations = pkgs.mkShell {
+          name = "mina-operations";
+          packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
+        };
+
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 

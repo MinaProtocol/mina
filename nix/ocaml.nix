@@ -8,8 +8,8 @@ let
   inherit (builtins) filterSource path;
 
   inherit (pkgs.lib)
-    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
-    optionalString escapeShellArg;
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
+    escapeShellArg;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
@@ -63,12 +63,6 @@ let
         [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
     };
 
-  dockerfiles-scripts = with inputs.nix-filter.lib;
-    filter {
-      root = ../.;
-      include = [ (inDirectory "dockerfiles") ];
-    };
-
   overlay = self: super:
     let
       ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
@@ -84,7 +78,7 @@ let
         commit_date = inputs.self.sourceInfo.lastModifiedDate or "<unknown>";
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
-      pkgs.runCommand "${package.name}-release" {
+      pkgs.runCommand "${package.pname}-release" {
         buildInputs = [ pkgs.makeWrapper pkgs.xorg.lndir ];
         outputs = package.outputs;
       } (map (output: ''
@@ -182,17 +176,30 @@ let
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
-            src/lib/mina_base/sample_keypairs.json \
-            -j$NIX_BUILD_CORES
+            src/app/archive/archive.exe \
+            src/app/archive_blocks/archive_blocks.exe \
+            src/app/extract_blocks/extract_blocks.exe \
+            src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+            src/app/replayer/replayer.exe \
+            src/app/swap_bad_balances/swap_bad_balances.exe \
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           dune build @doc || true
         '';
 
-        outputs =
-          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
+        outputs = [
+          "out"
+          "archive"
+          "generate_keypair"
+          "mainnet"
+          "testnet"
+          "genesis"
+          "sample"
+          "batch_txn_tool"
+        ];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
           cp src/app/cli/src/mina.exe $out/bin/mina
@@ -205,6 +212,11 @@ let
           cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
           cp src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          cp src/app/archive/archive.exe $archive/bin/mina-archive
+          cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
+          cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
+          cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
+          cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
           popd
@@ -272,36 +284,8 @@ let
         '';
       });
 
-      mina_build_config = pkgs.stdenv.mkDerivation {
-        pname = "mina_build_config";
-        version = "dev";
-        src = filtered-src;
-        nativeBuildInputs = [ pkgs.rsync ];
-
-        installPhase = ''
-          mkdir -p $out/etc/coda/build_config
-          cp src/config/mainnet.mlh $out/etc/coda/build_config/BUILD.mlh
-          rsync -Huav src/config/* $out/etc/coda/build_config/.
-        '';
-      };
-
-      mina_daemon_scripts = pkgs.stdenv.mkDerivation {
-        pname = "mina_daemon_scripts";
-        version = "dev";
-        src = dockerfiles-scripts;
-        buildInputs = [ pkgs.bash pkgs.python3 ];
-        installPhase = ''
-          mkdir -p $out/healthcheck $out/entrypoint.d
-          mv dockerfiles/scripts/healthcheck-utilities.sh $out/healthcheck/utilities.sh
-          mv dockerfiles/scripts/cron_job_dump_ledger.sh $out/cron_job_dump_ledger.sh
-          mv dockerfiles/scripts/daemon-entrypoint.sh $out/entrypoint.sh
-          mv dockerfiles/puppeteer-context/* $out/
-        '';
-      };
-
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
-        src = filtered-src;
         outputs = [ "out" ];
 
         buildPhase = ''
