@@ -88,7 +88,7 @@ CREATE TABLE internal_commands
 , receiver_id   int                   NOT NULL REFERENCES account_identifiers(id)
 , fee           text                  NOT NULL
 , hash          text                  NOT NULL
-, UNIQUE (hash,typ)
+, UNIQUE (hash,command_type)
 );
 
 /* block state hashes mentioned in voting_for fields */
