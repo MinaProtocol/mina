@@ -80,9 +80,7 @@ module Aux_hash = struct
         ; 'F'
         ]
     in
-    let digest_size_in_bits = 256 in
-    let digest_size_in_bytes = digest_size_in_bits / 8 in
-    String.gen_with_length (digest_size_in_bytes * 2) char_generator
+    String.gen_with_length (length_in_bytes * 2) char_generator
 end
 
 module Pending_coinbase_aux = struct
