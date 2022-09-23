@@ -10747,7 +10747,7 @@
         {
           "kind": "SCALAR",
           "name": "VerificationKey",
-          "description": "verification key in Base58Check format",
+          "description": "verification key in Base64 format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -10761,7 +10761,7 @@
           "fields": [
             {
               "name": "verificationKey",
-              "description": "Verification key in Base58Check format",
+              "description": "verification key in Base64 format",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
