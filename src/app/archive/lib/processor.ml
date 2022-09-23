@@ -2077,7 +2077,7 @@ module Fee_transfer = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
@@ -2093,10 +2093,12 @@ end
 module Coinbase = struct
   type t = { receiver_id : int; amount : int64; hash : string }
 
-  let coinbase_typ = "coinbase"
+  let coinbase_command_type = "coinbase"
 
   let typ =
-    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let encode t =
+      Ok (coinbase_command_type, t.receiver_id, t.amount, t.hash)
+    in
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
@@ -2109,7 +2111,7 @@ module Coinbase = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~command_type:coinbase_typ
+        ~transaction_hash ~command_type:coinbase_command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2123,7 +2125,7 @@ module Coinbase = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
