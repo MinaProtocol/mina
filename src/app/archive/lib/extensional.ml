@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; typ : string
+        ; command_type : string
         ; fee_payer : Account_id.Stable.V2.t
         ; source : Account_id.Stable.V2.t
         ; receiver : Account_id.Stable.V2.t
@@ -56,7 +56,7 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; typ : string
+        ; command_type : string
         ; receiver : Account_id.Stable.V2.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
