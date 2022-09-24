@@ -1106,6 +1106,8 @@ struct
     let after_index = sponge_after_index index in
     ( after_index
     , stage (fun t ~widths ~max_width ~proofs_verified_mask ->
+          (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
+          let proofs_verified_mask = Vector.rev proofs_verified_mask in
           let sponge = Sponge.copy after_index in
           let t =
             { t with

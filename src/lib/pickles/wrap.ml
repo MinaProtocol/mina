@@ -584,26 +584,26 @@ let wrap
     P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
       next_statement.proof_state.messages_for_next_wrap_proof
   in
+  let next_accumulator =
+    Vector.map2
+      (Vector.extend_front_exn
+         prev_statement.proof_state.messages_for_next_step_proof
+           .challenge_polynomial_commitments max_proofs_verified
+         (Lazy.force Dummy.Ipa.Wrap.sg) )
+      messages_for_next_wrap_proof_prepared.old_bulletproof_challenges
+      ~f:(fun sg chals ->
+        { Tock.Proof.Challenge_polynomial.commitment = sg
+        ; challenges = Vector.to_array chals
+        } )
+    |> Wrap_hack.pad_accumulator
+  in
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
-              ~auxiliary:auxiliary_inputs pk
-              ~message:
-                ( Vector.map2
-                    (Vector.extend_exn
-                       prev_statement.proof_state.messages_for_next_step_proof
-                         .challenge_polynomial_commitments max_proofs_verified
-                       (Lazy.force Dummy.Ipa.Wrap.sg) )
-                    messages_for_next_wrap_proof_prepared
-                      .old_bulletproof_challenges
-                    ~f:(fun sg chals ->
-                      { Tock.Proof.Challenge_polynomial.commitment = sg
-                      ; challenges = Vector.to_array chals
-                      } )
-                |> Wrap_hack.pad_accumulator ) )
+              ~auxiliary:auxiliary_inputs pk ~message:next_accumulator )
           [ input ]
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
