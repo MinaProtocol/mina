@@ -1,5 +1,5 @@
 use crate::{
-    arkworks::{CamlFq, CamlGPallas},
+    arkworks::CamlGPallas,
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
     srs::fq::CamlFqSrs,
@@ -18,14 +18,14 @@ use std::convert::TryInto;
 use std::path::Path;
 
 pub type CamlPastaFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
+    CamlPlonkVerifierIndex<Fq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
 
 impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
     fn from(vi: VerifierIndex<Pallas>) -> Self {
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
-                group_gen: CamlFq(vi.domain.group_gen),
+                group_gen: vi.domain.group_gen,
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
@@ -50,7 +50,7 @@ impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
                     .chacha_comm
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
-            shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            shifts: vi.shift.to_vec(),
             lookup_index: vi.lookup_index.map(Into::into),
         }
     }
@@ -80,7 +80,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         let chacha_comm: Option<[_; 4]> =
             chacha_comm.map(|x| x.try_into().expect("vector of sigma comm is of wrong size"));
 
-        let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
@@ -196,10 +195,10 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
+pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<Fq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
     let shifts = Shifts::new(&domain);
-    shifts.shifts().iter().map(Into::into).collect()
+    shifts.shifts().to_vec()
 }
 
 #[ocaml_gen::func]

@@ -1,5 +1,5 @@
 use crate::{
-    arkworks::{CamlFp, CamlGVesta},
+    arkworks::CamlGVesta,
     field_vector::fp::CamlFpVector,
     pasta_fp_plonk_index::{CamlPastaFpPlonkIndex, CamlPastaFpPlonkIndexPtr},
     pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex,
@@ -30,9 +30,9 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 pub fn caml_pasta_fp_plonk_proof_create(
     index: CamlPastaFpPlonkIndexPtr<'static>,
     witness: Vec<CamlFpVector>,
-    prev_challenges: Vec<CamlFp>,
+    prev_challenges: Vec<Fp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
+) -> Result<CamlProverProof<CamlGVesta, Fp>, ocaml::Error> {
     {
         let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -47,10 +47,8 @@ pub fn caml_pasta_fp_plonk_proof_create(
             .map(Into::<Vesta>::into)
             .enumerate()
             .map(|(i, sg)| {
-                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
-                    .iter()
-                    .map(Into::<Fp>::into)
-                    .collect();
+                let chals =
+                    prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg].to_vec();
                 let comm = PolyComm::<Vesta> {
                     unshifted: vec![sg],
                     shifted: None,
@@ -92,11 +90,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
 pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     srs: CamlFpSrs,
     indexed: bool,
-) -> (
-    CamlPastaFpPlonkIndex,
-    CamlFp,
-    CamlProverProof<CamlGVesta, CamlFp>,
-) {
+) -> (CamlPastaFpPlonkIndex, Fp, CamlProverProof<CamlGVesta, Fp>) {
     use ark_ff::Zero;
     use commitment_dlog::srs::{endos, SRS};
     use kimchi::circuits::{
@@ -202,7 +196,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
-    proof: CamlProverProof<CamlGVesta, CamlFp>,
+    proof: CamlProverProof<CamlGVesta, Fp>,
 ) -> bool {
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
 
@@ -218,7 +212,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
-    proofs: Vec<CamlProverProof<CamlGVesta, CamlFp>>,
+    proofs: Vec<CamlProverProof<CamlGVesta, Fp>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -238,7 +232,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> {
+pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, Fp> {
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::prime_subgroup_generator();
         PolyComm {
@@ -291,7 +285,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_deep_copy(
-    x: CamlProverProof<CamlGVesta, CamlFp>,
-) -> CamlProverProof<CamlGVesta, CamlFp> {
+    x: CamlProverProof<CamlGVesta, Fp>,
+) -> CamlProverProof<CamlGVesta, Fp> {
     x
 }

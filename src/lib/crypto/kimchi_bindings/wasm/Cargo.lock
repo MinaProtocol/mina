@@ -561,6 +561,16 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
+ "ark-poly",
+ "ark-serialize",
+ "ark-std",
+ "num-bigint",
+ "o1-utils",
+ "paste",
+ "rand",
+ "serde",
+ "serde_with",
+ "zeroize",
 ]
 
 [[package]]

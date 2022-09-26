@@ -2,9 +2,17 @@ use kimchi::proof::caml::CamlRecursionChallenge;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
+
+use mina_curves::{
+    arkworks::bigint256::{caml::*, BigInteger256},
+    pasta::{
+        arkworks::fields::{fp::caml::*, fq::caml::*},
+        Fp, Fq,
+    },
+};
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
-    arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
+    arkworks::{group_affine::*, group_projective::*},
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -125,7 +133,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_fake_generic!(T3, 2);
 
     decl_module!(w, env, "BigInt256", {
-        decl_type!(w, env, CamlBigInteger256 => "t");
+        decl_type!(w, env, BigInteger256 => "t");
 
         decl_func!(w, env, caml_bigint_256_of_numeral => "of_numeral");
         decl_func!(w, env, caml_bigint_256_of_decimal_string => "of_decimal_string");
@@ -142,7 +150,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     });
 
     decl_module!(w, env, "Fp", {
-        decl_type!(w, env, CamlFp => "t");
+        decl_type!(w, env, Fp => "t");
 
         decl_func!(w, env, caml_pasta_fp_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fp_size => "size");
@@ -178,7 +186,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     });
 
     decl_module!(w, env, "Fq", {
-        decl_type!(w, env, CamlFq => "t");
+        decl_type!(w, env, Fq => "t");
 
         decl_func!(w, env, caml_pasta_fq_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fq_size => "size");
@@ -215,15 +223,15 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_module!(w, env, "Vesta", {
         decl_module!(w, env, "BaseField", {
-            decl_type_alias!(w, env, "t" => CamlFq);
+            decl_type_alias!(w, env, "t" => Fq);
         });
 
         decl_module!(w, env, "ScalarField", {
-            decl_type_alias!(w, env, "t" => CamlFp);
+            decl_type_alias!(w, env, "t" => Fp);
         });
 
         decl_module!(w, env, "Affine", {
-            decl_type_alias!(w, env, "t" => CamlGroupAffine<CamlFq>);
+            decl_type_alias!(w, env, "t" => CamlGroupAffine<Fq>);
         });
 
         decl_type!(w, env, CamlGroupProjectiveVesta => "t");
@@ -246,15 +254,15 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_module!(w, env, "Pallas", {
         decl_module!(w, env, "BaseField", {
-            decl_type_alias!(w, env, "t" => CamlFp);
+            decl_type_alias!(w, env, "t" => Fp);
         });
 
         decl_module!(w, env, "ScalarField", {
-            decl_type_alias!(w, env, "t" => CamlFq);
+            decl_type_alias!(w, env, "t" => Fq);
         });
 
         decl_module!(w, env, "Affine", {
-            decl_type_alias!(w, env, "t" => CamlGroupAffine<CamlFp>);
+            decl_type_alias!(w, env, "t" => CamlGroupAffine<Fp>);
         });
 
         decl_type!(w, env, CamlGroupProjectivePallas => "t");
@@ -280,7 +288,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "FieldVectors", {
         decl_module!(w, env, "Fp", {
             decl_type!(w, env, CamlFpVector => "t");
-            decl_type_alias!(w, env, "elt" => CamlFp);
+            decl_type_alias!(w, env, "elt" => Fp);
 
             decl_func!(w, env, caml_fp_vector_create => "create");
             decl_func!(w, env, caml_fp_vector_length => "length");
@@ -291,7 +299,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
         decl_module!(w, env, "Fq", {
             decl_type!(w, env, CamlFqVector => "t");
-            decl_type_alias!(w, env, "elt" => CamlFq);
+            decl_type_alias!(w, env, "elt" => Fq);
 
             decl_func!(w, env, caml_fq_vector_create => "create");
             decl_func!(w, env, caml_fq_vector_length => "length");
@@ -306,7 +314,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_module!(w, env, "Vector", {
                 decl_module!(w, env, "Fp", {
                     decl_type!(w, env, CamlPastaFpPlonkGateVector => "t");
-                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFp>);
+                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<Fp>);
 
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_add => "add");
@@ -316,7 +324,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 });
                 decl_module!(w, env, "Fq", {
                     decl_type!(w, env, CamlPastaFqPlonkGateVector => "t");
-                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<CamlFq>);
+                    decl_type_alias!(w, env, "elt" => CamlCircuitGate<Fq>);
 
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_add => "add");
@@ -332,7 +340,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_type!(w, env, CamlFpSrs => "t");
 
                 decl_module!(w, env, "Poly_comm", {
-                    decl_type_alias!(w, env, "t" => CamlPolyComm<CamlGroupAffine<CamlFp>>);
+                    decl_type_alias!(w, env, "t" => CamlPolyComm<CamlGroupAffine<Fp>>);
                 });
 
                 decl_func!(w, env, caml_fp_srs_create => "create");
@@ -393,7 +401,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
         decl_module!(w, env, "VerifierIndex", {
             decl_module!(w, env, "Fp", {
-                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>);
+                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<Fp, CamlFpSrs, CamlPolyComm<CamlGVesta>>);
 
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_create => "create");
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_read => "read");
@@ -404,7 +412,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             });
 
             decl_module!(w, env, "Fq", {
-                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>);
+                decl_type_alias!(w, env, "t" => CamlPlonkVerifierIndex<Fq, CamlFqSrs, CamlPolyComm<CamlGPallas>>);
 
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_create => "create");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_read => "read");
@@ -417,7 +425,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
         decl_module!(w, env, "Oracles", {
             decl_module!(w, env, "Fp", {
-                decl_type_alias!(w, env, "t" => CamlOracles<CamlFp>);
+                decl_type_alias!(w, env, "t" => CamlOracles<Fp>);
 
                 decl_func!(w, env, fp_oracles_create => "create");
                 decl_func!(w, env, fp_oracles_dummy => "dummy");
@@ -425,7 +433,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             });
 
             decl_module!(w, env, "Fq", {
-                decl_type_alias!(w, env, "t" => CamlOracles<CamlFq>);
+                decl_type_alias!(w, env, "t" => CamlOracles<Fq>);
 
                 decl_func!(w, env, fq_oracles_create => "create");
                 decl_func!(w, env, fq_oracles_dummy => "dummy");

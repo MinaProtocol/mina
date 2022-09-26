@@ -1,6 +1,5 @@
 use crate::{
-    arkworks::{CamlFq, CamlGPallas},
-    field_vector::fq::CamlFqVector,
+    arkworks::CamlGPallas, field_vector::fq::CamlFqVector,
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
 };
@@ -26,9 +25,9 @@ use std::convert::TryInto;
 pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
     witness: Vec<CamlFqVector>,
-    prev_challenges: Vec<CamlFq>,
+    prev_challenges: Vec<Fq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
+) -> Result<CamlProverProof<CamlGPallas, Fq>, ocaml::Error> {
     {
         let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -43,10 +42,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
             .map(Into::<Pallas>::into)
             .enumerate()
             .map(|(i, sg)| {
-                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
-                    .iter()
-                    .map(Into::<Fq>::into)
-                    .collect();
+                let chals =
+                    prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg].to_vec();
                 let comm = PolyComm::<Pallas> {
                     unshifted: vec![sg],
                     shifted: None,
@@ -83,7 +80,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: CamlProverProof<CamlGPallas, CamlFq>,
+    proof: CamlProverProof<CamlGPallas, Fq>,
 ) -> bool {
     let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
@@ -99,7 +96,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
-    proofs: Vec<CamlProverProof<CamlGPallas, CamlFq>>,
+    proofs: Vec<CamlProverProof<CamlGPallas, Fq>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -119,7 +116,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
+pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, Fq> {
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::prime_subgroup_generator();
         PolyComm {
@@ -172,7 +169,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_deep_copy(
-    x: CamlProverProof<CamlGPallas, CamlFq>,
-) -> CamlProverProof<CamlGPallas, CamlFq> {
+    x: CamlProverProof<CamlGPallas, Fq>,
+) -> CamlProverProof<CamlGPallas, Fq> {
     x
 }

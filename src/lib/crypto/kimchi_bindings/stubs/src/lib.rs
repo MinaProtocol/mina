@@ -63,5 +63,6 @@ pub use {
     },
     kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
     kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
+    mina_curves::pasta::arkworks::fields::fq::caml::*,
     oracle::sponge::caml::CamlScalarChallenge,
 };

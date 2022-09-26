@@ -32,7 +32,7 @@ ark-poly = { version = "0.3.0", features = ["parallel"] }
 # proof-systems
 commitment_dlog = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }
 groupmap = { path = "../../proof-systems/groupmap" }
-mina-curves = { path = "../../proof-systems/curves" }
+mina-curves = { path = "../../proof-systems/curves", features = ["ocaml_types"] }
 o1-utils = { path = "../../proof-systems/utils" }
 oracle = { path = "../../proof-systems/oracle" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }

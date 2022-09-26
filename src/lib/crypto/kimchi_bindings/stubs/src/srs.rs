@@ -12,7 +12,7 @@ use std::{
 };
 
 macro_rules! impl_srs {
-    ($name: ident, $CamlF: ty, $CamlG: ty, $F: ty, $G: ty) => {
+    ($name: ident, $CamlG: ty, $F: ty, $G: ty) => {
 
         impl_shared_reference!($name => SRS<$G>);
 
@@ -111,7 +111,7 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _commit_evaluations>](
                 srs: $name,
                 domain_size: ocaml::Int,
-                evals: Vec<$CamlF>,
+                evals: Vec<$F>,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                     let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                         ocaml::Error::invalid_argument("CamlSRS::evaluations")
@@ -129,7 +129,7 @@ macro_rules! impl_srs {
             #[ocaml::func]
             pub fn [<$name:snake _b_poly_commitment>](
                 srs: $name,
-                chals: Vec<$CamlF>,
+                chals: Vec<$F>,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                 let chals: Vec<$F> = chals.into_iter().map(Into::into).collect();
                 let coeffs = b_poly_coefficients(&chals);
@@ -143,7 +143,7 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _batch_accumulator_check>](
                 srs: $name,
                 comms: Vec<$CamlG>,
-                chals: Vec<$CamlF>,
+                chals: Vec<$F>,
             ) -> bool {
                 let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
                 let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
@@ -155,7 +155,7 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _batch_accumulator_generate>](
                 srs: $name,
                 comms: ocaml::Int,
-                chals: Vec<$CamlF>,
+                chals: Vec<$F>,
             ) -> Vec<$CamlG> {
                 crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
                     &srs,
@@ -179,16 +179,16 @@ macro_rules! impl_srs {
 
 pub mod fp {
     use super::*;
-    use crate::arkworks::{CamlFp, CamlGVesta};
+    use crate::arkworks::CamlGVesta;
     use mina_curves::pasta::{Fp, Vesta};
 
-    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, Vesta);
+    impl_srs!(CamlFpSrs, CamlGVesta, Fp, Vesta);
 }
 
 pub mod fq {
     use super::*;
-    use crate::arkworks::{CamlFq, CamlGPallas};
+    use crate::arkworks::CamlGPallas;
     use mina_curves::pasta::{Fq, Pallas};
 
-    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
+    impl_srs!(CamlFqSrs, CamlGPallas, Fq, Pallas);
 }

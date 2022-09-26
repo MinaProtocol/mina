@@ -4,7 +4,7 @@ use paste::paste;
 use rand::rngs::StdRng;
 
 macro_rules! impl_projective {
-    ($name: ident, $GroupProjective: ty, $CamlG: ty, $CamlScalarField: ty, $BaseField: ty, $CamlBaseField: ty, $Projective: ty) => {
+    ($name: ident, $GroupProjective: ty, $CamlG: ty, $ScalarField: ty, $BaseField: ty, $Projective: ty) => {
 
         paste! {
             #[ocaml_gen::func]
@@ -51,9 +51,9 @@ macro_rules! impl_projective {
             #[ocaml::func]
             pub fn [<caml_ $name:snake _scale>](
                 x: ocaml::Pointer<$GroupProjective>,
-                y: $CamlScalarField,
+                y: $ScalarField,
             ) -> $GroupProjective {
-                let y: ark_ff::BigInteger256 = y.0.into();
+                let y: ark_ff::BigInteger256 = y.into();
                 x.as_ref().mul(&y).into()
             }
 
@@ -77,14 +77,14 @@ macro_rules! impl_projective {
 
             #[ocaml_gen::func]
             #[ocaml::func]
-            pub extern "C" fn [<caml_ $name:snake _endo_base>]() -> $CamlBaseField {
+            pub extern "C" fn [<caml_ $name:snake _endo_base>]() -> $BaseField {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
                 endo_q.into()
             }
 
             #[ocaml_gen::func]
             #[ocaml::func]
-            pub extern "C" fn [<caml_ $name:snake _endo_scalar>]() -> $CamlScalarField {
+            pub extern "C" fn [<caml_ $name:snake _endo_scalar>]() -> $ScalarField {
                 let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
                 endo_r.into()
             }
@@ -103,7 +103,7 @@ macro_rules! impl_projective {
 
             #[ocaml_gen::func]
             #[ocaml::func]
-            pub fn [<caml_ $name:snake _of_affine_coordinates>](x: $CamlBaseField, y: $CamlBaseField) -> $GroupProjective {
+            pub fn [<caml_ $name:snake _of_affine_coordinates>](x: $BaseField, y: $BaseField) -> $GroupProjective {
                 let res = $Projective::new(x.into(), y.into(), <$BaseField as ark_ff::One>::one());
                 res.into()
             }
@@ -119,32 +119,30 @@ macro_rules! impl_projective {
 
 pub mod pallas {
     use super::*;
-    use crate::arkworks::{CamlFp, CamlFq, CamlGPallas, CamlGroupProjectivePallas};
-    use mina_curves::pasta::{curves::pallas::ProjectivePallas, Fp, Pallas as GAffine};
+    use crate::arkworks::{CamlGPallas, CamlGroupProjectivePallas};
+    use mina_curves::pasta::{curves::pallas::ProjectivePallas, Fp, Fq, Pallas as GAffine};
 
     impl_projective!(
         pallas,
         CamlGroupProjectivePallas,
         CamlGPallas,
-        CamlFq,
+        Fq,
         Fp,
-        CamlFp,
         ProjectivePallas
     );
 }
 
 pub mod vesta {
     use super::*;
-    use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
-    use mina_curves::pasta::{curves::vesta::ProjectiveVesta, Fq, Vesta as GAffine};
+    use crate::arkworks::{CamlGVesta, CamlGroupProjectiveVesta};
+    use mina_curves::pasta::{curves::vesta::ProjectiveVesta, Fp, Fq, Vesta as GAffine};
 
     impl_projective!(
         vesta,
         CamlGroupProjectiveVesta,
         CamlGVesta,
-        CamlFp,
+        Fp,
         Fq,
-        CamlFq,
         ProjectiveVesta
     );
 }

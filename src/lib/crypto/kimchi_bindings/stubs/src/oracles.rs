@@ -20,7 +20,7 @@ pub struct CamlOracles<F> {
 }
 
 macro_rules! impl_oracles {
-    ($CamlF: ty, $F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
+    ($F: ty, $CamlG: ty, $G: ty, $index: ty, $curve_params: ty) => {
 
         paste! {
             #[ocaml_gen::func]
@@ -28,8 +28,8 @@ macro_rules! impl_oracles {
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: Vec<CamlPolyComm<$CamlG>>,
                 index: $index,
-                proof: CamlProverProof<$CamlG, $CamlF>,
-            ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
+                proof: CamlProverProof<$CamlG, $F>,
+            ) -> Result<CamlOracles<$F>, ocaml::Error> {
                 let index: VerifierIndex<$G> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
@@ -39,14 +39,14 @@ macro_rules! impl_oracles {
                     .collect();
                 let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
 
+                let neg_pub: Vec<_> = proof
+                .public
+                .iter()
+                .map(|s| -(*s))
+                .collect();
                 let p_comm = PolyComm::<$G>::multi_scalar_mul(
                     &lgr_comm_refs,
-                    &proof
-                        .public
-                        .iter()
-                        .map(Into::<$F>::into)
-                        .map(|s| -s)
-                        .collect::<Vec<_>>(),
+                    &neg_pub,
                 );
 
                 let proof: ProverProof<$G> = proof.into();
@@ -81,15 +81,15 @@ macro_rules! impl_oracles {
 
             #[ocaml_gen::func]
             #[ocaml::func]
-            pub fn [<$F:snake _oracles_dummy>]() -> CamlRandomOracles<$CamlF> {
+            pub fn [<$F:snake _oracles_dummy>]() -> CamlRandomOracles<$F> {
                 RandomOracles::<$F>::default().into()
             }
 
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$F:snake _oracles_deep_copy>](
-                x: CamlRandomOracles<$CamlF>,
-            ) -> CamlRandomOracles<$CamlF> {
+                x: CamlRandomOracles<$F>,
+            ) -> CamlRandomOracles<$F> {
                 x
             }
         }
@@ -98,11 +98,10 @@ macro_rules! impl_oracles {
 
 pub mod fp {
     use super::*;
-    use crate::arkworks::{CamlFp, CamlGVesta};
+    use crate::arkworks::CamlGVesta;
     use mina_curves::pasta::{Fp, Vesta, VestaParameters};
 
     impl_oracles!(
-        CamlFp,
         Fp,
         CamlGVesta,
         Vesta,
@@ -114,14 +113,12 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::{
-        arkworks::{CamlFq, CamlGPallas},
-        oracles::CamlOracles,
+        arkworks::CamlGPallas, oracles::CamlOracles,
         pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
     };
     use mina_curves::pasta::{Fq, Pallas, PallasParameters};
 
     impl_oracles!(
-        CamlFq,
         Fq,
         CamlGPallas,
         Pallas,
