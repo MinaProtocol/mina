@@ -760,3 +760,8 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[patch.unused]]
+name = "once_cell"
+version = "1.13.1"
+source = "git+https://github.com/mimoo/once_cell?rev=865ab5743361422f445f5d75c83bdb12820dac4f#865ab5743361422f445f5d75c83bdb12820dac4f"
