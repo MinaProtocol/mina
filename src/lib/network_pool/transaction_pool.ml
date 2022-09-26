@@ -1849,8 +1849,8 @@ let%test_module _ =
             let fee_payer_keypair = test_keys.(n) in
             let%map (zkapp_command : Zkapp_command.t) =
               Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-                ~keymap ~account_state_tbl ~fee_payer_keypair
-                ~ledger:best_tip_ledger ()
+                ~max_token_updates:1 ~keymap ~account_state_tbl
+                ~fee_payer_keypair ~ledger:best_tip_ledger ()
             in
             let zkapp_command =
               { zkapp_command with
