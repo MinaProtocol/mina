@@ -6,6 +6,65 @@ let bitwap_download_timeout = Time.Span.of_min 2.
 
 let peer_download_timeout = Time.Span.of_min 2.
 
+let rec notify_descedants_of_failed ~transition_states ~state_hash
+    (children : Substate.children_sets) =
+  let f child_hash =
+    match State_hash.Table.find transition_states child_hash with
+    | Some
+        (Transition_state.Downloading_body
+          ({ next_failed_ancestor = None; _ } as r) ) ->
+        State_hash.Table.set transition_states ~key:child_hash
+          ~data:
+            (Downloading_body { r with next_failed_ancestor = Some state_hash }) ;
+        notify_descedants_of_failed ~transition_states ~state_hash
+          r.substate.children
+    | _ ->
+        ()
+  in
+  State_hash.Set.iter children.processing_or_failed ~f ;
+  State_hash.Set.iter children.processed ~f
+
+let rec next_actual_failed_ancestor ~transition_states candidate_hash =
+  match State_hash.Table.find transition_states candidate_hash with
+  | Some
+      (Transition_state.Downloading_body
+        { substate = { status = Failed _; _ }; _ } )
+  | Some (Downloading_body { substate = { status = Processing _; _ }; _ }) ->
+      Some candidate_hash
+  | Some (Downloading_body ({ next_failed_ancestor = next; _ } as r)) ->
+      let next_failed_ancestor =
+        Option.bind ~f:(next_actual_failed_ancestor ~transition_states) next
+      in
+      State_hash.Table.set transition_states ~key:candidate_hash
+        ~data:(Downloading_body { r with next_failed_ancestor }) ;
+      next_failed_ancestor
+  | _ ->
+      None
+
+let rec collect_failed_ancestry ~transition_states state_hash =
+  let next = Option.bind ~f:(next_actual_failed_ancestor ~transition_states) in
+  let continue =
+    Option.value_map ~default:[] ~f:(collect_failed_ancestry ~transition_states)
+  in
+  match State_hash.Table.find transition_states state_hash with
+  | Some
+      (Transition_state.Downloading_body
+        ({ substate = { status = Failed _; _ }; _ } as r) ) ->
+      let next_failed_ancestor = next r.next_failed_ancestor in
+      let state' =
+        Transition_state.Downloading_body { r with next_failed_ancestor }
+      in
+      State_hash.Table.set transition_states ~key:state_hash ~data:state' ;
+      state' :: continue next_failed_ancestor
+  | Some (Downloading_body ({ substate = { status = Processing _; _ }; _ } as r))
+    ->
+      let next_failed_ancestor = next r.next_failed_ancestor in
+      State_hash.Table.set transition_states ~key:state_hash
+        ~data:(Downloading_body { r with next_failed_ancestor }) ;
+      continue next_failed_ancestor
+  | _ ->
+      []
+
 (* Pre-condition: new [status] is Failed or Processing *)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
@@ -69,6 +128,24 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
     | _ ->
         failwith "promote_verifying_blockchain_proof: expected processed"
   in
+  let parent_hash =
+    Mina_block.Validation.header header
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
+  let next_failed_ancestor =
+    match State_hash.Table.find transition_states parent_hash with
+    | Some
+        (Transition_state.Downloading_body
+          { substate = { status = Failed _; _ }; _ } ) ->
+        Some parent_hash
+    | Some (Transition_state.Downloading_body { next_failed_ancestor; _ }) ->
+        Option.bind
+          ~f:(next_actual_failed_ancestor ~transition_states)
+          next_failed_ancestor
+    | _ ->
+        None
+  in
   let consensus_state =
     Mina_block.Validation.header header
     |> Mina_block.Header.protocol_state
@@ -96,17 +173,19 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
         Some block_vc
   in
   let state' =
-    Transition_state.Downloading_body { header; substate; block_vc }
+    Transition_state.Downloading_body
+      { header; substate; block_vc; next_failed_ancestor }
   in
   ( if substate.received_via_gossip then
     let failed_ancestry =
-      Substate.collect_failed_ancestry ~state_functions ~transition_states
-        state'
+      Option.value_map ~default:[]
+        ~f:(collect_failed_ancestry ~transition_states)
+        next_failed_ancestor
     in
     List.iter failed_ancestry ~f:(fun state ->
         match state with
         | Downloading_body
-            { header; substate = { status = Failed _; _ } as s; block_vc } -> (
+            ({ header; substate = { status = Failed _; _ } as s; _ } as r) -> (
             let state_hash = state_hash_of_header_with_validation header in
             let ctx =
               make_download_body_ctx ~body_opt:None ~header ~transition_states
@@ -114,10 +193,7 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
             in
             let data =
               Transition_state.Downloading_body
-                { header
-                ; block_vc
-                ; substate = { s with status = Processing ctx }
-                }
+                { r with substate = { s with status = Processing ctx } }
             in
             State_hash.Table.set transition_states ~key:state_hash ~data ;
             match ctx with
@@ -129,7 +205,7 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
             (* We don't need to update parent's childen sets because
                Failed -> Processing status change doesn't require that *) )
         | _ ->
-            failwith
+            [%log' error Context.logger]
               "promote_verifying_blockchain_proof: unexpected non-failed \
                ancestor" ) ) ;
   state'
