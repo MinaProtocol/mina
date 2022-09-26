@@ -1714,7 +1714,7 @@ end
 module User_command = struct
   module Signed_command = struct
     type t =
-      { typ : string
+      { command_type : string
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
@@ -1811,9 +1811,9 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ =
+            { command_type =
                 ( match via with
                 | `Ident ->
                     Signed_command.tag_string t
@@ -1862,7 +1862,7 @@ module User_command = struct
                   ~tannot:(function
                     | "typ" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ = user_cmd.typ
+            { command_type = user_cmd.command_type
             ; fee_payer_id
             ; source_id
             ; receiver_id
@@ -1962,7 +1962,8 @@ module User_command = struct
 end
 
 module Internal_command = struct
-  type t = { typ : string; receiver_id : int; fee : string; hash : string }
+  type t =
+    { command_type : string; receiver_id : int; fee : string; hash : string }
   [@@deriving hlist, fields]
 
   let typ =
@@ -1972,16 +1973,16 @@ module Internal_command = struct
   let table_name = "internal_commands"
 
   let find_opt (module Conn : CONNECTION)
-      ~(transaction_hash : Transaction_hash.t) ~(typ : string) =
+      ~(transaction_hash : Transaction_hash.t) ~(command_type : string) =
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name
             ~tannot:(function
-              | "typ" -> Some "internal_command_type" | _ -> None )
-            ~cols:[ "hash"; "typ" ] () ) )
-      (Transaction_hash.to_base58_check transaction_hash, typ)
+              | "command_type" -> Some "internal_command_type" | _ -> None )
+            ~cols:[ "hash"; "command_type" ] () ) )
+      (Transaction_hash.to_base58_check transaction_hash, command_type)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1995,7 +1996,8 @@ module Internal_command = struct
     match%bind
       find_opt
         (module Conn)
-        ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
+        ~transaction_hash:internal_cmd.hash
+        ~command_type:internal_cmd.command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2011,7 +2013,7 @@ module Internal_command = struct
                 ~tannot:(function
                   | "typ" -> Some "internal_command_type" | _ -> None )
                 ~cols:Fields.names () ) )
-          { typ = internal_cmd.typ
+          { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
@@ -2059,7 +2061,7 @@ module Fee_transfer = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:(Kind.to_string kind)
+        ~transaction_hash ~command_type:(Kind.to_string kind)
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2075,7 +2077,7 @@ module Fee_transfer = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
@@ -2091,10 +2093,12 @@ end
 module Coinbase = struct
   type t = { receiver_id : int; amount : int64; hash : string }
 
-  let coinbase_typ = "coinbase"
+  let coinbase_command_type = "coinbase"
 
   let typ =
-    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let encode t =
+      Ok (coinbase_command_type, t.receiver_id, t.amount, t.hash)
+    in
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
@@ -2107,7 +2111,7 @@ module Coinbase = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:coinbase_typ
+        ~transaction_hash ~command_type:coinbase_command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2121,7 +2125,7 @@ module Coinbase = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
