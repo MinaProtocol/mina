@@ -18,6 +18,7 @@
    base.caml
    async_unix
    ;; local libraries
+   mina_wire_types
    mina_base.import
    mina_transaction
    mina_transaction_logic

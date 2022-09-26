@@ -50,3 +50,13 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 [%%inject "generate_genesis_proof", generate_genesis_proof]
 
 let transaction_expiry_hr = 2
+
+(* limits on Zkapp_command.t size *)
+
+let max_proof_zkapp_command = 4
+
+let max_zkapp_command = 8
+
+let max_event_elements = 16
+
+let max_sequence_event_elements = 16

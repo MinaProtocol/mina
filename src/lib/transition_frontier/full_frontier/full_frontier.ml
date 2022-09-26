@@ -4,6 +4,16 @@ module Ledger = Mina_ledger.Ledger
 open Mina_state
 open Frontier_base
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 module Node = struct
   type t =
     { breadcrumb : Breadcrumb.t
@@ -68,7 +78,7 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; max_length : int
-  ; precomputed_values : Precomputed_values.t
+  ; context : (module CONTEXT)
   ; time_controller : Block_time.Controller.t
   ; persistent_root_instance : Persistent_root.Instance.t
   }
@@ -116,8 +126,10 @@ let close ~loc t =
         (Breadcrumb.mask (root t))
       : Ledger.unattached_mask )
 
-let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
-    ~precomputed_values ~persistent_root_instance ~time_controller =
+let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
+    ~consensus_local_state ~max_length ~persistent_root_instance
+    ~time_controller =
+  let open Context in
   let open Root_data in
   let transition_receipt_time = None in
   let validated_transition = root_data.transition in
@@ -159,7 +171,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   ; table
   ; consensus_local_state
   ; max_length
-  ; precomputed_values
+  ; context = (module Context)
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
   ; time_controller
@@ -213,9 +225,11 @@ let best_tip_path ?max_length t = path_map ?max_length t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
-let precomputed_values t = t.precomputed_values
+let precomputed_values { context = (module Context); _ } =
+  Context.precomputed_values
 
-let genesis_constants t = t.precomputed_values.genesis_constants
+let genesis_constants { context = (module Context); _ } =
+  Context.precomputed_values.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -333,8 +347,9 @@ let calculate_root_transition_diff t heir =
        ; just_emitted_a_proof
        } )
 
-let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
-    ~enable_epoch_ledger_sync =
+let move_root ({ context = (module Context); _ } as t) ~new_root_hash
+    ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
+  let open Context in
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -473,9 +488,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
           in
           ignore
             ( Or_error.ok_exn
-                (Ledger.apply_transaction
-                   ~constraint_constants:
-                     t.precomputed_values.constraint_constants ~txn_state_view
+                (Ledger.apply_transaction ~constraint_constants ~txn_state_view
                    mt txn.data )
               : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
@@ -515,7 +528,15 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   t.root <- new_root_hash
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
-let calculate_diffs t breadcrumb =
+let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
+  let module Context = struct
+    include Context
+
+    let logger =
+      Logger.extend t.logger
+        [ ("selection_context", `String "comparing new breadcrumb to best tip")
+        ]
+  end in
   let open Diff in
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -537,15 +558,10 @@ let calculate_diffs t breadcrumb =
         if
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
-               ~constants:t.precomputed_values.consensus_constants
+               ~context:(module Context)
                ~existing:
                  (Breadcrumb.consensus_state_with_hashes current_best_tip)
-               ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb)
-               ~logger:
-                 (Logger.extend t.logger
-                    [ ( "selection_context"
-                      , `String "comparing new breadcrumb to best tip" )
-                    ] ) )
+               ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
             `Take
         then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
         else diffs
@@ -636,11 +652,11 @@ module Metrics = struct
     in
     go 0 (best_tip t)
 
-  let slot_time t b =
+  let slot_time { context = (module Context); _ } b =
+    let open Context in
     Breadcrumb.consensus_state b
     |> Consensus.Data.Consensus_state.consensus_time
-    |> Consensus.Data.Consensus_time.to_time
-         ~constants:t.precomputed_values.consensus_constants
+    |> Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
 
   let slot_time_to_offset_time_span s =
     let r =
@@ -666,7 +682,8 @@ module Metrics = struct
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
 
   (* Rate of slots filled on the main chain in the k slots preceeding the best tip. *)
-  let slot_fill_rate t =
+  let slot_fill_rate ({ context = (module Context); _ } as t) =
+    let open Context in
     let open Consensus.Data.Consensus_state in
     let best_tip = best_tip t in
     let rec find_ancestor ~f b =
@@ -682,9 +699,7 @@ module Metrics = struct
       let open Consensus.Data.Consensus_state in
       let slot = intprop curr_global_slot in
       let best_tip_slot = slot best_tip in
-      let k =
-        Unsigned.UInt32.to_int t.precomputed_values.consensus_constants.k
-      in
+      let k = Unsigned.UInt32.to_int consensus_constants.k in
       match
         find_ancestor best_tip ~f:(fun b -> best_tip_slot - slot b >= k)
       with
@@ -698,8 +713,10 @@ module Metrics = struct
     else Float.of_int length_change /. Float.of_int slot_change
 end
 
-let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
+let update_metrics_with_diff (type mutant)
+    ({ context = (module Context); _ } as t) (diff : (Diff.full, mutant) Diff.t)
     : unit =
+  let open Context in
   let open Metrics in
   match diff with
   | New_node (Full b) ->
@@ -754,19 +771,29 @@ let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let is_recent_block =
         let now = Block_time.now t.time_controller in
         let two_slots =
-          let one_slot =
-            t.precomputed_values.consensus_constants.block_window_duration_ms
-          in
+          let one_slot = consensus_constants.block_window_duration_ms in
           Block_time.Span.(one_slot + one_slot)
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
+      let valid_commands =
+        Breadcrumb.validated_transition best_tip
+        |> Mina_block.Validated.valid_commands
+      in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float
-             (List.length
-                ( Breadcrumb.validated_transition best_tip
-                |> Mina_block.Validated.valid_commands ) ) ) ;
+          (Int.to_float (List.length valid_commands)) ;
+        Mina_metrics.(
+          Gauge.set Transition_frontier.best_tip_zkapp_txns
+            (Int.to_float
+               (List.fold ~init:0
+                  ~f:(fun c cmd ->
+                    match cmd.data with
+                    | Mina_base.User_command.Poly.Zkapp_command _ ->
+                        c + 1
+                    | _ ->
+                        c )
+                  valid_commands ) )) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;
@@ -782,11 +809,12 @@ let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
 
-let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
+let apply_diffs ({ context = (module Context); _ } as t) diffs
+    ~enable_epoch_ledger_sync ~has_long_catchup_job =
+  let open Context in
   let open Root_identifier.Stable.Latest in
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
-  let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
@@ -881,6 +909,8 @@ module For_tests = struct
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
 
+  (* TODO: Don't force here!! *)
+
   let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
   let constraint_constants = precomputed_values.constraint_constants
@@ -890,6 +920,16 @@ module For_tests = struct
   let proof_level = precomputed_values.proof_level
 
   let logger = Logger.null ()
+
+  module Context = struct
+    let logger = logger
+
+    let constraint_constants = constraint_constants
+
+    let precomputed_values = precomputed_values
+
+    let consensus_constants = precomputed_values.consensus_constants
+  end
 
   let verifier () =
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -921,10 +961,11 @@ module For_tests = struct
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
     let consensus_local_state =
-      Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Genesis_ledger.t
+      Consensus.Data.Local_state.create
+        ~context:(module Context)
+        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
-        ~epoch_ledger_location ~ledger_depth:constraint_constants.ledger_depth
+        ~epoch_ledger_location
         ~genesis_state_hash:
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
@@ -954,12 +995,14 @@ module For_tests = struct
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
-    create ~logger ~root_data
+    create
+      ~context:(module Context)
+      ~root_data
       ~root_ledger:
         (Mina_ledger.Ledger.Any_ledger.cast
            (module Mina_ledger.Ledger)
            root_ledger )
-      ~consensus_local_state ~max_length ~precomputed_values
+      ~consensus_local_state ~max_length
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~persistent_root_instance
 

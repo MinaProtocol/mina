@@ -45,6 +45,6 @@ Pipeline.build
         name = "FuzzyZkappTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 1 Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 20 Size.Small
     ]
   }

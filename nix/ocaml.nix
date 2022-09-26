@@ -1,3 +1,4 @@
+# A set defining OCaml parts&dependencies of Mina
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
@@ -14,7 +15,7 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam ../src/opam.export;
+  export = opam-nix.importOpam ../opam.export;
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
@@ -88,6 +89,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -138,6 +144,7 @@ let
         # and copy it from within a dune rule
         # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        DISABLE_CHECK_OPAM_SWITCH = "true";
 
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
@@ -214,6 +221,8 @@ let
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_PASS = "naughty blue worm";
+          MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
         };
         extraInputs = [ pkgs.ephemeralpg ];

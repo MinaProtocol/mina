@@ -20,6 +20,8 @@ if (!nodeModulesExists || !fs.existsSync(`${nodeModules}/client_sdk`)) {
 }
 if (!nodeModulesExists || !fs.existsSync(`${nodeModules}/env`)) {
   fs.mkdirSync(`${nodeModules}/env`);
+}
+if (!nodeModulesExists || !fs.existsSync(`${nodeModules}/env/index.js`)) {
   fs.writeFileSync(`${nodeModules}/env/index.js`, "module.exports = {};");
 }
 
@@ -45,7 +47,6 @@ fs.readdirSync(wasmPath)
   });
 
 let clientSDK = require("client_sdk");
-if (!nodeModulesExists) fs.rmSync(nodeModules, { recursive: true });
 
 let didShutdown = false;
 

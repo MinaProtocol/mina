@@ -81,20 +81,20 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
-let apply_parties_unchecked_with_states ~constraint_constants ~state_view
+let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
     ~fee_excess ledger c =
   let open T in
-  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
-    (ref ledger) c ~init:[]
+  apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view
+    ~fee_excess (ref ledger) c ~init:[]
     ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
       ( { GS.ledger = !ledger; fee_excess; protocol_state }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
-  |> Result.map ~f:(fun (party_applied, states) ->
+  |> Result.map ~f:(fun (account_update_applied, states) ->
          (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the parties that generated the states.
+            wrt. the zkapp_command that generated the states.
          *)
-         (party_applied, List.rev states) )
+         (account_update_applied, List.rev states) )
 
 let apply_transaction_logic f t x =
   let open Or_error.Let_syntax in

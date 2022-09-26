@@ -107,14 +107,14 @@ CREATE INDEX idx_voting_for_value ON voting_for(value);
    we don't store a signature, the fee payer here refers
    directly to the fee payer body.
 
-   zkapp_other_parties_ids refers to a list of ids in zkapp_party.
-   The values in zkapp_other_parties_ids are unenforced foreign keys
-   that reference zkapp_party_body(id), and not NULL.
+   zkapp_account_updates_ids refers to a list of ids in zkapp_account_update.
+   The values in zkapp_account_updates_ids are unenforced foreign keys
+   that reference zkapp_account_update_body(id), and not NULL.
 */
 CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
 , zkapp_fee_payer_body_id               int            NOT NULL REFERENCES zkapp_fee_payer_body(id)
-, zkapp_other_parties_ids               int[]          NOT NULL
+, zkapp_account_updates_ids             int[]          NOT NULL
 , memo                                  text           NOT NULL
 , hash                                  text           NOT NULL UNIQUE
 );
@@ -226,8 +226,8 @@ CREATE INDEX idx_blocks_internal_commands_secondary_sequence_no ON blocks_intern
    sequence_no gives the order within all transactions in the block
 
    The `failure_reasons` column is not NULL iff `status` is `failed`. The
-   entries in the array are unenforced foreign key references to `zkapp_party_failures(id)`.
-   Each element of the array refers to the failures for a party in `other_parties`, and
+   entries in the array are unenforced foreign key references to `zkapp_account_update_failures(id)`.
+   Each element of the array refers to the failures for an account update in `account_updates`, and
    is not NULL.
 
    Blocks command convention
@@ -237,7 +237,7 @@ CREATE TABLE blocks_zkapp_commands
 ( block_id                        int                 NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , zkapp_command_id                int                 NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
 , sequence_no                     int                 NOT NULL
-, status                          transaction_status NOT NULL
+, status                          transaction_status  NOT NULL
 , failure_reasons_ids             int[]
 , PRIMARY KEY (block_id, zkapp_command_id, sequence_no)
 );

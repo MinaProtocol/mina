@@ -7,8 +7,8 @@ module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
 
 module type Input_intf = sig
-  (*Spec for all the updates to generate a parties transaction*)
-  val snapp_update : Party.Update.t
+  (*Spec for all the updates to generate a zkapp_command transaction*)
+  val snapp_update : Account_update.Update.t
 
   val test_description : string
 

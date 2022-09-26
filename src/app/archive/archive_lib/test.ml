@@ -61,7 +61,7 @@ let%test_module "Archive node unit tests" =
       Mina_state.Protocol_state.Body.view genesis_state_body
 
     let user_command_zkapp_gen :
-        ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
+        ('a, Zkapp_command.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind initial_balance =
         Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
@@ -70,7 +70,9 @@ let%test_module "Archive node unit tests" =
       and fee_payer_key_index =
         Base_quickcheck.Generator.int_inclusive 0 @@ (Array.length keys - 1)
       in
-      let keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let test_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let extra_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let keys = Array.append test_keys extra_keys in
       let fee_payer_keypair = keys.(fee_payer_key_index) in
       let keymap =
         Array.map keys ~f:(fun { public_key; private_key } ->
@@ -78,20 +80,40 @@ let%test_module "Archive node unit tests" =
         |> Array.to_list |> Public_key.Compressed.Map.of_alist_exn
       in
       let ledger = Mina_ledger.Ledger.create ~depth:10 () in
-      let fee_payer_cpk = Public_key.compress fee_payer_keypair.public_key in
-      let fee_payer_account_id =
-        Account_id.create fee_payer_cpk Token_id.default
+      let public_keys =
+        Array.map test_keys ~f:(fun key -> Public_key.compress key.public_key)
       in
-      let account = Account.create fee_payer_account_id initial_balance in
-      Mina_ledger.Ledger.get_or_create_account ledger fee_payer_account_id
-        account
-      |> Or_error.ok_exn
+      let account_ids =
+        Array.map public_keys ~f:(fun pk ->
+            Account_id.create pk Token_id.default )
+      in
+      let zkappify_account (account : Account.t) : Account.t =
+        let verification_key =
+          Some
+            With_hash.
+              { data = Side_loaded_verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        in
+        let zkapp = Some { Zkapp_account.default with verification_key } in
+        { account with zkapp }
+      in
+      let accounts =
+        Array.mapi account_ids ~f:(fun ndx account_id ->
+            let account = Account.create account_id initial_balance in
+            if ndx mod 2 = 0 then (account_id, account)
+            else (account_id, zkappify_account account) )
+      in
+      Array.map accounts ~f:(fun (account_id, account) ->
+          Mina_ledger.Ledger.get_or_create_account ledger account_id account
+          |> Or_error.ok_exn )
       |> fun _ ->
-      let%map (parties : Parties.t) =
-        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
+      let%map (zkapp_command : Zkapp_command.t) =
+        Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
+          ~fee_payer_keypair ~keymap ~ledger
+          ~protocol_state_view:genesis_state_view ()
       in
-      User_command.Parties parties
+      User_command.Zkapp_command zkapp_command
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0 ~max_fee:10
@@ -138,26 +160,50 @@ let%test_module "Archive node unit tests" =
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
-          match%map
-            let open Deferred.Result.Let_syntax in
-            let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
-            in
-            let%map result =
-              Processor.User_command.find conn ~transaction_hash
-              >>| function
-              | Some (`Zkapp_command_id zkapp_command_id) ->
-                  Some zkapp_command_id
-              | Some (`Signed_command_id _) | None ->
-                  None
-            in
-            [%test_result: int] ~expect:user_command_id
-              (Option.value_exn result)
-          with
-          | Ok () ->
-              ()
-          | Error e ->
-              failwith @@ Caqti_error.show e )
+          match user_command with
+          | Signed_command _ ->
+              failwith "zkapp_gen failed"
+          | Zkapp_command p -> (
+              let rec add_token_owners
+                  (forest :
+                    ( Account_update.t
+                    , Zkapp_command.Digest.Account_update.t
+                    , Zkapp_command.Digest.Forest.t )
+                    Zkapp_command.Call_forest.t ) =
+                List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
+                    if List.is_empty tree.calls then ()
+                    else
+                      let acct_id =
+                        Account_update.account_id tree.account_update
+                      in
+                      let token_id =
+                        Account_id.derive_token_id ~owner:acct_id
+                      in
+                      Processor.Token_owners.add_if_doesn't_exist token_id
+                        acct_id ;
+                      add_token_owners tree.calls )
+              in
+              add_token_owners p.account_updates ;
+              match%map
+                let open Deferred.Result.Let_syntax in
+                let%bind user_command_id =
+                  Processor.User_command.add_if_doesn't_exist conn user_command
+                in
+                let%map result =
+                  Processor.User_command.find conn ~transaction_hash
+                  >>| function
+                  | Some (`Zkapp_command_id zkapp_command_id) ->
+                      Some zkapp_command_id
+                  | Some (`Signed_command_id _) | None ->
+                      None
+                in
+                [%test_result: int] ~expect:user_command_id
+                  (Option.value_exn result)
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwith @@ Caqti_error.show e ) )
 
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =

@@ -312,41 +312,53 @@ let do_rpc (type a b) (t : t) ((module Rpc) : (a, b) Libp2p_ipc.Rpcs.rpc)
     Deferred.Or_error.errorf "helper process already exited (doing RPC %s)"
       Rpc.name
 
-let send_validation t ~validation_id ~validation_result =
+let send_push ~msg t =
   if
     (not t.finished)
     && (not @@ Writer.is_closed (Child_processes.stdin t.process))
   then
-    Libp2p_ipc.create_push_message ~validation_id ~validation_result
-    |> Libp2p_ipc.push_message_to_outgoing_message
+    Libp2p_ipc.push_message_to_outgoing_message msg
     |> Libp2p_ipc.write_outgoing_message (Child_processes.stdin t.process)
+
+let send_validation ~validation_id ~validation_result =
+  send_push
+    ~msg:
+      (Libp2p_ipc.create_validation_push_message ~validation_id
+         ~validation_result )
+
+let send_add_resource ~tag ~body =
+  let open Staged_ledger_diff in
+  let tag = Body.Tag.to_enum tag in
+  let data = Body.to_binio_bigstring body |> Bigstring.to_string in
+  send_push ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
+
+let send_heartbeat ~peer_id =
+  send_push ~msg:(Libp2p_ipc.create_heartbeat_peer_push_message ~peer_id)
+
+let test_with_libp2p_helper ?(logger = Logger.null ())
+    ?(handle_push_message = fun _ -> assert false) f =
+  let pids = Pid.Table.create () in
+  Thread_safe.block_on_async_exn (fun () ->
+      let%bind conf_dir = Async.Unix.mkdtemp "libp2p_helper_test" in
+      let%bind helper =
+        spawn ~logger ~pids ~conf_dir ~handle_push_message >>| Or_error.ok_exn
+      in
+      Monitor.protect
+        (fun () -> f conf_dir helper)
+        ~finally:(fun () ->
+          let%bind () = shutdown helper in
+          File_system.remove_dir conf_dir ) )
 
 let%test_module "bitswap blocks" =
   ( module struct
     open Staged_ledger_diff.Bitswap_block
-
-    let with_libp2p_helper f =
-      let logger = Logger.null () in
-      let pids = Pid.Table.create () in
-      let handle_push_message _ = assert false in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind conf_dir = Async.Unix.mkdtemp "bitswap_block_test" in
-          let%bind helper =
-            spawn ~logger ~pids ~conf_dir ~handle_push_message
-            >>| Or_error.ok_exn
-          in
-          Monitor.protect
-            (fun () -> f helper)
-            ~finally:(fun () ->
-              let%bind () = shutdown helper in
-              File_system.remove_dir conf_dir ) )
 
     let%test_unit "forall x: libp2p_helper#decode (daemon#encode x) = x" =
       Quickcheck.test For_tests.gen ~trials:100
         ~f:(fun (max_block_size, data) ->
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           let result =
-            with_libp2p_helper (fun helper ->
+            test_with_libp2p_helper (fun _ helper ->
                 let open Libp2p_ipc.Rpcs in
                 let request =
                   TestDecodeBitswapBlocks.create_request
@@ -367,7 +379,7 @@ let%test_module "bitswap blocks" =
         ~f:(fun (max_block_size, data) ->
           let blocks, root_block_hash =
             let resp =
-              with_libp2p_helper (fun helper ->
+              test_with_libp2p_helper (fun _ helper ->
                   let open Libp2p_ipc.Rpcs in
                   let request =
                     TestEncodeBitswapBlocks.create_request ~max_block_size
