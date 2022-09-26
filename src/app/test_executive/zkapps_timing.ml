@@ -83,6 +83,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              in
              { Account_update.Update.dummy with timing } )
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       let timing_account_id =
@@ -131,6 +132,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              in
              { Account_update.Update.dummy with timing } )
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       return

@@ -158,6 +158,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; new_zkapp_account = true
         ; snapp_update = Account_update.Update.dummy
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       return
