@@ -163,12 +163,12 @@ module Json_layout = struct
           let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
-            `String (Pickles.Side_loaded.Verification_key.to_base58_check t)
+            `String (Pickles.Side_loaded.Verification_key.to_base64 t)
 
           let of_yojson = function
             | `String s ->
                 let vk_or_err =
-                  Pickles.Side_loaded.Verification_key.of_base58_check s
+                  Pickles.Side_loaded.Verification_key.of_base64 s
                 in
                 Result.map_error vk_or_err ~f:Error.to_string_hum
             | _ ->

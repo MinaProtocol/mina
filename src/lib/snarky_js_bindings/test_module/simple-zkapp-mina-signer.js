@@ -46,7 +46,7 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-await SimpleZkapp.compile();
+await SimpleZkapp.compile(zkappAddress);
 toc();
 
 // deploy transaction
