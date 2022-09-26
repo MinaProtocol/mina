@@ -25,7 +25,7 @@ impl From<AffineVesta> for CamlGVesta {
         if point.infinity {
             Self::Infinity
         } else {
-            Self::Finite((point.x.into(), point.y.into()))
+            Self::Finite((point.x, point.y))
         }
     }
 }
@@ -35,7 +35,7 @@ impl From<&AffineVesta> for CamlGVesta {
         if point.infinity {
             Self::Infinity
         } else {
-            Self::Finite((point.x.into(), point.y.into()))
+            Self::Finite((point.x, point.y))
         }
     }
 }
@@ -65,7 +65,7 @@ impl From<AffinePallas> for CamlGPallas {
         if point.infinity {
             Self::Infinity
         } else {
-            Self::Finite((point.x.into(), point.y.into()))
+            Self::Finite((point.x, point.y))
         }
     }
 }
@@ -75,7 +75,7 @@ impl From<&AffinePallas> for CamlGPallas {
         if point.infinity {
             Self::Infinity
         } else {
-            Self::Finite((point.x.into(), point.y.into()))
+            Self::Finite((point.x, point.y))
         }
     }
 }
@@ -84,7 +84,7 @@ impl From<CamlGPallas> for AffinePallas {
     fn from(camlg: CamlGPallas) -> Self {
         match camlg {
             CamlGPallas::Infinity => AffinePallas::zero(),
-            CamlGPallas::Finite((x, y)) => AffinePallas::new(x.into(), y.into(), false),
+            CamlGPallas::Finite((x, y)) => AffinePallas::new(x, y, false),
         }
     }
 }

@@ -218,7 +218,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: 1,
-            group_gen: Fq::one().into(),
+            group_gen: Fq::one(),
         },
         max_poly_size: 0,
         max_quot_size: 0,
@@ -236,7 +236,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             emul_comm: comm(),
             chacha_comm: None,
         },
-        shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
+        shifts: (0..PERMUTS - 1).map(|_| Fq::one()).collect(),
         lookup_index: None,
     }
 }

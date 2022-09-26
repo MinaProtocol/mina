@@ -12,7 +12,8 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     lookup_configuration: Option<&LookupConfiguration<F>>,
 ) -> (String, Vec<(String, String)>) {
     let evaluated_cols = linearization_columns::<F>(lookup_configuration);
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(false, false, lookup_configuration);
+    let (linearization, _powers_of_alpha) =
+        constraints_expr::<F>(false, false, lookup_configuration);
 
     let Linearization {
         constant_term,
@@ -26,7 +27,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     let constant = constant_term.ocaml_str();
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), format!("{}", expr.ocaml_str())))
+        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml_str()))
         .collect();
 
     (constant, other_terms)

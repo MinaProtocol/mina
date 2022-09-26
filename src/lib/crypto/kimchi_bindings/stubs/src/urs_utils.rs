@@ -87,7 +87,7 @@ pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
         .into_par_iter()
         .chunks(rounds)
         .map(|chals| {
-            let chals: Vec<G::ScalarField> = chals.into_iter().map(|x| *x).collect();
+            let chals: Vec<G::ScalarField> = chals.into_iter().copied().collect();
             let scalars: Vec<_> = b_poly_coefficients(&chals)
                 .into_iter()
                 .map(|x| x.into_repr())
