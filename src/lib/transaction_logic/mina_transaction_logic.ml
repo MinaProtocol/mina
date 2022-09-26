@@ -1626,7 +1626,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
-      List.map (Zkapp_command.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
@@ -1675,7 +1675,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             { perform } initial_state )
     in
     let account_states_after_fee_payer =
-      List.map (Zkapp_command.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
