@@ -79,8 +79,6 @@ upload_libp2p_keys_by_folder $LIBP2P_KEYS_DIR
 #   echo '*** NOT UPLOADING DISCORD API KEY (required when running with bots sidecar)'
 # fi
 
-CRED_FILE=./terraform/testnets/${TESTNET}/gcloud-keyfile.json
-
-if [ -e $CRED_FILE ]; then
-  kubectl create secret generic gcloud-keyfile --cluster=$CLUSTER --namespace=$TESTNET --from-file=keyfile=$CRED_FILE
+if [ -e gcloud-keyfile.json ]; then
+  kubectl create secret generic gcloud-keyfile --cluster=$CLUSTER --namespace=$TESTNET --from-file=keyfile=gcloud-keyfile.json
 fi

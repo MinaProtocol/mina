@@ -3893,7 +3893,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         Sparse_ledger.of_ledger_subset_exn ledger
           (List.concat_map
              ~f:(fun (_, _, zkapp_command) ->
-               Zkapp_command.accounts_accessed zkapp_command )
+               Zkapp_command.accounts_referenced zkapp_command )
              zkapp_commands )
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
