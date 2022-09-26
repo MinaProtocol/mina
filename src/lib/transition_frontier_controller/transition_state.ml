@@ -40,6 +40,10 @@ type t =
       { header : initial_valid_with_header
       ; substate : Staged_ledger_diff.Body.t common_substate
       ; block_vc : Mina_net2.Validation_callback.t option
+            (** [next_failed_ancestor] is the next ancestor that is in [Downloading_body] state
+          and failed at least once. This field might be outdated (i.e. the ancestor is
+          of higher state or is not [Failed] anymore)*)
+      ; next_failed_ancestor : State_hash.t option
       }
   | Verifying_complete_works of
       { block : initial_valid_with_block

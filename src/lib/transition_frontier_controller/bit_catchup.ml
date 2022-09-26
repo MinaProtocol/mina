@@ -15,7 +15,7 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
       Option.some
       @@ Downloading_body.promote_to ~mark_processed_and_promote ~context
            ~transition_states ~substate ~gossip_data ~body_opt
-  | Downloading_body { header; substate; block_vc } ->
+  | Downloading_body { header; substate; block_vc; next_failed_ancestor = _ } ->
       Option.some
       @@ Verifying_complete_works.promote_to ~mark_processed_and_promote
            ~context ~transition_states ~header ~substate ~block_vc
