@@ -4364,6 +4364,7 @@ module For_tests = struct
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
       ; preconditions : Account_update.Preconditions.t option
+      ; current_auth : Permissions.Auth_required.t
       }
     [@@deriving sexp]
   end
@@ -4455,6 +4456,7 @@ module For_tests = struct
         ; events
         ; call_data
         ; preconditions
+        ; current_auth
         } =
       spec
     in
@@ -4576,7 +4578,12 @@ module For_tests = struct
                     }
                 ; use_full_commitment = true
                 ; caller = Call
-                ; authorization_kind = Signature
+                ; authorization_kind = (
+                    match current_auth with
+                    | None -> None_given
+                    | Signature -> Signature
+                    | Proof -> Proof
+                    | _ -> Signature)
                 }
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
@@ -4691,6 +4698,7 @@ module For_tests = struct
       ; events = []
       ; call_data = Tick.Field.zero
       ; preconditions
+      ; current_auth = Signature
       }
   end
 
@@ -4810,7 +4818,7 @@ module For_tests = struct
         ; memo
         ; new_zkapp_account
         ; snapp_update = _
-        ; current_auth = _
+        ; current_auth
         ; sequence_events
         ; events
         ; call_data
@@ -4828,6 +4836,7 @@ module For_tests = struct
       ; events
       ; call_data
       ; preconditions
+      ; current_auth
       }
   end
 
@@ -4965,6 +4974,7 @@ module For_tests = struct
       ; events
       ; call_data
       ; preconditions
+      ; current_auth = Signature
       }
   end
 
