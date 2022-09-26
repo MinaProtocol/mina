@@ -197,8 +197,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
         }
     ; prev_evals =
         (let e =
-           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:(fun n -> (tick_arr n, tick_arr n))
+           Plonk_types.Evals.map Evaluation_lengths.constants ~f:(fun n ->
+               (tick_arr n, tick_arr n) )
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =
