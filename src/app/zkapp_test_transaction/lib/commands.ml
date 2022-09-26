@@ -315,6 +315,7 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     ; new_zkapp_account = true
     ; snapp_update = Account_update.Update.dummy
     ; preconditions = None
+    ; authorization_kind = Signature
     }
   in
   let zkapp_command =
