@@ -13,6 +13,7 @@
    core
    sexplib0
    ;; local libraries
+   block_storage
    unix_timestamp
    transition_frontier
    data_hash_lib
