@@ -39,7 +39,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
         Inner_curve.typ
         { lookup = No; runtime = No }
         ~bool:Boolean.typ ~dummy:Inner_curve.Params.one
-        ~commitment_lengths:(Commitment_lengths.create ~of_int:(fun x -> x))
+        ~commitment_lengths:Commitment_lengths.commitment_lengths
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->
