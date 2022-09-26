@@ -131,18 +131,6 @@ let collect_dependent_ancestry ~state_functions ~transition_states top_state =
 
     Returned list of states is in the parent-first order.
 *)
-let collect_failed_ancestry ~state_functions ~transition_states top_state =
-  (* TODO optimize this function to take amortized O(logn) *)
-  let viewer s =
-    match (s.status, s.received_via_gossip) with
-    | Failed _, _ ->
-        (`Take true, `Continue true)
-    | _ ->
-        (`Take false, `Continue true)
-  in
-  collect_states ~predicate:{ viewer } ~state_functions ~transition_states
-    top_state
-
 let mark_processed_sm ~is_recursive_call subst =
   let reshape res =
     match res with
@@ -360,3 +348,16 @@ let update_children_on_promotion (type state_t)
   in
   State_hash.Table.change transition_states parent_hash
     ~f:(Option.bind ~f:update_children)
+
+module For_tests = struct
+  let collect_failed_ancestry ~state_functions ~transition_states top_state =
+    let viewer s =
+      match (s.status, s.received_via_gossip) with
+      | Failed _, _ ->
+          (`Take true, `Continue true)
+      | _ ->
+          (`Take false, `Continue true)
+    in
+    collect_states ~predicate:{ viewer } ~state_functions ~transition_states
+      top_state
+end
