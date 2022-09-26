@@ -1,14 +1,17 @@
-open Core_kernel
-open Pickles_types
-open Import
-open Plonk_types
-
-let create (type a) ~(of_int : int -> a) : a Plonk_types.Evals.t =
+let create ~of_int =
   let one = of_int 1 in
-  { w = Vector.init Columns.n ~f:(fun _ -> one)
-  ; z = one
-  ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
-  ; generic_selector = one
-  ; poseidon_selector = one
-  ; lookup = None
-  }
+  let z = one
+  and generic_selector = one
+  and poseidon_selector = one
+  and lookup = None in
+  let vinit = Pickles_types.Vector.init ~f:(fun _ -> one) in
+  Pickles_types.Plonk_types.Evals.
+    { w = vinit Pickles_types.Plonk_types.Columns.n
+    ; z
+    ; s = vinit Pickles_types.Plonk_types.Permuts_minus_1.n
+    ; generic_selector
+    ; poseidon_selector
+    ; lookup
+    }
+
+let constants = create ~of_int:(fun x -> x)
