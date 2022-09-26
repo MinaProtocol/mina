@@ -27,10 +27,19 @@ let unsigned_scalar_scalar ~to_string typ_name =
          (Stdlib.String.lowercase_ascii typ_name) )
     ~coerce:(fun num -> `String (to_string num))
 
+(* guard against negative wrap around behaviour from
+   the `integers` library *)
+let parse_uinteger json ~f =
+  let s = Yojson.Basic.Util.to_string json in
+  let neg = String.starts_with ~prefix:"-" s in
+  if neg then
+    failwith "Cannot parse string starting with a minus as an unsigned integer"
+  else f s
+
 module UInt32 : Json_intf with type t = Unsigned.UInt32.t = struct
   type t = Unsigned.UInt32.t
 
-  let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
+  let parse = parse_uinteger ~f:Unsigned.UInt32.of_string
 
   let serialize value = `String (Unsigned.UInt32.to_string value)
 
@@ -41,7 +50,7 @@ end
 module UInt64 : Json_intf with type t = Unsigned.UInt64.t = struct
   type t = Unsigned.UInt64.t
 
-  let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
+  let parse = parse_uinteger ~f:Unsigned.UInt64.of_string
 
   let serialize value = `String (Unsigned.UInt64.to_string value)
 

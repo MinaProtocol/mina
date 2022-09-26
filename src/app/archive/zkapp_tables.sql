@@ -146,7 +146,7 @@ CREATE TABLE zkapp_nonce_bounds
 CREATE TYPE zkapp_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
-CREATE TABLE zkapp_precondition_accounts
+CREATE TABLE zkapp_account_precondition_values
 ( id                       serial                 PRIMARY KEY
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
@@ -164,7 +164,7 @@ CREATE TABLE zkapp_precondition_accounts
 CREATE TABLE zkapp_account_precondition
 ( id                       serial                            PRIMARY KEY
 , kind                     zkapp_precondition_type           NOT NULL
-, precondition_account_id  int                               REFERENCES zkapp_precondition_accounts(id)
+, account_precondition_values_id  int                               REFERENCES zkapp_account_precondition_values(id)
 , nonce                    bigint
 );
 
@@ -254,7 +254,7 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
+CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
@@ -274,7 +274,7 @@ CREATE TABLE zkapp_account_update_body
 , zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
-, caller                                call_type_type  NOT NULL
+, caller                                call_type  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 

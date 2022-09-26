@@ -40,7 +40,7 @@ DROP TABLE zkapp_account_update;
 
 DROP TABLE zkapp_account_update_body;
 
-DROP TYPE call_type_type;
+DROP TYPE call_type;
 
 DROP TABLE zkapp_updates;
 
@@ -48,7 +48,7 @@ DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
-DROP TABLE zkapp_precondition_accounts;
+DROP TABLE zkapp_account_precondition_values;
 
 DROP TABLE zkapp_accounts;
 

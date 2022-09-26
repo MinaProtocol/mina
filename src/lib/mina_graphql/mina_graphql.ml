@@ -703,8 +703,16 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the staged ledger hash's aux_hash"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              Staged_ledger_hash.aux_hash (staged_ledger_hash t) )
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.aux_hash staged_ledger_hash )
         ; field "stagedLedgerPendingCoinbaseAux"
+            ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseAuxHash.typ ())
+            ~doc:"Base58Check-encoded staged ledger hash's pending_coinbase_aux"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.pending_coinbase_aux staged_ledger_hash )
+        ; field "stagedLedgerPendingCoinbaseHash"
             ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseHash.typ ())
             ~doc:
               "Base58Check-encoded hash of the staged ledger hash's \
