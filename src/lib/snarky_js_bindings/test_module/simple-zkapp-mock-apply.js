@@ -62,12 +62,12 @@ let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
 
 tic("compute circuit digest");
-SimpleZkapp.digest();
+let digest = SimpleZkapp.digest(zkappAddress);
 toc();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey } = await SimpleZkapp.compile();
+let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
 toc();
 
 tic("create deploy transaction");
@@ -88,13 +88,9 @@ let transaction = await Mina.transaction(() => {
 });
 let [proof] = await transaction.prove();
 let zkappCommandJsonInitialize = transaction.toJSON();
-zkappCommandJsonInitialize = signFeePayer(
-  zkappCommandJsonInitialize,
-  senderKey,
-  {
-    transactionFee,
-  }
-);
+zkappCommandJsonInitialize = signFeePayer(zkappCommandJsonInitialize, senderKey, {
+  transactionFee,
+});
 toc();
 
 // verify the proof

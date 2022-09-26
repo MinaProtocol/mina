@@ -403,7 +403,7 @@ let () =
     Js.wrap_callback
       (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
         (As_field.to_field_obj x)##toFields ) ;
-  field_class##.fromFields :=
+  field_class##.ofFields :=
     Js.wrap_callback
       (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
         array_check_length xs 1 ; array_get_exn xs 0 ) ;
@@ -417,7 +417,7 @@ let () =
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean (Field.equal (As_field.value x) Field.zero)) ) ;
-  field_class##.fromBits :=
+  field_class##.ofBits :=
     Js.wrap_callback
       (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
         try
@@ -624,7 +624,7 @@ let () =
     (fun (x : As_bool.t) : field_class Js.t Js.js_array Js.t ->
       singleton_array
         (new%js field_constr (As_field.of_field (As_bool.value x :> Field.t))) ) ;
-  static_method "fromFields"
+  static_method "ofFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : bool_class Js.t ->
       if xs##.length = 1 then
         Js.Optdef.case (Js.array_get xs 0)
@@ -863,7 +863,7 @@ let () =
     (fun (x : scalar_class Js.t) : field_class Js.t Js.js_array Js.t ->
       (Js.Unsafe.coerce x)##toFields ) ;
   static_method "sizeInFields" (fun () : int -> num_bits) ;
-  static_method "fromFields"
+  static_method "ofFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array xs) ~f:(fun x ->
@@ -871,7 +871,7 @@ let () =
   static_method "random" (fun () : scalar_class Js.t ->
       let x = Other_backend.Field.random () in
       new%js scalar_constr_const (bits x) x ) ;
-  static_method "fromBits"
+  static_method "ofBits"
     (fun (bits : bool_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array bits) ~f:(fun b ->
@@ -1004,7 +1004,7 @@ let () =
       arr##push p1##.y |> ignore ;
       arr ) ;
   static_method "toFields" (fun (p1 : group_class Js.t) -> p1##toFields) ;
-  static_method "fromFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
+  static_method "ofFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
       array_check_length xs 2 ;
       new%js group_constr
         (As_field.of_field_obj (array_get_exn xs 0))
@@ -1037,14 +1037,7 @@ class type ['a] as_field_elements =
   object
     method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
 
-    method fromFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
-
-    method sizeInFields : int Js.meth
-  end
-
-class type ['a] as_field_elements_minimal =
-  object
-    method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
+    method ofFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
 
     method sizeInFields : int Js.meth
   end
@@ -1289,7 +1282,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let has_methods ctor =
            let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
-           has "toFields" && has "fromFields"
+           has "toFields" && has "ofFields"
          in
          match Js.Optdef.(to_option ctor1) with
          | Some ctor1 when has_methods ctor1 ->
@@ -1367,7 +1360,7 @@ module Circuit = struct
         let t1 = ctor##toFields x1 in
         let t2 = ctor##toFields x2 in
         let arr = if_array b t1 t2 in
-        ctor##fromFields arr
+        ctor##ofFields arr
 
   let rec if_magic : type a. As_bool.t -> a Js.t -> a Js.t -> a Js.t =
     fun (type a) (b : As_bool.t) (t1 : a Js.t) (t2 : a Js.t) : a Js.t ->
@@ -1387,7 +1380,7 @@ module Circuit = struct
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
            let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
-           has "toFields" && has "fromFields"
+           has "toFields" && has "ofFields"
          in
          if not (js_equal ctor1 ctor2) then
            raise_error "if: Mismatched argument types" ;
@@ -1428,7 +1421,7 @@ module Circuit = struct
       Js.to_array (typ##toFields a) |> Array.map ~f:(fun x -> conv x##.value)
     in
     let of_array conv xs =
-      typ##fromFields
+      typ##ofFields
         (Js.array
            (Array.map xs ~f:(fun x ->
                 new%js field_constr (As_field.of_field (conv x)) ) ) )
@@ -1449,17 +1442,6 @@ module Circuit = struct
       ()
     else failwith "Circuit.witness: input does not have a `check` method" ;
     a
-
-  let typ_minimal (type a) (typ : a as_field_elements_minimal Js.t) =
-    Typ.array ~length:typ##sizeInFields Field.typ
-
-  let witness_minimal (type a) (typ : a as_field_elements_minimal Js.t)
-      (f : (unit -> a) Js.callback) =
-    Impl.exists (typ_minimal typ) ~compute:(fun () ->
-        typ##toFields (Js.Unsafe.fun_call f [||])
-        |> Js.to_array
-        |> Array.map ~f:of_js_field_unchecked )
-    |> Array.map ~f:to_js_field |> Js.array
 
   module Circuit_main = struct
     type ('w, 'p) t =
@@ -1540,6 +1522,7 @@ module Circuit = struct
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
+    circuit##.witness := Js.wrap_callback witness ;
     circuit##.generateKeypair :=
       Js.wrap_meth_callback
         (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
@@ -1563,8 +1546,6 @@ module Circuit = struct
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
     Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
-    Js.Unsafe.set circuit (Js.string "_witness")
-      (Js.wrap_callback witness_minimal) ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
@@ -2981,7 +2962,7 @@ module Ledger = struct
       (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_account_update_signatures txn ;
     let ledger = l##.value in
-    let application_result =
+    let applied_exn =
       T.apply_zkapp_command_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
@@ -2989,13 +2970,7 @@ module Ledger = struct
           }
         ledger txn
     in
-    let applied, _ =
-      match application_result with
-      | Ok res ->
-          res
-      | Error err ->
-          raise_error (Error.to_string_hum err)
-    in
+    let applied, _ = Or_error.ok_exn applied_exn in
     let T.Transaction_applied.Zkapp_command_applied.{ accounts; command; _ } =
       applied
     in

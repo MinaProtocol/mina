@@ -9,7 +9,7 @@ export { basicCircuit };
 let FieldArrayTyp = (size) => ({
   sizeInFields: () => size,
   toFields: (f) => f,
-  fromFields: (f) => f,
+  ofFields: (f) => f,
   check: () => {},
 });
 class Main extends Circuit {

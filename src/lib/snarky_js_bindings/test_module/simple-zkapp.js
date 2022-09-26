@@ -63,7 +63,7 @@ if (command === "deploy") {
     nonce: feePayerNonce,
   });
 
-  let { verificationKey } = await SimpleZkapp.compile();
+  let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
   let zkappCommandJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
@@ -93,7 +93,7 @@ if (command === "update") {
     publicKey: zkappAddress,
     zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0] },
   });
-  let { verificationKey } = await SimpleZkapp.compile();
+  let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
   let transaction = await Mina.transaction(() => {
     new SimpleZkapp(zkappAddress).update(Field(2));
   });
