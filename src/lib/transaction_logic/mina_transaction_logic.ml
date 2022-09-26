@@ -965,9 +965,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       type t = bool
 
       module Assert = struct
-        let is_true b = assert b
+        let is_true ~pos b =
+          try assert b
+          with Assert_failure _ ->
+            let file, line, col, _ecol = pos in
+            raise (Assert_failure (file, line, col))
 
-        let any bs = List.exists ~f:Fn.id bs |> is_true
+        let any ~pos bs = List.exists ~f:Fn.id bs |> is_true ~pos
       end
 
       let if_ = value_if
@@ -994,14 +998,23 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let is_empty t = List.join t |> List.is_empty
 
-      let assert_with_failure_status_tbl b failure_status_tbl =
+      let assert_with_failure_status_tbl ~pos b failure_status_tbl =
+        let file, line, col, ecol = pos in
         if (not b) && not (is_empty failure_status_tbl) then
           (* Raise a more useful error message if we have a failure
              description. *)
-          Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
-          @@ Transaction_status.Failure.Collection.Display.to_yojson
-          @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
-        else assert b
+          let failure_msg =
+            Yojson.Safe.to_string
+            @@ Transaction_status.Failure.Collection.Display.to_yojson
+            @@ Transaction_status.Failure.Collection.to_display
+                 failure_status_tbl
+          in
+          Error.raise @@ Error.of_string
+          @@ sprintf "File %S, line %d, characters %d-%d: %s" file line col ecol
+               failure_msg
+        else
+          try assert b
+          with Assert_failure _ -> raise (Assert_failure (file, line, col))
     end
 
     module Account_id = struct

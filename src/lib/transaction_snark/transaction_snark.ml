@@ -981,9 +981,27 @@ module Base = struct
       end
 
       module Bool = struct
-        include Boolean
+        type t = Boolean.var
 
-        type t = var
+        [%%define_locally
+        Boolean.(( ||| ), ( &&& ), if_, true_, false_, equal, not, all)]
+
+        module Assert = struct
+          let raise_failure ~pos msg =
+            let file, line, col, ecol = pos in
+            raise
+              (Failure
+                 (sprintf "File %S, line %d, characters %d-%d: %s" file line col
+                    ecol msg ) )
+
+          let is_true ~pos b =
+            try Boolean.Assert.is_true b
+            with Failure msg -> raise_failure ~pos msg
+
+          let any ~pos bs =
+            try Boolean.Assert.any bs
+            with Failure msg -> raise_failure ~pos msg
+        end
 
         let display _b ~label:_ = ""
 
@@ -991,8 +1009,8 @@ module Base = struct
 
         type failure_status_tbl = unit
 
-        let assert_with_failure_status_tbl b _failure_status_tbl =
-          Assert.is_true b
+        let assert_with_failure_status_tbl ~pos b _failure_status_tbl =
+          Assert.is_true ~pos b
       end
 
       module Index = struct
@@ -1306,7 +1324,7 @@ module Base = struct
 
         let or_exn x =
           with_label "or_exn is_some" (fun () ->
-              Bool.Assert.is_true (is_some x) ) ;
+              Bool.Assert.is_true ~pos:__POS__ (is_some x) ) ;
           Flagged_option.data x
       end
 
