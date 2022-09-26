@@ -4364,7 +4364,7 @@ module For_tests = struct
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
       ; preconditions : Account_update.Preconditions.t option
-      ; current_auth : Permissions.Auth_required.t
+      ; authorization_kind : Account_update.Authorization_kind.t
       }
     [@@deriving sexp]
   end
@@ -4456,7 +4456,7 @@ module For_tests = struct
         ; events
         ; call_data
         ; preconditions
-        ; current_auth
+        ; authorization_kind
         } =
       spec
     in
@@ -4578,12 +4578,7 @@ module For_tests = struct
                     }
                 ; use_full_commitment = true
                 ; caller = Call
-                ; authorization_kind = (
-                    match current_auth with
-                    | None -> None_given
-                    | Signature -> Signature
-                    | Proof -> Proof
-                    | _ -> Signature)
+                ; authorization_kind
                 }
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
@@ -4672,6 +4667,7 @@ module For_tests = struct
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
       ; preconditions : Account_update.Preconditions.t option
+      ; authorization_kind : Account_update.Authorization_kind.t
       }
     [@@deriving sexp]
 
@@ -4685,6 +4681,7 @@ module For_tests = struct
         ; new_zkapp_account
         ; snapp_update = _
         ; preconditions
+        ; authorization_kind
         } : Spec.t =
       { fee
       ; sender
@@ -4698,7 +4695,7 @@ module For_tests = struct
       ; events = []
       ; call_data = Tick.Field.zero
       ; preconditions
-      ; current_auth = Signature
+      ; authorization_kind
       }
   end
 
@@ -4836,7 +4833,16 @@ module For_tests = struct
       ; events
       ; call_data
       ; preconditions
-      ; current_auth
+      ; authorization_kind =
+          ( match current_auth with
+          | None ->
+              None_given
+          | Signature ->
+              Signature
+          | Proof ->
+              Proof
+          | _ ->
+              Signature )
       }
   end
 
@@ -4974,7 +4980,7 @@ module For_tests = struct
       ; events
       ; call_data
       ; preconditions
-      ; current_auth = Signature
+      ; authorization_kind = Signature
       }
   end
 

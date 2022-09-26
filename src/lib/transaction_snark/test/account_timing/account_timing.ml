@@ -1141,6 +1141,7 @@ let%test_module "account timing check" =
              in
              { Account_update.Update.dummy with timing } )
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       let timed_account_id =
@@ -1717,6 +1718,7 @@ let%test_module "account timing check" =
              in
              { Account_update.Update.dummy with timing } )
         ; preconditions = None
+        ; authorization_kind = None_given
         }
       in
       let timing_account_id =

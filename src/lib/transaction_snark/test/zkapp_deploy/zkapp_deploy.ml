@@ -29,6 +29,7 @@ let%test_module "Snapp deploy tests" =
                     ; new_zkapp_account = true
                     ; snapp_update = Account_update.Update.dummy
                     ; preconditions = None
+                    ; authorization_kind = Signature
                     }
                   in
                   let zkapp_command =
@@ -66,6 +67,7 @@ let%test_module "Snapp deploy tests" =
                     ; new_zkapp_account = true
                     ; snapp_update = Account_update.Update.dummy
                     ; preconditions = None
+                    ; authorization_kind = Signature
                     }
                   in
                   let zkapp_command =
@@ -97,6 +99,7 @@ let%test_module "Snapp deploy tests" =
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
                     ; preconditions = None
+                    ; authorization_kind = Signature
                     }
                   in
                   let zkapp_command =
@@ -129,6 +132,7 @@ let%test_module "Snapp deploy tests" =
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
                     ; preconditions = None
+                    ; authorization_kind = Signature
                     }
                   in
                   let zkapp_command =
@@ -161,6 +165,7 @@ let%test_module "Snapp deploy tests" =
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
                     ; preconditions = None
+                    ; authorization_kind = Signature
                     }
                   in
                   let zkapp_command =

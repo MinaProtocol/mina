@@ -511,6 +511,7 @@ module For_tests : sig
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
       ; preconditions : Account_update.Preconditions.t option
+      ; authorization_kind : Account_update.Authorization_kind.t
       }
     [@@deriving sexp]
   end

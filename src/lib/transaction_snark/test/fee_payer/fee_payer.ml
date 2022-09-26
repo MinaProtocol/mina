@@ -153,6 +153,7 @@ let%test_module "Fee payer tests" =
                 ; new_zkapp_account = true
                 ; snapp_update
                 ; preconditions = None
+                ; authorization_kind = Signature
                 }
               in
               let zkapp_command =
