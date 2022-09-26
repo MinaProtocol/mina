@@ -2523,7 +2523,13 @@ module Base = struct
       in
       Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
+    (* we calculate burned_tokens and new_account_fee when examining the fee payer *)
     let burned_tokens = ref Currency.Amount.(var_of_t zero) in
+    let new_account_fee =
+      ref
+      @@ Currency.Amount.(Signed.create_var ~magnitude:(var_of_t zero))
+           ~sgn:Sgn.Checked.pos
+    in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
@@ -2613,6 +2619,7 @@ module Base = struct
                     in
                     Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
+                  new_account_fee := account_creation_fee ;
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee) )
              in
@@ -2793,14 +2800,14 @@ module Base = struct
                   case.
                *)
                let%bind receiver_amount =
-                 let%bind account_creation_amount =
+                 let%bind account_creation_fee =
                    Amount.Checked.if_ should_pay_to_create
                      ~then_:account_creation_amount
                      ~else_:Amount.(var_of_t zero)
                  in
                  let%bind amount_for_new_account, `Underflow underflow =
                    Amount.Checked.sub_flagged receiver_increase
-                     account_creation_amount
+                     account_creation_fee
                  in
                  let%bind () =
                    [%with_label
@@ -3096,10 +3103,15 @@ module Base = struct
              ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
              ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
          in
-         let%bind amt, `Overflow overflow =
+         let%bind amt0, `Overflow overflow0 =
            Amount.Signed.Checked.(
              add_flagged expected_supply_increase
                (negate (of_unsigned !burned_tokens)))
+         in
+         let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
+         let%bind amt, `Overflow overflow =
+           (* new_account_fee is negative if nonzero *)
+           Amount.Signed.Checked.(add_flagged amt0 !new_account_fee)
          in
          let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
          amt )

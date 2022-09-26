@@ -49,6 +49,13 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let new_accounts (t : t) =
+      match t.body with
+      | Payment { new_accounts; _ } ->
+          new_accounts
+      | Stake_delegation _ | Failed ->
+          []
   end
 
   module Zkapp_command_applied = struct
@@ -152,10 +159,35 @@ module Transaction_applied = struct
     | Coinbase c ->
         c.burned_tokens
 
+  let num_new_accounts : t -> int =
+   fun { varying; _ } ->
+    match varying with
+    | Command c -> (
+        match c with
+        | Signed_command sc ->
+            List.length @@ Signed_command_applied.new_accounts sc
+        | Zkapp_command zc ->
+            List.length @@ zc.new_accounts )
+    | Fee_transfer f ->
+        List.length f.new_accounts
+    | Coinbase c ->
+        List.length c.new_accounts
+
   let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
    fun t ->
     let open Or_error.Let_syntax in
     let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
+    let account_creation_fees =
+      let account_creation_fee_int =
+        Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        |> Currency.Fee.to_int
+      in
+      let num_accounts_created = num_new_accounts t in
+      (* using int type is ok, no danger of overflow here *)
+      Currency.Amount.(
+        Signed.of_unsigned
+        @@ of_int (account_creation_fee_int * num_accounts_created))
+    in
     let txn : Transaction.t =
       match t.varying with
       | Command
@@ -171,10 +203,22 @@ module Transaction_applied = struct
     let%bind expected_supply_increase =
       Transaction.expected_supply_increase txn
     in
-    Currency.Amount.Signed.(
-      add (of_unsigned expected_supply_increase) (negate burned_tokens))
-    |> Option.value_map ~default:(Or_error.error_string "overflow") ~f:(fun v ->
-           Ok v )
+    let rec process_negations total = function
+      | [] ->
+          Some total
+      | amt :: amts ->
+          let%bind.Option sum =
+            Currency.Amount.Signed.(add @@ negate amt) total
+          in
+          process_negations sum amts
+    in
+    let total =
+      process_negations
+        (Currency.Amount.Signed.of_unsigned expected_supply_increase)
+        [ burned_tokens; account_creation_fees ]
+    in
+    Option.value_map total ~default:(Or_error.error_string "overflow")
+      ~f:(fun v -> Ok v)
 
   let transaction_with_status : t -> Transaction.t With_status.t =
    fun { varying; _ } ->

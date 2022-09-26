@@ -172,8 +172,6 @@ module Transaction_applied : sig
     { previous_hash : Ledger_hash.t; varying : Varying.t }
   [@@deriving sexp]
 
-  val burned_tokens : t -> Currency.Amount.t
-
   val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
 
   val transaction : t -> Transaction.t With_status.t
