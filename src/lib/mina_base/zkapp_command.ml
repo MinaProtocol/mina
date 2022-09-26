@@ -1969,10 +1969,10 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let proof_cost = 10.26 in
-  let signed_pair_cost = 10.08 in
-  let signed_single_cost = 9.14 in
-  let cost_limit = 69.45 in
+  let proof_cost = genesis_constants.zkapp_proof_update_cost in
+  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
+  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
+  let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_sequence_event_elements =
     genesis_constants.max_sequence_event_elements
