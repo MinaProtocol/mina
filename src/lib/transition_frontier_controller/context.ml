@@ -29,6 +29,9 @@ module type CONTEXT = sig
 
   val outdated_root_cache :
     (State_hash.t, unit) Transition_handler.Core_extended_cache.Lru.t
+
+  val check_body_in_storage :
+    Consensus.Body_reference.t -> Staged_ledger_diff.Body.t option
 end
 
 let genesis_state_hash (module Context : CONTEXT) =
