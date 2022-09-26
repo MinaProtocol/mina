@@ -3007,14 +3007,11 @@ module Ledger = struct
       | None ->
           false
       | Some pk_ ->
-          if
-            not
-              (Signature_lib.Schnorr.Chunked.verify s
-                 (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
-                 (Random_oracle_input.Chunked.field msg) )
-          then false
-          else true
+          Signature_lib.Schnorr.Chunked.verify s
+            (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+            (Random_oracle_input.Chunked.field msg)
     in
+
     let isValid =
       match account_update.authorization with
       | Signature s ->

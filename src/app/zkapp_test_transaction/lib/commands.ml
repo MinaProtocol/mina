@@ -334,9 +334,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let verification_key =
-    let data =
-      Side_loaded_verification_key.of_base58_check_exn verification_key
-    in
+    let data = Side_loaded_verification_key.of_base64 verification_key in
     let hash = Zkapp_account.digest_vk data in
     Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
   in
