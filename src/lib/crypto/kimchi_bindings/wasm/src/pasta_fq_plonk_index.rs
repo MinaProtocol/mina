@@ -5,11 +5,7 @@ use crate::srs::fq::WasmFqSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex;
-use mina_curves::pasta::{
-    fq::Fq,
-    pallas::{Pallas as GAffine, PallasParameters},
-    vesta::Vesta as GAffineOther,
-};
+use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters, Vesta as GAffineOther};
 use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
