@@ -246,9 +246,19 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~hash
 
 let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
     ~gossip_type ?vc received_header =
-  (* TODO try to retrieve body from DB *)
   let header_with_hash =
     Transition_state.header_with_hash_of_received_header received_header
+  in
+  let body =
+    if is_some body then body
+    else
+      let (module Context : CONTEXT) = context in
+      Context.check_body_in_storage
+        ( With_hash.data header_with_hash
+        |> Mina_block.Header.protocol_state
+        |> Mina_state.(
+             Fn.compose Blockchain_state.body_reference
+               Protocol_state.blockchain_state) )
   in
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =

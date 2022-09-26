@@ -22,6 +22,9 @@ module type CONTEXT = sig
   val write_breadcrumb : Frontier_base.Breadcrumb.t -> unit
 
   val timeout_controller : Timeout_controller.t
+
+  val check_body_in_storage :
+    Consensus.Body_reference.t -> Staged_ledger_diff.Body.t option
 end
 
 let genesis_state_hash (module Context : CONTEXT) =

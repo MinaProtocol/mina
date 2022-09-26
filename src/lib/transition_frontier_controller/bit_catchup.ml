@@ -121,6 +121,8 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
   in
   let breadcrumb_queue = Queue.create () in
+  (* TODO is it the right path ? *)
+  let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
   let module Context = struct
     include Context_
 
@@ -144,6 +146,8 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       Strict_pipe.Writer.write breadcrumb_notification_writer ()
 
     let timeout_controller = Timeout_controller.create ()
+
+    let check_body_in_storage = Block_storage.read_body block_storage
   end in
   let transition_states = State_hash.Table.create () in
   let state = { transition_states; orphans = State_hash.Table.create () } in
