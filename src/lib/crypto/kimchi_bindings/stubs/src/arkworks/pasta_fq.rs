@@ -3,7 +3,7 @@ use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::ToBytes;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fields::fq::{Fq, FqParameters as Fq_params};
+use mina_curves::pasta::{fields::fq::FqParameters as Fq_params, Fq};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{
