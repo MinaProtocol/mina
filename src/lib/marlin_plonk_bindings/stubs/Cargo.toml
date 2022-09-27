@@ -34,6 +34,3 @@ mina-curves = { path = "../../marlin/curves" }
 
 [profile.release]
 debug = true
-
-[patch.crates-io]
-once_cell = { git = "https://github.com/mimoo/once_cell", rev = "865ab5743361422f445f5d75c83bdb12820dac4f" }
