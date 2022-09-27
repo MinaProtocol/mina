@@ -295,10 +295,13 @@
         };
 
         inherit ocamlPackages;
-        packages.mina = ocamlPackages.mina;
-        packages.mina_tests = ocamlPackages.mina_tests;
-        packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
-        packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
+
+        packages = {
+          inherit (ocamlPackages)
+            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+          inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
+        };
+
         packages.mina-docker = pkgs.dockerTools.buildImage {
           name = "mina";
           copyToRoot = pkgs.buildEnv {
@@ -330,11 +333,6 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        # packages.mina_static = ocamlPackages_static.mina;
-        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
-        packages.go-capnproto2 = pkgs.go-capnproto2;
-        packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
         legacyPackages.regular = pkgs;
@@ -351,6 +349,7 @@
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-with-lsp";
           buildInputs = oa.buildInputs
             ++ [ pkgs.go_1_18 ];
           nativeBuildInputs = oa.nativeBuildInputs
