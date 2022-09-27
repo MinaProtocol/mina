@@ -15,6 +15,8 @@ error_msg = "Please see this issue https://github.com/MinaProtocol/mina/issues/1
 # This is the list of file while has never been changed before
 # and they haven't run through the CI before, and then fail 
 # when modified. To add new files, just add them to this list.
+# NOTE: Only add files that haven't been touched since this linter
+# was introduced should be added to this list.
 skip_list = ["src/nonconsensus/snark_params/tick.ml"]
 
 # This function determines if a particular file should be skipped
