@@ -1912,7 +1912,7 @@ let%test_module _ =
       apply_to_ledger ledger cmd ;
       let accounts_to_check =
         Transaction_hash.User_command_with_valid_signature.command cmd
-        |> User_command.accounts_accessed |> Account_id.Set.of_list
+        |> User_command.accounts_referenced |> Account_id.Set.of_list
       in
       let pool, dropped =
         revalidate pool ~logger (`Subset accounts_to_check) (fun sender ->

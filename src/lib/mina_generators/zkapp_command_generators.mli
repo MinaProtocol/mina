@@ -13,9 +13,12 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
-type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
+type role =
+  [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
 val max_account_updates : int
+
+val max_token_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure
@@ -41,6 +44,7 @@ val gen_protocol_state_precondition :
 val gen_zkapp_command_from :
      ?failure:failure
   -> ?max_account_updates:int
+  -> ?max_token_updates:int
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
@@ -56,6 +60,7 @@ val gen_zkapp_command_from :
 val gen_list_of_zkapp_command_from :
      ?failure:failure
   -> ?max_account_updates:int
+  -> ?max_token_updates:int
   -> fee_payer_keypairs:Signature_lib.Keypair.t list
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t

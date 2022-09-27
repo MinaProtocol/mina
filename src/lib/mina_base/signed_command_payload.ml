@@ -328,7 +328,12 @@ let amount (t : t) =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) = [ fee_payer t; source t; receiver t ]
+let accounts_accessed (t : t) (status : Transaction_status.t) =
+  match status with
+  | Applied ->
+      [ fee_payer t; source t; receiver t ]
+  | Failed _ ->
+      [ fee_payer t ]
 
 let dummy : t =
   { common =

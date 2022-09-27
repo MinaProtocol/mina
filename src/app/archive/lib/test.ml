@@ -160,26 +160,50 @@ let%test_module "Archive node unit tests" =
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
-          match%map
-            let open Deferred.Result.Let_syntax in
-            let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
-            in
-            let%map result =
-              Processor.User_command.find conn ~transaction_hash
-              >>| function
-              | Some (`Zkapp_command_id zkapp_command_id) ->
-                  Some zkapp_command_id
-              | Some (`Signed_command_id _) | None ->
-                  None
-            in
-            [%test_result: int] ~expect:user_command_id
-              (Option.value_exn result)
-          with
-          | Ok () ->
-              ()
-          | Error e ->
-              failwith @@ Caqti_error.show e )
+          match user_command with
+          | Signed_command _ ->
+              failwith "zkapp_gen failed"
+          | Zkapp_command p -> (
+              let rec add_token_owners
+                  (forest :
+                    ( Account_update.t
+                    , Zkapp_command.Digest.Account_update.t
+                    , Zkapp_command.Digest.Forest.t )
+                    Zkapp_command.Call_forest.t ) =
+                List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
+                    if List.is_empty tree.calls then ()
+                    else
+                      let acct_id =
+                        Account_update.account_id tree.account_update
+                      in
+                      let token_id =
+                        Account_id.derive_token_id ~owner:acct_id
+                      in
+                      Processor.Token_owners.add_if_doesn't_exist token_id
+                        acct_id ;
+                      add_token_owners tree.calls )
+              in
+              add_token_owners p.account_updates ;
+              match%map
+                let open Deferred.Result.Let_syntax in
+                let%bind user_command_id =
+                  Processor.User_command.add_if_doesn't_exist conn user_command
+                in
+                let%map result =
+                  Processor.User_command.find conn ~transaction_hash
+                  >>| function
+                  | Some (`Zkapp_command_id zkapp_command_id) ->
+                      Some zkapp_command_id
+                  | Some (`Signed_command_id _) | None ->
+                      None
+                in
+                [%test_result: int] ~expect:user_command_id
+                  (Option.value_exn result)
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwith @@ Caqti_error.show e ) )
 
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =
@@ -205,7 +229,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
-                ~typ:(Processor.Fee_transfer.Kind.to_string kind)
+                ~command_type:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
               (Option.value_exn result)
@@ -229,7 +253,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
-                ~typ:Processor.Coinbase.coinbase_typ
+                ~command_type:Processor.Coinbase.coinbase_command_type
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
           with

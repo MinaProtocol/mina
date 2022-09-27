@@ -416,7 +416,7 @@ let%test_module "account timing check" =
               in
               let validated_uc = validate_user_command uc in
               let account_ids =
-                Mina_transaction.Transaction.accounts_accessed txn
+                Mina_transaction.Transaction.accounts_referenced txn
               in
               let sparse_ledger_before =
                 Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
