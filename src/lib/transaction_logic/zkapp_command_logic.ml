@@ -1149,9 +1149,9 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Account_update.check_authorization ~commitment
         ~calls:account_update_forest account_update
     in
-    assert_
+    assert_ ~pos:__POS__
       (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
-    assert_
+    assert_ ~pos:__POS__
       (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
     (* The fee-payer must increment their nonce. *)
     let local_state =
