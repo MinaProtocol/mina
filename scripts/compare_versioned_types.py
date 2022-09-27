@@ -17,7 +17,13 @@ error_msg = "Please see this issue https://github.com/MinaProtocol/mina/issues/1
 # when modified. To add new files, just add them to this list.
 skip_list = ["src/nonconsensus/snark_params/tick.ml"]
 
-def skip(original, modified):
+# This function determines if a particular file should be skipped
+# version compatibility check in the CI check.
+# `modified` is the name of the file we have modified in the branch of a PR.
+# `original` is the name of the equivalent file in at the HEAD of the branch
+# you want to merge into (this is usually develop or compatible)
+# They basically have the same names, but different paths.
+def skip(original, _modified):
     for skip_item in skip_list:
         if skip_item in original:
             return True
