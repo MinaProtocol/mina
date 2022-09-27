@@ -97,6 +97,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ; Signature_lib.Private_key.to_base58_check zkapp_sk
                  ; Signature_lib.Private_key.to_base58_check my_sk
                  ; nonce
+                 ; Network.Node.graphql_uri
                  ]
                ()
            in

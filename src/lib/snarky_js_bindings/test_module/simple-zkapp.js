@@ -12,6 +12,7 @@ import {
   addCachedAccount,
   Mina,
   verify,
+  RemoteBlockchain,
 } from "snarkyjs";
 
 await isReady;
@@ -43,26 +44,24 @@ declareState(SimpleZkapp, { x: Field });
 declareMethods(SimpleZkapp, { update: [Field] });
 
 // parse command line; for local testing, use random keys as fallback
-let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =
+let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce, graphqlUrl] =
   process.argv.slice(2);
 zkappKeyBase58 ||= PrivateKey.random().toBase58();
 feePayerKeyBase58 ||= PrivateKey.random().toBase58();
 feePayerNonce ||= command === "update" ? "1" : "0";
+graphqlUrl ||= "http://localhost:3085/graphql";
 console.log(
-  `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce}`
+  `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce} querying ${graphqlUrl}`
 );
 
 let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
 let zkappAddress = zkappKey.toPublicKey();
 
+Mina.setActiveInstance(RemoteBlockchain(graphqlUrl));
+
 if (command === "deploy") {
   // snarkyjs part
   let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
-  addCachedAccount({
-    publicKey: feePayerKey.toPublicKey(),
-    nonce: feePayerNonce,
-  });
-
   let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
@@ -89,10 +88,6 @@ if (command === "deploy") {
 
 if (command === "update") {
   // snarkyjs part
-  addCachedAccount({
-    publicKey: zkappAddress,
-    zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0] },
-  });
   let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
   let transaction = await Mina.transaction(() => {
     new SimpleZkapp(zkappAddress).update(Field(2));
