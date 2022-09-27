@@ -536,7 +536,7 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_account_update_body Proof Call token_owner Token_id.default
+            (mk_account_update_body Signature Call token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
                 (mk_account_update_body None_given Call token_account1
@@ -548,7 +548,7 @@ let%test_unit "tokens test" =
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_account_update_body Proof Call token_owner Token_id.default
+            (mk_account_update_body Signature Call token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
                 (mk_account_update_body Signature Call token_account1
