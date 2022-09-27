@@ -59,8 +59,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Comparable.Make (T)
       include Hashable.Make (T)
 
-      let accounts_accessed ({ payload; _ } : t) =
-        Payload.accounts_accessed payload
+      let accounts_accessed ({ payload; _ } : t) status =
+        Payload.accounts_accessed payload status
+
+      let accounts_referenced (t : t) = accounts_accessed t Applied
     end
   end]
 
@@ -403,7 +405,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let filter_by_participant user_commands public_key =
     List.filter user_commands ~f:(fun user_command ->
         Core_kernel.List.exists
-          (accounts_accessed user_command)
+          (accounts_referenced user_command)
           ~f:
             (Fn.compose
                (Public_key.Compressed.equal public_key)

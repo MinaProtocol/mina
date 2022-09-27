@@ -539,7 +539,7 @@ WITH RECURSIVE chain AS (
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
           let%map kind =
-            match ic.Archive_lib.Processor.Internal_command.typ with
+            match ic.Archive_lib.Processor.Internal_command.command_type with
             | "fee_transfer" ->
                 M.return `Fee_transfer
             | "coinbase" ->
@@ -572,7 +572,7 @@ WITH RECURSIVE chain AS (
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
-            match uc.Archive_lib.Processor.User_command.Signed_command.typ with
+            match uc.Archive_lib.Processor.User_command.Signed_command.command_type with
             | "payment" ->
                 M.return `Payment
             | "delegation" ->

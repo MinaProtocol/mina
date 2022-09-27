@@ -1,7 +1,7 @@
 /* the Postgresql schema used by the Mina archive database */
 
 /* Unsigned 64-bit values in OCaml are represented by text values in the database,
-   and string values in the type `t`s in the modules below
+   and string values in the type `t`s in the modules below.
 
    Unsigned 32-bit values are represented by bigint values in the database, and
    int64 values in the `t`s
@@ -68,7 +68,7 @@ CREATE TYPE transaction_status AS ENUM ('applied', 'failed');
 
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
-, typ            user_command_type   NOT NULL
+, command_type   user_command_type   NOT NULL
 , fee_payer_id   int                 NOT NULL REFERENCES account_identifiers(id)
 , source_id      int                 NOT NULL REFERENCES account_identifiers(id)
 , receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
@@ -83,12 +83,12 @@ CREATE TABLE user_commands
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
 
 CREATE TABLE internal_commands
-( id          serial                PRIMARY KEY
-, typ         internal_command_type NOT NULL
-, receiver_id int                   NOT NULL REFERENCES account_identifiers(id)
-, fee         text                  NOT NULL
-, hash        text                  NOT NULL
-, UNIQUE (hash,typ)
+( id            serial                PRIMARY KEY
+, command_type  internal_command_type NOT NULL
+, receiver_id   int                   NOT NULL REFERENCES account_identifiers(id)
+, fee           text                  NOT NULL
+, hash          text                  NOT NULL
+, UNIQUE (hash,command_type)
 );
 
 /* block state hashes mentioned in voting_for fields */

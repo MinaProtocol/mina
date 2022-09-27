@@ -1139,8 +1139,7 @@ module Types = struct
     let account_vk =
       obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
         ~fields:(fun _ ->
-          [ field "verificationKey"
-              ~doc:"Verification key in Base58Check format"
+          [ field "verificationKey" ~doc:"verification key in Base64 format"
               ~typ:
                 (non_null @@ Pickles_unix.Graphql_scalars.VerificationKey.typ ())
               ~args:Arg.[]

@@ -2223,7 +2223,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
         let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
         object%js
           val data =
-            Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
+            Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
 
           val hash =
             Mina_base.Zkapp_account.digest_vk vk
@@ -2269,7 +2269,12 @@ let verify (public_input : public_input_js) (proof : proof)
   let typ = public_input_typ (Array.length public_input) in
   let proof = Pickles.Side_loaded.Proof.of_proof proof in
   let vk =
-    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+    match Pickles.Side_loaded.Verification_key.of_base64 (Js.to_string vk) with
+    | Ok vk_ ->
+        vk_
+    | Error err ->
+        failwithf "Could not decode base64 verification key: %s"
+          (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
   |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
@@ -2307,8 +2312,8 @@ module Ledger = struct
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
     ; verificationKey :
-        < hash : field_class Js.t Js.readonly_prop
-        ; data : Mina_base.Side_loaded_verification_key.t Js.readonly_prop >
+        < hash : Js.js_string Js.t Js.readonly_prop
+        ; data : Js.js_string Js.t Js.readonly_prop >
         Js.t
         Js.optdef
         Js.readonly_prop
@@ -2578,13 +2583,12 @@ module Ledger = struct
       Pickles_types.Vector.iter s ~f:(fun x -> ignore (xs##push (field x))) ;
       xs
 
-    let verification_key
-        (vk : (Mina_base.Side_loaded_verification_key.t, Impl.field) With_hash.t)
-        =
+    let verification_key (vk : Mina_base__Verification_key_wire.Stable.V1.t) =
       object%js
-        val hash = field (With_hash.hash vk)
+        val data =
+          Js.string (Pickles.Side_loaded.Verification_key.to_base64 vk.data)
 
-        val data = With_hash.data vk
+        val hash = vk.hash |> Field.Constant.to_string |> Js.string
       end
 
     let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
@@ -2995,6 +2999,29 @@ module Ledger = struct
       (Js.to_string account_creation_fee)
       network_state
 
+  let check_account_update_signature (account_update_json : Js.js_string Js.t)
+      (x : field_class Js.t) =
+    let account_update = account_update_of_json account_update_json in
+    let check_signature s pk msg =
+      match Signature_lib.Public_key.decompress pk with
+      | None ->
+          false
+      | Some pk_ ->
+          Signature_lib.Schnorr.Chunked.verify s
+            (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+            (Random_oracle_input.Chunked.field msg)
+    in
+
+    let isValid =
+      match account_update.authorization with
+      | Signature s ->
+          check_signature s account_update.body.public_key
+            (x |> of_js_field |> to_unchecked)
+      | Proof _ | None_given ->
+          false
+    in
+    Js.bool isValid
+
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key
     |> Signature_lib.Public_key.Compressed.to_string |> Js.string
@@ -3090,6 +3117,8 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
+
+    static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
     let version_bytes =
       let open Base58_check.Version_bytes in
