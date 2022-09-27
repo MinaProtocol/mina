@@ -35,22 +35,51 @@ module Authorization_kind = struct
     end
   end]
 
-  let to_booleans = function
-    | None_given ->
-        (false, false)
-    | Signature ->
-        (true, false)
-    | Proof ->
-        (false, true)
+  module Structured = struct
+    type t = { is_signed : bool; is_proved : bool } [@@deriving hlist]
 
-  let of_booleans_exn = function
-    | false, false ->
+    let to_input ({ is_signed; is_proved } : t) =
+      let f x = if x then Field.one else Field.zero in
+      Random_oracle_input.Chunked.packeds
+        [| (f is_signed, 1); (f is_proved, 1) |]
+
+    [%%ifdef consensus_mechanism]
+
+    module Checked = struct
+      type t = { is_signed : Boolean.var; is_proved : Boolean.var }
+      [@@deriving hlist]
+
+      let to_input { is_signed; is_proved } =
+        let f (x : Boolean.var) = (x :> Field.Var.t) in
+        Random_oracle_input.Chunked.packeds
+          [| (f is_signed, 1); (f is_proved, 1) |]
+    end
+
+    let typ =
+      Typ.of_hlistable ~var_to_hlist:Checked.to_hlist
+        ~var_of_hlist:Checked.of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+        [ Boolean.typ; Boolean.typ ]
+
+    [%%endif]
+  end
+
+  let to_structured : t -> Structured.t = function
+    | None_given ->
+        { is_signed = false; is_proved = false }
+    | Signature ->
+        { is_signed = true; is_proved = false }
+    | Proof ->
+        { is_signed = false; is_proved = true }
+
+  let of_structured_exn : Structured.t -> t = function
+    | { is_signed = false; is_proved = false } ->
         None_given
-    | true, false ->
+    | { is_signed = true; is_proved = false } ->
         Signature
-    | false, true ->
+    | { is_signed = false; is_proved = true } ->
         Proof
-    | true, true ->
+    | { is_signed = true; is_proved = true } ->
         failwith "Invalid authorization kind"
 
   let to_string = function
@@ -78,28 +107,14 @@ module Authorization_kind = struct
     iso_string ~name:"AuthorizationKind" ~js_type:(Custom "AuthorizationKind")
       ~to_string ~of_string:of_string_exn obj
 
-  let to_input x =
-    let is_signed, is_proved = to_booleans x in
-    let f x = if x then Field.one else Field.zero in
-    Random_oracle_input.Chunked.packeds [| (f is_signed, 1); (f is_proved, 1) |]
+  let to_input x = Structured.to_input (to_structured x)
 
   [%%ifdef consensus_mechanism]
 
-  module Checked = struct
-    type t = { is_signed : Boolean.var; is_proved : Boolean.var }
-
-    let to_input { is_signed; is_proved } =
-      let f (x : Boolean.var) = (x :> Field.Var.t) in
-      Random_oracle_input.Chunked.packeds
-        [| (f is_signed, 1); (f is_proved, 1) |]
-  end
+  module Checked = Structured.Checked
 
   let typ =
-    Typ.(Boolean.typ * Boolean.typ)
-    |> Typ.transport_var
-         ~back:(fun (is_signed, is_proved) -> { Checked.is_signed; is_proved })
-         ~there:(fun { Checked.is_signed; is_proved } -> (is_signed, is_proved))
-    |> Typ.transport ~there:to_booleans ~back:of_booleans_exn
+    Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
 
   [%%endif]
 end
