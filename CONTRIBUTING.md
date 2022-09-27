@@ -10,7 +10,7 @@ basic setup you need to get up and running to build and edit Mina.
 Here's the summary if you want to contribute code:
 
 1. Learn some OCaml. The [Real World OCaml](https://dev.realworldocaml.org/toc.html) book is good. Jane Street also has [some exercises](https://github.com/janestreet/learn-ocaml-workshop).
-2. Learn how we use OCaml. We have [a style guide](https://docs.minaprotocol.com/en/developers/style-guide) that goes over the important things.
+2. Learn how we use OCaml. We have [a style guide](https://docs.minaprotocol.com/en/node-developers/style-guide) that goes over the important things.
 3. Fork and clone the repo, then set up your development environment. See the [developer README](README-dev.md) for details.
 4. Find a good first issue. The best issues to start with are those tagged [`easy`](https://github.com/MinaProtocol/mina/labels/easy).
 5. Create a branch in your local clone and implement the solution.
@@ -43,7 +43,13 @@ labels.
 
 ## Pull Requests
 
-Our branching workflow is [documented on the wiki](https://minaprotocol.notion.site/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
+### Branching workflow
+
+Make sure to read about the [branching workflow](README-branching.md) to
+understand on which branch (`compatible` or `develop`) you should be working,
+and how to manage simultaneous PRs to both branches.
+
+### Continuous integration
 
 All pull requests go through Buildkite CI, which makes sure the code doesn't need to
 be reformatted, builds Mina in its various configurations, and runs all the
@@ -51,7 +57,7 @@ tests.
 
 All pull requests must get _code reviewed_. Anyone can do a code
 review! Check out the [code review
-guide](https://docs.minaprotocol.com/en/developers/code-reviews) for
+guide](https://docs.minaprotocol.com/en/node-developers/code-reviews) for
 what to look for. Just leave comments on the "Files changed" view.
 
 All pull requests must be approved by at least one _code owner_ for the
@@ -67,6 +73,9 @@ If you are PRing from the main remote, add `ci-build-me` label when you want to 
 Once a PR has been reviewed and approved, and all CI tests have passed, it can be merged
 by a maintainer (or by you, if you have this access).
 
+If you encounter problems with the CI, read [CI FAILURES](README-ci-failures.md)
+for common troubleshooting steps.
+
 ## Documentation
 
 There are three main pieces of Mina documentation:
@@ -76,8 +85,10 @@ There are three main pieces of Mina documentation:
 2. The `README.md` files in various directories. These explain the contents of that
    directory at a high level: the purpose of the library, design constraints, anything else
    specific to that directory.
-3. Inline code comments. There are very few of these, and we don't currently run ocamldoc
-   so they won't be exposed even as we write them. This should change eventually.
+3. Inline code comments. There are unfortunately very few of these currently,
+   but this will slowly change. We are now running `ocamldoc` and the generated
+   documentation is browsable
+   [online](https://mina-docs.storage.googleapis.com/index.html).
 
 Changes to the software should come with changes to the documentation.
 

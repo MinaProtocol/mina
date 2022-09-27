@@ -33,36 +33,42 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       (** generate a parties fee payer and sign other parties with the fee payer account *)
-       method signParty (parties_js : string_js)
-           (fee_payer_party_js : payload_fee_payer_party_js)
-           (sk_base58_check_js : string_js) =
-         let other_parties_json =
-           parties_js |> Js.to_string |> Yojson.Safe.from_string
+       (** generate a zkapp command fee payer and sign account updates with the fee payer account *)
+       method signZkappCommand (account_updates_js : string_js)
+           (fee_payer_js : payload_fee_payer_js) (sk_base58_check_js : string_js)
+           =
+         let account_updates_json =
+           account_updates_js |> Js.to_string |> Yojson.Safe.from_string
          in
-         let other_parties = Parties.other_parties_of_json other_parties_json in
-         let other_parties =
-           Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-             other_parties
-           |> Parties.Call_forest.map ~f:Party.of_graphql_repr
-           |> Parties.Call_forest.accumulate_hashes
-                ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
+         let account_updates =
+           Zkapp_command.account_updates_of_json account_updates_json
          in
-         let other_parties_hash = Parties.Call_forest.hash other_parties in
+         let account_updates =
+           Zkapp_command.Call_forest.of_account_updates
+             ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
+               p.body.call_depth )
+             account_updates
+           |> Zkapp_command.Call_forest.map ~f:Account_update.of_graphql_repr
+           |> Zkapp_command.Call_forest.accumulate_hashes
+                ~hash_account_update:(fun (p : Account_update.t) ->
+                  Zkapp_command.Digest.Account_update.create p )
+         in
+         let account_updates_hash =
+           Zkapp_command.Call_forest.hash account_updates
+         in
          let memo =
-           fee_payer_party_js##.memo |> Js.to_string
-           |> Memo.create_from_string_exn
+           fee_payer_js##.memo |> Js.to_string |> Memo.create_from_string_exn
          in
-         let commitment : Parties.Transaction_commitment.t =
-           Parties.Transaction_commitment.create ~other_parties_hash
+         let commitment : Zkapp_command.Transaction_commitment.t =
+           Zkapp_command.Transaction_commitment.create ~account_updates_hash
          in
-         let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
+         let fee_payer = payload_of_fee_payer_js fee_payer_js in
          let full_commitment =
-           Parties.Transaction_commitment.create_complete commitment
+           Zkapp_command.Transaction_commitment.create_complete commitment
              ~memo_hash:(Signed_command_memo.hash memo)
              ~fee_payer_hash:
-               (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+               (Zkapp_command.Digest.Account_update.create
+                  (Account_update.of_fee_payer fee_payer) )
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
@@ -74,8 +80,9 @@ let _ =
            in
            { fee_payer with authorization = fee_payer_signature_auth }
          in
-         { Parties.fee_payer; other_parties; memo }
-         |> Parties.parties_to_json |> Yojson.Safe.to_string |> Js.string
+         { Zkapp_command.fee_payer; account_updates; memo }
+         |> Zkapp_command.zkapp_command_to_json |> Yojson.Safe.to_string
+         |> Js.string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =

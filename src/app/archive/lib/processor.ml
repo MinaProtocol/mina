@@ -464,10 +464,7 @@ module Zkapp_verification_keys = struct
         , Pickles.Backend.Tick.Field.t )
         With_hash.t ) =
     let verification_key =
-      Binable.to_string
-        (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-        vk.data
-      |> Base64.encode_exn
+      Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
     let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
     let value = { hash; verification_key } in
@@ -589,7 +586,7 @@ module Zkapp_timing_info = struct
   let table_name = "zkapp_timing_info"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (timing_info : Party.Update.Timing_info.t) =
+      (timing_info : Account_update.Update.Timing_info.t) =
     let initial_minimum_balance =
       Currency.Balance.to_string timing_info.initial_minimum_balance
     in
@@ -670,8 +667,8 @@ module Zkapp_updates = struct
 
   let table_name = "zkapp_updates"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (update : Party.Update.t)
-      =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (update : Account_update.Update.t) =
     let open Deferred.Result.Let_syntax in
     let%bind app_state_id =
       Vector.map ~f:Zkapp_basic.Set_or_keep.to_option update.app_state
@@ -792,7 +789,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Zkapp_precondition_account = struct
+module Zkapp_account_precondition_values = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -818,7 +815,7 @@ module Zkapp_precondition_account = struct
         ; option bool
         ]
 
-  let table_name = "zkapp_precondition_accounts"
+  let table_name = "zkapp_account_precondition_values"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -878,15 +875,15 @@ end
 
 module Zkapp_account_precondition = struct
   type t =
-    { kind : Party.Account_precondition.Tag.t
-    ; precondition_account_id : int option
+    { kind : Account_update.Account_precondition.Tag.t
+    ; account_precondition_values_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
 
   let zkapp_account_precondition_kind_typ =
     let encode = function
-      | Party.Account_precondition.Tag.Full ->
+      | Account_update.Account_precondition.Tag.Full ->
           "full"
       | Nonce ->
           "nonce"
@@ -895,11 +892,11 @@ module Zkapp_account_precondition = struct
     in
     let decode = function
       | "full" ->
-          Result.return Party.Account_precondition.Tag.Full
+          Result.return Account_update.Account_precondition.Tag.Full
       | "nonce" ->
-          Result.return Party.Account_precondition.Tag.Nonce
+          Result.return Account_update.Account_precondition.Tag.Nonce
       | "accept" ->
-          Result.return Party.Account_precondition.Tag.Accept
+          Result.return Account_update.Account_precondition.Tag.Accept
       | _ ->
           Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
     in
@@ -913,20 +910,22 @@ module Zkapp_account_precondition = struct
   let table_name = "zkapp_account_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (account_precondition : Party.Account_precondition.t) =
+      (account_precondition : Account_update.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind precondition_account_id =
+    let%bind account_precondition_values_id =
       match account_precondition with
-      | Party.Account_precondition.Full acct ->
-          Zkapp_precondition_account.add_if_doesn't_exist (module Conn) acct
+      | Account_update.Account_precondition.Full acct ->
+          Zkapp_account_precondition_values.add_if_doesn't_exist
+            (module Conn)
+            acct
           >>| Option.some
       | _ ->
           return None
     in
-    let kind = Party.Account_precondition.tag account_precondition in
+    let kind = Account_update.Account_precondition.tag account_precondition in
     let nonce =
       match account_precondition with
-      | Party.Account_precondition.Nonce nonce ->
+      | Account_update.Account_precondition.Nonce nonce ->
           Option.some @@ Unsigned.UInt32.to_int64 nonce
       | _ ->
           None
@@ -934,7 +933,7 @@ module Zkapp_account_precondition = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      { kind; precondition_account_id; nonce }
+      { kind; account_precondition_values_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1440,7 +1439,7 @@ module Zkapp_events = struct
   let table_name = "zkapp_events"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (events : Party.Body.Events'.t) =
+      (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map events
@@ -1461,7 +1460,7 @@ module Zkapp_events = struct
       id
 end
 
-module Zkapp_other_party_body = struct
+module Zkapp_account_update_body = struct
   type t =
     { account_identifier_id : int
     ; update_id : int
@@ -1483,10 +1482,10 @@ module Zkapp_other_party_body = struct
       Caqti_type.
         [ int; int; string; bool; int; int; int; int; int; int; bool; string ]
 
-  let table_name = "zkapp_other_party_body"
+  let table_name = "zkapp_account_update_body"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (body : Party.Body.Simple.t) =
+      (body : Account_update.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
     let%bind account_identifier_id =
@@ -1525,7 +1524,7 @@ module Zkapp_other_party_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
-    let caller = Party.Call_type.to_string body.caller in
+    let caller = Account_update.Call_type.to_string body.caller in
     let value =
       { account_identifier_id
       ; update_id
@@ -1547,7 +1546,7 @@ module Zkapp_other_party_body = struct
         | "events_ids" | "sequence_events_ids" ->
             Some "int[]"
         | "caller" ->
-            Some "call_type_type"
+            Some "call_type"
         | _ ->
             None )
       (module Conn)
@@ -1560,7 +1559,7 @@ module Zkapp_other_party_body = struct
       id
 end
 
-module Zkapp_other_party = struct
+module Zkapp_account_update = struct
   type t = { body_id : int; authorization_kind : Control.Tag.t }
   [@@deriving fields, hlist]
 
@@ -1589,14 +1588,17 @@ module Zkapp_other_party = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; authorization_kind_typ ]
 
-  let table_name = "zkapp_other_party"
+  let table_name = "zkapp_account_update"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Simple.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (account_update : Account_update.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Zkapp_other_party_body.add_if_doesn't_exist (module Conn) party.body
+      Zkapp_account_update_body.add_if_doesn't_exist
+        (module Conn)
+        account_update.body
     in
-    let authorization_kind = Control.tag party.authorization in
+    let authorization_kind = Control.tag account_update.authorization in
     let value = { body_id; authorization_kind } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -1626,7 +1628,7 @@ module Zkapp_fee_payer_body = struct
   let table_name = "zkapp_fee_payer_body"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (body : Party.Body.Fee_payer.t) =
+      (body : Account_update.Body.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier =
       Account_id.create body.public_key Token_id.default
@@ -1712,7 +1714,7 @@ end
 module User_command = struct
   module Signed_command = struct
     type t =
-      { typ : string
+      { command_type : string
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
@@ -1809,13 +1811,13 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ =
+            { command_type =
                 ( match via with
                 | `Ident ->
                     Signed_command.tag_string t
-                | `Parties ->
+                | `Zkapp_command ->
                     "zkapp" )
             ; fee_payer_id
             ; source_id
@@ -1860,7 +1862,7 @@ module User_command = struct
                   ~tannot:(function
                     | "typ" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ = user_cmd.typ
+            { command_type = user_cmd.command_type
             ; fee_payer_id
             ; source_id
             ; receiver_id
@@ -1880,7 +1882,7 @@ module User_command = struct
   module Zkapp_command = struct
     type t =
       { zkapp_fee_payer_body_id : int
-      ; zkapp_other_parties_ids : int array
+      ; zkapp_account_updates_ids : int array
       ; memo : string
       ; hash : string
       }
@@ -1906,40 +1908,44 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
+    let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
-      let parties = Parties.to_simple ps in
+      let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
-          parties.fee_payer.body
+          zkapp_command.fee_payer.body
       in
-      let%bind zkapp_other_parties_ids =
-        Mina_caqti.deferred_result_list_map parties.other_parties
-          ~f:(Zkapp_other_party.add_if_doesn't_exist (module Conn))
+      let%bind zkapp_account_updates_ids =
+        Mina_caqti.deferred_result_list_map zkapp_command.account_updates
+          ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
-        Transaction_hash.hash_command (Parties ps)
+        Transaction_hash.hash_command (Zkapp_command ps)
         |> Transaction_hash.to_base58_check
       in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
         ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
         ~tannot:(function
-          | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None )
+          | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
         (module Conn)
-        { zkapp_fee_payer_body_id; zkapp_other_parties_ids; memo; hash }
+        { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
   end
 
-  let via (t : User_command.t) : [ `Parties | `Ident ] =
-    match t with Signed_command _ -> `Ident | Parties _ -> `Parties
+  let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
+    match t with
+    | Signed_command _ ->
+        `Ident
+    | Zkapp_command _ ->
+        `Zkapp_command
 
   let add_if_doesn't_exist conn (t : User_command.t) =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t) sc
-    | Parties ps ->
+    | Zkapp_command ps ->
         Zkapp_command.add_if_doesn't_exist conn ps
 
   let find conn ~(transaction_hash : Transaction_hash.t) =
@@ -1956,7 +1962,8 @@ module User_command = struct
 end
 
 module Internal_command = struct
-  type t = { typ : string; receiver_id : int; fee : string; hash : string }
+  type t =
+    { command_type : string; receiver_id : int; fee : string; hash : string }
   [@@deriving hlist, fields]
 
   let typ =
@@ -1966,16 +1973,16 @@ module Internal_command = struct
   let table_name = "internal_commands"
 
   let find_opt (module Conn : CONNECTION)
-      ~(transaction_hash : Transaction_hash.t) ~(typ : string) =
+      ~(transaction_hash : Transaction_hash.t) ~(command_type : string) =
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name
             ~tannot:(function
-              | "typ" -> Some "internal_command_type" | _ -> None )
-            ~cols:[ "hash"; "typ" ] () ) )
-      (Transaction_hash.to_base58_check transaction_hash, typ)
+              | "command_type" -> Some "internal_command_type" | _ -> None )
+            ~cols:[ "hash"; "command_type" ] () ) )
+      (Transaction_hash.to_base58_check transaction_hash, command_type)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1989,7 +1996,8 @@ module Internal_command = struct
     match%bind
       find_opt
         (module Conn)
-        ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
+        ~transaction_hash:internal_cmd.hash
+        ~command_type:internal_cmd.command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2005,7 +2013,7 @@ module Internal_command = struct
                 ~tannot:(function
                   | "typ" -> Some "internal_command_type" | _ -> None )
                 ~cols:Fields.names () ) )
-          { typ = internal_cmd.typ
+          { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
@@ -2053,7 +2061,7 @@ module Fee_transfer = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:(Kind.to_string kind)
+        ~transaction_hash ~command_type:(Kind.to_string kind)
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2069,7 +2077,7 @@ module Fee_transfer = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
@@ -2085,10 +2093,12 @@ end
 module Coinbase = struct
   type t = { receiver_id : int; amount : int64; hash : string }
 
-  let coinbase_typ = "coinbase"
+  let coinbase_command_type = "coinbase"
 
   let typ =
-    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let encode t =
+      Ok (coinbase_command_type, t.receiver_id, t.amount, t.hash)
+    in
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
@@ -2101,7 +2111,7 @@ module Coinbase = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:coinbase_typ
+        ~transaction_hash ~command_type:coinbase_command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2115,7 +2125,7 @@ module Coinbase = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
@@ -2301,14 +2311,14 @@ module Block_and_signed_command = struct
       (block_id, user_command_id, sequence_no)
 end
 
-module Zkapp_party_failures = struct
+module Zkapp_account_update_failures = struct
   type t = { index : int; failures : string array } [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; Mina_caqti.array_string_typ ]
 
-  let table_name = "zkapp_party_failures"
+  let table_name = "zkapp_account_update_failures"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) index failures =
     let failures =
@@ -2358,7 +2368,7 @@ module Block_and_zkapp_command = struct
           let%map failure_reasons_ids_list =
             Mina_caqti.deferred_result_list_map reasons
               ~f:(fun (ndx, failure_reasons) ->
-                Zkapp_party_failures.add_if_doesn't_exist
+                Zkapp_account_update_failures.add_if_doesn't_exist
                   (module Conn)
                   ndx failure_reasons )
           in
@@ -2858,7 +2868,7 @@ module Block = struct
                         ~block_id ~user_command_id:id ~sequence_no
                         ~status:user_command.status
                       >>| ignore
-                  | Parties _ ->
+                  | Zkapp_command _ ->
                       let status, failure_reasons =
                         failure_reasons user_command.status
                       in
@@ -3205,20 +3215,23 @@ module Block = struct
     let%bind zkapp_cmds_ids_and_seq_nos =
       let%map zkapp_cmds_and_ids_rev =
         Mina_caqti.deferred_result_list_fold block.zkapp_cmds ~init:[]
-          ~f:(fun acc ({ fee_payer; other_parties; memo; _ } as zkapp_cmd) ->
+          ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
-            let (fee_payer : Party.Fee_payer.t) =
+            let (fee_payer : Account_update.Fee_payer.t) =
               { body = fee_payer; authorization = Signature.dummy }
             in
-            let (other_parties : Party.Simple.t list) =
-              List.map other_parties
-                ~f:(fun (body : Party.Body.Simple.t) : Party.Simple.t ->
-                  { body; authorization = None_given } )
+            let (account_updates : Account_update.Simple.t list) =
+              List.map account_updates
+                ~f:(fun
+                     (body : Account_update.Body.Simple.t)
+                     :
+                     Account_update.Simple.t
+                   -> { body; authorization = None_given } )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Parties.of_simple { fee_payer; other_parties; memo })
+                (Zkapp_command.of_simple { fee_payer; account_updates; memo })
             in
             (zkapp_cmd, cmd_id) :: acc )
       in

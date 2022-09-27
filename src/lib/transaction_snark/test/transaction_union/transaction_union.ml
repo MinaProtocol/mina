@@ -179,7 +179,7 @@ let%test_module "Transaction union tests" =
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                Signed_command.accounts_accessed
+                Signed_command.accounts_referenced
                   (Signed_command.forget_check t1)
               in
               let sparse_ledger =
@@ -393,7 +393,7 @@ let%test_module "Transaction union tests" =
                           for each command normally, but we know statically
                           that these are payments in this test.
                        *)
-                       Signed_command.accounts_accessed
+                       Signed_command.accounts_referenced
                          (Signed_command.forget_check t) )
                      [ t1; t2 ] )
               in
@@ -625,7 +625,7 @@ let%test_module "Transaction union tests" =
 
     let sub_fee fee = sub_amount (Amount.of_fee fee)
 
-    (*TODO: test with parties transactions
+    (*TODO: test with zkapp_command transactions
         let%test_unit "transfer non-default tokens to a new account: fails but \
                        charges fee" =
           Test_util.with_randomness 123456789 (fun () ->

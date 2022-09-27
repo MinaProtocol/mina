@@ -119,12 +119,12 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_snapp_command t (parties : Parties.t) =
+let setup_and_submit_snapp_command t (zkapp_command : Zkapp_command.t) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_zkapp_transactions t [ parties ] in
+  let%map result = Mina_lib.add_zkapp_transactions t [ zkapp_command ] in
   txn_count := !txn_count + 1 ;
   match result with
   | Ok (_, [], [ failed_txn ]) ->
@@ -134,9 +134,9 @@ let setup_and_submit_snapp_command t (parties : Parties.t) =
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string ) ) )
-  | Ok (`Broadcasted, [ User_command.Parties txn ], []) ->
+  | Ok (`Broadcasted, [ User_command.Zkapp_command txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_command", Parties.to_yojson txn) ]
+        ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson txn) ]
         "Scheduled zkApp $zkapp_command" ;
       Ok txn
   | Ok (decision, valid_commands, invalid_commands) ->
@@ -179,15 +179,15 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
             (Signed_command.payload cmd)
         in
         Receipt.Chain_hash.cons_signed_command_payload elt parent_hash
-    | Parties _parties ->
+    | Zkapp_command _zkapp_command ->
         failwith "Not implemented for zkApps"
-  (* TODO: apply cons_parties_commitment operation for all occurrences of fee payer
+  (* TODO: apply cons_zkapp_command_commitment operation for all occurrences of fee payer
 
      issue #11495
 
-     let elt = Receipt.Parties_elt.Parties_commitment (Parties.commitment parties) in
+     let elt = Receipt.Zkapp_command_elt.Zkapp_command_commitment (Zkapp_command.commitment zkapp_command) in
      let fee_payer_index = Mina_numbers.Index.zero in
-     Receipt.Chain_hash.cons_parties_commitment fee_payer_index elt parent_hash *)
+     Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
 [%%inject "compile_time_current_protocol_version", current_protocol_version]

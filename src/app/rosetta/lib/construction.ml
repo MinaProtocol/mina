@@ -7,7 +7,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee
+            fee @ppxCustom(module: "Scalars.UInt64")
           }
         }
       }
@@ -18,7 +18,7 @@ module Get_options_metadata =
 
       account(publicKey: $sender, token: $token_id) {
         balance {
-          blockHeight
+          blockHeight @ppxCustom(module: "Scalars.UInt32")
           stateHash
         }
         nonce
@@ -40,7 +40,7 @@ module Send_payment =
                   {from: $from, to:$to_, token:$token, amount:$amount,
                   fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
   }}
   |}]
@@ -57,7 +57,7 @@ mutation ($sender: PublicKey!,
   sendDelegation(signature: {rawSignature: $signature}, input:
     {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
     delegation {
-      hash
+      hash @ppxCustom(module: "Scalars.String_json")
     }
   }
 }
@@ -324,11 +324,7 @@ module Metadata = struct
         | Some account ->
             M.return account
       in
-      let nonce =
-        Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
-          account.nonce
-        |> Option.value ~default:Unsigned.UInt32.zero
+      let nonce = Option.value ~default:Unsigned.UInt32.zero account.nonce
       in
       (* suggested fee *)
       (* Take the median of all the fees in blocks and add a bit extra using

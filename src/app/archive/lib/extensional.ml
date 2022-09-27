@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; typ : string
+        ; command_type : string
         ; fee_payer : Account_id.Stable.V2.t
         ; source : Account_id.Stable.V2.t
         ; receiver : Account_id.Stable.V2.t
@@ -56,7 +56,7 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; typ : string
+        ; command_type : string
         ; receiver : Account_id.Stable.V2.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
@@ -72,15 +72,15 @@ module Internal_command = struct
   end]
 end
 
-(* for fee payer, other parties, authorizations are omitted; signatures, proofs not in archive db *)
+(* for fee payer and account updates, authorizations are omitted; signatures, proofs not in archive db *)
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { sequence_no : int
-        ; fee_payer : Party.Body.Fee_payer.Stable.V1.t
-        ; other_parties : Party.Body.Simple.Stable.V1.t list
+        ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Body.Simple.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]

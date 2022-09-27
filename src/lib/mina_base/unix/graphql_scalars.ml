@@ -45,6 +45,24 @@ module LedgerHash =
       let doc = "Base58Check-encoded ledger hash"
     end)
 
+module StagedLedgerAuxHash =
+  Make_scalar_using_base58_check
+    (Mina_base.Staged_ledger_hash.Aux_hash)
+    (struct
+      let name = "StagedLedgerAuxHash"
+
+      let doc = "Base58Check-encoded hash of the staged ledger hash's aux_hash"
+    end)
+
+module PendingCoinbaseHash =
+  Make_scalar_using_base58_check
+    (Mina_base.Pending_coinbase.Hash)
+    (struct
+      let name = "PendingCoinbaseHash"
+
+      let doc = "Base58Check-encoded hash of a pending coinbase hash"
+    end)
+
 module FieldElem =
   Make_scalar_using_to_string
     (Mina_base.Zkapp_basic.F)
@@ -71,11 +89,11 @@ module TransactionStatusFailure :
       ~doc:"transaction status failure" ~coerce:serialize
 end
 
-module PartiesBase58 =
+module ZkappCommandBase58 =
   Make_scalar_using_base58_check
-    (Mina_base.Parties)
+    (Mina_base.Zkapp_command)
     (struct
-      let name = "PartiesBase58"
+      let name = "ZkappCommandBase58"
 
       let doc = "A Base58Check string representing the command"
     end)

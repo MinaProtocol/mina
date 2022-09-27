@@ -72,7 +72,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Parties_command_inputs of Parties.t list
+  | Zkapp_command_command_inputs of Zkapp_command.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -973,21 +973,21 @@ let add_full_transactions t user_commands =
   | Some err ->
       Deferred.Result.fail err
 
-let add_zkapp_transactions t (partiess : Parties.t list) =
+let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
-    let cmd_inputs = Parties_command_inputs partiess in
+    let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
     Strict_pipe.Writer.write t.pipes.user_command_input_writer
       (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
   let too_big_err =
-    List.find_map partiess ~f:(fun parties ->
+    List.find_map zkapp_commands ~f:(fun zkapp_command ->
         let size_validity =
-          Parties.valid_size
+          Zkapp_command.valid_size
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            parties
+            zkapp_command
         in
         match size_validity with Ok () -> None | Error err -> Some err )
   in
@@ -1884,15 +1884,15 @@ let create ?wallets (config : Config.t) =
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                       result_cb (Error e) ;
                       Deferred.unit )
-              | Parties_command_inputs partiess ->
-                  (* TODO: here, submit a Parties.t, which includes a nonce
+              | Zkapp_command_command_inputs zkapp_commands ->
+                  (* TODO: here, submit a Zkapp_command.t, which includes a nonce
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
-                  (* too-big Parties.t's were filtered when writing to the user command pipe *)
+                  (* too-big Zkapp_command.t's were filtered when writing to the user command pipe *)
                   Network_pool.Transaction_pool.Local_sink.push tx_local_sink
-                    ( List.map partiess ~f:(fun parties ->
-                          User_command.Parties parties )
+                    ( List.map zkapp_commands ~f:(fun zkapp_command ->
+                          User_command.Zkapp_command zkapp_command )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
