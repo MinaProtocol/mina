@@ -2594,7 +2594,7 @@ COPY public.zkapp_account_update (id, body_id, authorization_kind) FROM stdin;
 COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller, authorization_kind) FROM stdin;
 1	5	1	-10000000000	t	1	1	1	0	1	1	f	call	Signature
 2	7	2	9000000000	f	1	1	1	0	1	2	t	call	Signature
-3	7	3	0	f	1	1	1	0	1	2	t	call	Signature
+3	7	3	0	f	1	1	1	0	1	2	t	call	Proof
 \.
 
 
