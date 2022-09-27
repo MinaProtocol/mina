@@ -88,6 +88,58 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
+
+      transaction_snark_1_libs = [
+        "src/lib/transaction_snark/test/app_state"
+        "src/lib/transaction_snark/test/verification_key"
+        "src/lib/transaction_snark/test/voting_for"
+        "src/lib/transaction_snark/test/transaction_union"
+        "src/lib/transaction_snark/test/zkapp_uri"
+        "src/lib/transaction_snark/test/zkapp_tokens"
+        "src/lib/transaction_snark/test/token_symbol"
+        "src/lib/transaction_snark/test/permissions"
+      ];
+
+      transaction_snark_2_libs = [
+        "src/lib/transaction_snark"
+        "src/lib/transaction_snark/test"
+        "src/lib/transaction_snark/test/fee_payer"
+        "src/lib/transaction_snark/test/zkapp_payments"
+        "src/lib/transaction_snark/test/account_timing"
+        "src/lib/transaction_snark/test/zkapps_examples/add_events"
+        "src/lib/transaction_snark/test/zkapps_examples/sequence_events"
+        "src/lib/transaction_snark/test/zkapps_examples/empty_update"
+        "src/lib/transaction_snark/test/zkapps_examples/initialize_state"
+        "src/lib/transaction_snark/test/delegate"
+        "src/lib/transaction_snark/test/multisig_account"
+        "src/lib/transaction_snark/test/zkapp_deploy"
+        "src/lib/transaction_snark/test/party_preconditions"
+      ];
+
+      build_coverage = {libraries_to_test, name}: runMinaCheck {
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find coverage_output -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
+        };
+        # git is used in src/lib/crypto/kimchi_backend/common/gen_version.sh
+        extraInputs = [ pkgs.git ];
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        LIBRARIES_TO_TEST="${pkgs.lib.strings.concatStringsSep " " (map (lib: "@@"+lib+"/runtest") libraries_to_test)}"
+
+        mkdir coverage_output
+        export BISECT_FILE=$(pwd)/coverage_output/bisect
+        dune build $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
+      '';
+
     in {
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs (oa: {
@@ -217,13 +269,18 @@ let
         done
       '') self.mina-dev.outputs);
 
-      mina_tests = runMinaCheck {
+      mina_tests_archive = runMinaCheck {
         name = "tests";
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
         };
         extraInputs = [ pkgs.ephemeralpg ];
       } ''
@@ -233,11 +290,111 @@ let
         psql "$MINA_TEST_POSTGRES" < create_schema.sql
         popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
-        dune runtest src/app/archive src/lib/command_line_tests --display=short
+
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        dune runtest src/app/archive --instrument-with bisect_ppx --display=short || echo "failed"
+      '';
+
+      mina_tests_transaction_snark_1 = build_coverage {
+        name = "tests_transaction_snark_1";
+        libraries_to_test = transaction_snark_1_libs;
+      };
+
+      mina_tests_transaction_snark_2 = build_coverage {
+        name = "tests_transaction_snark_2";
+        libraries_to_test = transaction_snark_2_libs;
+      };
+
+      mina_tests_src_lib = runMinaCheck {
+        name = "tests_src_lib";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find coverage_output -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
+        };
+
+        # git is used in src/lib/crypto/kimchi_backend/common/gen_version.sh
+        extraInputs = [ pkgs.git ];
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        # We disable testing for some folders of src/lib
+        # mina_net2:
+        #   fails with error "libp2p error: no supported interface",
+        #   which may be because networking is disallowed in the sandbox.
+        # crypto/proof-systems/ocaml/tests/src:
+        #   fails because it makes a call to cargo, which is not available here.
+        # crypto/kimchi_backend:
+        #   fails because it makes a call to git, nut the .git folder is
+        #   not available in the nix sandbox.
+
+        LIBRARIES_TO_TEST=$(
+          find src/lib -not \( -path src/lib/transaction_snark -prune \) -name "dune" |
+          sed 's#/dune$##' |
+          grep -v 'mina_net2' |
+          grep -v 'crypto/proof-systems/ocaml/tests/src' |
+          grep -v 'crypto/kimchi_backend' |
+          awk '{print "@@"$1"/runtest"}' |
+          tr '\n' ' '
+        )
+
+        mkdir coverage_output
+        export BISECT_FILE=$(pwd)/coverage_output/bisect
+        dune build $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
+      '';
+
+      mina_tests_zkapp_test_transaction = runMinaCheck {
+        name = "tests_zkapp_test_transaction";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
+        };
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        dune runtest src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
+      '';
+
+      mina_coverage = runMinaCheck {
+        name = "build-coverage";
+        extraArgs = {
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir $out
+              mv _coverage $out/html
+              mv summary $out/summary
+          '';
+        };
+      } ''
+        mkdir coverage_files
+        #TODO can coverage files have the same names ?
+        cp ${self.mina_tests_transaction_snark_1}/coverage/* coverage_files
+        cp ${self.mina_tests_transaction_snark_2}/coverage/* coverage_files
+        cp ${self.mina_tests_zkapp_test_transaction}/coverage/* coverage_files
+        cp ${self.mina_tests_src_lib}/coverage/* coverage_files
+        cp ${self.mina_tests_archive}/coverage/* coverage_files
+        bisect-ppx-report html --coverage-path=coverage_files --tree --ignore-missing-files
+        bisect-ppx-report summary --coverage-path=coverage_files --per-file > summary
       '';
 
       mina_client_sdk = self.mina-dev.overrideAttrs (_: {
