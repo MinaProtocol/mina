@@ -52,4 +52,6 @@ let typ : (var, t) Typ.t =
 
 let to_hex = Blake2.to_hex
 
+let of_hex_exn = Blake2.of_hex
+
 let to_raw_string = Blake2.to_raw_string

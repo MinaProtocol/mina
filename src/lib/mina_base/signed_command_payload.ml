@@ -38,6 +38,12 @@ module Common = struct
     module Stable = struct
       module V2 = struct
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+              ( 'fee
+              , 'public_key
+              , 'nonce
+              , 'global_slot
+              , 'memo )
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V2.t =
           { fee : 'fee
           ; fee_payer_pk : 'public_key
           ; nonce : 'nonce
@@ -49,6 +55,13 @@ module Common = struct
 
       module V1 = struct
         type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+              ( 'fee
+              , 'public_key
+              , 'token_id
+              , 'nonce
+              , 'global_slot
+              , 'memo )
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V1.t =
           { fee : 'fee
           ; fee_token : 'token_id
           ; fee_payer_pk : 'public_key
@@ -161,7 +174,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
           | Payment of Payment_payload.Stable.V2.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
         [@@deriving sexp]
@@ -241,7 +254,11 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('common, 'body) t = { common : 'common; body : 'body }
+      type ('common, 'body) t =
+            ( 'common
+            , 'body )
+            Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
+        { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 
       let of_latest common_latest body_latest { common; body } =
@@ -311,7 +328,12 @@ let amount (t : t) =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) = [ fee_payer t; source t; receiver t ]
+let accounts_accessed (t : t) (status : Transaction_status.t) =
+  match status with
+  | Applied ->
+      [ fee_payer t; source t; receiver t ]
+  | Failed _ ->
+      [ fee_payer t ]
 
 let dummy : t =
   { common =

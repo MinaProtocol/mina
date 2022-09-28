@@ -576,6 +576,24 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; transaction_expiry_hr =
       Option.value ~default:default.transaction_expiry_hr
         (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
+  ; zkapp_proof_update_cost =
+      Option.value ~default:default.zkapp_proof_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
+  ; zkapp_signed_single_update_cost =
+      Option.value ~default:default.zkapp_signed_single_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_single_update_cost)
+  ; zkapp_signed_pair_update_cost =
+      Option.value ~default:default.zkapp_signed_pair_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_pair_update_cost)
+  ; zkapp_transaction_cost_limit =
+      Option.value ~default:default.zkapp_transaction_cost_limit
+        (config.daemon >>= fun cfg -> cfg.zkapp_transaction_cost_limit)
+  ; max_event_elements =
+      Option.value ~default:default.max_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_event_elements)
+  ; max_sequence_event_elements =
+      Option.value ~default:default.max_sequence_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_sequence_event_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -604,6 +622,25 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           ; peer_list_url = None
           ; transaction_expiry_hr =
               Some precomputed_values.genesis_constants.transaction_expiry_hr
+          ; zkapp_proof_update_cost =
+              Some precomputed_values.genesis_constants.zkapp_proof_update_cost
+          ; zkapp_signed_single_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_single_update_cost
+          ; zkapp_signed_pair_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_pair_update_cost
+          ; zkapp_transaction_cost_limit =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_transaction_cost_limit
+          ; max_event_elements =
+              Some precomputed_values.genesis_constants.max_event_elements
+          ; max_sequence_event_elements =
+              Some
+                precomputed_values.genesis_constants.max_sequence_event_elements
           }
     ; genesis =
         Some

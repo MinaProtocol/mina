@@ -15,6 +15,7 @@
    base.caml
    result
    ;;local libraries
+   mina_wire_types
    base58_check
    blake2
    mina_signature_kind
@@ -33,7 +34,7 @@
    (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_optcomp ppx_sexp_conv
+  (pps ppx_mina ppx_version ppx_optcomp ppx_sexp_conv
        ppx_custom_printf ppx_bin_prot ppx_hash ppx_compare ppx_compare ppx_deriving_yojson
        ppx_inline_test ppx_let))
  (instrumentation (backend bisect_ppx))

@@ -27,10 +27,19 @@ let unsigned_scalar_scalar ~to_string typ_name =
          (Stdlib.String.lowercase_ascii typ_name) )
     ~coerce:(fun num -> `String (to_string num))
 
+(* guard against negative wrap around behaviour from
+   the `integers` library *)
+let parse_uinteger json ~f =
+  let s = Yojson.Basic.Util.to_string json in
+  let neg = String.starts_with ~prefix:"-" s in
+  if neg then
+    failwith "Cannot parse string starting with a minus as an unsigned integer"
+  else f s
+
 module UInt32 : Json_intf with type t = Unsigned.UInt32.t = struct
   type t = Unsigned.UInt32.t
 
-  let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
+  let parse = parse_uinteger ~f:Unsigned.UInt32.of_string
 
   let serialize value = `String (Unsigned.UInt32.to_string value)
 
@@ -41,12 +50,22 @@ end
 module UInt64 : Json_intf with type t = Unsigned.UInt64.t = struct
   type t = Unsigned.UInt64.t
 
-  let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
+  let parse = parse_uinteger ~f:Unsigned.UInt64.of_string
 
   let serialize value = `String (Unsigned.UInt64.to_string value)
 
   let typ () =
     unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
+end
+
+module Index : Json_intf with type t = int = struct
+  type t = int
+
+  let parse json = Yojson.Basic.Util.to_string json |> int_of_string
+
+  let serialize value = `String (Int.to_string value)
+
+  let typ () = scalar "Index" ~doc:"ocaml integer as a string" ~coerce:serialize
 end
 
 module JSON = struct
@@ -134,3 +153,35 @@ end) : Json_intf with type t = T.t = struct
   let typ () =
     Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
+
+module Make_scalar_using_base64 (T : sig
+  type t
+
+  val to_base64 : t -> string
+
+  val of_base64 : string -> t Core_kernel.Or_error.t
+end) (Scalar : sig
+  val name : string
+
+  val doc : string
+end) : Json_intf with type t = T.t = struct
+  type t = T.t
+
+  let parse json =
+    Yojson.Basic.Util.to_string json
+    |> T.of_base64 |> Core_kernel.Or_error.ok_exn
+
+  let serialize x = `String (T.to_base64 x)
+
+  let typ () =
+    Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
+end
+
+module InetAddr =
+  Make_scalar_using_to_string
+    (Core.Unix.Inet_addr)
+    (struct
+      let name = "InetAddr"
+
+      let doc = "network address"
+    end)

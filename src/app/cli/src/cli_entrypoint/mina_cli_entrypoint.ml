@@ -21,7 +21,8 @@ type mina_initialization =
   ; limited_graphql_port : int option
   }
 
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
+    ~protocol_major_version =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -29,9 +30,13 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
     List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
+  let protocol_version_digest =
+    Int.to_string protocol_major_version |> Md5.digest_string |> Md5.to_hex
+  in
   let b2 =
     Blake2.digest_string
-      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
+      ^ protocol_version_digest )
   in
   Blake2.to_hex b2
 
@@ -244,12 +249,10 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--discovery-keypair" ~aliases:[ "discovery-keypair" ]
-      (optional string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (required string)
       ~doc:
-        "KEYFILE Keypair (generated from `mina advanced \
-         generate-libp2p-keypair`) to use with libp2p discovery (default: \
-         generate per-run temporary keypair)"
+        "KEYFILE Keypair (generated from `mina libp2p generate-keypair`) to \
+         use with libp2p discovery"
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
@@ -268,13 +271,10 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
-  and mina_peer_exchange =
-    flag "--enable-mina-peer-exchange"
-      ~aliases:[ "enable-mina-peer-exchange" ]
-      ~doc:
-        "true|false Help keep the mesh connected when closing connections \
-         (default: true)"
-      (optional_with_default true bool)
+  and peer_protection_ratio =
+    flag "--peer-protection-rate" ~aliases:[ "peer-protection-rate" ]
+      ~doc:"float Proportion of peers to be marked as protected (default: 0.2)"
+      (optional_with_default 0.2 float)
   and min_connections =
     flag "--min-connections" ~aliases:[ "min-connections" ]
       ~doc:
@@ -546,28 +546,23 @@ let setup_daemon logger =
         in
         let%bind libp2p_keypair =
           let libp2p_keypair_old_format =
-            Option.bind libp2p_keypair ~f:(fun s ->
-                match Mina_net2.Keypair.of_string s with
-                | Ok kp ->
-                    Some kp
-                | Error _ ->
-                    if String.contains s ',' then
-                      [%log warn]
-                        "I think -discovery-keypair is in the old format, but \
-                         I failed to parse it! Using it as a path..." ;
-                    None )
+            match Mina_net2.Keypair.of_string libp2p_keypair with
+            | Ok kp ->
+                Some kp
+            | Error _ ->
+                if String.contains libp2p_keypair ',' then
+                  [%log warn]
+                    "I think -libp2p-keypair is in the old format, but I \
+                     failed to parse it! Using it as a path..." ;
+                None
           in
-          match libp2p_keypair_old_format with
-          | Some kp ->
-              return (Some kp)
-          | None -> (
-              match libp2p_keypair with
-              | None ->
-                  return None
-              | Some s ->
-                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                    ~should_prompt_user:false ~which:"libp2p keypair" s
-                  |> Deferred.map ~f:Option.some )
+          Option.value_map
+            ~default:(fun () ->
+              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~which:"libp2p keypair" libp2p_keypair
+              )
+            ~f:(Fn.compose const Deferred.return)
+            libp2p_keypair_old_format ()
         in
         let%bind () =
           let version_filename = conf_dir ^/ "mina.version" in
@@ -1034,8 +1029,18 @@ let setup_daemon logger =
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let module Context = struct
+            let logger = logger
+
+            let precomputed_values = precomputed_values
+
+            let constraint_constants = precomputed_values.constraint_constants
+
+            let consensus_constants = precomputed_values.consensus_constants
+          end in
           let consensus_local_state =
             Consensus.Data.Local_state.create
+              ~context:(module Context)
               ~genesis_ledger:
                 (Precomputed_values.genesis_ledger precomputed_values)
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
@@ -1044,7 +1049,6 @@ let setup_daemon logger =
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
-              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -1117,7 +1121,7 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
-          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+          if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
@@ -1135,10 +1139,16 @@ let setup_daemon logger =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
+            let protocol_major_version =
+              Protocol_version.of_string_exn
+                compile_time_current_protocol_version
+              |> Protocol_version.major
+            in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
+              ~protocol_major_version
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -1155,7 +1165,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; trust_system
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
-              ; mina_peer_exchange
+              ; peer_protection_ratio
               ; peer_exchange = Option.value ~default:false peer_exchange
               ; min_connections
               ; max_connections
@@ -1184,6 +1194,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+            ; precomputed_values
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
@@ -1191,12 +1202,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ~f:(fun pk -> `Other pk)
           in
           let current_protocol_version =
-            Coda_run.get_current_protocol_version
+            Mina_run.get_current_protocol_version
               ~compile_time_current_protocol_version ~conf_dir ~logger
               curr_protocol_version
           in
           let proposed_protocol_version_opt =
-            Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+            Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
               proposed_protocol_version
           in
           ( match
@@ -1302,7 +1313,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             in
             Node_error_service.set_config ~get_node_state
               ~node_error_url:(Uri.of_string url) ~contact_info ) ;
-        Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+        Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
           ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
@@ -1319,7 +1330,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
-        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
+        Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           mina ;
         let%bind () =
@@ -1717,6 +1728,7 @@ let mina_commands logger =
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("ledger", Client.ledger)
+  ; ("libp2p", Client.libp2p)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)

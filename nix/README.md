@@ -196,7 +196,7 @@ If you wish to update all the inputs of this flake, run `nix flake update` . If 
 
 The "pure" build is performed with the help of
 [opam-nix](https://github.com/tweag/opam-nix). The switch is imported
-from `src/opam.export`, and then external deps (from `src/external`)
+from `opam.export`, and then external deps (from `src/external`)
 are added on top. Also, all in-tree Rust dependencies
 (`kimchi_bindings` in particular) are built as separate derivations
 using `rustPlatform`. Implicit native dependencies are taken from

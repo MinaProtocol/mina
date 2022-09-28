@@ -169,6 +169,7 @@ func TestConfigure(t *testing.T) {
 	c.SetUnsafeNoTrustIp(false)
 	c.SetFlood(false)
 	c.SetPeerExchange(false)
+	c.SetPeerProtectionRatio(.2)
 	_, err = c.NewDirectPeers(0)
 	require.NoError(t, err)
 	_, err = c.NewSeedPeers(0)
@@ -176,7 +177,6 @@ func TestConfigure(t *testing.T) {
 	c.SetMinConnections(20)
 	c.SetMaxConnections(50)
 	c.SetValidationQueueSize(16)
-	c.SetMinaPeerExchange(false)
 
 	gc, err := c.NewGatingConfig()
 	require.NoError(t, err)

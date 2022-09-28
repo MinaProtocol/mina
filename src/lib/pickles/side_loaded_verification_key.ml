@@ -277,6 +277,7 @@ module Stable = struct
 
     include T
     include Codable.Make_base58_check (T)
+    include Codable.Make_base64 (T)
   end
 end]
 
@@ -285,6 +286,8 @@ Stable.Latest.
   ( to_base58_check
   , of_base58_check
   , of_base58_check_exn
+  , to_base64
+  , of_base64
   , sexp_of_t
   , t_of_sexp
   , to_yojson

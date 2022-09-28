@@ -32,7 +32,7 @@ module Failure = struct
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
         | Update_not_permitted_voting_for
-        | Parties_replay_check_failed
+        | Zkapp_command_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
         | Account_balance_precondition_unsatisfied
@@ -111,8 +111,9 @@ module Failure = struct
       ~update_not_permitted_sequence_state:add
       ~update_not_permitted_zkapp_uri:add ~update_not_permitted_token_symbol:add
       ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
-      ~update_not_permitted_voting_for:add ~parties_replay_check_failed:add
-      ~fee_payer_nonce_must_increase:add ~fee_payer_must_be_signed:add
+      ~update_not_permitted_voting_for:add
+      ~zkapp_command_replay_check_failed:add ~fee_payer_nonce_must_increase:add
+      ~fee_payer_must_be_signed:add
       ~account_balance_precondition_unsatisfied:add
       ~account_nonce_precondition_unsatisfied:add
       ~account_receipt_chain_hash_precondition_unsatisfied:add
@@ -178,8 +179,8 @@ module Failure = struct
         "Update_not_permitted_nonce"
     | Update_not_permitted_voting_for ->
         "Update_not_permitted_voting_for"
-    | Parties_replay_check_failed ->
-        "Parties_replay_check_failed"
+    | Zkapp_command_replay_check_failed ->
+        "Zkapp_command_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
     | Fee_payer_must_be_signed ->
@@ -258,8 +259,8 @@ module Failure = struct
         Ok Update_not_permitted_nonce
     | "Update_not_permitted_voting_for" ->
         Ok Update_not_permitted_voting_for
-    | "Parties_replay_check_failed" ->
-        Ok Parties_replay_check_failed
+    | "Zkapp_command_replay_check_failed" ->
+        Ok Zkapp_command_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
     | "Fee_payer_must_be_signed" ->
@@ -341,8 +342,8 @@ module Failure = struct
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
     | Token_owner_not_caller ->
-        "A party used a non-default token but its caller was not the token \
-         owner"
+        "An account update used a non-default token but its caller was not the \
+         token owner"
     | Overflow ->
         "The resulting balance is too large to store"
     | Global_excess_overflow ->
@@ -352,7 +353,7 @@ module Failure = struct
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
-        "A snapp account does not exist"
+        "A zkApp account does not exist"
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
          to its balance"
@@ -385,36 +386,41 @@ module Failure = struct
     | Update_not_permitted_voting_for ->
         "The authentication for an account didn't allow the requested update \
          to its voted-for state hash"
-    | Parties_replay_check_failed ->
-        "Check to avoid replays failed. The party must increment nonce or use \
-         full commitment if the authorization is a signature"
+    | Zkapp_command_replay_check_failed ->
+        "Check to avoid replays failed. The account update must increment \
+         nonce or use full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
-        "Fee payer party must increment its nonce"
+        "Fee payer account update must increment its nonce"
     | Fee_payer_must_be_signed ->
-        "Fee payer party must have a valid signature"
+        "Fee payer account update must have a valid signature"
     | Account_balance_precondition_unsatisfied ->
-        "The party's account balance precondition was unsatisfied"
+        "The account update's account balance precondition was unsatisfied"
     | Account_nonce_precondition_unsatisfied ->
-        "The party's account nonce precondition was unsatisfied"
+        "The account update's account nonce precondition was unsatisfied"
     | Account_receipt_chain_hash_precondition_unsatisfied ->
-        "The party's account receipt-chain hash precondition was unsatisfied"
+        "The account update's account receipt-chain hash precondition was \
+         unsatisfied"
     | Account_delegate_precondition_unsatisfied ->
-        "The party's account delegate precondition was unsatisfied"
+        "The account update's account delegate precondition was unsatisfied"
     | Account_sequence_state_precondition_unsatisfied ->
-        "The party's account sequence state precondition was unsatisfied"
+        "The account update's account sequence state precondition was \
+         unsatisfied"
     | Account_app_state_precondition_unsatisfied i ->
         sprintf
-          "The party's account app state (%i) precondition was unsatisfied" i
+          "The account update's account app state (%i) precondition was \
+           unsatisfied"
+          i
     | Account_proved_state_precondition_unsatisfied ->
-        "The party's account proved state precondition was unsatisfied"
+        "The account update's account proved state precondition was unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
-        "The party's account is-new state precondition was unsatisfied"
+        "The account update's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
-        "The party's protocol state precondition unsatisfied"
+        "The account update's protocol state precondition unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
-        "Fee excess from parties transaction more than the transaction fees"
+        "Fee excess from zkapp_command transaction more than the transaction \
+         fees"
 end
 
 [%%versioned
