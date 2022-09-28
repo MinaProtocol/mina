@@ -10031,6 +10031,17 @@
         },
         {
           "kind": "SCALAR",
+          "name": "PendingCoinbaseAuxHash",
+          "description":
+            "Base58Check-encoded hash of a pending coinbase auxiliary hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "StagedLedgerAuxHash",
           "description":
             "Base58Check-encoded hash of the staged ledger hash's aux_hash",
@@ -10141,6 +10152,23 @@
             },
             {
               "name": "stagedLedgerPendingCoinbaseAux",
+              "description":
+                "Base58Check-encoded staged ledger hash's pending_coinbase_aux",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PendingCoinbaseAuxHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerPendingCoinbaseHash",
               "description":
                 "Base58Check-encoded hash of the staged ledger hash's pending_coinbase_hash",
               "args": [],
