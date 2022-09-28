@@ -2431,13 +2431,6 @@ module Base = struct
          i               i + state               i + state + coinbase
          i + coinbase    i + state + coinbase    i + state + coinbase
     *)
-    let b_to_b s b =
-      Run.as_prover
-        Run.As_prover.(
-          fun () ->
-            let b' = read Boolean.typ b in
-            Format.eprintf "%s: %B@." s b')
-    in
     let%bind () =
       [%with_label "Compute coinbase stack"]
         (let%bind state_body_hash =
@@ -2578,8 +2571,6 @@ module Base = struct
              let permitted_to_receive =
                Account.Checked.has_permission ~to_:`Receive account
              in
-             b_to_b "USER" is_user_command ;
-             b_to_b "SEND" permitted_to_send ;
              let%bind () =
                [%with_label
                  "Fee payer balance update should be permitted for all commands"]
@@ -2815,7 +2806,6 @@ module Base = struct
                      ~then_:account_creation_amount
                      ~else_:Amount.(var_of_t zero)
                  in
-                 b_to_b "SHOULD PAY" should_pay_to_create ;
                  let%bind new_account_fees_total =
                    Amount.Signed.Checked.(
                      add @@ negate @@ of_unsigned account_creation_fee)
@@ -3126,12 +3116,6 @@ module Base = struct
                (negate (of_unsigned !burned_tokens)))
          in
          let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
-         Run.as_prover
-           Run.As_prover.(
-             fun () ->
-               let fee = read Currency.Amount.Signed.typ !new_account_fees in
-               Format.eprintf "FEE: %s@."
-                 (Currency.Amount.Signed.to_yojson fee |> Yojson.Safe.to_string)) ;
          let%bind new_account_fees_total =
            Amount.Signed.Checked.if_ user_command_fails ~then_:zero_fee
              ~else_:!new_account_fees
@@ -3229,19 +3213,8 @@ module Base = struct
       [ [%with_label "equal roots"]
           (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
       ; [%with_label "equal supply_increases"]
-          ( Run.as_prover (fun () ->
-                let si0 =
-                  Run.As_prover.read Currency.Amount.Signed.typ supply_increase
-                in
-                let si1 =
-                  Run.As_prover.read Currency.Amount.Signed.typ
-                    statement.supply_increase
-                in
-                Format.eprintf "SI: %s: STMT.SI %s@."
-                  (Currency.Amount.Signed.to_yojson si0 |> Yojson.Safe.to_string)
-                  (Currency.Amount.Signed.to_yojson si1 |> Yojson.Safe.to_string) ) ;
-            Currency.Amount.Signed.Checked.assert_equal supply_increase
-              statement.supply_increase )
+          (Currency.Amount.Signed.Checked.assert_equal supply_increase
+             statement.supply_increase )
       ; [%with_label "equal fee excesses"]
           (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
       ]
@@ -3490,9 +3463,6 @@ end
 let check_transaction_union ?(preeval = false) ~constraint_constants
     ~supply_increase sok_message source target init_stack
     pending_coinbase_stack_state transaction state_body handler =
-  Format.eprintf "SUPPLY INCR, MAG: %S SGN: %s@."
-    (Amount.to_string supply_increase.Signed_poly.magnitude)
-    (Sgn.to_yojson supply_increase.Signed_poly.sgn |> Yojson.Safe.to_string) ;
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let handler =

@@ -85,8 +85,6 @@ let%test_module "Transaction union tests" =
       let receiver_id = Account_id.create receiver Token_id.default in
       let other = mk_pubkey () in
       let other_id = Account_id.create other Token_id.default in
-      Format.eprintf "OTHER ACCOUNT: %s@."
-        (Account_id.to_yojson other_id |> Yojson.Safe.to_string) ;
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
@@ -113,22 +111,12 @@ let%test_module "Transaction union tests" =
         { Transaction_protocol_state.Poly.transaction; block_data = state_body }
       in
       Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-          Format.eprintf "CREATING NEW ACCOUNT: %s@."
-            (Account_id.to_yojson receiver_id |> Yojson.Safe.to_string) ;
           Ledger.create_new_account_exn ledger producer_id
             (Account.create receiver_id Balance.zero) ;
-          Format.eprintf "ACCOUNTS IN REGULAR LEDGER:@." ;
-          Ledger.iteri ledger ~f:(fun _i acct ->
-              Format.eprintf " ACCOUNT: %s@."
-                (Account.to_yojson acct |> Yojson.Safe.to_string) ) ;
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger
               [ producer_id; receiver_id; other_id ]
           in
-          Format.eprintf "ACCOUNTS IN SPARSE LEDGER:@." ;
-          Sparse_ledger.iteri sparse_ledger ~f:(fun _i acct ->
-              Format.eprintf " ACCOUNT: %s@."
-                (Account.to_yojson acct |> Yojson.Safe.to_string) ) ;
           let sparse_ledger_after, applied_transaction =
             Sparse_ledger.apply_transaction
               ~constraint_constants:U.constraint_constants sparse_ledger
@@ -233,7 +221,6 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
-          Format.eprintf "PT 0@." ;
           let wallets = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
           let sender = List.hd_exn wallets in
           let receivers = List.tl_exn wallets in
@@ -245,7 +232,6 @@ let%test_module "Transaction union tests" =
               (Test_util.arbitrary_string
                  ~len:Signed_command_memo.max_digestible_string_length )
           in
-          Format.eprintf "PT 1@." ;
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
                 let receivers =
@@ -262,23 +248,19 @@ let%test_module "Transaction union tests" =
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
-              Format.eprintf "PT 2@." ;
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
                 sender.account ;
-              Format.eprintf "PT 3@." ;
               let () =
                 List.iter ucs ~f:(fun uc ->
                     U.test_transaction_union ledger
                       (Transaction.Command (Signed_command uc)) )
               in
-              Format.eprintf "PT 4@." ;
               List.iter receivers ~f:(fun receiver ->
                   U.check_balance
                     (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
                     ledger ) ;
-              Format.eprintf "PT 5@." ;
               U.check_balance
                 (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
