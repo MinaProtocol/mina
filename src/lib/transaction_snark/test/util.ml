@@ -557,6 +557,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
   | Error _e ->
+      Format.eprintf "ERROR: %s@." (Error.to_string_hum _e) ;
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)

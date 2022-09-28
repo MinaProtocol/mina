@@ -159,6 +159,20 @@ module Transaction_applied = struct
     | Coinbase c ->
         c.burned_tokens
 
+  let new_accounts : t -> Account_id.t list =
+   fun { varying; _ } ->
+    match varying with
+    | Command c -> (
+        match c with
+        | Signed_command sc ->
+            Signed_command_applied.new_accounts sc
+        | Zkapp_command zc ->
+            zc.new_accounts )
+    | Fee_transfer f ->
+        f.new_accounts
+    | Coinbase c ->
+        c.new_accounts
+
   let num_new_accounts : t -> int =
    fun { varying; _ } ->
     match varying with
@@ -175,6 +189,8 @@ module Transaction_applied = struct
 
   let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
    fun t ->
+    Format.eprintf "VARYING IN SUPPLY INCREASE: %s@."
+      (Varying.sexp_of_t t.varying |> Sexp.to_string) ;
     let open Or_error.Let_syntax in
     let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
     let account_creation_fees =
@@ -182,7 +198,12 @@ module Transaction_applied = struct
         Genesis_constants.Constraint_constants.compiled.account_creation_fee
         |> Currency.Fee.to_int
       in
+      Format.eprintf "NEW ACCOUNTS:@." ;
+      List.iter (new_accounts t) ~f:(fun acct_id ->
+          Format.eprintf " ACCOUNT %s@."
+            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string) ) ;
       let num_accounts_created = num_new_accounts t in
+      Format.eprintf "NUM NEW ACCOUNTS: %d@." num_accounts_created ;
       (* using int type is ok, no danger of overflow here *)
       Currency.Amount.(
         Signed.of_unsigned
@@ -1810,9 +1831,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       * Ledger_intf.account_state
       * [> `Has_permission_to_receive of bool ] =
     let init_account = Account.initialize receiver_account_id in
+    Format.eprintf "RECEIVER: %s@."
+      (Account_id.to_yojson receiver_account_id |> Yojson.Safe.to_string) ;
     match location_of_account ledger receiver_account_id with
     | None ->
-        (*new account, check that default permissions allow receiving *)
+        (* new account, check that default permissions allow receiving *)
         ( init_account
         , `Added
         , `Has_permission_to_receive
@@ -1824,6 +1847,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             , `Added
             , `Has_permission_to_receive
                 (Account.has_permission ~to_:`Receive init_account) )
+        (* failwith "Got location for account, but no account found" *)
         | Some receiver_account ->
             ( receiver_account
             , `Existed
@@ -2002,6 +2026,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           let transferee_account, action, `Has_permission_to_receive can_receive
               =
+            Format.eprintf "TRANSFEREE@." ;
             has_permission_to_receive ~ledger:t transferee_id
           in
           let new_accounts = get_new_accounts action transferee_id in
@@ -2030,6 +2055,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let receiver_id = Account_id.create receiver Token_id.default in
     let receiver_account, action2, `Has_permission_to_receive can_receive =
+      Format.eprintf "RECEIVER ACCT@." ;
       has_permission_to_receive ~ledger:t receiver_id
     in
     let new_accounts2 = get_new_accounts action2 receiver_id in
