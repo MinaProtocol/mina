@@ -1824,7 +1824,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             , `Added
             , `Has_permission_to_receive
                 (Account.has_permission ~to_:`Receive init_account) )
-        (* failwith "Got location for account, but no account found" *)
         | Some receiver_account ->
             ( receiver_account
             , `Existed
