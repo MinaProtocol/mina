@@ -198,7 +198,6 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
             sparse_ledger (Transaction.forget t)
           |> Or_error.ok_exn
         in
-        let (_ : _) = _applied.varying in
         let coinbase_stack_target =
           pending_coinbase_stack_target (Transaction.forget t)
             coinbase_stack_source
