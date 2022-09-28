@@ -627,7 +627,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use crate::srs::fp::WasmFpSrs;
-    use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine};
 
     impl_verification_key!(
         caml_pasta_fp_plonk_verifier_index,
@@ -651,7 +651,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use crate::srs::fq::WasmFqSrs;
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
+    use mina_curves::pasta::{Fq, Pallas as GAffine, Vesta as GAffineOther};
 
     impl_verification_key!(
         caml_pasta_fq_plonk_verifier_index,
