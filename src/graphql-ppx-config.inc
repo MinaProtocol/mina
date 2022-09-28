@@ -98,6 +98,9 @@ Graphql_lib.Scalars.StagedLedgerAuxHash
 PendingCoinbaseHash 
 Graphql_lib.Scalars.PendingCoinbaseHash
 -custom-field
+PendingCoinbaseAuxHash
+Graphql_lib.Scalars.PendingCoinbaseAuxHash
+-custom-field
 TransactionId
 Graphql_lib.Scalars.TransactionId
 -extend-query=Graphql_lib.Serializing.ExtendQuery
