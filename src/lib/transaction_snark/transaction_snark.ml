@@ -2523,7 +2523,7 @@ module Base = struct
       in
       Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
-    (* we calculate burned_tokens and new_account_fee when examining the fee payer *)
+    (* a couple of references, hard to thread the values *)
     let burned_tokens = ref Currency.Amount.(var_of_t zero) in
     let zero_fee =
       Currency.Amount.(Signed.create_var ~magnitude:(var_of_t zero))
