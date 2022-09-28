@@ -10,7 +10,7 @@ basic setup you need to get up and running to build and edit Mina.
 Here's the summary if you want to contribute code:
 
 1. Learn some OCaml. The [Real World OCaml](https://dev.realworldocaml.org/toc.html) book is good. Jane Street also has [some exercises](https://github.com/janestreet/learn-ocaml-workshop).
-2. Learn how we use OCaml. We have [a style guide](https://docs.minaprotocol.com/en/developers/style-guide) that goes over the important things.
+2. Learn how we use OCaml. We have [a style guide](https://docs.minaprotocol.com/en/node-developers/style-guide) that goes over the important things.
 3. Fork and clone the repo, then set up your development environment. See the [developer README](README-dev.md) for details.
 4. Find a good first issue. The best issues to start with are those tagged [`easy`](https://github.com/MinaProtocol/mina/labels/easy).
 5. Create a branch in your local clone and implement the solution.
@@ -57,7 +57,7 @@ tests.
 
 All pull requests must get _code reviewed_. Anyone can do a code
 review! Check out the [code review
-guide](https://docs.minaprotocol.com/en/developers/code-reviews) for
+guide](https://docs.minaprotocol.com/en/node-developers/code-reviews) for
 what to look for. Just leave comments on the "Files changed" view.
 
 All pull requests must be approved by at least one _code owner_ for the

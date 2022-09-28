@@ -630,7 +630,7 @@ let%test_unit "zkapp_command payment test" =
                       ~state_view:view )
               in
               let accounts =
-                List.concat_map ~f:Zkapp_command.accounts_accessed ts2
+                List.concat_map ~f:Zkapp_command.accounts_referenced ts2
               in
               (* TODO: Hack. The nonces are inconsistent between the 2
                  versions. See the comment in

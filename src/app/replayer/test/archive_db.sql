@@ -353,7 +353,7 @@ ALTER SEQUENCE public.epoch_data_id_seq OWNED BY public.epoch_data.id;
 
 CREATE TABLE public.internal_commands (
     id integer NOT NULL,
-    typ public.internal_command_type NOT NULL,
+    command_type public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
     fee text NOT NULL,
     hash text NOT NULL
@@ -567,7 +567,7 @@ ALTER SEQUENCE public.tokens_id_seq OWNED BY public.tokens.id;
 
 CREATE TABLE public.user_commands (
     id integer NOT NULL,
-    typ public.user_command_type NOT NULL,
+    command_type public.user_command_type NOT NULL,
     fee_payer_id integer NOT NULL,
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
@@ -2265,7 +2265,7 @@ COPY public.epoch_data (id, seed, ledger_hash_id, total_currency, start_checkpoi
 -- Data for Name: internal_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.internal_commands (id, typ, receiver_id, fee, hash) FROM stdin;
+COPY public.internal_commands (id, command_type, receiver_id, fee, hash) FROM stdin;
 1	coinbase	2	1440000000000	CkpZPC8P5wJ5zoMsUnwQ4yzMggpeifgXEtKG8L1qmsSZqAUaTGyHj
 2	fee_transfer	2	3500000000	CkpaKi6CtGXrNuB8NgSpH3wFkqeUNadD1BiXk41PpdGcHUnsRLYV7
 3	fee_transfer	2	1500000000	CkpZGU5BN9RcNywUqbNQ6ZUDmWM4MAAK9PcnTYASi7LXuKAbfMYQQ
@@ -2344,7 +2344,7 @@ COPY public.tokens (id, value, owner_public_key_id, owner_token_id) FROM stdin;
 -- Data for Name: user_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.user_commands (id, typ, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
+COPY public.user_commands (id, command_type, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
 1	payment	2	2	1	30	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZcwMTKuth1tPqomkFeYmsSkbqXNvzr9PsZKs6yTZDpvn7BwJpR
 2	payment	2	2	1	31	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZgMW3vCgskUnMLzLUngHKADPw72bWYWEeeCYmBsd9be1Nwtmzq
 3	payment	2	2	1	32	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZm3VfGE7AU8mMo2YZosE1VodqQYzZHzNc61xJvFTbhXbASbWUC

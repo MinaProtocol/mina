@@ -207,7 +207,7 @@ module User_command = struct
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT typ,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
+      {sql| SELECT command_type,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,status
 
@@ -333,7 +333,7 @@ module Internal_command = struct
   *)
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT typ,receiver_id,fee,
+      {sql| SELECT command_type,receiver_id,fee,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,
                    parent.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
