@@ -24,6 +24,10 @@
    currency_nonconsensus
    snark_params_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess
