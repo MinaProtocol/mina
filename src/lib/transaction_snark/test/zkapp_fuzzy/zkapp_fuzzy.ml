@@ -5,7 +5,7 @@ module U = Transaction_snark_tests.Util
 
 let logger = Logger.create ()
 
-let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
