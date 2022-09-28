@@ -12,7 +12,6 @@ import {
   addCachedAccount,
   Mina,
   verify,
-  RemoteBlockchain,
 } from "snarkyjs";
 
 await isReady;
@@ -57,7 +56,7 @@ console.log(
 let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
 let zkappAddress = zkappKey.toPublicKey();
 
-Mina.setActiveInstance(RemoteBlockchain(graphqlUrl));
+Mina.setActiveInstance(Mina.RemoteBlockchain(graphqlUrl));
 
 if (command === "deploy") {
   // snarkyjs part
