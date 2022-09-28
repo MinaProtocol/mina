@@ -1454,9 +1454,9 @@ module Circuit = struct
     Typ.array ~length:typ##sizeInFields Field.typ
 
   let witness_minimal (type a) (typ : a as_field_elements_minimal Js.t)
-      (f : (unit -> a) Js.callback) =
+      (f : (unit -> field_class Js.t Js.js_array Js.t) Js.callback) =
     Impl.exists (typ_minimal typ) ~compute:(fun () ->
-        typ##toFields (Js.Unsafe.fun_call f [||])
+        Js.Unsafe.fun_call f [||]
         |> Js.to_array
         |> Array.map ~f:of_js_field_unchecked )
     |> Array.map ~f:to_js_field |> Js.array
