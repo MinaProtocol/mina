@@ -82,6 +82,7 @@ automation/services/watchdog/check_libp2p/check_libp2p
 *.backup
 
 *.terraform.lock.hcl
+*gcloud-keyfile.json*
 _opam
 
 target

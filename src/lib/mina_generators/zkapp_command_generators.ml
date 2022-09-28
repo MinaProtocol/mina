@@ -612,7 +612,8 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
-       , 'caller )
+       , 'caller
+       , 'authorization_kind )
        t =
     { public_key : 'pk
     ; update : 'update
@@ -627,6 +628,7 @@ module Account_update_body_components = struct
     ; account_precondition : 'account_precondition
     ; use_full_commitment : 'bool
     ; caller : 'caller
+    ; authorization_kind : 'authorization_kind
     }
 
   let to_fee_payer t : Account_update.Body.Fee_payer.t =
@@ -661,6 +663,7 @@ module Account_update_body_components = struct
         }
     ; use_full_commitment = t.use_full_commitment
     ; caller = t.caller
+    ; authorization_kind = t.authorization_kind
     }
 end
 
@@ -689,7 +692,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_account_update_account_precondition :
        d -> Account_update.Account_precondition.t ) ~authorization_tag () :
-    (_, _, _, a, _, _, _, b, _, d, _) Account_update_body_components.t
+    (_, _, _, a, _, _, _, b, _, d, _, _) Account_update_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
@@ -871,6 +874,15 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
         return caller
   in
   let token_id = f_token_id token_id in
+  let authorization_kind =
+    match authorization_tag with
+    | Control.Tag.None_given ->
+        Account_update.Authorization_kind.None_given
+    | Signature ->
+        Signature
+    | Proof ->
+        Proof
+  in
   (* update account state table with all the changes*)
   (let add_balance_and_balance_change balance
        (balance_change : (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t) =
@@ -994,6 +1006,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; account_precondition
   ; use_full_commitment
   ; caller
+  ; authorization_kind
   }
 
 let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
