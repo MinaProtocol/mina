@@ -134,23 +134,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       module Unsafe = N.Unsafe
 
-      let typ = N.typ
-
       let to_input (t : t) = N.to_input t
 
       let to_field = N.to_field
 
-      open N
-
-      let ( = ) = ( = )
-
-      let ( <= ) = ( <= )
-
-      let ( >= ) = ( >= )
-
-      let ( < ) = ( < )
-
-      let ( > ) = ( > )
+      [%%define_locally N.(typ, ( = ), ( <= ), ( >= ), ( < ), ( > ))]
     end
 
     module Span = struct
@@ -185,25 +173,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let of_ms = UInt64.of_int64
 
-      let ( + ) = UInt64.Infix.( + )
+      [%%define_locally UInt64.Infix.(( + ), ( - ), ( * ))]
 
-      let ( - ) = UInt64.Infix.( - )
-
-      let ( * ) = UInt64.Infix.( * )
-
-      let ( < ) = UInt64.( < )
-
-      let ( > ) = UInt64.( > )
-
-      let ( = ) = UInt64.( = )
-
-      let ( <= ) = UInt64.( <= )
-
-      let ( >= ) = UInt64.( >= )
-
-      let min = UInt64.min
-
-      let zero = UInt64.zero
+      [%%define_locally UInt64.(( < ), ( > ), ( = ), ( <= ), ( >= ), min, zero)]
 
       let to_input = to_input
 

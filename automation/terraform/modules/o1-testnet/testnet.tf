@@ -102,11 +102,6 @@ module "kubernetes_testnet" {
     }
   ]
 
-  cpu_request = var.cpu_request
-  mem_request= var.mem_request
-  worker_cpu_request = var.worker_cpu_request
-  worker_mem_request= var.worker_mem_request
-
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes
   restart_nodes_every_mins        = var.restart_nodes_every_mins

@@ -477,7 +477,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     in
     match txn_unchecked with
     | Command (Signed_command uc) ->
-        ( Signed_command.accounts_accessed (uc :> Signed_command.t)
+        ( Signed_command.accounts_referenced (uc :> Signed_command.t)
         , pending_coinbase_stack )
     | Command (Zkapp_command _) ->
         failwith "Zkapp_command commands not supported here"

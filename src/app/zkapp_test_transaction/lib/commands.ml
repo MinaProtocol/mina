@@ -335,7 +335,11 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let verification_key =
     let data =
-      Side_loaded_verification_key.of_base58_check_exn verification_key
+      match Side_loaded_verification_key.of_base64 verification_key with
+      | Ok vk_data ->
+          vk_data
+      | Error err ->
+          failwith (Error.to_string_hum err)
     in
     let hash = Zkapp_account.digest_vk data in
     Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
