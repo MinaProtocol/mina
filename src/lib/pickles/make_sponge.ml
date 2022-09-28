@@ -19,8 +19,6 @@ module type S = sig
 
     type field := Field.t
 
-    type fields := field array
-
     val to_the_alpha : field -> field
 
     val alpha : int
