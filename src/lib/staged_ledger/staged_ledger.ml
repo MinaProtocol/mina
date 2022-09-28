@@ -3803,7 +3803,7 @@ let%test_module "staged ledger tests" =
             }
           in
           let memo = Signed_command_memo.dummy in
-          let test_spec : Spec.t =
+          let test_spec : Update_states_spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
             ; fee_payer = None

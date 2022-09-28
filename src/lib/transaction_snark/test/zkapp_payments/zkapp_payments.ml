@@ -4,7 +4,7 @@ open Currency
 open Snark_params
 open Tick
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 open Mina_base
 
 let%test_module "Zkapp payments tests" =
@@ -72,6 +72,7 @@ let%test_module "Zkapp payments tests" =
                       }
                   ; use_full_commitment = false
                   ; caller = Call
+                  ; authorization_kind = Signature
                   }
               ; authorization = Signature Signature.dummy
               }
@@ -92,6 +93,7 @@ let%test_module "Zkapp payments tests" =
                       }
                   ; use_full_commitment = false
                   ; caller = Call
+                  ; authorization_kind = None_given
                   }
               ; authorization = None_given
               }
@@ -193,7 +195,6 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
@@ -260,7 +261,6 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []

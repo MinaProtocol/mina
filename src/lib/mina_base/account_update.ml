@@ -20,6 +20,105 @@ module type Type = sig
   type t
 end
 
+module Authorization_kind = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+            Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
+        | None_given
+        | Signature
+        | Proof
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Structured = struct
+    type t = { is_signed : bool; is_proved : bool } [@@deriving hlist]
+
+    let to_input ({ is_signed; is_proved } : t) =
+      let f x = if x then Field.one else Field.zero in
+      Random_oracle_input.Chunked.packeds
+        [| (f is_signed, 1); (f is_proved, 1) |]
+
+    [%%ifdef consensus_mechanism]
+
+    module Checked = struct
+      type t = { is_signed : Boolean.var; is_proved : Boolean.var }
+      [@@deriving hlist]
+
+      let to_input { is_signed; is_proved } =
+        let f (x : Boolean.var) = (x :> Field.Var.t) in
+        Random_oracle_input.Chunked.packeds
+          [| (f is_signed, 1); (f is_proved, 1) |]
+    end
+
+    let typ =
+      Typ.of_hlistable ~var_to_hlist:Checked.to_hlist
+        ~var_of_hlist:Checked.of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+        [ Boolean.typ; Boolean.typ ]
+
+    [%%endif]
+  end
+
+  let to_structured : t -> Structured.t = function
+    | None_given ->
+        { is_signed = false; is_proved = false }
+    | Signature ->
+        { is_signed = true; is_proved = false }
+    | Proof ->
+        { is_signed = false; is_proved = true }
+
+  let of_structured_exn : Structured.t -> t = function
+    | { is_signed = false; is_proved = false } ->
+        None_given
+    | { is_signed = true; is_proved = false } ->
+        Signature
+    | { is_signed = false; is_proved = true } ->
+        Proof
+    | { is_signed = true; is_proved = true } ->
+        failwith "Invalid authorization kind"
+
+  let to_string = function
+    | None_given ->
+        "None_given"
+    | Signature ->
+        "Signature"
+    | Proof ->
+        "Proof"
+
+  let of_string_exn = function
+    | "None_given" ->
+        None_given
+    | "Signature" ->
+        Signature
+    | "Proof" ->
+        Proof
+    | _ ->
+        failwith "Invalid authorization kind"
+
+  let gen = Quickcheck.Generator.of_list [ None_given; Signature; Proof ]
+
+  let deriver obj =
+    let open Fields_derivers_zkapps in
+    iso_string ~name:"AuthorizationKind" ~js_type:(Custom "AuthorizationKind")
+      ~to_string ~of_string:of_string_exn obj
+
+  let to_input x = Structured.to_input (to_structured x)
+
+  [%%ifdef consensus_mechanism]
+
+  module Checked = Structured.Checked
+
+  let typ =
+    Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
+
+  [%%endif]
+end
+
 module Call_type = struct
   [%%versioned
   module Stable = struct
@@ -757,6 +856,7 @@ module Body = struct
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Call_type.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -776,7 +876,8 @@ module Body = struct
       and call_data = Field.gen
       and preconditions = Preconditions.gen
       and use_full_commitment = Quickcheck.Generator.bool
-      and caller = Call_type.gen in
+      and caller = Call_type.gen
+      and authorization_kind = Authorization_kind.gen in
       { public_key
       ; token_id
       ; update
@@ -788,6 +889,7 @@ module Body = struct
       ; preconditions
       ; use_full_commitment
       ; caller
+      ; authorization_kind
       }
   end
 
@@ -809,6 +911,7 @@ module Body = struct
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Token_id.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
@@ -825,6 +928,7 @@ module Body = struct
         ~sequence_events:!.Sequence_events.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
         ~caller:!.Token_id.deriver ~call_depth:!.int
+        ~authorization_kind:!.Authorization_kind.deriver
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
     let dummy : t =
@@ -840,6 +944,7 @@ module Body = struct
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
       ; caller = Token_id.default
+      ; authorization_kind = None_given
       }
   end
 
@@ -861,6 +966,7 @@ module Body = struct
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Call_type.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
@@ -885,6 +991,7 @@ module Body = struct
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
         ; caller : Token_id.Stable.V1.t
+        ; authorization_kind : Authorization_kind.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
@@ -904,6 +1011,7 @@ module Body = struct
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
 
   let of_graphql_repr
@@ -919,6 +1027,7 @@ module Body = struct
        ; use_full_commitment
        ; caller
        ; call_depth = _
+       ; authorization_kind
        } :
         Graphql_repr.t ) : t =
     { public_key
@@ -932,6 +1041,7 @@ module Body = struct
     ; preconditions
     ; use_full_commitment
     ; caller
+    ; authorization_kind
     }
 
   let to_graphql_repr
@@ -946,6 +1056,7 @@ module Body = struct
        ; preconditions
        ; use_full_commitment
        ; caller
+       ; authorization_kind
        } :
         t ) ~call_depth : Graphql_repr.t =
     { Graphql_repr.public_key
@@ -960,6 +1071,7 @@ module Body = struct
     ; use_full_commitment
     ; caller
     ; call_depth
+    ; authorization_kind
     }
 
   module Fee_payer = struct
@@ -1037,6 +1149,7 @@ module Body = struct
         }
     ; use_full_commitment = true
     ; caller = Token_id.default
+    ; authorization_kind = Signature
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
@@ -1051,6 +1164,7 @@ module Body = struct
         ; preconditions
         ; use_full_commitment = _
         ; caller = _
+        ; authorization_kind = _
         } =
       t
     in
@@ -1098,6 +1212,7 @@ module Body = struct
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
       ; caller : Token_id.Checked.t
+      ; authorization_kind : Authorization_kind.Checked.t
       }
     [@@deriving annot, hlist, fields]
 
@@ -1113,6 +1228,7 @@ module Body = struct
          ; preconditions
          ; use_full_commitment
          ; caller
+         ; authorization_kind
          } :
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -1130,6 +1246,7 @@ module Body = struct
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
         ; Token_id.Checked.to_input caller
+        ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
     let digest (t : t) =
@@ -1150,6 +1267,7 @@ module Body = struct
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
       ; Token_id.typ
+      ; Authorization_kind.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -1166,6 +1284,7 @@ module Body = struct
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
     ; caller = Token_id.default
+    ; authorization_kind = None_given
     }
 
   let%test_unit "json roundtrip" =
@@ -1187,6 +1306,7 @@ module Body = struct
        ; preconditions
        ; use_full_commitment
        ; caller
+       ; authorization_kind
        } :
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -1201,6 +1321,7 @@ module Body = struct
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ; Token_id.to_input caller
+      ; Authorization_kind.to_input authorization_kind
       ]
 
   let digest (t : t) =
@@ -1225,7 +1346,8 @@ module Body = struct
     and sequence_events = return []
     and call_data = Field.gen
     and preconditions = Preconditions.gen
-    and use_full_commitment = Quickcheck.Generator.bool in
+    and use_full_commitment = Quickcheck.Generator.bool
+    and authorization_kind = Authorization_kind.gen in
     { public_key
     ; token_id
     ; update
@@ -1237,6 +1359,7 @@ module Body = struct
     ; preconditions
     ; use_full_commitment
     ; caller
+    ; authorization_kind
     }
 end
 

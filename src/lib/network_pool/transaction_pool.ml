@@ -1767,7 +1767,7 @@ let%test_module _ =
         | Some time ->
             Zkapp_precondition.Protocol_state.valid_until time
       in
-      let test_spec : Transaction_snark.For_tests.Spec.t =
+      let test_spec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
         { sender
         ; fee_payer
         ; fee
@@ -1777,7 +1777,6 @@ let%test_module _ =
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
