@@ -1426,6 +1426,20 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | None_given ->
             (`Proof_verifies false, `Signature_verifies false)
 
+      let is_proved (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Proof ->
+            true
+        | Signature | None_given ->
+            false
+
+      let is_signed (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Signature ->
+            true
+        | Proof | None_given ->
+            false
+
       module Update = struct
         open Zkapp_basic
 
@@ -2303,6 +2317,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment
+                ; authorization_kind = Signature
                 }
             ; authorization = None_given
             }
@@ -2330,6 +2345,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = None_given
                 }
             ; authorization = None_given
             }

@@ -126,6 +126,7 @@ let%test_module "Composability test" =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
+        ; authorization_kind = Signature
         }
 
       let account_update : Account_update.t =
