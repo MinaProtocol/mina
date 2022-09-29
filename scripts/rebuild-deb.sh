@@ -111,7 +111,7 @@ copy_common_daemon_configs() {
   echo "copy_common_daemon_configs inputs:"
   echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
   echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL: ${3}"
+  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -141,7 +141,7 @@ copy_common_daemon_configs() {
 
   # Update the mina.service with a new default PEERS_URL based on Seed List URL $3
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
-  sed "s%PEERS_LIST_URL_PLACEHOLDER%${3}%../scripts/mina.service" > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${3}%" ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
   # Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
   # Genesis Ledger/proof/epoch ledger Copy
@@ -186,7 +186,7 @@ then
 
   create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-  copy_common_daemon_configs mainnet mainnet https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt
+  copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
   build_deb mina-mainnet
 
@@ -202,7 +202,7 @@ then
 
   copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
-  copy_common_daemon_configs devnet testnet https://storage.googleapis.com/seed-lists/devnet_seeds.txt
+  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
   build_deb mina-devnet
 
@@ -229,7 +229,7 @@ echo "Building Mina Berkeley testnet signatures deb without keys:"
 mkdir -p "${BUILDDIR}/DEBIAN"
 create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-copy_common_daemon_configs berkeley testnet https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
 build_deb mina-berkeley
 
