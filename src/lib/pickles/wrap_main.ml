@@ -104,7 +104,7 @@ let wrap_main
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      (Wrap_main_inputs.Inner_curve.Constant.t index, branches) Vector.t Lazy.t
+      (Wrap_main_inputs.Inner_curve.Constant.t index', branches) Vector.t Lazy.t
       ) (step_widths : (int, branches) Vector.t)
     (step_domains : (Domains.t, branches) Vector.t)
     (max_proofs_verified :
