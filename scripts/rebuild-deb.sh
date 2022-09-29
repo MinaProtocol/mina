@@ -139,8 +139,8 @@ copy_common_daemon_configs() {
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
-  # Overwrite the mina.service with a new default PEERS_URL based on Seed List URL $3
-  rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+  # Update the mina.service with a new default PEERS_URL based on Seed List URL $3
+  mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
   sed "s%PEERS_LIST_URL_PLACEHOLDER%${3}%../scripts/mina.service" > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
   # Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
