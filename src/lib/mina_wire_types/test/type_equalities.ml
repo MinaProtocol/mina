@@ -351,3 +351,9 @@ module Consensus = struct
   module W = WT.Consensus
   include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
 end
+
+module Consensus_vrf = struct
+  module O = Consensus_vrf
+  module W = WT.Consensus_vrf
+  include Assert_equal0V1 (O.Output.Truncated.Stable) (W.Output.Truncated)
+end
