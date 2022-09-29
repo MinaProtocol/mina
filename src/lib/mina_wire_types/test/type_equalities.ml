@@ -277,6 +277,7 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Fee_with_prover.Stable) (W.Fee_with_prover)
   include Assert_equal0V1 (O.State_body_hash.Stable) (W.State_body_hash)
   include Assert_equal0V1 (O.Frozen_ledger_hash0.Stable) (W.Frozen_ledger_hash0)
+  include Assert_equal0V1 (O.Epoch_ledger.Value.Stable) (W.Epoch_ledger.Value)
 end
 
 module One_or_two = struct
