@@ -36,3 +36,4 @@ module Stack_frame = Mina_base_stack_frame
 module Sok_message = Mina_base_sok_message
 module Fee_with_prover = Mina_base_fee_with_prover
 module State_body_hash = Mina_base_state_body_hash
+module Frozen_ledger_hash0 = Mina_base_frozen_ledger_hash0
