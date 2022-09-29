@@ -130,6 +130,8 @@ copy_common_daemon_configs() {
   cp "../src/config/${2//test/dev}.mlh" "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
   rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
+  mkdir -p "${BUILDDIR}/var/lib/coda"
+
   # Include all useful genesis ledgers
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
@@ -143,7 +145,6 @@ copy_common_daemon_configs() {
 
   # Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
   # Genesis Ledger/proof/epoch ledger Copy
-  mkdir -p "${BUILDDIR}/var/lib/coda"
   for f in /tmp/coda_cache_dir/genesis*; do
       if [ -e "$f" ]; then
           mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
@@ -284,5 +285,10 @@ then
   rm -rf "${BUILDDIR}"
 fi
 
+if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+  echo "---- Built all packages including mainnet, devnet, and the sidecar"
+else
+  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"  
+fi
 
 ls -lh mina*.deb
