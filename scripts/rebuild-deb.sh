@@ -43,276 +43,193 @@ esac
 
 BUILDDIR="deb_build"
 
-##################################### GENERATE KEYPAIR PACKAGE #######################################
 
-mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
+# Function to ease creation of Debian package control files
+create_control_file() {
+  
+  echo "------------------------------------------------------------"
+  echo "create_control_file inputs:"
+  echo "Package Name: ${1}"
+  echo "Dependencies: ${2}"
+  echo "Description: ${3}"
 
-Package: mina-generate-keypair
+  # Make sure the directory exists
+  mkdir -p "${BUILDDIR}/DEBIAN"
+
+  # Also make the binary directory that all packages need
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+  
+  # Create the control file itself
+  cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: ${SHARED_DEPS}
+Depends: ${2}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
-Description: Utility to generate mina private/public keys in new format
- Utility to regenerate mina private public keys in new format
+Description:
+ ${3}
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+  echo "------------------------------------------------------------"
+  echo "Control File:"
+  cat "${BUILDDIR}/DEBIAN/control"
 
-# Binaries
-mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+}
 
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
+# Function to ease package build
+build_deb() {
 
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
+  echo "------------------------------------------------------------"
+  echo "build_deb inputs:"
+  echo "Package Name: ${1}"
 
+  # echo contents of deb
+  echo "------------------------------------------------------------"
+  echo "Deb Contents:"
+  find "${BUILDDIR}"
+
+  # Build the package
+  echo "------------------------------------------------------------"
+  fakeroot dpkg-deb --build "${BUILDDIR}" ${1}_${MINA_DEB_VERSION}.deb
+  echo "build_deb outputs:"
+  ls -lh ${1}_*.deb
+  echo "deleting BUILDDIR ${BUILDDIR}"
+  rm -rf "${BUILDDIR}"
+}
+
+# Function to DRY copying config files into daemon packages
+copy_common_daemon_configs() {
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_configs inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Signature Type: ${2} (mainnet or testnet)"
+  echo "Seed List URL: ${3}"
+
+  # Copy shared binaries
+  cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+  cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
+  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+
+  # Copy signature-based Binaries (based on signature type $2 passed into the function)
+  cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+  cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+
+  # Copy over Build Configs (based on $2)
+  mkdir -p "${BUILDDIR}/etc/coda/build_config"
+  cp ../src/config/${2}.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+  rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
+
+  # Include all useful genesis ledgers
+  cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
+  cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
+  # Set the default configuration based on Network name ($1)
+  cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
+  # Overwrite the mina.service with a new default PEERS_URL based on Seed List URL $3
+  rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%${3}%../scripts/mina.service" > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
+  # Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
+  # Genesis Ledger/proof/epoch ledger Copy
+  mkdir -p "${BUILDDIR}/var/lib/coda"
+  for f in /tmp/coda_cache_dir/genesis*; do
+      if [ -e "$f" ]; then
+          mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+      fi
+  done
+  
+  # Support bash completion
+  # NOTE: We do not list bash-completion as a required package,
+  #       but it needs to be present for this to be effective
+  mkdir -p "${BUILDDIR}/etc/bash_completion.d"
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > "${BUILDDIR}/etc/bash_completion.d/mina"
+  
+}
+
+##################################### GENERATE KEYPAIR PACKAGE #######################################
+if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+then
+
+  echo "------------------------------------------------------------"
+  echo "Building generate keypair deb:"
+
+  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
+
+  # Binaries
+  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+
+  build_deb mina-generate-keypair
+
+fi # only builds on mainnet-like branches
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
-##################################### SNAPP TEST TXN #######################################
-
-mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-
-Package: mina-zkapp-test-transaction
-Version: ${MINA_DEB_VERSION}
-License: Apache-2.0
-Vendor: none
-Architecture: amd64
-Maintainer: O(1)Labs <build@o1labs.org>
-Installed-Size:
-Depends: ${SHARED_DEPS}${DAEMON_DEPS}
-Section: base
-Priority: optional
-Homepage: https://minaprotocol.com/
-Description: Utility to generate Snapp transactions in Mina GraphQL format
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
-
-# Binaries
-mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
-
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-zkapp-test-transaction_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
-
-##################################### END SNAPP TEST TXN PACKAGE #######################################
-
 ##################################### MAINNET PACKAGE #######################################
-echo "------------------------------------------------------------"
-echo "Building mainnet deb without keys:"
+if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+then
 
-rm -rf "${BUILDDIR}"
-mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: mina-mainnet
-Version: ${MINA_DEB_VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: ${SHARED_DEPS}${DAEMON_DEPS}
-Suggests: postgresql
-Conflicts: mina-devnet
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: O(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
+  echo "------------------------------------------------------------"
+  echo "Building mainnet deb without keys:"
 
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-echo "------------------------------------------------------------"
-# Binaries
-mkdir -p "${BUILDDIR}/usr/local/bin"
-sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  copy_common_daemon_configs mainnet mainnet https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt
 
-libp2p_location=../src/app/libp2p_helper/result/bin
-ls -l ../src/app/libp2p_helper/result/bin || libp2p_location=$HOME/app/
-p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-cp $libp2p_location/libp2p_helper $p2p_path
-chmod +w $p2p_path
-# Only for nix builds
-# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
-cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
+  build_deb mina-mainnet
 
-mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
-sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-
-# Build Config
-mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
-
-# Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
-# Genesis Ledger/proof/epoch ledger Copy
-mkdir -p "${BUILDDIR}/var/lib/coda"
-for f in /tmp/coda_cache_dir/genesis*; do
-    if [ -e "$f" ]; then
-        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    fi
-done
-
-#copy config.json
-cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
-cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
-# The default configuration:
-cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-
-# Bash autocompletion
-# NOTE: We do not list bash-completion as a required package,
-#       but it needs to be present for this to be effective
-mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-cwd=$(pwd)
-export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
-
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
-
+fi # only builds on mainnet-like branches
 ##################################### END MAINNET PACKAGE #######################################
 
 ##################################### DEVNET PACKAGE #######################################
+if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+then
+
+  echo "------------------------------------------------------------"
+  echo "Building testnet signatures deb without keys:"
+  
+  copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+
+  copy_common_daemon_configs devnet testnet https://storage.googleapis.com/seed-lists/devnet_seeds.txt
+  
+  build_deb mina-devnet
+  
+fi # only builds on mainnet-like branches
+##################################### END DEVNET PACKAGE #######################################
+
+##################################### ZKAPP TEST TXN #######################################
 echo "------------------------------------------------------------"
-echo "Building testnet signatures deb without keys:"
+echo "Building Mina Berkeley ZkApp test transaction tool:"
 
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: mina-devnet
-Version: ${MINA_DEB_VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: ${SHARED_DEPS}${DAEMON_DEPS}
-Suggests: postgresql
-Conflicts: mina-mainnet
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: O(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
+create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+# Binaries
+cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
 
+build_deb mina-zkapp-test-transaction
 
-echo "------------------------------------------------------------"
-# Overwrite binaries (sudo to fix permissions error)
-sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-
-# Switch the default configuration to devnet.json:
-sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-
-# Overwrite the mina.service with a new default PEERS_URL
-rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/devnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-
-
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
-
-##################################### END MAINNET PACKAGE #######################################
+##################################### END SNAPP TEST TXN PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
-
 echo "------------------------------------------------------------"
 echo "Building Mina Berkeley testnet signatures deb without keys:"
 
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: mina-berkeley
-Version: ${MINA_DEB_VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: ${SHARED_DEPS}${DAEMON_DEPS}
-Suggests: postgresql
-Conflicts: mina-mainnet
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: O(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
+mkdir -p "${BUILDDIR}/DEBIAN"
+create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+copy_common_daemon_configs berkeley testnet https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
 
-
-echo "------------------------------------------------------------"
-# Overwrite binaries (sudo to fix permissions error)
-sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-
-# Switch the default configuration to devnet.json:
-sudo cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-
-# Overwrite the mina.service with a new default PEERS_URL
-rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/berkeley_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-
-
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-berkeley_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
+build_deb mina-berkeley
 
 ##################################### END BERKELEY PACKAGE #######################################
 
@@ -359,9 +276,12 @@ do
     done
 done
 
-#remove build dir to prevent running out of space on the host machine
-rm -rf "${BUILDDIR}"
-
 # Build mina block producer sidecar
-../automation/services/mina-bp-stats/sidecar/build.sh
+if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+then
+  ../automation/services/mina-bp-stats/sidecar/build.sh # only builds on mainnet-like branches
+  rm -rf "${BUILDDIR}"
+fi
+
+
 ls -lh mina*.deb

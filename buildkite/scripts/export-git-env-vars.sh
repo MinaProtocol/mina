@@ -31,14 +31,14 @@ fi
 
 # Determine deb repo to use
 case $GITBRANCH in
-    master)
-        RELEASE=stable ;;
-    compatible|master|release*) # whitelist of branches that can be tagged
+    berkeley|rampup|compatible|master|release*) # whitelist of branches that can be tagged
         case "${THIS_COMMIT_TAG}" in
           *alpha*) # any tag including the string `alpha`
             RELEASE=alpha ;;
           *beta*) # any tag including the string `beta`
             RELEASE=beta ;;
+          *rampup*) # any tag including the string `rampup`
+            RELEASE=rampup ;;
           ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
             RELEASE=stable ;;
           "") # No tag
@@ -50,6 +50,14 @@ case $GITBRANCH in
         esac ;;
     *)
         RELEASE=unstable ;;
+esac
+
+# Determine the packages to build (mainnet y/N)
+case $GITBRANCH in
+    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
+      MINA_BUILD_MAINNET=true ;;
+    *) # Other branches
+      MINA_BUILD_MAINNET=false ;;
 esac
 
 echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
