@@ -337,8 +337,8 @@ end
 module Protocol_version = struct
   module O = Protocol_version
   module W = WT.Protocol_version
-  include Assert_equal0V1 (O.Stable) (W)           
-end  
+  include Assert_equal0V1 (O.Stable) (W)
+end
 
 module Network_pool = struct
   module O = Network_pool

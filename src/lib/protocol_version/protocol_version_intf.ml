@@ -1,40 +1,40 @@
 module type Full = sig
   [%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t [@@deriving compare, sexp, yojson]
-  end
-end]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving compare, sexp, yojson]
+    end
+  end]
 
-val major : t -> int
+  val major : t -> int
 
-val minor : t -> int
+  val minor : t -> int
 
-val patch : t -> int
+  val patch : t -> int
 
-val create_exn : major:int -> minor:int -> patch:int -> t
+  val create_exn : major:int -> minor:int -> patch:int -> t
 
-val create_opt : major:int -> minor:int -> patch:int -> t option
+  val create_opt : major:int -> minor:int -> patch:int -> t option
 
-val get_current : unit -> t
+  val get_current : unit -> t
 
-val set_current : t -> unit
+  val set_current : t -> unit
 
-val get_proposed_opt : unit -> t option
+  val get_proposed_opt : unit -> t option
 
-val set_proposed_opt : t option -> unit
+  val set_proposed_opt : t option -> unit
 
-val zero : t
+  val zero : t
 
-(** a daemon can accept blocks or RPC responses with compatible protocol versions *)
-val compatible_with_daemon : t -> bool
+  (** a daemon can accept blocks or RPC responses with compatible protocol versions *)
+  val compatible_with_daemon : t -> bool
 
-val to_string : t -> string
+  val to_string : t -> string
 
-val of_string_exn : string -> t
+  val of_string_exn : string -> t
 
-val of_string_opt : string -> t option
+  val of_string_opt : string -> t option
 
-(** useful when deserializing, could contain negative integers *)
-val is_valid : t -> bool
+  (** useful when deserializing, could contain negative integers *)
+  val is_valid : t -> bool
 end
