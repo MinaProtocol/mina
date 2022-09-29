@@ -2298,6 +2298,11 @@ let verify (public_input : public_input_js) (proof : proof)
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
   |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
+let dummy_base64_proof () =
+  let n2 = Pickles_types.Nat.N2.n in
+  let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+  Proof2.to_base64 proof |> Js.string
+
 let pickles =
   object%js
     val compile = pickles_compile
@@ -2305,6 +2310,8 @@ let pickles =
     val circuitDigest = pickles_digest
 
     val verify = verify
+
+    val dummyBase64Proof = dummy_base64_proof
 
     val proofToBase64 = proof_to_base64
 
