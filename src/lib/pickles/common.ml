@@ -142,8 +142,9 @@ module Ipa = struct
     endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
-    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        compute_challenge field ~endo_to_field prechallenge )
+    Vector.map chals ~f:(fun prechallenge ->
+        Bulletproof_challenge.pack prechallenge
+        |> compute_challenge field ~endo_to_field )
 
   module Wrap = struct
     let field =

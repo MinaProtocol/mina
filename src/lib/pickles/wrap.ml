@@ -256,10 +256,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       let open Tick.Field in
       challenge_poly zeta + (r * challenge_poly zetaw)
     in
-    let prechals =
-      Array.map prechals ~f:(fun x ->
-          { Bulletproof_challenge.prechallenge = x } )
-    in
+    let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
     (prechals, b)
   in
   let shift_value =

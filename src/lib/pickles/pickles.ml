@@ -2504,9 +2504,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               assert false
                         in
                         let overwritten_prechals =
-                          Array.map overwritten_prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map overwritten_prechals
+                            ~f:Bulletproof_challenge.unpack
                         in
+
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
@@ -3393,9 +3394,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let b = Tick.Field.random () in
                         let prechals =
-                          Array.map prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map prechals ~f:Bulletproof_challenge.unpack
                         in
+
                         (prechals, b)
                       in
                       let plonk =

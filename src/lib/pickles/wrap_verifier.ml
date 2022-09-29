@@ -165,8 +165,7 @@ struct
     let term_and_challenge (l, r) pre =
       let left_term = Scalar_challenge.endo_inv l pre in
       let right_term = Scalar_challenge.endo r pre in
-      ( Ops.add_fast left_term right_term
-      , { Bulletproof_challenge.prechallenge = pre } )
+      (Ops.add_fast left_term right_term, Bulletproof_challenge.unpack pre)
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -722,8 +721,8 @@ struct
         Array.zip_exn (mask lengths choice) e )
 
   let compute_challenges ~scalar chals =
-    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        scalar prechallenge )
+    Vector.map chals ~f:(fun prechallenge ->
+        scalar @@ Bulletproof_challenge.pack prechallenge )
 
   let challenge_polynomial = Field.(challenge_polynomial ~add ~mul ~one)
 
@@ -990,7 +989,7 @@ struct
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges
           ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            { Bulletproof_challenge.prechallenge = scalar r.prechallenge } )
+            Bulletproof_challenge.map ~f:scalar r )
     ; xi = scalar xi
     ; b
     }

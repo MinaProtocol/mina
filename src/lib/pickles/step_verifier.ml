@@ -202,7 +202,7 @@ struct
           let left_term = Scalar_challenge.endo_inv l pre in
           let right_term = Scalar_challenge.endo r pre in
           ( Inner_curve.(left_term + right_term)
-          , { Bulletproof_challenge.prechallenge = pre } )
+          , Bulletproof_challenge.unpack pre )
         in
         let terms, challenges =
           Array.map2_exn gammas prechallenges ~f:term_and_challenge
@@ -633,8 +633,7 @@ struct
 
   let compute_challenges ~scalar chals =
     with_label "compute_challenges" (fun () ->
-        Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-            scalar prechallenge ) )
+        Vector.map chals ~f:(fun b -> Bulletproof_challenge.pack b |> scalar) )
 
   let challenge_polynomial =
     Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
@@ -1207,7 +1206,7 @@ struct
           ~f:(fun i c1 ->
             let c2 = bulletproof_challenges_actual.(i) in
             let { Import.Scalar_challenge.inner = c1 } =
-              c1.Bulletproof_challenge.prechallenge
+              Bulletproof_challenge.pack c1
             in
             let c2 =
               Field.if_ is_base_case ~then_:c1

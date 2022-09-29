@@ -24,12 +24,13 @@ module Ipa = struct
     let challenges =
       Pickles_types.Vector.init Backend.Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Composition_types.Bulletproof_challenge.prechallenge } )
+          Composition_types.Bulletproof_challenge.unpack prechallenge )
 
     let challenges_computed =
       Pickles_types.Vector.map challenges
-        ~f:(fun Composition_types.{ prechallenge } : Backend.Tock.Field.t ->
-          Common.Ipa.Wrap.compute_challenge prechallenge )
+        ~f:(fun prechallenge : Backend.Tock.Field.t ->
+          Common.Ipa.Wrap.compute_challenge
+          @@ Composition_types.Bulletproof_challenge.pack prechallenge )
 
     let sg =
       lazy
@@ -41,12 +42,13 @@ module Ipa = struct
     let challenges =
       Pickles_types.Vector.init Backend.Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Composition_types.Bulletproof_challenge.prechallenge } )
+          Composition_types.Bulletproof_challenge.unpack prechallenge )
 
     let challenges_computed =
       Pickles_types.Vector.map challenges
-        ~f:(fun Composition_types.{ prechallenge } : Backend.Tick.Field.t ->
-          Common.Ipa.Step.compute_challenge prechallenge )
+        ~f:(fun prechallenge : Backend.Tick.Field.t ->
+          Common.Ipa.Step.compute_challenge
+          @@ Composition_types.Bulletproof_challenge.pack prechallenge )
 
     let sg =
       lazy

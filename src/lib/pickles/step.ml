@@ -333,9 +333,7 @@ struct
         in
         let prechals =
           Vector.of_list_and_length_exn
-            ( Array.map prechals ~f:(fun x ->
-                  { Bulletproof_challenge.prechallenge = x } )
-            |> Array.to_list )
+            (Array.map prechals ~f:Bulletproof_challenge.unpack |> Array.to_list)
             Tock.Rounds.n
         in
         (prechals, b)
