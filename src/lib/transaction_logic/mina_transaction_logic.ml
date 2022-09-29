@@ -203,17 +203,17 @@ module Transaction_applied = struct
     let%bind expected_supply_increase =
       Transaction.expected_supply_increase txn
     in
-    let rec process_negations total = function
+    let rec process_decreases total = function
       | [] ->
           Some total
       | amt :: amts ->
           let%bind.Option sum =
             Currency.Amount.Signed.(add @@ negate amt) total
           in
-          process_negations sum amts
+          process_decreases sum amts
     in
     let total =
-      process_negations
+      process_decreases
         (Currency.Amount.Signed.of_unsigned expected_supply_increase)
         [ burned_tokens; account_creation_fees ]
     in
