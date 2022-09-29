@@ -30,7 +30,8 @@ async function picklesProof() {
 
   console.log("compile (proof system with two branches)...");
   let start = Date.now();
-  let { provers, verify } = compile(rules);
+  let { provers, verify, getVerificationKey } = await compile(rules);
+  getVerificationKey();
   let time = Date.now() - start;
   console.log(`compiled proof system in ${(time / 1000).toFixed(2)} sec`);
 
@@ -74,7 +75,9 @@ function createDummyRule(name, func, witnessTypes) {
     witnesses = witnessTypes.map(
       witnesses
         ? (type, i) =>
-            type.fromFields(Circuit._witness(type, () => witnesses[i]))
+            type.fromFields(
+              Circuit._witness(type, () => type.toFields(witnesses[i]))
+            )
         : emptyWitness
     );
     func(...witnesses);
@@ -86,9 +89,7 @@ function createDummyRule(name, func, witnessTypes) {
 
 function emptyWitness(typ) {
   return typ.fromFields(
-    Circuit._witness(typ, () =>
-      typ.fromFields(Array(typ.sizeInFields()).fill(Field.zero))
-    )
+    Circuit._witness(typ, () => Array(typ.sizeInFields()).fill(Field.zero))
   );
 }
 
