@@ -46,7 +46,7 @@ BUILDDIR="deb_build"
 
 # Function to ease creation of Debian package control files
 create_control_file() {
-  
+
   echo "------------------------------------------------------------"
   echo "create_control_file inputs:"
   echo "Package Name: ${1}"
@@ -58,7 +58,7 @@ create_control_file() {
 
   # Also make the binary directory that all packages need
   mkdir -p "${BUILDDIR}/usr/local/bin"
-  
+
   # Create the control file itself
   cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${1}
@@ -148,13 +148,13 @@ copy_common_daemon_configs() {
           mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
       fi
   done
-  
+
   # Support bash completion
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
   env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > "${BUILDDIR}/etc/bash_completion.d/mina"
-  
+
 }
 
 ##################################### GENERATE KEYPAIR PACKAGE #######################################
@@ -197,13 +197,13 @@ then
 
   echo "------------------------------------------------------------"
   echo "Building testnet signatures deb without keys:"
-  
+
   copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
   copy_common_daemon_configs devnet testnet https://storage.googleapis.com/seed-lists/devnet_seeds.txt
-  
+
   build_deb mina-devnet
-  
+
 fi # only builds on mainnet-like branches
 ##################################### END DEVNET PACKAGE #######################################
 
