@@ -19,6 +19,7 @@
     transaction_snark_work
     ledger_proof
     network_pool
+    consensus
     ; Necessary for the type equality
     sgn
     sgn_type
@@ -29,6 +30,7 @@
     pickles.backend
     pickles_base
     pasta_bindings
+    blake2
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

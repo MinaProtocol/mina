@@ -345,3 +345,9 @@ module Network_pool = struct
       (O.Transaction_pool.Diff_versioned.Stable)
       (W.Transaction_pool.Diff_versioned)
 end
+
+module Consensus = struct
+  module O = Consensus
+  module W = WT.Consensus
+  include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
+end
