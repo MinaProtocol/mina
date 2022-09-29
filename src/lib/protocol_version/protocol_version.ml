@@ -1,11 +1,17 @@
 (* protocol_version.ml -- use semantic versioning *)
 
 open Core_kernel
+module Wire_types = Mina_wire_types.Protocol_version       
 
+module Make_sig (A: Wire_types.Types.S) = struct
+  module type S = Protocol_version_intf.Full with type Stable.V1.t = A.V1.t
+end
+
+module Make_str (A: Wire_types.Concrete) = struct
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = { major : int; minor : int; patch : int }
+    type t = A.V1.t = { major : int; minor : int; patch : int }
     [@@deriving compare, sexp, yojson, fields]
 
     let to_latest = Fn.id
@@ -69,3 +75,6 @@ let of_string_opt s = try Some (of_string_exn s) with _ -> None
    negative numbers
 *)
 let is_valid t = t.major >= 0 && t.minor >= 0 && t.patch >= 0
+end
+                                             
+include Wire_types.Make (Make_sig) (Make_str)

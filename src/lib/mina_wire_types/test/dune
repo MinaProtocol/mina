@@ -21,6 +21,7 @@
     network_pool
     consensus
     consensus.vrf
+    protocol_version
     ; Necessary for the type equality
     sgn
     sgn_type
