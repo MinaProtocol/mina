@@ -306,7 +306,7 @@ let pack_basic (type field other_field other_field_var)
              , Branch_data.length_in_bits )
         |]
     | Bulletproof_challenge ->
-        let { Bulletproof_challenge.prechallenge = { Sc.inner = pre } } = x in
+        let { Sc.inner = pre } = Bulletproof_challenge.pack x in
         [| `Packed_bits (pre, Challenge.length) |]
   in
   { pack }
@@ -388,13 +388,11 @@ let packed_typ_basic (type field other_field other_field_var)
         T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
     | Bulletproof_challenge ->
         let typ =
-          let there { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
-              =
+          let there bp_challenge =
+            let { Sc.inner = pre } = Bulletproof_challenge.pack bp_challenge in
             pre
           in
-          let back pre =
-            { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
-          in
+          let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
           Typ.transport Challenge.typ ~there ~back
           |> Typ.transport_var ~there ~back
         in
