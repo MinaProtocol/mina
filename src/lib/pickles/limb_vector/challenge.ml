@@ -7,9 +7,7 @@ module Constant = Constant.Make (Nat.N2)
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.Run
 
-  open Impl
-
-  type nonrec t = field t
+  type nonrec t = Impl.field t
 
   module Constant : sig
     type t = Constant.t [@@deriving sexp_of]
@@ -21,7 +19,7 @@ module type S = sig
     val dummy : t
   end
 
-  val typ : (t, Constant.t) Typ.t
+  val typ : (t, Constant.t) Impl.Typ.t
 
   val length : int
 end
