@@ -278,6 +278,10 @@ module Mina_base = struct
   include Assert_equal0V1 (O.State_body_hash.Stable) (W.State_body_hash)
   include Assert_equal0V1 (O.Frozen_ledger_hash0.Stable) (W.Frozen_ledger_hash0)
   include Assert_equal0V1 (O.Epoch_ledger.Value.Stable) (W.Epoch_ledger.Value)
+  include
+    Assert_equal0V1
+      (O.Staged_ledger_hash.Aux_hash.Stable)
+      (W.Staged_ledger_hash.Aux_hash)
 end
 
 module One_or_two = struct
