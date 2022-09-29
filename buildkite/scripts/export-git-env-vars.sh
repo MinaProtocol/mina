@@ -1,7 +1,6 @@
 #!/bin/bash
-set -eo pipefail
+set -euo pipefail
 
-set +x
 echo "Exporting Variables: "
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
@@ -63,5 +62,3 @@ esac
 echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
-
-set -x
