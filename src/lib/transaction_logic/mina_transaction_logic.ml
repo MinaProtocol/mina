@@ -1725,6 +1725,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let successfully_applied =
           Transaction_status.Failure.Collection.is_empty failure_status_tbl
         in
+        (* if the zkapp command fails in at least 1 account update,
+           then all the account updates would be cancelled except
+           the fee payer one
+        *)
+        let failure_status_tbl =
+          if successfully_applied then failure_status_tbl
+          else
+            List.mapi failure_status_tbl ~f:(fun idx fs ->
+                if idx > 0 && List.is_empty fs then
+                  [ Transaction_status.Failure.Cancelled ]
+                else fs )
+        in
         (* accounts not originally in ledger, now present in ledger *)
         let new_accounts =
           List.filter_map account_ids_originally_not_in_ledger

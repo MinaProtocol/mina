@@ -46,6 +46,7 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -124,7 +125,7 @@ module Failure = struct
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
-      ~invalid_fee_excess:add
+      ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -207,6 +208,8 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Cancelled ->
+        "Cancelled"
 
   let of_string = function
     | "Predicate" ->
@@ -285,6 +288,8 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
+    | "Cancelled" ->
+        Ok Cancelled
     | str -> (
         let res =
           List.find_map
@@ -421,6 +426,9 @@ module Failure = struct
     | Invalid_fee_excess ->
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
+    | Cancelled ->
+        "The account update gets cancelled because there's a failure in the \
+         zkapp command"
 end
 
 [%%versioned

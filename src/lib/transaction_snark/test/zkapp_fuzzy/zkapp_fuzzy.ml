@@ -5,7 +5,7 @@ module U = Transaction_snark_tests.Util
 
 let logger = Logger.create ()
 
-let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
@@ -234,16 +234,16 @@ let () =
              (required int))
        in
        fun () ->
+         let open Mina_generators.Zkapp_command_generators in
+         let open Transaction_status.Failure in
          let num_of_fee_payers = 5 in
          let max_account_updates = 3 in
          generate_zkapp_commands_and_apply_them_consecutively ~trials
            ~max_account_updates () ;
          generate_zkapp_commands_and_apply_them_freshly ~trials
            ~max_account_updates () ;
-         let open Mina_generators.Zkapp_command_generators in
-         let open Transaction_status.Failure in
          mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
-           ~type_of_failure:Invalid_protocol_state_precondition
+           ~type_of_failure:(Update_not_permitted `App_state)
            ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
          mk_invalid_test ~num_of_fee_payers ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `App_state)
