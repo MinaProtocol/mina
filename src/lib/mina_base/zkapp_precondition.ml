@@ -722,7 +722,7 @@ module Account = struct
     ; ( Transaction_status.Failure.Account_nonce_precondition_unsatisfied
       , Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce) )
     ; ( Transaction_status.Failure
-        .Account_receipt_chain_hash_precondition_unsatisfied
+        .Account_receipt_chain_hash_precondition_unsatistang @ o1labs.orgfied
       , Eq_data.(
           check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
             receipt_chain_hash a.receipt_chain_hash) )

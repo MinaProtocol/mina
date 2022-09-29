@@ -236,12 +236,16 @@ module Util = struct
 
   let snapp_keypair_of_file = keypair_of_file ~which:"Zkapp Account"
 
-  let print_snapp_transaction zkapp_command =
-    printf !"Zkapp_command sexp:\n %{sexp: Zkapp_command.t}\n\n%!" zkapp_command ;
-    printf "Zkapp transaction yojson:\n %s\n\n%!"
-      (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
-    printf "Zkapp transaction graphQL input %s\n\n%!"
-      (graphql_zkapp_command zkapp_command)
+  let print_snapp_transaction ~graphql zkapp_command =
+    if graphql then printf "%s\n%!" (graphql_zkapp_command zkapp_command)
+    else (
+      printf
+        !"Zkapp_command sexp:\n %{sexp: Zkapp_command.t}\n\n%!"
+        zkapp_command ;
+      printf "Zkapp transaction yojson:\n %s\n\n%!"
+        (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
+      printf "Zkapp transaction graphQL input %s\n\n%!"
+        (graphql_zkapp_command zkapp_command) )
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->

@@ -12,6 +12,7 @@ trap "killall background" EXIT
 MINA_EXE=_build/default/src/app/cli/src/mina.exe
 ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
 LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
+ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe 
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
@@ -27,6 +28,7 @@ ARCHIVE=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
+ZKAPP_TRANSFERS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
 
@@ -98,6 +100,8 @@ help() {
   echo "                                  |   Default: ${PG_DB}"
   echo "-vt |--value-transfer-txns        | Whether to execute periodic value transfer transactions (presence of argument)"
   echo "                                  |   Default: ${VALUE_TRANSFERS}"
+  echo "-zt |--zkapp-transfer-txns        | Whether to execute periodic zkapp transfer transactions (presence of argument)"
+  echo "                                  |   Default: ${ZKAPP_TRANSFERS}"
   echo "-tf |--transactions-frequency <#> | Frequency of periodic transactions execution (in seconds)"
   echo "                                  |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf |--snark-worker-fee <#>       | SNARK Worker fee"
@@ -358,7 +362,9 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir ${LEDGER_FOLDER}/online_fish_keys
   clean-dir ${LEDGER_FOLDER}/libp2p_keys
   clean-dir ${LEDGER_FOLDER}/service-keys
+  clean-dir ${LEDGER_FOLDER}/zkapp_keys
 
+  generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
   generate-keypair ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account
   for ((i = 0; i < ${FISH}; i++)); do
     generate-keypair ${LEDGER_FOLDER}/offline_fish_keys/offline_fish_account_${i}
@@ -381,6 +387,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     OWNER=$(stat -c "%U" ${LEDGER_FOLDER}/offline_fish_keys/${FILE})
 
     if [ "${FILE}" != "${USER}" ]; then
+      sudo chown -R ${USER} ${LEDGER_FOLDER}/zkapp_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_whale_keys
@@ -389,6 +396,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     fi
   fi
 
+  chmod -R 0700 ${LEDGER_FOLDER}/zkapp_keys
   chmod -R 0700 ${LEDGER_FOLDER}/offline_fish_keys
   chmod -R 0700 ${LEDGER_FOLDER}/online_fish_keys
   chmod -R 0700 ${LEDGER_FOLDER}/offline_whale_keys
@@ -552,6 +560,8 @@ printf "\n"
 # Start sending transactions
 
 if ${VALUE_TRANSFERS}; then
+  FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_0
+  ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
@@ -561,6 +571,11 @@ if ${VALUE_TRANSFERS}; then
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
     sleep 1
   done
+
+  echo "Set up zkapp account"
+  printf "\n"
+
+  QUERY=`${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 10000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --graphql`
 
   echo "Starting to send value transfer transactions every: ${TRANSACTION_FREQUENCY} seconds"
   printf "\n"
