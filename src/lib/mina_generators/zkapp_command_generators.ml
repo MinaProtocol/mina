@@ -14,7 +14,8 @@ type failure =
       | `Verification_key
       | `Zkapp_uri
       | `Token_symbol
-      | `Balance ]
+      | `Send
+      | `Receive ]
 
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
@@ -245,19 +246,24 @@ let gen_fee (account : Account.t) =
 let fee_to_amt fee =
   Currency.Amount.(Signed.of_unsigned (of_fee fee) |> Signed.negate)
 
-let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
+let gen_balance_change ?permissions_auth (account : Account.t) ?failure
+    ~new_account =
   let open Quickcheck.Let_syntax in
   let%bind sgn =
     if new_account then return Sgn.Pos
     else
-      match permissions_auth with
-      | Some auth -> (
+      match (failure, permissions_auth) with
+      | Some (Update_not_permitted `Send), _ ->
+          return Sgn.Neg
+      | Some (Update_not_permitted `Receive), _ ->
+          return Sgn.Pos
+      | _, Some auth -> (
           match auth with
           | Control.Tag.None_given ->
               return Sgn.Pos
           | _ ->
               Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] )
-      | None ->
+      | _, None ->
           Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
   in
   (* if negative, magnitude constrained to balance in account
@@ -1035,7 +1041,8 @@ let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
       ?permissions_auth ?account_id ?token_id ?caller ?protocol_state_view ?vk
       ~zkapp_account_ids ~account_ids_seen ~available_public_keys
       ?required_balance_change ~account_state_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
+      ~gen_balance_change:
+        (gen_balance_change ?permissions_auth ~new_account ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
         gen_account_precondition_from_account ~first_use_of_account acct )
@@ -1265,11 +1272,17 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                             set_voting_for = Auth_required.from ~auth_tag
                           }
                     }
-                | `Balance ->
+                | `Send ->
                     { Account_update.Update.dummy with
                       permissions =
                         Set_or_keep.Set
                           { perm with send = Auth_required.from ~auth_tag }
+                    }
+                | `Receive ->
+                    { Account_update.Update.dummy with
+                      permissions =
+                        Set_or_keep.Set
+                          { perm with receive = Auth_required.from ~auth_tag }
                     }
               in
               (auth_tag, Some update)
@@ -1350,7 +1363,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                       let%map field = Snark_params.Tick.Field.gen in
                       let voting_for = Set_or_keep.Set field in
                       { Account_update.Update.dummy with voting_for }
-                  | `Balance ->
+                  | `Send | `Receive ->
                       return Account_update.Update.dummy
                 in
                 let%map new_perm =
