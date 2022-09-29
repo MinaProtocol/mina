@@ -14,10 +14,10 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).ubuntu1804
             }
-            "./buildkite/scripts/connect-to-mainnet-on-compatible.sh"
+            "./buildkite/scripts/connect-to-berkeley.sh"
         ],
-        label = "Connect to testnet",
-        key = "connect-to-mainnet",
+        label = "Connect to Berkeley",
+        key = "connect-to-berkeley",
         target = Size.Large,
         depends_on = dependsOn
       }
