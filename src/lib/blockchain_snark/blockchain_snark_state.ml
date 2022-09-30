@@ -413,7 +413,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~exposing:[ typ ]
+         Tick.constraint_system ~input_typ:typ
            ~return_typ:(Snarky_backendless.Typ.unit ())
            main ) )
   ]

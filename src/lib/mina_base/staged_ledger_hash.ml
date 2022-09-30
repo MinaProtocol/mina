@@ -275,11 +275,8 @@ let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
       (Non_snark.var_to_input non_snark)
       (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
 
-let data_spec =
-  let open Data_spec in
-  [ Non_snark.typ; Pending_coinbase.Hash.typ ]
-
 let typ : (var, t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Non_snark.typ; Pending_coinbase.Hash.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist

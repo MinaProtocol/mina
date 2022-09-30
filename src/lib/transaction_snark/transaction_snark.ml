@@ -3537,7 +3537,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ]
+  generate_auxiliary_input ~input_typ:Statement.With_sok.typ
     ~return_typ:(Snarky_backendless.Typ.unit ())
     main statement
 
@@ -3581,14 +3581,14 @@ let constraint_system_digests ~constraint_constants () =
   [ ( "transaction-merge"
     , digest
         Merge.(
-          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+          Tick.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
               let open Tick in
               Checked.map ~f:ignore @@ main x )) )
   ; ( "transaction-base"
     , digest
         Base.(
-          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+          Tick.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (main ~constraint_constants)) )
   ]
