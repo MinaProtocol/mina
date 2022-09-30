@@ -3,9 +3,10 @@ module Impl = Pickles.Impls.Step
 module Field = Impl.Field
 
 (* function to check a circuit defined by a 'main' function *)
-let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
+let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) input_typ ?priv pub
+    =
   let kp =
-    Impl.constraint_system ~input_typ:spec
+    Impl.constraint_system ~input_typ
       ~return_typ:(Snarky_backendless.Typ.unit ())
       (main ?w:None)
     |> Impl.Keypair.generate ~prev_challenges:0
@@ -16,7 +17,7 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } _ ->
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
           ~primary:public_inputs )
-      spec
+      ~input_typ
       ~return_typ:(Snarky_backendless.Typ.unit ())
       (main ?w:priv) pub
   in
