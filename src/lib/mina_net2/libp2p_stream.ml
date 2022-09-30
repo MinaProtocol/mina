@@ -127,6 +127,40 @@ let stream_closed ~logger ~who_closed t =
         ] ;
   `Stream_should_be_released (equal_state FullyOpen t.state)
 
+let max_message_size = 16777216 (* 16 MiB *)
+
+let split_string ~every b =
+  let blen = String.length b in
+  let rec isplit sofar pos =
+    if blen - pos > every then
+      let chunk = String.sub b ~pos ~len:every in
+      isplit (chunk :: sofar) @@ (pos + every)
+    else if blen - pos = 0 then sofar
+    else String.sub ~pos ~len:(blen - pos) b :: sofar
+  in
+  List.rev (isplit [] 0)
+
+let%test_unit "split_string" =
+  let gen =
+    let module Gen = Quickcheck.Generator in
+    let%bind.Gen every = Gen.small_positive_int in
+    let%bind.Gen total = Gen.small_non_negative_int in
+    let%bind.Gen last =
+      if total % every = 0 then Gen.return []
+      else
+        let%map.Gen s = String.gen_with_length (total % every) Gen.char_print in
+        [ s ]
+    in
+    let%map.Gen rest =
+      Gen.list_with_length (total / every)
+        (String.gen_with_length every Gen.char_print)
+    in
+    (every, List.append rest last)
+  in
+  Quickcheck.test gen ~f:(fun (every, expected) ->
+      let s = String.concat expected in
+      assert (List.equal String.equal expected @@ split_string ~every s) )
+
 let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream =
   let incoming_r, incoming_w = Pipe.create () in
@@ -145,10 +179,13 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     Pipe.iter outgoing_r ~f:(fun msg ->
         Libp2p_helper.log_rpc_request helper "SendStream"
           ~metadata:[ ("len", `Int (String.length msg)) ] ;
+        let parts = split_string msg ~every:max_message_size in
         match%map
-          Libp2p_helper.do_rpc helper
-            (module Libp2p_ipc.Rpcs.SendStream)
-            (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data:msg)
+          Deferred.Or_error.List.iter parts ~f:(fun data ->
+              Deferred.Or_error.map ~f:(const ())
+              @@ Libp2p_helper.do_rpc helper
+                   (module Libp2p_ipc.Rpcs.SendStream)
+                   (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
         with
         | Ok _ ->
             ()
