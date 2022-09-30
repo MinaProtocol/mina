@@ -943,19 +943,16 @@ module Data = struct
         [@@deriving sexp, compare, hash, to_yojson]
       end
 
-      let data_spec =
-        let open Tick.Data_spec in
-        [ Epoch_ledger.typ
-        ; Epoch_seed.typ
-        ; Mina_base.State_hash.typ
-        ; Lock_checkpoint.typ
-        ; Length.typ
-        ]
-
       let typ : (var, Value.t) Typ.t =
-        Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-          ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-          ~value_of_hlist:Poly.of_hlist
+        Typ.of_hlistable
+          [ Epoch_ledger.typ
+          ; Epoch_seed.typ
+          ; Mina_base.State_hash.typ
+          ; Lock_checkpoint.typ
+          ; Length.typ
+          ]
+          ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+          ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
       let graphql_type name =
         let open Graphql_async in
@@ -1760,32 +1757,28 @@ module Data = struct
       , Public_key.Compressed.var )
       Poly.t
 
-    let data_spec
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-      let open Snark_params.Tick.Data_spec in
+    let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
+        (var, Value.t) Typ.t =
       let sub_windows_per_window =
         constraint_constants.sub_windows_per_window
       in
-      [ Length.typ
-      ; Length.typ
-      ; Length.typ
-      ; Typ.list ~length:sub_windows_per_window Length.typ
-      ; Vrf.Output.Truncated.typ
-      ; Amount.typ
-      ; Global_slot.typ
-      ; Mina_numbers.Global_slot.typ
-      ; Epoch_data.Staking.typ
-      ; Epoch_data.Next.typ
-      ; Boolean.typ
-      ; Public_key.Compressed.typ
-      ; Public_key.Compressed.typ
-      ; Public_key.Compressed.typ
-      ; Boolean.typ
-      ]
-
-    let typ ~constraint_constants : (var, Value.t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable
-        (data_spec ~constraint_constants)
+        [ Length.typ
+        ; Length.typ
+        ; Length.typ
+        ; Typ.list ~length:sub_windows_per_window Length.typ
+        ; Vrf.Output.Truncated.typ
+        ; Amount.typ
+        ; Global_slot.typ
+        ; Mina_numbers.Global_slot.typ
+        ; Epoch_data.Staking.typ
+        ; Epoch_data.Next.typ
+        ; Boolean.typ
+        ; Public_key.Compressed.typ
+        ; Public_key.Compressed.typ
+        ; Public_key.Compressed.typ
+        ; Boolean.typ
+        ]
         ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
         ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
