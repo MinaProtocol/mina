@@ -9,10 +9,6 @@ let%test_module "coda network tests" =
   ( module struct
     let logger = Logger.create ()
 
-    let testmsg =
-      "This is a test. This is a test of the Outdoor Warning System. This is \
-       only a test."
-
     let pids = Child_processes.Termination.create_pid_table ()
 
     let setup_two_nodes network_id =
@@ -103,7 +99,6 @@ let%test_module "coda network tests" =
       in
       (b, c, shutdown)
 
-    (* TODO fails occasionally, uncomment after debugging it *)
     let%test_unit "b_stream_c" =
       let () = Core.Backtrace.elide := false in
       let test_def () =
@@ -183,11 +178,18 @@ let%test_module "coda network tests" =
           open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
         in
         let r, w = Libp2p_stream.pipes stream in
+        let testmsg =
+          String.of_char_list
+          @@ Quickcheck.random_value
+               (Quickcheck.Generator.list_with_length 1_000_000
+                  Quickcheck.Generator.char_print )
+        in
+        let testmsg = String.concat (List.init 170 ~f:(const testmsg)) in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
            It would be more principled to add synchronization. *)
-        let%bind () = after (Time.Span.of_sec 1.) in
+        let%bind () = after (Time.Span.of_sec 120.) in
         let%bind () = reset_stream c stream >>| Or_error.ok_exn in
         let%bind msg = Pipe.read_all r in
         let msg = Queue.to_list msg |> String.concat in
