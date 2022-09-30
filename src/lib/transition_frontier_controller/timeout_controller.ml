@@ -82,16 +82,13 @@ let cancel_in_progress_ctx ~timeout_controller ~state_hash = function
 
 let create () = { events = TimeoutSet.empty }
 
-let cancel_all (type state_t)
-    ~state_functions:
-      (module F : Substate.State_functions with type state_t = state_t)
-    ~transition_states t =
+let cancel_all ~state_functions ~transition_states t =
   let events = t.events in
   t.events <- TimeoutSet.empty ;
   TimeoutSet.iter events ~f:(fun (_, h) ->
       Option.value ~default:()
       @@ let%bind.Option st = State_hash.Table.find transition_states h in
-         Substate.view st ~modify_substate:F.modify_substate
+         Substate.view st ~state_functions
            ~f:
              { viewer =
                  (fun subst ->

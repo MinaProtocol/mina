@@ -3,6 +3,15 @@ open Core_kernel
 open Async
 open Context
 
+(** [promote_to_higher_state_impl] takes state with [Processed] status and
+    returns the next state with [Processing] status or [None] if the transition
+    exits the catchup state.
+    
+    If needed, this function launches deferred action related to the new state.
+
+    Note that some other states may be restarted (transitioned from [Failed] to [In_progress])
+    on the course.
+    *)
 let promote_to_higher_state_impl ~mark_processed_and_promote ~context
     ~transition_states state =
   match state with
@@ -27,32 +36,27 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
       Option.some
       @@ Waiting_to_be_added_to_frontier.promote_to ~context ~substate ~block_vc
   | Waiting_to_be_added_to_frontier { breadcrumb; source; children = _ } ->
-      (* Just remove the state, it should be in frontier by now *)
       let (module Context : CONTEXT) = context in
       Context.write_verified_transition
         ( `Transition (Frontier_base.Breadcrumb.validated_transition breadcrumb)
         , `Source source ) ;
-
+      (* Just remove the state, it should be in frontier by now *)
       None
   | Invalid _ as e ->
       Some e
 
-let view_processing =
-  let viewer subst =
-    match subst.Substate.status with
-    | Substate.Processing (Done _) ->
-        Some `Done
-    | Substate.Processing (In_progress { timeout; _ }) ->
-        Some (`In_progress timeout)
-    | _ ->
-        None
-  in
-  Fn.compose Option.join
-  @@ Substate.view
-       ~modify_substate:Transition_state.State_functions.modify_substate
-       ~f:{ viewer }
+(** [promote_to_higher_state] takes state hash of a transition with [Processed] status
+    and updates it.
+    
+    The transition is updated to the highest state possible (given the available data).
+    E.g. a transition with block body available from the gossip will be
+    updated from [Verifying_blockchain_proof] to [Verifying_complete_works] without
+    launching action to download body.
 
-(* Pre-condition: state transition is in transition states *)
+    Some other states may also be updated (promoted) if promotion of the transition
+    triggers their subsequent update (promotion).
+
+    Pre-condition: state transition is in transition states and has [Processed] status.*)
 let rec promote_to_higher_state ~context:(module Context : CONTEXT)
     ~transition_states state_hash =
   let context = (module Context : CONTEXT) in
@@ -76,8 +80,16 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
           Timeout_controller.register ~state_functions ~transition_states
             ~state_hash ~timeout Context.timeout_controller )
   in
-  Option.iter ~f:(Fn.compose check_processing view_processing) state_opt
+  Option.iter state_opt
+    ~f:(Fn.compose check_processing @@ Substate.view_processing ~state_functions)
 
+(** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
+transitions processed. Then it promotes all of the transitions that can be promoted
+as the result of [mark_processed].
+
+This is a recursive function that is called recursively when a transition
+is promoted multiple times or upon completion of deferred action.
+*)
 and mark_processed_and_promote ~context:(module Context : CONTEXT)
     ~transition_states state_hashes =
   let higher_state_promotees =
@@ -88,6 +100,7 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
     ~f:(promote_to_higher_state ~context:(module Context) ~transition_states)
     higher_state_promotees
 
+(** [handle_produced_transition] adds locally produced block to the catchup state *)
 let handle_produced_transition ~logger ~state breadcrumb =
   let hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
   let data =
