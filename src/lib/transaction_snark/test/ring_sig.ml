@@ -18,7 +18,7 @@ let check_sig pk msg sigma : Boolean.var Checked.t =
   Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
-let%snarkydef verify_sig pubkeys msg sigma =
+let%snarkydef_ verify_sig pubkeys msg sigma =
   let%bind pubkeys =
     exists
       (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)

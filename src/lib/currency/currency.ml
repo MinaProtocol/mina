@@ -343,7 +343,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let typ : (var, t) Typ.t =
       let (Typ typ) = Field.typ in
       Typ.transport
-        (Typ { typ with check = range_check })
+        (Typ { typ with check = (fun x -> make_checked_ast @@ range_check x) })
         ~there:to_field ~back:of_field
 
     [%%endif]
