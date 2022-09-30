@@ -282,6 +282,7 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Staged_ledger_hash.Aux_hash.Stable)
       (W.Staged_ledger_hash.Aux_hash)
+  include Assert_equal0V1 (O.Epoch_seed.Stable) (W.Epoch_seed)
 end
 
 module One_or_two = struct
