@@ -46,7 +46,7 @@ type 'v viewer = { viewer : 'a. 'a common_substate -> 'v }
 
 type ('a, 'b) modify_substate_t = f:'a modifier -> 'b -> ('b * 'a) option
 
-let view ~(modify_substate : ('a, 'b) modify_substate_t) ~f =
+let view_ ~(modify_substate : ('a, 'b) modify_substate_t) ~f =
   Fn.compose (Option.map ~f:snd)
     (modify_substate ~f:{ modifier = (fun st -> (st, f.viewer st)) })
 
@@ -60,6 +60,10 @@ module type State_functions = sig
 
   val equal_state_levels : state_t -> state_t -> bool
 end
+
+let view (type state_t)
+    ~state_functions:(module F : State_functions with type state_t = state_t) =
+  view_ ~modify_substate:F.modify_substate
 
 (** [collect_states top_state] collects transitions from the top state (inclusive) down the ancestry chain 
   while:
@@ -80,7 +84,7 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     Option.value ~default:(`Take false, `Continue false)
     @@
     if equal_state_levels top_state state then None
-    else view ~modify_substate ~f:predicate state
+    else view ~state_functions ~f:predicate state
   in
   let rec loop state =
     let hh = header_with_hash state in
@@ -309,9 +313,11 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
   in
   List.concat @@ List.map processed ~f:(handle false)
 
-let update_children_on_promotion (type state_t)
-    ~state_functions:(module F : State_functions with type state_t = state_t)
+let update_children_on_promotion (type state_t) ~state_functions
     ~transition_states ~parent_hash ~state_hash state_opt =
+  let (module F : State_functions with type state_t = state_t) =
+    state_functions
+  in
   let add_if condition set =
     if condition then State_hash.Set.add set state_hash else set
   in
@@ -326,8 +332,7 @@ let update_children_on_promotion (type state_t)
           (false, false)
     in
     Option.value ~default:(false, false)
-    @@ Option.bind state_opt
-         ~f:(view ~modify_substate:F.modify_substate ~f:{ viewer })
+    @@ Option.bind state_opt ~f:(view ~state_functions ~f:{ viewer })
   in
   let update_children_modifier subst =
     ( { subst with
@@ -348,6 +353,24 @@ let update_children_on_promotion (type state_t)
   in
   State_hash.Table.change transition_states parent_hash
     ~f:(Option.bind ~f:update_children)
+
+(** [view_processing] functions takes state and returns [`Done] if the processing is finished,
+    [`In_progress timeout] is the processing continues and [None] if the processing is dependent
+      or status is different from [Processing].  *)
+let view_processing ~state_functions =
+  Fn.compose Option.join
+  @@ view ~state_functions
+       ~f:
+         { viewer =
+             (fun subst ->
+               match subst.status with
+               | Processing (Done _) ->
+                   Some `Done
+               | Processing (In_progress { timeout; _ }) ->
+                   Some (`In_progress timeout)
+               | _ ->
+                   None )
+         }
 
 module For_tests = struct
   let collect_failed_ancestry ~state_functions ~transition_states top_state =

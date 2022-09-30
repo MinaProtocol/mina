@@ -2,8 +2,15 @@ open Core_kernel
 open Context
 open Mina_base
 
-let building_broadcast_timeout = Time.Span.of_min 2.
+let building_breadcrumb_timeout = Time.Span.of_min 2.
 
+(** [validate_frontier_dependencies] converts [Mina_block.Validation.initial_valid_with_block]
+    to [Mina_block.Validation.almost_valid_with_block].
+  
+  Internally a [Mina_block.Validation.validate_frontier_dependencies] function is used.
+  Note that contary to other usages of the function, it's being checked that transition
+  is either in catchup state or in frontier (not just the latter).
+*)
 let validate_frontier_dependencies ~transition_states
     ~context:(module Context : CONTEXT) =
   let module Validation_context = struct
@@ -14,19 +21,18 @@ let validate_frontier_dependencies ~transition_states
     let consensus_constants = Context.consensus_constants
   end in
   let is_block_in_frontier state_hash =
-    Option.is_some
-    @@ Option.first_some
-         (Transition_frontier.find Context.frontier state_hash)
-         (let%bind.Option state =
+    Option.is_some (Transition_frontier.find Context.frontier state_hash)
+    || Option.value ~default:false
+         (let%map.Option state =
             State_hash.Table.find transition_states state_hash
           in
           match state with
           | Transition_state.Building_breadcrumb
-              { substate = { status = Processed breadcrumb; _ }; _ }
-          | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
-              Some breadcrumb
+              { substate = { status = Processed _; _ }; _ }
+          | Waiting_to_be_added_to_frontier _ ->
+              true
           | _ ->
-              None )
+              false )
   in
   Mina_block.Validation.validate_frontier_dependencies
     ~to_header:Mina_block.header
@@ -36,7 +42,11 @@ let validate_frontier_dependencies ~transition_states
       |> Frontier_base.Breadcrumb.block_with_hash )
     ~is_block_in_frontier
 
-(* Pre-condition: new [status] is Failed or Processing *)
+(** [update_status_from_processing ~state_hash status] updates status of a transition
+  corresponding to [state_hash] that is in [Building_breadcrumb] state.
+  
+  Pre-condition: new [status] is either [Failed] or [Processing].
+*)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
   let f = function
@@ -63,6 +73,9 @@ let update_status_from_processing ~timeout_controller ~transition_states
   in
   State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
 
+(** [upon_f] is a callback to be executed upon completion of building
+  a breadcrumb (or a failure).
+*)
 let upon_f ~state_hash ~timeout_controller ~mark_processed_and_promote
     ~transition_states res =
   let mark_invalid ~tag e =
@@ -87,6 +100,12 @@ let upon_f ~state_hash ~timeout_controller ~mark_processed_and_promote
         ~state_hash
       @@ Failed (Error.of_exn e)
 
+(** [building_breadcrumb_status ~parent block] decides upon status of [block]
+  that is a child of transition with the already-built breadcrumb [parent].
+  
+  This function validates frontier dependencies and if validation is successful,
+  returns a [Processing (In_progress _)] status and [Failed] otherwise.  
+*)
 let building_breadcrumb_status ~context ~mark_processed_and_promote
     ~transition_states ~received_at ~sender ~parent block =
   let impl =
@@ -109,7 +128,7 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
          ~timeout_controller ) ;
     Substate.In_progress
       { interrupt_ivar = I.interrupt_ivar
-      ; timeout = Time.(add @@ now ()) building_broadcast_timeout
+      ; timeout = Time.(add @@ now ()) building_breadcrumb_timeout
       }
   in
   match impl with
@@ -128,9 +147,11 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       Substate.Failed
         (Error.createf "failed to validate frontier dependencies: %s" err_str)
 
+(** Promote a transition that is in [Verifying_complete_works] state with
+    [Processed] status to [Building_breadcrumb] state.
+*)
 let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
     ~substate ~block_vc =
-  ignore mark_processed_and_promote ;
   let parent_hash =
     Mina_block.Validation.block block
     |> Mina_block.header |> Mina_block.Header.protocol_state
@@ -152,11 +173,17 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
         build parent
     | Some _ ->
         Substate.Waiting_for_parent mk_status
-    | None ->
+    | None -> (
         let (module Context : CONTEXT) = context in
-        Option.value_map ~default:(Substate.Waiting_for_parent mk_status)
-          ~f:build
-        @@ Transition_frontier.find Context.frontier parent_hash
+        match Transition_frontier.find Context.frontier parent_hash with
+        | Some parent ->
+            build parent
+        | None ->
+            (* parent is neither in transition states nor in frontier,
+               this case should not happen *)
+            failwith
+              "Building breadcrumb: parent is neither in catchup state nor in \
+               the frontier" )
   in
   let status = mk_status () in
   Transition_state.Building_breadcrumb

@@ -52,6 +52,10 @@ let state_hash_of_block_with_validation block =
   State_hash.With_state_hashes.state_hash
     (Mina_block.Validation.block_with_hash block)
 
+(** [accept_gossip] takes validation callback and consensus state of a transition
+    and accepts validation callback if a transition would be deemed relevant when
+    received via gossip by another node and rejects the validation callback otherwise.
+    *)
 let accept_gossip ~context:(module Context : CONTEXT) ~valid_cb consensus_state
     =
   let now =
