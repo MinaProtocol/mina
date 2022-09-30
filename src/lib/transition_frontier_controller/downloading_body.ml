@@ -70,7 +70,8 @@ let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
   let f = function
     | Transition_state.Downloading_body
-        ({ substate = { status = Processing ctx; _ }; block_vc; _ } as r) ->
+        ( { substate = { status = Processing ctx; children; _ }; block_vc; _ }
+        as r ) ->
         Timeout_controller.cancel_in_progress_ctx ~timeout_controller
           ~state_hash ctx ;
         let block_vc =
@@ -85,6 +86,7 @@ let update_status_from_processing ~timeout_controller ~transition_states
           | _ ->
               block_vc
         in
+        notify_descedants_of_failed ~transition_states ~state_hash children ;
         Transition_state.Downloading_body
           { r with substate = { r.substate with status }; block_vc }
     | st ->
