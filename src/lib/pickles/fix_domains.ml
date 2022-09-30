@@ -25,4 +25,4 @@ let domains (type field)
     in
     { h = Pow_2_roots_of_unity Int.(ceil_log2 rows) }
   in
-  domains2 (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)
+  domains2 (Impl.constraint_system ~input_typ:typ ~return_typ main)

@@ -491,27 +491,25 @@ let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
 let typ' zkapp =
-  let spec =
-    Data_spec.
-      [ Public_key.Compressed.typ
-      ; Token_id.typ
-      ; Token_permissions.typ
-      ; Token_symbol.typ
-      ; Balance.typ
-      ; Nonce.typ
-      ; Receipt.Chain_hash.typ
-      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
-          ~back:(fun delegate ->
-            if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate )
-      ; State_hash.typ
-      ; Timing.typ
-      ; Permissions.typ
-      ; zkapp
-      ; Data_as_hash.typ ~hash:hash_zkapp_uri
-      ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Public_key.Compressed.typ
+    ; Token_id.typ
+    ; Token_permissions.typ
+    ; Token_symbol.typ
+    ; Balance.typ
+    ; Nonce.typ
+    ; Receipt.Chain_hash.typ
+    ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
+        ~back:(fun delegate ->
+          if Public_key.Compressed.(equal empty) delegate then None
+          else Some delegate )
+    ; State_hash.typ
+    ; Timing.typ
+    ; Permissions.typ
+    ; zkapp
+    ; Data_as_hash.typ ~hash:hash_zkapp_uri
+    ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let typ : (var, value) Typ.t =

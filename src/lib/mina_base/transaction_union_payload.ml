@@ -117,8 +117,8 @@ module Body = struct
     , Boolean.var )
     t_
 
-  let spec =
-    Data_spec.
+  let typ =
+    Typ.of_hlistable
       [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
@@ -126,9 +126,7 @@ module Body = struct
       ; Currency.Amount.typ
       ; Boolean.typ
       ]
-
-  let typ =
-    Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
+      ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct

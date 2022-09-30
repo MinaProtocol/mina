@@ -1477,23 +1477,22 @@ module Circuit = struct
       in
       Js.Unsafe.(fun_call c##.snarkyMain [| inject w; inject public |])
     in
-    (main, Impl.Data_spec.[ typ_ c##.snarkyPublicTyp ])
+    (main, typ_ c##.snarkyPublicTyp)
 
   let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
       keypair_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let cs =
-      Impl.constraint_system ~exposing:spec
-        ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
+      Impl.constraint_system ~input_typ ~return_typ:Snark_params.Tick.Typ.unit
+        (fun x -> main x)
     in
     let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
 
   let constraint_system (main : unit -> unit) =
     let cs =
-      Impl.constraint_system
-        ~exposing:Impl.Data_spec.[]
-        ~return_typ:Snark_params.Tick.Typ.unit main
+      Impl.constraint_system ~input_typ:Impl.Typ.unit
+        ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
     let rows = List.length cs.rows_rev in
     let digest =
@@ -1519,14 +1518,14 @@ module Circuit = struct
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
       Impl.generate_witness_conv ~return_typ:Snark_params.Tick.Typ.unit
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } () ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs )
-        spec (main ~w:priv) pub
+        ~input_typ (main ~w:priv) pub
     in
     new%js proof_constr p
 
