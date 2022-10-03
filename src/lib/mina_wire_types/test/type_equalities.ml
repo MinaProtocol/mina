@@ -363,6 +363,10 @@ module Consensus = struct
   module O = Consensus
   module W = WT.Consensus
   include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
+  include
+    Assert_equal0V1
+      (O.Data.Consensus_state.Value.Stable)
+      (W.Data.Consensus_state.Value)
 end
 
 module Consensus_vrf = struct
