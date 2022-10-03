@@ -91,8 +91,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.extra_genesis_keypairs network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_formatted_string "10" in
-    let fee = Currency.Fee.of_formatted_string "1" in
+    let amount = Currency.Amount.mina_of_string_exn "10" in
+    let fee = Currency.Fee.mina_of_string_exn "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
       fish1.public_key |> Signature_lib.Public_key.compress
@@ -102,10 +102,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
     (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
-    let receiver_original_balance =
-      Currency.Amount.of_formatted_string "1000"
-    in
-    let sender_original_balance = Currency.Amount.of_formatted_string "1000" in
+    let receiver_original_balance = Currency.Amount.mina_of_string_exn "1000" in
+    let sender_original_balance = Currency.Amount.mina_of_string_exn "1000" in
     let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let receiver_account_id =
       Account_id.create receiver_pub_key Token_id.default
@@ -199,17 +197,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Option.value_exn
          in
          (* [%log info] "coinbase_amount: %s"
-            (Currency.Amount.to_formatted_string coinbase_reward) ; *)
+            (Currency.Amount.string_of_mina_exn coinbase_reward) ; *)
          [%log info] "txn_amount: %s"
-           (Currency.Amount.to_formatted_string amount) ;
+           (Currency.Amount.string_of_mina_exn amount) ;
          [%log info] "receiver_expected: %s"
-           (Currency.Amount.to_formatted_string receiver_expected) ;
+           (Currency.Amount.string_of_mina_exn receiver_expected) ;
          [%log info] "receiver_balance: %s"
-           (Currency.Balance.to_formatted_string receiver_balance) ;
+           (Currency.Balance.string_of_mina_exn receiver_balance) ;
          [%log info] "sender_expected: %s"
-           (Currency.Amount.to_formatted_string sender_expected) ;
+           (Currency.Amount.string_of_mina_exn sender_expected) ;
          [%log info] "sender_balance: %s"
-           (Currency.Balance.to_formatted_string sender_balance) ;
+           (Currency.Balance.string_of_mina_exn sender_balance) ;
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
@@ -348,19 +346,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~account_id:receiver_account_id
          in
          [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+           (Currency.Balance.string_of_mina_exn timed_node_c_total) ;
          [%log info] "timed_node_c liquid balance: %s"
-           (Currency.Balance.to_formatted_string
+           (Currency.Balance.string_of_mina_exn
               ( timed_node_c_liquid_opt
               |> Option.value ~default:Currency.Balance.zero ) ) ;
          [%log info] "timed_node_c liquid locked: %s"
-           (Currency.Balance.to_formatted_string
+           (Currency.Balance.string_of_mina_exn
               ( timed_node_c_locked_opt
               |> Option.value ~default:Currency.Balance.zero ) ) ;
          [%log info]
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
+           (Currency.Amount.string_of_mina_exn amount) ;
          let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
@@ -384,11 +382,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~account_id:sender_account_id
          in
          [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+           (Currency.Balance.string_of_mina_exn timed_node_c_total) ;
          [%log info]
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
+           (Currency.Amount.string_of_mina_exn amount) ;
          (* TODO: refactor this using new [expect] dsl when it's available *)
          let open Deferred.Let_syntax in
          match%bind

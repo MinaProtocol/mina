@@ -31,7 +31,7 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
     let%map accounts = accounts in
     List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_formatted_string (Int.to_string balance) in
+        let balance = Balance.mina_of_string_exn (Int.to_string balance) in
         (Some sk, account_with_timing account_id balance timing) )
 end
 

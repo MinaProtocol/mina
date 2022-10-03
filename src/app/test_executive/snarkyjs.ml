@@ -15,9 +15,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_fee_payer_balance = Currency.Balance.of_formatted_string "8000000"
+  let initial_fee_payer_balance = Currency.Balance.mina_of_string_exn "8000000"
 
-  let zkapp_target_balance = Currency.Balance.of_formatted_string "10"
+  let zkapp_target_balance = Currency.Balance.mina_of_string_exn "10"
 
   let config =
     let open Test_config in
@@ -26,7 +26,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         [ { balance =
-              Currency.Balance.to_formatted_string initial_fee_payer_balance
+              Currency.Balance.string_of_mina_exn initial_fee_payer_balance
           ; timing = Untimed
           }
         ]
