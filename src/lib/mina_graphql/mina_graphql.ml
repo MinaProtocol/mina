@@ -4298,7 +4298,7 @@ module Queries = struct
       ~typ:Types.account_id
       ~args:
         Arg.
-          [ arg "token" ~doc:"Token to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owner for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->
