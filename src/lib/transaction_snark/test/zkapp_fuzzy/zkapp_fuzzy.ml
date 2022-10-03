@@ -233,7 +233,6 @@ let () =
        fun () ->
          let open Mina_generators.Zkapp_command_generators in
          let open Transaction_status.Failure in
-         let num_of_fee_payers = 5 in
          let max_account_updates = 3 in
          generate_zkapp_commands_and_apply_them_consecutively ~trials
            ~max_account_updates () ;

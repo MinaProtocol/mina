@@ -427,8 +427,8 @@ module Failure = struct
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
     | Cancelled ->
-        "The account update gets cancelled because there's a failure in the \
-         zkapp command"
+        "The account update is cancelled because there's a failure in the \
+         zkApp transaction"
 end
 
 [%%versioned
