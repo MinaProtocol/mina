@@ -1,9 +1,9 @@
 open Pickles_types
-module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
+module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Opt = Plonk_types.Opt
 open Core_kernel
 
@@ -156,10 +156,10 @@ module Wrap = struct
               ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
-              [ Scalar_challenge.typ scalar_challenge
+              [ Kimchi_backend_common.Scalar_challenge.typ scalar_challenge
               ; challenge
               ; challenge
-              ; Scalar_challenge.typ scalar_challenge
+              ; Kimchi_backend_common.Scalar_challenge.typ scalar_challenge
               ; fp
               ; fp
               ; fp
@@ -174,7 +174,10 @@ module Wrap = struct
                     { joint_combiner = dummy_scalar_challenge
                     ; lookup_gate = dummy_scalar
                     }
-                  (Lookup.typ (Scalar_challenge.typ scalar_challenge) fp)
+                  (Lookup.typ
+                     (Kimchi_backend_common.Scalar_challenge.typ
+                        scalar_challenge )
+                     fp )
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -319,7 +322,7 @@ module Wrap = struct
                 ~dummy_scalar_challenge ~challenge ~scalar_challenge fp
             ; fp
             ; fp
-            ; Scalar_challenge.typ scalar_challenge
+            ; Kimchi_backend_common.Scalar_challenge.typ scalar_challenge
             ; Vector.typ
                 (Bulletproof_challenge.typ scalar_challenge)
                 Backend.Tick.Rounds.n

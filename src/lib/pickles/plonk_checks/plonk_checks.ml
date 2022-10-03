@@ -3,7 +3,7 @@ open Pickles_types
 open Pickles_base
 module Scalars = Scalars
 module Domain = Domain
-module Opt = Plonk_types.Opt
+module Opt = Pickles_types.Plonk_types.Opt
 
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial : 'field -> 'field >

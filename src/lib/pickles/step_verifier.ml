@@ -1085,7 +1085,7 @@ struct
   let sponge_after_index index =
     let sponge = Sponge.create sponge_params in
     Array.iter
-      (Types.index_to_field_elements
+      (Pickles_base.Side_loaded_verification_key.index_to_field_elements
          ~g:(fun (z : Inputs.Inner_curve.t) ->
            List.to_array (Inner_curve.to_field_elements z) )
          index )
