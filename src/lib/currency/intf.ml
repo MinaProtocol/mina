@@ -61,11 +61,11 @@ module type Basic = sig
 
   val nanomina_of_int_exn : int -> t
 
-  val mina : int -> t option
+  val mina_of_int : int -> t option
 
-  val centimina : int -> t option
+  val centimina_of_int : int -> t option
 
-  val nanomina : int -> t option
+  val nanomina_of_int : int -> t option
 
   val int_of_mina : t -> int
 
