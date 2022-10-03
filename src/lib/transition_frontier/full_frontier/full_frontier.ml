@@ -738,6 +738,8 @@ let update_metrics_with_diff (type mutant) t
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
+      let num_accounts = Breadcrumb.staged_ledger best_tip |> Staged_ledger.ledger |> Ledger.num_accounts
+      in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
           (Int.to_float (List.length (Breadcrumb.validated_transition best_tip |> Mina_block.Validated.valid_commands ))) ;
@@ -754,7 +756,8 @@ let update_metrics_with_diff (type mutant) t
         Gauge.set Transition_frontier.best_tip_block_height
           (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
-          (Int.to_float (empty_blocks_at_best_tip t)))
+          (Int.to_float (empty_blocks_at_best_tip t));
+        Gauge.set Transition_frontier.best_tip_num_accounts (Int.to_float num_accounts))
 
 let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Root_identifier.Stable.Latest in

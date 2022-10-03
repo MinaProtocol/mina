@@ -433,6 +433,8 @@ module Transition_frontier = struct
   let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
+
+  let best_tip_num_accounts : Gauge.t = ()
 end
 
 module Catchup = struct
