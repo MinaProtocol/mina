@@ -202,7 +202,7 @@ end
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
-    Impls.Wrap.generate_public_input [ typ ] prev_statement
+    Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
@@ -217,7 +217,7 @@ let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Tock.Rounds.n ~uses_lookup
     in
-    Impls.Step.generate_public_input [ input ] prev_statement
+    Impls.Step.generate_public_input input prev_statement
   in
   List.init
     (Backend.Tick.Field.Vector.length input)

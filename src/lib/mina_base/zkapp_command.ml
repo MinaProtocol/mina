@@ -15,6 +15,7 @@ let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -33,6 +34,7 @@ let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -1153,6 +1155,7 @@ let to_simple (t : t) : Simple.t =
               ; use_full_commitment = b.use_full_commitment
               ; caller = call_type
               ; call_depth = 0
+              ; authorization_kind = b.authorization_kind
               }
           } )
         ~null_id:Token_id.default
@@ -1481,6 +1484,14 @@ struct
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
+          let%bind () =
+            match (p.authorization, p.body.authorization_kind) with
+            | None_given, None_given | Proof _, Proof | Signature _, Signature
+              ->
+                Some ()
+            | _ ->
+                None
+          in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
             let%map { With_hash.hash; _ } = vk_opt in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)

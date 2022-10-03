@@ -29,12 +29,11 @@ type value = t [@@deriving sexp, compare, hash, yojson]
 
 type var = (T.Checked.t, Length.Checked.t) Poly.t
 
-let data_spec = Data_spec.[ T.Checked.typ; Length.Checked.typ ]
-
 let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ T.Checked.typ; Length.Checked.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : value) =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
