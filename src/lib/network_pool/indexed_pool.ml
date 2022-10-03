@@ -809,7 +809,7 @@ let revalidate :
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
             ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
             ; ( "account_balance"
-              , `String (Currency.Amount.to_formatted_string current_balance) )
+              , `String (Currency.Amount.string_of_mina_exn current_balance) )
             ] ;
         let first_cmd = F_sequence.head_exn queue in
         let first_nonce =

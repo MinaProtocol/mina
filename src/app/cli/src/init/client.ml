@@ -76,10 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.string_of_mina_exn account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.string_of_mina_exn account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -584,7 +584,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_formatted_string cancel_fee) ;
+           (Currency.Fee.string_of_mina_exn cancel_fee) ;
          let cancel_query =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input
@@ -877,7 +877,7 @@ let currency_in_ledger =
              let total =
                Token_id.Table.find_exn currency_tbl token
                |> Currency.Balance.of_uint64
-               |> Currency.Balance.to_formatted_string
+               |> Currency.Balance.string_of_mina_exn
              in
              if Token_id.equal token Token_id.default then
                Format.printf "MINA: %s@." total
@@ -1405,7 +1405,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.to_formatted_string w.balance.total)
+                       (Currency.Balance.string_of_mina_exn w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1746,7 +1746,7 @@ let compile_time_constants =
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
-                   (Currency.Amount.to_formatted_string
+                   (Currency.Amount.string_of_mina_exn
                       precomputed_values.constraint_constants.coinbase_amount )
                )
              ; ( "block_window_duration_ms"

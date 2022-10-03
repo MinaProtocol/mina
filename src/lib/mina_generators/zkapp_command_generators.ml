@@ -275,16 +275,15 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
   let small_balance_change =
     (*make small transfers to allow generating large number of zkapp_command without an overflow*)
     let open Currency in
-    if
-      Balance.(effective_balance < of_formatted_string "1.0") && not new_account
+    if Balance.(effective_balance < mina_of_string_exn "1.0") && not new_account
     then failwith "account has low balance"
-    else Balance.of_formatted_string "0.000001"
+    else Balance.mina_of_string_exn "0.000001"
   in
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "50.0")
-        (Currency.Amount.of_formatted_string "100.0")
+        (Currency.Amount.mina_of_string_exn "50.0")
+        (Currency.Amount.mina_of_string_exn "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)

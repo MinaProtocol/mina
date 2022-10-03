@@ -185,10 +185,10 @@ module Constraint_constants = struct
         ; transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
-            Currency.Amount.of_formatted_string coinbase_amount_string
+            Currency.Amount.mina_of_string_exn coinbase_amount_string
         ; supercharged_coinbase_factor
         ; account_creation_fee =
-            Currency.Fee.of_formatted_string account_creation_fee_string
+            Currency.Fee.mina_of_string_exn account_creation_fee_string
         ; fork
         }
     end :

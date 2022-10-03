@@ -69,7 +69,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "2000000000.0" in
+      let max_bal = Currency.Balance.mina_of_string_exn "2000000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)

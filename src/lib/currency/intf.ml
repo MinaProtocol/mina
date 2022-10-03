@@ -38,9 +38,9 @@ module type Basic = sig
 
   val to_string : t -> string
 
-  val of_formatted_string : string -> t
+  val mina_of_string_exn : string -> t
 
-  val to_formatted_string : t -> string
+  val string_of_mina_exn : t -> string
 
   val to_uint64 : t -> uint64
 

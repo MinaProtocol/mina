@@ -105,7 +105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
-    let to_formatted_string amount =
+    let string_of_mina_exn amount =
       let rec go num_stripped_zeros num =
         let open Int in
         if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
@@ -120,7 +120,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Int.(precision - num_stripped_zeros)
           num
 
-    let of_formatted_string input =
+    let mina_of_string_exn input =
       let parts = String.split ~on:'.' input in
       match parts with
       | [ whole ] ->
@@ -134,16 +134,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               ( whole ^ decimal
               ^ String.make Int.(precision - decimal_length) '0' )
       | _ ->
-          failwith "Currency.of_formatted_string: Invalid currency input"
+          failwith "Currency.mina_of_string_exn: Invalid currency input"
 
     module Arg = struct
       type typ = t [@@deriving sexp, hash, compare]
 
       type t = typ [@@deriving sexp, hash, compare]
 
-      let to_string = to_formatted_string
+      let to_string = string_of_mina_exn
 
-      let of_string = of_formatted_string
+      let of_string = mina_of_string_exn
     end
 
     include Codable.Make_of_string (Arg)
@@ -884,7 +884,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_roundtrip" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                match of_formatted_string (to_formatted_string num) with
+                match mina_of_string_exn (string_of_mina_exn num) with
                 | after_format ->
                     if Unsigned.equal after_format num then ()
                     else
@@ -894,7 +894,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                              (sprintf
                                 !"formatting: num=%{Unsigned} middle=%{String} \
                                   after=%{Unsigned}"
-                                num (to_formatted_string num) after_format ) ))
+                                num (string_of_mina_exn num) after_format ) ))
                 | exception e ->
                     let err = Error.of_exn e in
                     Error.(
@@ -906,7 +906,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_trailing_zeros" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                let formatted = to_formatted_string num in
+                let formatted = string_of_mina_exn num in
                 let has_decimal = String.contains formatted '.' in
                 let trailing_zero = String.is_suffix formatted ~suffix:"0" in
                 if has_decimal && trailing_zero then
@@ -915,7 +915,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (of_string
                          (sprintf
                             !"formatting: num=%{Unsigned} formatted=%{String}"
-                            num (to_formatted_string num) ) )) )
+                            num (string_of_mina_exn num) ) )) )
         end )
     end
 

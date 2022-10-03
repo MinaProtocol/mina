@@ -1524,7 +1524,7 @@ let%test_module _ =
             { new_commands = []; removed_commands = []; reorg_best_tip = false }
         in
         let initial_balance =
-          Currency.Balance.of_formatted_string "900000000.0"
+          Currency.Balance.mina_of_string_exn "900000000.0"
         in
         let ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 () in
         Array.iteri test_keys ~f:(fun i kp ->
