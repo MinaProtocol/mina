@@ -133,7 +133,7 @@ let transfer_funds_one_receiver =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       transfer_funds ~debug ~keyfile ~fee ~nonce ~memo
-        ~receivers:[ (receiver, amount) ]
+        ~receivers:(Deferred.return [ (receiver, amount) ])
     in
     Util.print_snapp_transaction ~graphql zkapp_command ;
     ()
