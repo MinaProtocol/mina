@@ -1,6 +1,6 @@
-open Pickles_types
-open Core_kernel
-module Limbs = Nat.N4
+module Limbs = Pickles_types.Nat.N4
+module Vector = Pickles_types.Vector
+module Fn = Core_kernel.Fn
 
 module Constant = struct
   include Limb_vector.Constant.Make (Limbs)
@@ -20,22 +20,20 @@ module Constant = struct
 
   (* Force the typechecker to verify that these types are equal. *)
   let () =
-    let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
+    let _f : unit -> (t, Stable.Latest.t) Core_kernel.Type_equal.t =
+     fun () -> Core_kernel.Type_equal.T
     in
     ()
 
-  open Backend
+  let to_tick_field x = Backend.Tick.Field.of_bits (to_bits x)
 
-  let to_tick_field x = Tick.Field.of_bits (to_bits x)
+  let to_tock_field x = Backend.Tock.Field.of_bits (to_bits x)
 
-  let to_tock_field x = Tock.Field.of_bits (to_bits x)
-
-  let of_tick_field x = of_bits (Tick.Field.to_bits x)
+  let of_tick_field x = of_bits (Backend.Tick.Field.to_bits x)
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
+  module Field = Impl.Field
 
   type t = Field.t
 
@@ -43,27 +41,28 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   module Unsafe = struct
     let to_bits_unboolean x =
-      with_label __LOC__ (fun () ->
+      Impl.with_label __LOC__ (fun () ->
           let length = Field.size_in_bits in
           let res =
-            exists
-              (Typ.list Boolean.typ_unchecked ~length)
-              ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+            Impl.exists
+              (Impl.Typ.list Impl.Boolean.typ_unchecked ~length)
+              ~compute:
+                Impl.As_prover.(fun () -> Field.Constant.unpack (read_var x))
           in
           Field.Assert.equal x (Field.project res) ;
           res )
   end
 
-  let () = assert (Field.size_in_bits < 64 * Nat.to_int Limbs.n)
+  let () = assert (Field.size_in_bits < 64 * Pickles_types.Nat.to_int Limbs.n)
 
   module Constant = struct
     include Constant
 
-    let to_bits x = List.take (to_bits x) Field.size_in_bits
+    let to_bits x = Core_kernel.List.take (to_bits x) Field.size_in_bits
   end
 
   let typ =
-    Typ.transport Field.typ
+    Impl.Typ.transport Field.typ
       ~there:(Fn.compose Field.Constant.project Constant.to_bits)
       ~back:(Fn.compose Constant.of_bits Field.Constant.unpack)
 end
