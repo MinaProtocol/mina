@@ -106,7 +106,7 @@ let%test_module "Add events test" =
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; fee = Currency.Fee.(nanomina_exn 100)
+            ; fee = Currency.Fee.(nanomina_of_int_exn 100)
             }
         ; authorization = Signature.dummy
         }
@@ -160,7 +160,7 @@ let%test_module "Add events test" =
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
-            Account.create account_id Currency.Balance.(nanomina_exn 500)
+            Account.create account_id Currency.Balance.(nanomina_of_int_exn 500)
           in
           let _, loc =
             Ledger.get_or_create_account ledger account_id account

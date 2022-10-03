@@ -177,7 +177,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
         key_gen
-      and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.nanomina_exn
+      and fee =
+        Int.gen_incl min_fee max_fee >>| Currency.Fee.nanomina_of_int_exn
       and memo = String.quickcheck_generator in
       let%map body = create_body signer receiver in
       let payload : Payload.t =
@@ -200,7 +201,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
-          Int.gen_incl min_amount max_amount >>| Currency.Amount.nanomina_exn
+          Int.gen_incl min_amount max_amount
+          >>| Currency.Amount.nanomina_of_int_exn
         in
         Signed_command_payload.Body.Payment
           { receiver_pk = Public_key.compress receiver
@@ -285,7 +287,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  let amount_to_spend =
                    if spend_all then balance
                    else
-                     Currency.Amount.nanomina_exn
+                     Currency.Amount.nanomina_of_int_exn
                        (Currency.Amount.int_of_nanomina balance / 2)
                  in
                  Quickcheck_lib.gen_division_currency amount_to_spend
@@ -302,7 +304,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Quickcheck.Generator.filter ~f:(fun (_, splits) ->
               Array.for_all splits ~f:(fun split ->
                   List.for_all split ~f:(fun amt ->
-                      Currency.Amount.(amt >= mina_exn 2) ) ) )
+                      Currency.Amount.(amt >= mina_of_int_exn 2) ) ) )
         in
         let account_nonces =
           Array.map ~f:(fun (_, _, nonce, _) -> nonce) account_info

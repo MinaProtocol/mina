@@ -58,13 +58,13 @@ end
 module Fee = Make_numeric (struct
   include Currency.Fee
 
-  let of_int = nanomina_exn
+  let of_int = nanomina_of_int_exn
 end)
 
 module Amount = Make_numeric (struct
   include Currency.Amount
 
-  let of_int = nanomina_exn
+  let of_int = nanomina_of_int_exn
 end)
 
 module Nonce = Make_numeric (Account.Nonce)

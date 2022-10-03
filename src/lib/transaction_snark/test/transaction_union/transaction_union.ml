@@ -88,7 +88,7 @@ let%test_module "Transaction union tests" =
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
-          ~amount:(Currency.Amount.mina_exn 10)
+          ~amount:(Currency.Amount.mina_of_int_exn 10)
           ~receiver
           ~fee_transfer:
             (Some
@@ -164,7 +164,7 @@ let%test_module "Transaction union tests" =
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:1 ~receiver:0
                   8_000_000_000
-                  (Fee.mina_exn @@ Random.int 20)
+                  (Fee.mina_of_int_exn @@ Random.int 20)
                   Account.Nonce.zero
                   (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
@@ -245,7 +245,9 @@ let%test_module "Transaction union tests" =
                     let uc =
                       U.Wallet.user_command ~fee_payer:sender
                         ~receiver_pk:(Account.public_key receiver.account)
-                        amount (Fee.nanomina_exn txn_fee) nonce memo
+                        amount
+                        (Fee.nanomina_of_int_exn txn_fee)
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
@@ -288,7 +290,7 @@ let%test_module "Transaction union tests" =
                       @@ One_or_two.map receiver ~f:(fun receiver ->
                              Fee_transfer.Single.create
                                ~receiver_pk:receiver.account.public_key
-                               ~fee:(Currency.Fee.nanomina_exn fee)
+                               ~fee:(Currency.Fee.nanomina_of_int_exn fee)
                                ~fee_token:receiver.account.token_id )
                     in
                     txns @ [ ft ] )
@@ -328,7 +330,7 @@ let%test_module "Transaction union tests" =
                   ~f:(fun (fts, cbs) _ ->
                     let cb =
                       Coinbase.create
-                        ~amount:(Currency.Amount.nanomina_exn reward)
+                        ~amount:(Currency.Amount.nanomina_of_int_exn reward)
                         ~receiver:receiver.account.public_key
                         ~fee_transfer:(List.hd fts)
                       |> Or_error.ok_exn
@@ -381,13 +383,13 @@ let%test_module "Transaction union tests" =
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:0 ~receiver:1
                   8_000_000_000
-                  (Fee.mina_exn @@ Random.int 20)
+                  (Fee.mina_of_int_exn @@ Random.int 20)
                   Account.Nonce.zero memo
               in
               let t2 =
                 U.Wallet.user_command_with_wallet wallets ~sender:1 ~receiver:2
                   8_000_000_000
-                  (Fee.mina_exn @@ Random.int 20)
+                  (Fee.mina_of_int_exn @@ Random.int 20)
                   Account.Nonce.zero memo
               in
               let sok_digest =
@@ -577,7 +579,9 @@ let%test_module "Transaction union tests" =
         ~carryforward1:false ~carryforward2:false
 
     let create_account pk token balance =
-      Account.create (Account_id.create pk token) (Balance.nanomina_exn balance)
+      Account.create
+        (Account_id.create pk token)
+        (Balance.nanomina_of_int_exn balance)
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
         ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
@@ -843,7 +847,7 @@ let%test_module "Transaction union tests" =
               let accounts =
                 [| create_account fee_payer_pk fee_token 20_000_000_000 |]
               in
-              let fee = Fee.mina_exn @@ random_int_incl 2 15 in
+              let fee = Fee.mina_of_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
@@ -883,7 +887,7 @@ let%test_module "Transaction union tests" =
                  ; create_account receiver_pk token_id 30_000_000_000
                 |]
               in
-              let fee = Fee.mina_exn @@ random_int_incl 2 15 in
+              let fee = Fee.mina_of_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
@@ -917,12 +921,12 @@ let%test_module "Transaction union tests" =
               (Test_util.arbitrary_string
                  ~len:Signed_command_memo.max_digestible_string_length )
           in
-          let balance = Balance.mina_exn 100_000 in
-          let initial_minimum_balance = Balance.mina_exn 80_000 in
+          let balance = Balance.mina_of_int_exn 100_000 in
+          let initial_minimum_balance = Balance.mina_of_int_exn 80_000 in
           let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-          let cliff_amount = Amount.nanomina_exn 10_000 in
+          let cliff_amount = Amount.nanomina_of_int_exn 10_000 in
           let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-          let vesting_increment = Amount.nanomina_exn 1 in
+          let vesting_increment = Amount.nanomina_of_int_exn 1 in
           let txn_global_slot = Mina_numbers.Global_slot.of_int 1002 in
           let sender =
             { sender with
@@ -949,7 +953,7 @@ let%test_module "Transaction union tests" =
                     let uc =
                       U.Wallet.user_command_with_wallet wallets ~sender:0
                         ~receiver amount
-                        (Fee.nanomina_exn txn_fee)
+                        (Fee.nanomina_of_int_exn txn_fee)
                         nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
@@ -1860,12 +1864,12 @@ let%test_module "Transaction union tests" =
           in
           let timed_account pk =
             let account_id = Account_id.create pk Token_id.default in
-            let balance = Balance.mina_exn 100_000 in
-            let initial_minimum_balance = Balance.mina_exn 80 in
+            let balance = Balance.mina_of_int_exn 100_000 in
+            let initial_minimum_balance = Balance.mina_of_int_exn 80 in
             let cliff_time = Mina_numbers.Global_slot.of_int 2 in
-            let cliff_amount = Amount.mina_exn 5 in
+            let cliff_amount = Amount.mina_of_int_exn 5 in
             let vesting_period = Mina_numbers.Global_slot.of_int 2 in
-            let vesting_increment = Amount.mina_exn 40 in
+            let vesting_increment = Amount.mina_of_int_exn 40 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
                  ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
@@ -1876,12 +1880,12 @@ let%test_module "Transaction union tests" =
           let ft1, ft2 =
             let single1 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.nanomina_exn fee)
+                ~fee:(Currency.Fee.nanomina_of_int_exn fee)
                 ~fee_token:Token_id.default
             in
             let single2 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(1)
-                ~fee:(Currency.Fee.nanomina_exn fee)
+                ~fee:(Currency.Fee.nanomina_of_int_exn fee)
                 ~fee_token:Token_id.default
             in
             ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
@@ -1890,14 +1894,14 @@ let%test_module "Transaction union tests" =
           let coinbase_with_ft, coinbase_wo_ft =
             let ft =
               Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.nanomina_exn fee)
+                ~fee:(Currency.Fee.nanomina_of_int_exn fee)
             in
             ( Coinbase.create
-                ~amount:(Currency.Amount.mina_exn 10)
+                ~amount:(Currency.Amount.mina_of_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:(Some ft)
               |> Or_error.ok_exn
             , Coinbase.create
-                ~amount:(Currency.Amount.mina_exn 10)
+                ~amount:(Currency.Amount.mina_of_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:None
               |> Or_error.ok_exn )
           in

@@ -3755,7 +3755,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.slot_number global_slot
         in
         let supply_increase =
-          Currency.Amount.(Signed.of_unsigned (nanomina_exn 42))
+          Currency.Amount.(Signed.of_unsigned (nanomina_of_int_exn 42))
         in
         (* setup ledger, needed to compute producer_vrf_result here and handler below *)
         let open Mina_base in
@@ -4089,7 +4089,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Option.value_exn
           Amount.(
             genesis_currency
-            + nanomina_exn (height * int_of_nanomina constraint_constants.coinbase_amount))
+            + nanomina_of_int_exn (height * int_of_nanomina constraint_constants.coinbase_amount))
 
       (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
       let opt_gen opt ~gen =
@@ -4177,7 +4177,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let gen_spot ?root_epoch_position
           ?(slot_fill_rate = default_slot_fill_rate)
           ?(slot_fill_rate_delta = default_slot_fill_rate_delta)
-          ?(genesis_currency = Currency.Amount.nanomina_exn 200_000)
+          ?(genesis_currency = Currency.Amount.nanomina_of_int_exn 200_000)
           ?gen_staking_epoch_length ?gen_next_epoch_length
           ?gen_curr_epoch_position ?staking_start_checkpoint
           ?staking_lock_checkpoint ?next_start_checkpoint ?next_lock_checkpoint

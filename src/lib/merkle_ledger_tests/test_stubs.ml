@@ -5,7 +5,7 @@ module Balance = struct
 
   let to_int = int_of_nanomina
 
-  let of_int = nanomina_exn
+  let of_int = nanomina_of_int_exn
 end
 
 module Account = struct
@@ -213,7 +213,7 @@ module Base_inputs = struct
   module Balance = struct
     include Balance
 
-    let of_int = nanomina_exn
+    let of_int = nanomina_of_int_exn
 
     let to_int = int_of_nanomina
   end

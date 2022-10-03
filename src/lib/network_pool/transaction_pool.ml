@@ -1730,7 +1730,7 @@ let%test_module _ =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
         (Signed_command_payload.create
-           ~fee:(Currency.Fee.nanomina_exn fee)
+           ~fee:(Currency.Fee.nanomina_of_int_exn fee)
            ~fee_payer_pk:(get_pk sender_idx) ~valid_until
            ~nonce:(Account.Nonce.of_int nonce)
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
@@ -1738,7 +1738,7 @@ let%test_module _ =
              (Signed_command_payload.Body.Payment
                 { source_pk = get_pk sender_idx
                 ; receiver_pk = get_pk receiver_idx
-                ; amount = Currency.Amount.nanomina_exn amount
+                ; amount = Currency.Amount.nanomina_of_int_exn amount
                 } ) )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
@@ -1746,7 +1746,7 @@ let%test_module _ =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
-      let amount = Currency.Amount.nanomina_exn amount in
+      let amount = Currency.Amount.nanomina_of_int_exn amount in
       let receiver_kp = test_keys.(receiver_idx) in
       let receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
@@ -1760,7 +1760,7 @@ let%test_module _ =
             let fee_payer_nonce = Account.Nonce.of_int nonce in
             Some (fee_payer_kp, fee_payer_nonce)
       in
-      let fee = Currency.Fee.nanomina_exn fee in
+      let fee = Currency.Fee.nanomina_of_int_exn fee in
       let protocol_state_precondition =
         match valid_period with
         | None ->
@@ -2036,7 +2036,7 @@ let%test_module _ =
       let account = Option.value_exn @@ Mina_ledger.Ledger.get ledger loc in
       Mina_ledger.Ledger.set ledger loc
         { account with
-          balance = Currency.Balance.nanomina_exn balance
+          balance = Currency.Balance.nanomina_of_int_exn balance
         ; nonce = Account.Nonce.of_int nonce
         }
 

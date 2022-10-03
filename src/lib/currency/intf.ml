@@ -55,11 +55,11 @@ module type Basic = sig
      possible and limit the use of _exn veriants to places where
      a fixed value is being converted and hence overflow cannot
      happen. *)
-  val mina_exn : int -> t
+  val mina_of_int_exn : int -> t
 
-  val centimina_exn : int -> t
+  val centimina_of_int_exn : int -> t
 
-  val nanomina_exn : int -> t
+  val nanomina_of_int_exn : int -> t
 
   val mina : int -> t option
 
