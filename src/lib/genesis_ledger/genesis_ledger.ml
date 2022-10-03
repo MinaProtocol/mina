@@ -11,12 +11,12 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
       Account.create account_id balance
   | Timed t ->
       let initial_minimum_balance =
-        Currency.Balance.nanomina_exn t.initial_minimum_balance
+        Currency.Balance.nanomina_of_int_exn t.initial_minimum_balance
       in
       let cliff_time = Mina_numbers.Global_slot.of_int t.cliff_time in
-      let cliff_amount = Currency.Amount.nanomina_exn t.cliff_amount in
+      let cliff_amount = Currency.Amount.nanomina_of_int_exn t.cliff_amount in
       let vesting_increment =
-        Currency.Amount.nanomina_exn t.vesting_increment
+        Currency.Amount.nanomina_of_int_exn t.vesting_increment
       in
       let vesting_period = Mina_numbers.Global_slot.of_int t.vesting_period in
       Account.create_timed account_id balance ~initial_minimum_balance
@@ -43,7 +43,7 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
     let%map accounts = Accounts.accounts in
     List.map accounts ~f:(fun { pk; balance; delegate; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.nanomina_exn balance in
+        let balance = Balance.nanomina_of_int_exn balance in
         let base_acct = account_with_timing account_id balance timing in
         (None, { base_acct with delegate = Option.value ~default:pk delegate }) )
 end

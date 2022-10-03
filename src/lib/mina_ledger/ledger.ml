@@ -418,7 +418,7 @@ let gen_initial_ledger_state : init_state Quickcheck.Generator.t =
   let%bind balances =
     let gen_balance =
       let%map whole_balance = Int.gen_incl 500_000_000 1_000_000_000 in
-      Currency.Amount.mina_exn whole_balance
+      Currency.Amount.mina_of_int_exn whole_balance
     in
     Quickcheck_lib.replicate_gen gen_balance n_accounts
   in
@@ -448,7 +448,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       let account' =
         { account with
           balance =
-            Currency.Balance.nanomina_exn
+            Currency.Balance.nanomina_of_int_exn
               (Currency.Amount.int_of_nanomina balance)
         ; nonce
         ; timing
@@ -591,7 +591,7 @@ let%test_unit "tokens test" =
            (Public_key.compress k.Keypair.public_key)
            custom_token_id )
           .balance
-        (Currency.Balance.nanomina_exn balance)
+        (Currency.Balance.nanomina_of_int_exn balance)
     in
     execute_zkapp_command_transaction create_token ;
     (* Check that token_owner exists *)
@@ -617,7 +617,7 @@ let%test_unit "zkapp_command payment test" =
   let module L = Ledger_inner in
   let constraint_constants =
     { Genesis_constants.Constraint_constants.for_unit_tests with
-      account_creation_fee = Currency.Fee.nanomina_exn 1
+      account_creation_fee = Currency.Fee.nanomina_of_int_exn 1
     }
   in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->

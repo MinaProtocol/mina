@@ -419,13 +419,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let mina i = Option.(nanomina i >>= Fn.flip scale unit_to_nano)
 
-    let nanomina_exn i =
+    let nanomina_of_int_exn i =
       match nanomina i with None -> raise (Currency_overflow i) | Some m -> m
 
-    let centimina_exn i =
+    let centimina_of_int_exn i =
       match centimina i with None -> raise (Currency_overflow i) | Some m -> m
 
-    let mina_exn i =
+    let mina_of_int_exn i =
       match mina i with None -> raise (Currency_overflow i) | Some m -> m
 
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
