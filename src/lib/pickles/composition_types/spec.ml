@@ -6,38 +6,7 @@ module Sc = Kimchi_backend_common.Scalar_challenge
 
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
-module Basic = struct
-  type (_, _, _) t =
-    | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
-    | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) t
-    | Digest
-        : ( 'digest1
-          , 'digest2
-          , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
-          t
-    | Challenge
-        : ( 'challenge1
-          , 'challenge2
-          , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
-          t
-    | Bulletproof_challenge
-        : ( 'bp_chal1
-          , 'bp_chal2
-          , < bulletproof_challenge1 : 'bp_chal1
-            ; bulletproof_challenge2 : 'bp_chal2
-            ; .. > )
-          t
-    | Branch_data
-        : ( 'branch_data1
-          , 'branch_data2
-          , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
-          )
-          t
-end
-
-open Basic
-
-type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
+type ('a, 'b, 'c) basic =
   | Field
       : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
@@ -75,9 +44,9 @@ end
 
 module rec T : sig
   type (_, _, _) t =
-    | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
+    | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t
     | Scalar :
-        ('a, 'b, (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env)) Basic.t
+        ('a, 'b, (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env)) basic
         -> ('a Sc.t, 'b Sc.t, 'env) t
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
@@ -97,10 +66,8 @@ module rec T : sig
 end =
   T
 
-include T
-
 type ('scalar, 'env) pack =
-  { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'scalar array }
+  { pack : 'a 'b. ('a, 'b, 'env) basic -> 'b -> 'scalar array }
 
 let rec pack :
     type t v env.
@@ -139,8 +106,7 @@ let rec pack :
 type ('f, 'env) typ =
   { typ :
       'var 'value.
-         ('value, 'var, 'env) Basic.t
-      -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+      ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
   }
 
 let rec typ :
@@ -193,8 +159,7 @@ module ETyp = struct
 end
 
 type ('f, 'env) etyp =
-  { etyp :
-      'var 'value. ('value, 'var, 'env) Basic.t -> ('var, 'value, 'f) ETyp.t
+  { etyp : 'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
   }
 
 let rec etyp :
@@ -287,7 +252,7 @@ let pack_basic (type field other_field other_field_var)
   let open C in
   let pack :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> b
       -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
    fun basic x ->
@@ -325,7 +290,7 @@ let typ_basic (type field other_field other_field_var)
   let open C in
   let typ :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> (b, a) Impl.Typ.t =
    fun basic ->
     match basic with
@@ -374,7 +339,7 @@ let packed_typ_basic (type field other_field other_field_var)
   end in
   let etyp :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> (b, a, field) ETyp.t = function
     | Field ->
         field
