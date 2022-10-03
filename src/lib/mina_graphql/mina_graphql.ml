@@ -4283,13 +4283,21 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            List.filter_map (Ledger.to_list ledger) ~f:(fun acc ->
-                let open Option.Let_syntax in
-                let%map () =
-                  Option.some_if (Token_id.equal token_id acc.token_id) ()
+            let token_accounts =
+              Ledger.accounts ledger
+              |> Account_id.Set.filter ~f:(fun acct_id ->
+                     Token_id.equal (Account_id.token_id acct_id) token_id )
+              |> Account_id.Set.to_list
+            in
+            List.map token_accounts ~f:(fun acct_id ->
+                (* we found these account ids in the ledger, lookup should always succeed *)
+                let loc =
+                  Option.value_exn @@ Ledger.location_of_account ledger acct_id
                 in
-                Types.AccountObj.Partial_account.of_full_account ~breadcrumb acc
-                |> Types.AccountObj.lift mina acc.public_key )
+                let account = Option.value_exn @@ Ledger.get ledger loc in
+                Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                  account
+                |> Types.AccountObj.lift mina account.public_key )
         | None ->
             [] )
 
