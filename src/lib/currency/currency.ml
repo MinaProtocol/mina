@@ -413,20 +413,34 @@ module Make_str (A : Wire_types.Concrete) = struct
        possible and limit the use of _exn veriants to places where
        a fixed value is being converted and hence overflow cannot
        happen. *)
-    let nanomina i = if Int.(i >= 0) then Some (of_int i) else None
+    let nanomina_of_int i = if Int.(i >= 0) then Some (of_int i) else None
 
-    let centimina i = Option.(nanomina i >>= Fn.flip scale centi_to_nano)
+    let centimina_of_int i =
+      Option.(nanomina_of_int i >>= Fn.flip scale centi_to_nano)
 
-    let mina i = Option.(nanomina i >>= Fn.flip scale unit_to_nano)
+    let mina_of_int i =
+      Option.(nanomina_of_int i >>= Fn.flip scale unit_to_nano)
 
     let nanomina_of_int_exn i =
-      match nanomina i with None -> raise (Currency_overflow i) | Some m -> m
+      match nanomina_of_int i with
+      | None ->
+          raise (Currency_overflow i)
+      | Some m ->
+          m
 
     let centimina_of_int_exn i =
-      match centimina i with None -> raise (Currency_overflow i) | Some m -> m
+      match centimina_of_int i with
+      | None ->
+          raise (Currency_overflow i)
+      | Some m ->
+          m
 
     let mina_of_int_exn i =
-      match mina i with None -> raise (Currency_overflow i) | Some m -> m
+      match mina_of_int i with
+      | None ->
+          raise (Currency_overflow i)
+      | Some m ->
+          m
 
     type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
