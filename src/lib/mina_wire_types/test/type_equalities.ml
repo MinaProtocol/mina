@@ -315,6 +315,8 @@ module Mina_state = struct
   module W = WT.Mina_state
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
+  include
+    Assert_equal0V2 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
 end
 
 module Mina_transaction_logic = struct
