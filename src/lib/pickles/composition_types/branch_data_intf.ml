@@ -1,5 +1,4 @@
 module type S = sig
-  open Core_kernel
   module Proofs_verified = Pickles_base.Proofs_verified
 
   module Domain_log2 : sig
