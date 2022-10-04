@@ -257,6 +257,12 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Pending_coinbase.Stack_versioned.Stable)
       (W.Pending_coinbase.Stack_versioned)
+  include
+    Assert_equal0 (O.Pending_coinbase.Hash) (W.Pending_coinbase.Hash_builder.V1)
+  include
+    Assert_equal0V1
+      (O.Pending_coinbase.Hash_versioned.Stable)
+      (W.Pending_coinbase.Hash_versioned)
   include Assert_equal2V1 (O.Fee_excess.Poly.Stable) (W.Fee_excess.Poly)
   include Assert_equal0V1 (O.Fee_excess.Stable) (W.Fee_excess)
   include

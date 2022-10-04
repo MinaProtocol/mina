@@ -13,6 +13,18 @@ module Types = struct
         type nonrec t
       end
     end
+
+    module Hash_builder : sig
+      module V1 : sig
+        type t = private Snark_params.Tick.Field.t
+      end
+    end
+
+    module Hash_versioned : sig
+      module V1 : sig
+        type t = Hash_builder.V1.t
+      end
+    end
   end
 end
 
@@ -58,6 +70,18 @@ module type Concrete = sig
       type t = (Coinbase_stack.V1.t, State_stack.V1.t) Poly.V1.t
     end
   end
+
+  module Hash_builder : sig
+    module V1 : sig
+      type t = Snark_params.Tick.Field.t
+    end
+  end
+
+  module Hash_versioned : sig
+    module V1 : sig
+      type t = Hash_builder.V1.t
+    end
+  end
 end
 
 module M = struct
@@ -100,6 +124,18 @@ module M = struct
 
     module V1 = struct
       type t = (Coinbase_stack.V1.t, State_stack.V1.t) Poly.V1.t
+    end
+  end
+
+  module Hash_builder = struct
+    module V1 = struct
+      type t = Snark_params.Tick.Field.t
+    end
+  end
+
+  module Hash_versioned = struct
+    module V1 = struct
+      type t = Hash_builder.V1.t
     end
   end
 end
