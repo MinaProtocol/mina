@@ -77,17 +77,13 @@ module Body = struct
     , Protocol_constants_checked.var )
     Poly.t
 
-  let data_spec ~constraint_constants =
-    Data_spec.
+  let typ ~constraint_constants =
+    Typ.of_hlistable
       [ State_hash.typ
       ; Blockchain_state.typ
       ; Consensus.Data.Consensus_state.typ ~constraint_constants
       ; Protocol_constants_checked.typ
       ]
-
-  let typ ~constraint_constants =
-    Typ.of_hlistable
-      (data_spec ~constraint_constants)
       ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
       ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
@@ -231,12 +227,9 @@ let constants { Poly.Stable.Latest.body = { Body.Poly.constants; _ }; _ } =
 
 let create_var = create'
 
-let data_spec ~constraint_constants =
-  Data_spec.[ State_hash.typ; Body.typ ~constraint_constants ]
-
 let typ ~constraint_constants =
   Typ.of_hlistable
-    (data_spec ~constraint_constants)
+    [ State_hash.typ; Body.typ ~constraint_constants ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 

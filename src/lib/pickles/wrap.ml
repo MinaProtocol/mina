@@ -604,7 +604,7 @@ let wrap
                       ; challenges = Vector.to_array chals
                       } )
                 |> Wrap_hack.pad_accumulator ) )
-          [ input ]
+          ~input_typ:input
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )

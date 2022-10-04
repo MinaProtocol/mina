@@ -306,20 +306,16 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Deploy_snapp_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
-    ; receivers = []
     ; amount
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
     ; new_zkapp_account = true
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Signature
-    ; call_data = Snark_params.Tick.Field.zero
-    ; events = []
-    ; sequence_events = []
     ; preconditions = None
+    ; authorization_kind = Signature
     }
   in
   let zkapp_command =
@@ -335,13 +331,17 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let verification_key =
     let data =
-      Side_loaded_verification_key.of_base58_check_exn verification_key
+      match Side_loaded_verification_key.of_base64 verification_key with
+      | Ok vk_data ->
+          vk_data
+      | Error err ->
+          failwith (Error.to_string_hum err)
     in
     let hash = Zkapp_account.digest_vk data in
     Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
   in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []
@@ -383,7 +383,8 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   in
   let%bind keypair = Util.keypair_of_file keyfile in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Multiple_transfers_spec.sender =
+        (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers
@@ -392,7 +393,6 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Proof
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
@@ -411,7 +411,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let app_state = Util.app_state_of_list app_state in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []
@@ -448,7 +448,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let zkapp_uri = Zkapp_basic.Set_or_keep.Set zkapp_uri in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []
@@ -487,7 +487,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let sequence_events = Util.sequence_state_of_list sequence_state in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []
@@ -524,7 +524,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let token_symbol = Zkapp_basic.Set_or_keep.Set token_symbol in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []
@@ -562,7 +562,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
-    { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers = []

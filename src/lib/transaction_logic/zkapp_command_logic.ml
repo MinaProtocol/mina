@@ -29,9 +29,11 @@ module type Bool_intf = sig
   val ( &&& ) : t -> t -> t
 
   module Assert : sig
-    val is_true : t -> unit
+    (* [pos] is file,line,col,endcol from __POS__ *)
+    val is_true : pos:string * int * int * int -> t -> unit
 
-    val any : t list -> unit
+    (* [pos] is file,line,col,endcol from __POS__ *)
+    val any : pos:string * int * int * int -> t list -> unit
   end
 
   val display : t -> label:string -> string
@@ -42,7 +44,9 @@ module type Bool_intf = sig
 
   type failure_status_tbl
 
-  val assert_with_failure_status_tbl : t -> failure_status_tbl -> unit
+  (* [pos] is file,line,col,endcol from __POS__ *)
+  val assert_with_failure_status_tbl :
+    pos:string * int * int * int -> t -> failure_status_tbl -> unit
 end
 
 module type Balance_intf = sig
@@ -308,6 +312,10 @@ module type Account_update_intf = sig
     -> calls:call_forest
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
+
+  val is_signed : t -> bool
+
+  val is_proved : t -> bool
 
   module Update : sig
     type _ set_or_keep
@@ -834,7 +842,7 @@ module Make (Inputs : Inputs_intf) = struct
     Stack_frame.make ~caller:default_caller ~caller_caller:default_caller
       ~calls:(Call_forest.empty ())
 
-  let assert_ = Bool.Assert.is_true
+  let assert_ ~pos b = Bool.Assert.is_true ~pos b
 
   (* Pop from the call stack, returning dummy values if the stack is empty. *)
   let pop_call_stack (s : Call_stack.t) : Stack_frame.t * Call_stack.t =
@@ -891,8 +899,9 @@ module Make (Inputs : Inputs_intf) = struct
               (Stack_frame.caller_caller current_forest)
           in
           (* Check that account_update has a valid caller. *)
-          assert_ Bool.(is_normal_call ||| is_delegate_call) )
+          assert_ ~pos:__POS__ Bool.(is_normal_call ||| is_delegate_call) )
     in
+
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
        Pop from the call stack to get another forest, which is guaranteed to be non-empty.
@@ -990,9 +999,9 @@ module Make (Inputs : Inputs_intf) = struct
       | `Compute _ ->
           ()
       | `Yes _ ->
-          assert_ is_start'
+          assert_ ~pos:__POS__ is_start'
       | `No ->
-          assert_ (Bool.not is_start') ) ;
+          assert_ ~pos:__POS__ (Bool.not is_start') ) ;
       match is_start with
       | `Yes _ ->
           Bool.true_
@@ -1140,6 +1149,10 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Account_update.check_authorization ~commitment
         ~calls:account_update_forest account_update
     in
+    assert_ ~pos:__POS__
+      (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
+    assert_ ~pos:__POS__
+      (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
     (* The fee-payer must increment their nonce. *)
     let local_state =
       Local_state.add_check local_state Fee_payer_nonce_must_increase
@@ -1193,7 +1206,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
-      assert_ Global_slot.(vesting_period > zero) ;
+      assert_ ~pos:__POS__ Global_slot.(vesting_period > zero) ;
       let a = Account.set_timing a timing in
       (a, local_state)
     in
@@ -1538,9 +1551,9 @@ module Make (Inputs : Inputs_intf) = struct
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
       (* We only allow the default token for fees. *)
-      assert_ curr_is_default ;
+      assert_ ~pos:__POS__ curr_is_default ;
       Bool.(
-        assert_
+        assert_ ~pos:__POS__
           ( (not is_start')
           ||| ( account_update_token_is_default
               &&& Amount.Signed.is_pos local_delta ) )) ;
@@ -1629,7 +1642,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* The first account_update must succeed. *)
     Bool.(
-      assert_with_failure_status_tbl
+      assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
     let global_state =

@@ -115,7 +115,9 @@
       };
       pipeline = with flake-buildkite-pipeline.lib;
         let
-
+          inherit (nixpkgs) lib;
+          dockerUrl = package: tag:
+            "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
           pushToRegistry = package: {
             command = runInEnv self.devShells.x86_64-linux.operations ''
               ${self.packages.x86_64-linux.${package}} | gzip --fast | \
@@ -334,7 +336,8 @@
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-with-lsp";
-          buildInputs = oa.buildInputs ++ [ pkgs.go_1_18 ];
+          buildInputs = oa.buildInputs
+            ++ [ pkgs.go_1_18 ];
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''

@@ -6,7 +6,6 @@ open Snark_params
 open Tick
 open Pickles_types
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
 module Impl = Pickles.Impls.Step
 
 let%test_module "multisig_account" =
@@ -343,6 +342,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
+                    ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
                 }
@@ -366,6 +366,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
+                    ; authorization_kind = Proof
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }

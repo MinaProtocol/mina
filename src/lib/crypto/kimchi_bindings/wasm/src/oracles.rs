@@ -204,7 +204,7 @@ macro_rules! impl_oracles {
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
@@ -259,10 +259,7 @@ pub mod fp {
         plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::vesta::WasmFpPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fp::Fp,
-        vesta::{Vesta as GAffine, VestaParameters},
-    };
+    use mina_curves::pasta::{Fp, Vesta as GAffine, VestaParameters};
 
     impl_oracles!(
         WasmPastaFp,
@@ -284,10 +281,7 @@ pub mod fq {
         plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::pallas::WasmFqPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fq::Fq,
-        pallas::{Pallas as GAffine, PallasParameters},
-    };
+    use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters};
 
     impl_oracles!(
         WasmPastaFq,
