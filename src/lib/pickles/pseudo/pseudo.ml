@@ -1,14 +1,14 @@
-open Core_kernel
-open Pickles_types
-module Domain = Plonk_checks.Domain
+module Array = Core_kernel.Array
+module Nat = Pickles_types.Nat
+module Vector = Pickles_types.Vector
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
-
   type ('a, 'n) t = 'n One_hot_vector.T(Impl).t * ('a, 'n) Vector.t
 
+  module Field = Impl.Field
+
   (* TODO: Use version in common. *)
-  let seal (x : Impl.Field.t) : Impl.Field.t =
+  let seal (x : Field.t) : Field.t =
     let open Impl in
     match Field.to_constant_and_terms x with
     | None, [ (x, i) ] when Field.Constant.(equal x one) ->
@@ -20,20 +20,21 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         Field.Assert.equal x y ; y
 
   let mask (type n) (bits : n One_hot_vector.T(Impl).t) xs =
+    let open Impl in
     with_label __LOC__ (fun () ->
         Vector.map
           (Vector.zip (bits :> (Boolean.var, n) Vector.t) xs)
           ~f:(fun (b, x) -> Field.((b :> t) * x))
         |> Vector.fold ~init:Field.zero ~f:Field.( + ) )
 
-  let choose : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t =
+  let choose : type a n. (a, n) t -> f:(a -> Impl.Field.t) -> Impl.Field.t =
    fun (bits, xs) ~f -> mask bits (Vector.map xs ~f)
 
   module Degree_bound = struct
     type nonrec 'n t = (int, 'n) t
 
     let shifted_pow ~crs_max_degree t x =
-      let pow = Field.(Pcs_batch.pow ~one ~mul) in
+      let pow = Field.(Pickles_types.Pcs_batch.pow ~one ~mul) in
       choose t ~f:(fun deg ->
           let d = deg mod crs_max_degree in
           pow x (crs_max_degree - d) )
@@ -42,22 +43,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Domain = struct
     let num_shifts = Nat.to_int Pickles_types.Plonk_types.Permuts.n
 
-    (** Compute the 'shifts' used by the kimchi permutation argument.
-
-        These values are selected deterministically-randomly to appear outside
-        of the domain, so that every choice of [i] and [shift] results in a
-        distinct value for [shift * domain_generator ^ i].
-
-        Note that, for each different domain size, we attempt to use the same
-        [shifts], and only sample different ones if the shifts are already a
-        member of the domain (ie. there exists some [i] such that
-        [shift = domain_generator ^ i]). This ensures that the invariant above
-        is satisfied.
-        Optimisation: since the shifts for the domains that we use in practise
-        are all the same -- none of them have 2-adic order < largest domain
-        size -- we can hard-code the shifts instead of using a one-hot mask,
-        and this function adds no constraints to the circuit.
-    *)
     let shifts (type n) ((which, log2s) : (int, n) t)
         ~(shifts : log2_size:int -> Field.Constant.t array) :
         Field.t Pickles_types.Plonk_types.Shifts.t =
@@ -98,18 +83,19 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     let generator (type n) ((which, log2s) : (int, n) t) ~domain_generator =
       mask which (Vector.map log2s ~f:(fun d -> domain_generator ~log2_size:d))
 
-    type nonrec 'n t = (Domain.t, 'n) t
+    type nonrec 'n t = (Plonk_checks.Domain.t, 'n) t
 
-    let to_domain ~shifts:s ~domain_generator (type n) (t : n t) :
+    let to_domain ~shifts:s ~domain_generator (type n) ((dom, ds) as t : n t) :
         Field.t Plonk_checks.plonk_domain =
-      let log2_sizes = Vector.map (snd t) ~f:Domain.log2_size in
-      let shifts = shifts (fst t, log2_sizes) ~shifts:s in
-      let generator = generator (fst t, log2_sizes) ~domain_generator in
+      let log2_sizes = Vector.map ds ~f:Plonk_checks.Domain.log2_size in
       let max_log2 =
-        let _, ds = t in
-        List.fold (Vector.to_list ds) ~init:0 ~f:(fun acc d ->
-            Int.max acc (Domain.log2_size d) )
+        Vector.fold ds ~init:0 ~f:(fun acc d ->
+            Int.max acc (Plonk_checks.Domain.log2_size d) )
       in
+      let v = (dom, log2_sizes) in
+      let shifts = shifts v ~shifts:s in
+      let generator = generator v ~domain_generator in
+
       object
         method shifts = shifts
 
@@ -124,7 +110,9 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             res
           in
           let open Field in
-          seal (choose t ~f:(fun d -> pow2_pows.(Domain.log2_size d)) - one)
+          seal
+            ( choose t ~f:(fun d -> pow2_pows.(Plonk_checks.Domain.log2_size d))
+            - one )
       end
   end
 end
