@@ -11,6 +11,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
     Staged_ledger_hash_intf.Full
       with type Aux_hash.t = A.Aux_hash.t
        and type Pending_coinbase_aux.t = A.Pending_coinbase_aux.V1.t
+       and type t = A.V1.t
+       and type Stable.V1.t = A.V1.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -113,7 +115,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = A.Non_snark.V1.t =
           { ledger_hash : Ledger_hash.Stable.V1.t
           ; aux_hash : Aux_hash.Stable.V1.t
           ; pending_coinbase_aux : Pending_coinbase_aux.Stable.V1.t
@@ -203,6 +205,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type ('non_snark, 'pending_coinbase_hash) t =
+              ('non_snark, 'pending_coinbase_hash) A.Poly.V1.t =
           { non_snark : 'non_snark
           ; pending_coinbase_hash : 'pending_coinbase_hash
           }
