@@ -4285,7 +4285,9 @@ module Queries = struct
         | Some (ledger, breadcrumb) ->
             let accounts = Ledger.accounts ledger in
             Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
-                if Token_id.equal (Account_id.token_id acct_id) token_id then
+                if Token_id.(Account_id.token_id acct_id <> token_id) then
+                  acct_objs
+                else
                   (* account id in the ledger, lookup should always succeed *)
                   let loc =
                     Option.value_exn
@@ -4297,8 +4299,7 @@ module Queries = struct
                       account
                   in
                   Types.AccountObj.lift mina account.public_key partial_account
-                  :: acct_objs
-                else acct_objs )
+                  :: acct_objs )
         | None ->
             [] )
 
