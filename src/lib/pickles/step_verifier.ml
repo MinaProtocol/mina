@@ -91,7 +91,8 @@ struct
     ignore
       ( SC.to_field_checked
           (module Impl)
-          (SC.SC.create a) ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
         : Field.t )
 
   let lowest_128_bits ~constrain_low_bits x =
@@ -184,9 +185,9 @@ struct
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
 
-  let squeeze_scalar sponge : Field.t SC.SC.t =
+  let squeeze_scalar sponge : Field.t Import.Scalar_challenge.t =
     (* No need to boolean constrain scalar challenges. *)
-    SC.SC.create
+    Import.Scalar_challenge.create
       (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
@@ -348,8 +349,9 @@ struct
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
-    let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
-        ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
+    let scalar_chal
+        ({ Import.Scalar_challenge.inner = t1 } : _ Import.Scalar_challenge.t)
+        ({ Import.Scalar_challenge.inner = t2 } : _ Import.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
@@ -954,10 +956,11 @@ struct
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
     let xi_correct =
-      Field.equal xi_actual (match xi with { SC.SC.inner = xi } -> xi)
+      Field.equal xi_actual
+        (match xi with { Import.Scalar_challenge.inner = xi } -> xi)
     in
     let xi = scalar xi in
-    let r = scalar (SC.SC.create r_actual) in
+    let r = scalar (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
     let combined_evals =
       let n = Int.ceil_log2 Common.Max_degree.step in

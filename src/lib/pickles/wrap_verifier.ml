@@ -135,7 +135,8 @@ struct
     ignore
       ( SC.to_field_checked
           (module Impl)
-          (SC.SC.create a) ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
         : Field.t )
 
   let lowest_128_bits ~constrain_low_bits x =
@@ -146,9 +147,9 @@ struct
     lowest_128_bits (* I think you may not have to constrain these actually *)
       ~constrain_low_bits:true (Sponge.squeeze sponge)
 
-  let squeeze_scalar sponge : Field.t SC.SC.t =
+  let squeeze_scalar sponge : Field.t Import.Scalar_challenge.t =
     (* No need to boolean constrain scalar challenges. *)
-    SC.SC.create
+    Import.Scalar_challenge.create
       (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
@@ -449,7 +450,8 @@ struct
 
     (* No need to boolean constrain scalar challenges. *)
     let scalar_challenge (s : t) : Scalar_challenge.t =
-      SC.SC.create (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
+      Import.Scalar_challenge.create
+        (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
   end
 
   (* TODO: This doesn't need to be an opt sponge *)
@@ -883,14 +885,14 @@ struct
     let r_actual = squeeze_challenge sponge in
     let xi_correct =
       with_label __LOC__ (fun () ->
-          let { SC.SC.inner = xi_actual } = xi_actual in
-          let { SC.SC.inner = xi } = xi in
+          let { Import.Scalar_challenge.inner = xi_actual } = xi_actual in
+          let { Import.Scalar_challenge.inner = xi } = xi in
           (* Sample new sg challenge point here *)
           Field.equal xi_actual xi )
     in
     let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
-    let r = scalar_to_field (SC.SC.create r_actual) in
+    let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
     in
