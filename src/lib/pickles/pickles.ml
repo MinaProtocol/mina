@@ -31,7 +31,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   open Pickles_types
   open Poly_types
   open Hlist
-  open Common
   open Backend
   module Backend = Backend
   module Sponge_inputs = Sponge_inputs
@@ -171,8 +170,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
   open Kimchi_backend
 
   module Messages_for_next_proof_over_same_field = struct
-    module Wrap = Types.Wrap.Proof_state.Messages_for_next_wrap_proof
-    module Step = Types.Step.Proof_state.Messages_for_next_step_proof
+    module Wrap = Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+
+    module Step = Import.Types.Step.Proof_state.Messages_for_next_step_proof
   end
 
   module Proof_ = P.Base
@@ -936,7 +936,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let srs = Tock.Keypair.load_urs () in
       List.iter [ 0; 1; 2 ] ~f:(fun i ->
           Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis srs
-            (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) )
+            (Import.Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) )
   end
 
   let compile_promise :
@@ -2308,11 +2308,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let module O = Tick.Oracles in
                     let public_input =
-                      tick_public_input_of_statement ~max_proofs_verified
+                      Common.tick_public_input_of_statement ~max_proofs_verified
                         ~uses_lookup:No prev_statement_with_hashes
                     in
                     let prev_challenges =
-                      Vector.map ~f:Ipa.Step.compute_challenges
+                      Vector.map ~f:Common.Ipa.Step.compute_challenges
                         prev_statement.proof_state.messages_for_next_step_proof
                           .old_bulletproof_challenges
                     in
@@ -2469,7 +2469,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let chals =
                           Array.map prechals ~f:(fun x ->
-                              Ipa.Step.compute_challenge x )
+                              Common.Ipa.Step.compute_challenge x )
                         in
                         let challenge_polynomial =
                           unstage (Wrap.challenge_polynomial chals)
@@ -2489,7 +2489,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let chals =
                           Array.map overwritten_prechals ~f:(fun x ->
-                              Ipa.Step.compute_challenge x )
+                              Common.Ipa.Step.compute_challenge x )
                         in
                         let sg_new =
                           let urs = Backend.Tick.Keypair.load_urs () in
@@ -2510,16 +2510,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
                         (sg_new, overwritten_prechals, b)
                       in
+                      let shift = Common.Shifts.tick1 in
                       let plonk =
                         Wrap.Plonk_checks.Type1.derive_plonk
                           (module Tick.Field)
-                          ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
+                          ~shift ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
                       let shift_value =
-                        Shifted_value.Type1.of_field
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1
+                        Shifted_value.Type1.of_field (module Tick.Field) ~shift
                       in
                       let branch_data : Composition_types.Branch_data.t =
                         { proofs_verified =
@@ -3232,6 +3231,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       }
                     in
                     let module O = Tick.Oracles in
+                    let open Common in
                     let public_input =
                       tick_public_input_of_statement ~uses_lookup:No
                         ~max_proofs_verified prev_statement_with_hashes
