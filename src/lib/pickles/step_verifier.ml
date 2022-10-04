@@ -5,7 +5,6 @@ open Import
 open Util
 open Types.Step
 open Pickles_types
-open Common
 open Import
 module S = Sponge
 
@@ -961,7 +960,7 @@ struct
     let r = scalar (SC.SC.create r_actual) in
     let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
     let combined_evals =
-      let n = Int.ceil_log2 Max_degree.step in
+      let n = Int.ceil_log2 Common.Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
       let zetaw_n : Field.t = pow2_pow zetaw n in
       Evals.In_circuit.map
