@@ -124,7 +124,7 @@ let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Finite (x, y) ->
       (x, y)
   | Infinity ->
-      failwith "finite_exn"
+      invalid_arg "finite_exn"
 
 let or_infinite_conv :
     ('a * 'a) Pickles_types.Or_infinity.t -> 'a Kimchi_types.or_infinity =
@@ -225,8 +225,6 @@ let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
   List.init
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
-
-let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
 
 let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
   of_int 5 * (domain_size - of_int 1)
