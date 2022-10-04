@@ -2814,9 +2814,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; block_window_duration_ms = 0
         ; transaction_capacity = Log_2 0
         ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
+        ; coinbase_amount = Unsigned.UInt64.zero
         ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
+        ; account_creation_fee = Unsigned.UInt64.zero
         ; fork = None
         }
 
