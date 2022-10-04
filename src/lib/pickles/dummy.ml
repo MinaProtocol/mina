@@ -1,5 +1,3 @@
-let _wrap_domains = Common.wrap_domains
-
 let evals =
   let open Pickles_types.Plonk_types in
   let e =
