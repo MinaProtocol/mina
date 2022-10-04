@@ -8,6 +8,9 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Field = Impl.Field
 
   (* TODO: Use version in common. *)
+  (* TODO?: There's no such version in module Pickles.Common *)
+  (* TODO: this function only applies to module Impl. This is probably where it
+     should be defined and not in this functor. *)
   let seal (x : Field.t) : Field.t =
     let open Impl in
     match Field.to_constant_and_terms x with
