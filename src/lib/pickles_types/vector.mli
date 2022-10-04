@@ -93,7 +93,7 @@ module Vector_2 : VECTOR with type 'a t = ('a, Nat.N2.n) vec
 
 module With_length (N : Nat_intf) : S with type 'a t = ('a, N.n) vec
 
-(** {1 Functions} *)
+(** {2 Functions} *)
 
 val typ :
      ('a, 'b, 'c) Snarky_backendless.Typ.t
@@ -133,13 +133,13 @@ val mapn :
 
 val to_array : ('a, 'b) t -> 'a array
 
-val foldi : ('a, 'b) t -> f:(int -> 'c -> 'a -> 'c) -> init:'c -> 'c
-
-val fold : ('a, 'n) t -> f:('acc -> 'a -> 'acc) -> init:'acc -> 'acc
+val iter : ('a, 'n) t -> f:('a -> unit) -> unit
 
 val reduce_exn : ('a, 'n) t -> f:('a -> 'a -> 'a) -> 'a
 
-val iter : ('a, 'n) t -> f:('a -> unit) -> unit
+val fold : ('a, 'n) t -> f:('acc -> 'a -> 'acc) -> init:'acc -> 'acc
+
+val foldi : ('a, 'b) t -> f:(int -> 'c -> 'a -> 'c) -> init:'c -> 'c
 
 val iter2 : ('a, 'n) t -> ('b, 'n) t -> f:('a -> 'b -> unit) -> unit
 
