@@ -1,6 +1,6 @@
 open Utils
 
-module Types = struct
+module Types : sig
   module type S = sig
     module Aux_hash : sig
       type t
@@ -30,25 +30,15 @@ module type Concrete = sig
   end
 end
 
-module M = struct
-  module Aux_hash = struct
-    type t = string
-
-    module V1 = struct
-      type nonrec t = string
-    end
-  end
-
-  module Pending_coinbase_aux = struct
-    module V1 = struct
-      type t = string
-    end
-  end
-end
+module M : Types.S
 
 module type Local_sig = Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
-  F (M)
-include M
+    (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
+  Signature(M).S
+
+include
+  Types.S
+    with module Aux_hash = M.Aux_hash
+     and module Pending_coinbase_aux = M.Pending_coinbase_aux

@@ -8,7 +8,9 @@ module Wire_types = Mina_wire_types.Mina_base.Staged_ledger_hash
 
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
-    Staged_ledger_hash_intf.Full with type Aux_hash.t = A.Aux_hash.t
+    Staged_ledger_hash_intf.Full
+      with type Aux_hash.t = A.Aux_hash.t
+       and type Pending_coinbase_aux.t = A.Pending_coinbase_aux.V1.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
