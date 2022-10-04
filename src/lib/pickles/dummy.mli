@@ -10,7 +10,7 @@ module Ipa : sig
 
     val challenges_computed :
       ( Backend.Tock.Field.t
-      , Pickles_types__Nat.z Backend.Tock.Rounds.plus_n )
+      , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
       Pickles_types.Vector.t
 
     val sg : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
