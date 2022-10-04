@@ -78,6 +78,7 @@ let%test_module "Initialize state test" =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
+        ; authorization_kind = Signature
         }
 
       let account_update : Account_update.t =

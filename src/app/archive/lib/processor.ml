@@ -1474,13 +1474,27 @@ module Zkapp_account_update_body = struct
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; caller : string
+    ; authorization_kind : string
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int; int; string; bool; int; int; int; int; int; int; bool; string ]
+        [ int
+        ; int
+        ; string
+        ; bool
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; bool
+        ; string
+        ; string
+        ]
 
   let table_name = "zkapp_account_update_body"
 
@@ -1525,6 +1539,9 @@ module Zkapp_account_update_body = struct
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
     let caller = Account_update.Call_type.to_string body.caller in
+    let authorization_kind =
+      Account_update.Authorization_kind.to_string body.authorization_kind
+    in
     let value =
       { account_identifier_id
       ; update_id
@@ -1538,6 +1555,7 @@ module Zkapp_account_update_body = struct
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; caller
+      ; authorization_kind
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1547,6 +1565,8 @@ module Zkapp_account_update_body = struct
             Some "int[]"
         | "caller" ->
             Some "call_type"
+        | "authorization_kind" ->
+            Some "authorization_kind_type"
         | _ ->
             None )
       (module Conn)

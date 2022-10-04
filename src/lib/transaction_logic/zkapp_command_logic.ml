@@ -326,6 +326,10 @@ module type Account_update_intf = sig
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
 
+  val is_signed : t -> bool
+
+  val is_proved : t -> bool
+
   module Update : sig
     type _ set_or_keep
 
@@ -1158,6 +1162,10 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Account_update.check_authorization ~commitment
         ~calls:account_update_forest account_update
     in
+    assert_ ~pos:__POS__
+      (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
+    assert_ ~pos:__POS__
+      (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
     (* The fee-payer must increment their nonce. *)
     let local_state =
       Local_state.add_check local_state Fee_payer_nonce_must_increase

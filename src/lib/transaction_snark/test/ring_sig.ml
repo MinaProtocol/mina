@@ -204,6 +204,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = Signature
                 }
             ; authorization = Signature Signature.dummy
             }
@@ -226,6 +227,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     }
                 ; use_full_commitment = false
                 ; caller = Call
+                ; authorization_kind = Proof
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
             }

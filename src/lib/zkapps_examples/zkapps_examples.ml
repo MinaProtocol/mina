@@ -262,6 +262,8 @@ module Account_update_under_construction = struct
             }
         ; use_full_commitment = Boolean.false_
         ; caller = t.token_id
+        ; authorization_kind =
+            { is_signed = Boolean.false_; is_proved = Boolean.true_ }
         }
       in
       let calls =

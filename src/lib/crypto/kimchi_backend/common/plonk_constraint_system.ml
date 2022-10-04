@@ -297,6 +297,15 @@ type ('f, 'rust_gates) t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
+let get_public_input_size sys = sys.public_input_size
+
+let get_rows_len sys = List.length sys.rows_rev
+
+let get_prev_challenges sys = sys.prev_challenges
+
+let set_prev_challenges sys challenges =
+  Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -452,6 +461,10 @@ struct
   (** Sets the number of previous challenges. It must and can only be called once. *)
   let set_prev_challenges (sys : t) num_prev_challenges =
     Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
+
+  let get_public_input_size (sys : t) = get_public_input_size sys
+
+  let get_rows_len (sys : t) = get_rows_len sys
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.

@@ -100,7 +100,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 log2_size: ocaml::Int,
             ) {
-                let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                let ptr: &mut commitment_dlog::srs::SRS<$G> =
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
                 ptr.add_lagrange_basis(domain);
@@ -180,15 +180,15 @@ macro_rules! impl_srs {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Vesta};
 
-    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, GAffine);
+    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, Vesta);
 }
 
 pub mod fq {
     use super::*;
     use crate::arkworks::{CamlFq, CamlGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
+    use mina_curves::pasta::{Fq, Pallas};
 
-    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, GAffine);
+    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
 }
