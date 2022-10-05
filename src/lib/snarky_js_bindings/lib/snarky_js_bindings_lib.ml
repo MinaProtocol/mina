@@ -345,8 +345,11 @@ let () =
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
    let cmp_method (name, f) =
-     method_ name (fun this (y : As_field.t) : unit ->
-         f ~bit_length this##.value (As_field.value y) )
+     arg_optdef_arg_method field_class name
+       (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit
+       ->
+         try f ~bit_length this##.value (As_field.value y)
+         with exn -> log_and_raise_error_with_message ~exn ~msg )
    in
    let bool_cmp_method (name, f) =
      method_ name (fun this (y : As_field.t) : bool_class Js.t ->
