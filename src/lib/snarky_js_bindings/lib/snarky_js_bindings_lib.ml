@@ -260,7 +260,6 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
-(* What's a good name for this? *)
 let arg_optdef_arg_method (type a b) class_ (name : string)
     (f : _ Js.t -> b -> a Js.Optdef.t -> _) =
   let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
@@ -593,13 +592,14 @@ let () =
   add_op1 "not" Boolean.not ;
   add_op2 "and" Boolean.( &&& ) ;
   add_op2 "or" Boolean.( ||| ) ;
-  arg_optdef_arg_method bool_class "assertEquals"
-    (fun this (y : As_bool.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
-      try Boolean.Assert.( = ) this##.value (As_bool.value y)
+  optdef_arg_method bool_class "assertTrue"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.is_true this##.value
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
-  method_ "assertTrue" (fun this : unit -> Boolean.Assert.is_true this##.value) ;
-  method_ "assertFalse" (fun this : unit ->
-      Boolean.Assert.( = ) this##.value Boolean.false_ ) ;
+  optdef_arg_method bool_class "assertFalse"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value Boolean.false_
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   add_op2 "equals" equal ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
