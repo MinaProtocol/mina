@@ -1,17 +1,17 @@
-var coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").codaSDK;
+var mina = require("./client_sdk.js").minaSDK;
 
 var keypair = {
   privateKey:
-    "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c",
+    "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw",
   publicKey:
-    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T",
+    "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
 };
 
 var receiver =
-  "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY";
+  "B62qrcFstkpqXww1EkSGrqMCwCNho86kuqBd4FrAAUsPxNKdiPzAUsy";
 
 var newDelegate =
-  "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt";
+  "B62qkfHpLpELqpMK6ZvUTJ5wRqKDRF3UHyJ4Kv3FU79Sgs4qpBnx5RR";
 
 var payments = [
     {
@@ -43,17 +43,34 @@ var delegations = [
     },
   ];
 
+var strings = [
+    'this is a test',
+    'this is only a test',
+    'if this had been an actual emergency...'
+    ]
+
 var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
-var payment_signatures = payments.map (t => coda.signPayment(keypair.privateKey, t))
+var networks = ["testnet","mainnet"]
 
-var delegation_signatures = delegations.map (t => coda.signStakeDelegation(keypair.privateKey, t))
+for (let i = 0; i < networks.length; i++) {
 
-// verify signatures before printing them
-payment_signatures.forEach (t => { if (!coda.verifyPaymentSignature (t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
-delegation_signatures.forEach (t => { if (!coda.verifyStakeDelegationSignature (t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+    var payment_signatures = payments.map (t => mina.signPayment(networks[i],keypair.privateKey, t))
 
-console.log("[");
-payment_signatures.forEach(t => printSignature (t.signature))
-delegation_signatures.forEach(t => printSignature (t.signature))
-console.log("]");
+    var delegation_signatures = delegations.map (t => mina.signStakeDelegation(networks[i],keypair.privateKey, t))
+
+    var string_signatures = strings.map (t => mina.signString(networks[i],keypair.privateKey, t))
+
+    // verify signatures before printing them
+    payment_signatures.forEach (t => { if (!mina.verifyPaymentSignature (networks[i],t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
+    delegation_signatures.forEach (t => { if (!mina.verifyStakeDelegationSignature (networks[i],t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+    string_signatures.forEach (t => {if (!mina.verifyStringSignature (networks[i],t)) { console.error ("String signature did not verify"); process.exit (1) } })
+
+    console.log("[");
+    payment_signatures.forEach(t => printSignature (t.signature))
+    delegation_signatures.forEach(t => printSignature (t.signature))
+    string_signatures.forEach(t => printSignature (t.signature))
+    console.log("]")
+}
+
+mina.shutdown();

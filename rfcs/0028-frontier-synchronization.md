@@ -41,7 +41,7 @@ IMPLEMENTATION NOTE: The entire chain of mask destruction hooks needs to be exec
 
 #### Frontier Read Monad
 
-A new monad is introduced for specifying reads from the transition frontier (see [alternatives section](#alternatives-misread) for explanation on why). All existing read functions on the transition frontier will instead by turned into functions which do not take in a transition frontier and return a result wrapped in the `'a Transition_frontier.Read.t` monad. This monad is used to build up a list of computations which will be performed during the read phase. The monad is designed to interact with deferreds so that async programming is still accessible during reads when necessary.
+A new monad is introduced for specifying reads from the transition frontier (see [alternatives section](#alternatives) for explanation on why). All existing read functions on the transition frontier will instead by turned into functions which do not take in a transition frontier and return a result wrapped in the `'a Transition_frontier.Read.t` monad. This monad is used to build up a list of computations which will be performed during the read phase. The monad is designed to interact with deferreds so that async programming is still accessible during reads when necessary.
 
 #### New Frontier Interface
 
@@ -162,7 +162,7 @@ It's important that computations described in `'a Read.t` monad need to be short
 An alternative approach to mask destruction hooks which downgrade subtrees of full breadcrumbs as necessary would be to maintain a ref counted pool of full breadcrumbs which lock the ledger masks they control. This would require adding backwards chaining (copy on write) as a capability to masks as the frontier would need to support masks which are behind the persistent root. This method could also easily introduce memory leaks.
 
 #### Alternative Misread Protection (no read monad)
-[alternative-misread]: alternative-misread
+[alternative-misread]: #alternative-misread
 
 To protect against misreads, all reads have to be expressed in a monad (`'a Transition_frontier.Read.t`). The `Transition_frontier.read` function interprets this monad when the read is performed.
 

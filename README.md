@@ -1,23 +1,22 @@
 <a href="https://minaprotocol.com">
-	<img width="200" src="https://minaprotocol.com/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
+  <img src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" width="350" alt="Mina logo">
 </a>
-<hr/>
 
-Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), and wallet. Enjoy!
+# Mina
+
+Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), & wallet. Enjoy!
 
 ## Notes
 
 - Mina is still under active development, and APIs are still evolving. If you do build upon the APIs, be aware that breaking changes may occur.
-- There is a live testnet of the Mina protocol currently running - [sign up here to join the testnet](http://bit.ly/TestnetForm).
 
 ## What is Mina?
 
 ### Mina Walkthrough
 
-- [Overview of Mina](https://minaprotocol.com/docs/)
-- [Getting Started](https://minaprotocol.com/docs/getting-started/)
-- [My First Transaction](https://minaprotocol.com/docs/my-first-transaction/)
-- [Become a Node Operator](https://minaprotocol.com/docs/node-operator/)
+- [Docs](https://minaprotocol.com/docs/)
+- [Connecting](https://docs.minaprotocol.com/en/node-operators/connecting)
+- [Become a Node Operator](https://docs.minaprotocol.com/en/node-operators/getting-started)
 
 ### Technical Papers
 
@@ -29,26 +28,36 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 
 ## Contributing
 
-Read the [Contributing Guide](https://minaprotocol.com/docs/contributing/) for information on how to make both technical and non-technical contributions.
+Read the [Contributing Guide](https://docs.minaprotocol.com/en/node-developers/contributing) for information on how to make both technical and non-technical contributions.
 
 ## Developers
 
-The [Developer docs](https://minaprotocol.com/docs/developers/) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
+The [Developer docs](https://docs.minaprotocol.com/en/node-developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
 
 #### Quick Links:
 
-- [Developer readme](README-dev.md)
+- [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
-- [Directory structure](frontend/website-redesign/docs/developers/directory-structure.mdx)
-- [Lifecycle of a payment](frontend/website-redesign/docs/architecture/lifecycle-payment.mdx)
+- [Lifecycle of a payment](https://docs.minaprotocol.com/en/node-operators/lifecycle-payment)
 
 ## Community
 
 - Join the public [Discord server](https://bit.ly/MinaDiscord)! Please come by if you need help or have any questions.
 - Get the latest updates by [signing up for the Mina newsletter](https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!).
 
+## Follow our work
+
+We use ZenHub to track our tasks and get metrics about our team's efforts. ZenHub is a third-party product that adds an abstraction layer with more functionalities on top of GitHub. You can follow our work in the following boards:
+
+- [zkApps](https://app.zenhub.com/workspaces/unified-zkapp-6244b2acba5b64001dfe6ba6/board)
+- [Core Crypto](https://app.zenhub.com/workspaces/core-crypto-621fcb82b7d49700156fd060/board)
+- [Velocity](https://app.zenhub.com/workspaces/velocity-62264fddc441a100183f7f86/board)
+- [Network Stability](https://app.zenhub.com/workspaces/network-stability-6205823c982b610013c514cd/board)
+- [Product](https://app.zenhub.com/workspaces/o1-product-61fc1ed4aeb5be00144a555c/board)
+- [Rosetta](https://app.zenhub.com/workspaces/rosetta-62546aa5cb3db30019d602c5/board)
+
 ## License
 
-This repository is distributed under the terms of the Apache 2.0 license,
-available in the LICENSE file and online at https://www.apache.org/licenses/LICENSE-2.0. Commits older than 2018-10-03 do
-not have a LICENSE file or this notice, but are distributed under the same terms.
+[Apache 2.0](LICENSE)
+
+Commits older than 2018-10-03 do not have a [LICENSE](LICENSE) file or this notice, but are distributed under the same terms.

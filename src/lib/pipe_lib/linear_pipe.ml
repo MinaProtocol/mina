@@ -3,23 +3,25 @@ open Async_kernel
 module Writer = Pipe.Writer
 
 module Reader = struct
-  type 'a t = {pipe: 'a Pipe.Reader.t; mutable has_reader: bool}
+  type 'a t = { pipe : 'a Pipe.Reader.t; mutable has_reader : bool }
 end
 
 let create () =
   let r, w = Pipe.create () in
-  ({Reader.pipe= r; has_reader= false}, w)
+  ({ Reader.pipe = r; has_reader = false }, w)
 
-let wrap_reader reader = {Reader.pipe= reader; has_reader= false}
+let wrap_reader reader = { Reader.pipe = reader; has_reader = false }
 
 let force_write_maybe_drop_head ~capacity writer reader x =
   if Pipe.length reader.Reader.pipe > capacity then
-    ignore (Pipe.read_now reader.Reader.pipe) ;
+    ignore
+      ( Pipe.read_now reader.Reader.pipe
+        : [ `Eof | `Nothing_available | `Ok of 'a ] ) ;
   Pipe.write_without_pushback writer x
 
 let create_reader ~close_on_exception f =
   let r = Pipe.create_reader ~close_on_exception f in
-  {Reader.pipe= r; has_reader= false}
+  { Reader.pipe = r; has_reader = false }
 
 let write w x =
   ( if Pipe.is_closed w then
@@ -47,8 +49,8 @@ let closed (reader : 'a Reader.t) = Pipe.closed reader.pipe
 
 let multiple_reads_error () =
   failwith
-    "Linear_pipe.bracket: the same reader has been used multiple times. If \
-     you want to rebroadcast the reader, use fork"
+    "Linear_pipe.bracket: the same reader has been used multiple times. If you \
+     want to rebroadcast the reader, use fork"
 
 let bracket (reader : 'a Reader.t) dx =
   if reader.has_reader then multiple_reads_error ()
@@ -75,7 +77,8 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
            let%bind () = f v in
            run_reader ()
      in
-     Deferred.all_unit (List.init max_concurrency ~f:(fun _ -> run_reader ())))
+     Deferred.all_unit (List.init max_concurrency ~f:(fun _ -> run_reader ()))
+    )
 
 let drain r = iter r ~f:(fun _ -> Deferred.unit)
 
@@ -132,7 +135,7 @@ let merge_unordered rs =
       don't_wait_for (iter reader ~f:(fun x -> Pipe.write merged_writer x)) ) ;
   don't_wait_for
     (let%map () = Deferred.List.iter rs ~f:closed in
-     Pipe.close merged_writer) ;
+     Pipe.close merged_writer ) ;
   merged_reader
 
 (* TODO following are all more efficient with iter',
@@ -146,31 +149,31 @@ let fork reader n =
     (iter reader ~f:(fun x ->
          Deferred.List.iter writers ~f:(fun writer ->
              if not (Pipe.is_closed writer) then Pipe.write writer x
-             else return () ) )) ;
+             else return () ) ) ) ;
   don't_wait_for
     (let%map () = Deferred.List.iter readers ~f:closed in
-     close_read reader) ;
+     close_read reader ) ;
   readers
 
 let fork2 reader =
-  match fork reader 2 with [x; y] -> (x, y) | _ -> assert false
+  match fork reader 2 with [ x; y ] -> (x, y) | _ -> assert false
 
 let fork3 reader =
-  match fork reader 3 with [x; y; z] -> (x, y, z) | _ -> assert false
+  match fork reader 3 with [ x; y; z ] -> (x, y, z) | _ -> assert false
 
 let fork4 reader =
-  match fork reader 4 with [x; y; z; w] -> (x, y, z, w) | _ -> assert false
+  match fork reader 4 with [ x; y; z; w ] -> (x, y, z, w) | _ -> assert false
 
 let fork5 reader =
   match fork reader 5 with
-  | [x; y; z; w; v] ->
+  | [ x; y; z; w; v ] ->
       (x, y, z, w, v)
   | _ ->
       assert false
 
 let fork6 reader =
   match fork reader 6 with
-  | [x; y; z; w; v; u] ->
+  | [ x; y; z; w; v; u ] ->
       (x, y, z, w, v, u)
   | _ ->
       assert false
@@ -183,10 +186,10 @@ let partition_map2 reader ~f =
          | `Fst x ->
              Pipe.write writer_a x
          | `Snd x ->
-             Pipe.write writer_b x )) ;
+             Pipe.write writer_b x ) ) ;
   don't_wait_for
     (let%map () = closed reader_a and () = closed reader_b in
-     close_read reader) ;
+     close_read reader ) ;
   (reader_a, reader_b)
 
 let partition_map3 reader ~f =
@@ -201,26 +204,23 @@ let partition_map3 reader ~f =
          | `Snd x ->
              Pipe.write writer_b x
          | `Trd x ->
-             Pipe.write writer_c x )) ;
+             Pipe.write writer_c x ) ) ;
   don't_wait_for
     (let%map () = closed reader_a
      and () = closed reader_b
      and () = closed reader_c in
-     close_read reader) ;
+     close_read reader ) ;
   (reader_a, reader_b, reader_c)
 
 let filter_map_unordered ~max_concurrency t ~f =
   let reader, writer = create () in
   don't_wait_for
     (iter_unordered ~max_concurrency t ~f:(fun x ->
-         match%bind f x with
-         | Some y ->
-             Pipe.write writer y
-         | None ->
-             return () )) ;
+         match%bind f x with Some y -> Pipe.write writer y | None -> return () )
+    ) ;
   don't_wait_for
     (let%map () = closed reader in
-     close_read t) ;
+     close_read t ) ;
   reader
 
 let latest_ref t ~initial =
@@ -228,9 +228,9 @@ let latest_ref t ~initial =
   don't_wait_for (iter t ~f:(fun a -> return (cell := a))) ;
   cell
 
-let values_available ({pipe; _} : 'a Reader.t) = Pipe.values_available pipe
+let values_available ({ pipe; _ } : 'a Reader.t) = Pipe.values_available pipe
 
-let peek ({pipe; _} : 'a Reader.t) = Pipe.peek pipe
+let peek ({ pipe; _ } : 'a Reader.t) = Pipe.peek pipe
 
 let release_has_reader (reader : 'a Reader.t) =
   if not reader.has_reader then
@@ -242,10 +242,10 @@ let read_now reader =
   let res = Pipe.read_now reader.pipe in
   release_has_reader reader ; res
 
-let read' ?max_queue_length ({pipe; _} : 'a Reader.t) =
+let read' ?max_queue_length ({ pipe; _ } : 'a Reader.t) =
   Pipe.read' ?max_queue_length pipe
 
-let read ({pipe; _} : 'a Reader.t) = Pipe.read pipe
+let read ({ pipe; _ } : 'a Reader.t) = Pipe.read pipe
 
 let read_exn reader =
   match%map read reader with

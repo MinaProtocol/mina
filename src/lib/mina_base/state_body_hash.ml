@@ -1,19 +1,5 @@
-[%%import
-"/src/config.mlh"]
-
-open Core
-
-[%%ifdef
-consensus_mechanism]
-
+open Core_kernel
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 include Data_hash.Make_full_size (struct
   let description = "State body hash"
@@ -27,17 +13,18 @@ let dummy = of_hash Outside_hash_image.t
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
     end
 
     include T
 
     let to_latest = Fn.id
 
-    [%%define_from_scope
-    to_yojson, of_yojson]
+    [%%define_from_scope to_yojson, of_yojson]
 
     include Comparable.Make (T)
     include Hashable.Make_binable (T)

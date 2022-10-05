@@ -7,32 +7,34 @@ let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
 let dispatch rpc query (host_and_port : Host_and_port.t) =
-  Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port host_and_port)
-    ~timeout:(Time.Span.of_sec 1.) (fun _ r w ->
-      let open Deferred.Let_syntax in
-      match%bind
-        Rpc.Connection.create
-          ~handshake_timeout:
-            (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
-          ~heartbeat_config:
-            (Rpc.Connection.Heartbeat_config.create
-               ~timeout:
-                 (Time_ns.Span.of_sec
-                    Coda_compile_config.rpc_heartbeat_timeout_sec)
-               ~send_every:
-                 (Time_ns.Span.of_sec
-                    Coda_compile_config.rpc_heartbeat_send_every_sec))
-          r w
-          ~connection_state:(fun _ -> ())
-      with
-      | Error exn ->
-          return
-            (Or_error.errorf
-               !"Error connecting to the daemon on %{sexp:Host_and_port.t} \
-                 using the RPC call, %s,: %s"
-               host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn))
-      | Ok conn ->
-          Rpc.Rpc.dispatch rpc conn query )
+  Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
+      Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port host_and_port)
+        ~timeout:(Time.Span.of_sec 1.) (fun _ r w ->
+          let open Deferred.Let_syntax in
+          match%bind
+            Rpc.Connection.create
+              ~handshake_timeout:
+                (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+              ~heartbeat_config:
+                (Rpc.Connection.Heartbeat_config.create
+                   ~timeout:
+                     (Time_ns.Span.of_sec
+                        Mina_compile_config.rpc_heartbeat_timeout_sec )
+                   ~send_every:
+                     (Time_ns.Span.of_sec
+                        Mina_compile_config.rpc_heartbeat_send_every_sec )
+                   () )
+              r w
+              ~connection_state:(fun _ -> ())
+          with
+          | Error exn ->
+              return
+                (Or_error.errorf
+                   !"Error connecting to the daemon on %{sexp:Host_and_port.t} \
+                     using the RPC call, %s,: %s"
+                   host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn) )
+          | Ok conn ->
+              Rpc.Rpc.dispatch rpc conn query ) )
 
 let dispatch_join_errors rpc query port =
   let open Deferred.Let_syntax in

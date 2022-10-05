@@ -15,14 +15,14 @@ module Exported : sig
   module Consensus_state : sig
     include
       module type of Data.Consensus_state
-      with type Value.Stable.V1.t = Data.Consensus_state.Value.Stable.V1.t
-       and type var = Data.Consensus_state.var
+        with type Value.Stable.V1.t = Data.Consensus_state.Value.Stable.V1.t
+         and type var = Data.Consensus_state.var
 
     val global_slot : Value.t -> Global_slot.t
 
     val total_currency : Value.t -> Currency.Amount.t
 
-    val min_window_density : Value.t -> Coda_numbers.Length.t
+    val min_window_density : Value.t -> Mina_numbers.Length.t
 
     val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 

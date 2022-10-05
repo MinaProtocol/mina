@@ -7,16 +7,16 @@ module type Inputs_intf = sig
 
   module Mask :
     Masking_merkle_tree_intf.S
-    with module Location = Location
-     and type account := Account.t
-     and type location := Location.t
-     and type hash := Hash.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type parent := Base.t
+      with module Location = Location
+       and type account := Account.t
+       and type location := Location.t
+       and type hash := Hash.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type parent := Base.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
@@ -33,12 +33,12 @@ module Make (Inputs : Inputs_intf) = struct
     type t = Mask.Attached.t
 
     type attached =
-      {hash: string; uuid: string; total_currency: int; num_accounts: int}
+      { hash : string; uuid : string; total_currency : int; num_accounts : int }
     [@@deriving yojson]
 
-    type dangling = {uuid: string; nulled_at: string} [@@deriving yojson]
+    type dangling = { uuid : string; nulled_at : string } [@@deriving yojson]
 
-    type display = [`Attached of attached | `Dangling_parent of dangling]
+    type display = [ `Attached of attached | `Dangling_parent of dangling ]
     [@@deriving yojson]
 
     let format_uuid mask =
@@ -58,15 +58,18 @@ module Make (Inputs : Inputs_intf) = struct
             else total_currency )
       in
       let uuid = format_uuid mask in
-      { hash= Visualization.display_prefix_of_string @@ Hash.to_string root_hash
+      { hash =
+          Visualization.display_prefix_of_string
+          @@ Hash.to_base58_check root_hash
       ; num_accounts
       ; total_currency
-      ; uuid }
+      ; uuid
+      }
 
     let display mask =
       try `Attached (display_attached_mask mask)
       with Mask.Attached.Dangling_parent_reference (_, nulled_at) ->
-        `Dangling_parent {uuid= format_uuid mask; nulled_at}
+        `Dangling_parent { uuid = format_uuid mask; nulled_at }
 
     let equal mask1 mask2 =
       let open Mask.Attached in
@@ -106,7 +109,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Visualize = struct
     module Summary = struct
-      type t = [`Uuid of Uuid.t] * [`Hash of Hash.t] [@@deriving sexp_of]
+      type t = [ `Uuid of Uuid.t ] * [ `Hash of Hash.t ] [@@deriving sexp_of]
     end
 
     type t = Leaf of Summary.t | Node of Summary.t * t list
@@ -169,15 +172,15 @@ module Make (Inputs : Inputs_intf) = struct
     in
     ( match grandchildren with
     | `Check -> (
-      match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
-      | Some children ->
-          failwith @@ error_msg
-          @@ sprintf
-               !"mask has children that must be unregistered first: %{sexp: \
-                 Uuid.t list}"
-               (List.map ~f:Mask.Attached.get_uuid children)
-      | None ->
-          () )
+        match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
+        | Some children ->
+            failwith @@ error_msg
+            @@ sprintf
+                 !"mask has children that must be unregistered first: %{sexp: \
+                   Uuid.t list}"
+                 (List.map ~f:Mask.Attached.get_uuid children)
+        | None ->
+            () )
     | `I_promise_I_am_reparenting_this_mask ->
         ()
     | `Recursive ->
@@ -236,8 +239,9 @@ module Make (Inputs : Inputs_intf) = struct
           unregister_mask_exn ~loc:__LOC__
             ~grandchildren:`I_promise_I_am_reparenting_this_mask c )
     in
-    ignore (unregister_mask_exn ~loc:__LOC__ t_as_mask) ;
-    List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
+    ignore (unregister_mask_exn ~loc:__LOC__ t_as_mask : Mask.unattached) ;
+    List.iter dangling_masks ~f:(fun m ->
+        ignore (register_mask parent m : Mask.Attached.t) )
 
   let batch_notify_mask_children t accounts =
     match Uuid.Table.find registered_masks (get_uuid t) with

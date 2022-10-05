@@ -1,0 +1,64 @@
+(library
+ (name consensus_vrf)
+ (public_name consensus.vrf)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   bignum.bigint
+   base.caml
+   base
+   base64
+   core_kernel
+   sexplib0
+   result
+   bignum
+   integers
+   bin_prot.shape
+   ;; local libraries
+   mina_wire_types
+   mina_base.util
+   kimchi_backend.pasta
+   genesis_constants
+   crypto_params
+   random_oracle
+   blake2
+   base58_check
+   random_oracle_input
+   unsigned_extended
+   snarky.backendless
+   pickles
+   snarky_taylor
+   mina_numbers
+   fold_lib
+   mina_base
+   snark_params
+   vrf_lib
+   snarky_integer
+   test_util
+   pickles.backend
+   non_zero_curve_point
+   bignum_bigint
+   codable
+   signature_lib
+   currency
+   hash_prefix_states
+   kimchi_backend
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   ppx_version.runtime
+ )
+ (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (preprocess
+  (pps
+    ppx_mina
+    h_list.ppx
+    ppx_assert
+    ppx_compare
+    ppx_deriving_yojson
+    ppx_hash
+    ppx_inline_test
+    ppx_let
+    ppx_sexp_conv
+    ppx_version)))

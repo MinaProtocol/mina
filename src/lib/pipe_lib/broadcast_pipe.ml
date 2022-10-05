@@ -2,15 +2,20 @@ open Core_kernel
 open Async_kernel
 
 type 'a t =
-  { root_pipe: 'a Pipe.Writer.t
-  ; mutable cache: 'a
-  ; mutable reader_id: int
-  ; pipes: 'a Pipe.Writer.t Int.Table.t }
+  { root_pipe : 'a Pipe.Writer.t
+  ; mutable cache : 'a
+  ; mutable reader_id : int
+  ; pipes : 'a Pipe.Writer.t Int.Table.t
+  }
 
 let create a =
   let root_r, root_w = Pipe.create () in
   let t =
-    {root_pipe= root_w; cache= a; reader_id= 0; pipes= Int.Table.create ()}
+    { root_pipe = root_w
+    ; cache = a
+    ; reader_id = 0
+    ; pipes = Int.Table.create ()
+    }
   in
   let downstream_flushed_v : unit Ivar.t ref = ref @@ Ivar.create () in
   let consumer =
@@ -30,10 +35,12 @@ let create a =
          Pipe.Consumer.values_sent_downstream consumer ;
          let%bind () =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
-               Deferred.ignore @@ Pipe.downstream_flushed p )
+               Deferred.ignore_m @@ Pipe.downstream_flushed p )
          in
+         if Ivar.is_full !downstream_flushed_v then
+           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill !downstream_flushed_v () ;
-         Deferred.unit )) ;
+         Deferred.unit ) ) ;
   (t, t)
 
 exception Already_closed of string
@@ -47,8 +54,7 @@ let guard_already_closed ~context t f =
 module Reader = struct
   type nonrec 'a t = 'a t
 
-  let peek t =
-    guard_already_closed ~context:"Reader.peek" t (fun () -> t.cache)
+  let peek t = guard_already_closed ~context:"Reader.peek" t (fun () -> t.cache)
 
   let fresh_reader_id t =
     t.reader_id <- t.reader_id + 1 ;
@@ -95,10 +101,9 @@ module Reader = struct
       | `Eof ->
           return ()
       | `Ok v ->
-          if%bind f v then return ()
-          else (
-            Pipe.Consumer.values_sent_downstream consumer ;
-            loop ~consumer reader )
+          let%bind b = f v in
+          Pipe.Consumer.values_sent_downstream consumer ;
+          if b then return () else loop ~consumer reader
     in
     prepare_pipe t ~default_value:() ~f:(fun reader ->
         let consumer = add_trivial_consumer reader in
@@ -122,13 +127,18 @@ module Writer = struct
         Int.Table.clear t.pipes )
 end
 
+let map t ~f =
+  let r, w = create (f (Reader.peek t)) in
+  don't_wait_for (Reader.iter t ~f:(fun x -> Writer.write w (f x))) ;
+  r
+
 (*
  * 1. Cached value is keeping peek working
  * 2. Multiple listeners receive the first mvar value
  * 3. Multiple listeners receive updates after changes
  * 4. Peek sees the latest value
  * 5. If we close the broadcast pipe, all listeners stop
-*)
+ *)
 let%test_unit "listeners properly receive updates" =
   let expect_pipe t expected =
     let got_rev =
@@ -139,15 +149,15 @@ let%test_unit "listeners properly receive updates" =
       ~message:"Expected the following values from the pipe" ~expect:expected
       got
   in
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let initial = 0 in
       let r, w = create initial in
       (*1*)
       [%test_result: int] ~message:"Initial value not observed when peeking"
         ~expect:initial (Reader.peek r) ;
       (* 2-3 *)
-      let d1 = expect_pipe r [0; 1; 2] in
-      let d2 = expect_pipe r [0; 1; 2] in
+      let d1 = expect_pipe r [ 0; 1; 2 ] in
+      let d2 = expect_pipe r [ 0; 1; 2 ] in
       don't_wait_for d1 ;
       don't_wait_for d2 ;
       let next_value = 1 in
@@ -166,9 +176,9 @@ let%test_unit "listeners properly receive updates" =
 let%test_module _ =
   ( module struct
     type iter_counts =
-      {mutable immediate_iterations: int; mutable deferred_iterations: int}
+      { mutable immediate_iterations : int; mutable deferred_iterations : int }
 
-    let zero_counts () = {immediate_iterations= 0; deferred_iterations= 0}
+    let zero_counts () = { immediate_iterations = 0; deferred_iterations = 0 }
 
     let assert_immediate counts expected =
       [%test_eq: int] counts.immediate_iterations expected
@@ -181,31 +191,29 @@ let%test_module _ =
       assert_deferred counts expected
 
     let%test "Writing is synchronous" =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Core.Backtrace.elide := false ;
-          Async.Scheduler.set_record_backtraces true ;
+      Run_in_thread.block_on_async_exn (fun () ->
+          Core_kernel.Backtrace.elide := false ;
           let pipe_r, pipe_w = create () in
           let counts1, counts2 = (zero_counts (), zero_counts ()) in
           let setup_reader counts =
             don't_wait_for
             @@ Reader.iter pipe_r ~f:(fun () ->
-                   counts.immediate_iterations
-                   <- counts.immediate_iterations + 1 ;
-                   let%map () = Async.after @@ Time.Span.of_sec 1. in
-                   counts.deferred_iterations <- counts.deferred_iterations + 1
-               )
+                   counts.immediate_iterations <-
+                     counts.immediate_iterations + 1 ;
+                   let%map () = after @@ Time_ns.Span.of_sec 1. in
+                   counts.deferred_iterations <- counts.deferred_iterations + 1 )
           in
           setup_reader counts1 ;
           (* The reader doesn't run until we yield. *)
           assert_both counts1 0 ;
           (* Once we yield, the reader has run, but has returned to the
              scheduler before setting deferred_iterations. *)
-          let%bind () = Async.after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 0.1 in
           assert_immediate counts1 1 ;
           assert_deferred counts1 0 ;
           (* After we yield for long enough, deferred_iterations has been
              set. *)
-          let%bind () = Async.after @@ Time.Span.of_sec 1.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 1.1 in
           assert_both counts1 1 ;
           (* Writing to the pipe blocks until the reader is finished. *)
           let%bind () = Writer.write pipe_w () in
@@ -214,10 +222,9 @@ let%test_module _ =
              after its creation. *)
           setup_reader counts2 ;
           assert_both counts2 0 ;
-          let%bind () = Async.after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after @@ Time_ns.Span.of_sec 0.1 in
           assert_immediate counts2 1 ;
           assert_deferred counts2 0 ;
           let%bind () = Writer.write pipe_w () in
-          assert_both counts1 3 ; assert_both counts2 2 ; Deferred.return true
-      )
+          assert_both counts1 3 ; assert_both counts2 2 ; Deferred.return true )
   end )

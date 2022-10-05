@@ -1,22 +1,21 @@
-{{- if .Values.worker.active }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl .Values.worker.fullname .}}
+  name: {{ $.Values.workerName }}
   labels:
-    app: {{tpl .Values.worker.fullname .}}
+    app: {{$.Values.workerName}}
 spec:
-  replicas: {{ .Values.worker.numReplicas }}
+  replicas: {{ $.Values.workerReplicas }}
   selector:
     matchLabels:
-      app: {{tpl .Values.worker.fullname .}}
+      app: {{$.Values.workerName}}
   template:
     metadata:
       labels:
-        app: {{tpl .Values.worker.fullname .}}
-        testnet: {{ .Values.testnetName }}
+        app: {{$.Values.workerName}}
+        testnet: {{ $.Values.testnetName }}
         role: snark-worker
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -28,14 +27,21 @@ spec:
           limits:
             memory: 16.0Gi
           requests:
-            memory: 6.0Gi
-            cpu: 4
-        image: {{ .Values.coda.image }}
-        command: ["bash", "-c"]
-        args: [ "sleep 120 && coda internal snark-worker -proof-level full -daemon-address '{{ tpl $.Values.worker.remoteCoordinatorHost . }}:{{ $.Values.worker.remoteCoordinatorPort }}'" ]
+            memory: {{$.Values.workerMemRequest}}
+            cpu: {{$.Values.workerCpuRequest}}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
+        args: [
+          "internal", 
+          "snark-worker", 
+          "-proof-level","full",
+          "-shutdown-on-disconnect", "false", "-daemon-address",
+          "{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}"
+        ]
         env:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
-{{ end }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}

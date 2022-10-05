@@ -52,6 +52,8 @@ module Intf = struct
 
     val get : t -> key:key -> value option M.t
 
+    val get_batch : t -> keys:key list -> value option list M.t
+
     val set : t -> key:key -> data:value -> unit M.t
 
     val remove : t -> key:key -> unit M.t
@@ -76,13 +78,13 @@ end
 
 module Make_mock
     (Key : Hashable.S) (Value : sig
-        type t
+      type t
     end) :
   Intf.Mock
-  with type t = Value.t Key.Table.t
-   and type key := Key.t
-   and type value := Value.t
-   and type config := unit = struct
+    with type t = Value.t Key.Table.t
+     and type key := Key.t
+     and type value := Value.t
+     and type config := unit = struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
@@ -94,6 +96,8 @@ module Make_mock
   let create _ = Key.Table.create ()
 
   let get t ~key = Key.Table.find t key
+
+  let get_batch t ~keys = List.map keys ~f:(Key.Table.find t)
 
   let set = Key.Table.set
 

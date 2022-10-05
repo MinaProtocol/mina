@@ -3,23 +3,34 @@
  (public_name merkle_ledger)
  (library_flags -linkall)
  (libraries
-   ;; opam deps
+   ;; opam libraries
+   bitstring
+   async_kernel
+   core_kernel.uuid
+   bin_prot.shape
+   sexplib0
+   integers
+   core.uuid
+   async
    core
    extlib
-   integers
    rocks
-   ;; libraries
-   bitstring
-   cache_dir
-   direction
-   empty_hashes
-   immutable_array
-   key_value_database
+   core_kernel
+   base.caml
+   base.base_internalhash_types
+   async_unix
+   ;; local libraries
    merkle_address
+   immutable_array
+   direction
+   cache_dir
+   empty_hashes
+   key_value_database
    non_empty_list
-   signature_lib
-   visualization)
+   visualization
+   ppx_version.runtime
+ )
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson))
+  (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Implementation of different account databases"))

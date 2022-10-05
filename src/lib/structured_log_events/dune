@@ -3,7 +3,14 @@
  (public_name structured_log_events)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel interpolator_lib yojson)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   yojson
+   sexplib0
+   ;; local libraries
+   interpolator_lib
+   )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_inline_test))
  (instrumentation (backend bisect_ppx))

@@ -1,5 +1,5 @@
 open Mina_base
-open Coda_transition
+open Mina_block
 
 type full = Full
 
@@ -22,21 +22,25 @@ type lite = Lite
  *  transition frontier and the persistent transition frontier.
  *)
 module Node : sig
-  type _ t =
-    | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+  [%%versioned:
+  module Stable : sig
+    module V3 : sig
+      type 'a t =
+        | Full : Breadcrumb.t -> full t
+        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
+    end
+  end]
 end
 
 module Node_list : sig
   type full_node =
-    { transition: External_transition.Validated.t
-    ; scan_state: Staged_ledger.Scan_state.t }
+    { transition : Mina_block.Validated.t
+    ; scan_state : Staged_ledger.Scan_state.t
+    }
 
   type lite_node = State_hash.Stable.V1.t
 
-  type _ t =
-    | Full : full_node list -> full t
-    | Lite : lite_node list -> lite t
+  type _ t = Full : full_node list -> full t | Lite : lite_node list -> lite t
 
   type 'repr node_list = 'repr t
 
@@ -59,14 +63,18 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
-  type 'repr t = {new_root: Root_data.Limited.t; garbage: 'repr Node_list.t}
+  type 'repr t =
+    { new_root : Root_data.Limited.t
+    ; garbage : 'repr Node_list.t
+    ; just_emitted_a_proof : bool
+    }
 
   type 'repr root_transition = 'repr t
 
   module Lite : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V4 : sig
         type t = lite root_transition
       end
     end]
@@ -127,7 +135,7 @@ module Lite : sig
   module E : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V3 : sig
         type t = E : (lite, 'mutant) diff -> t
       end
     end]

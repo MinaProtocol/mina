@@ -1,5 +1,4 @@
 open Core
-open Mina_base
 open Async
 
 let command_name = "snark-worker"
@@ -24,10 +23,7 @@ module type Inputs_intf = sig
   val perform_single :
        Worker_state.t
     -> message:Mina_base.Sok_message.t
-    -> ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Work.Single.Spec.t
+    -> (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
 end
 
@@ -69,8 +65,7 @@ module type Work_S = sig
 
   module Single : sig
     module Spec : sig
-      type t =
-        (Transaction.t, Transaction_witness.t, ledger_proof) Work.Single.Spec.t
+      type t = (Transaction_witness.t, ledger_proof) Work.Single.Spec.t
       [@@deriving sexp, to_yojson]
     end
   end
@@ -81,6 +76,9 @@ module type Work_S = sig
 
   module Result : sig
     type t = (Spec.t, ledger_proof) Work.Result.t
+
+    val transactions :
+      t -> Mina_transaction.Transaction.t option One_or_two.Stable.V1.t
   end
 end
 
@@ -88,7 +86,7 @@ module type Rpcs_versioned_S = sig
   module Work : Work_S
 
   module Get_work : sig
-    module V1 : sig
+    module V2 : sig
       type query = unit [@@deriving bin_io]
 
       type response =
@@ -98,11 +96,11 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   module Submit_work : sig
-    module V1 : sig
+    module V2 : sig
       type query = Work.Result.t [@@deriving bin_io]
 
       type response = unit [@@deriving bin_io]
@@ -110,7 +108,20 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V1
+    module Latest = V2
+  end
+
+  module Failed_to_generate_snark : sig
+    module V2 : sig
+      type query = Work.Spec.t * Signature_lib.Public_key.Compressed.t
+      [@@deriving bin_io]
+
+      type response = unit [@@deriving bin_io]
+
+      val rpc : (query, response) Rpc.Rpc.t
+    end
+
+    module Latest = V2
   end
 end
 
@@ -123,14 +134,20 @@ module type S0 = sig
   module Rpcs : sig
     module Get_work :
       Rpc_master
-      with type Master.T.query = unit
-       and type Master.T.response =
-                  (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+        with type Master.T.query = unit
+         and type Master.T.response =
+          (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
 
     module Submit_work :
       Rpc_master
-      with type Master.T.query = Work.Result.t
-       and type Master.T.response = unit
+        with type Master.T.query = Work.Result.t
+         and type Master.T.response = unit
+
+    module Failed_to_generate_snark :
+      Rpc_master
+        with type Master.T.query =
+          Work.Spec.t * Signature_lib.Public_key.Compressed.t
+         and type Master.T.response = unit
   end
 
   val command_from_rpcs :

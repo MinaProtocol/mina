@@ -96,15 +96,15 @@ struct
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
 
-  module String_ops = struct
-    type t = T.t
+  let to_yojson t = `String (to_base58_check t)
 
-    let to_string = to_base58_check
-
-    let of_string = of_base58_check_exn
-  end
-
-  include Make_of_string (String_ops)
+  let of_yojson = function
+    | `String s ->
+        Result.map_error (of_base58_check s) ~f:Error.to_string_hum
+    | json ->
+        failwithf "of_yojson: expect JSON string, got %s"
+          (Yojson.Safe.to_string json)
+          ()
 end
 
 module type Base58_check_base_intf = sig
@@ -120,14 +120,35 @@ end
 module type Base58_check_intf = sig
   type t
 
-  (** string encoding (Base58Check) *)
-  val to_string : t -> string
-
-  (** string (Base58Check) decoding *)
-  val of_string : string -> t
-
   (** explicit Base58Check encoding *)
   val to_base58_check : t -> string
 
   include Base58_check_base_intf with type t := t
+end
+
+module Make_base64 (T : sig
+  type t [@@deriving bin_io]
+end) =
+struct
+  let to_base64 (t : T.t) : string =
+    Binable.to_string (module T) t
+    |> (* raises only on errors from invalid optional arguments *)
+    Base64.encode_exn
+
+  let of_base64 b64 : T.t Or_error.t =
+    match Base64.decode b64 with
+    | Ok s -> (
+        try Ok (Binable.of_string (module T) s)
+        with Bin_prot.Common.Read_error _ as e ->
+          Error (Error.of_exn ~backtrace:`Get e) )
+    | Error (`Msg msg) ->
+        Error (Error.of_string msg)
+end
+
+module type Base64_intf = sig
+  type t
+
+  val to_base64 : t -> string
+
+  val of_base64 : string -> t Or_error.t
 end

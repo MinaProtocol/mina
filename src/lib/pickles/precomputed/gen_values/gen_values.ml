@@ -3,12 +3,12 @@ open Asttypes
 open Parsetree
 open Longident
 open Core_kernel
-open Zexe_backend.Tweedle
+open Kimchi_pasta.Pasta
 open Pickles_types
 
 let () =
-  Dee_based_plonk.Keypair.set_urs_info [] ;
-  Dum_based_plonk.Keypair.set_urs_info []
+  Vesta_based_plonk.Keypair.set_urs_info [] ;
+  Pallas_based_plonk.Keypair.set_urs_info []
 
 let time lab f =
   printf "%s: %!" lab ;
@@ -25,36 +25,34 @@ let unwrap = function
 
 let max_public_input_size = 128
 
-let dee =
-  let max_domain_log2 = Nat.to_int Backend.Tock.Rounds.n in
+let vesta =
+  let max_domain_log2 = Nat.to_int Vesta_based_plonk.Rounds.n in
   List.map
     (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
       let domain_size = 1 lsl d in
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
-          ksprintf time "dee %d" i (fun () ->
-              Marlin_plonk_bindings.Tweedle_fp_urs.lagrange_commitment
-                (Dee_based_plonk.Keypair.load_urs ())
-                (Unsigned.Size_t.of_int domain_size)
-                (Unsigned.Size_t.of_int i) )
-          |> Zexe_backend.Tweedle.Fp_poly_comm.of_backend_without_degree_bound
+          ksprintf time "vesta %d" i (fun () ->
+              Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
+                (Vesta_based_plonk.Keypair.load_urs ())
+                domain_size i )
+          |> Kimchi_pasta.Pasta.Fp_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )
 
-let dum =
-  let max_domain_log2 = Nat.to_int Backend.Tick.Rounds.n in
+let pallas =
+  let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
   List.map
     (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
       let domain_size = 1 lsl d in
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
-          ksprintf time "dum %d" i (fun () ->
-              Marlin_plonk_bindings.Tweedle_fq_urs.lagrange_commitment
-                (Dum_based_plonk.Keypair.load_urs ())
-                (Unsigned.Size_t.of_int domain_size)
-                (Unsigned.Size_t.of_int i) )
-          |> Zexe_backend.Tweedle.Fq_poly_comm.of_backend_without_degree_bound
+          ksprintf time "pallas %d" i (fun () ->
+              Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
+                (Pallas_based_plonk.Keypair.load_urs ())
+                domain_size i )
+          |> Kimchi_pasta.Pasta.Fq_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )
 
 let mk xss ~f =
@@ -64,7 +62,7 @@ let mk xss ~f =
   let open E in
   pexp_array
     (List.map xss ~f:(fun xs ->
-         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ))
+         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ) )
 
 let structure =
   let loc = Ppxlib.Location.none in
@@ -84,15 +82,15 @@ let structure =
 
       let max_public_input_size = 150
 
-      open Zexe_backend.Tweedle
+      open Kimchi_backend.Pasta.Basic
 
-      let dee =
+      let vesta =
         let f s = Fq.of_bigint (Bigint256.of_hex_string s) in
-        [%e mk dee ~f:(fun (x, y) -> pexp_tuple [fq x; fq y])]
+        [%e mk vesta ~f:(fun (x, y) -> pexp_tuple [ fq x; fq y ])]
 
-      let dum =
+      let pallas =
         let f s = Fp.of_bigint (Bigint256.of_hex_string s) in
-        [%e mk dum ~f:(fun (x, y) -> pexp_tuple [fp x; fp y])]
+        [%e mk pallas ~f:(fun (x, y) -> pexp_tuple [ fp x; fp y ])]
     end]
 
 let () =

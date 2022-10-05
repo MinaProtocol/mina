@@ -13,7 +13,7 @@ module B = Bigint
     value / 2^precision
 *)
 
-type 'f t = {value: 'f Cvar.t; precision: int}
+type 'f t = { value : 'f Cvar.t; precision : int }
 
 let precision t = t.precision
 
@@ -33,12 +33,12 @@ let mul (type f) ~m:((module I) : f m) x y =
   let open I in
   let new_precision = x.precision + y.precision in
   assert (new_precision < Field.Constant.size_in_bits) ;
-  {value= Field.(x.value * y.value); precision= new_precision}
+  { value = Field.(x.value * y.value); precision = new_precision }
 
 let constant (type f) ~m:((module M) as m : f m) ~value ~precision =
   assert (B.(value < one lsl precision)) ;
   let open M in
-  {value= Field.constant (bigint_to_field ~m value); precision}
+  { value = Field.constant (bigint_to_field ~m value); precision }
 
 (* x, x^2, ..., x^n *)
 let powers ~m x n =
@@ -73,7 +73,7 @@ let add_signed (type f) ~m:((module M) : f m) t1 (sgn, t2) =
     let f = match sgn with `Pos -> ( + ) | `Neg -> ( - ) in
     f (pow2 add ~one Int.(t2.precision - t1.precision) * t1.value) t2.value
   in
-  {precision; value}
+  { precision; value }
 
 let add ~m x y = add_signed ~m x (`Pos, y)
 
@@ -117,8 +117,8 @@ let le (type f) ~m:((module M) : f m) t1 t2 =
 *)
 let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
   let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
-  {value= Integer.to_field q; precision}
+  { value = Integer.to_field q; precision }
 
 let of_bits (type f) ~m:((module M) : f m) bits ~precision =
   assert (List.length bits <= precision) ;
-  {value= M.Field.pack bits; precision}
+  { value = M.Field.pack bits; precision }

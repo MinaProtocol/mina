@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 
 module T = struct
-  type 'a t = [`Active of 'a | `Bootstrapping]
+  type 'a t = [ `Active of 'a | `Bootstrapping ]
 
   let return value = `Active value
 
@@ -62,8 +62,8 @@ let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =
   match list with
   | [] ->
       return []
-  | [participating_state] ->
-      bind participating_state ~f:(fun value -> return [value])
+  | [ participating_state ] ->
+      bind participating_state ~f:(fun value -> return [ value ])
   | participating_state :: participating_states ->
       bind participating_state ~f:(fun x ->
           map (sequence participating_states) ~f:(fun sub_result ->

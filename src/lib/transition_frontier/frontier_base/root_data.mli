@@ -1,5 +1,5 @@
 open Mina_base
-open Coda_transition
+open Mina_block
 
 (* Historical root data is similar to Limited root data, except that it also
  * contains a recording of some extra computed staged ledger properties that
@@ -8,12 +8,12 @@ open Coda_transition
 module Historical : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V3 : sig
       type t
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val transition : t -> Mina_block.Validated.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
@@ -29,27 +29,28 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V3 : sig
       type t [@@deriving to_yojson]
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val transition : t -> Mina_block.Validated.t
 
-  val hash : t -> State_hash.t
+  val hashes : t -> State_hash.State_hashes.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
   val protocol_states :
-    t -> (State_hash.t * Coda_state.Protocol_state.value) list
+    t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
   val create :
-       transition:External_transition.Validated.t
+       transition:Mina_block.Validated.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
-    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
+    -> protocol_states:
+         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
     -> t
 end
 
@@ -61,7 +62,7 @@ end
 module Minimal : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t
     end
   end]
@@ -76,10 +77,9 @@ module Minimal : sig
 
   val upgrade :
        t
-    -> transition:External_transition.Validated.t
-    -> protocol_states:( Mina_base.State_hash.t
-                       * Coda_state.Protocol_state.Value.t )
-                       list
+    -> transition:Mina_block.Validated.t
+    -> protocol_states:
+         (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
     -> Limited.t
 
   val create :
@@ -90,10 +90,12 @@ module Minimal : sig
 end
 
 type t =
-  { transition: External_transition.Validated.t
-  ; staged_ledger: Staged_ledger.t
-  ; protocol_states:
-      (Mina_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+  { transition : Mina_block.Validated.t
+  ; staged_ledger : Staged_ledger.t
+  ; protocol_states :
+      Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      list
+  }
 
 val minimize : t -> Minimal.t
 

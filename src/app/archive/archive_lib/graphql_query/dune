@@ -1,8 +1,0 @@
-(library
- (name graphql_query)
- (public_name graphql_query)
- (libraries core mina_base coda_transition graphql_lib)
- (preprocessor_deps ../../archive_graphql_schema.json)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
-)

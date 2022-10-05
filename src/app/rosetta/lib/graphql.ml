@@ -35,13 +35,13 @@ let query query_obj uri =
       [("Content-Type", "application/json"); ("Accept", "application/json")]
   in
   let%bind response, body =
-    Deferred.Or_error.try_with ~extract_exn:true (fun () ->
+    Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Internal POST to Coda Daemon failed"
-             (`Graphql_coda_query (Error.to_string_hum e)) )
+           Errors.create ~context:"Internal POST to Mina Daemon failed"
+             (`Graphql_mina_query (Error.to_string_hum e)) )
   in
   let%bind body_str =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -55,36 +55,37 @@ let query query_obj uri =
     | code ->
         Deferred.return
           (Error
-             (Errors.create ~context:"Response from Coda Daemon is not a 200"
-                (`Graphql_coda_query
+             (Errors.create ~context:"Response from Mina Daemon is not a 200"
+                (`Graphql_mina_query
                   (Printf.sprintf "Status code %d -- %s" code body_str))))
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
   | `Null, `Null ->
       Error
-        (Errors.create ~context:"Empty response from Coda Daemon"
-           (`Graphql_coda_query "Empty response"))
+        (Errors.create ~context:"Empty response from Mina Daemon"
+           (`Graphql_mina_query "Empty response"))
   | error, `Null ->
-      Error
-        (Errors.create ~context:"Explicit error response from Coda Daemon"
-           (`Graphql_coda_query (graphql_error_to_string error)))
+      Errors.Transaction_submit.of_request_error (graphql_error_to_string error)
+        |> Option.value
+            ~default:(
+              Errors.create
+                ~context:"Explicit error response from Mina Daemon"
+                (`Graphql_mina_query (graphql_error_to_string error)))
+        |> Result.fail
   | _, raw_json ->
       Result.try_with (fun () -> query_obj#parse raw_json)
       |> Result.map_error ~f:(fun e ->
              Errors.create
-               ~context:"JSON parse error in response from Coda Daemon"
-               (`Graphql_coda_query
+               ~context:"JSON parse error in response from Mina Daemon"
+               (`Graphql_mina_query
                  (Printf.sprintf "Error parsing graphql response: %s"
                     (Exn.to_string e))) ) )
   |> Deferred.return
 
-module Decoders = struct
-  let uint64 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
-
-  let int64 json = Yojson.Basic.Util.to_string json |> Int64.of_string
-
-  let uint32 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
-end
+let query_and_catch query_obj uri =
+  let open Deferred.Let_syntax in
+  let%map res = query query_obj uri in
+  match res with
+  | Ok r -> Ok (`Successful r)
+  | Error e -> Ok (`Failed e)

@@ -1,0 +1,63 @@
+(library
+ (name uptime_service)
+ (public_name uptime_service)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   base64
+   cohttp-async
+   async_unix
+   rpc_parallel
+   ptime
+   core_kernel
+   async
+   bin_prot.shape
+   async_kernel
+   core
+   base.caml
+   cohttp
+   uri
+   ;; local libraries
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   network_peer
+   block_time
+   transaction_witness
+   mina_state
+   staged_ledger
+   pickles
+   random_oracle_input
+   snark_params
+   transition_frontier
+   currency
+   signature_lib
+   child_processes
+   genesis_constants
+   memory_stats
+   logger
+   mina_base
+   snark_worker
+   mina_block
+   daemon_rpcs
+   snark_work_lib
+   rfc3339_time
+   ledger_proof
+   error_json
+   pipe_lib
+   blake2
+   with_hash
+   transition_frontier_base
+   random_oracle
+   interruptible
+   truth
+   one_or_two
+   transaction_snark
+   pickles.backend
+   consensus
+   mina_base.import
+   kimchi_backend.pasta
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
+ (synopsis "Uptime service library for delegation program"))

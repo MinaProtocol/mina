@@ -38,16 +38,16 @@ module type S = sig
 
   module type Base_intf =
     Base_ledger_intf.S
-    with module Addr = Location.Addr
-    with module Location = Location
-    with type key := key
-     and type token_id := token_id
-     and type token_id_set := token_id_set
-     and type account_id := account_id
-     and type account_id_set := account_id_set
-     and type hash := hash
-     and type root_hash := hash
-     and type account := account
+      with module Addr = Location.Addr
+      with module Location = Location
+      with type key := key
+       and type token_id := token_id
+       and type token_id_set := token_id_set
+       and type account_id := account_id
+       and type account_id_set := account_id_set
+       and type hash := hash
+       and type root_hash := hash
+       and type account := account
 
   val cast : (module Base_intf with type t = 'a) -> 'a -> witness
 
@@ -62,29 +62,29 @@ end
 
 module Make_base (Inputs : Inputs_intf) :
   S
-  with module Location = Inputs.Location
-  with type key := Inputs.Key.t
-   and type token_id := Inputs.Token_id.t
-   and type token_id_set := Inputs.Token_id.Set.t
-   and type account_id := Inputs.Account_id.t
-   and type hash := Inputs.Hash.t
-   and type account_id_set := Inputs.Account_id.Set.t
-   and type account := Inputs.Account.t = struct
+    with module Location = Inputs.Location
+    with type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account_id := Inputs.Account_id.t
+     and type hash := Inputs.Hash.t
+     and type account_id_set := Inputs.Account_id.Set.t
+     and type account := Inputs.Account.t = struct
   open Inputs
   module Location = Location
 
   module type Base_intf =
     Base_ledger_intf.S
-    with module Addr = Location.Addr
-    with module Location = Location
-    with type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
+      with module Addr = Location.Addr
+      with module Location = Location
+      with type key := Inputs.Key.t
+       and type token_id := Inputs.Token_id.t
+       and type token_id_set := Inputs.Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type hash := Hash.t
+       and type root_hash := Hash.t
+       and type account := Account.t
 
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
 
@@ -135,6 +135,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let get (T ((module Base), t)) = Base.get t
 
+    let get_batch (T ((module Base), t)) = Base.get_batch t
+
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
     let get_directory (T ((module Base), t)) = Base.get_directory t
@@ -143,13 +145,13 @@ module Make_base (Inputs : Inputs_intf) :
 
     let close (T ((module Base), t)) = Base.close t
 
-    let get_or_create_account_exn (T ((module Base), t)) =
-      Base.get_or_create_account_exn t
-
     let get_or_create_account (T ((module Base), t)) =
       Base.get_or_create_account t
 
     let location_of_account (T ((module Base), t)) = Base.location_of_account t
+
+    let location_of_account_batch (T ((module Base), t)) =
+      Base.location_of_account_batch t
 
     let fold_until (T ((module Base), t)) = Base.fold_until t
 
@@ -161,17 +163,11 @@ module Make_base (Inputs : Inputs_intf) :
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
 
-    let next_available_token (T ((module Base), t)) =
-      Base.next_available_token t
-
-    let set_next_available_token (T ((module Base), t)) =
-      Base.set_next_available_token t
-
     let iteri (T ((module Base), t)) = Base.iteri t
 
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
        Keys passed to this functor; as long as we use the same Keys for all ledgers, this should work
-     *)
+    *)
     let foldi_with_ignored_accounts (T ((module Base), t)) =
       Base.foldi_with_ignored_accounts t
 

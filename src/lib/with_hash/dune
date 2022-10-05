@@ -1,6 +1,20 @@
 (library
  (name with_hash)
  (public_name with_hash)
- (libraries core_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_deriving.std ppx_version)))
+ (libraries
+   ;; opam libraries
+   bin_prot.shape sexplib0 base.caml core_kernel
+   ;; local libraries
+   mina_wire_types
+   ppx_version.runtime
+ )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_annot
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_deriving.std
+   ppx_version
+   ppx_fields_conv)))

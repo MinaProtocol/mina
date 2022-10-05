@@ -1,7 +1,4 @@
 let Prelude = ../../External/Prelude.dhall
-let B = ../../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -13,8 +10,6 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let jobDocker = Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).codaToolchain}
-
 in
 
 Pipeline.build
@@ -23,6 +18,8 @@ Pipeline.build
       dirtyWhen = [
         S.contains "helm/",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
+        -- trigger on HelmRelease job change due to dependency
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
         S.exactly "buildkite/scripts/helm-ci" "sh"
       ],
       path = "Lint",
@@ -35,7 +32,6 @@ Pipeline.build
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
           , target = Size.Small
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]

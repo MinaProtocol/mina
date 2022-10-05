@@ -8,8 +8,7 @@ let runtime_config = Runtime_config.Test_configs.split_snarkless
 let main () =
   let logger = Logger.create () in
   let%bind precomputed_values, _runtime_config =
-    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
-      ~proof_level:None
+    Genesis_ledger_helper.inputs_from_config_file ~logger ~proof_level:None
       (Lazy.force runtime_config)
     >>| Or_error.ok_exn
   in
@@ -26,11 +25,9 @@ let main () =
         * (Unsigned.UInt32.to_int consensus_constants.delta + 1)
       |> Float.of_int )
   in
-  let work_selection_method =
-    Cli_lib.Arg_type.Work_selection_method.Sequence
-  in
+  let work_selection_method = Cli_lib.Arg_type.Work_selection_method.Sequence in
   Coda_processes.init () ;
-  let trace_dir = Unix.getenv "CODA_TRACING" in
+  let trace_dir = Unix.getenv "MINA_TRACING" in
   let max_concurrent_connections = None in
   let%bind configs =
     Coda_processes.local_configs n ~program_dir ~block_production_interval
@@ -45,24 +42,21 @@ let main () =
   let new_node_addrs_and_ports_list, _ = new_node_net_config in
   let expected_peers_addrs_keypairs =
     List.map configs ~f:(fun c ->
-        (Node_addrs_and_ports.of_display c.addrs_and_ports, c.libp2p_keypair)
-    )
+        (Node_addrs_and_ports.of_display c.addrs_and_ports, c.libp2p_keypair) )
   in
   let expected_peers_addr, expected_peers =
     List.fold ~init:([], []) expected_peers_addrs_keypairs
       ~f:(fun (peer_addrs, peers) (p, k) ->
         ( Node_addrs_and_ports.to_multiaddr_exn p :: peer_addrs
         , Network_peer.Peer.create p.external_ip ~libp2p_port:p.libp2p_port
-            ~peer_id:(Coda_net2.Keypair.to_peer_id k)
+            ~peer_id:(Mina_net2.Keypair.to_peer_id k)
           :: peers ) )
   in
   let addrs_and_ports, libp2p_keypair =
     let addr_and_ports, k = List.nth_exn new_node_addrs_and_ports_list n in
     (Node_addrs_and_ports.to_display addr_and_ports, k)
   in
-  [%log debug]
-    !"connecting to peers %{sexp: string list}\n"
-    expected_peers_addr ;
+  [%log debug] !"connecting to peers %{sexp: string list}\n" expected_peers_addr ;
   let config =
     Coda_process.local_config ~is_seed:true ~peers:expected_peers_addr
       ~addrs_and_ports ~acceptable_delay ~chain_id:name ~libp2p_keypair

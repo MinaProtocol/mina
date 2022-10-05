@@ -3,6 +3,9 @@ open Core_kernel
 let required_uri =
   Command.Param.(required (Command.Arg_type.map string ~f:Uri.of_string))
 
+let optional_uri =
+  Command.Param.(optional (Command.Arg_type.map string ~f:Uri.of_string))
+
 let log_level =
   let open Command.Param in
   optional_with_default Logger.Level.Info
@@ -26,7 +29,7 @@ let logger_setup log_json log_level =
     else
       Logger.Processor.pretty ~log_level
         ~config:
-          { Logproc_lib.Interpolator.mode= Inline
+          { Interpolator_lib.Interpolator.mode= Inline
           ; max_interpolation_length= 50
           ; pretty_print= true }
   in

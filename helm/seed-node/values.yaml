@@ -1,6 +1,14 @@
-testnetName: "coda-testnet"
-coda:
-  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+testnetName: "testnet"
+mina:
+  runtimeConfig:
+  generateGenesisProof: true
+  logPrecomputedBlocks: true
+  logTxnPoolGossip: false
+  maxConnections: 200
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  useCustomEntrypoint: false
+  customEntrypoint: ""
+  privkeyPass: "naughty blue worm"
   seedPeers:
     - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
     - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
@@ -9,6 +17,9 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 seed:
   active: true
@@ -17,7 +28,17 @@ seed:
   rpcPort: 8301
   discoveryKeypair: "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
+seedConfigs:
+- name: test-1
+  class: "seed"
+  external_port: 1111
+  external_ip: 1.1.1.1
+  node_port: 1111
+  enableArchive: false
+  archiveAddress: archive-1:3086
+
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30

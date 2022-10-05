@@ -24,7 +24,7 @@ def run_comparison(base_commit, compare_script):
     os.chdir(cwd)
     # changed files in the PR
     diffs_raw = subprocess.check_output(
-        ['git', 'diff', '--name-only', base_commit])
+        ['git', 'diff', '--name-only', 'origin/' + base_commit])
     diffs_decoded = diffs_raw.decode('UTF-8')
     diffs = diffs_decoded.split('\n')
     for diff in diffs:

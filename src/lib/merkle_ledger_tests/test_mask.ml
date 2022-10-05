@@ -11,46 +11,46 @@ module type Test_intf = sig
 
   module Base :
     Merkle_mask.Base_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account := Account.t
-     and type root_hash := Hash.t
-     and type hash := Hash.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
+      with module Addr = Location.Addr
+       and module Location = Location
+       and type account := Account.t
+       and type root_hash := Hash.t
+       and type hash := Hash.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
 
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
-    with module Location = Location
-     and module Attached.Addr = Location.Addr
-    with type account := Account.t
-     and type location := Location.t
-     and type hash := Hash.t
-     and type parent := Base.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
+      with module Location = Location
+       and module Attached.Addr = Location.Addr
+      with type account := Account.t
+       and type location := Location.t
+       and type hash := Hash.t
+       and type parent := Base.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
-    with module Location = Location
-     and module Addr = Location.Addr
-    with type account := Account.t
-     and type root_hash := Hash.t
-     and type hash := Hash.t
-     and type unattached_mask := Mask.t
-     and type attached_mask := Mask.Attached.t
-     and type t := Base.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
+      with module Location = Location
+       and module Addr = Location.Addr
+      with type account := Account.t
+       and type root_hash := Hash.t
+       and type hash := Hash.t
+       and type unattached_mask := Mask.t
+       and type attached_mask := Mask.Attached.t
+       and type t := Base.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
@@ -61,7 +61,7 @@ module type Test_intf = sig
         -> mask:Mask.Attached.t
         -> mask_as_base:Base.t
         -> mask2:Mask.Attached.t
-        -> 'a)
+        -> 'a )
     -> 'a
 end
 
@@ -87,7 +87,8 @@ module Make (Test : Test_intf) = struct
   let create_new_account_exn mask account =
     let public_key = Account.identifier account in
     let action, location =
-      Mask.Attached.get_or_create_account_exn mask public_key account
+      Mask.Attached.get_or_create_account mask public_key account
+      |> Or_error.ok_exn
     in
     match action with
     | `Existed ->
@@ -98,7 +99,8 @@ module Make (Test : Test_intf) = struct
   let create_existing_account_exn mask account =
     let public_key = Account.identifier account in
     let action, location =
-      Mask.Attached.get_or_create_account_exn mask public_key account
+      Mask.Attached.get_or_create_account mask public_key account
+      |> Or_error.ok_exn
     in
     match action with
     | `Existed ->
@@ -110,7 +112,8 @@ module Make (Test : Test_intf) = struct
   let parent_create_new_account_exn parent account =
     let public_key = Account.identifier account in
     let action, location =
-      Maskable.get_or_create_account_exn parent public_key account
+      Maskable.get_or_create_account parent public_key account
+      |> Or_error.ok_exn
     in
     match action with
     | `Existed ->
@@ -208,7 +211,7 @@ module Make (Test : Test_intf) = struct
           (* verify account pruned from mask *)
           not
             (Mask.Attached.For_testing.location_in_mask attached_mask
-               dummy_location) )
+               dummy_location ) )
         else false )
 
   let%test "commit puts mask contents in parent, flushes mask" =
@@ -225,7 +228,7 @@ module Make (Test : Test_intf) = struct
           (* verify account no longer in mask but is in parent *)
           (not
              (Mask.Attached.For_testing.location_in_mask attached_mask
-                dummy_location))
+                dummy_location ) )
           && Option.is_some (Maskable.get maskable dummy_location) )
         else false )
 
@@ -233,19 +236,15 @@ module Make (Test : Test_intf) = struct
     Test.with_chain (fun base ~mask:level1 ~mask_as_base:_ ~mask2:level2 ->
         Mask.Attached.set level2 dummy_location dummy_account ;
         (* verify account is in the layer2 mask *)
-        assert (
-          Mask.Attached.For_testing.location_in_mask level2 dummy_location ) ;
+        assert (Mask.Attached.For_testing.location_in_mask level2 dummy_location) ;
         Mask.Attached.commit level2 ;
         (* account is no longer in layer2 *)
         assert (
-          not
-            (Mask.Attached.For_testing.location_in_mask level2 dummy_location)
-        ) ;
+          not (Mask.Attached.For_testing.location_in_mask level2 dummy_location) ) ;
         (* account is still not in base *)
         assert (Option.is_none @@ Maskable.get base dummy_location) ;
         (* account is present in layer1 *)
-        assert (
-          Mask.Attached.For_testing.location_in_mask level1 dummy_location ) )
+        assert (Mask.Attached.For_testing.location_in_mask level1 dummy_location) )
 
   let%test "register and unregister mask" =
     Test.with_instances (fun maskable mask ->
@@ -306,7 +305,7 @@ module Make (Test : Test_intf) = struct
         (* set affects hashes along the path P from location to the root, while the Merkle path for the location
                contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an
                address that is a sibling of an element in P; the Merkle path for that address will include a P element
-            *)
+        *)
         let address =
           dummy_address |> Maskable.Addr.parent_exn |> Maskable.Addr.sibling
         in
@@ -317,7 +316,7 @@ module Make (Test : Test_intf) = struct
         let maskable_merkle_path =
           Maskable.merkle_path_at_addr_exn maskable address
         in
-        mask_merkle_path = maskable_merkle_path )
+        [%equal: Mask.Attached.Path.t] mask_merkle_path maskable_merkle_path )
 
   let%test "mask and parent agree on Merkle root before set" =
     Test.with_instances (fun maskable mask ->
@@ -332,7 +331,7 @@ module Make (Test : Test_intf) = struct
         (* the order of sets matters here; if we set in the mask first,
                the set in the maskable notifies the mask, which then removes
                the account, changing the Merkle root to what it was before the set
-            *)
+        *)
         Maskable.set maskable dummy_location dummy_account ;
         Mask.Attached.set attached_mask dummy_location dummy_account ;
         let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
@@ -391,8 +390,8 @@ module Make (Test : Test_intf) = struct
           in
           let subset_indices, subset_accounts =
             List.permute
-              (List.mapi base_accounts ~f:(fun index account -> (index, account)
-               ))
+              (List.mapi base_accounts ~f:(fun index account ->
+                   (index, account) ) )
             |> (Fn.flip List.take) num_subset
             |> List.unzip
           in
@@ -400,8 +399,10 @@ module Make (Test : Test_intf) = struct
           let subset_updated_accounts =
             List.map2_exn subset_accounts subset_balances
               ~f:(fun account balance ->
-                let updated_account = {account with balance} in
-                create_existing_account_exn mask2 updated_account |> ignore ;
+                let updated_account = { account with balance } in
+                ignore
+                  ( create_existing_account_exn mask2 updated_account
+                    : Test.Location.t ) ;
                 updated_account )
           in
           let updated_accounts_map =
@@ -423,8 +424,7 @@ module Make (Test : Test_intf) = struct
             Int.equal
               (List.length base_accounts)
               (List.length retrieved_accounts) ) ;
-          assert (List.equal Account.equal expected_accounts retrieved_accounts)
-      )
+          assert (List.equal Account.equal expected_accounts retrieved_accounts) )
 
   let%test_unit "removing accounts from mask restores Merkle root" =
     Test.with_instances (fun maskable mask ->
@@ -615,7 +615,9 @@ module Make (Test : Test_intf) = struct
         let ledger = Maskable.register_mask maskable mask in
         let key = List.nth_exn (Account_id.gen_accounts 1) 0 in
         let start_hash = merkle_root ledger in
-        match get_or_create_account_exn ledger key Account.empty with
+        match
+          get_or_create_account ledger key Account.empty |> Or_error.ok_exn
+        with
         | `Existed, _ ->
             failwith
               "create_empty with empty ledger somehow already has that key?"
@@ -687,11 +689,11 @@ module Make (Test : Test_intf) = struct
         in
         let accounts = List.map2_exn account_ids balances ~f:Account.create in
         match accounts with
-        | [a1; a2; a3] ->
+        | [ a1; a2; a3 ] ->
             let loc1 = parent_create_new_account_exn base a1 in
             let loc2 = create_new_account_exn m1 a2 in
             let loc3 = create_new_account_exn m2 a3 in
-            let locs = [(loc1, a1); (loc2, a2); (loc3, a3)] in
+            let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
             (* all accounts are here *)
             List.iter locs ~f:(fun (loc, a) ->
                 [%test_result: Account.t option]
@@ -722,12 +724,13 @@ module Make (Test : Test_intf) = struct
         let k = Account_id.gen_accounts 1 |> List.hd_exn in
         let acct1 = Account.create k (Balance.of_int 10) in
         let loc =
-          snd (Mask.Attached.get_or_create_account_exn attached_mask k acct1)
+          Mask.Attached.get_or_create_account attached_mask k acct1
+          |> Or_error.ok_exn |> snd
         in
         let acct2 = Account.create k (Balance.of_int 5) in
         Maskable.set maskable loc acct2 ;
-        [%test_result: Account.t]
-          ~message:"account in mask should be unchanged" ~expect:acct1
+        [%test_result: Account.t] ~message:"account in mask should be unchanged"
+          ~expect:acct1
           (Mask.Attached.get attached_mask loc |> Option.value_exn) )
 end
 
@@ -755,8 +758,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
       | Hash of Location.Addr.t
     [@@deriving hash, sexp, compare]
 
-    include Hashable.Make_binable (Arg) [@@deriving
-                                          sexp, compare, hash, yojson]
+    include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
   module Inputs = struct
@@ -770,16 +772,16 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   (* underlying Merkle tree *)
   module Base_db :
     Merkle_ledger.Database_intf.S
-    with module Location = Location
-     and module Addr = Location.Addr
-     and type account := Account.t
-     and type root_hash := Hash.t
-     and type hash := Hash.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t =
+      with module Location = Location
+       and module Addr = Location.Addr
+       and type account := Account.t
+       and type root_hash := Hash.t
+       and type hash := Hash.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t =
     Database.Make (Inputs)
 
   module Any_base = Merkle_ledger.Any_ledger.Make_base (Inputs)
@@ -788,17 +790,17 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   (* the mask tree *)
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
-    with module Location = Location
-     and module Attached.Addr = Location.Addr
-    with type account := Account.t
-     and type location := Location.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type hash := Hash.t
-     and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
+      with module Location = Location
+       and module Attached.Addr = Location.Addr
+      with type account := Account.t
+       and type location := Location.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type hash := Hash.t
+       and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Base
   end)
@@ -806,19 +808,19 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   (* tree that can register masks *)
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-    with type account := Account.t
-     and type key := Key.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type root_hash := Hash.t
-     and type hash := Hash.t
-     and type unattached_mask := Mask.t
-     and type attached_mask := Mask.Attached.t
-     and type t := Base.t = Merkle_mask.Maskable_merkle_tree.Make (struct
+      with module Addr = Location.Addr
+       and module Location = Location
+      with type account := Account.t
+       and type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type root_hash := Hash.t
+       and type hash := Hash.t
+       and type unattached_mask := Mask.t
+       and type attached_mask := Mask.Attached.t
+       and type t := Base.t = Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
     module Base = Base
     module Mask = Mask

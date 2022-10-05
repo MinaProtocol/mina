@@ -23,7 +23,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds && updateSyncStatusLabel {{ .name }}"
     ]
 {{- end }}
 
@@ -31,8 +31,10 @@ readinessProbe:
 ALL block-producer healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.blockProducer.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.blockProducer.livenessCheck" . }}
 {{- include "healthcheck.blockProducer.readinessCheck" . }}
+{{- end }}
 {{- end }}
 
 ### User Agent Healthchecks ###
@@ -72,8 +74,10 @@ readinessProbe:
 ALL user-agent healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.userAgent.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.userAgent.livenessCheck" . }}
 {{- include "healthcheck.userAgent.readinessCheck" . }}
+{{- end }}
 {{- end }}
 
 ### Bot Healthchecks ###
@@ -113,6 +117,8 @@ readinessProbe:
 ALL bots healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.bots.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.bots.livenessCheck" . }}
 {{- include "healthcheck.bots.readinessCheck" . }}
+{{- end }}
 {{- end }}

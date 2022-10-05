@@ -172,6 +172,24 @@ module N27 = S (N26)
 module N28 = S (N27)
 module N29 = S (N28)
 module N30 = S (N29)
+module N31 = S (N30)
+module N32 = S (N31)
+module N33 = S (N32)
+module N34 = S (N33)
+module N35 = S (N34)
+module N36 = S (N35)
+module N37 = S (N36)
+module N38 = S (N37)
+module N39 = S (N38)
+module N40 = S (N39)
+module N41 = S (N40)
+module N42 = S (N41)
+module N43 = S (N42)
+module N44 = S (N43)
+module N45 = S (N44)
+module N46 = S (N45)
+module N47 = S (N46)
+module N48 = S (N47)
 
 module Empty = struct
   type t = T of t
@@ -185,8 +203,9 @@ end
 
 open Core_kernel
 
-let rec compare : type n m.
-    n t -> m t -> [`Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t] =
+let rec compare :
+    type n m. n t -> m t -> [ `Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t ]
+    =
  fun n m ->
   match (n, m) with
   | Z, _ ->
@@ -194,17 +213,17 @@ let rec compare : type n m.
   | S _, Z ->
       `Gt (function _ -> .)
   | S n, S m -> (
-    match compare n m with
-    | `Lte pi ->
-        `Lte (S pi)
-    | `Gt gt ->
-        `Gt (function S pi -> gt pi) )
+      match compare n m with
+      | `Lte pi ->
+          `Lte (S pi)
+      | `Gt gt ->
+          `Gt (function S pi -> gt pi) )
 
 let lte_exn n m =
   match compare n m with `Lte pi -> pi | `Gt _gt -> failwith "lte_exn"
 
-let rec gt_implies_gte : type n m.
-    n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =
+let rec gt_implies_gte :
+    type n m. n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =
  fun n m not_lte ->
   match (n, m) with
   | Z, _ ->
@@ -214,11 +233,12 @@ let rec gt_implies_gte : type n m.
   | S n, S m ->
       S (gt_implies_gte n m (fun pi -> not_lte (S pi)))
 
-let rec eq : type n m.
+let rec eq :
+    type n m.
        n nat
     -> m nat
-    -> [`Equal of (n, m) Type_equal.t | `Not_equal of (n, m) Type_equal.t Not.t]
-    =
+    -> [ `Equal of (n, m) Type_equal.t
+       | `Not_equal of (n, m) Type_equal.t Not.t ] =
  fun n m ->
   match (n, m) with
   | Z, Z ->
@@ -228,11 +248,11 @@ let rec eq : type n m.
   | Z, S _ ->
       `Not_equal (function _ -> .)
   | S n, S m -> (
-    match eq n m with
-    | `Equal T ->
-        `Equal T
-    | `Not_equal f ->
-        `Not_equal (function T -> f T) )
+      match eq n m with
+      | `Equal T ->
+          `Equal T
+      | `Not_equal f ->
+          `Not_equal (function T -> f T) )
 
 let eq_exn : type n m. n nat -> m nat -> (n, m) Type_equal.t =
  fun n m ->

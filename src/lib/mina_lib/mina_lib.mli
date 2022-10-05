@@ -1,13 +1,13 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
 open Pipe_lib
 open Signature_lib
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 
 type t
 
@@ -17,27 +17,39 @@ type Structured_log_events.t +=
   | Bootstrapping
   | Ledger_catchup
   | Synced
-  | Rebroadcast_transition of {state_hash: State_hash.t}
+  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
 
+exception Offline_shutdown
+
 val time_controller : t -> Block_time.Controller.t
 
-val subscription : t -> Coda_subscriptions.t
+val subscription : t -> Mina_subscriptions.t
+
+val daemon_start_time : Time_ns.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
-val replace_block_production_keypairs :
-  t -> Keypair.And_compressed_pk.Set.t -> unit
+val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
 
-val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
+val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
+
+val next_producer_timing :
+  t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 
 val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
+
+val next_epoch_ledger :
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
@@ -71,21 +83,47 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val snark_job_state : t -> Work_selector.State.t
 
+val get_current_nonce :
+     t
+  -> Account_id.t
+  -> ([> `Min of Account.Nonce.t ] * Account.Nonce.t, string) result
+
 val add_transactions :
      t
   -> User_command_input.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
+
+val add_full_transactions :
+     t
+  -> User_command.t list
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
+val add_zkapp_transactions :
+     t
+  -> Zkapp_command.t list
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
+val get_account : t -> Account_id.t -> Account.t option Participating_state.T.t
 
 val get_inferred_nonce_from_transaction_pool_and_ledger :
   t -> Account_id.t -> Account.Nonce.t option Participating_state.t
 
 val active_or_bootstrapping : t -> unit Participating_state.t
 
+val get_node_state : t -> Node_error_service.node_state Deferred.t
+
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
-val best_ledger : t -> Ledger.t Participating_state.t
+val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t
 
 val root_length : t -> int Participating_state.t
 
@@ -93,26 +131,26 @@ val best_protocol_state : t -> Protocol_state.Value.t Participating_state.t
 
 val best_tip : t -> Transition_frontier.Breadcrumb.t Participating_state.t
 
-val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
+val sync_status : t -> Sync_status.t Mina_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Coda_net2.Multiaddr.t list
+val initial_peers : t -> Mina_net2.Multiaddr.t list
 
 val client_port : t -> int
 
-val validated_transitions :
-  t -> External_transition.Validated.t Strict_pipe.Reader.t
+val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t
 
 module Root_diff : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
-        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
-        ; root_length: int }
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
+        ; root_length : int
+        }
     end
   end]
 end
@@ -135,7 +173,7 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed_block.t Sequence.t -> unit Deferred.t
+  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
@@ -146,18 +184,26 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger :
-  t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+
+val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
-val subscriptions : t -> Coda_subscriptions.t
+val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+
+val block_produced_bvar :
+  t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
 
 val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t
 
 val net : t -> Mina_networking.t
+
+val runtime_config : t -> Runtime_config.t
+
+val verifier : t -> Verifier.t

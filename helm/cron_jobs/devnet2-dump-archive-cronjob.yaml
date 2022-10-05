@@ -1,0 +1,66 @@
+# kubectl apply -f helm/cron_jobs/devnet2-dump-archive-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: devnet2-dump-archive-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+            apk add curl;
+            apk add python3;
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            tar -xzf google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            echo "installed gsutil";
+
+            DATE="$(date +%F_%H%M)";
+            FILENAME=devnet2-archive-dump-"$DATE".sql;
+
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive > $FILENAME;
+
+            tar -czvf $FILENAME.tar.gz $FILENAME;
+
+            echo "archive database dumped";
+
+            ./google-cloud-sdk/bin/gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $FILENAME.tar.gz gs://mina-archive-dumps;
+
+            echo "archive database uploaded to bucket";
+
+            '
+            env:
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: postgres:11-alpine
+            imagePullPolicy: IfNotPresent
+            name: devnet2-dump-archive-cronjob
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 0 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

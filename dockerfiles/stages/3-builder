@@ -1,0 +1,75 @@
+#################################################################################################
+# The "builder" Stage
+# - builds mina and any other binaries required to run rosetta
+# - should not include any data related to joining a specific network, only the node software itself
+#################################################################################################
+FROM opam-deps AS builder
+
+# Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
+ARG DUNE_PROFILE=devnet
+
+# branch to checkout on first clone (this will be the only available branch in the container)
+# can also be a tagged release
+ARG MINA_BRANCH=compatible
+
+# repo to checkout the branch from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
+
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
+ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
+
+# --- Shallow Clone the Mina repo
+# Delete any previous clones of the mina repo and then clone into an empty directory
+RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
+  && git clone \
+  -b "${MINA_BRANCH}" \
+  --depth 1 \
+  --shallow-submodules \
+  --recurse-submodules \
+  ${MINA_REPO} ${HOME}/${MINA_DIR}
+# Set the working directory to the cloned mina repo
+WORKDIR $HOME/${MINA_DIR}
+# Create a directory for compiled outputs
+RUN mkdir ${HOME}/app
+
+# --- Build libp2p_helper
+RUN make libp2p_helper \
+   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
+
+# HACK: build without special cpu features to allow more people to run mina-rosetta
+RUN ./scripts/zexe-standardize.sh
+
+# --- Make rosetta-crucial components and the generate_keypair tool
+RUN eval $(opam config env) \
+  && dune build --profile=${DUNE_PROFILE} \
+    src/app/cli/src/mina_testnet_signatures.exe \
+    src/app/cli/src/mina_mainnet_signatures.exe \
+    src/app/archive/archive.exe \
+    src/app/archive_blocks/archive_blocks.exe \
+    src/app/extract_blocks/extract_blocks.exe \
+    src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+    src/app/replayer/replayer.exe \
+    src/app/rosetta/rosetta_testnet_signatures.exe \
+    src/app/rosetta/rosetta_mainnet_signatures.exe \
+    src/app/generate_keypair/generate_keypair.exe \
+    src/app/validate_keypair/validate_keypair.exe \
+    src/app/rosetta/ocaml-signer/signer.exe \
+  && cp _build/default/src/app/archive_blocks/archive_blocks.exe $HOME/app/mina-archive-blocks \
+  && cp _build/default/src/app/extract_blocks/extract_blocks.exe $HOME/app/mina-extract-blocks \
+  && cp _build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe $HOME/app/mina-missing-blocks-auditor \
+  && cp _build/default/src/app/replayer/replayer.exe $HOME/app/mina-replayer \
+  && mv _build/default/src/app/cli/src/mina_mainnet_signatures.exe $HOME/app/mina \
+  && mv _build/default/src/app/cli/src/mina_testnet_signatures.exe $HOME/app/mina-dev \
+  && mv _build/default/src/app/archive/archive.exe $HOME/app/mina-archive \
+  && mv _build/default/src/app/rosetta/rosetta_mainnet_signatures.exe $HOME/app/mina-rosetta \
+  && mv _build/default/src/app/rosetta/rosetta_testnet_signatures.exe $HOME/app/mina-rosetta-dev \
+  && mv _build/default/src/app/generate_keypair/generate_keypair.exe $HOME/app/mina-generate-keypair \
+  && mv _build/default/src/app/validate_keypair/validate_keypair.exe $HOME/app/mina-validate-keypair \
+  && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
+  && rm -rf _build
+
+# --- Clear go module caches to make the container smaller
+RUN cd src/app/libp2p_helper/src/libp2p_helper \
+  && go clean --cache --modcache --testcache -r

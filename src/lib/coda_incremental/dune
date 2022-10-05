@@ -1,7 +1,0 @@
-(library
- (name coda_incremental)
- (public_name coda_incremental)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
- (libraries incremental pipe_lib)
-)

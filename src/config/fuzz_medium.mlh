@@ -23,10 +23,12 @@
 [%%define force_updates false]
 
 [%%define download_snark_keys false]
+[%%define generate_genesis_proof false]
 
-[%%define mock_frontend_data false]
 [%%define print_versioned_types false]
 [%%define daemon_expiry "never"]
 [%%define pending_coinbase_hack false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/dev.mlh"]
+[%%undef compaction_interval]
+[%%define vrf_poll_interval 0]

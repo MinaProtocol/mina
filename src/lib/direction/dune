@@ -2,8 +2,8 @@
  (name direction)
  (public_name direction)
  (library_flags -linkall)
- (libraries core)
+ (libraries core_kernel sexplib0)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq))
+  (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))
  (synopsis "Representation of direction in a binary tree"))

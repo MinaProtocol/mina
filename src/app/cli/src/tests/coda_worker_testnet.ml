@@ -5,29 +5,30 @@ open Mina_base
 open Pipe_lib
 
 module Api = struct
-  type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
+  type user_cmd_status = { expected_deadline : int; passed_root : unit Ivar.t }
 
   type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
 
-  type restart_type = [`Catchup | `Bootstrap]
+  type restart_type = [ `Catchup | `Bootstrap ]
 
   (* TODO: remove status #2336 *)
   type t =
-    { workers: Coda_process.t Array.t
-    ; configs: Coda_worker.Input.t list
-    ; start_writer:
+    { workers : Coda_process.t Array.t
+    ; configs : Coda_worker.Input.t list
+    ; start_writer :
         (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
         Linear_pipe.Writer.t
-    ; status:
-        [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
+    ; status :
+        [ `On of [ `Synced of user_cmds_under_inspection | `Catchup ] | `Off ]
         Array.t
-    ; locks: (int ref * unit Condition.t) Array.t
+    ; locks : (int ref * unit Condition.t) Array.t
           (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
         [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
         so eventually the counter _must_ become 0, ensuring progress. *)
-    ; root_lengths: int Array.t
-    ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t
-    ; precomputed_values: Precomputed_values.t }
+    ; root_lengths : int Array.t
+    ; restart_signals : (restart_type * unit Ivar.t) Option.t Array.t
+    ; precomputed_values : Genesis_proof.Inputs.t
+    }
 
   let create ~precomputed_values configs workers start_writer =
     let status =
@@ -52,7 +53,8 @@ module Api = struct
     ; locks
     ; root_lengths
     ; restart_signals
-    ; precomputed_values }
+    ; precomputed_values
+    }
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
@@ -111,7 +113,7 @@ module Api = struct
   let stop t i ~logger =
     ( match t.status.(i) with
     | `On (`Synced user_cmds_under_inspection) ->
-        Hashtbl.iter user_cmds_under_inspection ~f:(fun {passed_root; _} ->
+        Hashtbl.iter user_cmds_under_inspection ~f:(fun { passed_root; _ } ->
             Ivar.fill passed_root () )
     | _ ->
         () ) ;
@@ -129,12 +131,11 @@ module Api = struct
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
-      User_command_input.create ~signer:pk_of_sk ~fee
-        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk ~memo ~valid_until
-        ~body
+      User_command_input.create ~signer:pk_of_sk ~fee ~fee_payer_pk:pk_of_sk
+        ~memo ~valid_until ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
-             (Keypair.of_private_key_exn sk))
+             (Keypair.of_private_key_exn sk) )
         ()
     in
     let%map user_cmd =
@@ -151,7 +152,8 @@ module Api = struct
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "sd%i" i))
       t i delegator_sk fee valid_until
       ~body:
-        (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
+        (Stake_delegation
+           (Set_delegate { delegator; new_delegate = delegate_pk }) )
 
   let send_payment t i sender_sk receiver_pk amount fee valid_until =
     let source_pk =
@@ -160,8 +162,7 @@ module Api = struct
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
-      ~body:
-        (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
+      ~body:(Payment { source_pk; receiver_pk; amount })
 
   let new_block t i key =
     run_online_worker
@@ -216,10 +217,11 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
           match el with
           | [] ->
               false
-          | [state_hash]
+          | [ state_hash ]
             when State_hash.equal state_hash
-                   testnet.Api.precomputed_values.protocol_state_with_hash.hash
-            ->
+                   testnet.Api.precomputed_values.protocol_state_with_hashes
+                     .hash
+                     .state_hash ->
               (* Knowing only the genesis transition doesn't indicate an online
                  chain.
               *)
@@ -235,8 +237,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
       `List
         ( Array.to_list online_chains
         |> List.map ~f:(fun chain ->
-               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) )
-        )
+               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) ) )
     in
     match
       Array.fold ~init:None
@@ -254,12 +255,12 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
              Deferred.Array.map workers ~f:Coda_process.dump_tf
              >>| Array.to_list
            in
-           [%log fatal]
-             "Best paths have diverged completely, network is forked"
+           [%log fatal] "Best paths have diverged completely, network is forked"
              ~metadata:
                [ ("chains", chains_json ())
-               ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs)) ] ;
-           exit 7)
+               ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs))
+               ] ;
+           exit 7 )
           |> don't_wait_for
         else
           [%log info] "Chains are OK, they have hashes $hashes in common"
@@ -272,11 +273,12 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               ; ( "root_lengths"
                 , `List
                     ( List.map ~f:(fun l -> `Int l)
-                    @@ Array.to_list testnet.root_lengths ) ) ]
+                    @@ Array.to_list testnet.root_lengths ) )
+              ]
     | None ->
         [%log warn]
           "Empty list of online chains, OK if we're still starting the network"
-          ~metadata:[("chains", chains_json ())]
+          ~metadata:[ ("chains", chains_json ()) ]
   in
   let last_time = ref (Time.now ()) in
   don't_wait_for
@@ -287,23 +289,25 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        if
          Array.existsi testnet.status ~f:(fun i _ -> Api.synced testnet i)
          && not
-              ( diff
-              < Time.Span.to_sec acceptable_delay
-                +. epsilon
-                +. Int.to_float
-                     ( (8 - 1)
-                     * testnet.precomputed_values.constraint_constants
-                         .block_window_duration_ms )
-                   /. 1000. )
+              Float.(
+                diff
+                < Time.Span.to_sec acceptable_delay
+                  +. epsilon
+                  +. Int.to_float
+                       Int.(
+                         (8 - 1)
+                         * testnet.precomputed_values.constraint_constants
+                             .block_window_duration_ms)
+                     /. 1000.)
        then (
          [%log fatal] "No recent blocks" ;
          ignore (exit 8) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
      in
-     go ()) ;
+     go () ) ;
   don't_wait_for
-    (Deferred.ignore
+    (Deferred.ignore_m
        (Linear_pipe.fold ~init:chains all_transitions_r
           ~f:(fun chains (_, _, i) ->
             let%map path = Api.best_path testnet i in
@@ -311,18 +315,21 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 chains.(i) <- path ;
                 last_time := Time.now () ;
                 check_chains chains ;
-                chains ) ))) ;
+                chains ) ) ) ) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
-         Linear_pipe.write all_transitions_w (prev, curr, i) ))
+         Linear_pipe.write all_transitions_w (prev, curr, i) ) )
 
 type user_cmd_status =
-  {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
+  { snapshots : int option array
+  ; passed_root : bool array
+  ; result : unit Ivar.t
+  }
 
 let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
-         | `Root (worker_id, ({commands; root_length} : Mina_lib.Root_diff.t))
+         | `Root (worker_id, ({ commands; root_length } : Mina_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -363,26 +370,28 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      status2.expected_deadline )
              in
              Option.iter earliest_user_cmd
-               ~f:(fun (user_cmd, {expected_deadline; _}) ->
+               ~f:(fun (user_cmd, { expected_deadline; _ }) ->
                  if expected_deadline < root_length then (
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
-                     "Transaction $user_cmd took too long to get into the \
-                      root of node $worker_id. Length expected: %d got: %d"
+                       ; ("user_cmd", User_command.to_yojson user_cmd)
+                       ]
+                     "Transaction $user_cmd took too long to get into the root \
+                      of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
                    exit 9 |> ignore ) ) ;
              List.iter commands ~f:(fun user_cmd ->
                  Hashtbl.change user_cmds_under_inspection user_cmd.data
                    ~f:(function
-                   | Some {passed_root; _} ->
+                   | Some { passed_root; _ } ->
                        Ivar.fill passed_root () ;
                        [%log info]
                          ~metadata:
                            [ ("user_cmd", User_command.to_yojson user_cmd.data)
                            ; ("worker_id", `Int worker_id)
-                           ; ("length", `Int root_length) ]
+                           ; ("length", `Int root_length)
+                           ]
                          "Transaction $user_cmd finally gets into the root of \
                           node $worker_id, when root length is $length" ;
                        None
@@ -390,9 +399,9 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        None ) ) ;
              Deferred.unit
          | _ ->
-             Deferred.unit ) ))
+             Deferred.unit ) ) )
 
-let events ~(precomputed_values : Precomputed_values.t) workers start_reader =
+let events ~(precomputed_values : Genesis_proof.Inputs.t) workers start_reader =
   let event_r, event_w = Linear_pipe.create () in
   let root_r, root_w = Linear_pipe.create () in
   let connect_worker i worker =
@@ -424,9 +433,9 @@ let events ~(precomputed_values : Precomputed_values.t) workers start_reader =
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
-               synced ()) ;
-            connect_worker i worker) ;
-         Deferred.unit )) ;
+               synced () ) ;
+            connect_worker i worker ) ;
+         Deferred.unit ) ) ;
   Array.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   (event_r, root_r)
 
@@ -443,7 +452,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader
   let%map () =
     Deferred.all_unit
       (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
-           Linear_pipe.read p >>| ignore ))
+           Linear_pipe.read p >>| ignore ) )
   in
   [%log info] "initialization finishes, start check" ;
   don't_wait_for
@@ -458,8 +467,8 @@ let start_checks logger (workers : Coda_process.t array) start_reader
    *   change network connectivity *)
 let test ?archive_process_location ?is_archive_rocksdb ~name logger n
     block_production_keys snark_work_public_keys work_selection_method
-    ~max_concurrent_connections ~(precomputed_values : Precomputed_values.t) =
-  let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
+    ~max_concurrent_connections ~(precomputed_values : Genesis_proof.Inputs.t) =
+  let logger = Logger.extend logger [ ("worker_testnet", `Bool true) ] in
   let block_production_interval =
     precomputed_values.constraint_constants.block_window_duration_ms
   in
@@ -478,7 +487,7 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
       ~block_production_keys ~acceptable_delay ~chain_id:name
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
-      ~trace_dir:(Unix.getenv "CODA_TRACING")
+      ~trace_dir:(Unix.getenv "MINA_TRACING")
       ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
       ~runtime_config
   in
@@ -519,12 +528,13 @@ end = struct
               Hashtbl.add_exn user_cmds_under_inspection
                 ~key:(Signed_command user_cmd)
                 ~data:
-                  { expected_deadline=
+                  { expected_deadline =
                       root_length
                       + Unsigned.UInt32.to_int
                           testnet.precomputed_values.consensus_constants.k
                       + delay
-                  ; passed_root } ;
+                  ; passed_root
+                  } ;
               Option.return passed_root
           | _ ->
               return None )
@@ -571,8 +581,8 @@ end = struct
                 in
                 let worker = testnet.workers.(node) in
                 let%bind user_cmd =
-                  Api.send_payment testnet node sender_sk receiver_pk amount
-                    fee valid_until
+                  Api.send_payment testnet node sender_sk receiver_pk amount fee
+                    valid_until
                 in
                 let%map (all_passed_root : unit Ivar.t list) =
                   let open Deferred.Let_syntax in
@@ -590,14 +600,15 @@ end = struct
                           (Hashtbl.add user_cmds_under_inspection
                              ~key:(Signed_command user_cmd)
                              ~data:
-                               { expected_deadline=
+                               { expected_deadline =
                                    root_length
                                    + Unsigned.UInt32.to_int
                                        testnet.precomputed_values
                                          .consensus_constants
                                          .k
                                    + delay
-                               ; passed_root }) ;
+                               ; passed_root
+                               } ) ;
                         Option.return passed_root
                     | _ ->
                         return None )

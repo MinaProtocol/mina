@@ -10,18 +10,18 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # Generate the JSON file containing the unencrypted keys
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
-"$SCRIPTPATH"/../_build/default/src/lib/mina_base/gen/gen.exe
+"$SCRIPTPATH"/../_build/default/src/lib/key_gen/gen/gen.exe
 jsonpath="$tmpdir/sample_keypairs.json"
 
 cd "$SCRIPTPATH/.."
 
 mkdir -p wallet-keys
-export CODA_PRIVKEY_PASS=""
+export MINA_PRIVKEY_PASS=""
 
 # Iterate over the keys in the JSON and wrap them in the proper format
 i=1
 for k in $(jq -r '.[] | .private_key' < "$jsonpath"); do
-    dune exec -- coda advanced wrap-key -privkey-path "wallet-keys/$i" <<<"$k"
+    dune exec -- mina advanced wrap-key -privkey-path "wallet-keys/$i" <<<"$k"
     # echo "$k" > "wallet-keys/$i"
     i=$((i + 1))
 done

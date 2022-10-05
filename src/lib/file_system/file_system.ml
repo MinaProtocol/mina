@@ -2,14 +2,17 @@ open Core
 open Async
 
 let dir_exists dir =
-  let%bind access_res = Unix.access dir [`Exists] in
+  let%bind access_res = Unix.access dir [ `Exists ] in
   if Result.is_ok access_res then
     let%map stat = Unix.stat dir in
-    Unix.Stats.kind stat = `Directory
+    Unix.File_kind.equal (Unix.Stats.kind stat) `Directory
   else return false
 
 let remove_dir dir =
-  let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; dir] () in
+  let%bind _ =
+    Monitor.try_with ~here:[%here] (fun () ->
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
+  in
   Deferred.unit
 
 let rec rmrf path =
@@ -19,10 +22,11 @@ let rec rmrf path =
       |> Array.iter ~f:(fun name -> rmrf (Filename.concat path name)) ;
       Core.Unix.rmdir path
   | _ ->
-      if Core.Sys.file_exists path = `Yes then Core.Sys.remove path
+      if [%equal: [ `Yes | `No | `Unknown ]] (Core.Sys.file_exists path) `Yes
+      then Core.Sys.remove path
 
-let try_finally ~(f : unit -> 'a Deferred.t)
-    ~(finally : unit -> unit Deferred.t) =
+let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
+    =
   try_with f
   >>= function
   | Ok x ->
@@ -58,11 +62,11 @@ let clear_dir toplevel_dir =
         in
         let dirs =
           if String.equal dirname toplevel_dir then List.concat dirs
-          else List.append (List.concat dirs) [fullname]
+          else List.append (List.concat dirs) [ fullname ]
         in
         (dirs, List.concat files)
     | _ ->
-        Deferred.return ([], [fullname])
+        Deferred.return ([], [ fullname ])
   in
   let%bind dirs, files = all_files toplevel_dir "" in
   let%bind () = Deferred.List.iter files ~f:(fun file -> Sys.remove file) in

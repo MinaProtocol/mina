@@ -1,16 +1,16 @@
 (* TODO: check if this is needed *)
 open Core_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp, yojson]
   end
 end]
 
-val create : state:Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t
+val create : state:Protocol_state.Value.t -> proof:Proof.t -> t
 
 val state : t -> Protocol_state.Value.t
 

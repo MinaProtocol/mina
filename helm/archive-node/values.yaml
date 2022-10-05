@@ -1,9 +1,13 @@
-testnetName: "coda-testnet"
-coda:
-  runtimeConfig: ""
+testnetName: "testnet"
+mina:
+  runtimeConfig:
+  generateGenesisProof: true
   logLevel: "Info"
   logSnarkWorkGossip: false
-  image: codaprotocol/coda-daemon:0.0.16-beta7-develop
+  logTxnPoolGossip: false
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  useCustomEntrypoint: false
+  customEntrypoint: ""
   privkeyPass: "naughty blue worm"
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
@@ -13,30 +17,37 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 archive:
-  fullname: "archive-node"
   hostPort: "10909"
-  image: codaprotocol/coda-archive:0.0.16-beta7-develop
-  listenPort: "3086"
-  nodeName: "dev"
-  remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-  postgresHost: '{{ .Release.Name }}-postgresql'
-  postgresPort: "5432"
+  image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
+  # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
+  remoteSchemaFile: "create_schema.sql"
+  remoteSchemaAuxFiles: 
+    - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
+    - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+  postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"
+    metrics: "10002"
+  enableLocalDaemon: true
+  enablePostgresDB: true
 
 postgresql:
   postgresqlPassword: "foobar"
   postgresqlUsername: "postgres"
 
+nodeSelector:
+  preemptible: false
+
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
-
-nodeSelector:
-  preemptible: false

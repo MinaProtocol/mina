@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Bitstring
 
 let depth = bitstring_length
@@ -6,7 +6,7 @@ let depth = bitstring_length
 let add_padding path =
   let length = depth path in
   if length mod 8 = 0 then path
-  else concat [path; zeroes_bitstring (8 - (length mod 8))]
+  else concat [ path; zeroes_bitstring (8 - (length mod 8)) ]
 
 let slice = subbitstring
 
@@ -42,6 +42,8 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = int * string
 
@@ -57,15 +59,16 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable = to_tuple
+          let to_binable = to_tuple
 
-                let of_binable = of_tuple
-              end)
+          let of_binable = of_tuple
+        end)
 
     let sexp_of_t = Fn.compose sexp_of_string to_string
 
@@ -82,8 +85,7 @@ module Stable = struct
     let hash_fold_t hash_state t =
       [%hash_fold: int * string] hash_state (to_tuple t)
 
-    [%%define_from_scope
-    compare, to_yojson]
+    [%%define_from_scope compare, to_yojson]
 
     let equal = equals
   end
@@ -141,12 +143,13 @@ let of_int_exn ~ledger_depth index =
   if index >= 1 lsl ledger_depth then failwith "Index is too large"
   else
     let buf = create_bitstring ledger_depth in
-    Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-      (ledger_depth - 1) 0
-    |> Sequence.fold ~init:index ~f:(fun i pos ->
-           Bitstring.put buf pos (i % 2) ;
-           i / 2 )
-    |> ignore ;
+    ignore
+      ( Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+          (ledger_depth - 1) 0
+        |> Sequence.fold ~init:index ~f:(fun i pos ->
+               Bitstring.put buf pos (i % 2) ;
+               i / 2 )
+        : int ) ;
     buf
 
 let dirs_from_root t =
@@ -208,7 +211,7 @@ let serialize ~ledger_depth path =
   assert (path_len <= required_bits) ;
   let required_padding = required_bits - path_len in
   Bigstring.of_string @@ string_of_bitstring
-  @@ concat [path; zeroes_bitstring required_padding]
+  @@ concat [ path; zeroes_bitstring required_padding ]
 
 let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
 
@@ -220,8 +223,7 @@ module Range = struct
     if comparison > 0 then
       raise (Invalid_argument "first address needs to precede last address")
     else if comparison = 0 then init
-    else
-      fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
+    else fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
 
   let fold_incl (first, last) ~init ~f =
     f last @@ fold_exl (first, last) ~init ~f
@@ -236,10 +238,10 @@ module Range = struct
 
   let subtree_range ~ledger_depth address =
     let first_node =
-      concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+      concat [ address; zeroes_bitstring @@ height ~ledger_depth address ]
     in
     let last_node =
-      concat [address; ones_bitstring @@ height ~ledger_depth address]
+      concat [ address; ones_bitstring @@ height ~ledger_depth address ]
     in
     (first_node, last_node)
 
@@ -258,30 +260,18 @@ module Range = struct
                   (current_node, (next_node, `Don't_stop)) ) )
 end
 
-let%test "Bitstring bin_io serialization does not change" =
-  (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
-  let text =
-    "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
-     has roots in a piece of classical Latin literature."
-  in
-  let bitstring = Bitstring.bitstring_of_string text in
-  let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    bitstring known_good_digest
-
 module Make_test (Input : sig
   val depth : int
 end) =
 struct
   let%test "the merkle root should have no path" =
-    dirs_from_root (root ()) = []
+    List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
          (Direction.gen_var_length_list Input.depth)
-         Direction.gen)
+         Direction.gen )
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq: t]
@@ -304,8 +294,7 @@ struct
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth)
-      ~f:(fun directions ->
+      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
 

@@ -1,31 +1,111 @@
-drop table blocks_internal_commands;
+/* delete all relations and types from the archive database
 
-drop table blocks_user_commands;
+   it is not necessary to explicitly drop indexes, they're removed when dropping the relation
+    containing the indexed column
+*/
 
-drop index idx_blocks_height;
+DROP TABLE blocks_internal_commands;
 
-drop index idx_blocks_creator_id;
+DROP TABLE blocks_user_commands;
 
-drop index idx_blocks_state_hash;
+DROP TABLE blocks_zkapp_commands;
 
-drop table blocks;
+DROP TABLE zkapp_account_update_failures;
 
-drop table epoch_data;
+DROP TABLE accounts_accessed;
 
-drop table internal_commands;
+DROP TABLE accounts_created;
 
-drop type internal_command_type;
+DROP TABLE blocks;
 
-drop table user_commands;
+DROP TYPE chain_status_type;
 
-drop type user_command_type;
+DROP TABLE epoch_data;
 
-drop type user_command_status;
+DROP TABLE internal_commands;
 
-drop index idx_snarked_ledger_hashes_value;
+DROP TYPE internal_command_type;
 
-drop table snarked_ledger_hashes;
+DROP TABLE user_commands;
 
-drop index idx_public_keys_value;
+DROP TYPE user_command_type;
 
-drop table public_keys;
+DROP TYPE transaction_status;
+
+DROP TABLE zkapp_commands;
+
+DROP TABLE zkapp_fee_payer_body;
+
+DROP TABLE zkapp_account_update;
+
+DROP TABLE zkapp_account_update_body;
+
+DROP TYPE call_type;
+
+DROP TABLE zkapp_updates;
+
+DROP TABLE zkapp_network_precondition;
+
+DROP TABLE zkapp_account_precondition;
+
+DROP TABLE zkapp_account_precondition_values;
+
+DROP TABLE zkapp_accounts;
+
+DROP TABLE zkapp_epoch_data;
+
+DROP TABLE zkapp_epoch_ledger;
+
+DROP TABLE zkapp_permissions;
+
+DROP TABLE zkapp_state_data_array;
+
+DROP TABLE zkapp_states_nullable;
+
+DROP TABLE zkapp_states;
+
+DROP TABLE zkapp_state_data;
+
+DROP TABLE zkapp_timing_info;
+
+DROP TABLE zkapp_verification_keys;
+
+DROP TABLE zkapp_amount_bounds;
+
+DROP TABLE zkapp_balance_bounds;
+
+DROP TABLE zkapp_length_bounds;
+
+DROP TABLE zkapp_global_slot_bounds;
+
+DROP TABLE zkapp_nonce_bounds;
+
+DROP TABLE zkapp_timestamp_bounds;
+
+DROP TABLE zkapp_token_id_bounds;
+
+DROP TYPE zkapp_auth_required_type;
+
+DROP TYPE zkapp_authorization_kind_type;
+
+DROP TYPE zkapp_precondition_type;
+
+DROP TABLE snarked_ledger_hashes;
+
+DROP TABLE timing_info;
+
+DROP TABLE account_identifiers;
+
+DROP TABLE zkapp_sequence_states;
+
+DROP TABLE zkapp_uris;
+
+DROP TABLE tokens;
+
+DROP TABLE public_keys;
+
+DROP TABLE zkapp_events;
+
+DROP TABLE token_symbols;
+
+DROP TABLE voting_for;

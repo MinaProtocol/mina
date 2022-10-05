@@ -4,7 +4,7 @@ let S = ../../Lib/SelectFiles.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
-let OpamInit = ../../Command/OpamInit.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 let WithCargo = ../../Command/WithCargo.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
@@ -34,19 +34,16 @@ Pipeline.build
       [ Command.build
           Command.Config::
             { commands =
-              OpamInit.andThenRunInDocker
+              RunInToolchain.runInToolchainBuster
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"
+                , "GO=/usr/lib/go/bin/go"
                 ]
                 (Prelude.Text.concatSep " && "
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , WithCargo.withCargo "eval $(opam config env) && dune runtest src/app/archive"
-                  , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql"
-                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , "GO=/usr/lib/go/bin/go make libp2p_helper"
-                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:coda-archive-processor-test'"
+                  , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive"
                   ])
             , label = "Archive node unit tests"
             , key = "archive-unit-tests"

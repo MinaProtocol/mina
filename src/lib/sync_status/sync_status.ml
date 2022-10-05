@@ -7,7 +7,7 @@ open Core_kernel
     the node receives a constant flow of messages, its state should be SYNCED.
     However, when the node is bootstrapping, its state is BOOTSTRAPPING. If it
     hasn’t received messages for some time
-    (Coda_compile_config.inactivity_secs), then it is OFFLINE. *)
+    (Mina_compile_config.inactivity_secs), then it is OFFLINE. *)
 let to_string = function
   | `Connecting ->
       "Connecting"
@@ -41,17 +41,25 @@ let of_string string =
 
 let to_yojson status = `String (to_string status)
 
+let of_yojson : Yojson.Safe.t -> (_, string) Result.t = function
+  | `String s ->
+      Result.map_error ~f:Error.to_string_hum (of_string s)
+  | _ ->
+      Error "expected string"
+
 module T = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
-        [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
+        [ `Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup ]
       [@@deriving sexp, hash, compare, equal, enumerate]
 
       let to_latest = Fn.id
 
       let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
 
       module T = struct
         type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
@@ -67,9 +75,14 @@ end
 include T
 include Hashable.Make (T)
 
-let%test "of_string (to_string x) == x" =
+let check_conv to_repr of_repr ok_or_fail =
   List.for_all
-    [`Offline; `Bootstrap; `Synced; `Connecting; `Listening; `Catchup]
+    [ `Offline; `Bootstrap; `Synced; `Connecting; `Listening; `Catchup ]
     ~f:(fun sync_status ->
-      equal sync_status (of_string (to_string sync_status) |> Or_error.ok_exn)
-  )
+      equal sync_status (of_repr (to_repr sync_status) |> ok_or_fail) )
+
+let%test "of_string (to_string x) == x" =
+  check_conv to_string of_string Or_error.ok_exn
+
+let%test "of_yojson (to_yojson x) == x" =
+  check_conv to_yojson of_yojson (function Error e -> failwith e | Ok x -> x)

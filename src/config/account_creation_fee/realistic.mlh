@@ -1,1 +1,1 @@
-[%%define account_creation_fee_int "0.001"]
+[%%define account_creation_fee_int "1.0"]

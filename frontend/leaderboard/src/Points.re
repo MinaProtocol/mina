@@ -40,20 +40,40 @@ let applyTopNPoints =
   Array.sort(f, metricsArray);
   Belt.Array.reverseInPlace(metricsArray);
 
+  metricsArray
+  |> Array.iteri((index, metric) => {
+       Js.log("index: " ++ string_of_int(index));
+       Js.log("metric: ");
+       Js.log(metric);
+       Js.log("\n");
+     });
+
   let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
-    |> Array.mapi((i, (username, _)) =>
-         if (counter^ >= Array.length(threshholdPointsList)) {
-           (username, 0);
-         } else {
-           let (place, points) = threshholdPointsList[counter^];
-           if (place == i) {
-             counter := counter^ + 1;
-           };
-           (username, points);
-         }
-       );
+    |> Array.mapi((i, (username, metric)) => {
+         metric
+         ->getMetricValue
+         ->Belt.Option.mapWithDefault((username, 0), challengeMetric =>
+             if (counter^ >= Array.length(threshholdPointsList)) {
+               (username, 0);
+             } else {
+               let (place, points) = threshholdPointsList[counter^];
+               if (i < Array.length(metricsArray) - 1) {
+                 let (_, nextMetric) = metricsArray[i + 1];
+
+                 nextMetric
+                 ->getMetricValue
+                 ->Belt.Option.mapWithDefault((), nextChallengeMetric =>
+                     if (challengeMetric !== nextChallengeMetric && i >= place) {
+                       counter := counter^ + 1;
+                     }
+                   );
+               };
+               (username, points);
+             }
+           )
+       });
 
   Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points != 0})
   |> Array.fold_left(

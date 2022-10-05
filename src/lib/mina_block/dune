@@ -1,0 +1,60 @@
+(library
+ (name mina_block)
+ (public_name mina_block)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   integers
+   core_kernel
+   async_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   base64
+   result
+   ppx_inline_test.config
+   base
+   core
+   ;; local libraries
+   mina_ledger
+   mina_numbers
+   currency
+   unsigned_extended
+   ledger_proof
+   logger
+   blockchain_snark
+   unix_timestamp
+   allocation_functor
+   verifier
+   staged_ledger_diff
+   protocol_version
+   consensus
+   precomputed_values
+   mina_state
+   mina_net2
+   mina_base
+   mina_transaction
+   truth
+   transition_chain_verifier
+   staged_ledger
+   data_hash_lib
+   block_time
+   non_empty_list
+   with_hash
+   signature_lib
+   genesis_constants
+   transaction_snark_work
+   coda_genesis_proof
+   blake2
+   snark_params
+   crypto_params
+   pickles
+   pickles.backend
+   pasta_bindings
+   kimchi_pasta
+   random_oracle
+   random_oracle_input
+   ppx_version.runtime
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))

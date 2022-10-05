@@ -1,8 +1,9 @@
 module Data = struct
-  type t = {ledger: Mina_base.Ledger.t Lazy.t; seed: Mina_base.Epoch_seed.t}
+  type t =
+    { ledger : Mina_ledger.Ledger.t Lazy.t; seed : Mina_base.Epoch_seed.t }
 end
 
-type tt = {staking: Data.t; next: Data.t option}
+type tt = { staking : Data.t; next : Data.t option }
 
 type t = tt option
 

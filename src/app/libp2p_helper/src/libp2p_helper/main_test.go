@@ -2,239 +2,222 @@ package main
 
 import (
 	"bufio"
-	"codanet"
 	"context"
-	crand "crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"sync"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	"codanet"
 
-	"github.com/libp2p/go-libp2p-pubsub"
-	ma "github.com/multiformats/go-multiaddr"
+	"net/http"
+	"strconv"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	logging "github.com/ipfs/go-log/v2"
+
+	net "github.com/libp2p/go-libp2p-core/network"
+
+	ipc "libp2p_ipc"
 
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	testTimeout  = 10 * time.Second
-	testProtocol = protocol.ID("/mina/")
+func TestMain(m *testing.M) {
+	for i := 0; i < 100; i++ {
+		logging.Logger(fmt.Sprintf("node%d", i))
+	}
+	// Uncomment for more logging (ERROR by default)
+	// _ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
+	// _ = logging.SetLogLevel("engine", "DEBUG")
+	// _ = logging.SetLogLevel("codanet.Helper", "WARN")
+	// _ = logging.SetLogLevel("codanet.CodaGatingState", "WARN")
+	// for i := 0; i < 100; i++ {
+	// 	logging.SetLogLevel(fmt.Sprintf("node%d", i), "WARN")
+	// }
+	// _ = logging.SetLogLevel("dht", "debug")
+	// _ = logging.SetLogLevel("connmgr", "debug")
+	// _ = logging.SetLogLevel("*", "debug")
+	codanet.WithPrivate = true
+
+	os.Exit(m.Run())
+}
+
+const (
+	maxStatsMsg = 1 << 6
+	minStatsMsg = 1 << 3
 )
 
-func newTestKey(t *testing.T) crypto.PrivKey {
-	r := crand.Reader
-	key, _, err := crypto.GenerateEd25519Key(r)
-	require.NoError(t, err)
+func TestMplex_SendLargeMessage(t *testing.T) {
+	// assert we are able to send and receive a message with size up to 1 << 30 bytes
+	appA, _ := newTestApp(t, nil, true)
+	appA.NoDHT = true
 
-	return key
-}
+	appB, _ := newTestApp(t, nil, true)
+	appB.NoDHT = true
 
-func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
-	dir, err := ioutil.TempDir("", "mina_test_*")
-	require.NoError(t, err)
-
-	helper, err := codanet.MakeHelper(context.Background(),
-		[]ma.Multiaddr{},
-		nil,
-		dir,
-		newTestKey(t),
-		string(testProtocol),
-		seeds,
-		codanet.NewCodaGatingState(nil, nil, nil),
-		50
-	)
-	require.NoError(t, err)
-
-	return &app{
-		P2p:            helper,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		AddedPeers:     make([]peer.AddrInfo, 0, 512),
-	}
-}
-
-func addrInfos(h host.Host) (addrInfos []peer.AddrInfo, err error) {
-	for _, multiaddr := range multiaddrs(h) {
-		addrInfo, err := peer.AddrInfoFromP2pAddr(multiaddr)
-		if err != nil {
-			return nil, err
-		}
-		addrInfos = append(addrInfos, *addrInfo)
-	}
-	return addrInfos, nil
-}
-
-func multiaddrs(h host.Host) (multiaddrs []ma.Multiaddr) {
-	addrs := h.Addrs()
-	for _, addr := range addrs {
-		multiaddr, err := ma.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", addr, h.ID()))
-		if err != nil {
-			continue
-		}
-		multiaddrs = append(multiaddrs, multiaddr)
-	}
-	return multiaddrs
-}
-
-func TestDHTDiscovery_TwoNodes(t *testing.T) {
-	appA := newTestApp(t, nil)
-	appA.NoMDNS = true
-	defer appA.P2p.Host.Close()
-
+	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
-
-	appB := newTestApp(t, appAInfos)
-	appB.AddedPeers = appAInfos
-	appB.NoMDNS = true
-	defer appB.P2p.Host.Close()
-
-	// begin appB and appC's DHT advertising
-	ret, err := new(beginAdvertisingMsg).run(appB)
-	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
-
-	ret, err = new(beginAdvertisingMsg).run(appA)
-	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
-
-	time.Sleep(time.Second)
-}
-
-func TestDHTDiscovery(t *testing.T) {
-	appA := newTestApp(t, nil)
-	appA.NoMDNS = true
-	defer appA.P2p.Host.Close()
-
-	appAInfos, err := addrInfos(appA.P2p.Host)
-	require.NoError(t, err)
-
-	appB := newTestApp(t, appAInfos)
-	appB.NoMDNS = true
-	defer appB.P2p.Host.Close()
 
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	appC := newTestApp(t, appAInfos)
-	appC.NoMDNS = true
-	defer appC.P2p.Host.Close()
+	msgSize := uint64(1 << 30)
 
+	withTimeoutAsync(t, func(done chan interface{}) {
+		// create handler that reads `msgSize` bytes
+		handler := func(stream net.Stream) {
+			r := bufio.NewReader(stream)
+			i := uint64(0)
+
+			for {
+				_, err := r.ReadByte()
+				if err == io.EOF {
+					break
+				}
+
+				i++
+				if i == msgSize {
+					close(done)
+					return
+				}
+			}
+		}
+
+		appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+		// send large message from A to B
+		msg := createMessage(msgSize)
+
+		stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+		require.NoError(t, err)
+
+		_, err = stream.Write(msg)
+		require.NoError(t, err)
+	}, "B did not receive a large message from A")
+}
+
+func createMessage(size uint64) []byte {
+	return make([]byte, size)
+}
+
+func TestPeerExchange(t *testing.T) {
+	// only allow peer count of 2 for node A
+	maxCount := 2
+	appAPort := nextPort()
+	appA := newTestAppWithMaxConnsAndCtxAndGrace(t, newTestKey(t), nil, true, maxCount, maxCount, .2, appAPort, context.Background(), time.Second)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	appB, _ := newTestApp(t, nil, true)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	appC, _ := newTestApp(t, nil, true)
 	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	time.Sleep(time.Second)
-
-	go func() {
-		<-appA.OutChan
-	}()
-
-	go func() {
-		<-appB.OutChan
-	}()
-
-	go func() {
-		<-appC.OutChan
-	}()
-
-	// begin appB and appC's DHT advertising
-	ret, err := new(beginAdvertisingMsg).run(appB)
+	// appD will try to connect to appA, appA will send peer msg containing B and C and disconnect
+	appD, _ := newTestApp(t, appAInfos, true)
+	err = appD.P2p.Host.Connect(appD.Ctx, appAInfos[0])
 	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
 
-	ret, err = new(beginAdvertisingMsg).run(appC)
-	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
+	t.Logf("a=%s", appA.P2p.Host.ID())
+	t.Logf("b=%s", appB.P2p.Host.ID())
+	t.Logf("c=%s", appC.P2p.Host.ID())
+	t.Logf("d=%s", appD.P2p.Host.ID())
 
-	done := make(chan struct{})
-
+	ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
 	go func() {
 		for {
-			// check if peerB knows about peerC
-			addrs := appB.P2p.Host.Peerstore().Addrs(appC.P2p.Host.ID())
-			if len(addrs) != 0 {
-        // send a stream message
-        // then exit
-				close(done)
-				return
+			// check if appC is connected to appB
+			for _, peer := range appD.P2p.Host.Network().Peers() {
+				if peer == appB.P2p.Host.ID() || peer == appC.P2p.Host.ID() {
+					cancelF()
+					return
+				}
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not discover C via DHT")
-	case <-done:
-	}
+	<-ctx.Done()
 
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatal("D did not connect to B or C via A")
+	}
+	time.Sleep(time.Second * 2)
+	appA.P2p.TrimOpenConns(context.Background())
 	time.Sleep(time.Second)
+
+	require.LessOrEqual(t, len(appA.P2p.Host.Network().Peers()), maxCount)
 }
 
-func TestMDNSDiscovery(t *testing.T) {
-	appA := newTestApp(t, nil)
-	appA.NoDHT = true
-	defer appA.P2p.Host.Close()
-
-	appB := newTestApp(t, nil)
-	appB.NoDHT = true
-	defer appB.P2p.Host.Close()
-
-	// begin appA and appB's mDNS advertising
-	ret, err := new(beginAdvertisingMsg).run(appB)
+func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {
+	stream, err := from.P2p.Host.NewStream(context.Background(), to.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
-
-	ret, err = new(beginAdvertisingMsg).run(appA)
+	_, err = stream.Write(msg)
 	require.NoError(t, err)
-	require.Equal(t, ret, "beginAdvertising success")
+	err = stream.Close()
+	require.NoError(t, err)
+}
 
-	done := make(chan struct{})
+func waitForMessages(t *testing.T, app *app, numExpectedMessages int) [][]byte {
+	msgStates := make(map[uint64][]byte)
+	receivedMsgs := make([][]byte, 0, numExpectedMessages)
 
-	go func() {
+	withTimeout(t, func() {
+		awaiting := numExpectedMessages
 		for {
-			// check if peerB knows about peerA
-			addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
-			if len(addrs) != 0 {
-				close(done)
-				return
+			rawMsg := <-app.OutChan
+			imsg, err := ipc.ReadRootDaemonInterface_Message(rawMsg)
+			require.NoError(t, err)
+			if !imsg.HasPushMessage() {
+				continue
 			}
-			time.Sleep(time.Millisecond * 100)
+			pmsg, err := imsg.PushMessage()
+			require.NoError(t, err)
+			if pmsg.HasStreamComplete() {
+				smc, err := pmsg.StreamComplete()
+				require.NoError(t, err)
+				sid, err := smc.StreamId()
+				streamId := sid.Id()
+				require.NoError(t, err)
+				receivedMsgs = append(receivedMsgs, msgStates[streamId])
+				awaiting -= 1
+				if awaiting <= 0 {
+					return
+				}
+			} else if pmsg.HasStreamMessageReceived() {
+				smr, err := pmsg.StreamMessageReceived()
+				require.NoError(t, err)
+				msg, err := smr.Msg()
+				require.NoError(t, err)
+				sid, err := msg.StreamId()
+				require.NoError(t, err)
+				streamId := sid.Id()
+				data, err := msg.Data()
+				require.NoError(t, err)
+				msgStates[streamId] = append(msgStates[streamId], data...)
+			}
 		}
-	}()
+	}, "did not receive all expected messages")
 
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not discover A via mDNS")
-	case <-done:
-	}
-
-	time.Sleep(time.Second * 3)
+	return receivedMsgs
 }
 
-func createLargeMessage() []byte {
-	return make([]byte, (1 << 30))
-}
-
-func TestMplex_SendLargeMessage(t *testing.T) {
-	// assert we are able to send and receive a message with size up to 1 << 30 bytes
-	appA := newTestApp(t, nil)
+func TestMplex_SendMultipleMessage(t *testing.T) {
+	// assert we are able to send and receive multiple messages with size up to 1 << 10 bytes
+	appA, _ := newTestApp(t, nil, false)
 	appA.NoDHT = true
 	defer appA.P2p.Host.Close()
 
-	appB := newTestApp(t, nil)
+	appB, _ := newTestApp(t, nil, false)
 	appB.NoDHT = true
 	defer appB.P2p.Host.Close()
 
@@ -245,40 +228,100 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	// create handler that reads 1<<30 bytes
-	done := make(chan struct{})
 	handler := func(stream net.Stream) {
-		r := bufio.NewReader(stream)
-		i := 0
-
-		for {
-			_, err := r.ReadByte()
-			if err == io.EOF {
-				break
-			}
-
-			i++
-			if i == 1<<30 {
-				close(done)
-				return
-			}
-		}
+		handleStreamReads(appB, stream, appB.NextId())
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
-	// send large message from A to B
-	msg := createLargeMessage()
+	// Send multiple messages from A to B
+	msg := createMessage(1 << 10)
+	sendStreamMessage(t, appA, appB, msg)
+	sendStreamMessage(t, appA, appB, msg)
+	sendStreamMessage(t, appA, appB, msg)
 
-	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+	// Assert all messages were received intact
+	receivedMsgs := waitForMessages(t, appB, 3)
+	require.Equal(t, [][]byte{msg, msg, msg}, receivedMsgs)
+}
+
+func TestLibp2pMetrics(t *testing.T) {
+	// assert we are able to get the correct metrics of libp2p node
+	appA, _ := newTestApp(t, nil, false)
+	appA.NoDHT = true
+	defer appA.P2p.Host.Close()
+
+	appB, _ := newTestApp(t, nil, false)
+	appB.NoDHT = true
+	defer appB.P2p.Host.Close()
+
+	// connect the two nodes
+	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
-	_, err = stream.Write(msg)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	select {
-	case <-time.After(testTimeout):
-		t.Fatal("B did not receive a large message from A")
-	case <-done:
+	var streamIdx uint64 = 0
+	handler := func(stream net.Stream) {
+		handleStreamReads(appB, stream, streamIdx)
+		streamIdx++
 	}
+
+	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+	server := http.NewServeMux()
+	server.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":9001", server)
+
+	go appB.checkPeerCount()
+	go appB.checkMessageStats()
+
+	// Send multiple messages from A to B
+	sendStreamMessage(t, appA, appB, createMessage(maxStatsMsg))
+	sendStreamMessage(t, appA, appB, createMessage(minStatsMsg))
+	waitForMessages(t, appB, 2)
+
+	time.Sleep(5 * time.Second) // Wait for metrics to be reported.
+
+	avgStatsMsg := (maxStatsMsg + minStatsMsg) / 2 // Total message sent count
+	expectedPeerCount := len(appB.P2p.Host.Network().Peers())
+	expectedCurrentConnCount := appB.P2p.ConnectionManager.GetInfo().ConnCount
+
+	resp, err := http.Get("http://localhost:9001/metrics")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	respBody := string(body)
+	peerCount := getMetricsValue(t, respBody, "\nMina_libp2p_peer_count")
+	require.Equal(t, strconv.Itoa(expectedPeerCount), peerCount)
+
+	connectedPeerCount := getMetricsValue(t, respBody, "\nMina_libp2p_connected_peer_count")
+	require.Equal(t, strconv.Itoa(expectedCurrentConnCount), connectedPeerCount)
+
+	maxStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_max_stats")
+	require.Equal(t, strconv.Itoa(maxStatsMsg), maxStats)
+
+	avgStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_avg_stats")
+	require.Equal(t, strconv.Itoa(avgStatsMsg), avgStats)
+
+	minStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_min_stats")
+	require.Equal(t, strconv.Itoa(minStatsMsg), minStats)
+}
+
+func getMetricsValue(t *testing.T, str string, pattern string) string {
+	t.Helper()
+
+	indx := strings.Index(str, pattern)
+	endIdx := strings.Index(str[indx+len(pattern):], "\n")
+	endIdx = endIdx + indx + len(pattern)
+
+	u := str[indx+1 : endIdx]
+	metricsData := strings.Split(u, " ")
+	require.Len(t, metricsData, 2)
+
+	return metricsData[1]
 }

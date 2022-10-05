@@ -2,16 +2,20 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.3.2
+version: 1.0.7
 appVersion: 1.16.0
+annotations:
+  artifacthub.io/changes: |
+    - All references to the crypto currency now say Mina
 dependencies:
   - name: postgresql
     version: "*"
     repository: "https://charts.bitnami.com/bitnami"
+    condition: archive.enablePostgresDB
   - name: common-utilities
-    version: 0.0.4
+    version: 0.0.9
     repository: "https://coda-charts.storage.googleapis.com"
-icon: https://github.com/MinaProtocol/mina/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
 keywords:
 - archive
 - postgres
@@ -19,4 +23,4 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/tree/develop/src/app/archive
+- https://github.com/MinaProtocol/mina/tree/develop/helm/archive-node

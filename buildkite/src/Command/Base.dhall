@@ -20,6 +20,8 @@ let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let B/Skip = B.definitions/commandStep/properties/skip/Type
 
+let B/If = B.definitions/commandStep/properties/if/Type
+
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
@@ -64,12 +66,14 @@ let TaggedKey = {
   default = {=}
 }
 
+let ExitStatus = <Code : Integer | Any>
+
 -- Retry requires you feed an exit status (as a string so we can support
 -- negative codes), and optionally a limit to the number of times this command
 -- should be retried.
 let Retry = {
   Type = {
-    exit_status : Integer,
+    exit_status : ExitStatus,
     limit : Optional Natural
   },
   default = {
@@ -99,6 +103,7 @@ let Config =
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
+      , `if` : Optional B/If
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -110,14 +115,16 @@ let Config =
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
+    , `if` = None B/If
     }
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { XLarge = toMap { size = "xlarge" },
-          Large = toMap { size = "large" },
-          Medium = toMap { size = "medium" },
-          Small = toMap { size = "small" }
+  merge { XLarge = toMap { size = "generic" },
+          Large = toMap { size = "generic" },
+          Medium = toMap { size = "generic" },
+          Small = toMap { size = "generic" },
+          Integration = toMap { size = "integration" }
         }
         target
 
@@ -157,7 +164,11 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       (\(retry : Retry.Type) ->
                       {
                         -- we always require the exit status
-                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
+                        exit_status = Some (
+                            merge
+                              { Code = \(i : Integer) -> B/ExitStatus.Integer i
+                              , Any = B/ExitStatus.String "*" }
+                            retry.exit_status),
                         -- but limit is optional
                         limit =
                           Optional/map
@@ -168,21 +179,32 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
                     ([
-                      -- ensure automatic retries on -1 exit status (infra error)
-                      Retry::{ exit_status = -1, limit = Some 2 },
-                      -- automatically retry on 100 exit status (apt-get update race condition error)
-                      Retry::{ exit_status = +100, limit = Some 2 },
-                      -- automatically retry on 1 exit status (common/flake error)
-                      Retry::{ exit_status = +1, limit = Some 1 }
+                      -- infra error
+                      Retry::{ exit_status = ExitStatus.Code -1, limit = Some 2 },
+                      -- infra error
+                      Retry::{ exit_status = ExitStatus.Code +255, limit = Some 2 },
+                      -- common/flake error
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 1 },
+                      -- apt-get update race condition error
+                      Retry::{ exit_status = ExitStatus.Code +100, limit = Some 2 },
+                      -- Git checkout error
+                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 2 }
                     ] #
                     -- and the retries that are passed in (if any)
-                    c.retries)
+                    c.retries #
+                    -- Other job-specific errors
+                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 1 } ])
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
-              manual = None B/Manual
+              manual = Some (B/Manual.Manual/Type {
+                allowed = Some True,
+                permit_on_passed = Some True,
+                reason = None Text
+              })
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
+    `if` = c.`if`,
     plugins =
       let dockerPart =
         Optional/toList
@@ -218,5 +240,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry, ExitStatus = ExitStatus}
 

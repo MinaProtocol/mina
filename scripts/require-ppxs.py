@@ -16,12 +16,13 @@ def dune_paths_ok(dune):
     path = dune.split('/')
     path_prefix2 = path[1:2]
     path_prefix3 = path[1:3]
+    path_prefix4 = path[1:4]
     return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external']
-                 or path_prefix3 == ['lib', 'marlin']
+                 or path_prefix4 == ['lib', 'crypto', 'proof-systems']
                  or path_prefix3 == ['lib', 'snarky']
                  or path_prefix3 == ['lib', 'ppx_version']
                  or path_prefix3 == ['app', 'reformat']
-                 or path_prefix3 == ['lib', 'ppx_coda']))
+                 or path_prefix3 == ['lib', 'ppx_mina']))
 
 
 dune_paths = list(
@@ -37,6 +38,8 @@ instrumentation = sexpdata.loads('instrumentation')
 
 ppx_lint = sexpdata.loads('ppx_version')
 ppx_coverage = sexpdata.loads('bisect_ppx')
+
+version_lint_as_warning_flag = sexpdata.loads('-lint-version-syntax-warnings')
 
 exit_code = 0
 
@@ -78,6 +81,16 @@ def get_ppx_ndx(dune, ppxs, ppx):
         global exit_code
         exit_code = 1
 
+def check_for_proscribed_flag(dune, ppxs, flag):
+    try:
+        ndx = ppxs.index(flag)
+        print("In dune file " + dune +
+              ", the preprocessing clause contains proscribed flag " + (sexpdata.dumps(flag)))
+        global exit_code
+        exit_code = 1
+    except:
+        None
+
 def get_backends_ndx(dune, backends, ppx):
     try:
         backends.index(ppx)
@@ -108,6 +121,7 @@ for dune in dune_paths:
                             no_ppx_error(dune, ppx_lint)
                         elif sexpdata.car(subclause) == pps:
                             ppxs = sexpdata.cdr(subclause)
+                            check_for_proscribed_flag(dune,ppxs,version_lint_as_warning_flag)
                             lint_ppx_ndx = get_ppx_ndx(dune, ppxs, ppx_lint)
                     if sexpdata.car(clause) == instrumentation:
                         found_instrumentation = True

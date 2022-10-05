@@ -2,18 +2,19 @@ open Core_kernel
 
 type t = ..
 
-type id = string [@@deriving eq, yojson, sexp]
+type id = string [@@deriving equal, yojson, sexp]
 
 let id_of_string s = s
 
 let string_of_id s = s
 
 type repr =
-  { id: id
-  ; event_name: string
-  ; arguments: String.Set.t
-  ; log: t -> (string * (string * Yojson.Safe.t) list) option
-  ; parse: (string * Yojson.Safe.t) list -> t option }
+  { id : id
+  ; event_name : string
+  ; arguments : String.Set.t
+  ; log : t -> (string * (string * Yojson.Safe.t) list) option
+  ; parse : (string * Yojson.Safe.t) list -> t option
+  }
 
 module Registry = struct
   let reprs : repr list ref = ref []
@@ -32,7 +33,18 @@ let parse_exn id json_pairs =
             List.filter json_pairs ~f:(fun (field_name, _) ->
                 Set.mem repr.arguments field_name )
           in
-          repr.parse json_pairs
+          match repr.parse json_pairs with
+          | Some t ->
+              Some t
+          | None ->
+              failwithf
+                "parse_exn: parser for id %s found, but failed when applied to \
+                 arguments: %s"
+                id
+                ( List.map json_pairs ~f:(fun (name, json) ->
+                      sprintf "%s = %s" name (Yojson.Safe.to_string json) )
+                |> String.concat ~sep:"," )
+                ()
         else None )
   in
   match result with
@@ -44,8 +56,7 @@ let parse_exn id json_pairs =
 let log t =
   let result =
     List.find_map !Registry.reprs ~f:(fun repr ->
-        Option.map (repr.log t) ~f:(fun (msg, fields) -> (msg, repr.id, fields))
-    )
+        Option.map (repr.log t) ~f:(fun (msg, fields) -> (msg, repr.id, fields)) )
   in
   match result with
   | Some data ->
@@ -59,7 +70,7 @@ let log t =
 let register_constructor = Registry.register_constructor
 
 let dump_registered_events () =
-  List.map !Registry.reprs ~f:(fun {event_name; id; arguments; _} ->
+  List.map !Registry.reprs ~f:(fun { event_name; id; arguments; _ } ->
       (event_name, id, Set.to_list arguments) )
 
 let check_interpolations_exn ~msg_loc msg label_names =
@@ -78,8 +89,8 @@ let check_interpolations_exn ~msg_loc msg label_names =
           when not (List.mem ~equal:String.equal label_names interp) ->
             failwithf
               "%s\n\
-               The structured log message contains interpolation point \
-               \"$%s\" which is not a field in the record"
+               The structured log message contains interpolation point \"$%s\" \
+               which is not a field in the record"
               msg_loc interp ()
         | _ ->
             () )

@@ -6,7 +6,8 @@
  * Schema Block_transaction_response.t : A BlockTransactionResponse contains information about a block transaction.
  *)
 
-type t = {transaction: Transaction.t} [@@deriving yojson {strict= false}, show]
+type t = { transaction : Transaction.t }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A BlockTransactionResponse contains information about a block transaction. *)
-let create (transaction : Transaction.t) : t = {transaction}
+let create (transaction : Transaction.t) : t = { transaction }

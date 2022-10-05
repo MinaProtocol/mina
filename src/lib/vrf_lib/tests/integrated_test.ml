@@ -24,27 +24,27 @@ module Group = struct
 end
 
 module Message = struct
-  type 'state_hash t = {state_hash: 'state_hash} [@@deriving hlist]
+  type 'state_hash t = { state_hash : 'state_hash } [@@deriving hlist]
 
   type value = Mina_base.State_hash.t t
 
   type var = Mina_base.State_hash.var t
 
-  let data_spec = Tick.Data_spec.[Mina_base.State_hash.typ]
-
   let typ =
-    Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Tick.Typ.of_hlistable
+      [ Mina_base.State_hash.typ ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let gen =
     let open Quickcheck.Let_syntax in
     let%map state_hash = Mina_base.State_hash.gen in
-    {state_hash}
+    { state_hash }
 
   let hash_to_group ~constraint_constants:_ msg =
     Group_map.to_group
       (Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_message
-         [|msg.state_hash|])
+         [| msg.state_hash |] )
     |> Tick.Inner_curve.of_affine
 
   module Checked = struct
@@ -53,27 +53,29 @@ module Message = struct
           Group_map.Checked.to_group
             (Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
                (Random_oracle.Checked.pack_input
-                  (Mina_base.State_hash.var_to_input msg.state_hash))) )
+                  (Mina_base.State_hash.var_to_input msg.state_hash) ) ) )
   end
 end
 
 module Output_hash = struct
-  type value = Snark_params.Tick.Field.t [@@deriving eq, sexp]
+  type value = Snark_params.Tick.Field.t [@@deriving equal, sexp]
+
+  type t = value [@@deriving equal, sexp]
 
   type var = Random_oracle.Checked.Digest.t
 
   let typ : (var, value) Snark_params.Tick.Typ.t = Snark_params.Tick.Field.typ
 
-  let hash ~constraint_constants:_ ({Message.state_hash} : Message.value) g =
+  let hash ~constraint_constants:_ ({ Message.state_hash } : Message.value) g =
     let x, y = Snark_params.Tick.Inner_curve.to_affine_exn g in
-    Random_oracle.hash [|(state_hash :> Snark_params.Tick.Field.t); x; y|]
+    Random_oracle.hash [| (state_hash :> Snark_params.Tick.Field.t); x; y |]
 
   module Checked = struct
-    let hash ({state_hash} : Message.var) g =
+    let hash ({ state_hash } : Message.var) g =
       Snark_params.Tick.make_checked (fun () ->
           let x, y = g in
           Random_oracle.Checked.hash
-            [|Mina_base.State_hash.var_to_hash_packed state_hash; x; y|] )
+            [| Mina_base.State_hash.var_to_hash_packed state_hash; x; y |] )
   end
 end
 
@@ -100,7 +102,7 @@ let%test_unit "eval unchecked vs. checked equality" =
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
          (fun (private_key, msg) ->
-           Vrf.eval ~constraint_constants ~private_key msg ))
+           Vrf.eval ~constraint_constants ~private_key msg ) )
 
 let%bench_module "vrf bench module" =
   ( module struct

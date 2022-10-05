@@ -1,4 +1,4 @@
-type t [@@deriving eq]
+type t [@@deriving equal]
 
 val succ : t -> t
 
@@ -19,19 +19,19 @@ module Checked : sig
 
   type t
 
-  val succ : t -> t
+  val succ : t -> t Checked.t
 
-  val equal : t -> t -> (Boolean.var, _) Checked.t
+  val equal : t -> t -> Boolean.var Checked.t
 
   val constant : Unsigned.UInt32.t -> t
 
-  val add : t -> Coda_numbers.Length.Checked.t -> t
+  val add : t -> Mina_numbers.Length.Checked.t -> t Checked.t
 
-  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( >= ) : t -> t -> Boolean.var Checked.t
 
   val of_global_slot :
-    constants:Constants.var -> Global_slot.Checked.t -> (t, _) Checked.t
+    constants:Constants.var -> Global_slot.Checked.t -> t Checked.t
 
   val sub_window :
-    constants:Constants.var -> t -> (Sub_window.Checked.t, _) Checked.t
+    constants:Constants.var -> t -> Sub_window.Checked.t Checked.t
 end

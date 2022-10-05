@@ -15,9 +15,9 @@ module type S = sig
 
   val zero : t
 
-  val xor : t -> t -> (t, _) Checked.t
+  val xor : t -> t -> t Checked.t
 
-  val sum : t list -> (t, _) Checked.t
+  val sum : t list -> t Checked.t
 
   val rotr : t -> int -> t
 
@@ -79,7 +79,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
                  (Option.value_exn (Field.Var.to_constant (b :> Field.Var.t)))
                  Field.one
              in
-             if b then acc lor (one lsl i) else acc ))
+             if b then acc lor (one lsl i) else acc ) )
     with _ -> None
 
   let pack (t : t) =
@@ -108,14 +108,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
         let max_length =
           Int.(
             ceil_log2
-              ( c
-              + (List.length vars * Unchecked.to_int Unsigned.UInt32.max_int)
-              ))
+              (c + (List.length vars * Unchecked.to_int Unsigned.UInt32.max_int)))
         in
         let%map bits =
           Field.Checked.choose_preimage_var ~length:max_length
             (Field.Var.sum
-               (Field.Var.constant (Field.of_int c) :: List.map vars ~f:pack))
+               (Field.Var.constant (Field.of_int c) :: List.map vars ~f:pack) )
         in
         Array.of_list
           ( List.take bits 32

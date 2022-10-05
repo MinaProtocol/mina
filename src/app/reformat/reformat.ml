@@ -15,7 +15,10 @@ let dirs_trustlist =
   ; "node_modules"
   ; "tablecloth"
   ; "zexe"
-  ; "snarky" ]
+  ; "proof-systems"
+  ; "snarky"
+  ; "_opam"
+  ; ".direnv" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
@@ -54,7 +57,7 @@ let main dry_run check path =
           let prog, args = ("ocamlformat", ["--doc-comments=before"; file]) in
           let%bind formatted = Process.run_exn ~prog ~args () in
           let%bind raw = Reader.file_contents file in
-          if formatted <> raw then (
+          if not (String.equal formatted raw) then (
             eprintf "File: %s has needs to be ocamlformat-ed\n" file ;
             exit 1 )
           else return ()
@@ -69,13 +72,15 @@ let main dry_run check path =
   in
   exit 0
 
-let cli =
+let _cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
-    (let%map_open path = flag "path" ~doc:"Path to traverse" (required string)
-     and dry_run = flag "dry-run" no_arg ~doc:"Dry run"
+    (let%map_open path =
+       flag "--path" ~aliases:["path"] ~doc:"Path to traverse"
+         (required string)
+     and dry_run = flag "--dry-run" ~aliases:["dry-run"] no_arg ~doc:"Dry run"
      and check =
-       flag "check" no_arg
+       flag "--check" ~aliases:["check"] no_arg
          ~doc:
            "Return with an error code if there exists an ml file that was \
             formatted improperly"

@@ -2,10 +2,14 @@ apiVersion: v2
 name: common-utilities
 description: A Helm chart for Mina Protocol's common chart utilities
 type: library
-version: 0.0.4
+version: 0.0.9
 appVersion: 0.0.1
+annotations:
+  artifacthub.io/changes: |
+    - enable Artifacthub repository hosting *changes* annotations
+    - add CHANGELOG.md for chart version => changelog tracking
 dependencies:
-icon:
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
 keywords:
 - mina
 - testnet
@@ -13,4 +17,4 @@ keywords:
 - utilities
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina
+- https://github.com/MinaProtocol/mina/tree/develop/helm/common

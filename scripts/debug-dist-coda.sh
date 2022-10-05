@@ -21,20 +21,20 @@ sysctl -n machdep.cpu.brand_string
 echo "========="
 echo "== Verify static initilization works"
 echo "========="
-./coda.exe -help
+./mina.exe -help
 
 # Re-enable if you want to debug illegal instructions
-# lldb -o run ./coda.exe transaction-snark-profiler
+# lldb -o run ./mina.exe transaction-snark-profiler
 
 echo "========="
 echo "== Verify snarks work"
 echo "========="
-./coda.exe transaction-snark-profiler
+./mina.exe transaction-snark-profiler
 
-rm -rf ~/.coda-config
+rm -rf ~/.mina-config
 
 echo "========="
 echo "== Verify full test"
 echo "========="
-./coda.exe integration-tests full-test
+./mina.exe integration-tests full-test
 

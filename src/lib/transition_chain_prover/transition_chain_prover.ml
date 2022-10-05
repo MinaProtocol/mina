@@ -1,15 +1,14 @@
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_chain_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t = struct
+  Mina_intf.Transition_chain_prover_intf
+    with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let find_in_root_history frontier state_hash =
@@ -22,19 +21,19 @@ module Make (Inputs : Inputs_intf) :
     Frontier_base.Root_data.Historical.transition root_data
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
-    type value = External_transition.Validated.t
+    type value = Mina_block.Validated.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem transition =
-      transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+    let to_proof_elem = Mina_block.Validated.state_body_hash
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> External_transition.Validated.parent_hash
+        transition |> Mina_block.Validated.forget |> With_hash.data
+        |> Mina_block.header |> Mina_block.Header.protocol_state
+        |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
       Option.merge
@@ -56,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    (External_transition.Validated.state_hash first_transition, merkle_list)
+    (Mina_block.Validated.state_hash first_transition, merkle_list)
 end
 
 include Make (struct

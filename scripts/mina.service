@@ -5,17 +5,19 @@ StartLimitIntervalSec=60
 StartLimitBurst=3
 
 [Service]
+Environment="PEERS_LIST_URL=PEERS_LIST_URL_PLACEHOLDER"
+Environment="LOG_LEVEL=Info"
+Environment="FILE_LOG_LEVEL=Debug"
 EnvironmentFile=%h/.mina-env
 Type=simple
 Restart=always
-RestartSec=15
-ExecStart=/usr/local/bin/coda daemon \
-  -peer-list-file %h/peers.txt \
-  -block-producer-key %h/keys/my-wallet \
-  -generate-genesis-proof true \
-  -log-level Info \
+RestartSec=30
+ExecStart=/usr/local/bin/mina daemon \
+  --peer-list-url "${PEERS_LIST_URL}" \
+  --log-level "${LOG_LEVEL}" \
+  --file-log-level "${FILE_LOG_LEVEL}" \
   $EXTRA_FLAGS
-ExecStop=/usr/local/bin/coda client stop-daemon
+ExecStop=/usr/local/bin/mina client stop-daemon
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

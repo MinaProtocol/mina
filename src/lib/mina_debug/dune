@@ -1,0 +1,8 @@
+(library
+ (name mina_debug)
+ (public_name mina_debug)
+ (libraries core_kernel)
+ (flags :standard -short-paths)
+ (preprocess
+  (pps ppx_version ppx_jane))
+ (instrumentation (backend bisect_ppx)))

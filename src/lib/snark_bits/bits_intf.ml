@@ -1,7 +1,6 @@
 (* bits_intf.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Fold_lib
 
@@ -27,8 +26,7 @@ module type Convertible_bits = sig
   val of_bits : bool list -> t
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Tuple_lib
 
@@ -36,7 +34,7 @@ module Snarkable = struct
   module type Basic = sig
     type (_, _) typ
 
-    type (_, _) checked
+    type _ checked
 
     type boolean_var
 
@@ -80,7 +78,7 @@ module Snarkable = struct
 
     val project_var : Unpacked.var -> Packed.var
 
-    val choose_preimage_var : Packed.var -> (Unpacked.var, _) checked
+    val choose_preimage_var : Packed.var -> Unpacked.var checked
   end
 
   module type Faithful = sig
@@ -92,7 +90,7 @@ module Snarkable = struct
 
     val pack_var : Unpacked.var -> Packed.var
 
-    val unpack_var : Packed.var -> (Unpacked.var, _) checked
+    val unpack_var : Packed.var -> Unpacked.var checked
   end
 
   module type Small = sig
@@ -102,19 +100,17 @@ module Snarkable = struct
 
     include Faithful with type Packed.var = private field_var
 
-    val compare_var :
-      Unpacked.var -> Unpacked.var -> (comparison_result, _) checked
+    val compare_var : Unpacked.var -> Unpacked.var -> comparison_result checked
 
-    val increment_var : Unpacked.var -> (Unpacked.var, _) checked
+    val increment_var : Unpacked.var -> Unpacked.var checked
 
-    val increment_if_var :
-      Unpacked.var -> boolean_var -> (Unpacked.var, _) checked
+    val increment_if_var : Unpacked.var -> boolean_var -> Unpacked.var checked
 
-    val assert_equal_var : Unpacked.var -> Unpacked.var -> (unit, _) checked
+    val assert_equal_var : Unpacked.var -> Unpacked.var -> unit checked
 
-    val equal_var : Unpacked.var -> Unpacked.var -> (boolean_var, _) checked
+    val equal_var : Unpacked.var -> Unpacked.var -> boolean_var checked
 
-    val var_of_field : field_var -> (Unpacked.var, _) checked
+    val var_of_field : field_var -> Unpacked.var checked
 
     val var_of_field_unsafe : field_var -> Packed.var
 
@@ -122,7 +118,7 @@ module Snarkable = struct
          boolean_var
       -> then_:Unpacked.var
       -> else_:Unpacked.var
-      -> (Unpacked.var, _) checked
+      -> Unpacked.var checked
   end
 end
 

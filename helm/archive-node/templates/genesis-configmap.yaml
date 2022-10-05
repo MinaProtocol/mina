@@ -1,12 +1,12 @@
-{{- if .Values.coda.runtimeConfig }}
+{{- if .Values.mina.runtimeConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: archive-daemon-config
+  name: "{{ template "archive-node.fullname" . }}-daemon-config"
   labels:
-    app: archive
+    app: {{ template "archive-node.fullname" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
 data:
-  daemon.json: {{ .Values.coda.runtimeConfig | quote }}
+  daemon.json: {{ .Values.mina.runtimeConfig | quote }}
 {{- end }}

@@ -14,25 +14,26 @@ module BytesWr = struct
 
   let of_yojson = function
     | `String s -> (
-      match Base58_check.decode s with
-      | Error e ->
-          Error
-            (sprintf "Bytes.of_yojson, bad Base58Check: %s"
-               (Error.to_string_hum e))
-      | Ok x ->
-          Ok (Bytes.of_string x) )
+        match Base58_check.decode s with
+        | Error e ->
+            Error
+              (sprintf "Bytes.of_yojson, bad Base58Check: %s"
+                 (Error.to_string_hum e) )
+        | Ok x ->
+            Ok (Bytes.of_string x) )
     | _ ->
         Error "Bytes.of_yojson needs a string"
 end
 
 module T = struct
   type t =
-    { box_primitive: string
-    ; pw_primitive: string
-    ; nonce: Bytes.t
-    ; pwsalt: Bytes.t
-    ; pwdiff: Int64.t * int
-    ; ciphertext: Bytes.t }
+    { box_primitive : string
+    ; pw_primitive : string
+    ; nonce : Bytes.t
+    ; pwsalt : Bytes.t
+    ; pwdiff : Int64.t * int
+    ; ciphertext : Bytes.t
+    }
   [@@deriving sexp]
 end
 
@@ -44,30 +45,32 @@ module Json : sig
   val to_stable : t -> T.t
 end = struct
   type t =
-    { box_primitive: string
-    ; pw_primitive: string
-    ; nonce: BytesWr.t
-    ; pwsalt: BytesWr.t
-    ; pwdiff: Int64.t * int
-    ; ciphertext: BytesWr.t }
+    { box_primitive : string
+    ; pw_primitive : string
+    ; nonce : BytesWr.t
+    ; pwsalt : BytesWr.t
+    ; pwdiff : Int64.t * int
+    ; ciphertext : BytesWr.t
+    }
   [@@deriving yojson]
 
   let of_stable
-      {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext} =
-    {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+      { T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext } =
+    { box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext }
 
-  let to_stable {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
-      =
-    {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+  let to_stable
+      { box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext } =
+    { T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext }
 end
 
 type t = T.t =
-  { box_primitive: string
-  ; pw_primitive: string
-  ; nonce: Bytes.t
-  ; pwsalt: Bytes.t
-  ; pwdiff: Int64.t * int
-  ; ciphertext: Bytes.t }
+  { box_primitive : string
+  ; pw_primitive : string
+  ; nonce : Bytes.t
+  ; pwsalt : Bytes.t
+  ; pwdiff : Int64.t * int
+  ; ciphertext : Bytes.t
+  }
 [@@deriving sexp]
 
 let to_yojson t : Yojson.Safe.t = Json.to_yojson (Json.of_stable t)
@@ -79,18 +82,19 @@ let of_yojson (t : Yojson.Safe.t) =
 let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =
   let nonce = Secret_box.random_nonce () in
   let salt = Password_hash.random_salt () in
-  let ({Password_hash.mem_limit; ops_limit} as diff) =
+  let ({ Password_hash.mem_limit; ops_limit } as diff) =
     Password_hash.moderate
   in
   let pw = Password_hash.Bytes.wipe_to_password password in
   let key = Secret_box.derive_key diff pw salt in
   let ciphertext = Secret_box.Bytes.secret_box key plaintext nonce in
-  { box_primitive= Secret_box.primitive
-  ; pw_primitive= Password_hash.primitive
-  ; nonce= Secret_box.Bytes.of_nonce nonce
-  ; pwsalt= Password_hash.Bytes.of_salt salt
-  ; pwdiff= (mem_limit, ops_limit)
-  ; ciphertext }
+  { box_primitive = Secret_box.primitive
+  ; pw_primitive = Password_hash.primitive
+  ; nonce = Secret_box.Bytes.of_nonce nonce
+  ; pwsalt = Password_hash.Bytes.of_salt salt
+  ; pwdiff = (mem_limit, ops_limit)
+  ; ciphertext
+  }
 
 (** warning: this will zero [password] *)
 let decrypt ~(password : Bytes.t)
@@ -98,24 +102,25 @@ let decrypt ~(password : Bytes.t)
     ; pw_primitive
     ; nonce
     ; pwsalt
-    ; pwdiff= mem_limit, ops_limit
-    ; ciphertext } =
-  if box_primitive <> Secret_box.primitive then
+    ; pwdiff = mem_limit, ops_limit
+    ; ciphertext
+    } =
+  if not (String.equal box_primitive Secret_box.primitive) then
     Error
       (`Corrupted_privkey
         (Error.createf
            !"don't know how to handle a %s secret_box"
-           box_primitive))
-  else if pw_primitive <> Password_hash.primitive then
+           box_primitive ) )
+  else if not (String.equal pw_primitive Password_hash.primitive) then
     Error
       (`Corrupted_privkey
         (Error.createf
            !"don't know how to handle a %s password_hash"
-           pw_primitive))
+           pw_primitive ) )
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in
-    let diff = {Password_hash.mem_limit; ops_limit} in
+    let diff = { Password_hash.mem_limit; ops_limit } in
     let pw = Password_hash.Bytes.wipe_to_password password in
     let key = Secret_box.derive_key diff pw salt in
     try Result.return @@ Secret_box.Bytes.secret_box_open key ciphertext nonce

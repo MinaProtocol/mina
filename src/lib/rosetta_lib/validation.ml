@@ -8,7 +8,7 @@ module T = struct
 
   let return a = Result.return a
 
-  let fail e = Result.fail [e]
+  let fail e = Result.fail [ e ]
 
   let apply ft t =
     match (ft, t) with

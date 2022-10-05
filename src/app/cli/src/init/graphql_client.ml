@@ -1,7 +1,5 @@
 open Core
 open Async
-open Signature_lib
-open Mina_base
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -12,7 +10,7 @@ end)
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =
     if Cli_lib.Flag.Uri.is_localhost uri.value then
-      " (in `~/.coda-config/coda.log`)"
+      " (in `~/.mina-config/mina.log`)"
     else ""
   in
   match%bind f query_obj uri.value with
@@ -20,9 +18,9 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
       Deferred.return r
   | Error (`Failed_request e) ->
       eprintf
-        "Error: Unable to connect to Coda daemon.\n\
+        "Error: Unable to connect to Mina daemon.\n\
          - The daemon might not be running. See logs%s for details.\n\
-        \  Run `coda daemon -help` to see how to start daemon.\n\
+        \  Run `mina daemon -help` to see how to start daemon.\n\
          - If you just started the daemon, wait a minute for the GraphQL \
          server to start.\n\
          - Alternatively, the daemon may not be running the GraphQL server on \
@@ -41,25 +39,4 @@ let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
 
 let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
-module Signed_command = struct
-  type t =
-    { id: string
-    ; isDelegation: bool
-    ; nonce: int
-    ; from: Public_key.Compressed.t
-    ; to_: Public_key.Compressed.t
-    ; amount: Currency.Amount.t
-    ; fee: Currency.Fee.t
-    ; memo: Signed_command_memo.t }
-  [@@deriving yojson]
-
-  let of_obj x =
-    { id= x#id
-    ; isDelegation= x#isDelegation
-    ; nonce= x#nonce
-    ; from= x#from
-    ; to_= x#to_
-    ; amount= x#amount
-    ; fee= x#fee
-    ; memo= x#memo }
-end
+let query_json_exn query_obj port = run_exn ~f:Client.query_json query_obj port

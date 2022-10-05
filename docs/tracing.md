@@ -1,11 +1,11 @@
-# Tracing coda daemons
+# Tracing mina daemons
 
 We have support for a very limited async-integrated tracing profiler!
-When starting a daemon with `-tracing` or using `coda client start-tracing`,
+When starting a daemon with `-tracing` or using `mina client start-tracing`,
 it will write `*.trace` files into its config directory. They can grow
 quite fast, but for the most part they grow no faster than 5MB/minute.
 
-Most of the integration tests (including full-test) support a `CODA_TRACING`
+Most of the integration tests (including full-test) support a `MINA_TRACING`
 environment variable that specifies the directory the integration tests
 will put their trace files in. If you leave it empty, no tracing will
 occur.

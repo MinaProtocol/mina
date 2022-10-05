@@ -2,8 +2,17 @@
   (name allocation_functor)
   (public_name allocation_functor)
   (inline_tests)
-  (libraries core_kernel coda_metrics)
+  (libraries
+   ;; opam libraries
+   core_kernel
+   result
+   ppx_inline_test.config
+   sexplib0
+   ;; local libraries
+   mina_metrics
+   ppx_version.runtime
+  )
   (instrumentation (backend bisect_ppx))
-  (preprocess (pps ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_version))
+  (preprocess (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))
   ; ignore ppx_version errors for this library
   (flags -w -22))

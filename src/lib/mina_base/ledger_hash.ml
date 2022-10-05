@@ -1,9 +1,12 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_import
 open Snark_params
 open Snarky_backendless
 open Tick
 open Let_syntax
+
+let merge_var ~height h1 h2 =
+  Random_oracle.Checked.hash ~init:(Hash_prefix.merkle_tree height) [| h1; h2 |]
 
 module Merkle_tree =
   Snarky_backendless.Merkle_tree.Checked
@@ -16,10 +19,7 @@ module Merkle_tree =
       let typ = Field.typ
 
       let merge ~height h1 h2 =
-        Tick.make_checked (fun () ->
-            Random_oracle.Checked.hash
-              ~init:(Hash_prefix.merkle_tree height)
-              [|h1; h2|] )
+        Tick.make_checked (fun () -> merge_var ~height h1 h2)
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -37,7 +37,7 @@ include Ledger_hash0
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
     ~init:(Hash_prefix.merkle_tree height)
-    [|(h1 :> field); (h2 :> field)|]
+    [| (h1 :> field); (h2 :> field) |]
   |> of_hash
 
 let empty_hash = of_hash Outside_hash_image.t
@@ -55,7 +55,7 @@ type _ Request.t +=
   | Set : Account.Index.t * Account.t -> unit Request.t
   | Find_index : Account_id.t -> Account.Index.t Request.t
 
-let reraise_merkle_requests (With {request; respond}) =
+let reraise_merkle_requests (With { request; respond }) =
   match request with
   | Merkle_tree.Get_path addr ->
       respond (Delegate (Get_path addr))
@@ -82,7 +82,7 @@ let get ~depth t addr =
      account [f account] at path [addr].
 *)
 let%snarkydef modify_account ~depth t aid
-    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
+    ~(filter : Account.var -> 'a Checked.t) ~f =
   let%bind addr =
     request_witness
       (Account.Index.Unpacked.typ ~ledger_depth:depth)
@@ -92,7 +92,7 @@ let%snarkydef modify_account ~depth t aid
     (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
        ~f:(fun account ->
          let%bind x = filter account in
-         f x account ))
+         f x account ) )
     reraise_merkle_requests
   >>| var_of_hash_packed
 
@@ -121,9 +121,9 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
          let%bind () =
            [%with_label "account is either present or empty and writeable"]
              (Boolean.Assert.any
-                [account_already_there; not_there_but_writeable])
+                [ account_already_there; not_there_but_writeable ] )
          in
-         return not_there_but_writeable) )
+         return not_there_but_writeable ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -147,7 +147,7 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
          in
          let%bind () =
            [%with_label "account is either present or empty"]
-             (Boolean.Assert.any [account_already_there; account_not_there])
+             (Boolean.Assert.any [ account_already_there; account_not_there ])
          in
-         return account_not_there) )
+         return account_not_there ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)

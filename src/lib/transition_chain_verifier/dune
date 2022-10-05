@@ -2,5 +2,15 @@
  (name transition_chain_verifier)
  (public_name transition_chain_verifier)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
- (libraries core_kernel mina_base coda_state merkle_list_verifier))
+ (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (libraries
+   ;; opam libraries
+   core_kernel
+   core
+   ;; local libraries
+   merkle_list_verifier
+   mina_state
+   mina_base
+   non_empty_list
+   data_hash_lib
+))

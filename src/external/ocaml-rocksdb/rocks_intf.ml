@@ -97,6 +97,9 @@ module type ROCKS = sig
   val get : ?pos:int -> ?len:int -> ?opts:ReadOptions.t -> t -> bigarray -> bigarray option
   val get_string : ?pos:int -> ?len:int -> ?opts:ReadOptions.t -> t -> string -> string option
 
+  (* there are more efficient encodings of this... *)
+  val multi_get : ?opts:ReadOptions.t -> t -> bigarray list -> bigarray option list
+
   val put : ?key_pos:int -> ?key_len:int -> ?value_pos:int -> ?value_len:int -> ?opts:WriteOptions.t -> t -> bigarray -> bigarray -> unit
   val put_string : ?key_pos:int -> ?key_len:int -> ?value_pos:int -> ?value_len:int -> ?opts:WriteOptions.t -> t -> string -> string -> unit
 
@@ -110,6 +113,6 @@ module type ROCKS = sig
   val create_snapshot : t -> Snapshot.t
   val release_snapshot : t -> Snapshot.t -> unit
 
-  val checkpoint_create :  t -> ?log_size_for_flush:int -> dir:string -> unit
+  val checkpoint_create :  t -> ?log_size_for_flush:int -> dir:string -> unit -> unit
   val property_value : t -> string -> string option
 end

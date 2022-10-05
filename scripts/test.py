@@ -74,10 +74,6 @@ medium_curves_and_other_tests = {
     'test_postake_full_epoch': ['full-test'],
 }
 
-archive_processor_test = {
-    'test_archive_processor': ['coda-archive-processor-test'],
-}
-
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
     'testnet_postake_many_producers_medium_curves'
@@ -97,7 +93,9 @@ required_excludes = [
 ]
 
 # these extra jobs are not filters, they are full status check names
-extra_required_status_checks = ['buildkite/mina/pr']
+extra_required_status_checks = [
+    'buildkite/mina/pr', 'buildkite/mina-pr-gating'
+]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
@@ -337,7 +335,7 @@ class Executive:
 # It is responsible for dispatching builds and tests.
 class CodaProject:
     logproc_exe_path = 'src/app/logproc/logproc.exe'
-    coda_exe_path = 'src/app/cli/src/coda.exe'
+    coda_exe_path = 'src/app/cli/src/mina.exe'
 
     def __init__(self, executive, root='.'):
         self.executive = executive
@@ -404,7 +402,6 @@ class OutDirectory:
 def run(args):
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
-    all_tests.update(archive_processor_test)
     all_tests.update({
         profile: compile_config_agnostic_tests
         for profile in compile_config_agnostic_profiles

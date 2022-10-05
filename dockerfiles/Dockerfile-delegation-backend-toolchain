@@ -1,0 +1,4 @@
+FROM golang:1.16
+
+COPY result/headers /headers
+COPY result/libmina_signer.so /lib/x86_64-linux-gnu

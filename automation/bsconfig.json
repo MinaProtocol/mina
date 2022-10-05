@@ -1,0 +1,10 @@
+{
+  "name": "coda-network",
+  "namespace": true,
+  "sources": ["src"],
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": true
+  },
+  "bs-dependencies": ["@elliottcable/bs-cmdliner", "@o1labs/client-sdk"]
+}

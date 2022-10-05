@@ -2,7 +2,7 @@ open Core_kernel
 open Snark_params
 open Unsigned
 
-module T = Coda_numbers.Nat.Make32 ()
+module T = Mina_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)
 
@@ -17,25 +17,22 @@ module Checked = struct
 
   let in_seed_update_range ~(constants : Constants.var) (slot : var) =
     let open Tick in
-    let open Snarky_integer in
-    let module Length = Coda_numbers.Length in
-    let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
-    let to_integer = Length.Checked.to_integer in
-    let%bind third_epoch =
-      make_checked (fun () ->
-          let q, r =
-            Integer.div_mod ~m
-              (to_integer constants.slots_per_epoch)
-              (Integer.constant ~m (Bignum_bigint.of_int 3))
-          in
-          Tick.Run.Boolean.Assert.is_true
-            (Integer.equal ~m r (Integer.constant ~m Bignum_bigint.zero)) ;
-          q )
+    let module Length = Mina_numbers.Length in
+    let constant c =
+      Length.Checked.Unsafe.of_field (Field.Var.constant (Field.of_int c))
     in
-    let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
-    let%bind ck_times_2 = integer_mul third_epoch two in
-    make_checked (fun () ->
-        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2 )
+    let%bind third_epoch =
+      let%bind q, r =
+        Length.Checked.div_mod constants.slots_per_epoch (constant 3)
+      in
+      let%map () = Length.Checked.Assert.equal r (constant 0) in
+      q
+    in
+    let two = constant 2 in
+    let%bind ck_times_2 = Length.Checked.mul third_epoch two in
+    Length.Checked.( < )
+      (Length.Checked.Unsafe.of_field (T.Checked.to_field slot))
+      ck_times_2
 end
 
 let gen (constants : Constants.t) =
@@ -45,7 +42,7 @@ let gen (constants : Constants.t) =
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let constants = Lazy.force Constants.for_unit_tests in
-  let module Length = Coda_numbers.Length in
+  let module Length = Mina_numbers.Length in
   let test x =
     Test_util.test_equal
       (Snarky_backendless.Typ.tuple2 Constants.typ typ)
@@ -58,6 +55,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
     UInt32.div constants.slots_per_epoch (UInt32.of_int 3) |> UInt32.to_int
   in
   let examples =
-    List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
+    List.map ~f:UInt32.of_int
+      [ x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1 ]
   in
   Quickcheck.test ~trials:100 ~examples (gen constants) ~f:test

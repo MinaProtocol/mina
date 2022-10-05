@@ -2,10 +2,10 @@ open Core_kernel
 
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S
-  with module M := Key_value_database.Monad.Ident
-   and type key := Key.t
-   and type value := Value.t
-   and type config := string = struct
+    with module M := Key_value_database.Monad.Ident
+     and type key := Key.t
+     and type value := Value.t
+     and type config := string = struct
   type t = Database.t
 
   let create directory = Database.create directory
@@ -18,6 +18,11 @@ module Make (Key : Binable.S) (Value : Binable.S) :
       Database.get t ~key:(Binable.to_bigstring (module Key) key)
     in
     Binable.of_bigstring (module Value) serialized_value
+
+  let get_batch t ~keys =
+    Database.get_batch t
+      ~keys:(List.map keys ~f:(Binable.to_bigstring (module Key)))
+    |> List.map ~f:(Option.map ~f:(Binable.of_bigstring (module Value)))
 
   let set t ~key ~data =
     Database.set t
@@ -114,8 +119,7 @@ module GADT = struct
       let set t ~(key : 'a Key.t) ~(data : 'a) : unit =
         set_raw t ~key ~data:(bin_data_dump key data)
 
-      let remove t ~(key : 'a Key.t) =
-        Database.remove t ~key:(bin_key_dump key)
+      let remove t ~(key : 'a Key.t) = Database.remove t ~key:(bin_key_dump key)
     end
 
     let create directory = Database.create directory

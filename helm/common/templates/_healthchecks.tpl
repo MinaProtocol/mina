@@ -39,7 +39,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced"
+      "source /healthcheck/utilities.sh && isDaemonSynced && updateSyncStatusLabel {{ .name }} "
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
@@ -48,6 +48,8 @@ readinessProbe:
 ALL daemon healthchecks
 */}}
 {{- define "healthcheck.daemon.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.daemon.livenessCheck" . }}
 {{- include "healthcheck.daemon.readinessCheck" . }}
+{{- end }}
 {{- end }}

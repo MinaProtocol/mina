@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda Protocol Testnet leaderboard service
+This chart bootstraps a Mina Protocol Testnet leaderboard service
 
-## Add Coda Helm chart repository:
+## Add Mina Helm chart repository:
 
  ```console
- helm repo add coda https://coda-charts.storage.googleapis.com
+ helm repo add mina https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,20 +17,20 @@ The following table lists the configurable parameters of the `leaderboard` chart
 
 Parameter | Description
 --- | ---
-`postgresql.postgresHost` | Coda protocol Postgres SQL archive host address
-`postgresql.postgresPort` | Coda protocol Postgres SQL archive listening port
+`postgresql.postgresHost` | Mina protocol Postgres SQL archive host address
+`postgresql.postgresPort` | Mina protocol Postgres SQL archive listening port
 `volume.secretName` | Leaderboard credentials information | `none`
 
 ### Optional Settings
 
 Parameter | Description | Default
 --- | --- | ---
-`leaderboard.name` | Coda protocol leaderboard service/cron job name | `leaderboard-cron`
+`leaderboard.name` | Mina protocol leaderboard service/cron job name | `leaderboard-cron`
 `leaderboard.containerName` | name of container to provision for leaderboard job | `leaderboard`
-`leaderboard.image` | Coda protocol leaderboard container image | `gcr.io/o1labs-192920/leaderboard`
+`leaderboard.image` | Mina protocol leaderboard container image | `gcr.io/o1labs-192920/leaderboard`
 `leaderboard.schedule` | frequency with which to execute leaderboard operations | `@hourly`
-`postgresql.postgresqlUsername` | Coda protocol Postgres SQL archive username | `none`
-`postgresql.postgresqlPassword` | Coda protocol Postgres SQL archive password | `none`
+`postgresql.postgresqlUsername` | Mina protocol Postgres SQL archive username | `none`
+`postgresql.postgresqlPassword` | Mina protocol Postgres SQL archive password | `none`
 
 ## leaderboard launch examples
 

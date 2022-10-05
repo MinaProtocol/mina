@@ -1,9 +1,12 @@
 open Core_kernel
+open Async_kernel
 open Mina_base
+open Mina_transaction
+module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp]
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -13,12 +16,12 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
-    ; state_hash: State_hash.t * State_body_hash.t
-    ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
-    ; statement: Transaction_snark.Statement.t
-    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness: Sparse_ledger.t }
+    { transaction_with_info : Ledger.Transaction_applied.t
+    ; state_hash : State_hash.t * State_body_hash.t
+    ; statement : Transaction_snark.Statement.t
+    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; ledger_witness : Mina_ledger.Sparse_ledger.t
+    }
   [@@deriving sexp]
 end
 
@@ -31,64 +34,44 @@ module Available_job : sig
 end
 
 module Space_partition : sig
-  type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
+  type t = { first : int * int; second : (int * int) option } [@@deriving sexp]
 end
 
 module Job_view : sig
   type t [@@deriving sexp, to_yojson]
 end
 
-module type Monad_with_Or_error_intf = sig
-  type 'a t
+module Make_statement_scanner (Verifier : sig
+  type t
 
-  include Monad.S with type 'a t := 'a t
-
-  module Or_error : sig
-    type nonrec 'a t = 'a Or_error.t t
-
-    include Monad.S with type 'a t := 'a t
-  end
-end
-
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-        type t
-
-        val verify :
-             verifier:t
-          -> Ledger_proof_with_sok_message.t list
-          -> sexp_bool M.Or_error.t
-    end) : sig
+  val verify :
+       verifier:t
+    -> Ledger_proof_with_sok_message.t list
+    -> bool Deferred.Or_error.t
+end) : sig
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
-    -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) result M.t
+    -> ( Transaction_snark.Statement.t
+       , [ `Empty | `Error of Error.t ] )
+       Deferred.Result.t
 
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
-    -> ledger_hash_end:Frozen_ledger_hash.t
-    -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> next_available_token_begin:Token_id.t option
-    -> next_available_token_end:Token_id.t
-    -> (unit, Error.t) result M.t
+    -> registers_begin:Mina_state.Registers.Value.t option
+    -> registers_end:Mina_state.Registers.Value.t
+    -> (unit, Error.t) Deferred.Result.t
 end
-
-(*All the transactions with undos*)
-module Staged_undos : sig
-  type t
-
-  val apply :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t
-    -> Ledger.t
-    -> unit Or_error.t
-end
-
-val staged_undos : t -> Staged_undos.t
 
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
@@ -112,9 +95,11 @@ val free_space : t -> int
 
 val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
-val hash : t -> Staged_ledger_hash.Aux_hash.t
+(* a 0 index means next-to-latest tree *)
+val base_jobs_on_earlier_tree :
+  t -> index:int -> Transaction_with_witness.t list
 
-val target_merkle_root : t -> Frozen_ledger_hash.t option
+val hash : t -> Staged_ledger_hash.Aux_hash.t
 
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t With_status.t list
@@ -122,8 +107,8 @@ val staged_transactions : t -> Transaction.t With_status.t list
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
      Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
@@ -159,17 +144,16 @@ val required_state_hashes : t -> State_hash.Set.t
 (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
 val check_required_protocol_states :
      t
-  -> protocol_states:Coda_state.Protocol_state.value list
-  -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
+  -> protocol_states:
+       Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+  -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+     Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t
-     , Transaction_witness.t
-     , Ledger_proof.t )
-     Snark_work_lib.Work.Single.Spec.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

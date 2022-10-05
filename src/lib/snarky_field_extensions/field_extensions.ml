@@ -4,12 +4,11 @@ module Make_test (F : Intf.Basic) = struct
   let test arg_typ gen_arg sexp_of_arg label unchecked checked =
     let open F.Impl in
     let converted x =
-      let (), r =
+      let r =
         run_and_check
           (let open Checked.Let_syntax in
           let%bind x = exists arg_typ ~compute:(As_prover.return x) in
           checked x >>| As_prover.read F.typ)
-          ()
         |> Or_error.ok_exn
       in
       r
@@ -57,7 +56,7 @@ module Make (F : Intf.Basic) = struct
     assert_all
       (List.map2_exn
          ~f:(fun x y -> Constraint.equal x y)
-         (F.to_list x) (F.to_list y))
+         (F.to_list x) (F.to_list y) )
 
   let ( + ) = F.( + )
 
@@ -171,11 +170,8 @@ struct
       try
         Some
           (A.map t ~f:(fun x ->
-               match F.to_constant x with
-               | Some x ->
-                   x
-               | None ->
-                   raise None_exn ))
+               match F.to_constant x with Some x -> x | None -> raise None_exn )
+          )
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
@@ -254,7 +250,7 @@ struct
 
     type 'a t_ = 'a
 
-    let to_list x = [x]
+    let to_list x = [ x ]
 
     type t = Field.Var.t
 
@@ -298,15 +294,15 @@ end
    the field F(sqrt(s)) = F[x] / (x^2 - s) *)
 module E2
     (F : Intf.S) (Params : sig
-        val non_residue : F.Unchecked.t
+      val non_residue : F.Unchecked.t
 
-        val mul_by_non_residue : F.t -> F.t
+      val mul_by_non_residue : F.t -> F.t
     end) : sig
   include
     Intf.S_with_primitive_element
-    with module Impl = F.Impl
-     and module Base = F
-     and type 'a A.t = 'a * 'a
+      with module Impl = F.Impl
+       and module Base = F
+       and type 'a A.t = 'a * 'a
 
   val unitary_inverse : t -> t
 end = struct
@@ -333,7 +329,7 @@ end = struct
     let to_list (x, y) = F.to_list x @ F.to_list y
 
     (* A value [(a, b) : t] should be thought of as the field element
-   a + b sqrt(s). Then all operations are just what follow algebraically. *)
+       a + b sqrt(s). Then all operations are just what follow algebraically. *)
 
     include Make_applicative (Base) (A)
 
@@ -436,18 +432,18 @@ end
 
 module E3
     (F : Intf.S) (Params : sig
-        val non_residue : F.Unchecked.t
+      val non_residue : F.Unchecked.t
 
-        val frobenius_coeffs_c1 : F.Unchecked.t array
+      val frobenius_coeffs_c1 : F.Unchecked.t array
 
-        val frobenius_coeffs_c2 : F.Unchecked.t array
+      val frobenius_coeffs_c2 : F.Unchecked.t array
 
-        val mul_by_non_residue : F.t -> F.t
+      val mul_by_non_residue : F.t -> F.t
     end) :
   Intf.S_with_primitive_element
-  with module Impl = F.Impl
-   and module Base = F
-   and type 'a A.t = 'a * 'a * 'a = struct
+    with module Impl = F.Impl
+     and module Base = F
+     and type 'a A.t = 'a * 'a * 'a = struct
   module T = struct
     module Base = F
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
@@ -594,24 +590,23 @@ end
 
 module F3
     (F : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a) (Params : sig
-        val non_residue : F.Unchecked.t
+      val non_residue : F.Unchecked.t
 
-        val frobenius_coeffs_c1 : F.Unchecked.t array
+      val frobenius_coeffs_c1 : F.Unchecked.t array
 
-        val frobenius_coeffs_c2 : F.Unchecked.t array
+      val frobenius_coeffs_c2 : F.Unchecked.t array
     end) :
   Intf.S_with_primitive_element
-  with module Impl = F.Impl
-   and module Base = F
-   and type 'a A.t = 'a * 'a * 'a = struct
+    with module Impl = F.Impl
+     and module Base = F
+     and type 'a A.t = 'a * 'a * 'a = struct
   module T = struct
     module Base = F
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
 
-    let mul_by_primitive_element (a, b, c) =
-      (F.scale c Params.non_residue, a, b)
+    let mul_by_primitive_element (a, b, c) = (F.scale c Params.non_residue, a, b)
 
     module A = struct
       include T3
@@ -621,7 +616,7 @@ module F3
         (x, y, z)
     end
 
-    let to_list (x, y, z) = [x; y; z]
+    let to_list (x, y, z) = [ x; y; z ]
 
     include Make_applicative (Base) (A)
 
@@ -698,9 +693,10 @@ module Cyclotomic_square = struct
 
   module Make_F6
       (F2 : Intf.S_with_primitive_element
-            with type 'a A.t = 'a * 'a
-             and type 'a Base.t_ = 'a) (Params : sig
-          val cubic_non_residue : F2.Impl.Field.t
+              with type 'a A.t = 'a * 'a
+               and type 'a Base.t_ = 'a)
+      (Params : sig
+        val cubic_non_residue : F2.Impl.Field.t
       end) =
   struct
     let cyclotomic_square ((x00, x01, x02), (x10, x11, x12)) =
@@ -727,34 +723,35 @@ end
 module F6
     (Fq : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a)
     (Fq2 : Intf.S_with_primitive_element
-           with module Impl = Fq.Impl
-            and type 'a A.t = 'a * 'a
-            and type 'a Base.t_ = 'a Fq.t_) (Fq3 : sig
-        include
-          Intf.S_with_primitive_element
+             with module Impl = Fq.Impl
+              and type 'a A.t = 'a * 'a
+              and type 'a Base.t_ = 'a Fq.t_)
+    (Fq3 : sig
+      include
+        Intf.S_with_primitive_element
           with module Impl = Fq.Impl
            and type 'a A.t = 'a * 'a * 'a
            and type 'a Base.t_ = 'a Fq.t_
 
-        module Params : sig
-          val non_residue : Fq.Unchecked.t
+      module Params : sig
+        val non_residue : Fq.Unchecked.t
 
-          val frobenius_coeffs_c1 : Fq.Unchecked.t array
+        val frobenius_coeffs_c1 : Fq.Unchecked.t array
 
-          val frobenius_coeffs_c2 : Fq.Unchecked.t array
-        end
+        val frobenius_coeffs_c2 : Fq.Unchecked.t array
+      end
     end) (Params : sig
       val frobenius_coeffs_c1 : Fq.Unchecked.t array
     end) =
 struct
-  include E2
-            (Fq3)
-            (struct
-              let non_residue : Fq3.Unchecked.t =
-                Fq.Unchecked.(zero, one, zero)
+  include
+    E2
+      (Fq3)
+      (struct
+        let non_residue : Fq3.Unchecked.t = Fq.Unchecked.(zero, one, zero)
 
-              let mul_by_non_residue = Fq3.mul_by_primitive_element
-            end)
+        let mul_by_non_residue = Fq3.mul_by_primitive_element
+      end)
 
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
@@ -783,15 +780,15 @@ struct
           As_prover.(
             map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
       (* v0
-          = (a00 + s a01 s^2 a02) (s^2 b02)
-        = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
+           = (a00 + s a01 s^2 a02) (s^2 b02)
+         = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
     in
     let%map () =
       let%map () =
         Fq.assert_r1cs a01
           (Fq.scale b02 Fq3.Params.non_residue)
           (Field.Var.linear_combination
-             [(Field.one, c00); (Field.negate Fq3.Params.non_residue, v12)])
+             [ (Field.one, c00); (Field.negate Fq3.Params.non_residue, v12) ] )
       and () =
         Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
       and () = Fq.assert_r1cs a00 b02 Fq.(c02 - v11) in
@@ -812,11 +809,12 @@ struct
   (* TODO: Make sure this is ok *)
   let special_div = special_div_unsafe
 
-  include Cyclotomic_square.Make_F6
-            (Fq2)
-            (struct
-              let cubic_non_residue = Fq3.Params.non_residue
-            end)
+  include
+    Cyclotomic_square.Make_F6
+      (Fq2)
+      (struct
+        let cubic_non_residue = Fq3.Params.non_residue
+      end)
 
   let frobenius ((c00, c01, c02), (c10, c11, c12)) power =
     let module Field = Impl.Field in
@@ -839,18 +837,20 @@ end
 
 module F4
     (Fq2 : Intf.S_with_primitive_element
-           with type 'a A.t = 'a * 'a
-            and type 'a Base.t_ = 'a) (Params : sig
-        val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
+             with type 'a A.t = 'a * 'a
+              and type 'a Base.t_ = 'a)
+    (Params : sig
+      val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
     end) =
 struct
-  include E2
-            (Fq2)
-            (struct
-              let non_residue = Fq2.Impl.Field.(zero, one)
+  include
+    E2
+      (Fq2)
+      (struct
+        let non_residue = Fq2.Impl.Field.(zero, one)
 
-              let mul_by_non_residue = Fq2.mul_by_primitive_element
-            end)
+        let mul_by_non_residue = Fq2.mul_by_primitive_element
+      end)
 
   let special_mul = ( * )
 

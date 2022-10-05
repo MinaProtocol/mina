@@ -10,7 +10,7 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let jobDocker = Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).rustToolchain}
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 in
 
@@ -24,7 +24,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool ; cargo check --frozen" ]
+          commands = RunInToolchain.runInToolchainBullseye ([] : List Text) "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:$PATH cargo check"
           , label = "Rust lint steps; trace-tool"
           , key = "lint-trace-tool"
           , target = Size.Small

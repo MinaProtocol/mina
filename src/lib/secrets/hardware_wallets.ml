@@ -29,20 +29,20 @@ let decode_field (type field) (module Tick : Tick_intf with type field = field)
     : string -> field =
  fun field ->
   Bytes.of_string field
-  |> B58.decode Base58_check.coda_alphabet
+  |> B58.decode Base58_check.mina_alphabet
   |> Bytes.to_list |> List.rev |> Bytes.of_char_list |> Bytes.to_string
   |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
          Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
   |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
 
-type public_key = {status: string; x: string; y: string} [@@deriving yojson]
+type public_key = { status : string; x : string; y : string }
+[@@deriving yojson]
 
 let decode_status_code ~f = function
   | "Ok" ->
       Ok (f ())
   | "Hardware_wallet_not_found" ->
-      Error
-        "Hardware wallet not found. Is the device plugged in and activated?"
+      Error "Hardware wallet not found. Is the device plugged in and activated?"
   | "Computation_aborted" ->
       Error "An internal error happens in hardware wallet."
   | s ->
@@ -63,12 +63,12 @@ let decode_public_key : string -> (Public_key.t, string) Result.t =
   Yojson.Safe.from_string public_key
   |> public_key_of_yojson
   |> Result.map_error ~f:report_json_error
-  |> Result.bind ~f:(fun {status; x; y} ->
+  |> Result.bind ~f:(fun { status; x; y } ->
          decode_status_code status ~f:(fun () ->
              ( decode_field (module Snark_params.Tick) x
              , decode_field (module Snark_params.Tick) y ) ) )
 
-type signature = {status: string; field: string; scalar: string}
+type signature = { status : string; field : string; scalar : string }
 [@@deriving yojson]
 
 let decode_signature : string -> (Signature.t, string) Result.t =
@@ -76,7 +76,7 @@ let decode_signature : string -> (Signature.t, string) Result.t =
   Yojson.Safe.from_string signature
   |> signature_of_yojson
   |> Result.map_error ~f:report_json_error
-  |> Result.bind ~f:(fun {status; field; scalar} ->
+  |> Result.bind ~f:(fun { status; field; scalar } ->
          decode_status_code status ~f:(fun () ->
              ( decode_field (module Snark_params.Tick) field
              , decode_field (module Snark_params.Tock) scalar ) ) )
@@ -86,7 +86,8 @@ let compute_public_key ~hd_index =
     ( "python3"
     , [ "-m" ^ hardware_wallet_script
       ; "--request=publickey"
-      ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+      ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index
+      ] )
   in
   Process.run ~prog ~args ()
   |> Deferred.Result.map_error ~f:report_process_error
@@ -96,10 +97,10 @@ let sign ~hd_index ~public_key ~user_command_payload :
     (Signed_command.With_valid_signature.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let input =
-    Transaction_union_payload.to_input
+    Transaction_union_payload.to_input_legacy
     @@ Transaction_union_payload.of_user_command_payload user_command_payload
   in
-  let fields = Random_oracle.pack_input input in
+  let fields = Random_oracle.Legacy.pack_input input in
   let messages =
     Array.map fields ~f:(fun field -> Tick.Field.to_string field)
   in
@@ -112,7 +113,8 @@ let sign ~hd_index ~public_key ~user_command_payload :
         ; "--request=sign"
         ; "--msgx=" ^ messages.(0)
         ; "--msgm=" ^ messages.(1)
-        ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+        ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index
+        ] )
     in
     let%bind signature_str =
       Process.run ~prog ~args ()
@@ -142,5 +144,5 @@ let sign ~hd_index ~public_key ~user_command_payload :
 
 let write_exn ~hd_index ~index_path : unit Deferred.t =
   let%bind index_file = Writer.open_file index_path in
-  Writer.write_line index_file (Coda_numbers.Hd_index.to_string hd_index) ;
+  Writer.write_line index_file (Mina_numbers.Hd_index.to_string hd_index) ;
   Writer.close index_file

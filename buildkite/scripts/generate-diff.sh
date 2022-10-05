@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Base against origin/develop by default, but use pull-request base otherwise
-BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-develop}
+# Base against origin/compatible by default, but use pull-request base otherwise
+BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
 TAG=$(git tag --points-at HEAD)
 
 [[ -n $TAG ]] && git ls-files && exit

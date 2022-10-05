@@ -13,17 +13,20 @@ let rate = m - capacity
 
 type 'f sponge_state =
   | Absorbing of
-      { next_index: 'f Snarky_backendless.Boolean.t
-      ; xs: ('f Snarky_backendless.Boolean.t * 'f) list }
+      { next_index : 'f Snarky_backendless.Boolean.t
+      ; xs : ('f Snarky_backendless.Boolean.t * 'f) list
+      }
   | Squeezed of int
 
 type 'f t =
-  { mutable state: 'f array
-  ; params: 'f Sponge.Params.t
-  ; mutable sponge_state: 'f sponge_state }
+  { mutable state : 'f array
+  ; params : 'f Sponge.Params.t
+  ; needs_final_permute_if_empty : bool
+  ; mutable sponge_state : 'f sponge_state
+  }
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) =
 struct
   open P
@@ -31,36 +34,53 @@ struct
 
   type nonrec t = Field.t t
 
-  let state {state; _} = Array.copy state
+  let state { state; _ } = Array.copy state
 
-  let copy {state; params; sponge_state} =
-    {state= Array.copy state; params; sponge_state}
+  let copy { state; params; sponge_state; needs_final_permute_if_empty } =
+    { state = Array.copy state
+    ; params
+    ; sponge_state
+    ; needs_final_permute_if_empty
+    }
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let of_sponge {Sponge.state; params; sponge_state} =
-    let sponge_state =
-      match sponge_state with
-      | Squeezed n ->
-          Squeezed n
-      | Absorbed n ->
-          let next_index =
-            match n with
-            | 0 ->
-                Boolean.false_
-            | 1 ->
-                Boolean.true_
-            | _ ->
-                assert false
-          in
-          Absorbing {next_index; xs= []}
-    in
-    {sponge_state; state= Array.copy state; params}
+  let of_sponge { Sponge.state; params; sponge_state } =
+    match sponge_state with
+    | Squeezed n ->
+        { sponge_state = Squeezed n
+        ; state = Array.copy state
+        ; needs_final_permute_if_empty = true
+        ; params
+        }
+    | Absorbed n -> (
+        let abs i =
+          { sponge_state = Absorbing { next_index = i; xs = [] }
+          ; state = Array.copy state
+          ; params
+          ; needs_final_permute_if_empty = true
+          }
+        in
+        match n with
+        | 0 ->
+            abs Boolean.false_
+        | 1 ->
+            abs Boolean.true_
+        | 2 ->
+            { sponge_state = Absorbing { next_index = Boolean.false_; xs = [] }
+            ; state = P.block_cipher params state
+            ; needs_final_permute_if_empty = false
+            ; params
+            }
+        | _ ->
+            assert false )
 
   let create ?(init = initial_state) params =
     { params
-    ; state= Array.copy init
-    ; sponge_state= Absorbing {next_index= Boolean.false_; xs= []} }
+    ; state = Array.copy init
+    ; needs_final_permute_if_empty = true
+    ; sponge_state = Absorbing { next_index = Boolean.false_; xs = [] }
+    }
 
   let () = assert (rate = 2)
 
@@ -70,7 +90,7 @@ struct
     (*
       a.(0) <- a.(0) + i_equals_0 * x
       a.(1) <- a.(1) + i_equals_1 * x *)
-    List.iteri [i_equals_0; i_equals_1] ~f:(fun j i_equals_j ->
+    List.iteri [ i_equals_0; i_equals_1 ] ~f:(fun j i_equals_j ->
         let a_j' =
           exists Field.typ
             ~compute:
@@ -84,7 +104,7 @@ struct
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
         a.(j) <- a_j' )
 
-  let consume ~params ~start_pos input state =
+  let consume ~needs_final_permute_if_empty ~params ~start_pos input state =
     assert (Array.length state = m) ;
     let n = Array.length input in
     let pos = ref start_pos in
@@ -122,41 +142,41 @@ struct
       let y = Field.(y * (b' :> t)) in
       let add_in_y_after_perm =
         (* post
-          add in
-          (1, 1, 1)
+           add in
+           (1, 1, 1)
 
-          do not add in
-          (1, 1, 0)
-          (0, 1, 0)
-          (0, 1, 1)
+           do not add in
+           (1, 1, 0)
+           (0, 1, 0)
+           (0, 1, 1)
 
-          (1, 0, 0)
-          (1, 0, 1)
-          (0, 0, 0)
-          (0, 0, 1)
+           (1, 0, 0)
+           (1, 0, 1)
+           (0, 0, 0)
+           (0, 0, 1)
         *)
         (* Only one case where we add in y after the permutation is applied *)
-        Boolean.all [b; b'; p]
+        Boolean.all [ b; b'; p ]
       in
       let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
       add_in state p Field.(x * (b :> t)) ;
       add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
       let permute =
         (* (b, b', p)
-           true:
-           (0, 1, 1)
-           (1, 0, 1)
-           (1, 1, 0)
-           (1, 1, 1)
+            true:
+            (0, 1, 1)
+            (1, 0, 1)
+            (1, 1, 0)
+            (1, 1, 1)
 
-          false:
-           (0, 0, 0)
-           (0, 0, 1)
-           (0, 1, 0)
-           (1, 0, 0)
+           false:
+            (0, 0, 0)
+            (0, 0, 1)
+            (0, 1, 0)
+            (1, 0, 0)
         *)
         (* (b && b') || (p && (b || b')) *)
-        Boolean.(any [all [b; b']; all [p; b ||| b']])
+        Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
       in
       cond_permute permute ;
       add_in state p' Field.(y * (add_in_y_after_perm :> t))
@@ -167,13 +187,15 @@ struct
     let should_permute =
       match remaining with
       | 0 ->
-          Boolean.(empty_imput ||| !pos)
+          if needs_final_permute_if_empty then Boolean.(empty_imput ||| !pos)
+          else !pos
       | 1 ->
           let b, x = input.(n - 1) in
           let p = !pos in
           pos := Boolean.( lxor ) p b ;
           add_in state p Field.(x * (b :> t)) ;
-          Boolean.any [p; b; empty_imput]
+          if needs_final_permute_if_empty then Boolean.any [ p; b; empty_imput ]
+          else Boolean.any [ p; b ]
       | _ ->
           assert false
     in
@@ -181,10 +203,10 @@ struct
 
   let absorb (t : t) x =
     match t.sponge_state with
-    | Absorbing {next_index; xs} ->
-        t.sponge_state <- Absorbing {next_index; xs= x :: xs}
+    | Absorbing { next_index; xs } ->
+        t.sponge_state <- Absorbing { next_index; xs = x :: xs }
     | Squeezed _ ->
-        t.sponge_state <- Absorbing {next_index= Boolean.false_; xs= [x]}
+        t.sponge_state <- Absorbing { next_index = Boolean.false_; xs = [ x ] }
 
   let squeeze (t : t) =
     match t.sponge_state with
@@ -196,9 +218,9 @@ struct
         else (
           t.sponge_state <- Squeezed (n + 1) ;
           t.state.(n) )
-    | Absorbing {next_index; xs} ->
-        consume ~start_pos:next_index ~params:t.params (Array.of_list_rev xs)
-          t.state ;
+    | Absorbing { next_index; xs } ->
+        consume ~needs_final_permute_if_empty:t.needs_final_permute_if_empty
+          ~start_pos:next_index ~params:t.params (Array.of_list_rev xs) t.state ;
         t.sponge_state <- Squeezed 1 ;
         t.state.(0)
 
@@ -207,23 +229,36 @@ struct
       module S = Sponge.Make_sponge (P)
 
       let%test_unit "correctness" =
+        let params : _ Sponge.Params.t =
+          let a () =
+            Array.init 3 ~f:(fun _ -> Field.(constant (Constant.random ())))
+          in
+          { mds = Array.init 3 ~f:(fun _ -> a ())
+          ; round_constants = Array.init 40 ~f:(fun _ -> a ())
+          }
+        in
         let gen =
           let open Quickcheck.Generator.Let_syntax in
-          let%bind n = Quickcheck.Generator.small_positive_int in
+          let%bind n = Quickcheck.Generator.small_positive_int
+          and n_pre = Quickcheck.Generator.small_positive_int in
           let%map xs = List.gen_with_length n Field.Constant.gen
-          and bs = List.gen_with_length n Bool.quickcheck_generator in
-          List.zip_exn bs xs
+          and bs = List.gen_with_length n Bool.quickcheck_generator
+          and pre = List.gen_with_length n_pre Field.Constant.gen in
+          (pre, List.zip_exn bs xs)
         in
-        Quickcheck.test gen ~trials:5 ~f:(fun ps ->
+        Quickcheck.test gen ~trials:10 ~f:(fun (pre, ps) ->
             let filtered =
               List.filter_map ps ~f:(fun (b, x) -> if b then Some x else None)
             in
-            let params : _ Sponge.Params.t =
-              let a () =
-                Array.init 3 ~f:(fun _ -> Field.(constant (Constant.random ())))
+            let init () =
+              let pre =
+                exists
+                  (Typ.list ~length:(List.length pre) Field.typ)
+                  ~compute:(fun () -> pre)
               in
-              { mds= Array.init 3 ~f:(fun _ -> a ())
-              ; round_constants= Array.init 40 ~f:(fun _ -> a ()) }
+              let s = S.create params in
+              List.iter pre ~f:(S.absorb s) ;
+              s
             in
             let filtered_res =
               let n = List.length filtered in
@@ -232,7 +267,7 @@ struct
                 Field.typ
                 (fun xs ->
                   make_checked (fun () ->
-                      let s = S.create params in
+                      let s = init () in
                       List.iter xs ~f:(S.absorb s) ;
                       S.squeeze s ) )
                 filtered
@@ -244,15 +279,17 @@ struct
                 Field.typ
                 (fun xs ->
                   make_checked (fun () ->
-                      let s = create params in
+                      let s =
+                        if List.length pre = 0 then create params
+                        else of_sponge (init ())
+                      in
                       List.iter xs ~f:(absorb s) ;
                       squeeze s ) )
                 ps
             in
             if not (Field.Constant.equal filtered_res opt_res) then
               failwithf
-                !"hash(%{sexp:Field.Constant.t list}) = \
-                  %{sexp:Field.Constant.t}\n\
+                !"hash(%{sexp:Field.Constant.t list}) = %{sexp:Field.Constant.t}\n\
                   hash(%{sexp:(bool * Field.Constant.t) list}) = \
                   %{sexp:Field.Constant.t}"
                 filtered filtered_res ps opt_res () )

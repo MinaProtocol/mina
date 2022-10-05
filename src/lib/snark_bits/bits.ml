@@ -1,14 +1,13 @@
 (* bits.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Fold_lib
 open Bitstring_lib
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
-camlsnark *)
+   camlsnark *)
 let unpack_field unpack ~bit_length x = List.take (unpack x) bit_length
 
 let bits_per_char = 8
@@ -46,7 +45,7 @@ module Vector = struct
 
     let empty = zero
 
-    let get t i = (t lsr i) land one = one
+    let get t i = equal ((t lsr i) land one) one
 
     let set t i b = if b then t lor (one lsl i) else t land lognot (one lsl i)
   end
@@ -59,7 +58,7 @@ module Vector = struct
 
     let empty = zero
 
-    let get t i = (t lsr i) land one = one
+    let get t i = equal ((t lsr i) land one) one
 
     let set t i b = if b then t lor (one lsl i) else t land lognot (one lsl i)
   end
@@ -68,12 +67,13 @@ module Vector = struct
     type t = V.t
 
     let fold t =
-      { Fold.fold=
+      { Fold.fold =
           (fun ~init ~f ->
             let rec go acc i =
               if i = V.length then acc else go (f acc (V.get t i)) (i + 1)
             in
-            go init 0 ) }
+            go init 0 )
+      }
 
     let iter t ~f =
       for i = 0 to V.length - 1 do
@@ -95,8 +95,7 @@ module UInt64 : Bits_intf.Convertible_bits with type t := Unsigned.UInt64.t =
 module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module type Big_int_intf = sig
   include Snarky_backendless.Bigint_intf.S
@@ -107,21 +106,22 @@ end
 module Make_field0
     (Field : Snarky_backendless.Field_intf.S)
     (Bigint : Big_int_intf with type field := Field.t) (M : sig
-        val bit_length : int
+      val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   open M
 
   type t = Field.t
 
   let fold t =
-    { Fold.fold=
+    { Fold.fold =
         (fun ~init ~f ->
           let n = Bigint.of_field t in
           let rec go acc i =
             if i = bit_length then acc
             else go (f acc (Bigint.test_bit n i)) (i + 1)
           in
-          go init 0 ) }
+          go init 0 )
+    }
 
   let iter t ~f =
     let n = Bigint.of_field t in
@@ -151,7 +151,7 @@ module Make_field
 module Small
     (Field : Snarky_backendless.Field_intf.S)
     (Bigint : Big_int_intf with type field := Field.t) (M : sig
-        val bit_length : int
+      val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   let () = assert (M.bit_length < Field.size_in_bits)
 
@@ -161,26 +161,26 @@ end
 module Snarkable = struct
   module Small_bit_vector
       (Impl : Snarky_backendless.Snark_intf.S) (V : sig
-          type t
+        type t
 
-          val empty : t
+        val empty : t
 
-          val length : int
+        val length : int
 
-          val get : t -> int -> bool
+        val get : t -> int -> bool
 
-          val set : t -> int -> bool -> t
+        val set : t -> int -> bool -> t
       end) :
     Bits_intf.Snarkable.Small
-    with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-     and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type boolean_var := Impl.Boolean.var
-     and type field_var := Impl.Field.Var.t
-     and type Packed.var = Impl.Field.Var.t
-     and type Packed.value = V.t
-     and type Unpacked.var = Impl.Boolean.var list
-     and type Unpacked.value = V.t
-     and type comparison_result := Impl.Field.Checked.comparison_result =
+      with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+       and type 'a checked := 'a Impl.Checked.t
+       and type boolean_var := Impl.Boolean.var
+       and type field_var := Impl.Field.Var.t
+       and type Packed.var = Impl.Field.Var.t
+       and type Packed.value = V.t
+       and type Unpacked.var = Impl.Boolean.var list
+       and type Unpacked.value = V.t
+       and type comparison_result := Impl.Field.Checked.comparison_result =
   struct
     open Impl
 
@@ -202,27 +202,21 @@ module Snarkable = struct
       type value = V.t
 
       let typ : (var, value) Typ.t =
-        let open Typ in
-        let read v =
-          let open Read.Let_syntax in
-          let%map x = Read.read v in
-          let n = Bigint.of_field x in
-          init ~f:(fun i -> Bigint.test_bit n i)
-        in
-        let store t =
-          let rec go two_to_the_i i acc =
-            if i = V.length then acc
-            else
-              let acc =
-                if V.get t i then Field.add two_to_the_i acc else acc
-              in
-              go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
-          in
-          Store.store (go Field.one 0 Field.zero)
-        in
-        let alloc = Alloc.alloc in
-        let check _ = Checked.return () in
-        {read; store; alloc; check}
+        Field.typ
+        |> Typ.transport
+             ~there:(fun t ->
+               let rec go two_to_the_i i acc =
+                 if i = V.length then acc
+                 else
+                   let acc =
+                     if V.get t i then Field.add two_to_the_i acc else acc
+                   in
+                   go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
+               in
+               go Field.one 0 Field.zero )
+             ~back:(fun t ->
+               let n = Bigint.of_field t in
+               init ~f:(fun i -> Bigint.test_bit n i) )
 
       let size_in_bits = size_in_bits
     end
@@ -290,8 +284,8 @@ module Snarkable = struct
     let%snarkydef assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       Field.Checked.Assert.equal (pack_var n) (pack_var n')
 
-    let if_ (cond : Boolean.var) ~(then_ : Unpacked.var)
-        ~(else_ : Unpacked.var) : (Unpacked.var, _) Checked.t =
+    let if_ (cond : Boolean.var) ~(then_ : Unpacked.var) ~(else_ : Unpacked.var)
+        : Unpacked.var Checked.t =
       match
         List.map2 then_ else_ ~f:(fun then_ else_ ->
             Boolean.if_ cond ~then_ ~else_ )
@@ -309,7 +303,7 @@ module Snarkable = struct
 
   module Field_backed
       (Impl : Snarky_backendless.Snark_intf.S) (M : sig
-          val bit_length : int
+        val bit_length : int
       end) =
   struct
     open Impl
@@ -358,7 +352,7 @@ module Snarkable = struct
 
     let project_var = Field.Var.project
 
-    let choose_preimage_var : Packed.var -> (Unpacked.var, _) Checked.t =
+    let choose_preimage_var : Packed.var -> Unpacked.var Checked.t =
       Field.Checked.choose_preimage_var ~length:bit_length
 
     let unpack_value = Fn.id
@@ -366,13 +360,13 @@ module Snarkable = struct
 
   module Field (Impl : Snarky_backendless.Snark_intf.S) :
     Bits_intf.Snarkable.Lossy
-    with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-     and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Field.Var.t
-     and type Packed.value = Impl.Field.t
-     and type Unpacked.var = Impl.Boolean.var list
-     and type Unpacked.value = Impl.Field.t =
+      with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+       and type 'a checked := 'a Impl.Checked.t
+       and type boolean_var := Impl.Boolean.var
+       and type Packed.var = Impl.Field.Var.t
+       and type Packed.value = Impl.Field.t
+       and type Unpacked.var = Impl.Boolean.var list
+       and type Unpacked.value = Impl.Field.t =
     Field_backed
       (Impl)
       (struct
@@ -381,16 +375,16 @@ module Snarkable = struct
 
   module Small
       (Impl : Snarky_backendless.Snark_intf.S) (M : sig
-          val bit_length : int
+        val bit_length : int
       end) :
     Bits_intf.Snarkable.Faithful
-    with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-     and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Field.Var.t
-     and type Packed.value = Impl.Field.t
-     and type Unpacked.var = Impl.Boolean.var list
-     and type Unpacked.value = Impl.Field.t = struct
+      with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+       and type 'a checked := 'a Impl.Checked.t
+       and type boolean_var := Impl.Boolean.var
+       and type Packed.var = Impl.Field.Var.t
+       and type Packed.value = Impl.Field.t
+       and type Unpacked.var = Impl.Boolean.var list
+       and type Unpacked.value = Impl.Field.t = struct
     let () = assert (M.bit_length < Impl.Field.size_in_bits)
 
     include Field_backed (Impl) (M)
@@ -407,7 +401,7 @@ end
 
 module Make_unpacked
     (Impl : Snarky_backendless.Snark_intf.S) (M : sig
-        val bit_length : int
+      val bit_length : int
     end) =
 struct
   open Impl

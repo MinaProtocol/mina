@@ -77,9 +77,9 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshal-keys) to the [client-sdk](#marshal-keys), the [generate-keypair binary](#marshal-keys), and the offcial [Mina CLI](#marshal-keys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
 
-The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
+The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#add-curves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
 #### Preprocess
 
@@ -97,13 +97,13 @@ The [metadata endpoint](#metadata-endpoint) takes the senders public key+token_i
 
 [payloads]: #payloads
 
-The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns an [encoded unsigned transaction](#encoded-unsigned-transaction).
+The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns an [encoded unsigned transaction](#unsigned-transaction-encoding).
 
 #### After Payloads
 
 [after-payloads]: #after-payloads
 
-After the payloads endpoint, folks must sign the transaction. In the future, we should build support for this natively, but for now our client-sdk's signing mechanism suffices. As such, we don't need to do much here other than [encode the signed transaction properly](#encoded-signed-transaction).
+After the payloads endpoint, folks must sign the transaction. In the future, we should build support for this natively, but for now our client-sdk's signing mechanism suffices. As such, we don't need to do much here other than [encode the signed transaction properly](#signed-transaction-encoding).
 
 #### Parse
 
@@ -115,7 +115,7 @@ The [parse endpoint](#parse-endpoint) takes a possibly signed transaction and pa
 
 [combine]: #combine
 
-The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction](#encoded-signed-transaction).
+The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction](#signed-transaction-encoding).
 
 #### Hash
 
@@ -143,27 +143,28 @@ Think of these as the tasks necessary to complete this project. Each item here w
 
 #### Marshal Keys
 
-[marshalkeys]: #marshalkeys
+[marshal-keys]: #marshal-keys
 
 Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
+Compressed public keys are accepted of the following form:
+
+Field elements are expected to be backed by a 32-byte array where the highest bits of the field are stored in arr[31].
+
+Presented is a hex encoded 32-byte array where the highest bit of arr[31] is the `is_odd` parity bit.
 
 ```
-|----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
+|----- pk : Fq.t (32 bytes) ------{is_odd}--|
+
 ```
 
 Example:
 
-`(123123, 234234)`
+The encoding `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390`
 
-is encoded as the string:
-
-`000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
-
-(abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
+Decodes to the field represented by the number `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310`. That's the same as the encoding, except that the 9 representing the high nybble of the final byte is replaced by 1, by zeroing the high bit. Because the high bit was set, is_odd is true.
 
 **Name**
 
@@ -187,7 +188,7 @@ ii. Add a new subcommand `show-public-key` which takes the private key file as i
 
 c. Change coda cli
 
-i. Add a new subcommand `show-public-key` as a subcommand to `coda accounts` (reuse the implementation in (b.ii)
+i. Add a new subcommand `show-public-key` as a subcommand to `mina accounts` (reuse the implementation in (b.ii)
 
 #### Derivation endpoint
 
@@ -266,21 +267,29 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 #### Unsigned transaction encoding
 
-[encoded-unsigned-transaction]: #encoded-unsigned-transaction
+[unsigned-transaction-encoding]: #unsigned-transaction-encoding
 
 [via Payloads](#payloads)
 
 The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we want to make it easy for alternate signers to be created (eg. the ledger), we'll want this encoding to be some faithful representation of the bytes upon which the signature operation acts.
 
-Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input with a custom protocol as defined below and send that byte-buffer as hex-encoded ascii.
+Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input in two ways as defined below and send that byte-buffer as hex-encoded ascii.
+
 
 ```
-// Serialization schema for Random oracle input
+// Serialization schema for Random oracle input (1)
 
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t above)
+yy yy ...    #
+             # Field elements are represented by laying out their bits from high
+             # to low (adding a padding zero at the highest bit in the front)
+             # and then grouping by 8 and converting to bytes:
+             #
+             #     (always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
+             #     |----groups of 8---|--groups of 8---|
+             #
              #
 00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
@@ -290,16 +299,41 @@ A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte wit
 // Note: Edited on 8/18 to include 4-byte length of bits in the bitstring to remove any ambiguity between the zero-padding and true zeros in the bitstring
 ```
 
-Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
+```
+// Serialization schema for Random oracle input (2)
+// This is denoted as "signerInput" in the output
+//
+// The prefix and suffix can be used by a signer more easily
+
+SignerInput (JSON):
+{
+  prefix: [field],
+  suffix: [field]
+}
+
+// where the fields are encoded as strings like above
+// example:
+
+{
+  prefix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ],
+  suffix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ]
+}
+
+A signer would take the prefix and suffix and use it during `derive` (which doesn't necessarily need to be exactly the same as the implementation Mina (it just needs to be "random"). And use `px`, `py`, and `r` in between prefix and suffix for hash.
+```
+
+Another important property of the unsigned-transaction and signed-transaction representations is that they are invertible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
 
 ```
-{ randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex  *)
+{ randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex *)
+, signerInput : SignerInput
 , payment: Payment?
 , stakeDelegation: StakeDelegation?
 }
 // where stakeDelegation and payemnt are currently defined in the client-sdk shown below
 // it is an error to treat stakeDelegation / payment in any way other than a variant, but it is encoded unsafely like this becuase JSON is garbage-fire and can't represent sum types ergonomically
 ```
+
 
 ```reasonml
 // Taken from Client-SDK code
@@ -336,33 +370,34 @@ Additionally, we should expose a new method in the client-sdk to feed the raw `R
 
 [via Payloads](#payloads)
 
-First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#encoded-unsigned-transaction) as described above.
+First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#unsigned-transaction-encoding) as described above.
 
 This endpoint will also accept a query parameter `?plain_random_oracle`
 
 #### Signed transaction encoding
 
-[encoded-signed-transaction]: #encoded-signed-transaction
+[signed-transaction-encoding]: #signed-transaction-encoding
 
 [via After Payloads](#after-payloads)
 
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
-// Signature encoding
-
-a signature is a field and a scalar
-|----- field 32bytes ----|---- scalar 32bytes ---|
-Use the same hex-encoded little endian represenation as described above for
-the public key for these 64 bytes
-```
-
-```
 {
-  signature: string (* Signature as described above *),
+  signature: string (* Signature hex bytes as described below *),
   payment: payment?,
   stakeDelegation: stakeDelegation?
 }
+```
+
+**Format**
+
+```
+// Signature encoding
+
+a signature is a field and a scalar
+|---- field 32bytes (Fp) ---|----- scalar 32bytes (Fq) ----|
+Use the same hex-encoded representation as described above for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint
@@ -381,7 +416,7 @@ Importantly, we've ensured that our unsigned and signed transaction serialized r
 
 [via Combine](#combine)
 
-The combine endpoint [encodes the signed transaction](#encoded-signed-transaction) according to the schema defined above.
+The combine endpoint [encodes the signed transaction](#signed-transaction-encoding) according to the schema defined above.
 
 #### Hash Endpoint
 
@@ -399,7 +434,7 @@ The hash endpoint takes the signed transaction and returns the hash. This can be
 
 Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully audit the implementation to ensure this is the case as it's an explicit requirement in the spec.
 
-#### Submit
+#### Submit Endpoint
 
 [submit-endpoint]: #submit-endpoint
 
@@ -448,9 +483,9 @@ Decisions were made here to limit scope where possible to enable shipping an MVP
 
 Luckily Rosetta has a very clear specification, so our designs are mostly constrained by the decisions made in that API.
 
-In [marshal keys (c)](#marshalkeys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
+In [marshal keys (c)](#marshal-keys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
 
-In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
+In the sections about [encoding unsigned transactions](#unsigned-transaction-encoding) and [encoding signed transactions](#signed-transaction-encoding), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
 
 ## Prior art
 

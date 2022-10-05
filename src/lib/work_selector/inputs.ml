@@ -31,8 +31,8 @@ module Test_inputs = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
-        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]
 
         let to_latest = Fn.id
@@ -57,8 +57,7 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
-      List.t
+      (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t List.t
 
     let work = Fn.id
 
@@ -79,15 +78,17 @@ module Test_inputs = struct
 
     let get_protocol_state _t _hash =
       Ok
-        (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hash
+        (Lazy.force Precomputed_values.for_unit_tests)
+          .protocol_state_with_hashes
           .data
   end
 end
 
 module Implementation_inputs = struct
   open Mina_base
+  open Mina_transaction
   module Ledger_hash = Ledger_hash
-  module Sparse_ledger = Sparse_ledger
+  module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction
   module Transaction_witness = Transaction_witness
   module Ledger_proof = Ledger_proof

@@ -1,26 +1,26 @@
 [
   {
     "account_identifier": {
-      "address": "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g",
+      "address": "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV",
       "metadata": {
         "token_id": "1"
       }
     },
     "currency": {
-      "symbol": "CODA",
+      "symbol": "MINA",
       "decimals": 9
     },
     "value": "66000000000000"
   },
   {
     "account_identifier": {
-      "address": "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf",
+      "address": "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL",
       "metadata": {
         "token_id": "1"
       }
     },
     "currency": {
-      "symbol": "CODA",
+      "symbol": "MINA",
       "decimals": 9
     },
     "value": "1"

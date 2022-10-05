@@ -1,7 +1,7 @@
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
 
-open Async
+open Async_kernel
 
 module Actions = struct
   type action =
@@ -21,6 +21,7 @@ module Actions = struct
         (** Peer sent us some data that doesn't hash to the expected value *)
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
+    | Sent_invalid_transaction  (** Peer sent us an invalid transaction *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
     | Sent_invalid_signature_or_proof
         (** Peer either sent us a proof or a signature that does not verify. *)
@@ -32,8 +33,7 @@ module Actions = struct
         (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
     | Sent_invalid_transition_chain_merkle_proof
         (** Peer sent us a transition chain witness that does not verify *)
-    | Violated_protocol
-        (** Peer violated the specification of the protocol. *)
+    | Violated_protocol  (** Peer violated the specification of the protocol. *)
     | Made_request
         (** Peer made a valid request. This causes a small decrease to mitigate
             DoS. *)
@@ -52,6 +52,10 @@ module Actions = struct
           date, etc.
       *)
     | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
+    | No_reply_from_preferred_peer
+        (** A peer that should have had the response to a query did not provide it. *)
+    | Unknown_rpc  (** A peer made an unknown RPC. *)
+    | Decoding_failed  (** A gossip message could not be decoded. *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -98,6 +102,8 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_signature ->
         Insta_ban
+    | Sent_invalid_transaction ->
+        Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
     | Sent_invalid_signature_or_proof ->
@@ -118,6 +124,8 @@ module Actions = struct
     | Incoming_connection_error ->
         Trust_decrease 0.05
     | Outgoing_connection_error ->
+        Trust_decrease 0.05
+    | No_reply_from_preferred_peer ->
         Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
@@ -143,6 +151,19 @@ module Actions = struct
         Trust_decrease (old_gossip_increment *. 3.)
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
+    | Unknown_rpc ->
+        (* TODO: Should do a soft ban of some kind if this happens enough. *)
+        Trust_decrease 0.05
+    | Decoding_failed ->
+        Insta_ban
+
+  (* Disabling everything except insta-ban *)
+  let to_trust_response t =
+    match to_trust_response t with
+    | Insta_ban ->
+        Peer_trust.Trust_response.Insta_ban
+    | _ ->
+        Trust_decrease 0.
 
   let to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t =
    fun (action, extra_opt) ->
@@ -151,6 +172,9 @@ module Actions = struct
         (show_action action, [])
     | Some (fmt, metadata) ->
         (sprintf !"%s (%s)" (show_action action) fmt, metadata)
+
+  let is_reason_for_heartbeat (a, _) =
+    match a with Sent_useful_gossip | Fulfilled_request -> true | _ -> false
 end
 
 module Banned_status = Banned_status

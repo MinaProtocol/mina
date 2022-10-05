@@ -1,8 +1,0 @@
-(library
- (name archive_lib)
- (public_name archive_lib)
- (libraries core async mina_base coda_transition one_or_two transition_frontier caqti-async caqti caqti-driver-postgresql)
- (inline_tests)
- (modes native)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_custom_printf h_list.ppx)))

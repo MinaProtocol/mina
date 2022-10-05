@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Hash_intf = sig
   type t
@@ -20,7 +20,7 @@ let cache hash_mod ~init_hash depth =
            !last_hash ) )
 
 let extensible_cache hash_mod ~init_hash =
-  let empty_hashes = ref [|init_hash|] in
+  let empty_hashes = ref [| init_hash |] in
   fun i ->
     let prev = !empty_hashes in
     let height = Array.length prev - 1 in
@@ -31,5 +31,5 @@ let extensible_cache hash_mod ~init_hash =
         Array.append prev
           (Array.init deficit ~f:(fun i ->
                last_hash := merge_hash hash_mod (i + height) !last_hash ;
-               !last_hash )) ) ;
+               !last_hash ) ) ) ;
     !empty_hashes.(i)

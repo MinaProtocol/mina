@@ -1,7 +1,7 @@
 open Async_kernel
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_block
 open Blockchain_snark
 
 module type S = sig
@@ -23,7 +23,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> t Deferred.t
 
-  val initialized : t -> [`Initialized] Deferred.Or_error.t
+  val initialized : t -> [ `Initialized ] Deferred.Or_error.t
 
   val extend_blockchain :
        t
@@ -43,4 +43,7 @@ module type S = sig
     -> Internal_transition.t
     -> Pending_coinbase_witness.t
     -> Proof.t Deferred.Or_error.t
+
+  val create_genesis_block :
+    t -> Genesis_proof.Inputs.t -> Blockchain.t Deferred.Or_error.t
 end

@@ -1,0 +1,16 @@
+.DS_Store
+.merlin
+npm-debug.log
+/node_modules/
+*.bc.js
+*.wasm
+*/plonk.js
+yarn-error.log
+.vscode
+
+# Ignore built ts files
+dist/**/*
+*.js
+
+# These are generated but helpful for documentation
+!src/*.d.ts

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Backend
 open Composition_types
@@ -7,47 +7,49 @@ open Common
 let wrap_domains = Common.wrap_domains
 
 let evals =
+  let open Plonk_types in
   let e =
-    Dlog_plonk_types.Evals.map
-      (Commitment_lengths.of_domains ~max_degree:Max_degree.wrap wrap_domains)
-      ~f:(fun len -> Array.create ~len Backend.Tock.Field.one)
+    Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
+        let a () = Array.create ~len:n (Ro.tock ()) in
+        (a (), a ()) )
   in
-  let ex = (e, Backend.Tock.Field.zero) in
-  (ex, ex)
+  let ex =
+    { All_evals.With_public_input.evals = e
+    ; public_input = (Ro.tock (), Ro.tock ())
+    }
+  in
+  { All_evals.ft_eval1 = Ro.tock (); evals = ex }
 
 let evals_combined =
-  Tuple_lib.Double.map evals ~f:(fun (e, _x) ->
-      Dlog_plonk_types.Evals.map e
-        ~f:(Array.reduce_exn ~f:Backend.Tock.Field.( + )) )
+  Plonk_types.All_evals.map evals ~f1:Fn.id
+    ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
 
 module Ipa = struct
   module Wrap = struct
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          {Bulletproof_challenge.prechallenge} )
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {prechallenge} ->
-          (Ipa.Wrap.compute_challenge prechallenge : Tock.Field.t) )
+      Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
+          Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
   end
 
   module Step = struct
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          {Bulletproof_challenge.prechallenge} )
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {prechallenge} ->
-          (Ipa.Step.compute_challenge prechallenge : Tick.Field.t) )
+      Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
+          Ipa.Step.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
   end
 end

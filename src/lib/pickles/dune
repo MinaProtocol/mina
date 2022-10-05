@@ -3,26 +3,63 @@
  (name pickles)
  (public_name pickles)
  (flags -warn-error -22+34+33+27)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_mina
+   ppx_jane
+   ppx_compare
+   ppx_deriving_yojson
+   h_list.ppx))
  (libraries
-   digestif
-   coda_version
-   zexe_backend
-   random_oracle_input
-   pickles_base
-   pickles.composition_types
-   pickles.limb_vector
-   pickles.plonk_checks
-   pickles.precomputed
-   pickles.one_hot_vector
-   pickles.pseudo
-   snarky_log
-   sponge
-   group_map
-   snarky_group_map
-   snarky_curve
-   snarky.backendless
-   key_cache
+   ;; opam libraries
+   stdio
+   integers
+   result
+   base.caml
+   bignum.bigint
    core_kernel
-   snark_keys_header))
+   base64
+   digestif
+   ppx_inline_test.config
+   sexplib0
+   base
+   async_kernel
+   bin_prot.shape
+   ;; local libraries
+   mina_wire_types
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
+   bitstring_lib
+   snarky.intf
+   pickles.backend
+   pickles_types
+   snarky.backendless
+   snarky_group_map
+   sponge
+   pickles.pseudo
+   pickles.precomputed
+   pickles.limb_vector
+   pickles_base
+   kimchi_backend
+   mina_version
+   base58_check
+   codable
+   random_oracle_input
+   pickles.composition_types
+   pickles.plonk_checks
+   pickles.one_hot_vector
+   snarky_log
+   group_map
+   snarky_curve
+   key_cache
+   snark_keys_header
+   tuple_lib
+   promise
+   kimchi_backend.common
+   ppx_version.runtime
+))

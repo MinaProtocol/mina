@@ -2,6 +2,6 @@
  (name random_oracle_input)
  (public_name random_oracle_input)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_sexp_conv ppx_inline_test ppx_let ppx_version))
+ (preprocess (pps ppx_jane ppx_sexp_conv ppx_inline_test ppx_let ppx_version ppx_deriving_yojson))
  (inline_tests)
- (libraries core_kernel))
+ (libraries core_kernel sexplib0 base.caml ppx_inline_test.config))

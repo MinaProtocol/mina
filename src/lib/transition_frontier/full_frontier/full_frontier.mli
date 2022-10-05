@@ -2,7 +2,7 @@
  *  In this context, "full" refers to the fact that this frontier contains
  *  "fully expanded blockchain states" (i.e. [Breadcrumb]s). By comparison,
  *  the persistent frontier only contains "light blockchain states" (i.e.
- *  [External_transition]s). This module is only concerned with the core
+ *  [Mina_block]s). This module is only concerned with the core
  *  data structure of the frontier, and is further wrapped with logic to
  *  integrate the core data structure with the various other concerns of
  *  the transition frontier (e.g. extensions, persistence, etc...) in the
@@ -11,28 +11,41 @@
 
 open Mina_base
 open Frontier_base
-open Coda_state
+open Mina_state
+
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
 
 include Frontier_intf.S
 
 module Protocol_states_for_root_scan_state : sig
-  type t = Protocol_state.value State_hash.Map.t
+  type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
   val protocol_states_for_next_root_scan_state :
        t
     -> new_scan_state:Staged_ledger.Scan_state.t
-    -> old_root_state:(Protocol_state.value, State_hash.t) With_hash.t
-    -> (State_hash.t * Protocol_state.value) list
+    -> old_root_state:Protocol_state.value State_hash.With_state_hashes.t
+    -> Protocol_state.value State_hash.With_state_hashes.t list
 end
 
 val create :
-     logger:Logger.t
+     context:(module CONTEXT)
   -> root_data:Root_data.t
-  -> root_ledger:Ledger.Any_ledger.witness
+  -> root_ledger:Mina_ledger.Ledger.Any_ledger.witness
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
-  -> precomputed_values:Precomputed_values.t
+  -> persistent_root_instance:Persistent_root.Instance.t
+  -> time_controller:Block_time.Controller.t
   -> t
+
+val persistent_root_instance : t -> Persistent_root.Instance.t
 
 val close : loc:string -> t -> unit
 
@@ -46,7 +59,7 @@ val protocol_states_for_root_scan_state :
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> enable_epoch_ledger_sync:[`Enabled of Ledger.Db.t | `Disabled]
+  -> enable_epoch_ledger_sync:[ `Enabled of Mina_ledger.Ledger.Db.t | `Disabled ]
   -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
@@ -55,5 +68,28 @@ module For_tests : sig
   val equal : t -> t -> bool
 
   val find_protocol_state_exn :
-    t -> State_hash.t -> Coda_state.Protocol_state.value
+    t -> State_hash.t -> Mina_state.Protocol_state.value
+
+  val gen_breadcrumb :
+       verifier:Verifier.t
+    -> ?send_to_random_pk:bool
+    -> unit
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val gen_breadcrumb_seq :
+       verifier:Verifier.t
+    -> int
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val create_frontier : unit -> t
+
+  val clean_up_persistent_root : frontier:t -> unit
+
+  val verifier : unit -> Verifier.t
+
+  val max_length : int
 end

@@ -3,9 +3,15 @@
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp]
+    type t [@@deriving compare, sexp, yojson]
   end
 end]
+
+val major : t -> int
+
+val minor : t -> int
+
+val patch : t -> int
 
 val create_exn : major:int -> minor:int -> patch:int -> t
 

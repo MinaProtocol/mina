@@ -144,14 +144,14 @@ module Parser = struct
     maybe (op <* commit) >>= function Some f -> p >>| f l | None -> return l
 
   let bool =
-    choice [string "true" *> return true; string "false" *> return false]
+    choice [ string "true" *> return true; string "false" *> return false ]
     <?> "bool"
 
   let int = take_while1 is_numeric >>| int_of_string <?> "int"
 
   let text_escape =
-    choice (List.map ~f:char ['"'; '\\'; '/'; 'b'; 'n'; 'r'; 't'])
-    >>| fun c -> String.of_char_list ['\\'; c]
+    choice (List.map ~f:char [ '"'; '\\'; '/'; 'b'; 'n'; 'r'; 't' ])
+    >>| fun c -> String.of_char_list [ '\\'; c ]
 
   let text_component =
     char '\\' *> text_escape <|> (text_char >>| String.of_char)
@@ -170,7 +170,7 @@ module Parser = struct
   let str = pad (char '"') text <?> "str"
 
   let literal =
-    choice [bool >>| Ast.bool; int >>| Ast.int; str >>| Ast.string]
+    choice [ bool >>| Ast.bool; int >>| Ast.int; str >>| Ast.string ]
     <?> "literal"
 
   let value_exp =
@@ -179,13 +179,15 @@ module Parser = struct
           choice
             [ literal >>| Ast.value_lit
             ; wrap brackets (pad ws (sep_by (pad ws (char ',')) value_exp))
-              >>| Ast.value_list ]
+              >>| Ast.value_list
+            ]
         in
         let rec access parent =
           choice
             [ char '.' *> (ident <|> wrap brackets (pad ws str))
               >>| Ast.value_access_string parent
-            ; wrap brackets (pad ws int) >>| Ast.value_access_int parent ]
+            ; wrap brackets (pad ws int) >>| Ast.value_access_int parent
+            ]
           >>= fun parent' -> access parent' <|> return parent'
         in
         maybe base
@@ -203,7 +205,8 @@ module Parser = struct
             choice
               [ lift2 List.cons (string {|\/|}) inner
               ; char '/' *> return []
-              ; lift2 List.cons (take 1) inner ] )
+              ; lift2 List.cons (take 1) inner
+              ] )
         >>| String.concat ~sep:""
       in
       char '/' *> commit *> inner
@@ -216,7 +219,8 @@ module Parser = struct
          [ pad ws (stringc "==") *> value_exp >>| Fn.flip Ast.cmp_eq
          ; pad ws (stringc "!=") *> value_exp >>| Fn.flip Ast.cmp_neq
          ; pad ws (stringc "in") *> value_exp >>| Fn.flip Ast.cmp_in
-         ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match ])
+         ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match
+         ] )
     <* commit <?> "cmp_exp"
 
   let bool_exp =
@@ -226,12 +230,14 @@ module Parser = struct
             [ wrap parens (pad ws bool_exp)
             ; bool >>| Ast.bool_lit
             ; char '!' *> ws *> bool_exp >>| Ast.bool_not
-            ; cmp_exp >>| Ast.bool_cmp ]
+            ; cmp_exp >>| Ast.bool_cmp
+            ]
         in
         let infix_op =
           choice
             [ stringc "&&" *> return Ast.bool_and
-            ; stringc "||" *> return Ast.bool_or ]
+            ; stringc "||" *> return Ast.bool_or
+            ]
         in
         infix main (pad ws infix_op) )
     <?> "bool_exp"
@@ -239,7 +245,7 @@ module Parser = struct
   let parser = ws *> bool_exp <* ws <* end_of_input
 
   let parse str =
-    Result.map_error (parse_string parser str) ~f:(fun err ->
+    Result.map_error (parse_string ~consume:All parser str) ~f:(fun err ->
         let msg =
           match err with
           | ": end_of_input" ->
@@ -300,30 +306,24 @@ module Interpreter = struct
         Option.map2
           (interpret_value_exp json x)
           (interpret_value_exp json y)
-          ~f:( = )
+          ~f:Yojson.Safe.equal
         |> Option.value ~default:false
     | Cmp_neq (x, y) ->
-        Option.map2
-          (interpret_value_exp json x)
-          (interpret_value_exp json y)
-          ~f:( <> )
+        Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
+          ~f:(fun json1 json2 -> not (Yojson.Safe.equal json1 json2))
         |> Option.value ~default:false
     | Cmp_in (x, y) ->
         Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
           ~f:(fun scalar list ->
             match list with
             | `List items ->
-                List.exists items ~f:(( = ) scalar)
+                List.exists items ~f:(Yojson.Safe.equal scalar)
             | _ ->
                 (* TODO: filter warnings *) false )
         |> Option.value ~default:false
     | Cmp_match (x, regex) ->
         Option.map (interpret_value_exp json x) ~f:(fun value ->
-            match value with
-            | `String str ->
-                Re2.matches regex str
-            | _ ->
-                false )
+            match value with `String str -> Re2.matches regex str | _ -> false )
         |> Option.value ~default:false
 
   let rec interpret_bool_exp json = function

@@ -1,5 +1,0 @@
-(library
- (name plugin_do_nothing)
- (libraries coda_plugins)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))

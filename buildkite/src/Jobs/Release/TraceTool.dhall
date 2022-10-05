@@ -8,10 +8,10 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
-let OpamInit = ../../Command/OpamInit.dhall
 let Size = ../../Command/Size.dhall
 
-let jobDocker = Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).rustToolchain}
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 in
 
@@ -25,7 +25,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && cargo build --frozen" ]
+          commands = RunInToolchain.runInToolchainBullseye ([] : List Text) "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:$PATH cargo build"
           , label = "Build trace-tool"
           , key = "build-trace-tool"
           , target = Size.Small

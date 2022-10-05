@@ -14,17 +14,20 @@ let command =
             (Command.Arg_type.of_alist_exn
                [ ("Full", Genesis_constants.Proof_level.Full)
                ; ("Check", Check)
-               ; ("None", None) ]))
+               ; ("None", None)
+               ] ) )
      in
      fun () ->
        let open Async in
-       let%bind worker_state = Prod.Worker_state.create ~proof_level () in
-       let public_key =
-         fst (Lazy.force Mina_base.Sample_keypairs.keypairs).(0)
+       let%bind worker_state =
+         Prod.Worker_state.create
+           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+           ~proof_level ()
        in
+       let public_key = fst (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
        let fee = Currency.Fee.of_int 10 in
        let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
-       match Prod.perform_single worker_state ~message spec with
+       match%bind Prod.perform_single worker_state ~message spec with
        | Ok (proof, time) ->
            Caml.Format.printf
              !"Successfully proved in %{sexp: Time.Span.t}.@.Proof \
@@ -35,6 +38,6 @@ let command =
            Caml.Format.printf
              !"Proving failed with error:@.%s"
              (Error.to_string_hum err) ;
-           exit 1)
+           exit 1 )
 
 let () = Command.run command

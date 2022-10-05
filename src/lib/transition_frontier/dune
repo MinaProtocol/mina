@@ -1,6 +1,55 @@
 (library
  (name transition_frontier)
  (public_name transition_frontier)
- (libraries transition_frontier_base transition_frontier_persistent_root transition_frontier_persistent_frontier transition_frontier_full_frontier transition_frontier_extensions ppx_deriving_yojson.runtime)
+ (libraries
+   ;;opam libraries
+   core_kernel.uuid
+   async_unix
+   integers
+   base.caml
+   sexplib0
+   async
+   core
+   core_kernel
+   async_kernel
+   bin_prot.shape
+   base.base_internalhash_types
+   result
+   core.uuid
+   ;;local libraries
+   o1trace
+   mina_metrics
+   mina_wire_types
+   merkle_ledger
+   staged_ledger
+   mina_state
+   signature_lib
+   mina_ledger
+   consensus
+   genesis_constants
+   mina_numbers
+   mina_block
+   logger
+   transition_frontier_full_frontier
+   transition_frontier_persistent_root
+   downloader
+   transition_frontier_base
+   transition_frontier_persistent_frontier
+   transition_frontier_extensions
+   mina_base
+   cache_lib
+   data_hash_lib
+   network_peer
+   unsigned_extended
+   verifier
+   precomputed_values
+   block_time
+   trust_system
+   with_hash
+   rose_tree
+   quickcheck_lib
+   protocol_version
+   mina_net2
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.eq ppx_deriving_yojson)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_compare ppx_deriving_yojson)))

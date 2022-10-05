@@ -4,7 +4,7 @@ open Core
 
 (* Dhall types (as OCaml values) and their names to be used in Dhall *)
 let types_and_files =
-  [(Runtime_config.Json_layout.dhall_type, "runtime_config")]
+  [ (Runtime_config.Json_layout.dhall_type, "runtime_config") ]
 
 let print_dhall_type (ty, nm) =
   let s = Ppx_dhall_type.Dhall_type.to_string ty in
@@ -14,7 +14,8 @@ let print_dhall_type (ty, nm) =
   Printf.fprintf oc "let %s : Type = %s in %s" nm s nm ;
   Caml.close_out oc ;
   ignore
-    (Unix.create_process ~prog:"dhall" ~args:["format"; "--inplace"; dhall_file])
+    (Unix.create_process ~prog:"dhall"
+       ~args:[ "format"; "--inplace"; dhall_file ] )
 
 let main ~output_dir () =
   let output_dir =
@@ -35,4 +36,4 @@ let () =
                 current directory)"
              Param.(optional string)
          in
-         main ~output_dir)))
+         main ~output_dir )))

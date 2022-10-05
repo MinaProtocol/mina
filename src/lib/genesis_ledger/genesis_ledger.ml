@@ -2,6 +2,7 @@ open Core_kernel
 open Currency
 open Signature_lib
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
@@ -12,10 +13,10 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
       let initial_minimum_balance =
         Currency.Balance.of_int t.initial_minimum_balance
       in
-      let cliff_time = Coda_numbers.Global_slot.of_int t.cliff_time in
+      let cliff_time = Mina_numbers.Global_slot.of_int t.cliff_time in
       let cliff_amount = Currency.Amount.of_int t.cliff_amount in
       let vesting_increment = Currency.Amount.of_int t.vesting_increment in
-      let vesting_period = Coda_numbers.Global_slot.of_int t.vesting_period in
+      let vesting_period = Mina_numbers.Global_slot.of_int t.vesting_period in
       Account.create_timed account_id balance ~initial_minimum_balance
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
@@ -26,7 +27,7 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
   let accounts =
     let open Lazy.Let_syntax in
     let%map accounts = accounts in
-    List.map accounts ~f:(fun {pk; sk; balance; timing} ->
+    List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
         let balance = Balance.of_formatted_string (Int.to_string balance) in
         (Some sk, account_with_timing account_id balance timing) )
@@ -38,11 +39,11 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
   let accounts =
     let open Lazy.Let_syntax in
     let%map accounts = Accounts.accounts in
-    List.map accounts ~f:(fun {pk; balance; delegate; timing} ->
+    List.map accounts ~f:(fun { pk; balance; delegate; timing } ->
         let account_id = Account_id.create pk Token_id.default in
         let balance = Balance.of_int balance in
         let base_acct = account_with_timing account_id balance timing in
-        (None, {base_acct with delegate= Option.value ~default:pk delegate}) )
+        (None, { base_acct with delegate = Option.value ~default:pk delegate }) )
 end
 
 (** Generate a ledger using the sample keypairs from [Mina_base] with the given
@@ -57,12 +58,13 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Mina_base.Sample_keypairs.keypairs in
+      and keypairs = Key_gen.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
-          { balance= b
-          ; pk= fst keypairs.(i)
-          ; sk= snd keypairs.(i)
-          ; timing= Untimed } )
+          { balance = b
+          ; pk = fst keypairs.(i)
+          ; sk = snd keypairs.(i)
+          ; timing = Untimed
+          } )
   end)
 end
 
@@ -80,7 +82,7 @@ module Utils = struct
         (Public_key.decompress account.Poly.Stable.Latest.public_key)
         ~message:pk_error_msg
     in
-    {Keypair.public_key; private_key}
+    { Keypair.public_key; private_key }
 
   let id_of_account_record (_private_key, account) = Account.identifier account
 
@@ -93,7 +95,7 @@ module Utils = struct
     find_account_record_exn accounts ~f:(fun new_account ->
         not
           (List.mem ~equal:Public_key.Compressed.equal old_account_pks
-             (Account.public_key new_account)) )
+             (Account.public_key new_account) ) )
 
   let find_new_account_record_exn accounts old_account_pks =
     find_new_account_record_exn_ accounts
@@ -250,7 +252,7 @@ module Testnet_postake_many_producers = Register (Balances (struct
     lazy
       (let high_balances = List.init 50 ~f:(Fn.const 5_000_000) in
        let low_balances = List.init 10 ~f:(Fn.const 1_000) in
-       high_balances @ low_balances)
+       high_balances @ low_balances )
 end))
 
 module Test = Register (Balances (Test_ledger))
@@ -262,8 +264,7 @@ module Unit_test_ledger = Make (struct
 
   let directory = `Ephemeral
 
-  let depth =
-    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+  let depth = Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)
@@ -273,14 +274,14 @@ module Integration_tests = struct
     let name = "test_delegation"
 
     let balances =
-      lazy [0 (* delegatee *); 0 (* placeholder *); 5_000_000 (* delegator *)]
+      lazy [ 0 (* delegatee *); 0 (* placeholder *); 5_000_000 (* delegator *) ]
   end))
 
   module Five_even_stakes = Register (Balances (struct
     let name = "test_five_even_stakes"
 
     let balances =
-      lazy [1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000]
+      lazy [ 1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000 ]
   end))
 
   module Split_two_stakes = Register (Balances (struct
@@ -290,12 +291,12 @@ module Integration_tests = struct
       lazy
         (let high_balances = List.init 2 ~f:(Fn.const 5_000_000) in
          let low_balances = List.init 16 ~f:(Fn.const 1_000) in
-         high_balances @ low_balances)
+         high_balances @ low_balances )
   end))
 
   module Three_even_stakes = Register (Balances (struct
     let name = "test_three_even_stakes"
 
-    let balances = lazy [1_000_000; 1_000_000; 1_000_000; 1000; 1000; 1000]
+    let balances = lazy [ 1_000_000; 1_000_000; 1_000_000; 1000; 1000; 1000 ]
   end))
 end

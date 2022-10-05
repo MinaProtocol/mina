@@ -3,15 +3,14 @@ open Core
 module type Key = sig
   type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
     end
-    with type V1.t = t
+
+    module Latest = V1
+  end
+  with type V1.t = t
 
   val empty : t
 
@@ -25,17 +24,14 @@ end
 module type Token_id = sig
   type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module Latest : sig
-        type t [@@deriving bin_io]
-      end
+  module Stable : sig
+    module Latest : sig
+      type t [@@deriving bin_io]
     end
-    with type Latest.t = t
+  end
+  with type Latest.t = t
 
   val default : t
-
-  val next : t -> t
 
   include Hashable.S_binable with type t := t
 
@@ -49,7 +45,7 @@ module type Account_id = sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
     end
   end]
@@ -60,13 +56,15 @@ module type Account_id = sig
 
   val create : key -> token_id -> t
 
+  val derive_token_id : owner:t -> token_id
+
   include Hashable.S_binable with type t := t
 
   include Comparable.S with type t := t
 end
 
 module type Balance = sig
-  type t [@@deriving eq]
+  type t [@@deriving equal]
 
   val zero : t
 
@@ -74,7 +72,7 @@ module type Balance = sig
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq, sexp, compare]
+  type t [@@deriving bin_io, equal, sexp, compare]
 
   type token_id
 
@@ -94,9 +92,9 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, compare, eq, sexp, yojson]
+  type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
   include Hashable.S_binable with type t := t
 
@@ -120,12 +118,14 @@ module type Key_value_database = sig
 
   include
     Key_value_database.Intf.Ident
-    with type t := t
-     and type key := Bigstring.t
-     and type value := Bigstring.t
-     and type config := config
+      with type t := t
+       and type key := Bigstring.t
+       and type value := Bigstring.t
+       and type config := config
 
   val create_checkpoint : t -> string -> t
+
+  val make_checkpoint : t -> string -> unit
 
   val get_uuid : t -> Uuid.t
 

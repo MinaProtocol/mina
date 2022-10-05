@@ -2,22 +2,22 @@
 
 open Core
 
-(* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
-
-module T = struct
-  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
-end
-
-include T
+type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
+[@@deriving sexp]
 
 let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
-  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
+  Rocks.Options.set_prefix_extractor opts
+    (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
+  { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
 
 let create_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () ;
   create dir
+
+let make_checkpoint t dir =
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ()
 
 let get_uuid t = t.uuid
 
@@ -25,6 +25,9 @@ let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
   Rocks.get ?pos:None ?len:None ?opts:None t.db key
+
+let get_batch t ~(keys : Bigstring.t list) : Bigstring.t option list =
+  Rocks.multi_get t.db keys
 
 let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
@@ -81,6 +84,24 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let to_bigstring = Bigstring.of_string
 
+let%test_unit "get_batch" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+          let db = create db_dir in
+          let[@warning "-8"] [ key1; key2; key3 ] =
+            List.map ~f:Bigstring.of_string [ "a"; "b"; "c" ]
+          in
+          let data = Bigstring.of_string "test" in
+          set db ~key:key1 ~data ;
+          set db ~key:key3 ~data ;
+          let[@warning "-8"] [ res1; res2; res3 ] =
+            get_batch db ~keys:[ key1; key2; key3 ]
+          in
+          assert ([%equal: Bigstring.t option] res1 (Some data)) ;
+          assert ([%equal: Bigstring.t option] res2 None) ;
+          assert ([%equal: Bigstring.t option] res3 (Some data)) ;
+          Async.Deferred.unit ) )
+
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
@@ -92,7 +113,7 @@ let%test_unit "to_alist (of_alist l) = l" =
       | `Duplicate_key _ ->
           Async.Deferred.unit
       | `Ok _ ->
-          File_system.with_temp_dir "/tmp/coda-test" ~f:(fun db_dir ->
+          File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
               let sorted =
                 List.sort kvs ~compare:[%compare: string * string]
                 |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
@@ -135,10 +156,8 @@ let%test_unit "checkpoint read" =
             , Hashtbl.add cp_hashtbl ~key:"cp_key" ~data:"cp_data" )
           with
           | `Ok, `Ok ->
-              set db ~key:(to_bigstring "db_key")
-                ~data:(to_bigstring "db_data") ;
-              set cp ~key:(to_bigstring "cp_key")
-                ~data:(to_bigstring "cp_data") ;
+              set db ~key:(to_bigstring "db_key") ~data:(to_bigstring "db_data") ;
+              set cp ~key:(to_bigstring "cp_key") ~data:(to_bigstring "cp_data") ;
               let db_sorted =
                 List.sort
                   (Hashtbl.to_alist db_hashtbl)
@@ -159,16 +178,12 @@ let%test_unit "checkpoint read" =
                 List.sort (to_alist cp)
                   ~compare:[%compare: Bigstring.t * Bigstring.t]
               in
-              [%test_result: (Bigstring.t * Bigstring.t) list]
-                ~expect:db_sorted db_alist ;
-              [%test_result: (Bigstring.t * Bigstring.t) list]
-                ~expect:cp_sorted cp_alist ;
+              [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:db_sorted
+                db_alist ;
+              [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:cp_sorted
+                cp_alist ;
               close db ;
               close cp ;
-              let%bind () = File_system.remove_dir db_dir in
-              let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit
           | _ ->
-              let%bind () = File_system.remove_dir db_dir in
-              let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit ) )

@@ -59,7 +59,7 @@ module Ppx_inline_test_lib = struct
         let buf = Stdlib.Bytes.create buf_len in
         let rec go () =
           let len = input tempfile_channel buf 0 buf_len in
-          if len > 0 then ( output stdout buf 0 len ; go () )
+          if len > 0 then (output stdout buf 0 len ; go ())
         in
         go () ;
         (* Flush to ensure that the data is printed before the next test
@@ -71,8 +71,7 @@ module Ppx_inline_test_lib = struct
       Unix.dup2 stdout_orig Unix.stdout ;
       Unix.unlink tempfile
 
-    let test ~config ~descr ~tags ~filename ~line_number ~start_pos ~end_pos f
-        =
+    let test ~config ~descr ~tags ~filename ~line_number ~start_pos ~end_pos f =
       let f () =
         let redirect_data = redirect_to_newfile () in
         try

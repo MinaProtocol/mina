@@ -2,8 +2,16 @@ apiVersion: v2
 name: buildkite-exporter
 description: A Helm chart for O(1) Lab's Buildkite graphql exporter
 type: application
-version: 0.1.1
-appVersion: 0.1.0
+version: 0.1.4
+appVersion: 0.2.1
+annotations:
+  artifacthub.io/changes: |
+    - fix metrics port type interpretation (ensure cast to int)
+    - update default exporter image version (0.2.0 => 0.2.1)
+dependencies:
+  - name: common-utilities
+    version: 0.0.8
+    repository: "https://coda-charts.storage.googleapis.com"
 icon: https://pbs.twimg.com/profile_images/968998928241733632/Rhxmu_9O_400x400.jpg
 keywords:
 - buildkite
@@ -12,4 +20,4 @@ keywords:
 - mina
 home: https://o1labs.org/
 sources:
-- https://github.com/CodaProtocol
+- https://github.com/MinaProtocol/mina/tree/develop/buildkite/helm/buildkite-exporter

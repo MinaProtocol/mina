@@ -4,8 +4,32 @@
  (flags :standard -short-paths)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel snark_params fold_lib codable ppx_version.runtime)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   base.caml
+   sexplib0
+   core_kernel
+   bin_prot.shape
+   base
+   base.base_internalhash_types
+   ;; local libraries
+   mina_wire_types
+   snarky.backendless
+   random_oracle_input
+   pickles.backend
+   pickles
+   codable
+   snark_params
+   fold_lib
+   base58_check
+   random_oracle
+   bitstring_lib
+   kimchi_backend.pasta
+   test_util
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_deriving.eq h_list.ppx ppx_custom_printf))
+  (pps ppx_snarky ppx_mina ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_compare h_list.ppx ppx_custom_printf))
  (instrumentation (backend bisect_ppx)))

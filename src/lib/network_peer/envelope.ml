@@ -12,13 +12,13 @@ module Sender = struct
     | Local ->
         `String "Local"
     | Remote p ->
-        `Assoc [("Remote", Peer.to_yojson p)]
+        `Assoc [ ("Remote", Peer.to_yojson p) ]
 
   let of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local
-    | `Assoc [("Remote", peer_json)] ->
+    | `Assoc [ ("Remote", peer_json) ] ->
         let open Result.Let_syntax in
         let%map peer = Peer.of_yojson peer_json in
         Remote peer
@@ -68,11 +68,12 @@ module Incoming = struct
         Error "time_of_yojson: Expected string"
 
   type 'a t =
-    { data: 'a
-    ; sender: Sender.t
-    ; received_at: Time.t
-          [@to_yojson time_to_yojson] [@of_yojson time_of_yojson] }
-  [@@deriving eq, sexp, yojson, compare]
+    { data : 'a
+    ; sender : Sender.t
+    ; received_at : Time.t
+          [@to_yojson time_to_yojson] [@of_yojson time_of_yojson]
+    }
+  [@@deriving equal, sexp, yojson, compare]
 
   let sender t = t.sender
 
@@ -82,18 +83,18 @@ module Incoming = struct
 
   let wrap ~data ~sender =
     let received_at = Time.now () in
-    {data; sender; received_at}
+    { data; sender; received_at }
 
   let wrap_peer ~data ~sender =
     let received_at = Time.now () in
-    {data; sender= Sender.of_peer sender; received_at}
+    { data; sender = Sender.of_peer sender; received_at }
 
-  let map ~f t = {t with data= f t.data}
+  let map ~f t = { t with data = f t.data }
 
   let local data =
     let received_at = Time.now () in
     let sender = Sender.Local in
-    {data; sender; received_at}
+    { data; sender; received_at }
 
   let remote_sender_exn t =
     match t.sender with
@@ -107,5 +108,5 @@ module Incoming = struct
     let%bind data = gen_a in
     let%map sender = Sender.gen in
     let received_at = Time.now () in
-    {data; sender; received_at}
+    { data; sender; received_at }
 end

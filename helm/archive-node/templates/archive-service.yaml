@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ tpl .Values.archive.fullname . }}
+  name: {{ template "archive-node.fullname" . }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -10,8 +10,13 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ tpl .Values.archive.fullname . }}
+    app: {{ template "archive-node.fullname" . }}
   ports:
+{{- if .Values.archive.enableLocalDaemon }}
   - name: tcp-p2p
-    port: {{ .Values.coda.ports.p2p }}
+    port: {{ .Values.mina.ports.p2p }}
     targetPort: external-port
+{{- end }}
+  - name: tcp-archive
+    port: {{ .Values.archive.ports.server }}
+    targetPort: archive-port

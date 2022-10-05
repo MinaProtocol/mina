@@ -3,28 +3,20 @@
 	url = https://github.com/o1-labs/snarky
 [submodule "src/external/ppx_optcomp"]
 	path = src/external/ppx_optcomp
-	url = https://github.com/CodaProtocol/ppx_optcomp
-[submodule "src/external/async_kernel"]
-	path = src/external/async_kernel
-	url = https://github.com/CodaProtocol/async_kernel
-[submodule "src/external/ocaml-extlib"]
-	path = src/external/ocaml-extlib
-	url = https://github.com/CodaProtocol/ocaml-extlib.git
-[submodule "src/external/rpc_parallel"]
-	path = src/external/rpc_parallel
-	url = https://github.com/CodaProtocol/rpc_parallel.git
+	url = https://github.com/MinaProtocol/ppx_optcomp
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
-[submodule "src/external/graphql_ppx"]
-	path = src/external/graphql_ppx
-	url = https://github.com/o1-labs/graphql_ppx.git
-[submodule "src/lib/marlin"]
-	path = src/lib/marlin
-	url = https://github.com/o1-labs/marlin.git
-[submodule "src/external/ppx_version"]
-	path = src/external/ppx_version
-	url = https://github.com/o1-labs/ppx_version.git
-[submodule "coda-automation"]
-	path = coda-automation
-	url = https://github.com/MinaProtocol/coda-automation.git
+[submodule "src/lib/crypto/proof-systems"]
+	path = src/lib/crypto/proof-systems
+	url = https://github.com/o1-labs/proof-systems.git
+[submodule "src/external/prometheus"]
+	path = src/external/prometheus
+	url = https://github.com/MinaProtocol/prometheus.git
+    branch = master
+[submodule "src/external/c-reference-signer"]
+	path = src/external/c-reference-signer
+	url = https://github.com/MinaProtocol/c-reference-signer.git
+[submodule "src/lib/snarky_js_bindings/snarkyjs"]
+	path = src/lib/snarky_js_bindings/snarkyjs
+	url = https://github.com/o1-labs/snarkyjs.git

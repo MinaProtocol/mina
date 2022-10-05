@@ -1,20 +1,18 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 open Random_oracle
 
 val signature : Field.t State.t
+
+val signature_for_mainnet : Field.t State.t
+
+val signature_for_testnet : Field.t State.t
+
+val signature_legacy : Field.t Legacy.State.t
+
+val signature_for_mainnet_legacy : Field.t Legacy.State.t
+
+val signature_for_testnet_legacy : Field.t Legacy.State.t
 
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
@@ -29,6 +27,8 @@ val vrf_message : Field.t State.t
 
 val vrf_output : Field.t State.t
 
+val vrf_evaluation : Field.t State.t
+
 val epoch_seed : Field.t State.t
 
 val protocol_state : Field.t State.t
@@ -41,21 +41,35 @@ val account : Field.t State.t
 
 val side_loaded_vk : Field.t State.t
 
-val snapp_account : Field.t State.t
+val zkapp_account : Field.t State.t
 
-val snapp_payload : Field.t State.t
+val zkapp_payload : Field.t State.t
 
-val snapp_body : Field.t State.t
+val zkapp_body : Field.t State.t
 
-val snapp_predicate : Field.t State.t
+val zkapp_precondition : Field.t State.t
 
-val snapp_predicate_account : Field.t State.t
+val zkapp_precondition_account : Field.t State.t
 
-val snapp_predicate_protocol_state : Field.t State.t
+val zkapp_precondition_protocol_state : Field.t State.t
 
-val receipt_chain_user_command : Field.t State.t
+val account_update_account_precondition : Field.t State.t
 
-val receipt_chain_snapp : Field.t State.t
+val account_update : Field.t State.t
+
+val account_update_cons : Field.t State.t
+
+val account_update_node : Field.t State.t
+
+val account_update_stack_frame : Field.t State.t
+
+val account_update_stack_frame_cons : Field.t State.t
+
+val receipt_chain_signed_command : Field.t Legacy.State.t
+
+val receipt_chain_zkapp_command : Field.t State.t
+
+val receipt_chain_zkapp : Field.t State.t
 
 val pending_coinbases : Field.t State.t
 
@@ -72,3 +86,17 @@ val checkpoint_list : Field.t State.t
 val merge_snark : Field.t State.t
 
 val base_snark : Field.t State.t
+
+val zkapp_uri : Field.t State.t
+
+val zkapp_event : Field.t State.t
+
+val zkapp_events : Field.t State.t
+
+val zkapp_sequence_events : Field.t State.t
+
+val zkapp_memo : Field.t State.t
+
+val zkapp_test : Field.t State.t
+
+val derive_token_id : Field.t State.t

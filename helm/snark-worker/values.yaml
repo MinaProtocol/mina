@@ -1,13 +1,19 @@
-testnetName: "coda-testnet"
-coda:
+testnetName: "testnet"
+mina:
+  runtimeConfig:
+  generateGenesisProof: true
+  enableArchive: false
+  archiveAddress: archive-1:3086
   genesis:
     active: true
     k: 10
     delta: 3
     txpool_max_size: 3000
     genesis_state_timestamp: "2020-04-20 11:00:00-07:00"
-    runtimeConfig: ""
-  image: codaprotocol/coda-daemon:0.0.16-beta7-develop
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  useCustomEntrypoint: false
+  customEntrypoint: ""
+  privkeyPass: "naughty blue worm"
   seedPeers:
     - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
     - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
@@ -16,25 +22,29 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
+  logTxnPoolGossip: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
-worker:
-  fullname: "snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
-  active: true
-  numReplicas: 1
-  remoteCoordinatorHost: "{{ tpl $.Values.coordinator.fullname . }}.{{ $.Values.testnetName }}"
-  remoteCoordinatorPort: 8301
+# worker:
+  # remoteCoordinatorHost: "{{ tpl $.Values.coordinator.fullname . }}.{{ $.Values.testnetName }}"
+  # remoteCoordinatorPort: 8301
 
-coordinator:
-  fullname: "snark-coordinator-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
-  rpcPort: 8301
-  hostPort: 10001
-  deployService: true
-  active: true
-  publicKey: "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-  snarkFee: "0.025"
-  workSelectionAlgorithm: seq # seq OR rand
+coordinatorName: "snark-coordinator" #"snark-coordinator-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+workerName: "snark-worker" #"snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+workerReplicas: 1
+coordinatorHostName: "" # "{{ tpl $.Values.coordinator.fullname . }}.{{ $.Values.testnetName }}"
+coordinatorRpcPort: 8301
+coordinatorHostPort: 10001
+publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+snarkFee: "0.025"
+workSelectionAlgorithm: seq # seq OR rand
+workerCpuRequest: 4
+workerMemRequest: "6.0Gi"
 
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30

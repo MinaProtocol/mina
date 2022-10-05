@@ -54,14 +54,14 @@ Seeds nodes can be looked up here: https://console.cloud.google.com/compute. Usu
 
 `docker exec -it <container> /bin/bash` into coda-daemon container and follow [this](#multiaddress) to get the multiaddress of the node. These are then published on the website (https://codaprotocol.com/docs/getting-started) for users to connect to the testnet.
 
-Alternatively, multiaddresses of seed nodes can be obtained from the daemon command of other nodes in the testnet which use them as initial peers (using `-peer` flag). Retrieve the daemon command using: 
+Alternatively, multiaddresses of seed nodes can be obtained from the daemon command of other nodes in the testnet which use them as initial peers (using `-peer` flag). Retrieve the daemon command using:
 `kubectl exec -it <pod-id> --namespace <namespace> -c <container-name> cat /proc/10/cmdline`
 
  Any other node in the testnet can also be used as an initial peer to connect to the testnet. To obtain the multiaddress of non-seed nodes that are running on kubernetes, run `kubectl exec -it <pod-id> /bin/bash --namespace <namespace> -c <container-name>` and follow [this](#multiaddress).
 
 ##### Multiaddress
 
-Run `coda client status` to get the IP address [IPADDR], Libp2p port [PORT] and peer id [PEERID]  and combine them in the following format:
+Run `mina client status` to get the IP address [IPADDR], Libp2p port [PORT] and peer id [PEERID]  and combine them in the following format:
     `/ip4/IPADDR/tcp/PORT/p2p/PEERID`
 For example: `/ip4/104.196.41.236/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr`
 
@@ -76,7 +76,7 @@ Verify that online docs https://codaprotocol.com/docs/getting-started are update
 
 ##### Monitor the QA-net and report status
 
-Monitor the health of the QA-net by checking the logs (https://console.cloud.google.com/kubernetes), grafana dashboard (https://o1testnet.grafana.net), telemetry and other tools. Check for
+Monitor the health of the QA-net by checking the logs (https://console.cloud.google.com/kubernetes), grafana dashboard (https://o1testnet.grafana.net), node status, and other tools. Check for
 1. Crashes
 2. Forks
 3. Expected transactions per second(TPS): TPS is currently a compile time configuration and all the compile-time constants for the testnet/qa-net are defined in `src/config/testnet_postake_medium_curves.mlh`. The file consists of configuration for TPS such as `[%%import "/src/config/scan_state/point2tps.mlh"]` or `[%%import "/src/config/scan_state/point5tps.mlh"]`. Each of these files define maximum TPS (`scan_state_tps_goal_x10`) that can be achieved. Verify this against the observed value on the grafana dashboard.
@@ -102,8 +102,8 @@ Maybe not, sometimes there could be unintended twists in the story and the testn
 
 *Criteria for an unstable testnet:
 
-    1. Network forks 
-    2. Blocks are not being created 
+    1. Network forks
+    2. Blocks are not being created
     3. Blocks/transactions/snark-work not being gossiped
     4. Transactions not getting included in a block
     5. Prover failures
@@ -131,7 +131,7 @@ To update brew package,
  2. push the tag `git push origin 0.0.13`
  3. Merge the changes from the release branch into master
     ```
-    git checkout master 
+    git checkout master
     git merge release/0.0.13-beta
     ```
 

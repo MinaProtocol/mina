@@ -32,24 +32,24 @@ end
 
 module S3_to_S2 (X : State_or_error_intf.S3) :
   State_or_error_intf.S2
-  with type ('a, 'b) t := ('a, 'b, unit) X.t
-   and type 'a state := ('a, unit) X.state = struct
+    with type ('a, 'b) t := ('a, 'b, unit) X.t
+     and type 'a state := ('a, unit) X.state = struct
   include (
     X :
       State_or_error_intf.S3
-      with type ('a, 'b, 'e) t := ('a, 'b, 'e) X.t
-       and type ('b, 'e) state := ('b, 'e) X.state )
+        with type ('a, 'b, 'e) t := ('a, 'b, 'e) X.t
+         and type ('b, 'e) state := ('b, 'e) X.state )
 end
 
 module S2_to_S (X : State_or_error_intf.S2) :
   State_or_error_intf.S
-  with type 'a t := ('a, unit) X.t
-   and type state := unit X.state = struct
+    with type 'a t := ('a, unit) X.t
+     and type state := unit X.state = struct
   include (
     X :
       State_or_error_intf.S2
-      with type ('a, 'b) t := ('a, 'b) X.t
-       and type 'a state := 'a X.state )
+        with type ('a, 'b) t := ('a, 'b) X.t
+         and type 'a state := 'a X.state )
 end
 
 module Make2 (State : State_or_error_intf.State_intf1) :

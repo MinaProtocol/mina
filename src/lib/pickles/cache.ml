@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Step = struct
   module Key = struct
@@ -11,8 +11,8 @@ module Step = struct
 
       let to_string : t -> _ = function
         | _id, header, n, h ->
-            sprintf !"step-%s-%s-%d-%s" header.kind.type_
-              header.kind.identifier n header.identifying_hash
+            sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
+              n header.identifying_hash
     end
 
     module Verification = struct
@@ -34,7 +34,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Tweedle_fq_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ()) )
                 path
             in
@@ -44,14 +44,14 @@ module Step = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            {Tweedle.Dum_based_plonk.Keypair.index; cs} ) )
+            { Backend.Tick.Keypair.index; cs } ) )
       (fun (_, header, _, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Tweedle_fq_index.write ~append:true
-                   t.Tweedle.Dum_based_plonk.Keypair.index)
+                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
+                   t.Backend.Tick.Keypair.index )
               header path ) )
 
   let vk_storable =
@@ -62,7 +62,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset path ->
-                  Marlin_plonk_bindings.Tweedle_fq_verifier_index.read ~offset
+                  Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ())
                     path )
                 path
@@ -79,11 +79,10 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Tweedle_fq_verifier_index.write
-                   ~append:true x)
+                (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate cache k_p k_v typ main =
+  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -99,12 +98,13 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  generate_keypair ~exposing:[typ] main )
+                  constraint_system ~input_typ:typ ~return_typ main
+                  |> Keypair.generate ~prev_challenges )
             in
             Timer.clock __LOC__ ;
-            let _ =
-              Key_cache.Sync.write cache s_p (Lazy.force k_p) (Keypair.pk r)
-            in
+            ignore
+              ( Key_cache.Sync.write cache s_p (Lazy.force k_p) (Keypair.pk r)
+                : unit Or_error.t ) ;
             (r, `Generated_something) )
     in
     let vk =
@@ -119,8 +119,8 @@ module Step = struct
          | Error _e ->
              let pk, c = Lazy.force pk in
              let vk = Keypair.vk pk in
-             let _ = Key_cache.Sync.write cache s_v k_v vk in
-             (vk, c))
+             ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
+             (vk, c) )
     in
     (pk, vk)
 end
@@ -132,12 +132,12 @@ module Wrap = struct
       [@@deriving sexp]
 
       let equal ((_, x1, y1) : t) ((_, x2, y2) : t) =
-        [%eq: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
+        [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
 
       let to_string : t -> _ = function
         | _id, header, h ->
-            sprintf !"vk-wrap-%s-%s-%s" header.kind.type_
-              header.kind.identifier header.identifying_hash
+            sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
+              header.identifying_hash
     end
 
     module Proving = struct
@@ -161,7 +161,7 @@ module Wrap = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Tweedle_fp_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
                     (Backend.Tock.Keypair.load_urs ()) )
                 path
             in
@@ -171,17 +171,16 @@ module Wrap = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            {Tweedle.Dee_based_plonk.Keypair.index; cs} ) )
+            { Backend.Tock.Keypair.index; cs } ) )
       (fun (_, header, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Tweedle_fp_index.write ~append:true
-                   t.index)
+                (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path ) )
 
-  let read_or_generate step_domains cache k_p k_v typ main =
+  let read_or_generate ~prev_challenges cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -197,10 +196,13 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   generate_keypair ~exposing:[typ] main )
+                   constraint_system ~input_typ:typ ~return_typ main
+                   |> Keypair.generate ~prev_challenges )
              in
-             let _ = Key_cache.Sync.write cache s_p k (Keypair.pk r) in
-             (r, `Generated_something))
+             ignore
+               ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
+                 : unit Or_error.t ) ;
+             (r, `Generated_something) )
     in
     let vk =
       lazy
@@ -247,23 +249,17 @@ module Wrap = struct
              let vk = Keypair.vk kp in
              let pk = Keypair.pk kp in
              let vk : Vk.t =
-               { index= vk
-               ; commitments=
-                   Pickles_types.Plonk_verification_key_evals.map vk.evals
-                     ~f:(fun x ->
-                       Array.map x.unshifted ~f:(function
-                         | Infinity ->
-                             failwith "Unexpected zero curve point"
-                         | Finite x ->
-                             x ) )
-               ; step_domains
-               ; data=
-                   (let open Marlin_plonk_bindings.Tweedle_fp_index in
-                   {constraints= domain_d1_size pk.index}) }
+               { index = vk
+               ; commitments =
+                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
+               ; data =
+                   (let open Kimchi_bindings.Protocol.Index.Fq in
+                   { constraints = domain_d1_size pk.index })
+               }
              in
-             let _ = Key_cache.Sync.write cache s_v k_v vk in
+             ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              let _vk = Key_cache.Sync.read cache s_v k_v in
-             (vk, `Generated_something))
+             (vk, `Generated_something) )
     in
     (pk, vk)
 end

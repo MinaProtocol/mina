@@ -690,6 +690,63 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
     | None ->
         ReadOptions.with_t inner
 
+  let multi_get_raw =
+    foreign "rocksdb_multi_get"
+      ( t
+      @-> ReadOptions.t
+      @-> Views.int_to_size_t
+      @-> ptr (ptr char)
+      @-> ptr size_t
+      @-> ptr (ptr char)
+      @-> ptr size_t
+      @-> ptr (ptr char)
+      @-> returning void )
+
+  let multi_get ?opts t keys =
+    let inner opts =
+      let cast_array_ptr typ arr = arr |> bigarray_start array1 |> to_voidp |> from_voidp typ in
+      let count = List.length keys in
+      (* could optimize this into a single allocation *)
+      let inputs = Bigarray.(Array1.create Nativeint C_layout) count in
+      let input_lengths = Bigarray.(Array1.create Nativeint C_layout) count in
+      let outputs = Bigarray.(Array1.create Nativeint C_layout) count in
+      let output_lengths = Bigarray.(Array1.create Nativeint C_layout) count in
+      let errors = Bigarray.(Array1.create Nativeint C_layout) count in
+      keys |> List.iteri (fun i key ->
+        Bigarray.Array1.unsafe_set inputs i (bigarray_start array1 key |> to_voidp |> raw_address_of_ptr) ;
+        Bigarray.Array1.unsafe_set input_lengths i (Bigarray.Array1.dim key |> Nativeint.of_int) ) ;
+      multi_get_raw t opts count
+        (cast_array_ptr (ptr char) inputs)
+        (cast_array_ptr size_t input_lengths)
+        (cast_array_ptr (ptr char) outputs)
+        (cast_array_ptr size_t output_lengths)
+        (cast_array_ptr (ptr char) errors) ;
+      keep_alive (inputs, input_lengths, keys) ;
+      let results = ref [] in
+      for i = count - 1 downto 0 do
+        let res =
+          let error_ptr = Bigarray.Array1.unsafe_get errors i |> ptr_of_raw_address in
+          if is_null error_ptr then (
+            let output_length = Nativeint.to_int (Bigarray.Array1.unsafe_get output_lengths i) in
+            let output_ptr = Bigarray.Array1.unsafe_get outputs i |> ptr_of_raw_address in
+            if output_ptr = null then None else (
+              let output = bigarray_of_ptr array1 output_length Bigarray.char (from_voidp char output_ptr) in
+              Gc.finalise_last (fun () -> free output_ptr) output ;
+              Some output ))
+          else (
+            free error_ptr ;
+            None )
+        in
+        results := res :: !results
+      done ;
+      !results
+    in
+    match opts with
+    | Some opts ->
+        inner opts
+    | None ->
+        ReadOptions.with_t inner
+
   let flush_raw =
     foreign "rocksdb_flush" (t @-> FlushOptions.t @-> returning_error void)
 
@@ -733,7 +790,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
      always triggered. If you move away from the default, the checkpoint
      may not contain up-to-date data if WAL writing is not always
      enabled.*)
-  let checkpoint_create db ?log_size_for_flush:(l = 0) ~dir =
+  let checkpoint_create db ?log_size_for_flush:(l = 0) ~dir () =
     let checkpoint_create_raw =
       foreign "rocksdb_checkpoint_create"
         ( CheckpointObject.t @-> string @-> Views.int_to_uint64_t

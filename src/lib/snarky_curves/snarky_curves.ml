@@ -18,7 +18,7 @@ module type Scalar_intf = sig
 
   type var
 
-  type t [@@deriving eq, sexp]
+  type t [@@deriving equal, sexp]
 
   val typ : (var, t) typ
 
@@ -36,7 +36,7 @@ module type Scalar_intf = sig
 end
 
 module type Shifted_intf = sig
-  type (_, _) checked
+  type _ checked
 
   type boolean_var
 
@@ -46,16 +46,16 @@ module type Shifted_intf = sig
 
   val zero : t
 
-  val add : t -> curve_var -> (t, _) checked
+  val add : t -> curve_var -> t checked
 
   (* This is only safe if the result is guaranteed to not be zero. *)
 
-  val unshift_nonzero : t -> (curve_var, _) checked
+  val unshift_nonzero : t -> curve_var checked
 
-  val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+  val if_ : boolean_var -> then_:t -> else_:t -> t checked
 
   module Assert : sig
-    val equal : t -> t -> (unit, _) checked
+    val equal : t -> t -> unit checked
   end
 end
 
@@ -73,13 +73,13 @@ module type Weierstrass_checked_intf = sig
   module Shifted : sig
     module type S =
       Shifted_intf
-      with type ('a, 'b) checked := ('a, 'b) Checked.t
-       and type curve_var := t
-       and type boolean_var := Boolean.var
+        with type 'a checked := 'a Checked.t
+         and type curve_var := t
+         and type boolean_var := Boolean.var
 
     type 'a m = (module S with type t = 'a)
 
-    val create : unit -> ((module S), _) Checked.t
+    val create : unit -> (module S) Checked.t
   end
 
   val negate : t -> t
@@ -87,11 +87,11 @@ module type Weierstrass_checked_intf = sig
   val constant : unchecked -> t
 
   val add_unsafe :
-    t -> t -> ([`I_thought_about_this_very_carefully of t], _) Checked.t
+    t -> t -> [ `I_thought_about_this_very_carefully of t ] Checked.t
 
-  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+  val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
-  val double : t -> (t, _) Checked.t
+  val double : t -> t Checked.t
 
   val if_value : Boolean.var -> then_:unchecked -> else_:unchecked -> t
 
@@ -100,29 +100,29 @@ module type Weierstrass_checked_intf = sig
     -> t
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
-    -> ('s, _) Checked.t
+    -> 's Checked.t
 
   val scale_known :
        's Shifted.m
     -> unchecked
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
-    -> ('s, _) Checked.t
+    -> 's Checked.t
 
-  val sum : 's Shifted.m -> t list -> init:'s -> ('s, _) Checked.t
+  val sum : 's Shifted.m -> t list -> init:'s -> 's Checked.t
 
   module Assert : sig
-    val on_curve : t -> (unit, _) Checked.t
+    val on_curve : t -> unit Checked.t
 
-    val equal : t -> t -> (unit, _) Checked.t
+    val equal : t -> t -> unit Checked.t
   end
 end
 
 module Make_weierstrass_checked
     (F : Snarky_field_extensions.Intf.S) (Scalar : sig
-        type t
+      type t
 
-        val of_int : int -> t
+      val of_int : int -> t
     end) (Curve : sig
       type t
 
@@ -141,13 +141,12 @@ module Make_weierstrass_checked
       val scale : t -> Scalar.t -> t
     end)
     (Params : Params_intf with type field := F.Unchecked.t) (Override : sig
-        val add :
-          (F.t * F.t -> F.t * F.t -> (F.t * F.t, _) F.Impl.Checked.t) option
+      val add : (F.t * F.t -> F.t * F.t -> (F.t * F.t) F.Impl.Checked.t) option
     end) :
   Weierstrass_checked_intf
-  with module Impl := F.Impl
-   and type unchecked := Curve.t
-   and type t = F.t * F.t = struct
+    with module Impl := F.Impl
+     and type unchecked := Curve.t
+     and type t = F.t * F.t = struct
   open F.Impl
 
   type t = F.t * F.t
@@ -160,12 +159,12 @@ module Make_weierstrass_checked
     assert_square y (x3 + ax + constant Params.b)
 
   let typ : (t, Curve.t) Typ.t =
-    let unchecked =
+    let (Typ unchecked) =
       Typ.transport
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    {unchecked with check= assert_on_curve}
+    Typ { unchecked with check = assert_on_curve }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
@@ -201,7 +200,7 @@ module Make_weierstrass_checked
     let%bind () =
       (* lambda^2 = cx + ax + bx
             cx = lambda^2 - (ax + bc)
-        *)
+      *)
       assert_square lambda F.(cx + ax + bx)
     in
     let%bind cy =
@@ -222,8 +221,8 @@ module Make_weierstrass_checked
     match Override.add with Some add -> add p1 p2 | None -> add' ~div p1 p2
 
   (* This function MUST NOT be called UNLESS you are certain the two points
-   on which it is called are not equal. If it is called on equal points,
-   the prover can return almost any curve point they want to from this function. *)
+     on which it is called are not equal. If it is called on equal points,
+     the prover can return almost any curve point they want to from this function. *)
   let add_unsafe p q =
     let%map r = add' ~div:F.div_unsafe p q in
     `I_thought_about_this_very_carefully r
@@ -239,9 +238,9 @@ module Make_weierstrass_checked
   module Shifted = struct
     module type S =
       Shifted_intf
-      with type ('a, 'b) checked := ('a, 'b) Checked.t
-       and type curve_var := t
-       and type boolean_var := Boolean.var
+        with type 'a checked := 'a Checked.t
+         and type curve_var := t
+         and type boolean_var := Boolean.var
 
     type 'a m = (module S with type t = 'a)
 
@@ -265,7 +264,7 @@ module Make_weierstrass_checked
       end
     end
 
-    let create () : ((module S), _) Checked.t =
+    let create () : (module S) Checked.t =
       let%map shift =
         exists typ ~compute:As_prover.(map (return ()) ~f:Curve.random)
       in
@@ -284,8 +283,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
                 let open F.Unchecked in
-                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay)
-            ))
+                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ))
     in
     let%bind bx =
       exists typ
@@ -328,7 +326,7 @@ module Make_weierstrass_checked
   let%snarkydef scale (type shifted)
       (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
-      (shifted, _) Checked.t =
+      shifted Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
     let open Let_syntax in
     let rec go i bs0 acc pt =
@@ -340,16 +338,16 @@ module Make_weierstrass_checked
             with_label (sprintf "acc_%d" i)
               (let%bind add_pt = Shifted.add acc pt in
                let don't_add_pt = acc in
-               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
+               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
           and pt' = double pt in
           go (i + 1) bs acc' pt'
     in
     go 0 c init t
 
   (* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
-   a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for
-   a discussion of this trick.
-*)
+     a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for
+     a discussion of this trick.
+  *)
   let lookup_point (b0, b1) (t1, t2, t3, t4) =
     let%map b0_and_b1 = Boolean.( && ) b0 b1 in
     let lookup_one (a1, a2, a3, a4) =
@@ -384,6 +382,7 @@ module Make_weierstrass_checked
     let sigma = t in
     let n = List.length b in
     let sigma_count = (n + 1) / 2 in
+
     (* = ceil (n / 2.0) *)
     (* We implement a complicated optimzation so that in total
        this costs roughly (1 + 3) * (n / 2) constraints, rather than
@@ -415,6 +414,7 @@ module Make_weierstrass_checked
         , Curve.(sigma + two_to_the_i_plus_1)
         , Curve.(sigma + two_to_the_i + two_to_the_i_plus_1) )
     in
+
     (*
        Say b = b0, b1, .., b_{n-1}.
        We compute
@@ -438,7 +438,7 @@ module Make_weierstrass_checked
       match bits with
       | [] ->
           return acc
-      | [b_i] ->
+      | [ b_i ] ->
           let term =
             lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
           in

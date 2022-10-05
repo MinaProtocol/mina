@@ -1,25 +1,15 @@
-[%%import
-"/src/config.mlh"]
-
+module Prod = Prod
 module Intf = Intf
-
-[%%if
-proof_level = "full"]
-
 module Inputs = Prod.Inputs
 
-[%%else]
-
-module Inputs = Debug.Inputs
-
-[%%endif]
+type Structured_log_events.t += Generating_snark_work_failed
+  [@@deriving register_event { msg = "Failed to generate SNARK work" }]
 
 module Worker = struct
   include Functor.Make (Inputs)
 
   module Rpcs_versioned = struct
     open Core_kernel
-    open Mina_base
     open Signature_lib
 
     module Work = struct
@@ -28,26 +18,27 @@ module Worker = struct
       include Work
     end
 
+    [%%versioned_rpc
     module Get_work = struct
-      module V1 = struct
+      module V2 = struct
         module T = struct
-          type query = unit [@@deriving bin_io, version {rpc}]
+          type query = unit
 
           type response =
-            ( ( Transaction.Stable.V1.t
-              , Transaction_witness.Stable.V1.t
-              , Inputs.Ledger_proof.Stable.V1.t )
-              Snark_work_lib.Work.Single.Spec.Stable.V1.t
+            ( ( Transaction_witness.Stable.V2.t
+              , Inputs.Ledger_proof.Stable.V2.t )
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t )
             option
-          [@@deriving bin_io, version {rpc}]
 
           let query_of_caller_model = Fn.id
 
           let callee_model_of_query = Fn.id
 
-          let response_of_callee_model = Fn.id
+          let response_of_callee_model :
+              Rpcs.Get_work.Master.Callee.response -> response =
+            Fn.id
 
           let caller_model_of_response = Fn.id
         end
@@ -56,23 +47,22 @@ module Worker = struct
         include Rpcs.Get_work.Register (T)
       end
 
-      module Latest = V1
-    end
+      module Latest = V2
+    end]
 
+    [%%versioned_rpc
     module Submit_work = struct
-      module V1 = struct
+      module V2 = struct
         module T = struct
           type query =
-            ( ( Transaction.Stable.V1.t
-              , Transaction_witness.Stable.V1.t
-              , Ledger_proof.Stable.V1.t )
-              Snark_work_lib.Work.Single.Spec.Stable.V1.t
+            ( ( Transaction_witness.Stable.V2.t
+              , Ledger_proof.Stable.V2.t )
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
-            , Ledger_proof.Stable.V1.t )
+            , Ledger_proof.Stable.V2.t )
             Snark_work_lib.Work.Result.Stable.V1.t
-          [@@deriving bin_io, version {rpc}]
 
-          type response = unit [@@deriving bin_io, version {rpc}]
+          type response = unit
 
           let query_of_caller_model = Fn.id
 
@@ -87,8 +77,37 @@ module Worker = struct
         include Rpcs.Submit_work.Register (T)
       end
 
-      module Latest = V1
-    end
+      module Latest = V2
+    end]
+
+    [%%versioned_rpc
+    module Failed_to_generate_snark = struct
+      module V2 = struct
+        module T = struct
+          type query =
+            ( Transaction_witness.Stable.V2.t
+            , Inputs.Ledger_proof.Stable.V2.t )
+            Snark_work_lib.Work.Single.Spec.Stable.V2.t
+            Snark_work_lib.Work.Spec.Stable.V1.t
+            * Public_key.Compressed.Stable.V1.t
+
+          type response = unit
+
+          let query_of_caller_model = Fn.id
+
+          let callee_model_of_query = Fn.id
+
+          let response_of_callee_model = Fn.id
+
+          let caller_model_of_response = Fn.id
+        end
+
+        include T
+        include Rpcs.Failed_to_generate_snark.Register (T)
+      end
+
+      module Latest = V2
+    end]
   end
 
   let command = command_from_rpcs (module Rpcs_versioned)

@@ -3,7 +3,22 @@
  (public_name transaction_protocol_state)
  (library_flags -linkall)
  (inline_tests)
- (libraries core snarky.backendless coda_state mina_base sgn)
+ (libraries
+   ;; opam libraries
+   sexplib0
+   core_kernel
+   core
+   bin_prot.shape
+   base.caml
+   ;; local libraries
+   pickles
+   genesis_constants
+   snark_params
+   snarky.backendless
+   mina_state
+   sgn
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

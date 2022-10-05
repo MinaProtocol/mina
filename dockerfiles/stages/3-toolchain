@@ -1,0 +1,127 @@
+#################################################################################################
+# The "toolchain" Stage
+# - installs optional tools that are required in our CI/CD but are not required to build mina
+#################################################################################################
+FROM opam-deps AS toolchain
+
+ARG deb_codename=focal
+
+ARG DOCKER_VERSION=19.03.4
+ARG TERRAFORM_VERSION=0.14.11
+ARG DEBS3_VERSION=0.11.6
+ARG DHALL_VERSION=1.41.1
+ARG DHALL_JSON_VERSION=1.7.10
+ARG DHALL_BASH_VERSION=1.0.40
+
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
+# location of external packages
+ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
+
+# Rust nightly toolchain for WebAssembly builds
+ARG RUST_NIGHTLY=2022-09-12
+
+ENV PATH "$PATH:$HOME/.cargo/bin"
+
+# don't keep sources, to force reinstall of pinned packages from Mina sources
+# and to keep Docker image reasonable size
+ENV OPAMKEEPBUILDDIR=false
+ENV OPAMREUSEBUILDDIR=false
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# OS package dependencies
+RUN sudo apt-get update -y \
+    && sudo apt-get install -y \
+    apt-transport-https \
+    apt-utils \
+    awscli \
+    cmake \
+    jq \
+    libboost-dev \
+    libboost-program-options-dev \
+    libbz2-dev \
+    libffi-dev \
+    libgmp-dev \
+    libgmp3-dev \
+    libgmp10 \
+    libgomp1 \
+    libjemalloc-dev \
+    libpq-dev \
+    libprocps-dev \
+    libsodium-dev \
+    libssl-dev \
+    lsb-release \
+    m4 \
+    pandoc \
+    patchelf \
+    postgresql \
+    postgresql-contrib \
+    perl \
+    pkg-config \
+    rubygems \
+    zlib1g-dev
+
+# -- Debian Buster python dependencies (largely installed above from apt)
+# Buster images are used in our migrated integration tests which reqiure python2 jinja2
+# Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
+RUN test "$deb_codename" = "buster" \
+    && sudo apt-get install -y \
+    python \
+    python-pip \
+    python-jinja2 \
+    python-flake8 \
+    python-sexpdata \
+    python3-sexpdata \
+    && sudo pip install readchar \
+    || exit 0
+
+# --- deb-s3 tool
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+    && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
+    && rm -f deb-s3-${DEBS3_VERSION}.gem
+
+# --- Docker Daemon
+RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+    && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
+    && sudo mv /tmp/docker/* /usr/bin
+
+# --- Terraform tools
+RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
+    && unzip terraform.zip \
+    && sudo mv terraform /usr/bin \
+    && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+
+# --- Google Cloud tools
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
+    && sudo apt-get update -y \
+    && sudo apt-get install -y google-cloud-sdk kubectl
+
+# --- Helm tools
+RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && sudo apt-get update -y \
+    && sudo apt-get install -y helm
+
+# --- yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
+    && sudo apt update \
+    && sudo apt install -y nodejs yarn
+
+# Dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+
+# --- extra Rust toolchain and wasm-pack for Wasm builds
+RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
+    && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh

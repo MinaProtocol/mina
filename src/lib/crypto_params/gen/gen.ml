@@ -1,18 +1,14 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
-open Core
+open Core_kernel
 module Impl = Pickles.Impls.Step.Internal_Basic
 module Group = Pickles.Backend.Tick.Inner_curve
 
 let group_map_params =
   Group_map.Params.create
     (module Pickles.Backend.Tick.Field)
-    Group.Params.{a; b}
+    Group.Params.{ a; b }
 
 let group_map_params_structure ~loc =
   let module T = struct
@@ -31,9 +27,11 @@ let group_map_params_structure ~loc =
              Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
            [@@deriving bin_io_unversioned]
          end in
-        Core.Binable.of_string
+        Core_kernel.Binable.of_string
           (module T)
-          [%e estring (Core.Binable.to_string (module T) group_map_params)])]
+          [%e
+            estring (Core_kernel.Binable.to_string (module T) group_map_params)]
+        )]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in

@@ -1,20 +1,140 @@
 {
-    "target_epoch_ledgers_state_hash": "3NLCoipk8wFvBZ1EHMyKzNgFEgdQY3MzoMcBd5Gh4QUqUVPz4sue",
-    "genesis_ledger": {
-        "accounts": [
-            {
-                "pk": "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g",
-                "balance": "66000",
-                "sk": null,
-                "delegate": null
-            },
-            {
-                "pk": "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf",
-                "balance": "0.000000001",
-                "sk": null,
-                "delegate": null
-            }
-        ],
-        "add_genesis_winner": false
-    }
+  "genesis_ledger": {
+    "accounts": [
+      {
+        "pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+        "token_permissions": {},
+        "balance": "1000000000",
+        "nonce": "0",
+        "receipt_chain_hash": "2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe",
+        "delegate": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        },
+        "snapp": null
+      },
+      {
+        "pk": "B62qjJwgq7kNXYHXQsMeyiMWL7fHsnPeuAiPfYd3yTor3eKpK8VV1gG",
+        "delegate": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+        "token_permissions": {},
+        "balance": "1000000000",
+        "nonce": "0",
+        "receipt_chain_hash": "2mzhRazYextcWnQ81n5CGTrFD2Rx5dAS6rYjAeYCEyfhUjZUzYFy",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        }
+      },
+      {
+        "pk": "B62qrbENDJv8qrQ5sJoGhzmA7rxT571StwTzqZ8veiPMh5guLcPQ6XW",
+        "balance": "1000000000",
+        "delegate": "B62qrbENDJv8qrQ5sJoGhzmA7rxT571StwTzqZ8veiPMh5guLcPQ6XW",
+        "token_permissions": {},
+        "nonce": "30",
+        "receipt_chain_hash": "2n28bLJpCLPYEgNqp7rQosEHQdfqSzBSjwX52jMDZbe34d9wExef",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "receive": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        }
+      },
+      {
+        "pk": "B62qjwvvHoM9RVt9onMpSMS5rFzhy3jjXY1Q9JU7HyHW4oWFEbWpghe",
+        "balance": "100000000",
+        "delegate": "B62qjwvvHoM9RVt9onMpSMS5rFzhy3jjXY1Q9JU7HyHW4oWFEbWpghe",
+        "token_permissions": {},
+        "nonce": "1",
+        "receipt_chain_hash": "2n16Uzkm9ABP5XHKJj81zD3EnbURJf5GykKxhNRrspMus1NNeXvL",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "receive": "proof",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        }
+      },
+      {
+        "pk": "B62qpgJJN3ZE56rVN8Q8Gx6XsGMkiESqDnnjAC8AtLrkioxqo2gD4wt",
+        "balance": "0",
+        "delegate": "B62qpgJJN3ZE56rVN8Q8Gx6XsGMkiESqDnnjAC8AtLrkioxqo2gD4wt",
+        "token_permissions": {},
+        "nonce": "907",
+        "receipt_chain_hash": "2n1VHJxAsZy8krLNTbTocdwMh2XLEexuz1Y21QJgMVNQjDGCqhKk",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "signature",
+          "set_verification_key": "signature"
+        }
+      },
+      {
+        "pk": "B62qjW4wkRcDv3Z6GWd83LK4NcGe6id4fKPmNybjFSDvCDs5uizf8Lj",
+        "balance": "0",
+        "delegate": "B62qjW4wkRcDv3Z6GWd83LK4NcGe6id4fKPmNybjFSDvCDs5uizf8Lj",
+        "token_permissions": {},
+        "nonce": "293",
+        "receipt_chain_hash": "2mzaNmmgKfkbziZZgGhdyMjYXgpnLDSZb3zsMmR7atQudvXuXFDn",
+        "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+        "snapp": {
+          "state": [
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "verification_key": null,
+          "snapp_version": "0",
+          "sequence_state": [
+            "13474767002023316877791367175498367355298038424545738388029053206239354049137",
+            "13474767002023316877791367175498367355298038424545738388029053206239354049137",
+            "13474767002023316877791367175498367355298038424545738388029053206239354049137",
+            "13474767002023316877791367175498367355298038424545738388029053206239354049137",
+            "13474767002023316877791367175498367355298038424545738388029053206239354049137"
+          ],
+          "last_sequence_slot": 0,
+          "proved_state": false
+        },
+        "permissions": {
+          "stake": true,
+          "edit_state": "signature",
+          "send": "signature",
+          "set_delegate": "signature",
+          "set_permissions": "proof",
+          "set_verification_key": "signature",
+          "set_snapp_uri": "signature",
+          "edit_sequence_state": "signature",
+          "set_token_symbol": "signature"
+        },
+        "token_symbol": "",
+        "snapp_uri": ""
+      }
+    ],
+    "add_genesis_winner": true
+  }
 }

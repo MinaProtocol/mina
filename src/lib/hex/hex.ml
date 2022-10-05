@@ -150,18 +150,22 @@ module Sequence_be = struct
   let to_bigstring = to_bytes_like ~init:Bigstring.init
 end
 
-let decode ?(pos = 0) ~init t =
+let decode ?(reverse = false) ?(pos = 0) ~init t =
   let n = String.length t - pos in
   let k = n / 2 in
   assert (n = k + k) ;
   let h j = Digit.(to_int (of_char_exn t.[pos + j])) in
-  init k ~f:(fun i -> Char.of_int_exn ((16 * h (2 * i)) + h ((2 * i) + 1)))
+  init k ~f:(fun i ->
+      let i = if reverse then k - 1 - i else i in
+      Char.of_int_exn ((16 * h (2 * i)) + h ((2 * i) + 1)) )
 
-let encode t =
-  String.init
-    (2 * String.length t)
-    ~f:(fun i ->
-      let c = Char.to_int t.[i / 2] in
+let encode ?(reverse = false) t =
+  let n = String.length t in
+  String.init (2 * n) ~f:(fun i ->
+      let c =
+        let byte = i / 2 in
+        Char.to_int t.[if reverse then n - 1 - byte else byte]
+      in
       let c = if i mod 2 = 0 then (* hi *)
                 c lsr 4 else (* lo *)
                           c in
@@ -171,6 +175,9 @@ let%test_unit "decode" =
   let t = String.init 100 ~f:(fun _ -> Char.of_int_exn (Random.int 256)) in
   let h = encode t in
   assert (String.equal t (decode ~init:String.init h)) ;
+  assert (
+    String.equal t
+      (decode ~reverse:true ~init:String.init (encode ~reverse:true t)) ) ;
   assert (String.equal t Sequence_be.(to_string (decode h)))
 
 (* TODO: Better deduplicate the hex coding between these two implementations #5711 *)
@@ -190,7 +197,7 @@ module Safe = struct
            in
            let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
            let lo = charify (Char.to_int c land 0x0F) in
-           String.of_char_list [high; lo] )
+           String.of_char_list [ high; lo ] )
     |> String.concat
 
   let%test_unit "to_hex sane" =
@@ -218,7 +225,7 @@ module Safe = struct
     String.to_list hex |> List.chunks_of ~length:2
     |> List.fold_result ~init:[] ~f:(fun acc chunk ->
            match chunk with
-           | [a; b] when Char.is_alphanum a && Char.is_alphanum b ->
+           | [ a; b ] when Char.is_alphanum a && Char.is_alphanum b ->
                Or_error.return
                @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
            | _ ->
@@ -227,7 +234,7 @@ module Safe = struct
     |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
 
   let%test_unit "partial isomorphism" =
-    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:["\243"; "abc"]
+    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:[ "\243"; "abc" ]
       Quickcheck.Generator.(map (list char) ~f:String.of_char_list)
       ~f:(fun s ->
         let hexified = to_hex s in

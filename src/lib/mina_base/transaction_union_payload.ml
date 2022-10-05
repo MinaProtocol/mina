@@ -1,36 +1,28 @@
 (* transaction_union_payload.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
-open Snark_params.Tick
-open Signature_lib
 open Currency
 
-[%%else]
+[%%ifdef consensus_mechanism]
 
-open Signature_lib_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-open Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+open Snark_params.Tick
 
 [%%endif]
 
+open Signature_lib
 module Tag = Transaction_union_tag
 
 module Body = struct
   type ('tag, 'public_key, 'token_id, 'amount, 'bool) t_ =
-    { tag: 'tag
-    ; source_pk: 'public_key
-    ; receiver_pk: 'public_key
-    ; token_id: 'token_id
-    ; amount: 'amount
-    ; token_locked: 'bool }
+    { tag : 'tag
+    ; source_pk : 'public_key
+    ; receiver_pk : 'public_key
+    ; token_id : 'token_id
+    ; amount : 'amount
+    ; token_locked : 'bool
+    }
   [@@deriving sexp, hlist]
 
   type t =
@@ -38,43 +30,22 @@ module Body = struct
   [@@deriving sexp]
 
   let of_user_command_payload_body = function
-    | Signed_command_payload.Body.Payment
-        {source_pk; receiver_pk; token_id; amount} ->
-        { tag= Tag.Payment
+    | Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount } ->
+        { tag = Tag.Payment
         ; source_pk
         ; receiver_pk
-        ; token_id
+        ; token_id = Token_id.default
         ; amount
-        ; token_locked= false }
-    | Stake_delegation (Set_delegate {delegator; new_delegate}) ->
-        { tag= Tag.Stake_delegation
-        ; source_pk= delegator
-        ; receiver_pk= new_delegate
-        ; token_id= Token_id.default
-        ; amount= Currency.Amount.zero
-        ; token_locked= false }
-    | Create_new_token {token_owner_pk; disable_new_accounts} ->
-        { tag= Tag.Create_account
-        ; source_pk= token_owner_pk
-        ; receiver_pk= token_owner_pk
-        ; token_id= Token_id.invalid
-        ; amount= Currency.Amount.zero
-        ; token_locked= disable_new_accounts }
-    | Create_token_account
-        {token_id; token_owner_pk; receiver_pk; account_disabled} ->
-        { tag= Tag.Create_account
-        ; source_pk= token_owner_pk
-        ; receiver_pk
-        ; token_id
-        ; amount= Currency.Amount.zero
-        ; token_locked= account_disabled }
-    | Mint_tokens {token_id; token_owner_pk; receiver_pk; amount} ->
-        { tag= Tag.Mint_tokens
-        ; source_pk= token_owner_pk
-        ; receiver_pk
-        ; token_id
-        ; amount
-        ; token_locked= false }
+        ; token_locked = false
+        }
+    | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
+        { tag = Tag.Stake_delegation
+        ; source_pk = delegator
+        ; receiver_pk = new_delegate
+        ; token_id = Token_id.default
+        ; amount = Currency.Amount.zero
+        ; token_locked = false
+        }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -96,8 +67,8 @@ module Body = struct
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
             (* In this case,
-             amount - fee should be defined. In other words,
-             amount >= fee *)
+               amount - fee should be defined. In other words,
+               amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
         | Mint_tokens ->
             (Amount.zero, Amount.max_int)
@@ -126,97 +97,186 @@ module Body = struct
       | Stake_delegation ->
           return Token_id.default
       | Create_account ->
-          Token_id.gen_with_invalid
+          Token_id.gen
       | Mint_tokens ->
-          Token_id.gen_non_default
+          Token_id.gen
       | Fee_transfer ->
           return Token_id.default
       | Coinbase ->
           return Token_id.default
     in
-    {tag; source_pk; receiver_pk; token_id; amount; token_locked}
+    { tag; source_pk; receiver_pk; token_id; amount; token_locked }
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   type var =
     ( Tag.Unpacked.var
     , Public_key.Compressed.var
-    , Token_id.var
+    , Token_id.Checked.t
     , Currency.Amount.var
     , Boolean.var )
     t_
 
-  let spec =
-    Data_spec.
+  let typ =
+    Typ.of_hlistable
       [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
       ; Token_id.typ
       ; Currency.Amount.typ
-      ; Boolean.typ ]
-
-  let typ =
-    Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
+      ; Boolean.typ
+      ]
+      ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
     let constant
-        ({tag; source_pk; receiver_pk; token_id; amount; token_locked} : t) :
+        ({ tag; source_pk; receiver_pk; token_id; amount; token_locked } : t) :
         var =
-      { tag= Tag.unpacked_of_t tag
-      ; source_pk= Public_key.Compressed.var_of_t source_pk
-      ; receiver_pk= Public_key.Compressed.var_of_t receiver_pk
-      ; token_id= Token_id.var_of_t token_id
-      ; amount= Currency.Amount.var_of_t amount
-      ; token_locked= Boolean.var_of_value token_locked }
+      { tag = Tag.unpacked_of_t tag
+      ; source_pk = Public_key.Compressed.var_of_t source_pk
+      ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
+      ; token_id = Token_id.Checked.constant token_id
+      ; amount = Currency.Amount.var_of_t amount
+      ; token_locked = Boolean.var_of_value token_locked
+      }
 
-    let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked}
-        =
-      let%map token_id = Token_id.Checked.to_input token_id in
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Tag.Unpacked.to_input tag
-         ; Public_key.Compressed.Checked.to_input source_pk
-         ; Public_key.Compressed.Checked.to_input receiver_pk
+    let to_input_legacy
+        { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+      let%map amount = Currency.Amount.var_to_input_legacy amount
+      and () =
+        make_checked (fun () ->
+            Token_id.Checked.Assert.equal token_id
+              (Token_id.Checked.constant Token_id.default) )
+      in
+      let token_id = Signed_command_payload.Legacy_token_id.default_checked in
+      Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+        [| Tag.Unpacked.to_input_legacy tag
+         ; Public_key.Compressed.Checked.to_input_legacy source_pk
+         ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
          ; token_id
-         ; Currency.Amount.var_to_input amount
-         ; Random_oracle.Input.bitstring [token_locked] |]
+         ; amount
+         ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+        |]
   end
 
   [%%endif]
 
-  let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked} =
-    Array.reduce_exn ~f:Random_oracle.Input.append
-      [| Tag.to_input tag
-       ; Public_key.Compressed.to_input source_pk
-       ; Public_key.Compressed.to_input receiver_pk
-       ; Token_id.to_input token_id
-       ; Currency.Amount.to_input amount
-       ; Random_oracle.Input.bitstring [token_locked] |]
+  let to_input_legacy
+      { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+    assert (Token_id.equal token_id Token_id.default) ;
+    Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
+      [| Tag.to_input_legacy tag
+       ; Public_key.Compressed.to_input_legacy source_pk
+       ; Public_key.Compressed.to_input_legacy receiver_pk
+       ; Signed_command_payload.Legacy_token_id.default
+       ; Currency.Amount.to_input_legacy amount
+       ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+      |]
 end
 
-type t =
-  (Signed_command_payload.Common.t, Body.t) Signed_command_payload.Poly.t
+module Payload_common = struct
+  module Poly = struct
+    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+      { fee : 'fee
+      ; fee_token : 'token_id
+      ; fee_payer_pk : 'public_key
+      ; nonce : 'nonce
+      ; valid_until : 'global_slot
+      ; memo : 'memo
+      }
+    [@@deriving sexp, hlist]
+  end
+
+  let to_signed_command_payload_common
+      { Poly.fee; fee_payer_pk; nonce; valid_until; memo; fee_token = _ } =
+    { Signed_command_payload.Common.Poly.fee
+    ; fee_payer_pk
+    ; nonce
+    ; valid_until
+    ; memo
+    }
+
+  type t =
+    ( Currency.Fee.t
+    , Public_key.Compressed.t
+    , Token_id.t
+    , Mina_numbers.Account_nonce.t
+    , Mina_numbers.Global_slot.t
+    , Signed_command_memo.t )
+    Poly.t
+  [@@deriving sexp]
+
+  [%%ifdef consensus_mechanism]
+
+  module Checked = struct
+    type value = t
+
+    type t =
+      ( Currency.Fee.Checked.t
+      , Public_key.Compressed.var
+      , Token_id.Checked.t
+      , Mina_numbers.Account_nonce.Checked.t
+      , Mina_numbers.Global_slot.Checked.t
+      , Signed_command_memo.Checked.t )
+      Poly.t
+
+    let constant
+        ({ fee; fee_payer_pk; nonce; valid_until; memo; fee_token } : value) : t
+        =
+      { fee = Currency.Fee.var_of_t fee
+      ; fee_payer_pk = Public_key.Compressed.var_of_t fee_payer_pk
+      ; fee_token = Token_id.Checked.constant fee_token
+      ; nonce = Mina_numbers.Account_nonce.Checked.constant nonce
+      ; memo = Signed_command_memo.Checked.constant memo
+      ; valid_until = Mina_numbers.Global_slot.Checked.constant valid_until
+      }
+  end
+
+  let typ : (Checked.t, t) Typ.t =
+    let open Poly in
+    Typ.of_hlistable
+      [ Currency.Fee.typ
+      ; Token_id.typ
+      ; Public_key.Compressed.typ
+      ; Mina_numbers.Account_nonce.typ
+      ; Mina_numbers.Global_slot.typ
+      ; Signed_command_memo.typ
+      ]
+      ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_of_hlist:of_hlist
+
+  [%%endif]
+end
+
+type t = (Payload_common.t, Body.t) Signed_command_payload.Poly.t
 [@@deriving sexp]
 
 type payload = t [@@deriving sexp]
 
-let of_user_command_payload ({common; body} : Signed_command_payload.t) : t =
-  {common; body= Body.of_user_command_payload_body body}
+let of_user_command_payload
+    ({ common = { memo; fee; fee_payer_pk; nonce; valid_until }; body } :
+      Signed_command_payload.t ) : t =
+  { common =
+      { fee
+      ; fee_token = Token_id.default
+      ; fee_payer_pk
+      ; nonce
+      ; valid_until
+      ; memo
+      }
+  ; body = Body.of_user_command_payload_body body
+  }
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind common =
-    Signed_command_payload.Common.gen ~fee_token_id:Token_id.default ()
-  in
+  let%bind common = Signed_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
-  Signed_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{ common; body }
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
-type var =
-  (Signed_command_payload.Common.var, Body.var) Signed_command_payload.Poly.t
+type var = (Payload_common.Checked.t, Body.var) Signed_command_payload.Poly.t
 
 type payload_var = var
 
@@ -224,29 +284,33 @@ let typ : (var, t) Typ.t =
   let to_hlist = Signed_command_payload.Poly.to_hlist in
   let of_hlist = Signed_command_payload.Poly.of_hlist in
   Typ.of_hlistable
-    [Signed_command_payload.Common.typ; Body.typ]
+    [ Payload_common.typ; Body.typ ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 let payload_typ = typ
 
 module Checked = struct
-  let to_input ({common; body} : var) =
-    let%map common = Signed_command_payload.Common.Checked.to_input common
-    and body = Body.Checked.to_input body in
-    Random_oracle.Input.append common body
+  let to_input_legacy ({ common; body } : var) =
+    let%map common =
+      Signed_command_payload.Common.Checked.to_input_legacy
+        (Payload_common.to_signed_command_payload_common common)
+    and body = Body.Checked.to_input_legacy body in
+    Random_oracle.Input.Legacy.append common body
 
-  let constant ({common; body} : t) : var =
-    { common= Signed_command_payload.Common.Checked.constant common
-    ; body= Body.Checked.constant body }
+  let constant ({ common; body } : t) : var =
+    { common = Payload_common.Checked.constant common
+    ; body = Body.Checked.constant body
+    }
 end
 
 [%%endif]
 
-let to_input ({common; body} : t) =
-  Random_oracle.Input.append
-    (Signed_command_payload.Common.to_input common)
-    (Body.to_input body)
+let to_input_legacy ({ common; body } : t) =
+  Random_oracle.Input.Legacy.append
+    (Signed_command_payload.Common.to_input_legacy
+       (Payload_common.to_signed_command_payload_common common) )
+    (Body.to_input_legacy body)
 
 let excess (payload : t) : Amount.Signed.t =
   let tag = payload.body.tag in
@@ -262,35 +326,24 @@ let excess (payload : t) : Amount.Signed.t =
   | Coinbase ->
       Amount.Signed.zero
 
-let fee_excess ({body= {tag; amount; _}; common= {fee_token; fee; _}} : t) =
+let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
   | Payment | Stake_delegation | Create_account | Mint_tokens ->
       (* For all user commands, the fee excess is just the fee. *)
-      Fee_excess.of_single (fee_token, Fee.Signed.of_unsigned fee)
+      Fee_excess.of_single (Token_id.default, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
       let excess =
         Option.value_exn (Amount.add_fee amount fee)
         |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
       in
-      Fee_excess.of_single (fee_token, excess)
+      Fee_excess.of_single (Token_id.default, excess)
   | Coinbase ->
       Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
-let supply_increase (payload : payload) =
+let expected_supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
       payload.body.amount
   | Payment | Stake_delegation | Create_account | Mint_tokens | Fee_transfer ->
       Amount.zero
-
-let next_available_token (payload : payload) tid =
-  match payload.body.tag with
-  | Payment | Stake_delegation | Mint_tokens | Coinbase | Fee_transfer ->
-      tid
-  | Create_account when Token_id.(equal invalid) payload.body.token_id ->
-      (* Creating a new token. *)
-      Token_id.next tid
-  | Create_account ->
-      (* Creating an account for an existing token. *)
-      tid

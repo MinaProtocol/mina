@@ -7,12 +7,13 @@
  *)
 
 type t =
-  { blockchain: string
+  { blockchain : string
   ; (* If a blockchain has a specific chain-id or network identifier, it should go in this field. It is up to the client to determine which network-specific identifier is mainnet or testnet. *)
-    network: string
-  ; sub_network_identifier: Sub_network_identifier.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+    network : string
+  ; sub_network_identifier : Sub_network_identifier.t option [@default None]
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** The network_identifier specifies which network a particular object is associated with. *)
 let create (blockchain : string) (network : string) : t =
-  {blockchain; network; sub_network_identifier= None}
+  { blockchain; network; sub_network_identifier = None }

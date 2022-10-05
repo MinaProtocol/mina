@@ -1,0 +1,21 @@
+testnetName: "mina-testnet"
+name: "watchdog"
+
+mina:
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "8000"
+    p2p: "10909"
+  uploadBlocksToGCloud: false
+
+image: gcr.io/o1labs-192920/watchdog:0.3.7
+
+restartEveryMins: ""
+restartNodes: ""
+makeReports: ""
+makeReportEveryMins: ""
+makeReportDiscordWebhookUrl: ""
+makeReportAccounts: ""
+seedPeersURL: ""

@@ -1,0 +1,12 @@
+(library
+ (public_name cache_dir.fake)
+ (name cache_dir_fake)
+ (libraries
+   ; opam deps
+   async_kernel
+   core_kernel
+   ; libs
+   key_cache)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (implements cache_dir))

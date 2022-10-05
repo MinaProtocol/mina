@@ -1,10 +1,58 @@
 (executable
  (name client_sdk)
  (modes js)
- (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries snark_params_nonconsensus rosetta_lib_nonconsensus mina_base_nonconsensus data_hash_lib_nonconsensus
-            random_oracle_nonconsensus signature_lib_nonconsensus zarith_stubs_js integers integers_stubs_js js_of_ocaml
-            digestif.ocaml)
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
+ (libraries
+  ;; opam libraries
+  js_of_ocaml
+  integers
+  core_kernel
+  zarith_stubs_js
+  digestif.ocaml
+  base
+  yojson
+  ppx_deriving.runtime
+  result
+  ppx_deriving_yojson.runtime
+  bignum.bigint
+  ;; local libraries
+  bignum_bigint
+  sponge
+  integers_stubs_js
+  snark_params
+  rosetta_lib
+  mina_base
+  mina_base.import
+  mina_numbers
+  data_hash_lib
+  pickles
+  pickles.backend
+  kimchi_backend
+  kimchi_backend.pasta
+  snarky.backendless
+  random_oracle
+  random_oracle.permutation.ocaml
+  signature_lib
+  string_sign
+  hex
+  mina_signature_kind
+  random_oracle_input
+  snarkette
+  currency
+  rosetta_coding
+  cache_dir.fake
+  run_in_thread.fake
+  mina_metrics.none
+  bindings_js
+  node_backend
+  mina_transaction)
+ (link_deps
+  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))
+ (instrumentation
+  (backend bisect_ppx))
+ (forbidden_libraries async core re2 ctypes)
+ (preprocess
+  (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))

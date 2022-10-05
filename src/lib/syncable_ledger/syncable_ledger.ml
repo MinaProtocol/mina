@@ -1,10 +1,10 @@
-open Core
+open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Network_peer
 
 type Structured_log_events.t += Snarked_ledger_synced
-  [@@deriving register_event {msg= "Snarked database sync'd. All done"}]
+  [@@deriving register_event { msg = "Snarked database sync'd. All done" }]
 
 (** Run f recursively n times, starting with value r.
     e.g. funpow 3 f r = f (f (f r)) *)
@@ -23,7 +23,7 @@ module Query = struct
         | Num_accounts
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
-      [@@deriving sexp, yojson]
+      [@@deriving sexp, yojson, hash, compare]
     end
   end]
 end
@@ -41,6 +41,14 @@ module Answer = struct
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
       [@@deriving sexp, yojson]
+
+      let to_latest acct_to_latest = function
+        | Child_hashes_are (h1, h2) ->
+            Child_hashes_are (h1, h2)
+        | Contents_are accts ->
+            Contents_are (List.map ~f:acct_to_latest accts)
+        | Num_accounts (i, h) ->
+            Num_accounts (i, h)
     end
   end]
 end
@@ -55,20 +63,18 @@ module type Inputs_intf = sig
   module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
 
   module Root_hash : sig
-    type t [@@deriving eq, sexp, yojson]
+    type t [@@deriving equal, sexp, yojson]
 
     val to_hash : t -> Hash.t
   end
 
   module MT :
     Merkle_ledger.Syncable_intf.S
-    with type hash := Hash.t
-     and type root_hash := Root_hash.t
-     and type addr := Addr.t
-     and type account := Account.t
+      with type hash := Hash.t
+       and type root_hash := Root_hash.t
+       and type addr := Addr.t
+       and type account := Account.t
 
-  (** Fetch all the accounts in subtrees of this size at once, rather than
-      recursively one at a time *)
   val account_subtree_height : int
 end
 
@@ -125,7 +131,7 @@ module type S = sig
     -> root_hash
     -> data:'a
     -> equal:('a -> 'a -> bool)
-    -> [`Repeat | `New | `Update_data]
+    -> [ `Repeat | `New | `Update_data ]
 
   val peek_valid_tree : 'a t -> merkle_tree option
 
@@ -134,7 +140,7 @@ module type S = sig
   val wait_until_valid :
        'a t
     -> root_hash
-    -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
+    -> [ `Ok of merkle_tree | `Target_changed of root_hash option * root_hash ]
        Deferred.t
 
   val fetch :
@@ -142,7 +148,7 @@ module type S = sig
     -> root_hash
     -> data:'a
     -> equal:('a -> 'a -> bool)
-    -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
+    -> [ `Ok of merkle_tree | `Target_changed of root_hash option * root_hash ]
        Deferred.t
 
   val apply_or_queue_diff : 'a t -> diff -> unit
@@ -196,14 +202,14 @@ module Make (Inputs : Inputs_intf) : sig
 
   include
     S
-    with type merkle_tree := MT.t
-     and type hash := Hash.t
-     and type root_hash := Root_hash.t
-     and type addr := Addr.t
-     and type merkle_path := MT.path
-     and type account := Account.t
-     and type query := Addr.t Query.t
-     and type answer := (Hash.t, Account.t) Answer.t
+      with type merkle_tree := MT.t
+       and type hash := Hash.t
+       and type root_hash := Root_hash.t
+       and type addr := Addr.t
+       and type merkle_path := MT.path
+       and type account := Account.t
+       and type query := Addr.t Query.t
+       and type answer := (Hash.t, Account.t) Answer.t
 end = struct
   open Inputs
 
@@ -217,10 +223,11 @@ end = struct
 
   module Responder = struct
     type t =
-      { mt: MT.t
-      ; f: query -> unit
-      ; logger: Logger.t
-      ; trust_system: Trust_system.t }
+      { mt : MT.t
+      ; f : query -> unit
+      ; logger : Logger.t
+      ; trust_system : Trust_system.t
+      }
 
     let create :
            MT.t
@@ -228,11 +235,11 @@ end = struct
         -> logger:Logger.t
         -> trust_system:Trust_system.t
         -> t =
-     fun mt f ~logger ~trust_system -> {mt; f; logger; trust_system}
+     fun mt f ~logger ~trust_system -> { mt; f; logger; trust_system }
 
     let answer_query :
         t -> query Envelope.Incoming.t -> answer option Deferred.t =
-     fun {mt; f; logger; trust_system} query_envelope ->
+     fun { mt; f; logger; trust_system } query_envelope ->
       let open Trust_system in
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
@@ -241,35 +248,35 @@ end = struct
       let response_or_punish =
         match query with
         | What_child_hashes a -> (
-          match
-            let open Or_error.Let_syntax in
-            let%bind lchild = Addr.child ~ledger_depth a Direction.Left in
-            let%bind rchild = Addr.child ~ledger_depth a Direction.Right in
-            Or_error.try_with (fun () ->
-                Answer.Child_hashes_are
-                  ( MT.get_inner_hash_at_addr_exn mt lchild
-                  , MT.get_inner_hash_at_addr_exn mt rchild ) )
-          with
-          | Ok answer ->
-              Either.First answer
-          | Error e ->
-              let logger = Logger.create () in
-              [%log error]
-                ~metadata:[("error", Error_json.error_to_yojson e)]
-                "When handling What_child_hashes request, the following error \
-                 happended: $error" ;
-              Either.Second
-                ( Actions.Violated_protocol
-                , Some
-                    ( "invalid address $addr in What_child_hashes request"
-                    , [("addr", Addr.to_yojson a)] ) ) )
+            match
+              let open Or_error.Let_syntax in
+              let%bind lchild = Addr.child ~ledger_depth a Direction.Left in
+              let%bind rchild = Addr.child ~ledger_depth a Direction.Right in
+              Or_error.try_with (fun () ->
+                  Answer.Child_hashes_are
+                    ( MT.get_inner_hash_at_addr_exn mt lchild
+                    , MT.get_inner_hash_at_addr_exn mt rchild ) )
+            with
+            | Ok answer ->
+                Either.First answer
+            | Error e ->
+                let logger = Logger.create () in
+                [%log error]
+                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                  "When handling What_child_hashes request, the following \
+                   error happended: $error" ;
+                Either.Second
+                  ( Actions.Violated_protocol
+                  , Some
+                      ( "invalid address $addr in What_child_hashes request"
+                      , [ ("addr", Addr.to_yojson a) ] ) ) )
         | What_contents a ->
             if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
                     ( "requested too big of a subtree at once: $addr"
-                    , [("addr", Addr.to_yojson a)] ) )
+                    , [ ("addr", Addr.to_yojson a) ] ) )
             else
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -285,7 +292,7 @@ end = struct
                   ( Actions.Violated_protocol
                   , Some
                       ( "Requested empty subtree: $addr"
-                      , [("addr", Addr.to_yojson a)] ) )
+                      , [ ("addr", Addr.to_yojson a) ] ) )
               else
                 let first_address, rest_address =
                   (List.hd_exn addresses, List.tl_exn addresses)
@@ -294,7 +301,10 @@ end = struct
                   List.fold rest_address
                     ~init:(Addr.next first_address, true)
                     ~f:(fun (expected_address, is_compact) actual_address ->
-                      if is_compact && expected_address = Some actual_address
+                      if
+                        is_compact
+                        && [%equal: Addr.t option] expected_address
+                             (Some actual_address)
                       then (Addr.next actual_address, true)
                       else (expected_address, false) )
                 in
@@ -310,7 +320,9 @@ end = struct
                                ~f:(fun (addr, account) ->
                                  `Tuple
                                    [ Addr.to_yojson addr
-                                   ; Account.to_yojson account ] )) ) ]
+                                   ; Account.to_yojson account
+                                   ] ) ) )
+                      ]
                     "Missing an account at address: $missing_address inside \
                      the list: $addresses_and_accounts" ;
                   assert false )
@@ -327,7 +339,7 @@ end = struct
             in
             Either.First
               (Num_accounts
-                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
+                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
       in
       match response_or_punish with
       | Either.First answer ->
@@ -340,29 +352,30 @@ end = struct
   end
 
   type 'a t =
-    { mutable desired_root: Root_hash.t option
-    ; mutable auxiliary_data: 'a option
-    ; tree: MT.t
-    ; logger: Logger.t
-    ; trust_system: Trust_system.t
-    ; answers:
+    { mutable desired_root : Root_hash.t option
+    ; mutable auxiliary_data : 'a option
+    ; tree : MT.t
+    ; logger : Logger.t
+    ; trust_system : Trust_system.t
+    ; answers :
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
-    ; answer_writer:
+    ; answer_writer :
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
-    ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
-    ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
-    ; waiting_parents: Hash.t Addr.Table.t
+    ; queries : (Root_hash.t * query) Linear_pipe.Writer.t
+    ; query_reader : (Root_hash.t * query) Linear_pipe.Reader.t
+    ; waiting_parents : Hash.t Addr.Table.t
           (** Addresses we are waiting for the children of, and the expected
               hash of the node with the address. *)
-    ; waiting_content: Hash.t Addr.Table.t
-    ; mutable validity_listener:
-        [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
+    ; waiting_content : Hash.t Addr.Table.t
+    ; mutable validity_listener :
+        [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
+    }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 
   let sexp_of_t _ = failwith "sexp_of_t: not implemented"
 
-  let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
+  let desired_root_exn { desired_root; _ } = desired_root |> Option.value_exn
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
@@ -377,7 +390,8 @@ end = struct
     [%log' trace t.logger]
       ~metadata:
         [ ("parent_address", Addr.to_yojson parent_addr)
-        ; ("hash", Hash.to_yojson expected) ]
+        ; ("hash", Hash.to_yojson expected)
+        ]
       "Expecting children parent $parent_address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
@@ -385,7 +399,7 @@ end = struct
    fun t addr expected ->
     [%log' trace t.logger]
       ~metadata:
-        [("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected)]
+        [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
@@ -447,7 +461,7 @@ end = struct
         not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
       in
       let subtrees_to_fetch =
-        [(la, lh); (ra, rh)]
+        [ (la, lh); (ra, rh) ]
         |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
       in
       Addr.Table.remove t.waiting_parents parent_addr ;
@@ -457,7 +471,10 @@ end = struct
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else Ivar.fill t.validity_listener `Ok
+    else (
+      if Ivar.is_full t.validity_listener then
+        [%log' error t.logger] "Ivar.fill bug is here!" ;
+      Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
@@ -495,7 +512,8 @@ end = struct
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
   let handle_num_accounts :
-      'a t -> int -> Hash.t -> [`Success | `Hash_mismatch of Hash.t * Hash.t] =
+      'a t -> int -> Hash.t -> [ `Success | `Hash_mismatch of Hash.t * Hash.t ]
+      =
    fun t n content_hash ->
     let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
@@ -522,24 +540,22 @@ end = struct
           the t and the underlying ledger can change while processing is
           happening. *)
       let already_done =
-        match Ivar.peek t.validity_listener with
-        | Some `Ok ->
-            true
-        | _ ->
-            false
+        match Ivar.peek t.validity_listener with Some `Ok -> true | _ -> false
       in
       let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
       [%log' trace t.logger]
         ~metadata:
           [ ("root_hash", Root_hash.to_yojson root_hash)
-          ; ("query", Query.to_yojson Addr.to_yojson query) ]
+          ; ("query", Query.to_yojson Addr.to_yojson query)
+          ]
         "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         [%log' trace t.logger]
           ~metadata:
             [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
-            ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
+            ; ("ignored_hash", Root_hash.to_yojson root_hash)
+            ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
         Deferred.unit )
       else if already_done then (
@@ -553,75 +569,77 @@ end = struct
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries
-            (root_hash, query)
+          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
         in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system t.logger sender
             ( Actions.Fulfilled_request
             , Some
                 ( "sync ledger query $query"
-                , [("query", Query.to_yojson Addr.to_yojson query)] ) )
+                , [ ("query", Query.to_yojson Addr.to_yojson query) ] ) )
         in
         let%bind _ =
           match (query, answer) with
           | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
-            match add_child_hashes_to t addr lh rh with
-            | `Hash_mismatch (expected, actual) ->
-                let%map () =
-                  record_envelope_sender t.trust_system t.logger sender
-                    ( Actions.Sent_bad_hash
-                    , Some
-                        ( "sent child hashes $lhash and $rhash for address \
-                           $addr, they merge hash to $actualmerge but we \
-                           expected $expectedmerge"
-                        , [ ("lhash", Hash.to_yojson lh)
-                          ; ("rhash", Hash.to_yojson rh)
-                          ; ("actualmerge", Hash.to_yojson actual)
-                          ; ("expectedmerge", Hash.to_yojson expected) ] ) )
-                in
-                requeue_query ()
-            | `Good children_to_verify ->
-                (* TODO #312: Make sure we don't write too much *)
-                List.iter children_to_verify ~f:(fun (addr, hash) ->
-                    handle_node t addr hash ) ;
-                credit_fulfilled_request () )
+              match add_child_hashes_to t addr lh rh with
+              | `Hash_mismatch (expected, actual) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "sent child hashes $lhash and $rhash for address \
+                             $addr, they merge hash to $actualmerge but we \
+                             expected $expectedmerge"
+                          , [ ("lhash", Hash.to_yojson lh)
+                            ; ("rhash", Hash.to_yojson rh)
+                            ; ("actualmerge", Hash.to_yojson actual)
+                            ; ("expectedmerge", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query ()
+              | `Good children_to_verify ->
+                  (* TODO #312: Make sure we don't write too much *)
+                  List.iter children_to_verify ~f:(fun (addr, hash) ->
+                      handle_node t addr hash ) ;
+                  credit_fulfilled_request () )
           | Query.What_contents addr, Answer.Contents_are leaves -> (
-            match add_content t addr leaves with
-            | `Success ->
-                credit_fulfilled_request ()
-            | `Hash_mismatch (expected, actual) ->
-                let%map () =
-                  record_envelope_sender t.trust_system t.logger sender
-                    ( Actions.Sent_bad_hash
-                    , Some
-                        ( "sent accounts $accounts for address $addr, they \
-                           hash to $actual but we expected $expected"
-                        , [ ( "accounts"
-                            , `List (List.map ~f:Account.to_yojson leaves) )
-                          ; ("addr", Addr.to_yojson addr)
-                          ; ("actual", Hash.to_yojson actual)
-                          ; ("expected", Hash.to_yojson expected) ] ) )
-                in
-                requeue_query () )
+              match add_content t addr leaves with
+              | `Success ->
+                  credit_fulfilled_request ()
+              | `Hash_mismatch (expected, actual) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "sent accounts $accounts for address $addr, they \
+                             hash to $actual but we expected $expected"
+                          , [ ( "accounts"
+                              , `List (List.map ~f:Account.to_yojson leaves) )
+                            ; ("addr", Addr.to_yojson addr)
+                            ; ("actual", Hash.to_yojson actual)
+                            ; ("expected", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query () )
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) -> (
-            match handle_num_accounts t count content_root with
-            | `Success ->
-                credit_fulfilled_request ()
-            | `Hash_mismatch (expected, actual) ->
-                let%map () =
-                  record_envelope_sender t.trust_system t.logger sender
-                    ( Actions.Sent_bad_hash
-                    , Some
-                        ( "Claimed num_accounts $count, content root hash \
-                           $content_root_hash, that implies a root hash of \
-                           $actual, we expected $expected"
-                        , [ ("count", `Int count)
-                          ; ("content_root_hash", Hash.to_yojson content_root)
-                          ; ("actual", Hash.to_yojson actual)
-                          ; ("expected", Hash.to_yojson expected) ] ) )
-                in
-                requeue_query () )
+              match handle_num_accounts t count content_root with
+              | `Success ->
+                  credit_fulfilled_request ()
+              | `Hash_mismatch (expected, actual) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "Claimed num_accounts $count, content root hash \
+                             $content_root_hash, that implies a root hash of \
+                             $actual, we expected $expected"
+                          , [ ("count", `Int count)
+                            ; ("content_root_hash", Hash.to_yojson content_root)
+                            ; ("actual", Hash.to_yojson actual)
+                            ; ("expected", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query () )
           | query, answer ->
               let%map () =
                 record_envelope_sender t.trust_system t.logger sender
@@ -632,7 +650,8 @@ end = struct
                       , [ ("query", Query.to_yojson Addr.to_yojson query)
                         ; ( "answer"
                           , Answer.to_yojson Hash.to_yojson Account.to_yojson
-                              answer ) ] ) )
+                              answer )
+                        ] ) )
               in
               requeue_query ()
         in
@@ -660,9 +679,9 @@ end = struct
           [%log' debug t.logger]
             ~metadata:
               [ ("old_root_hash", Root_hash.to_yojson root_hash)
-              ; ("new_root_hash", Root_hash.to_yojson h) ]
-            "New_goal: changing target from $old_root_hash to $new_root_hash"
-      ) ;
+              ; ("new_root_hash", Root_hash.to_yojson h)
+              ]
+            "New_goal: changing target from $old_root_hash to $new_root_hash" ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
@@ -705,25 +724,26 @@ end = struct
             `Ok t.tree )
 
   let fetch t rh ~data ~equal =
-    new_goal t rh ~data ~equal |> ignore ;
+    ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
-      { desired_root= None
-      ; auxiliary_data= None
-      ; tree= mt
+      { desired_root = None
+      ; auxiliary_data = None
+      ; tree = mt
       ; logger
       ; trust_system
-      ; answers= ar
-      ; answer_writer= aw
-      ; queries= qw
-      ; query_reader= qr
-      ; waiting_parents= Addr.Table.create ()
-      ; waiting_content= Addr.Table.create ()
-      ; validity_listener= Ivar.create () }
+      ; answers = ar
+      ; answer_writer = aw
+      ; queries = qw
+      ; query_reader = qr
+      ; waiting_parents = Addr.Table.create ()
+      ; waiting_content = Addr.Table.create ()
+      ; validity_listener = Ivar.create ()
+      }
     in
     don't_wait_for (main_loop t) ;
     t

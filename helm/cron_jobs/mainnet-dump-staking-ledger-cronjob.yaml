@@ -1,0 +1,85 @@
+# kubectl apply -f helm/cron_jobs/mainnet-dump-staking-ledger-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: mainnet-dump-staking-ledger-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - 'mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt --background;
+               sleep 480;echo "done sleeping";
+               while true; do
+                 STATUS=$(mina client status | grep "Sync status");
+                 echo "$STATUS" | grep "Synced";
+                 RESULT=$?;
+                 if [ $RESULT -eq 0 ]; then
+                   echo "daemon is synced";
+                   break;
+                 else
+                   echo "waiting for daemon to sync";
+                   sleep 60;
+                 fi;
+               done;
+               while true;
+                do mina ledger export staking-epoch-ledger>staking_epoch_ledger.json;
+                 if [ "$?" -eq 0 ]&&[ "$(cat staking_epoch_ledger.json)" != "Ledger not found: current staking ledger not available" ];
+                  then echo "staking epoch ledger dumped!";break;
+                  else echo "waiting for staking ledger to become available, sleeping for 30s";sleep 30;
+                 fi;
+               done;
+               mina ledger export next-epoch-ledger>next_epoch_ledger.json;
+               echo "next epoch ledger dumped!";
+               DATE="$(date +%F_%H%M)"
+               EPOCHNUM="$(mina client status|grep "Best tip consensus time"|grep -o "epoch=[0-9]*"|sed "s/[^0-9]*//g")";
+               STAKING_HASH="$(mina ledger hash --ledger-file staking_epoch_ledger.json)";
+               STAKING_MD5="$(md5sum staking_epoch_ledger.json|cut -d " " -f 1)";
+               LEDGER_FILENAME=staking-"$EPOCHNUM"-"$STAKING_HASH"-"$STAKING_MD5"-"${DATE:: -1}0".json;
+               mv ./staking_epoch_ledger.json ./$LEDGER_FILENAME;NEXT_STAKING_HASH="$(mina ledger hash --ledger-file next_epoch_ledger.json)";
+               NEXT_STAKING_MD5="$(md5sum next_epoch_ledger.json|cut -d " " -f 1)";
+               NEXT_FILENAME=next-staking-"$EPOCHNUM"-"$NEXT_STAKING_HASH"-"$NEXT_STAKING_MD5"-"$DATE".json;
+               mv ./next_epoch_ledger.json ./$NEXT_FILENAME;
+               EXPORTED_LOGS="local-logs";
+               LOGS_FILENAME="daemon-logs-epoch-$EPOCHNUM-"${DATE:: -1}0".tgz";
+               mina client export-local-logs --tarfile $EXPORTED_LOGS;
+               mv /root/.mina-config/exported_logs/$EXPORTED_LOGS.tar.gz $LOGS_FILENAME;
+               echo "upload to a GCP cloud storage bucket";
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $LEDGER_FILENAME gs://mina-staking-ledgers;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $NEXT_FILENAME gs://mina-staking-ledgers;
+               gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $LOGS_FILENAME gs://mina-staking-ledgers'
+            env:
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: minaprotocol/mina-daemon-baked:1.1.5-a42bdee
+            imagePullPolicy: IfNotPresent
+            name: mainnet-dump-staking-ledger-container
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 11 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

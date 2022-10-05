@@ -235,7 +235,7 @@ module CloudLogging = {
   external create: input => Logging.t = "Logging";
 };
 
-// TODO: Pull the ids from `coda internal dump-structured-events`
+// TODO: Pull the ids from `mina internal dump-structured-events`
 /// Information about the specific structured log events we'll be needing to
 /// pull
 module StructuredLog = {

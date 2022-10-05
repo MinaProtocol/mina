@@ -1,24 +1,13 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t = Sgn_type.Sgn.Stable.V1.t = Pos | Neg
-    [@@deriving sexp, hash, compare, eq, yojson]
+    [@@deriving sexp, hash, compare, equal, yojson]
 
     let to_latest = Fn.id
   end
@@ -39,17 +28,21 @@ let of_field_exn x =
   else if Field.equal x neg_one then Neg
   else failwith "Sgn.of_field: Expected positive or negative 1"
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = Field.Var.t
 
 let typ : (var, t) Typ.t =
   let open Typ in
-  { check= (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
-  ; store= (fun t -> Store.store (to_field t))
-  ; read= (fun x -> Read.(read x >>| of_field_exn))
-  ; alloc= Alloc.alloc }
+  Typ
+    { check = (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
+    ; var_to_fields = (fun t -> ([| t |], ()))
+    ; var_of_fields = (fun (ts, ()) -> ts.(0))
+    ; value_to_fields = (fun t -> ([| to_field t |], ()))
+    ; value_of_fields = (fun (ts, ()) -> of_field_exn ts.(0))
+    ; size_in_field_elements = 1
+    ; constraint_system_auxiliary = (fun () -> ())
+    }
 
 module Checked = struct
   let two = Field.of_int 2

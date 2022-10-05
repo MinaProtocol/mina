@@ -5,6 +5,7 @@ extern crate memmap;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
+use std::str;
 
 use clap::{App, Arg};
 use nom::{le_u64, le_u8};
@@ -92,7 +93,7 @@ fn complete_event(
         Some(tid) => match tids.get(&tid) {
             Some(tname) => println!(
                 r#"{{"name":"{}","pid":{},"ph":"X","ts":{},"dur":{},"tid":{}}},"#,
-                tname,
+                escape(tname),
                 pid,
                 prev_ts / 1000.0,
                 (cur_ts - prev_ts) / 1000.0,
@@ -109,6 +110,10 @@ fn complete_event(
         },
         None => {}
     }
+}
+
+fn escape(s: &str) -> String {
+    str::replace(&s, "\"", "\\\"")
 }
 
 fn main() {
@@ -166,7 +171,7 @@ fn main() {
                                     let real = recurring_map.entry(s.clone()).or_insert(t);
                                     tidmap.insert(t, *real);
                                 }
-                                println!(r#"{{"name":"thread_name","ph":"M","pid":{},"tid":{},"args":{{"name":"{}"}}}},"#, cur_pid, t.0, s);
+                                println!(r#"{{"name":"thread_name","ph":"M","pid":{},"tid":{},"args":{{"name":"{}"}}}},"#, cur_pid, t.0, escape(&s));
                                 seen_tids.insert(t, s);
                                 (prev_ts, prev_task)
                             }
@@ -196,13 +201,13 @@ fn main() {
                                 (prev_ts, prev_task)
                             }
                             Event(s) => {
-                                println!(r#"{{"name":"{}","ph":"i","ts":{},"pid":{},"tid":{},"s":"t"}},"#, s, cur_ts/1000.0, cur_pid, prev_task.unwrap_or(Tid(0)).0);
+                                println!(r#"{{"name":"{}","ph":"i","ts":{},"pid":{},"tid":{},"s":"t"}},"#, escape(&s), cur_ts/1000.0, cur_pid, prev_task.unwrap_or(Tid(0)).0);
                                 (prev_ts, prev_task)
                             }
                             Start(s) => {
                                 println!(
                                     r#"{{"name":"{}","ph":"B","ts":{},"pid":{},"tid":{}}},"#,
-                                    s,
+                                    escape(&s),
                                     cur_ts / 1000.0,
                                     cur_pid,
                                     prev_task.unwrap_or(Tid(0)).0

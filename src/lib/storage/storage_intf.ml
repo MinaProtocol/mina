@@ -16,14 +16,14 @@ module type With_checksum_intf = sig
        'a Controller.t
     -> location
     -> ( 'a
-       , [> `Checksum_no_match | `IO_error of Error.t | `No_exist] )
+       , [> `Checksum_no_match | `IO_error of Error.t | `No_exist ] )
        Deferred.Result.t
 
   val load_with_checksum :
        'a Controller.t
     -> location
     -> ( 'a Checked_data.t
-       , [> `Checksum_no_match | `IO_error of Error.t | `No_exist] )
+       , [> `Checksum_no_match | `IO_error of Error.t | `No_exist ] )
        Deferred.Result.t
 
   val store : 'a Controller.t -> location -> 'a -> unit Deferred.t

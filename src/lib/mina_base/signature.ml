@@ -1,20 +1,7 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Hex = Hex_nonconsensus.Hex
-module Rosetta_coding = Rosetta_coding_nonconsensus
-
-[%%endif]
 
 module Arg = struct
   type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.Latest.t
@@ -25,11 +12,14 @@ module Arg = struct
   let version_byte = Base58_check.Version_bytes.signature
 end
 
-[%%versioned_asserted
+[%%versioned
 module Stable = struct
   module V1 = struct
-    type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash]
+    type t =
+      ( (Field.t[@version_asserted])
+      , (Inner_curve.Scalar.t[@version_asserted]) )
+      Signature_poly.Stable.V1.t
+    [@@deriving sexp, compare, equal, hash]
 
     type _unused = unit constraint t = Arg.t
 
@@ -38,28 +28,6 @@ module Stable = struct
     let to_latest = Fn.id
 
     let gen = Quickcheck.Generator.tuple2 Field.gen Inner_curve.Scalar.gen
-  end
-
-  module Tests = struct
-    [%%if
-    curve_size = 255]
-
-    let%test "signature serialization v1 (curve_size=255)" =
-      let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
-      in
-      let known_good_digest = "b991865dd2ff76596c470a72a4282cbd" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        signature known_good_digest
-
-    [%%else]
-
-    let%test "signature serialization v1" =
-      failwith "No test for this curve size"
-
-    [%%endif]
   end
 end]
 
@@ -82,12 +50,12 @@ module Raw = struct
         [%test_eq: t option] (Some signature) (encode signature |> decode) )
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = Field.Var.t * Inner_curve.Scalar.var
 
 [%%endif]
 
 [%%define_locally
-Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
+Stable.Latest.
+  (of_base58_check_exn, of_base58_check, of_yojson, to_yojson, to_base58_check)]

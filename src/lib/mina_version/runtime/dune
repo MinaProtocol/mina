@@ -1,0 +1,7 @@
+(library
+ (name mina_version_runtime)
+ (libraries core_kernel base unix)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (public_name mina_version.runtime)
+ (implements mina_version))

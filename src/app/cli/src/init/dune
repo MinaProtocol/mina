@@ -7,16 +7,118 @@
  (name init)
  (public_name init)
  (libraries
-   ; opam deps
-   async cohttp core
-   ; libs
-   snarky_log
-   cli_lib
-   mina_base mina_graphql mina_lib coda_state
-   consensus coda_transition coda_version
+   ;;opam libraries
+   stdio
+   integers
+   astring
+   async_ssl
+   sexplib0
+   async.async_rpc
+   result
+   graphql
+   async_kernel
+   async_unix
+   uri
+   core_kernel
+   core
+   base
+   async
+   cohttp
+   graphql_parser
+   async.async_command
+   async_rpc_kernel
+   base.caml
+   graphql-cohttp
+   cohttp-async
+   graphql-async
+   archive_lib
+   ;;local libraries
+   mina_wire_types
+   perf_histograms
+   one_or_two
+   block_time
+   child_processes
+   mina_net2
+   snark_worker
+   allocation_functor
+   blockchain_snark
+   genesis_ledger_helper.lib
+   transaction_inclusion_status
+   error_json
+   network_pool
+   user_command_input
+   network_peer
+   logger
+   coda_genesis_proof
+   data_hash_lib
+   currency
+   genesis_constants
+   bash_colors
+   graphql_lib
+   node_status
+   o1trace_webkit_event
+   generated_graphql_queries
+   mina_transaction
+   mina_generators
    mina_user_error
-   o1trace protocol_version telemetry transition_frontier web_client_pipe
-   web_request graphql_lib genesis_ledger_helper)
+   mina_ledger
+   mina_block
+   mina_lib
+   mina_base
+   cli_lib
+   mina_graphql
+   mina_state
+   consensus
+   mina_version
+   o1trace
+   protocol_version
+   node_error_service
+   genesis_ledger_helper
+   signature_lib
+   mina_base.import
+   mina_numbers
+   precomputed_values
+   with_hash
+   transaction_snark
+   transaction_snark_tests
+   transaction_protocol_state
+   test_util
+   file_system
+   daemon_rpcs
+   trust_system
+   secrets
+   participating_state
+   staged_ledger
+   mina_commands
+   coda_runtime_config
+   coda_genesis_ledger
+   mina_networking
+   sgn
+   unsigned_extended
+   mina_metrics
+   group_map
+   snark_work_lib
+   mina_compile_config
+   mina_transaction_logic
+   verifier
+   parallel
+   random_oracle
+   kimchi_backend
+   kimchi_backend.pasta
+   pickles_types
+   pickles
+   pickles.backend
+   snark_params
+   zkapp_command_builder
+ )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../../config.mlh)
- (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocessor_deps ../../../../config.mlh
+                    ../../../../../graphql_schema.json
+                    ../../../../graphql-ppx-config.inc)
+ (preprocess (pps ppx_deriving_yojson ppx_mina ppx_version
+                  ; ppx_jane except ppx_optcomp
+                  ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf
+                  ppx_fields_conv ppx_fixed_literal ppx_here ppx_inline_test ppx_let
+                  ppx_module_timer ppx_optional ppx_pipebang ppx_sexp_message
+                  ppx_sexp_value ppx_string ppx_typerep_conv ppx_variants_conv
+                  graphql_ppx -- %{read-lines:../../../../graphql-ppx-config.inc})))

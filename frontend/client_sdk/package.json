@@ -1,7 +1,7 @@
 {
   "name": "@o1labs/client-sdk",
-  "description": "Node API for signing transactions for Coda Protocol",
-  "version": "0.1.2",
+  "description": "Node API for signing transactions for Mina Protocol",
+  "version": "2.0.0",
   "scripts": {
     "build": "bsb -make-world && tsc src/SDKWrapper.ts -d",
     "start": "bsb -make-world -w",
@@ -11,13 +11,15 @@
     "test": "tsc test/Test.ts && node test/Test.js"
   },
   "keywords": [
-    "coda", "cryptocurrency"
+    "mina",
+    "coda",
+    "cryptocurrency"
   ],
   "author": "o1labs",
   "license": "MIT",
-  "homepage": "https://codaprotocol.com",
-  "repository": "https://github.com/CodaProtocol/coda",
-  "bugs": "https://github.com/CodaProtocol/coda/issues",
+  "homepage": "https://minaprotocol.com/",
+  "repository": "https://github.com/MinaProtocol/mina",
+  "bugs": "https://github.com/MinaProtocol/mina/issues",
   "main": "src/SDKWrapper.js",
   "types": "src/SDKWrapper.d.ts",
   "files": [
@@ -28,7 +30,7 @@
   "devDependencies": {
     "bs-platform": "^7.0.2-dev.2",
     "gentype": "^3.11.0",
-    "typescript": "^3.7.5"
+    "typescript": "^3.8.2"
   },
   "dependencies": {
     "@types/node": "^13.7.0"

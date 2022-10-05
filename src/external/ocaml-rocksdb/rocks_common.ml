@@ -1,6 +1,13 @@
 open Ctypes
 open Foreign
 
+(* Trick taken from Janestreet's core_kernel library.
+ * This function guarantees `o` will not be garbage collected.
+ * It is safer than using `ignore` to provide this guarantee, as
+ * the compiler won't optimize int_of_string away and will not perform
+ * constant folding on invocations of `keep_alive` *)
+let rec keep_alive o = if Sys.opaque_identity (int_of_string "0") <> 0 then keep_alive (Sys.opaque_identity o)
+
 module Views = struct
   open Unsigned
 

@@ -1,107 +1,154 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.archive.fullname }}
+  name: {{ template "archive-node.fullname" . }}
   labels:
-    app: {{ .Values.archive.fullname }}
+    app: {{ template "archive-node.fullname" . }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.archive.fullname }}
+      app: {{ template "archive-node.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{ .Values.archive.fullname }}
+        app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.mina.image)._1 | trimSuffix "-" }}
+        {{- if .Values.archive.enableLocalDaemon }}
+        syncStatus: INIT
+        {{- end }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      initContainers:
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       containers:
-      - name: coda
+{{- if .Values.archive.enableLocalDaemon }}
+      - name: mina
         resources:
           limits:
           requests:
-            memory: 8.0Gi
-            cpu: 4.0
-        image: {{ $.Values.coda.image }}
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
         args: [ "daemon",
-          "-log-level", {{ .Values.coda.logLevel }},
+          "-log-level", {{ .Values.mina.logLevel }},
           "-log-json",
-          {{- if .Values.coda.logSnarkWorkGossip }}
+          {{- if .Values.mina.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
-          {{- range .Values.coda.seedPeers }}
+          {{- if $.Values.mina.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- range .Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          {{- if .Values.coda.enableFlooding }}
+          {{- if .Values.mina.enableFlooding }}
           "-enable-flooding true"
           {{- end -}}
-          {{- if .Values.coda.peerExchange }}
+          {{- if .Values.mina.peerExchange }}
           "-peer-exchange true"
           {{- end -}}
-          {{- range .Values.coda.directPeers }}
-
+          {{- range .Values.mina.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          {{- if .Values.mina.seedPeersURL }}
+          "-peer-list-url", {{ .Values.mina.seedPeersURL | quote }},
+          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
-          {{- if .Values.coda.runtimeConfig }}
+          {{- if .Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ .Values.mina.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ .Values.mina.ports.graphql | quote }}
         - name: DAEMON_ARCHIVE_PORT
           value: {{ .Values.archive.ports.server | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ .Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
+          value: {{ .Values.mina.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+          value: {{ .Values.mina.ports.p2p | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ .Values.mina.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ .Values.mina.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ .Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.external }}
-{{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
+          containerPort: {{ .Values.mina.ports.p2p }}
+          hostPort: {{ .Values.mina.ports.p2p }}
+{{$name := include "archive-node.fullname" . }}
+{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
-          mountPath: /root/.coda-config
-        {{- if .Values.coda.runtimeConfig }}
+          mountPath: /root/.mina-config
+        {{- if .Values.mina.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+{{- end }}
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
+        args: [ 
+          "mina-archive",
+          "run",
+          "-metrics-port", "{{ .Values.archive.ports.metrics }}",
+          "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
+          {{- if .Values.mina.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          "-server-port", "{{ .Values.archive.ports.server }}"
+        ]
         env:
         imagePullPolicy: Always
+        {{- if .Values.mina.runtimeConfig }}
+        volumeMounts:
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP
@@ -109,13 +156,18 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
-{{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
+        - name: metrics-port
+          protocol: TCP 
+          containerPort: {{ .Values.archive.ports.metrics }}
+{{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
       - name: config-dir
         emptyDir: {}
-      {{- if .Values.coda.runtimeConfig }}
+      {{- if .Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: archive-daemon-config
+          name: "{{ template "archive-node.fullname" . }}-daemon-config"
       {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}

@@ -1,8 +1,10 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_transition
+open Mina_block
 open Frontier_base
+
+(* TODO: cache state body hashes in db to avoid re-hashing on load (#10293) *)
 
 (* TODO: bundle together with other writes by sharing batch requests between
  * function calls in this module (#3738) *)
@@ -22,7 +24,7 @@ open Result.Let_syntax
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
-let version = 1
+let version = 2
 
 module Schema = struct
   module Keys = struct
@@ -31,6 +33,8 @@ module Schema = struct
     module Prefixed_state_hash = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = string * State_hash.Stable.V1.t
 
@@ -42,12 +46,12 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.t -> External_transition.t t
-    | Arcs : State_hash.t -> State_hash.t list t
-    | Root : Root_data.Minimal.t t
-    | Best_tip : State_hash.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
+    | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
+    | Root : Root_data.Minimal.Stable.V2.t t
+    | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Coda_state.Protocol_state.value list t
+        : Mina_state.Protocol_state.Value.Stable.V2.t list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -67,7 +71,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.Latest.t]
+        [%bin_type_class: Mina_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -75,7 +79,7 @@ module Schema = struct
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
-        [%bin_type_class: Coda_state.Protocol_state.Value.Stable.Latest.t list]
+        [%bin_type_class: Mina_state.Protocol_state.Value.Stable.Latest.t list]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -84,23 +88,26 @@ module Schema = struct
       -> of_gadt:(a t -> data)
       -> a t Bin_prot.Type_class.t =
    fun (module M) ~to_gadt ~of_gadt ->
-    let ({shape; writer= {size; write}; reader= {read; vtag_read}}
-          : data Bin_prot.Type_class.t) =
+    let ({ shape; writer = { size; write }; reader = { read; vtag_read } }
+          : data Bin_prot.Type_class.t ) =
       [%bin_type_class: M.t]
     in
     { shape
-    ; writer=
-        { size= Fn.compose size of_gadt
-        ; write= (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt)) }
-    ; reader=
-        { read= (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
-        ; vtag_read=
+    ; writer =
+        { size = Fn.compose size of_gadt
+        ; write = (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt))
+        }
+    ; reader =
+        { read = (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
+        ; vtag_read =
             (fun buffer ~pos_ref number ->
-              to_gadt (vtag_read buffer ~pos_ref number) ) } }
+              to_gadt (vtag_read buffer ~pos_ref number) )
+        }
+    }
 
   (* HACK: The OCaml compiler thought the pattern matching in of_gadts was
-   non-exhaustive. However, it should not be since I constrained the
-   polymorphic type *)
+     non-exhaustive. However, it should not be since I constrained the
+     polymorphic type *)
   let[@warning "-8"] binable_key_type (type a) :
       a t -> a t Bin_prot.Type_class.t = function
     | Db_version ->
@@ -150,9 +157,11 @@ module Error = struct
     | `Arcs of State_hash.t
     | `Protocol_states_for_root_scan_state ]
 
-  type not_found = [`Not_found of not_found_member]
+  type not_found = [ `Not_found of not_found_member ]
 
-  type t = [not_found | `Invalid_version]
+  type raised = [ `Raised of Error.t ]
+
+  type t = [ not_found | raised | `Invalid_version ]
 
   let not_found_message (`Not_found member) =
     let member_name, member_id =
@@ -192,16 +201,18 @@ module Error = struct
         "invalid version"
     | `Not_found _ as err ->
         not_found_message err
+    | `Raised err ->
+        sprintf "Raised %s" (Error.to_string_hum err)
 end
 
 module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 
-type t = {directory: string; logger: Logger.t; db: Rocks.t}
+type t = { directory : string; logger : Logger.t; db : Rocks.t }
 
 let create ~logger ~directory =
-  if not (Result.is_ok (Unix.access directory [`Exists])) then
+  if not (Result.is_ok (Unix.access directory [ `Exists ])) then
     Unix.mkdir ~perm:0o766 directory ;
-  {directory; logger; db= Rocks.create directory}
+  { directory; logger; db = Rocks.create directory }
 
 let close t = Rocks.close t.db
 
@@ -219,69 +230,81 @@ let get db ~key ~error =
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
 let check t ~genesis_state_hash =
-  let check_version () =
-    match get_if_exists t.db ~key:Db_version ~default:0 with
-    | 0 ->
-        Error `Not_initialized
-    | v when v = version ->
-        Ok ()
-    | _ ->
-        Error `Invalid_version
-  in
-  (* checks the pointers, frontier hash, and checks pointer references *)
-  let check_base () =
-    let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
-    let root_hash = Root_data.Minimal.hash root in
-    let%bind best_tip =
-      get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
-    in
-    let%bind root_transition =
-      get t.db ~key:(Transition root_hash)
-        ~error:(`Corrupt (`Not_found `Root_transition))
-    in
-    let%bind _ =
-      get t.db ~key:Protocol_states_for_root_scan_state
-        ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
-    in
-    let%map _ =
-      get t.db ~key:(Transition best_tip)
-        ~error:(`Corrupt (`Not_found `Best_tip_transition))
-    in
-    (root_hash, root_transition)
-  in
-  let rec check_arcs pred_hash =
-    let%bind successors =
-      get t.db ~key:(Arcs pred_hash)
-        ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
-    in
-    List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
-        let%bind () = acc in
-        let%bind _ =
-          get t.db ~key:(Transition succ_hash)
-            ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+  Or_error.try_with (fun () ->
+      let check_version () =
+        match get_if_exists t.db ~key:Db_version ~default:0 with
+        | 0 ->
+            Error `Not_initialized
+        | v when v = version ->
+            Ok ()
+        | _ ->
+            Error `Invalid_version
+      in
+      (* checks the pointers, frontier hash, and checks pointer references *)
+      let check_base () =
+        let%bind root =
+          get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
         in
-        check_arcs succ_hash )
-  in
-  let%bind () = check_version () in
-  let%bind root_hash, root_transition = check_base () in
-  let%bind () =
-    let persisted_genesis_state_hash =
-      External_transition.protocol_state root_transition
-      |> Coda_state.Protocol_state.genesis_state_hash
-    in
-    if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
-      Ok ()
-    else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
-  in
-  check_arcs root_hash
+        let root_hash = Root_data.Minimal.hash root in
+        let%bind best_tip =
+          get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
+        in
+        let%bind root_transition =
+          get t.db ~key:(Transition root_hash)
+            ~error:(`Corrupt (`Not_found `Root_transition))
+        in
+        let%bind _ =
+          get t.db ~key:Protocol_states_for_root_scan_state
+            ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
+        in
+        let%map _ =
+          get t.db ~key:(Transition best_tip)
+            ~error:(`Corrupt (`Not_found `Best_tip_transition))
+        in
+        (root_hash, root_transition)
+      in
+      let rec check_arcs pred_hash =
+        let%bind successors =
+          get t.db ~key:(Arcs pred_hash)
+            ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
+        in
+        List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
+            let%bind () = acc in
+            let%bind _ =
+              get t.db ~key:(Transition succ_hash)
+                ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+            in
+            check_arcs succ_hash )
+      in
+      let%bind () = check_version () in
+      let%bind root_hash, root_block = check_base () in
+      let root_protocol_state =
+        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
+      in
+      let%bind () =
+        let persisted_genesis_state_hash =
+          Mina_state.Protocol_state.genesis_state_hash root_protocol_state
+        in
+        if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
+          Ok ()
+        else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
+      in
+      let%map () = check_arcs root_hash in
+      root_block |> Mina_block.header |> Header.protocol_state
+      |> Mina_state.Protocol_state.blockchain_state
+      |> Mina_state.Blockchain_state.snarked_ledger_hash )
+  |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
+  |> Result.join
 
 let initialize t ~root_data =
   let open Root_data.Limited in
-  let {With_hash.hash= root_state_hash; data= root_transition}, _ =
-    External_transition.Validated.erase (transition root_data)
+  let root_state_hash, root_transition =
+    let t = Mina_block.Validated.forget (transition root_data) in
+    ( State_hash.With_state_hashes.state_hash t
+    , State_hash.With_state_hashes.data t )
   in
   [%log' trace t.logger]
-    ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
+    ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
@@ -290,12 +313,14 @@ let initialize t ~root_data =
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.unzip (protocol_states root_data) |> snd) )
+        ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
 let add t ~transition =
-  let parent_hash = External_transition.Validated.parent_hash transition in
-  let {With_hash.hash; data= raw_transition}, _ =
-    External_transition.Validated.erase transition
+  let transition = Mina_block.Validated.forget transition in
+  let hash = State_hash.With_state_hashes.state_hash transition in
+  let parent_hash =
+    With_hash.data transition |> Mina_block.header |> Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
   in
   let%bind () =
     Result.ok_if_true
@@ -306,7 +331,7 @@ let add t ~transition =
     get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
   in
   Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
+      Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
       Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
@@ -314,7 +339,7 @@ let move_root t ~new_root ~garbage =
   let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition (hash new_root)))
+      (mem t.db ~key:(Transition (hashes new_root).state_hash))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
@@ -325,7 +350,7 @@ let move_root t ~new_root ~garbage =
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:snd (protocol_states new_root)) ;
+        ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
       List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node
@@ -340,14 +365,23 @@ let get_transition t hash =
   let%map transition =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
-  (* this transition was read from the database, so it must have been validated already *)
-  let (`I_swear_this_is_safe_see_my_comment validated_transition) =
-    External_transition.Validated.create_unsafe transition
+  let block =
+    { With_hash.data = transition
+    ; hash =
+        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
+    }
   in
-  validated_transition
+  let parent_hash =
+    block |> With_hash.data |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
+  (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
+  Mina_block.Validated.unsafe_of_trusted_block
+    ~delta_block_chain_proof:(Non_empty_list.singleton parent_hash)
+    (`This_block_is_trusted_to_be_safe block)
 
-let get_arcs t hash =
-  get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
+let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
 let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 

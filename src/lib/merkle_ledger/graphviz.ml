@@ -31,8 +31,8 @@ module type Inputs_intf = sig
 
   module Account :
     Intf.Account
-    with type account_id := Account_id.t
-     and type balance := Balance.t
+      with type account_id := Account_id.t
+       and type balance := Balance.t
 
   module Hash : Intf.Hash with type account := Account.t
 
@@ -40,13 +40,13 @@ module type Inputs_intf = sig
 
   module Ledger :
     Base_ledger_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
+      with module Addr = Location.Addr
+       and module Location = Location
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type hash := Hash.t
+       and type root_hash := Hash.t
+       and type account := Account.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -59,7 +59,7 @@ struct
     include Comparator.Make (Account)
   end
 
-  type ('source, 'target) edge = {source: 'source; target: 'target}
+  type ('source, 'target) edge = { source : 'source; target : 'target }
 
   type target =
     | Hash of Hash.t
@@ -69,7 +69,7 @@ struct
 
   type merkle_tree_edge = (Hash.t, target) edge
 
-  type pretty_format_account = {public_key: string; balance: int}
+  type pretty_format_account = { public_key : string; balance : int }
 
   type pretty_target =
     | Pretty_hash of string
@@ -105,19 +105,20 @@ struct
             match Ledger.get t (Location.Account address) with
             | Some new_account ->
                 (* let public_key = Account.public_key new_account in
-                let location = Ledger.location_of_account t public_key |> Option.value_exn in
-                let queried_account = Ledger.get t location |> Option.value_exn in
-                assert (Account.equal queried_account new_account); *)
+                   let location = Ledger.location_of_account t public_key |> Option.value_exn in
+                   let queried_account = Ledger.get t location |> Option.value_exn in
+                   assert (Account.equal queried_account new_account); *)
                 assert (not @@ Set.mem accounts new_account) ;
                 let new_accounts = Set.add accounts new_account in
                 bfs
                   ~edges:
-                    ( {source= parent_hash; target= Account new_account}
+                    ( { source = parent_hash; target = Account new_account }
                     :: edges )
                   ~accounts:new_accounts jobs
             | None ->
                 bfs
-                  ~edges:({source= parent_hash; target= Empty_account} :: edges)
+                  ~edges:
+                    ({ source = parent_hash; target = Empty_account } :: edges)
                   ~accounts jobs
           else
             let current_hash = Ledger.get_inner_hash_at_addr_exn t address in
@@ -136,40 +137,46 @@ struct
                 Hash current_hash )
               else Empty_hash
             in
-            bfs ~edges:({source= parent_hash; target} :: edges) ~accounts jobs
+            bfs
+              ~edges:({ source = parent_hash; target } :: edges)
+              ~accounts jobs
     in
     let edges =
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
         (Queue.of_list
            [ Addr.child_exn ~ledger_depth initial_address Direction.Left
-           ; Addr.child_exn ~ledger_depth initial_address Direction.Right ])
+           ; Addr.child_exn ~ledger_depth initial_address Direction.Right
+           ] )
     in
     let edges =
       List.folding_map edges ~init:(0, 0)
-        ~f:(fun (empty_account_counter, empty_hash_counter) {source; target} ->
+        ~f:(fun (empty_account_counter, empty_hash_counter) { source; target }
+           ->
           let source = string_of_hash source in
           match target with
           | Hash target_hash ->
               ( (empty_account_counter, empty_hash_counter)
-              , {source; target= Pretty_hash (string_of_hash target_hash)} )
+              , { source; target = Pretty_hash (string_of_hash target_hash) } )
           | Account account ->
               let string_key = string_of_account_id account in
               let pretty_account =
-                { public_key= string_key
-                ; balance= Account.balance account |> Balance.to_int }
+                { public_key = string_key
+                ; balance = Account.balance account |> Balance.to_int
+                }
               in
               ( (empty_account_counter, empty_hash_counter)
-              , {source; target= Pretty_account pretty_account} )
+              , { source; target = Pretty_account pretty_account } )
           | Empty_hash ->
               let new_empty_hash_counter = empty_hash_counter + 1 in
               ( (empty_account_counter, new_empty_hash_counter)
-              , {source; target= Pretty_empty_hash new_empty_hash_counter} )
+              , { source; target = Pretty_empty_hash new_empty_hash_counter } )
           | Empty_account ->
               let new_empty_account_counter = empty_account_counter + 1 in
               ( (new_empty_account_counter, empty_hash_counter)
-              , {source; target= Pretty_empty_account new_empty_account_counter}
-              ) )
+              , { source
+                ; target = Pretty_empty_account new_empty_account_counter
+                } ) )
     in
     edges
 
@@ -179,18 +186,20 @@ struct
     let write_empty_entry ~id source count =
       let empty_hash_id = sprintf "EMPTY_%s_%d" id count in
       [ sprintf "\"%s\" -> \"%s\" " source empty_hash_id
-      ; sprintf "\"%s\" [shape=point]" empty_hash_id ]
+      ; sprintf "\"%s\" [shape=point]" empty_hash_id
+      ]
 
     let write ~path ~name edges =
       let body =
-        List.map edges ~f:(fun {source; target} ->
+        List.map edges ~f:(fun { source; target } ->
             match target with
             | Pretty_hash hash ->
-                [sprintf "\"%s\" -> \"%s\" " source hash]
-            | Pretty_account {public_key; balance} ->
+                [ sprintf "\"%s\" -> \"%s\" " source hash ]
+            | Pretty_account { public_key; balance } ->
                 [ sprintf "\"%s\" -> \"%s\" " source public_key
                 ; sprintf "\"%s\" [shape=record,label=\"{%s|%d}\"]" public_key
-                    public_key balance ]
+                    public_key balance
+                ]
             | Pretty_empty_hash count ->
                 write_empty_entry ~id:"HASH" source count
             | Pretty_empty_account count ->

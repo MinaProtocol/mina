@@ -1,0 +1,100 @@
+#!/usr/bin/env node
+"use strict";
+const { spawnSync } = require("child_process");
+const csv = require("csv-parser");
+const fs = require("fs");
+const path = require("path");
+const { GraphQLClient, gql } = require("graphql-request");
+const { Headers } = require("cross-fetch");
+const fetch = require("node-fetch");
+
+global.fetch = fetch;
+
+// WORKAROUND: https://github.com/prisma-labs/graphql-request/issues/206#issuecomment-689514984
+global.Headers = global.Headers || Headers;
+
+const strip = (str) => str.replace(/\s+/g, "");
+
+const filename = process.argv[2];
+const keysetName = strip(path.basename(filename, ".csv"));
+
+const results = [];
+const invalidKeys = [];
+
+// Create the keyset
+let createKeyset = spawnSync("coda-network", [
+  "keyset",
+  "create",
+  "-n",
+  keysetName,
+]);
+if (!createKeyset.error) {
+  console.log(`Created keyset: ${keysetName}\n`);
+} else {
+  console.log("Error while creating keyset.");
+  console.error(createKeyset.error);
+  exit();
+}
+
+const endpoint = "http://localhost:3085/graphql";
+const client = new GraphQLClient(endpoint, {
+  mode: "cors",
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  },
+});
+
+const query = gql`
+  query Balance($publicKey: PublicKey) {
+    account(publicKey: $publicKey) {
+      balance {
+        total
+      }
+    }
+  }
+`;
+
+const validateKeys = (entries) =>
+  Promise.all(
+    entries.map((entry) =>
+      client
+        .request(query, { publicKey: entry.publicKey })
+        .then(() => entry.publicKey)
+        .catch(() => entry.publickey)
+    )
+  ).then((results) => results.filter((member) => member !== null));
+
+const importKeys = (keys) =>
+  keys.map((publicKey) => {
+    spawnSync("coda-network", [
+      "keyset",
+      "add",
+      "-n",
+      keysetName,
+      "-k",
+      publicKey,
+    ]);
+    publicKey;
+  });
+
+// Process the csv
+fs.createReadStream(filename)
+  .pipe(csv())
+  .on("data", (entry) => {
+    let username = entry["Discord ID#"];
+    let publicKey = strip(entry["Your public key"]);
+
+    results.push({ username, publicKey });
+  })
+  .on("end", () => {
+    validateKeys(results)
+      .then(importKeys)
+      .then((validEntries) => {
+        console.log(
+          `Added keys for ${validEntries.length} community members to keyset ${keysetName}.`
+        );
+        console.log("\nUnable to validate the following users:");
+        invalidKeys.map((entry) => console.log(entry.username));
+      });
+  });

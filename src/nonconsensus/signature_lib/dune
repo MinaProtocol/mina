@@ -1,21 +1,41 @@
 (library
- (name signature_lib_nonconsensus)
+ (name signature_lib)
  (public_name signature_lib_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   bignum_bigint
-   blake2
+   ;;opam libraries
+   bignum.bigint
+   ppx_inline_test.config
+   bin_prot.shape
+   base
+   sexplib0
    core_kernel
+   js_of_ocaml
+   base.caml
+   result
+   ;;local libraries
+   mina_wire_types
+   base58_check
+   blake2
+   mina_signature_kind
+   random_oracle_input
+   fold_lib
+   snarkette
+   codable
+   snark_params_nonconsensus
+   random_oracle_nonconsensus
    hash_prefix_states_nonconsensus
    non_zero_curve_point_nonconsensus
-   random_oracle_nonconsensus
-   snark_params_nonconsensus
-   yojson)
+ )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_optcomp ppx_sexp_conv
-       ppx_custom_printf ppx_bin_prot ppx_hash ppx_compare ppx_deriving.eq ppx_deriving_yojson
+  (pps ppx_mina ppx_version ppx_optcomp ppx_sexp_conv
+       ppx_custom_printf ppx_bin_prot ppx_hash ppx_compare ppx_compare ppx_deriving_yojson
        ppx_inline_test ppx_let))
  (instrumentation (backend bisect_ppx))
  (synopsis "Schnorr signatures using the tick and tock curves"))

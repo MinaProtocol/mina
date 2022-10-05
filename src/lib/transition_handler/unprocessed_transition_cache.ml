@@ -5,7 +5,6 @@
 
 open Core_kernel
 open Mina_base
-open Coda_transition
 open Network_peer
 
 module Name = struct
@@ -14,27 +13,29 @@ end
 
 module Transmuter = struct
   module Source = struct
-    type t = External_transition.Initial_validated.t Envelope.Incoming.t
+    type t = Mina_block.initial_valid_block Envelope.Incoming.t
   end
 
-  module Target = State_hash
+  module Target = struct
+    include State_hash
+
+    let to_string = to_base58_check
+  end
 
   let transmute enveloped_transition =
-    let {With_hash.hash; data= _}, _ =
-      Envelope.Incoming.data enveloped_transition
-    in
-    hash
+    let transition, _ = Envelope.Incoming.data enveloped_transition in
+    State_hash.With_state_hashes.state_hash transition
 end
 
 module Registry = struct
   type element = State_hash.t
 
   let element_added _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
 
   let element_removed _ _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
 end
 

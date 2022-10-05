@@ -7,40 +7,42 @@
  *)
 
 type t =
-  { network_identifier: Network_identifier.t
-  ; operator: Enums.operator option [@default None]
+  { network_identifier : Network_identifier.t
+  ; operator : Enums.operator option [@default None]
   ; (* max_block is the largest block index to consider when searching for transactions. If this field is not populated, the current block is considered the max_block. If you do not specify a max_block, it is possible a newly synced block will interfere with paginated transaction queries (as the offset could become invalid with newly added rows). *)
-    max_block: int64 option [@default None]
+    max_block : int64 option [@default None]
   ; (* offset is the offset into the query result to start returning transactions. If any search conditions are changed, the query offset will change and you must restart your search iteration. *)
-    offset: int64 option [@default None]
+    offset : int64 option [@default None]
   ; (* limit is the maximum number of transactions to return in one call. The implementation may return <= limit transactions. *)
-    limit: int64 option [@default None]
-  ; transaction_identifier: Transaction_identifier.t option [@default None]
-  ; account_identifier: Account_identifier.t option [@default None]
-  ; coin_identifier: Coin_identifier.t option [@default None]
-  ; currency: Currency.t option [@default None]
+    limit : int64 option [@default None]
+  ; transaction_identifier : Transaction_identifier.t option [@default None]
+  ; account_identifier : Account_identifier.t option [@default None]
+  ; coin_identifier : Coin_identifier.t option [@default None]
+  ; currency : Currency.t option [@default None]
   ; (* status is the network-specific operation type. *)
-    status: string option [@default None]
+    status : string option [@default None]
   ; (* type is the network-specific operation type. *)
-    _type: string option [@default None]
+    _type : string option [@default None] [@key "type"]
   ; (* address is AccountIdentifier.Address. This is used to get all transactions related to an AccountIdentifier.Address, regardless of SubAccountIdentifier. *)
-    address: string option [@default None]
+    address : string option [@default None]
   ; (* success is a synthetic condition populated by parsing network-specific operation statuses (using the mapping provided in `/network/options`). *)
-    success: bool option [@default None] }
-[@@deriving yojson {strict= false}, show]
+    success : bool option [@default None]
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** SearchTransactionsRequest is used to search for transactions matching a set of provided conditions in canonical blocks. *)
 let create (network_identifier : Network_identifier.t) : t =
   { network_identifier
-  ; operator= None
-  ; max_block= None
-  ; offset= None
-  ; limit= None
-  ; transaction_identifier= None
-  ; account_identifier= None
-  ; coin_identifier= None
-  ; currency= None
-  ; status= None
-  ; _type= None
-  ; address= None
-  ; success= None }
+  ; operator = None
+  ; max_block = None
+  ; offset = None
+  ; limit = None
+  ; transaction_identifier = None
+  ; account_identifier = None
+  ; coin_identifier = None
+  ; currency = None
+  ; status = None
+  ; _type = None
+  ; address = None
+  ; success = None
+  }

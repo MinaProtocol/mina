@@ -4,27 +4,27 @@ open Async.Deferred.Let_syntax
 open Keypair_common
 
 module T = struct
-  type t = Coda_net2.Keypair.t
+  type t = Mina_net2.Keypair.t
 
-  let env = "CODA_LIBP2P_PASS"
+  let env = "MINA_LIBP2P_PASS"
 
   let which = "libp2p keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
-  let write_exn kp ~(privkey_path : string) ~(password : Secret_file.password)
-      : unit Deferred.t =
-    let str = Coda_net2.Keypair.to_string kp in
+  let write_exn kp ~(privkey_path : string) ~(password : Secret_file.password) :
+      unit Deferred.t =
+    let str = Mina_net2.Keypair.to_string kp in
     match%bind
       Secret_file.write ~path:privkey_path ~mkdir:true
         ~plaintext:(Bytes.of_string str) ~password
     with
     | Ok () ->
         (* The hope is that if [Secret_file.write] succeeded then this ought to
-       as well, letting [handle_open] stay inside [Secret_file]. It might not
-       if the environment changes underneath us, and we won't have nice errors
-       in that case. *)
+           as well, letting [handle_open] stay inside [Secret_file]. It might not
+           if the environment changes underneath us, and we won't have nice errors
+           in that case. *)
         let%bind pubkey_f = Writer.open_file (privkey_path ^ ".peerid") in
-        Writer.write_line pubkey_f (Coda_net2.Keypair.to_peer_id kp) ;
+        Writer.write_line pubkey_f (Mina_net2.Keypair.to_peer_id kp) ;
         Writer.close pubkey_f
     | Error e ->
         Privkey_error.raise ~which e
@@ -36,7 +36,7 @@ module T = struct
     let%bind bytes = Secret_file.read ~path:privkey_path ~password in
     Deferred.return
     @@
-    match Coda_net2.Keypair.of_string (Bytes.to_string bytes) with
+    match Mina_net2.Keypair.of_string (Bytes.to_string bytes) with
     | Ok kp ->
         Ok kp
     | Error e ->

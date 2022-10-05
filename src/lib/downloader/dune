@@ -1,0 +1,23 @@
+(library
+ (name downloader)
+ (public_name downloader)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   async
+   core
+   core_kernel
+   sexplib0
+   core_kernel.pairing_heap
+   async_unix
+   base.caml
+   ;; local libraries
+   network_peer
+   pipe_lib
+   trust_system
+   logger
+   o1trace
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))
+

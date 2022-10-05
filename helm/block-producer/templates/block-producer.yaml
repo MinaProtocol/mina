@@ -17,10 +17,11 @@ spec:
         testnet: {{ $.Values.testnetName }}
         role: block-producer
         class: {{ default "undefined" $config.class }}
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       initContainers:
@@ -47,19 +48,45 @@ spec:
         securityContext:
           runAsUser: 0
       - name: install-key
-        image: {{ $.Values.coda.image | quote }}
+        image: {{ $.Values.mina.image | quote }}
         command:
         - bash
         - -c
-        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.coda-config -privkey-path /root/wallet-keys/$key; done
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || mina accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
-        env: 
-          - name: CODA_PRIVKEY_PASS
-            value: {{ $.Values.coda.privkeyPass | quote }}
+          mountPath: /root/.mina-config
+        env:
+          - name: MINA_PRIVKEY_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: libp2p-keys
+          mountPath: /libp2p-keys
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
+      {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
@@ -70,7 +97,7 @@ spec:
         image: {{ $.Values.userAgent.image }}
         command: ["bash"]
         args: ["-c", "python3 agent.py"]
-        env: 
+        env:
           {{ if ne $.Values.userAgent.minFee "" -}}
           - name: AGENT_MIN_FEE
             value: {{ $.Values.userAgent.minFee | quote }}
@@ -92,7 +119,7 @@ spec:
             value: {{ $.Values.userAgent.txBatchSize | quote }}
           {{ end -}}
           {{- if ne $.Values.userAgent.sendEveryMins "" -}}
-          - name: AGENT_SEND_EVERY_MINUTES
+          - name: AGENT_SEND_EVERY_MINS
             value: "1"
           {{ end -}}
           - name: CODA_PUBLIC_KEY
@@ -100,11 +127,11 @@ spec:
               secretKeyRef:
                 name: {{ $config.privateKeySecret }}
                 key: pub
-          - name: CODA_PRIVKEY_PASS
-            value: {{ $.Values.coda.privkeyPass | quote }}
+          - name: MINA_PRIVKEY_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
-        ports: 
+        ports:
         - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
 {{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
@@ -118,9 +145,9 @@ spec:
             cpu: 0.1
         image: {{ $.Values.bots.image }}
         env:
-          - name: CODA_GRAPHQL_HOST
+          - name: MINA_GRAPHQL_HOST
             value: "0.0.0.0"
-          - name: CODA_GRAPHQL_PORT
+          - name: MINA_GRAPHQL_PORT
             value: {{ $.Values.bots.ports.graphql | quote }}
           - name: ECHO_PUBLICKEY
             valueFrom:
@@ -128,14 +155,14 @@ spec:
                 name: echo-service-key
                 key: pub
           - name: ECHO_PASSWORD
-            value: {{ $.Values.coda.privkeyPass | quote }}
+            value: {{ $.Values.mina.privkeyPass | quote }}
           - name: FAUCET_PUBLICKEY
             valueFrom:
               secretKeyRef:
                 name: faucet-service-key
                 key: pub
           - name: FAUCET_PASSWORD
-            value: {{ $.Values.coda.privkeyPass | quote }}
+            value: {{ $.Values.mina.privkeyPass | quote }}
           - name: DISCORD_API_KEY
             valueFrom:
               secretKeyRef:
@@ -151,18 +178,27 @@ spec:
 {{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
-      - name: coda
+      - name: mina
         resources:
           limits:
           requests:
-            memory: 8.0Gi
-            cpu: 8.0
-        image: {{ $.Values.coda.image }}
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
         args: [ "daemon",
-          "-log-level", {{ $.Values.coda.logLevel }},
+          "-log-level", {{ $.Values.mina.logLevel }},
           "-log-json",
-          {{- if $.Values.coda.logSnarkWorkGossip }}
+          {{- if $.Values.mina.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.mina.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.mina.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
           {{- end -}}
           {{- if $config.isolated }}
           "-isolate-network", "true",
@@ -173,58 +209,85 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          {{- range $.Values.coda.seedPeers }}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
+          {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if $.Values.mina.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
+          {{- if $.Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
+          {{- end -}}
+          "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }}
           {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
           value: "6"
         - name: DAEMON_REST_PORT
-          value: {{ $.Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.mina.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ $.Values.coda.ports.client | quote }}
+          value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ $.Values.coda.ports.metrics | quote }}
+          value: {{ $.Values.mina.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $.Values.coda.ports.p2p | quote }}
-        - name: CODA_PRIVKEY_PASS
-          value: {{ $.Values.coda.privkeyPass | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+          value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "mina_network_block_data"
+        - name: MINA_PRIVKEY_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         ports:
         - name: client-port
-          protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.client }}
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.client }}
         - name: graphql-port
-          protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.graphql }}
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.metrics }}
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
-          protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.external }}
-{{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
+          protocol: TCP
+          containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
+          hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+{{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
-        {{- if $.Values.coda.runtimeConfig }}
+          mountPath: /root/.mina-config
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        {{- if $.Values.mina.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
@@ -239,6 +302,17 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- if $config.libp2pSecret }}
+      - name: libp2p-keys
+        secret:
+          secretName: {{ $config.libp2pSecret }}
+          defaultMode: 0700
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
       {{ if $config.runWithBots }}
       - name: echo-service-key
         secret:
@@ -263,10 +337,21 @@ spec:
         emptyDir: {}
       - name: config-dir
         emptyDir: {}
-      {{- if $.Values.coda.runtimeConfig }}
+      - name: actual-libp2p
+        emptyDir: {}
+      {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
           name: block-producer-daemon-config
+      {{- end }}
+      {{- if $.Values.mina.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
       {{- end }}
 ---
 apiVersion: v1
@@ -283,7 +368,24 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ $.Values.coda.ports.p2p }}
+    port: {{ default $.Values.mina.ports.p2p $config.externalPort }}
     targetPort: external-port
+---
+{{- if $.Values.mina.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
 ---
 {{ end }}

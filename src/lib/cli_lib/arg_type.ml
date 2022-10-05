@@ -10,33 +10,53 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
+let pubsub_topic_mode =
+  let open Gossip_net.Libp2p in
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "ro" ->
+          RO
+      | "rw" ->
+          RW
+      | "none" ->
+          N
+      | _ ->
+          eprintf "Invalid pubsub topic mode: %s" s ;
+          exit 1 )
+
+let pubsub_topic_mode_to_string mode =
+  let open Gossip_net.Libp2p in
+  match mode with RO -> "ro" | RW -> "rw" | N -> "none"
+
 let public_key_compressed =
   Command.Arg_type.create (fun s ->
-      try Public_key.Compressed.of_base58_check_exn s
-      with e ->
+      let error_string e =
         let random = Public_key.compress (Keypair.create ()).public_key in
         eprintf
           "Error parsing command line.  Run with -help for usage information.\n\n\
-           Couldn't read public key (Invalid key format)\n\
+           Couldn't read public key\n\
           \ %s\n\
           \ - here's a sample one: %s\n"
-          (Error.to_string_hum (Error.of_exn e))
+          (Error.to_string_hum e)
           (Public_key.Compressed.to_base58_check random) ;
-        exit 1 )
+        exit 1
+      in
+      try Public_key.of_base58_check_decompress_exn s
+      with e -> error_string (Error.of_exn e) )
 
 (* Hack to allow us to deprecate a value without needing to add an mli
  * just for this. We only want to have one "kind" of public key in the
  * public-facing interface if possible *)
 include (
   struct
-      let public_key =
-        Command.Arg_type.map public_key_compressed ~f:(fun pk ->
-            match Public_key.decompress pk with
-            | None ->
-                failwith "Invalid key"
-            | Some pk' ->
-                pk' )
-    end :
+    let public_key =
+      Command.Arg_type.map public_key_compressed ~f:(fun pk ->
+          match Public_key.decompress pk with
+          | None ->
+              failwith "Invalid key"
+          | Some pk' ->
+              pk' )
+  end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
         [@@deprecated "Use public_key_compressed in commandline args"]
@@ -47,13 +67,13 @@ let token_id =
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
-    ~f:Mina_base.Receipt.Chain_hash.of_string
+    ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
 
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
@@ -67,13 +87,12 @@ let txn_nonce =
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
 let hd_index =
-  Command.Arg_type.map Command.Param.string ~f:Coda_numbers.Hd_index.of_string
+  Command.Arg_type.map Command.Param.string ~f:Mina_numbers.Hd_index.of_string
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-let cidr_mask =
-  Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
+let cidr_mask = Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
 
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
@@ -92,10 +111,11 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Mina_base.Signed_command.of_base58_check_exn s
-      with e ->
-        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise )
+      match Mina_base.Signed_command.of_base64 s with
+      | Ok s ->
+          s
+      | Error err ->
+          Error.tag err ~tag:"Couldn't decode transaction id" |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

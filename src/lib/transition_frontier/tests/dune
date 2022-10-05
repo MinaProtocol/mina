@@ -1,6 +1,44 @@
 (library
  (name transition_frontier_tests)
- (libraries transition_frontier)
+ (libraries
+   ;;opam libraries
+   core.uuid
+   core
+   async
+   async_kernel
+   core_kernel
+   ppx_inline_test.config
+   async_unix
+   core_kernel.uuid
+   sexplib0
+   ;;local libraries
+   mina_state
+   staged_ledger
+   with_hash
+   mina_ledger
+   child_processes
+   genesis_constants
+   logger
+   mina_block
+   transition_frontier_persistent_root
+   inline_test_quiet_logs
+   mina_base
+   precomputed_values
+   verifier
+   coda_genesis_ledger
+   merkle_ledger
+   consensus
+   data_hash_lib
+   block_time
+   full_frontier
+   frontier_base
+   transition_frontier
+   protocol_version
+   yojson
+   mina_net2
+   libp2p_ipc
+   staged_ledger_diff
+ )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version)))
+ (preprocess (pps ppx_jane ppx_version ppx_mina)))

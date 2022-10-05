@@ -23,12 +23,12 @@ end
 module Make
     (Transition_frontier : T)
     (Pool : Intf.Snark_resource_pool_intf
-            with type transition_frontier := Transition_frontier.t) :
+              with type transition_frontier := Transition_frontier.t) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
   type t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson]
+  [@@deriving compare, sexp, to_yojson, hash]
 
   type verified = t [@@deriving compare, sexp, to_yojson]
 
@@ -37,14 +37,15 @@ module Make
   let reject_overloaded_diff _ = ()
 
   type compact =
-    { work: Work.t
-    ; fee: Currency.Fee.t
-    ; prover: Signature_lib.Public_key.Compressed.t }
-  [@@deriving yojson]
+    { work : Work.t
+    ; fee : Currency.Fee.t
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving yojson, hash]
 
   let to_compact = function
-    | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
-        Some {work; fee; prover}
+    | Add_solved_work (work, { proof = _; fee = { fee; prover } }) ->
+        Some { work; fee; prover }
     | Empty ->
         None
 
@@ -61,12 +62,10 @@ module Make
     | Empty ->
         1
 
-  let verified_size _ = 1
-
-  let max_per_second = 4
+  let max_per_15_seconds = 20
 
   let summary = function
-    | Add_solved_work (work, {proof= _; fee}) ->
+    | Add_solved_work (work, { proof = _; fee }) ->
         Printf.sprintf
           !"Snark_pool_diff for work %s added with fee-prover %s"
           (Yojson.Safe.to_string @@ Work.compact_json work)
@@ -78,14 +77,15 @@ module Make
 
   let of_result
       (res :
-        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-          Snark_work_lib.Work.Spec.t
+        ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t
         , Ledger_proof.t )
-        Snark_work_lib.Work.Result.t) =
+        Snark_work_lib.Work.Result.t ) =
     Add_solved_work
       ( One_or_two.map res.spec.instances
           ~f:Snark_work_lib.Work.Single.Spec.statement
-      , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
+      , { proof = res.proofs
+        ; fee = { fee = res.spec.fee; prover = res.prover }
+        } )
 
   let has_lower_fee pool work ~fee ~sender =
     let reject_and_log_if_local reason =
@@ -94,28 +94,29 @@ module Make
         ~metadata:
           [ ("work", Work.compact_json work)
           ; ("sender", Envelope.Sender.to_yojson sender)
-          ; ("reason", `String reason) ] ;
+          ; ("reason", `String reason)
+          ] ;
       Or_error.error_string reason
     in
     match Pool.request_proof pool work with
     | None ->
         Ok ()
-    | Some {fee= {fee= prev; _}; _} -> (
-      match Currency.Fee.compare fee prev with
-      | -1 ->
-          Ok ()
-      | 0 ->
-          reject_and_log_if_local "fee equal to cheapest work we have"
-      | 1 ->
-          reject_and_log_if_local "fee higher than cheapest work we have"
-      | _ ->
-          failwith "compare didn't return -1, 0, or 1!" )
+    | Some { fee = { fee = prev; _ }; _ } -> (
+        match Currency.Fee.compare fee prev with
+        | -1 ->
+            Ok ()
+        | 0 ->
+            reject_and_log_if_local "fee equal to cheapest work we have"
+        | 1 ->
+            reject_and_log_if_local "fee higher than cheapest work we have"
+        | _ ->
+            failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({data; sender; _} as t : t Envelope.Incoming.t) =
+  let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) =
     match data with
     | Empty ->
         Deferred.Or_error.error_string "cannot verify empty snark pool diff"
-    | Add_solved_work (work, ({Priced_proof.fee; _} as p)) -> (
+    | Add_solved_work (work, ({ Priced_proof.fee; _ } as p)) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let verify () =
           if%map Pool.verify_and_act pool ~work:(work, p) ~sender then
@@ -128,20 +129,17 @@ module Make
           match has_lower_fee pool work ~fee:fee.fee ~sender with
           | Ok () ->
               verify ()
-          | _ ->
-              Deferred.Or_error.error_string
-                "snark pool diff fee is not high enough to be included in \
-                 snark pool" )
+          | Error e ->
+              Deferred.return (Error e) )
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
-    let {Envelope.Incoming.data= diff; sender; _} = t in
+    let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
         Deferred.return
-          (Error
-             (`Other (Error.of_string "cannot apply empty snark pool diff")))
-    | Add_solved_work (work, {Priced_proof.proof; fee}) ->
+          (Error (`Other (Error.of_string "cannot apply empty snark pool diff")))
+    | Add_solved_work (work, { Priced_proof.proof; fee }) -> (
         let is_local = match sender with Local -> true | _ -> false in
         let to_or_error = function
           | `Statement_not_referenced ->
@@ -149,14 +147,31 @@ module Make
           | `Added ->
               Ok (diff, ())
         in
-        Deferred.return
-          (let add_to_pool () =
-             Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
-           in
-           match has_lower_fee pool work ~fee:fee.fee ~sender with
-           | Ok () ->
-               add_to_pool ()
-           | Error e ->
-               if is_local then Error (`Locally_generated (diff, ()))
-               else Error (`Other e))
+        match has_lower_fee pool work ~fee:fee.fee ~sender with
+        | Ok () ->
+            let%map.Deferred.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            in
+            (`Accept, accepted, rejected)
+        | Error e ->
+            Deferred.return
+              ( if is_local then Error (`Locally_generated (diff, ()))
+              else Error (`Other e) ) )
+
+  type Structured_log_events.t +=
+    | Snark_work_received of { work : compact; sender : Envelope.Sender.t }
+    [@@deriving
+      register_event { msg = "Received Snark-pool diff $work from $sender" }]
+
+  let update_metrics envelope valid_cb gossip_heard_logger_option =
+    Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+    Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
+    let diff = Envelope.Incoming.data envelope in
+    Option.iter gossip_heard_logger_option ~f:(fun logger ->
+        Option.iter (to_compact diff) ~f:(fun work ->
+            [%str_log debug]
+              (Snark_work_received
+                 { work; sender = Envelope.Incoming.sender envelope } ) ) ) ;
+    Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
+    Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work
 end

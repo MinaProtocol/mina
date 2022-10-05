@@ -1,14 +1,13 @@
 open Core_kernel
 open Async
 open Mina_base
-open Signature_lib
 module Types = Types
 module Client = Client
 
 module Get_transaction_status = struct
   type query = Signed_command.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Transaction_status.State.Stable.Latest.t Or_error.t
+  type response = Transaction_inclusion_status.State.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -21,7 +20,8 @@ module Send_user_commands = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
+    ( [ `Broadcasted | `Not_broadcasted ]
+    * Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
     * Network_pool.Transaction_pool.Diff_versioned.Rejected.Stable.Latest.t )
     Or_error.t
   [@@deriving bin_io_unversioned]
@@ -32,14 +32,35 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t option
-  [@@deriving bin_io_unversioned]
+  type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_snarked_ledger = struct
+  type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
+
+  type response = Account.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_snarked_ledger" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Get_staking_ledger = struct
+  type query = Current | Next [@@deriving bin_io_unversioned]
+
+  type response = Account.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_staking_ledger" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_balance = struct
@@ -56,7 +77,9 @@ module Get_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -67,7 +90,9 @@ module Get_trust_status_all = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -79,12 +104,25 @@ module Reset_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
       ~bin_response
+end
+
+module Chain_id_inputs = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response =
+    State_hash.Stable.Latest.t * Genesis_constants.t * string list * int
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Chain_id_inputs" ~version:0 ~bin_query ~bin_response
 end
 
 module Verify_proof = struct
@@ -122,7 +160,7 @@ module Get_nonce = struct
 end
 
 module Get_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io_unversioned]
+  type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 
   type response = Types.Status.t [@@deriving bin_io_unversioned]
 
@@ -131,13 +169,12 @@ module Get_status = struct
 end
 
 module Clear_hist_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io_unversioned]
+  type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 
   type response = Types.Status.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
-      ~bin_response
+    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query ~bin_response
 end
 
 module Get_public_keys_with_details = struct
@@ -205,20 +242,11 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
-module Set_staking = struct
-  type query = Keypair.Stable.Latest.t list [@@deriving bin_io_unversioned]
-
-  type response = unit [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
-end
-
 module Visualization = struct
   module Frontier = struct
     type query = string [@@deriving bin_io_unversioned]
 
-    type response = [`Active of unit | `Bootstrapping]
+    type response = [ `Active of unit | `Bootstrapping ]
     [@@deriving bin_io_unversioned]
 
     let rpc : (query, response) Rpc.Rpc.t =
@@ -264,22 +292,16 @@ module Get_trustlist = struct
     Rpc.Rpc.create ~name:"Get_trustlist" ~version:0 ~bin_query ~bin_response
 end
 
-(** daemon-level Get_telemetry_data; implementation invokes
-    Mina_networking's Get_telemetry_data for each provided peer
-*)
-module Get_telemetry_data = struct
-  type query = Network_peer.Peer.Id.Stable.Latest.t list option
-  [@@deriving bin_io_unversioned]
+module Get_node_status = struct
+  type query = Mina_net2.Multiaddr.t list option [@@deriving bin_io_unversioned]
 
   type response =
-    Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
-    Or_error.t
+    Mina_networking.Rpcs.Get_node_status.Node_status.Stable.Latest.t Or_error.t
     list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_telemetry_data" ~version:0 ~bin_query
-      ~bin_response
+    Rpc.Rpc.create ~name:"Get_node_status" ~version:0 ~bin_query ~bin_response
 end
 
 module Get_object_lifetime_statistics = struct

@@ -30,7 +30,7 @@ module type S = sig
   val find : t -> State_hash.t -> Breadcrumb.t option
 
   val find_protocol_state :
-    t -> State_hash.t -> Coda_state.Protocol_state.value option
+    t -> State_hash.t -> Mina_state.Protocol_state.value option
 
   val successor_hashes : t -> State_hash.t -> State_hash.t list
 

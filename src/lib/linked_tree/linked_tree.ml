@@ -1,5 +1,5 @@
-open Core
-open Coda_numbers
+open Core_kernel
+open Mina_numbers
 
 module type Key = Hashtbl.Key_plain
 
@@ -14,7 +14,7 @@ module type S = sig
     -> key:Key.t
     -> length:Length.t
     -> data:'a
-    -> [`Ok | `Duplicate | `Too_old]
+    -> [ `Ok | `Duplicate | `Too_old ]
 
   val path : 'a t -> source:Key.t -> ancestor:Key.t -> 'a list option
 
@@ -30,26 +30,28 @@ module Make (Key : Key) : S with module Key = Key = struct
 
   module Node = struct
     type 'a t =
-      { value: 'a
-      ; key: Key.t
-      ; length: Length.t
-      ; mutable parent: [`Node of 'a t | `Key of Key.t]
-      ; mutable children: 'a t list }
+      { value : 'a
+      ; key : Key.t
+      ; length : Length.t
+      ; mutable parent : [ `Node of 'a t | `Key of Key.t ]
+      ; mutable children : 'a t list
+      }
   end
 
   type 'a t =
-    { table: 'a Node.t Table.t
-    ; mutable roots: 'a Node.t list
-    ; max_size: int
-    ; mutable newest: Length.t option }
+    { table : 'a Node.t Table.t
+    ; mutable roots : 'a Node.t list
+    ; max_size : int
+    ; mutable newest : Length.t option
+    }
 
   let create ~max_size =
-    {table= Table.create (); newest= None; roots= []; max_size}
+    { table = Table.create (); newest = None; roots = []; max_size }
 
   let lookup_node (t : 'a t) k = Hashtbl.find t.table k
 
   (* TODO: May have to punish peers who ask for ancestor paths
-   that don't exist. *)
+     that don't exist. *)
   let path t ~source ~ancestor =
     let rec go acc (node : _ Node.t) =
       let acc = node.value :: acc in
@@ -102,21 +104,23 @@ module Make (Key : Key) : S with module Key = Key = struct
         match lookup_node t prev_key with
         | None ->
             let node =
-              { Node.value= data
+              { Node.value = data
               ; key
-              ; parent= `Key prev_key
-              ; children= []
-              ; length }
+              ; parent = `Key prev_key
+              ; children = []
+              ; length
+              }
             in
             t.roots <- node :: t.roots ;
             node
         | Some parent ->
             let node =
-              { Node.value= data
+              { Node.value = data
               ; key
-              ; parent= `Node parent
-              ; children= []
-              ; length }
+              ; parent = `Node parent
+              ; children = []
+              ; length
+              }
             in
             parent.children <- node :: parent.children ;
             node

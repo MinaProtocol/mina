@@ -10,9 +10,9 @@ module type S = sig
 
   module Account :
     Intf.Account
-    with type token_id := Token_id.t
-     and type account_id := Account_id.t
-     and type balance := Balance.t
+      with type token_id := Token_id.t
+       and type account_id := Account_id.t
+       and type balance := Balance.t
 
   module Hash : Intf.Hash with type account := Account.t
 end

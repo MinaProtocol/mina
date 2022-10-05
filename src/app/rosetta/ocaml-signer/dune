@@ -1,26 +1,97 @@
+(library
+ (name signer_cli)
+ (public_name signer.cli)
+ (modules signer_cli)
+ (libraries
+   ;;opam libraries
+   async_kernel
+   core
+   core_kernel
+   async
+   base
+   lib
+   async_unix
+   async.async_command
+   ;;local libraries
+   kimchi_backend.pasta
+   pickles
+   rosetta_coding
+   rosetta_lib
+   string_sign
+   signature_lib
+   mina_base
+   snark_params
+   pickles.backend
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps
+               graphql_ppx
+               ppx_mina
+               ppx_deriving.show
+               ppx_deriving_yojson
+               ppx_base
+               ppx_let
+               ppx_version
+               ppx_compare
+ ))
+)
+
 (executable
  (package signer)
  (name signer)
  (public_name signer)
  (modes native)
- (libraries
-   async
-   async_ssl
-   core_kernel
-   logger
-   rosetta_models
-   lib
-   ppx_deriving_yojson.runtime
-   yojson
- )
+ (modules signer)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
-               ppx_deriving.eq
+               ppx_compare
+ ))
+)
+
+(executable
+ (package signer)
+ (name signer_testnet_signatures)
+ (public_name signer-testnet)
+ (modes native)
+ (modules signer_testnet_signatures)
+ (libraries signer_cli async core_kernel base)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps
+               graphql_ppx
+               ppx_mina
+               ppx_deriving.show
+               ppx_deriving_yojson
+               ppx_base
+               ppx_let
+               ppx_version
+               ppx_compare
+ ))
+)
+
+(executable
+ (package signer)
+ (name signer_mainnet_signatures)
+ (public_name signer-mainnet)
+ (modes native)
+ (modules signer_mainnet_signatures)
+ (libraries signer_cli async core_kernel base)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps
+               graphql_ppx
+               ppx_mina
+               ppx_deriving.show
+               ppx_deriving_yojson
+               ppx_base
+               ppx_let
+               ppx_version
+               ppx_compare
  ))
 )

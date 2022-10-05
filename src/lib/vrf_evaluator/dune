@@ -1,0 +1,33 @@
+(library
+ (name vrf_evaluator)
+ (public_name vrf_evaluator)
+ (libraries
+   ;; opam libraries
+   async_unix
+   async_kernel
+   rpc_parallel
+   core
+   async
+   core_kernel
+   bin_prot.shape
+   sexplib0
+   base.caml
+   ;; local libraries
+   mina_wire_types
+   error_json
+   currency
+   unsigned_extended
+   interruptible
+   signature_lib
+   consensus
+   mina_base
+   child_processes
+   mina_numbers
+   genesis_constants
+   logger
+   logger.file_system
+   ppx_version.runtime
+ )
+ (preprocessor_deps "../../config.mlh")
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))
