@@ -247,6 +247,24 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+(* What's a good name for this? *)
+let arg_optdef_arg_method (type a b) class_ (name : string)
+    (f : _ Js.t -> b -> a Js.Optdef.t -> _) =
+  let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
+  let meth =
+    let wrapper =
+      Js.Unsafe.eval_string
+        {js|
+        (function(f) {
+          return function(argVal, xOptdef) {
+            return f(this, argVal, xOptdef);
+          };
+        })|js}
+    in
+    Js.Unsafe.(fun_call wrapper [| inject (Js.wrap_callback f) |])
+  in
+  Js.Unsafe.set prototype (Js.string name) meth
+
 let to_js_bigint =
   let bigint_constr = Js.Unsafe.eval_string {js|BigInt|js} in
   fun (s : Js.js_string Js.t) ->
@@ -335,8 +353,20 @@ let () =
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
-  method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      Field.Assert.equal this##.value (As_field.value y) ) ;
+
+  arg_optdef_arg_method field_class "assertEquals"
+    (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Field.Assert.equal this##.value (As_field.value y)
+      with e -> (
+        match Js.Optdef.to_option msg with
+        | None ->
+            raise e
+        | Some msg ->
+            let stack = Printexc.get_backtrace () in
+            let msg =
+              sprintf "%s:\n%s%s" (Js.to_string msg) (Exn.to_string e) stack
+            in
+            raise_error msg ) ) ;
 
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value) ) ;
