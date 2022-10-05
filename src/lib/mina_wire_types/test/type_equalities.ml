@@ -294,6 +294,10 @@ module Mina_base = struct
       (W.Staged_ledger_hash.Pending_coinbase_aux)
   include Assert_equal0V1 (O.Epoch_seed.Stable) (W.Epoch_seed)
   include Assert_equal0V1 (O.Staged_ledger_hash.Stable) (W.Staged_ledger_hash)
+  include
+    Assert_equal0V1
+      (O.Protocol_constants_checked.Value.Stable)
+      (W.Protocol_constants_checked.Value)
 end
 
 module One_or_two = struct
