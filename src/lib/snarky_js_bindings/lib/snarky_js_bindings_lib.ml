@@ -374,9 +374,10 @@ let () =
     (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Field.Assert.equal this##.value (As_field.value y)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
-
-  method_ "assertBoolean" (fun this : unit ->
-      Impl.assert_ (Constraint.boolean this##.value) ) ;
+  optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero)) ) ;
