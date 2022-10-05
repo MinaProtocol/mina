@@ -30,7 +30,7 @@ let log_and_raise_error_with_message ~exn ~msg =
           (Core_kernel.Exn.to_string exn)
           stack
       in
-      raise_error msg
+      ignore (raise_error msg)
 
 class type field_class =
   object
