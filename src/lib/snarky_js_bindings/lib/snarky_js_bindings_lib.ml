@@ -19,6 +19,19 @@ let raise_error s =
 
 let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 
+let log_and_raise_error_with_message ~exn ~msg =
+  match Js.Optdef.to_option msg with
+  | None ->
+      raise exn
+  | Some msg ->
+      let stack = Printexc.get_backtrace () in
+      let msg =
+        Printf.sprintf "%s:\n%s%s" (Js.to_string msg)
+          (Core_kernel.Exn.to_string exn)
+          stack
+      in
+      raise_error msg
+
 class type field_class =
   object
     method value : Impl.Field.t Js.prop
@@ -357,16 +370,7 @@ let () =
   arg_optdef_arg_method field_class "assertEquals"
     (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Field.Assert.equal this##.value (As_field.value y)
-      with e -> (
-        match Js.Optdef.to_option msg with
-        | None ->
-            raise e
-        | Some msg ->
-            let stack = Printexc.get_backtrace () in
-            let msg =
-              sprintf "%s:\n%s%s" (Js.to_string msg) (Exn.to_string e) stack
-            in
-            raise_error msg ) ) ;
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
 
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value) ) ;
