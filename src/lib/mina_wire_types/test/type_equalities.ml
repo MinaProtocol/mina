@@ -387,3 +387,9 @@ module Consensus_vrf = struct
   module W = WT.Consensus_vrf
   include Assert_equal0V1 (O.Output.Truncated.Stable) (W.Output.Truncated)
 end
+
+module Genesis_constants = struct
+  module O = Genesis_constants
+  module W = WT.Genesis_constants
+  include Assert_equal3V1 (O.Protocol.Poly.Stable) (W.Protocol.Poly)
+end

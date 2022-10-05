@@ -22,6 +22,7 @@
     consensus
     consensus.vrf
     protocol_version
+    genesis_constants
     ; Necessary for the type equality
     sgn
     sgn_type
