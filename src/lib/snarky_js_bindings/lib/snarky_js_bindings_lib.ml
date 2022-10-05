@@ -26,7 +26,7 @@ let log_and_raise_error_with_message ~exn ~msg =
   | Some msg ->
       let stack = Printexc.get_backtrace () in
       let msg =
-        Printf.sprintf "%s:\n%s%s" (Js.to_string msg)
+        Printf.sprintf "%s\n%s%s" (Js.to_string msg)
           (Core_kernel.Exn.to_string exn)
           stack
       in
