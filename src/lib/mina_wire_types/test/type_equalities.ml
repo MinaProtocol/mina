@@ -55,6 +55,11 @@ module Assert_equal3V2
     (W : V2S3 with type ('a, 'b, 'c) V2.t = ('a, 'b, 'c) O.V2.t) =
 struct end
 
+module Assert_equal4V1
+    (O : V1S4)
+    (W : V1S4 with type ('a, 'b, 'c, 'd) V1.t = ('a, 'b, 'c, 'd) O.V1.t) =
+struct end
+
 module Assert_equal9V1
     (O : V1S9)
     (W : V1S9
@@ -321,6 +326,10 @@ module Mina_state = struct
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
   include
     Assert_equal0V2 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
+  include
+    Assert_equal4V1
+      (O.Protocol_state.Body.Poly.Stable)
+      (W.Protocol_state.Body.Poly)
 end
 
 module Mina_transaction_logic = struct

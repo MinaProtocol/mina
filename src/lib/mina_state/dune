@@ -2,6 +2,7 @@
  (name mina_state)
  (public_name mina_state)
  (inline_tests)
+ (flags -w -22) ; Silence ppx_version's warnings
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_mina ppx_version ppx_snarky ppx_optcomp ppx_bin_prot ppx_compare ppx_sexp_conv ppx_hash ppx_fields_conv ppx_let ppx_inline_test ppx_assert ppx_deriving.std ppx_deriving_yojson h_list.ppx))
