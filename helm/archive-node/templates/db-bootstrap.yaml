@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: create-db
-        image: bitnami/postgresql
+        image: bitnami/postgresql:13.8.0
         command: ["bash", "-c"]
         args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} createdb --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --echo {{ .Values.archive.postgresDB}}"]
       - name: import-schema
