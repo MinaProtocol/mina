@@ -1001,11 +1001,22 @@ let () =
            (As_group.value (As_group.of_group_obj p1))
            (Scalar_challenge s##.value)
          |> mk) ; *)
-  method_ "assertEquals"
-    (fun (p1 : group_class Js.t) (p2 : As_group.t) : unit ->
+  arg_optdef_arg_method group_class "assertEquals"
+    (fun
+      (p1 : group_class Js.t)
+      (p2 : As_group.t)
+      (msg : Js.js_string Js.t Js.Optdef.t)
+      :
+      unit
+    ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
       let x2, y2 = As_group.value p2 in
-      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2 ) ;
+      try Field.Assert.equal x1 x2
+      with exn -> (
+        log_and_raise_error_with_message ~exn ~msg ;
+        try Field.Assert.equal y1 y2
+        with exn -> log_and_raise_error_with_message ~exn ~msg ) ) ;
+
   method_ "equals"
     (fun (p1 : group_class Js.t) (p2 : As_group.t) : bool_class Js.t ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
