@@ -303,6 +303,7 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Protocol_constants_checked.Value.Stable)
       (W.Protocol_constants_checked.Value)
+  include Assert_equal0V1 (O.State_hash.Stable) (W.State_hash)
 end
 
 module One_or_two = struct
@@ -326,10 +327,15 @@ module Mina_state = struct
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
   include
     Assert_equal0V2 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
+  include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V2)
   include
     Assert_equal4V1
       (O.Protocol_state.Body.Poly.Stable)
       (W.Protocol_state.Body.Poly)
+  include
+    Assert_equal0V2
+      (O.Protocol_state.Body.Value.Stable)
+      (W.Protocol_state.Body.Value)
 end
 
 module Mina_transaction_logic = struct

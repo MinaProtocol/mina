@@ -25,6 +25,14 @@
    transaction_snark
    sgn
    snark_params
+   mina_wire_types
+   sgn_type
+   pickles.backend
+   mina_transaction_logic
+   kimchi_backend
+   mina_numbers
+   block_time
+   kimchi_backend.pasta
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

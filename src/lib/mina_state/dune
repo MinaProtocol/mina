@@ -46,6 +46,7 @@
    mina_ledger
    unsigned_extended
    sgn
+   sgn_type
    blake2
    ppx_version.runtime
    mina_wire_types

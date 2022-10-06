@@ -8,6 +8,17 @@ module Types = struct
           type ('a, 'b, 'c, 'd) t
         end
       end
+
+      module Value : sig
+        module V2 : sig
+          type t =
+            ( Mina_base_state_hash.V1.t
+            , Mina_state_blockchain_state.Value.V2.t
+            , Consensus.Data.Consensus_state.Value.V1.t
+            , Mina_base_protocol_constants_checked.Value.V1.t )
+            Poly.V1.t
+        end
+      end
     end
   end
 end
@@ -24,6 +35,17 @@ module type Concrete = sig
           }
       end
     end
+
+    module Value : sig
+      module V2 : sig
+        type t =
+          ( Mina_base_state_hash.V1.t
+          , Mina_state_blockchain_state.Value.V2.t
+          , Consensus.Data.Consensus_state.Value.V1.t
+          , Mina_base_protocol_constants_checked.Value.V1.t )
+          Poly.V1.t
+      end
+    end
   end
 end
 
@@ -37,6 +59,17 @@ module M = struct
           ; consensus_state : 'consensus_state
           ; constants : 'constants
           }
+      end
+    end
+
+    module Value = struct
+      module V2 = struct
+        type t =
+          ( Mina_base_state_hash.V1.t
+          , Mina_state_blockchain_state.Value.V2.t
+          , Consensus.Data.Consensus_state.Value.V1.t
+          , Mina_base_protocol_constants_checked.Value.V1.t )
+          Poly.V1.t
       end
     end
   end

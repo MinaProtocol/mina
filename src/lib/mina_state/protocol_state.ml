@@ -24,6 +24,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'consensus_state
         , 'constants )
         A.Body.Poly.V1.t
+       and type Body.Value.Stable.V2.t = A.Body.Value.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct

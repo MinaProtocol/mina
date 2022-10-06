@@ -41,3 +41,4 @@ module Frozen_ledger_hash = Mina_base_frozen_ledger_hash
 module Frozen_ledger_hash0 = Mina_base_frozen_ledger_hash0
 module Staged_ledger_hash = Mina_base_staged_ledger_hash
 module Protocol_constants_checked = Mina_base_protocol_constants_checked
+module State_hash = Mina_base_state_hash

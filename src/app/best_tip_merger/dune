@@ -32,6 +32,7 @@
    data_hash_lib
    rose_tree
    consensus
+   mina_wire_types
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
