@@ -121,9 +121,9 @@ let%test_module "Archive node unit tests" =
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
-        ~fee_transfer:
-          (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~min_fee:Currency.Fee.zero )
+        ~fee_transfer:(fun ~coinbase_amount ->
+          Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
+            ~min_fee:Currency.Fee.zero coinbase_amount )
 
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
