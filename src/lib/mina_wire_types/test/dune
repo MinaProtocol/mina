@@ -23,6 +23,7 @@
     consensus.vrf
     protocol_version
     genesis_constants
+    mina_block
     ; Necessary for the type equality
     sgn
     sgn_type

@@ -415,3 +415,9 @@ module Genesis_constants = struct
   module W = WT.Genesis_constants
   include Assert_equal3V1 (O.Protocol.Poly.Stable) (W.Protocol.Poly)
 end
+
+module Mina_block = struct
+  module O = Mina_block
+  module W = WT.Mina_block
+  include Assert_equal0V2 (O.Header.Stable) (W.Header)
+end
