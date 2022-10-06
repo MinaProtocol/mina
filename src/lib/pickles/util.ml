@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types
 
 let rec absorb :
     type a g1 g1_opt f scalar.
@@ -41,12 +40,18 @@ let ones_vector :
     type f n.
        first_zero:f Snarky_backendless.Cvar.t
     -> (module Snarky_backendless.Snark_intf.Run with type field = f)
-    -> n Nat.t
-    -> (f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, n) Vector.t =
+    -> n Pickles_types.Nat.t
+    -> ( f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+       , n )
+       Pickles_types.Vector.t =
  fun ~first_zero (module Impl) n ->
   let open Impl in
   let rec go :
-      type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
+      type m.
+         Boolean.var
+      -> int
+      -> m Pickles_types.Nat.t
+      -> (Boolean.var, m) Pickles_types.Vector.t =
    fun value i m ->
     match m with
     | Z ->
