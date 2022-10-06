@@ -18,4 +18,9 @@
    transition_frontier_base
    data_hash_lib
    with_hash
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
 ))

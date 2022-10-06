@@ -33,6 +33,10 @@
    rose_tree
    consensus
    mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

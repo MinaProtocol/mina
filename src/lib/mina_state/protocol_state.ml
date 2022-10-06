@@ -25,6 +25,9 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'constants )
         A.Body.Poly.V1.t
        and type Body.Value.Stable.V2.t = A.Body.Value.V2.t
+       and type ('state_hash, 'body) Poly.Stable.V1.t =
+        ('state_hash, 'body) A.Poly.V1.t
+       and type Value.Stable.V2.t = A.Value.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -32,7 +35,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_hash, 'body) t =
+        type ('state_hash, 'body) t = ('state_hash, 'body) A.Poly.V1.t =
           { previous_state_hash : 'state_hash; body : 'body }
         [@@deriving equal, ord, hash, sexp, yojson, hlist]
       end

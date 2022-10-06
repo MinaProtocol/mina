@@ -20,6 +20,19 @@ module Types : sig
         end
       end
     end
+
+    module Poly : sig
+      module V1 : sig
+        type ('state_hash, 'body) t =
+          { previous_state_hash : 'state_hash; body : 'body }
+      end
+    end
+
+    module Value : sig
+      module V2 : sig
+        type t = (Mina_base.State_hash.V1.t, Body.Value.V2.t) Poly.V1.t
+      end
+    end
   end
 end
 
@@ -47,6 +60,19 @@ module type Concrete = sig
       end
     end
   end
+
+  module Poly : sig
+    module V1 : sig
+      type ('state_hash, 'body) t =
+        { previous_state_hash : 'state_hash; body : 'body }
+    end
+  end
+
+  module Value : sig
+    module V2 : sig
+      type t = (Mina_base.State_hash.V1.t, Body.Value.V2.t) Poly.V1.t
+    end
+  end
 end
 
 module M : Types.S
@@ -57,4 +83,8 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module Body = M.Body
+include
+  Types.S
+    with module Body = M.Body
+     and module Poly = M.Poly
+     and module Value = M.Value

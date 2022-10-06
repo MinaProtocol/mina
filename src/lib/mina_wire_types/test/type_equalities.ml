@@ -336,6 +336,8 @@ module Mina_state = struct
     Assert_equal0V2
       (O.Protocol_state.Body.Value.Stable)
       (W.Protocol_state.Body.Value)
+  include
+    Assert_equal0V2 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
 end
 
 module Mina_transaction_logic = struct
