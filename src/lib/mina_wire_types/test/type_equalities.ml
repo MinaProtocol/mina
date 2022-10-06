@@ -304,6 +304,7 @@ module Mina_base = struct
       (O.Protocol_constants_checked.Value.Stable)
       (W.Protocol_constants_checked.Value)
   include Assert_equal0V1 (O.State_hash.Stable) (W.State_hash)
+  include Assert_equal0V2 (O.Proof.Stable) (W.Proof)
 end
 
 module One_or_two = struct
