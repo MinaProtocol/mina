@@ -16,8 +16,6 @@ type 'field plonk_domain =
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
-let debug = false
-
 module type Field_intf = sig
   type t
 
@@ -42,8 +40,6 @@ end
 
 type 'f field = (module Field_intf with type t = 'f)
 
-let map_reduce reduce xs map = List.reduce_exn (List.map xs ~f:map) ~f:reduce
-
 let pow2pow (type t) ((module F) : t field) (x : t) n : t =
   let rec go acc i = if i = 0 then acc else go F.(acc * acc) (i - 1) in
   go x n
@@ -65,9 +61,6 @@ let domain (type t) ((module F) : t field) ~shifts ~domain_generator
 
     method generator = generator
   end
-
-let all_but m =
-  List.filter Abc.Label.all ~f:(fun label -> not (Abc.Label.equal label m))
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
     (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
