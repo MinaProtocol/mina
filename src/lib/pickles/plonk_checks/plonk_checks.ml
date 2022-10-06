@@ -1,8 +1,9 @@
 open Core_kernel
 open Pickles_types
-open Pickles_base
+
+(* Module aliases *)
 module Scalars = Scalars
-module Domain = Domain
+module Domain = Pickles_base.Domain
 module Opt = Pickles_types.Plonk_types.Opt
 
 type 'field vanishing_polynomial_domain =
