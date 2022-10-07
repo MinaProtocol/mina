@@ -18,6 +18,15 @@ module Types : sig
           }
       end
     end
+
+    module Pre_diff_with_at_most_two_coinbase : sig
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.V2.t
+          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          Pre_diff_two.V2.t
+      end
+    end
   end
 end
 
@@ -46,6 +55,15 @@ module type Concrete = sig
         }
     end
   end
+
+  module Pre_diff_with_at_most_two_coinbase : sig
+    module V2 : sig
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_two.V2.t
+    end
+  end
 end
 
 module M : Types.S
@@ -59,4 +77,6 @@ module Make
 include
   Types.S
     with module At_most_two = M.At_most_two
-    with module Pre_diff_two = M.Pre_diff_two
+     and module Pre_diff_two = M.Pre_diff_two
+     and module Pre_diff_with_at_most_two_coinbase = M
+                                                     .Pre_diff_with_at_most_two_coinbase

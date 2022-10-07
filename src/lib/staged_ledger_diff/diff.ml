@@ -8,6 +8,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
       with type 'a At_most_two.t = 'a A.At_most_two.V1.t
        and type 'a At_most_two.Stable.V1.t = 'a A.At_most_two.V1.t
        and type ('a, 'b) Pre_diff_two.Stable.V2.t = ('a, 'b) A.Pre_diff_two.V2.t
+       and type Pre_diff_with_at_most_two_coinbase.Stable.V2.t =
+        A.Pre_diff_with_at_most_two_coinbase.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct

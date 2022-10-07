@@ -18,6 +18,15 @@ module Types = struct
           }
       end
     end
+
+    module Pre_diff_with_at_most_two_coinbase : sig
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.V2.t
+          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          Pre_diff_two.V2.t
+      end
+    end
   end
 end
 
@@ -46,6 +55,15 @@ module type Concrete = sig
         }
     end
   end
+
+  module Pre_diff_with_at_most_two_coinbase : sig
+    module V2 : sig
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_two.V2.t
+    end
+  end
 end
 
 module M = struct
@@ -71,6 +89,15 @@ module M = struct
         ; coinbase : Mina_base_coinbase_fee_transfer.V1.t At_most_two.V1.t
         ; internal_command_statuses : Mina_base_transaction_status.V2.t list
         }
+    end
+  end
+
+  module Pre_diff_with_at_most_two_coinbase = struct
+    module V2 = struct
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_two.V2.t
     end
   end
 end
