@@ -6,3 +6,5 @@ include
       'a Mina_wire_types.Staged_ledger_diff.At_most_two.V1.t
      and type ('a, 'b) Pre_diff_two.Stable.V2.t =
       ('a, 'b) Mina_wire_types.Staged_ledger_diff.Pre_diff_two.V2.t
+    with type 'a At_most_one.t =
+      'a Mina_wire_types.Staged_ledger_diff.At_most_one.V1.t

@@ -27,6 +27,12 @@ module Types : sig
           Pre_diff_two.V2.t
       end
     end
+
+    module At_most_one : sig
+      module V1 : sig
+        type 'a t = Zero | One of 'a option
+      end
+    end
   end
 end
 
@@ -64,6 +70,12 @@ module type Concrete = sig
         Pre_diff_two.V2.t
     end
   end
+
+  module At_most_one : sig
+    module V1 : sig
+      type 'a t = Zero | One of 'a option
+    end
+  end
 end
 
 module M : Types.S
@@ -80,3 +92,4 @@ include
      and module Pre_diff_two = M.Pre_diff_two
      and module Pre_diff_with_at_most_two_coinbase = M
                                                      .Pre_diff_with_at_most_two_coinbase
+     and module At_most_one = M.At_most_one

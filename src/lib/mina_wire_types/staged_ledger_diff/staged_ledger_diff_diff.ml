@@ -27,6 +27,12 @@ module Types = struct
           Pre_diff_two.V2.t
       end
     end
+
+    module At_most_one : sig
+      module V1 : sig
+        type 'a t = Zero | One of 'a option
+      end
+    end
   end
 end
 
@@ -64,6 +70,12 @@ module type Concrete = sig
         Pre_diff_two.V2.t
     end
   end
+
+  module At_most_one : sig
+    module V1 : sig
+      type 'a t = Zero | One of 'a option
+    end
+  end
 end
 
 module M = struct
@@ -98,6 +110,12 @@ module M = struct
         ( Transaction_snark_work.V2.t
         , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
         Pre_diff_two.V2.t
+    end
+  end
+
+  module At_most_one = struct
+    module V1 = struct
+      type 'a t = Zero | One of 'a option
     end
   end
 end

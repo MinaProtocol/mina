@@ -10,6 +10,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type ('a, 'b) Pre_diff_two.Stable.V2.t = ('a, 'b) A.Pre_diff_two.V2.t
        and type Pre_diff_with_at_most_two_coinbase.Stable.V2.t =
         A.Pre_diff_with_at_most_two_coinbase.V2.t
+       and type 'a At_most_one.t = 'a A.At_most_one.V1.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -55,7 +56,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = Zero | One of 'a option
+        type 'a t = 'a A.At_most_one.V1.t = Zero | One of 'a option
         [@@deriving equal, compare, sexp, yojson]
       end
     end]
