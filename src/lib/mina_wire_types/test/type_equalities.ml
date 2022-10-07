@@ -431,6 +431,7 @@ module Staged_ledger_diff = struct
   include Assert_equal1V1 (O.At_most_two.Stable) (W.At_most_two)
   include Assert_equal1V1 (O.At_most_one.Stable) (W.At_most_one)
   include Assert_equal2V2 (O.Pre_diff_two.Stable) (W.Pre_diff_two)
+  include Assert_equal2V2 (O.Pre_diff_one.Stable) (W.Pre_diff_one)
   include
     Assert_equal0V2
       (O.Pre_diff_with_at_most_two_coinbase.Stable)
