@@ -18,6 +18,16 @@ module Poly = struct
         { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
     end
+
+    module V1 = struct
+      type ('public_key, 'token_id, 'amount) t =
+        { source_pk : 'public_key
+        ; receiver_pk : 'public_key
+        ; token_id : 'token_id
+        ; amount : 'amount
+        }
+      [@@deriving equal, sexp, hash, yojson, compare, hlist]
+    end
   end]
 end
 
@@ -29,6 +39,18 @@ module Stable = struct
     [@@deriving equal, sexp, hash, compare, yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V1 = struct
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Token_id.Stable.V1.t
+      , Amount.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving equal, sexp, hash, compare, yojson]
+
+    (* don't need to coerce old payments to new ones *)
+    let to_latest _ = failwith "Not implemented"
   end
 end]
 

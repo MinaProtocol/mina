@@ -77,6 +77,9 @@ end
 module type S = sig
   type t [@@deriving sexp, yojson, hash]
 
+  (* type of signed commands, pre-Berkeley hard fork *)
+  type t_legacy
+
   include Comparable.S with type t := t
 
   include Hashable.S with type t := t
@@ -201,7 +204,7 @@ module type S = sig
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
-  include Codable.Base58_check_intf with type t := t
+  val of_base58_check_exn_legacy : string -> t_legacy Or_error.t
 
   include Codable.Base64_intf with type t := t
 end
@@ -236,8 +239,6 @@ module type Full = sig
         Poly.Stable.V1.t
       [@@deriving sexp, hash, yojson, version]
 
-      val version_byte : char (* for base58_check *)
-
       include Comparable.S with type t := t
 
       include Hashable.S with type t := t
@@ -246,7 +247,16 @@ module type Full = sig
 
       val accounts_referenced : t -> Account_id.t list
     end
+
+    module V1 : sig
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, sexp, hash, yojson]
+    end
   end]
 
-  include S with type t = Stable.V2.t
+  include S with type t = Stable.V2.t and type t_legacy = Stable.V1.t
 end
