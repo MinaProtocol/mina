@@ -81,7 +81,7 @@ let get ~depth t addr =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account ~depth t aid
+let%snarkydef_ modify_account ~depth t aid
     ~(filter : Account.var -> 'a Checked.t) ~f =
   let%bind addr =
     request_witness
@@ -104,10 +104,10 @@ let%snarkydef modify_account ~depth t aid
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
+let%snarkydef_ modify_account_send ~depth t aid ~is_writeable ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label "modify_account_send filter"]
+      [%with_label_ "modify_account_send filter"]
         (let%bind account_already_there =
            Account_id.Checked.equal (Account.identifier_of_var account) aid
          in
@@ -119,7 +119,7 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
            Boolean.(account_not_there && is_writeable)
          in
          let%bind () =
-           [%with_label "account is either present or empty and writeable"]
+           [%with_label_ "account is either present or empty and writeable"]
              (Boolean.Assert.any
                 [ account_already_there; not_there_but_writeable ] )
          in
@@ -134,10 +134,10 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv ~depth t aid ~f =
+let%snarkydef_ modify_account_recv ~depth t aid ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label "modify_account_recv filter"]
+      [%with_label_ "modify_account_recv filter"]
         (let%bind account_already_there =
            Account_id.Checked.equal (Account.identifier_of_var account) aid
          in
@@ -146,7 +146,7 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
              Public_key.Compressed.(var_of_t empty)
          in
          let%bind () =
-           [%with_label "account is either present or empty"]
+           [%with_label_ "account is either present or empty"]
              (Boolean.Assert.any [ account_already_there; account_not_there ])
          in
          return account_not_there ) )
