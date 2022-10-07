@@ -33,7 +33,7 @@ struct
 
   let version_string = String.make 1 version_byte
 
-  let chunk_size = 8192
+  let max_length = 8192
 
   let compute_checksum payload =
     (* double-hash using SHA256 *)
@@ -46,58 +46,20 @@ struct
     let second_hash = get ctx3 |> to_raw_string in
     second_hash |> String.sub ~pos:0 ~len:checksum_len
 
-  let encode_unchunked payload =
-    (* this function is not exposed in the .mli file, so it's only called
-       locally, calls are guarded by checking the input length
-    *)
+  (* we don't name this with _exn, we don't expect to raise an exception
+     if we do, we're encoding types that shouldn't be encoded
+  *)
+  let encode payload =
+    let len = String.length payload in
+    if len > max_length then
+      failwithf
+        "String is too long (%d bytes) to Base58Check-encode, max length is %d"
+        len max_length () ;
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
     B58.encode mina_alphabet bytes |> Bytes.to_string
 
-  (* the chunk marker prefixes encodings that are chunked
-
-     it must not appear in the alphabet above, so it can
-     never appear in Base58-encoded text
-
-     it does appear to be mouse-selectable when it appears with
-     alphanumeric text (in Linux, at least)
-
-     do not change it!
-  *)
-  let chunk_marker = '0'
-
-  let encode_chunked payload =
-    let split s =
-      let len = String.length s in
-      if len <= chunk_size then (s, "")
-      else
-        ( String.sub s ~pos:0 ~len:chunk_size
-        , String.sub s ~pos:chunk_size ~len:(len - chunk_size) )
-    in
-    let rec get_chunks acc cs =
-      match split cs with
-      | l1, "" ->
-          List.rev (l1 :: acc)
-      | l1, l2 ->
-          get_chunks (l1 :: acc) l2
-    in
-    let chunks = get_chunks [] payload in
-    (* represent length as 4 hex digits, which
-       is mouse-selectable (note that 0 does not appear
-       in the alphabet above)
-    *)
-    let len_prefixed_encoded_chunks =
-      List.map chunks ~f:(fun chunk ->
-          let encoded = encode_unchunked chunk in
-          sprintf "%04X%s" (String.length encoded) encoded )
-    in
-    String.concat (String.of_char chunk_marker :: len_prefixed_encoded_chunks)
-
-  let encode payload =
-    if String.length payload <= chunk_size then encode_unchunked payload
-    else encode_chunked payload
-
-  let decode_unchunked_exn s =
+  let decode_exn s =
     let bytes = Bytes.of_string s in
     let decoded =
       try B58.decode mina_alphabet bytes |> Bytes.to_string
@@ -121,49 +83,6 @@ struct
     if not (Char.equal decoded.[0] version_byte) then
       raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     payload
-
-  let decode_chunked_exn s =
-    let hex_char_to_int =
-      let code_0 = Char.to_int '0' in
-      let code_9 = Char.to_int '9' in
-      let code_A = Char.to_int 'A' in
-      let code_a = Char.to_int 'a' in
-      let code_F = Char.to_int 'F' in
-      let code_f = Char.to_int 'f' in
-      fun c ->
-        let code = Char.to_int c in
-        if code >= code_0 && code <= code_9 then code - code_0
-        else if code >= code_A && code <= code_F then code - code_A + 0xA
-        else if code >= code_a && code <= code_f then code - code_a + 0xA
-        else failwithf "hex_char_to_int: got invalid character: %c" c ()
-    in
-    (* remove chunk marker *)
-    let stitched = String.sub s ~pos:1 ~len:(String.length s - 1) in
-    let split s =
-      (* interpret 4 hex char length prefix *)
-      let len =
-        (hex_char_to_int s.[0] lsl 12)
-        + (hex_char_to_int s.[1] lsl 8)
-        + (hex_char_to_int s.[2] lsl 4)
-        + hex_char_to_int s.[3]
-      in
-      ( String.sub s ~pos:4 ~len
-      , String.sub s ~pos:(4 + len) ~len:(String.length s - (4 + len)) )
-    in
-    let rec rechunk acc s =
-      match split s with
-      | chunk, "" ->
-          List.rev (chunk :: acc)
-      | chunk, rest ->
-          rechunk (chunk :: acc) rest
-    in
-    let chunks = rechunk [] stitched in
-    List.map chunks ~f:decode_unchunked_exn |> String.concat
-
-  let decode_exn s =
-    if String.is_empty s then failwith "decode_exn: empty input" ;
-    if Char.equal s.[0] chunk_marker then decode_chunked_exn s
-    else decode_unchunked_exn s
 
   let decode s =
     let error_str e desc =
