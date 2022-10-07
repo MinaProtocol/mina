@@ -153,32 +153,4 @@ let%test_module "base58check tests" =
         let _payload = decode_exn "abcd" in
         false
       with Invalid_base58_check_length _ -> true
-
-    let%test "round trip with chunking" =
-      let para =
-        {| Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                    incididunt ut labore et dolore magna aliqua. Integer quis auctor
-                    elit sed vulputate mi sit amet. Sapien pellentesque habitant morbi
-                    tristique senectus et. Eu tincidunt tortor aliquam nulla facilisi
-                    cras fermentum odio. Tortor pretium viverra suspendisse
-                    potenti. Faucibus vitae aliquet nec ullamcorper sit amet risus
-                    nullam eget. Quis auctor elit sed vulputate mi sit amet mauris
-                    commodo. Porttitor rhoncus dolor purus non enim praesent
-                    elementum. Enim tortor at auctor urna nunc id cursus metus
-                    aliquam. Commodo odio aenean sed adipiscing diam donec. Maecenas
-                    ultricies mi eget mauris pharetra et. Morbi tempus iaculis urna id
-                    volutpat lacus laoreet non. Nulla facilisi etiam dignissim diam
-                    quis enim lobortis scelerisque. Sit amet dictum sit amet
-                    justo. Odio eu feugiat pretium nibh. Feugiat in ante metus
-                    dictum. Tempus urna et pharetra pharetra massa massa. Purus in
-                    mollis nunc sed id semper risus in. Leo in vitae turpis
-                    massa. Pellentesque habitant morbi tristique senectus et netus.
-                  |}
-      in
-      let page = String.concat [ para; para; para; para; para ] in
-      let book = String.concat [ page; page; page; page; page ] in
-      (* length of book is about 35K, several chunks *)
-      let encoded = encode book in
-      let decoded = decode_exn encoded in
-      String.equal decoded book
   end )
