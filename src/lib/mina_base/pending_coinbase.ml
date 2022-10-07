@@ -811,7 +811,7 @@ module T = struct
 
     let get ~depth t addr =
       handle
-        (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
+        (fun () -> Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
     let%snarkydef_ add_coinbase
@@ -868,9 +868,9 @@ module T = struct
         let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
         (*if no update then coinbase amount has to be zero*)
         let%bind () =
-          with_label __LOC__
-            (let%bind check = Boolean.equal no_update amount1_equal_to_zero in
-             Boolean.Assert.is_true check )
+          with_label __LOC__ (fun () ->
+              let%bind check = Boolean.equal no_update amount1_equal_to_zero in
+              Boolean.Assert.is_true check )
         in
         let%bind no_coinbase =
           Boolean.(no_update ||| no_coinbase_in_this_stack)
@@ -920,16 +920,18 @@ module T = struct
       (*update the first stack*)
       let%bind root', `Old prev, `New _updated_stack1 =
         handle
-          (Merkle_tree.fetch_and_update_req ~depth
-             (Hash.var_to_hash_packed t)
-             addr1 ~f:update_stack1 )
+          (fun () ->
+            Merkle_tree.fetch_and_update_req ~depth
+              (Hash.var_to_hash_packed t)
+              addr1 ~f:update_stack1 )
           reraise_merkle_requests
       in
       (*update the second stack*)
       let%map root, _, _ =
         handle
-          (Merkle_tree.fetch_and_update_req ~depth root' addr2
-             ~f:(update_stack2 prev) )
+          (fun () ->
+            Merkle_tree.fetch_and_update_req ~depth root' addr2
+              ~f:(update_stack2 prev) )
           reraise_merkle_requests
       in
       Hash.var_of_hash_packed root
@@ -1384,14 +1386,15 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
-              (f_add_coinbase
-                 (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action = action_var
-                 ; coinbase_amount = amount_var
-                 }
-                 ~coinbase_receiver:coinbase_receiver_var
-                 ~supercharge_coinbase:supercharge_coinbase_var
-                 state_body_hash_var )
+              (fun () ->
+                f_add_coinbase
+                  (Hash.var_of_t (merkle_root pending_coinbases))
+                  { Update.Poly.action = action_var
+                  ; coinbase_amount = amount_var
+                  }
+                  ~coinbase_receiver:coinbase_receiver_var
+                  ~supercharge_coinbase:supercharge_coinbase_var
+                  state_body_hash_var )
               (unstage (handler ~depth pending_coinbases ~is_new_stack))
           in
           As_prover.read Hash.typ result
@@ -1442,14 +1445,15 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
-              (f_add_coinbase
-                 (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action = action_var
-                 ; coinbase_amount = amount_var
-                 }
-                 ~coinbase_receiver:coinbase_receiver_var
-                 ~supercharge_coinbase:supercharge_coinbase_var
-                 state_body_hash_var )
+              (fun () ->
+                f_add_coinbase
+                  (Hash.var_of_t (merkle_root pending_coinbases))
+                  { Update.Poly.action = action_var
+                  ; coinbase_amount = amount_var
+                  }
+                  ~coinbase_receiver:coinbase_receiver_var
+                  ~supercharge_coinbase:supercharge_coinbase_var
+                  state_body_hash_var )
               (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1469,8 +1473,9 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let open Snark_params.Tick in
           let%map current, _previous =
             handle
-              (f_pop_coinbase ~proof_emitted:Boolean.true_
-                 (Hash.var_of_t checked_merkle_root) )
+              (fun () ->
+                f_pop_coinbase ~proof_emitted:Boolean.true_
+                  (Hash.var_of_t checked_merkle_root) )
               (unstage (handler ~depth unchecked ~is_new_stack:false))
           in
           As_prover.read Hash.typ current
