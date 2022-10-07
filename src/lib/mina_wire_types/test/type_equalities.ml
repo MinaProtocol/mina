@@ -424,3 +424,9 @@ module Mina_block = struct
   module W = WT.Mina_block
   include Assert_equal0V2 (O.Header.Stable) (W.Header)
 end
+
+module Staged_ledger_diff = struct
+  module O = Staged_ledger_diff
+  module W = WT.Staged_ledger_diff
+  include Assert_equal1V1 (O.At_most_two.Stable) (W.At_most_two)
+end

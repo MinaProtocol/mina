@@ -35,6 +35,7 @@
     pickles_base
     pasta_bindings
     blake2
+    staged_ledger_diff
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

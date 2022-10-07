@@ -1,6 +1,7 @@
 (library
  (name staged_ledger_diff)
  (public_name staged_ledger_diff)
+ (flags -w -22) ; Silence ppx_version's warnings
  (libraries
    ;; opam libraries
    core_kernel
@@ -24,6 +25,7 @@
    consensus
    logger
    ppx_version.runtime
+   mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))
