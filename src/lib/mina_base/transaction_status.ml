@@ -426,7 +426,9 @@ end
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = Applied | Failed of Failure.Collection.Stable.V1.t
+    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+      | Applied
+      | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
