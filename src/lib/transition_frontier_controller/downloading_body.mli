@@ -1,5 +1,8 @@
 open Mina_base
 
+(** Promote a transition that is in [Verifying_blockchain_proof] state with
+    [Processed] status to [Downloading_body] state.
+*)
 val promote_to :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)

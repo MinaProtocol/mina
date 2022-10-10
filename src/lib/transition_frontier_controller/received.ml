@@ -70,7 +70,7 @@ let mark_done ~transition_states state_hash =
   | _ ->
       None
 
-let to_gossip_data ?gossip_type vc_opt =
+let create_gossip_data ?gossip_type vc_opt =
   Option.value ~default:Transition_state.Not_a_gossip
   @@ let%bind.Option gt = gossip_type in
      let%map.Option vc = vc_opt in
@@ -80,9 +80,12 @@ let to_gossip_data ?gossip_type vc_opt =
      | `Block ->
          Gossiped_block vc
 
-(** [add_received] adds a relevant gossip to the state.
+(** [add_received] adds a gossip to the state.
 
-Pre-condition: transition is neither in frontier nor in catchup state *)
+  Pre-conditions:
+  * transition is neither in frontier nor in catchup state
+  * [verify_header_is_relevant] returns [`Relevant] for the gossip
+*)
 let add_received ~context:(module Context : CONTEXT) ~mark_processed_and_promote
     ~sender ~state ?gossip_type ?vc ?body:body_opt received_header =
   let transition_states = state.transition_states in
@@ -152,7 +155,7 @@ let add_received ~context:(module Context : CONTEXT) ~mark_processed_and_promote
       (Received
          { body_opt
          ; header = received_header
-         ; gossip_data = to_gossip_data ?gossip_type vc
+         ; gossip_data = create_gossip_data ?gossip_type vc
          ; substate =
              { children
              ; received_via_gossip = Option.is_some gossip_type
@@ -165,6 +168,8 @@ let add_received ~context:(module Context : CONTEXT) ~mark_processed_and_promote
     ~timeout Context.timeout_controller ;
   mark_processed_and_promote children_list
 
+(** Update gossip data kept for a transition to include information
+    that became potentially available from a recently received gossip *)
 let update_gossip_data ~context:(module Context : Context.CONTEXT) ~hash ~vc
     ~gossip_type old =
   let log_duplicate () =
@@ -190,6 +195,12 @@ let update_gossip_data ~context:(module Context : Context.CONTEXT) ~hash ~vc
   | `Block, Transition_state.Gossiped_both _ ->
       log_duplicate () ; old
 
+(** [preserve_relevant_gossip st] takes data of a recently received gossip related to a
+    transition already present in the catchup state and is associated with state [st].
+    
+    Function returns a pair of a new transition state and an ivar to interrupt processing
+    of the transition if one was active and is no longer relevant.
+    *)
 let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~hash
     ~gossip_type st =
   let update_gossip_data =
@@ -326,7 +337,7 @@ let handle_collected_transition ~context:(module Context : CONTEXT)
     | Bootstrap_controller.Transition_cache.Header header ->
         (header, None, `Header)
   in
-  (* TODO: is it safe to add this as a gossip. Transition was received
+  (* TODO: is it safe to add this as a gossip? Transition was received
      through gossip, but was potentially sent not within its slot
      as boostrap controller is not able to verify this part.orphans
      Hence maybe it's worth leaving it as non-gossip, a dependent transition. *)
