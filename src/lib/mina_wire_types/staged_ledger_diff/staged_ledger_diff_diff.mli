@@ -53,6 +53,14 @@ module Types : sig
           Pre_diff_one.V2.t
       end
     end
+
+    module Diff : sig
+      module V2 : sig
+        type t =
+          Pre_diff_with_at_most_two_coinbase.V2.t
+          * Pre_diff_with_at_most_one_coinbase.V2.t option
+      end
+    end
   end
 end
 
@@ -114,6 +122,14 @@ module type Concrete = sig
         ( Transaction_snark_work.V2.t
         , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
         Pre_diff_one.V2.t
+    end
+  end
+
+  module Diff : sig
+    module V2 : sig
+      type t =
+        Pre_diff_with_at_most_two_coinbase.V2.t
+        * Pre_diff_with_at_most_one_coinbase.V2.t option
     end
   end
 end
