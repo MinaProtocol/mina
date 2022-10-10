@@ -12,6 +12,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
         A.Pre_diff_with_at_most_two_coinbase.V2.t
        and type 'a At_most_one.t = 'a A.At_most_one.V1.t
        and type ('a, 'b) Pre_diff_one.Stable.V2.t = ('a, 'b) A.Pre_diff_one.V2.t
+       and type Pre_diff_with_at_most_one_coinbase.Stable.V2.t =
+        A.Pre_diff_with_at_most_one_coinbase.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
