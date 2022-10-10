@@ -835,7 +835,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
           reraise_merkle_requests
 
-      let%snarkydef add_coinbase
+      let%snarkydef_ add_coinbase
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ({ action; coinbase_amount = amount } : Update.var) ~coinbase_receiver
           ~supercharge_coinbase state_body_hash =
@@ -955,7 +955,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Hash.var_of_hash_packed root
 
-      let%snarkydef pop_coinbases
+      let%snarkydef_ pop_coinbases
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ~proof_emitted =
         let depth = constraint_constants.pending_coinbase_depth in

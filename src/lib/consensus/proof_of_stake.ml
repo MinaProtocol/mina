@@ -712,7 +712,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Producer_private_key : Scalar.value Snarky_backendless.Request.t
         | Producer_public_key : Public_key.t Snarky_backendless.Request.t
 
-      let%snarkydef get_vrf_evaluation
+      let%snarkydef.Snark_params.Tick get_vrf_evaluation
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           shifted ~block_stake_winner ~block_creator ~ledger ~message =
         let open Mina_base in
@@ -727,24 +727,24 @@ module Make_str (A : Wire_types.Concrete) = struct
                ledger staker_addr )
         in
         let%bind () =
-          [%with_label "Account is for the default token"]
+          [%with_label_ "Account is for the default token"]
             (make_checked (fun () ->
                  Token_id.(
                    Checked.Assert.equal account.token_id
                      (Checked.constant default)) ) )
         in
         let%bind () =
-          [%with_label "Block stake winner matches account pk"]
+          [%with_label_ "Block stake winner matches account pk"]
             (Public_key.Compressed.Checked.Assert.equal block_stake_winner
                account.public_key )
         in
         let%bind () =
-          [%with_label "Block creator matches delegate pk"]
+          [%with_label_ "Block creator matches delegate pk"]
             (Public_key.Compressed.Checked.Assert.equal block_creator
                account.delegate )
         in
         let%bind delegate =
-          [%with_label "Decompress delegate pk"]
+          [%with_label_ "Decompress delegate pk"]
             (Public_key.decompress_var account.delegate)
         in
         let%map evaluation =
@@ -755,7 +755,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (evaluation, account)
 
       module Checked = struct
-        let%snarkydef check
+        let%snarkydef.Tick check
             ~(constraint_constants : Genesis_constants.Constraint_constants.t)
             shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
             ~block_creator ~global_slot ~seed =
@@ -1339,9 +1339,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         (min_window_density, next_sub_window_densities)
 
       module Checked = struct
-        let%snarkydef update_min_window_density ~(constants : Constants.var)
-            ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
-            ~prev_min_window_density =
+        let%snarkydef.Tick update_min_window_density
+            ~(constants : Constants.var) ~prev_global_slot ~next_global_slot
+            ~prev_sub_window_densities ~prev_min_window_density =
           (* Please see Min_window_density.update_min_window_density for documentation *)
           let open Tick in
           let open Tick.Checked.Let_syntax in
@@ -2171,7 +2171,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Boolean.not winner_locked
 
-      let%snarkydef update_var (previous_state : var)
+      let%snarkydef_ update_var (previous_state : var)
           (transition_data : Consensus_transition.var)
           (previous_protocol_state_hash : Mina_base.State_hash.var)
           ~(supply_increase : Currency.Amount.Signed.var)
@@ -2188,7 +2188,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label "Next global slot is less that previous global slot"]
+          [%with_label_ "Next global slot is less that previous global slot"]
             (Global_slot.Checked.sub next_global_slot prev_global_slot)
         in
         let%bind () =
@@ -2248,7 +2248,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             previous_state.total_currency supply_increase
         in
         let%bind () =
-          [%with_label "Total currency is greater than or equal to zero"]
+          [%with_label_ "Total currency is greater than or equal to zero"]
             (Boolean.Assert.is_true (Boolean.not overflow))
         in
         let%bind has_ancestor_in_same_checkpoint_window =
@@ -3581,7 +3581,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (protocol_state, consensus_transition)
 
       include struct
-        let%snarkydef next_state_checked ~constraint_constants
+        let%snarkydef.Tick next_state_checked ~constraint_constants
             ~(prev_state : Protocol_state.var)
             ~(prev_state_hash : Mina_base.State_hash.var) transition
             supply_increase =
