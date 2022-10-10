@@ -18,14 +18,8 @@ module Instance = struct
         -> t
 end
 
-(* TODO: Just stick this in plonk_checks.ml *)
-module Plonk_checks = struct
-  include Plonk_checks
-  module Type1 =
-    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
-end
+module Type1 =
+  Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 
 let verify_heterogenous (ts : Instance.t list) =
   let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
@@ -124,7 +118,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let plonk =
           let p =
-            Plonk_checks.Type1.derive_plonk
+            Type1.derive_plonk
               (module Tick.Field)
               ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
               tick_combined_evals
