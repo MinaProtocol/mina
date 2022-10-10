@@ -61,6 +61,10 @@ module Types : sig
           * Pre_diff_with_at_most_one_coinbase.V2.t option
       end
     end
+
+    module V2 : sig
+      type t = { diff : Diff.V2.t }
+    end
   end
 end
 
@@ -132,6 +136,10 @@ module type Concrete = sig
         * Pre_diff_with_at_most_one_coinbase.V2.t option
     end
   end
+
+  module V2 : sig
+    type t = { diff : Diff.V2.t }
+  end
 end
 
 module M : Types.S
@@ -150,3 +158,4 @@ include
                                                      .Pre_diff_with_at_most_two_coinbase
      and module At_most_one = M.At_most_one
      and module Pre_diff_one = M.Pre_diff_one
+     and module V2 = M.V2

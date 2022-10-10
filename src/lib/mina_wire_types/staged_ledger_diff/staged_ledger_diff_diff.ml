@@ -61,6 +61,10 @@ module Types = struct
           * Pre_diff_with_at_most_one_coinbase.V2.t option
       end
     end
+
+    module V2 : sig
+      type t = { diff : Diff.V2.t }
+    end
   end
 end
 
@@ -132,6 +136,10 @@ module type Concrete = sig
         * Pre_diff_with_at_most_one_coinbase.V2.t option
     end
   end
+
+  module V2 : sig
+    type t = { diff : Diff.V2.t }
+  end
 end
 
 module M = struct
@@ -201,6 +209,10 @@ module M = struct
         Pre_diff_with_at_most_two_coinbase.V2.t
         * Pre_diff_with_at_most_one_coinbase.V2.t option
     end
+  end
+
+  module V2 = struct
+    type t = { diff : Diff.V2.t }
   end
 end
 
