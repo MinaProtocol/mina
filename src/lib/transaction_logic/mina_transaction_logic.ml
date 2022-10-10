@@ -1734,7 +1734,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           else
             let fee_payer_idx = List.length failure_status_tbl - 1 in
             List.mapi failure_status_tbl ~f:(fun idx fs ->
-                if idx != fee_payer_idx && List.is_empty fs then
+                if phys_equal idx fee_payer_idx && List.is_empty fs then
                   [ Transaction_status.Failure.Cancelled ]
                 else fs )
         in
