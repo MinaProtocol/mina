@@ -442,4 +442,5 @@ module Staged_ledger_diff = struct
       (W.Pre_diff_with_at_most_two_coinbase)
   include Assert_equal0V2 (O.Diff.Stable) (W.Diff)
   include Assert_equal0V2 (O.Stable) (W)
+  include Assert_equal0V1 (O.Body.Stable) (W.Body)
 end
