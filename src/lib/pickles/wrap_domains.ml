@@ -1,17 +1,11 @@
-open Core_kernel
-open Pickles_types
-open Import
-open Poly_types
-open Hlist
-
 (* Compute the domains corresponding to wrap_main *)
 module Make
-    (A : T0)
-    (A_value : T0)
-    (Ret_var : T0)
-    (Ret_value : T0)
-    (Auxiliary_var : T0)
-    (Auxiliary_value : T0) =
+    (A : Pickles_types.Poly_types.T0)
+    (A_value : Pickles_types.Poly_types.T0)
+    (Ret_var : Pickles_types.Poly_types.T0)
+    (Ret_value : Pickles_types.Poly_types.T0)
+    (Auxiliary_var : Pickles_types.Poly_types.T0)
+    (Auxiliary_value : Pickles_types.Poly_types.T0) =
 struct
   module I =
     Inductive_rule.T (A) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
@@ -19,6 +13,7 @@ struct
 
   let f_debug full_signature num_choices choices_length ~self ~choices
       ~max_proofs_verified =
+    let open Pickles_types in
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
       Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
@@ -43,7 +38,8 @@ struct
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ())
-        (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+        (T (Snarky_backendless.Typ.unit (), Core_kernel.Fn.id, Core_kernel.Fn.id)
+        )
         main
     in
     Timer.clock __LOC__ ; t
@@ -52,13 +48,13 @@ struct
       ~max_proofs_verified =
     let res =
       Common.wrap_domains
-        ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
+        ~proofs_verified:Pickles_types.Nat.(to_int (Add.n max_proofs_verified))
     in
-    ( if debug then
+    ( if Import.debug then
       let res' =
         f_debug full_signature num_choices choices_length ~self ~choices
           ~max_proofs_verified
       in
-      [%test_eq: Domains.t] res res' ) ;
+      [%test_eq: Import.Domains.t] res res' ) ;
     res
 end
