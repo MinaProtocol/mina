@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
@@ -131,7 +130,7 @@ module Stable = struct
             { log_size_of_group = log2_size
             ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
             }
-        ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
+        ; max_poly_size = 1 lsl Nat.to_int Kimchi_pasta.Pasta.Rounds.Wrap.n
         ; max_quot_size
         ; public
         ; prev_challenges = 2 (* Due to Wrap_hack *)
