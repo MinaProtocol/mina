@@ -64,24 +64,28 @@ module Make (Inputs : Inputs_intf) :
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
            staking_epoch_ledger )
-    then
+    then (
       match staking_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
+          Format.eprintf "REJECTING STAKING LEDGER@." ;
           None
       | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+          Format.eprintf "FOUND STAKING LEDGER@." ;
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger) )
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
            next_epoch_ledger )
-    then
+    then (
       match next_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
+          Format.eprintf "REJECTING NEXT LEDGER@." ;
           None
       | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+          Format.eprintf "FOUND NEXT LEDGER@." ;
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger) )
     else None
 
   let answer_query :

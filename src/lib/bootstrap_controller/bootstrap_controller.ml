@@ -524,19 +524,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       Consensus.Hooks.sync_local_state
                         ~context:(module Context)
                         ~local_state:consensus_local_state ~trust_system
+                        ~glue_sync_ledger:
+                          (Mina_networking.glue_sync_ledger t.network)
                         ~random_peers:(fun n ->
                           (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
                           let%map peers =
                             Mina_networking.random_peers t.network n
                           in
                           sender :: peers )
-                        ~query_peer:
-                          { Consensus.Hooks.Rpcs.query =
-                              (fun peer rpc query ->
-                                Mina_networking.(
-                                  query_peer t.network peer.peer_id
-                                    (Rpcs.Consensus_rpc rpc) query) )
-                          }
                         sync_jobs
                     in
                     (true, result) )

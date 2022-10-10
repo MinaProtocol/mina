@@ -2514,191 +2514,6 @@ end
 module Hooks = struct
   open Data
 
-  module Rpcs = struct
-    open Async
-
-    [%%versioned_rpc
-    module Get_epoch_ledger = struct
-      module Master = struct
-        let name = "get_epoch_ledger"
-
-        module T = struct
-          type query = Mina_base.Ledger_hash.t
-
-          type response = (Mina_ledger.Sparse_ledger.t, string) Result.t
-        end
-
-        module Caller = T
-        module Callee = T
-      end
-
-      include Master.T
-
-      let sent_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_sent
-
-      let received_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_received
-
-      let failed_request_counter =
-        Mina_metrics.Network.get_epoch_ledger_rpc_requests_failed
-
-      let failed_response_counter =
-        Mina_metrics.Network.get_epoch_ledger_rpc_responses_failed
-
-      module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-      include M
-
-      include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
-
-      module V2 = struct
-        module T = struct
-          type query = Mina_base.Ledger_hash.Stable.V1.t
-
-          type response =
-            ( Mina_ledger.Sparse_ledger.Stable.V2.t
-            , string )
-            Core_kernel.Result.Stable.V1.t
-
-          let query_of_caller_model = Fn.id
-
-          let callee_model_of_query = Fn.id
-
-          let response_of_callee_model = Fn.id
-
-          let caller_model_of_response = Fn.id
-        end
-
-        module T' =
-          Perf_histograms.Rpc.Plain.Decorate_bin_io
-            (struct
-              include M
-              include Master
-            end)
-            (T)
-
-        include T'
-        include Register (T')
-      end
-
-      let implementation ~context:(module Context : CONTEXT) ~local_state
-          ~genesis_ledger_hash conn ~version:_ ledger_hash =
-        let open Context in
-        let open Mina_base in
-        let open Local_state in
-        let open Snapshot in
-        Deferred.create (fun ivar ->
-            [%log info]
-              ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson conn)
-                ; ("ledger_hash", Mina_base.Ledger_hash.to_yojson ledger_hash)
-                ]
-              "Serving epoch ledger query with hash $ledger_hash from $peer" ;
-            let response =
-              if
-                Ledger_hash.equal ledger_hash
-                  (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
-              then Error "refusing to serve genesis ledger"
-              else
-                let candidate_snapshots =
-                  [ !local_state.Data.staking_epoch_snapshot
-                  ; !local_state.Data.next_epoch_snapshot
-                  ]
-                in
-                let res =
-                  List.find_map candidate_snapshots ~f:(fun snapshot ->
-                      (* if genesis epoch ledger is different from genesis ledger*)
-                      match snapshot.ledger with
-                      | Genesis_epoch_ledger genesis_epoch_ledger ->
-                          if
-                            Ledger_hash.equal ledger_hash
-                              (Mina_ledger.Ledger.merkle_root
-                                 genesis_epoch_ledger )
-                          then
-                            Some (Error "refusing to serve genesis epoch ledger")
-                          else None
-                      | Ledger_db ledger ->
-                          if
-                            Ledger_hash.equal ledger_hash
-                              (Mina_ledger.Ledger.Db.merkle_root ledger)
-                          then
-                            Some
-                              (Ok
-                                 ( Mina_ledger.Sparse_ledger.of_any_ledger
-                                 @@ Mina_ledger.Ledger.Any_ledger.cast
-                                      (module Mina_ledger.Ledger.Db)
-                                      ledger ) )
-                          else None )
-                in
-                Option.value res ~default:(Error "epoch ledger not found")
-            in
-            Result.iter_error response ~f:(fun err ->
-                Mina_metrics.Counter.inc_one failed_response_counter ;
-                [%log info]
-                  ~metadata:
-                    [ ("peer", Network_peer.Peer.to_yojson conn)
-                    ; ("error", `String err)
-                    ; ( "ledger_hash"
-                      , Mina_base.Ledger_hash.to_yojson ledger_hash )
-                    ]
-                  "Failed to serve epoch ledger query with hash $ledger_hash \
-                   from $peer: $error" ) ;
-            if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
-            Ivar.fill ivar response )
-    end]
-
-    open Network_peer.Rpc_intf
-
-    type ('query, 'response) rpc =
-      | Get_epoch_ledger
-          : (Get_epoch_ledger.query, Get_epoch_ledger.response) rpc
-
-    type rpc_handler =
-      | Rpc_handler :
-          { rpc : ('q, 'r) rpc
-          ; f : ('q, 'r) rpc_fn
-          ; cost : 'q -> int
-          ; budget : int * [ `Per of Core.Time.Span.t ]
-          }
-          -> rpc_handler
-
-    type query =
-      { query :
-          'q 'r.
-             Network_peer.Peer.t
-          -> ('q, 'r) rpc
-          -> 'q
-          -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
-      }
-
-    let implementation_of_rpc :
-        type q r. (q, r) rpc -> (q, r) rpc_implementation = function
-      | Get_epoch_ledger ->
-          (module Get_epoch_ledger)
-
-    let match_handler :
-        type q r.
-        rpc_handler -> (q, r) rpc -> do_:((q, r) rpc_fn -> 'a) -> 'a option =
-     fun handler rpc ~do_ ->
-      match (rpc, handler) with
-      | Get_epoch_ledger, Rpc_handler { rpc = Get_epoch_ledger; f; _ } ->
-          Some (do_ f)
-
-    let rpc_handlers ~context:(module Context : CONTEXT) ~local_state
-        ~genesis_ledger_hash =
-      [ Rpc_handler
-          { rpc = Get_epoch_ledger
-          ; f =
-              Get_epoch_ledger.implementation
-                ~context:(module Context)
-                ~local_state ~genesis_ledger_hash
-          ; cost = (fun _ -> 1)
-          ; budget = (2, `Per Core.Time.Span.minute)
-          }
-      ]
-  end
-
   let is_genesis_epoch ~(constants : Constants.t) time =
     Epoch.(equal (of_time_exn ~constants time) zero)
 
@@ -2832,7 +2647,7 @@ module Hooks = struct
               ) )
 
   let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-      ~local_state ~random_peers ~(query_peer : Rpcs.query) requested_syncs =
+      ~local_state ~glue_sync_ledger ~random_peers requested_syncs =
     let open Context in
     let open Local_state in
     let open Snapshot in
@@ -2846,7 +2661,7 @@ module Hooks = struct
         ] ;
     let sync { snapshot_id; expected_root = target_ledger_hash } =
       (* if requested last epoch ledger is equal to the current epoch ledger
-         then we don't need make a rpc call to the peers. *)
+         then we don't need to sync the ledger to the peers. *)
       if
         equal_snapshot_identifier snapshot_id Staking_epoch_snapshot
         && Mina_base.(
@@ -2875,70 +2690,50 @@ module Hooks = struct
                   !local_state.next_epoch_snapshot.delegatee_table
               } ;
             Deferred.Or_error.ok_unit )
-      else
+      else (
+        [%log info] "GETTING EPOCH LEDGER@." ;
         let%bind peers = random_peers 5 in
-        Deferred.List.fold peers
-          ~init:(Or_error.error_string "Failed to sync epoch ledger: No peers")
-          ~f:(fun acc peer ->
-            match acc with
+        (* start with empty ledger *)
+        let genesis_ledger =
+          Mina_ledger.Ledger.Db.create
+            ~depth:Context.constraint_constants.ledger_depth ()
+        in
+        let sync_ledger =
+          Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system genesis_ledger
+        in
+        let query_reader =
+          Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+        in
+        let response_writer =
+          Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+        in
+        glue_sync_ledger ~preferred:peers query_reader response_writer ;
+        match%bind
+          Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
+            ~data:() ~equal:(fun () () -> true)
+        with
+        | `Ok ledger_db -> (
+            [%log info] "GOT EPOCH LEDGER@." ;
+            let sparse_ledger =
+              Mina_ledger.Sparse_ledger.of_any_ledger
+                (Mina_ledger.Ledger.Any_ledger.cast
+                   (module Mina_ledger.Ledger.Db)
+                   ledger_db )
+            in
+            match
+              reset_snapshot
+                ~context:(module Context)
+                local_state snapshot_id ~sparse_ledger
+            with
             | Ok () ->
+                [%log info] "RESET SNAPSHOT@." ;
                 Deferred.Or_error.ok_unit
-            | Error _ -> (
-                match%bind
-                  query_peer.query peer Rpcs.Get_epoch_ledger
-                    (Mina_base.Frozen_ledger_hash.to_ledger_hash
-                       target_ledger_hash )
-                with
-                | Connected { data = Ok (Ok sparse_ledger); _ } -> (
-                    match
-                      reset_snapshot
-                        ~context:(module Context)
-                        local_state snapshot_id ~sparse_ledger
-                    with
-                    | Ok () ->
-                        (*Don't fail if recording fails*)
-                        don't_wait_for
-                          Trust_system.(
-                            record trust_system logger peer
-                              Actions.(Epoch_ledger_provided, None)) ;
-                        Deferred.Or_error.ok_unit
-                    | Error e ->
-                        [%log faulty_peer_without_punishment]
-                          ~metadata:
-                            [ ("peer", Network_peer.Peer.to_yojson peer)
-                            ; ("error", Error_json.error_to_yojson e)
-                            ]
-                          "Peer $peer failed to serve requested epoch ledger: \
-                           $error" ;
-                        return (Error e) )
-                | Connected { data = Ok (Error err); _ } ->
-                    (* TODO figure out punishments here. *)
-                    [%log faulty_peer_without_punishment]
-                      ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
-                        ; ("error", `String err)
-                        ]
-                      "Peer $peer failed to serve requested epoch ledger: \
-                       $error" ;
-                    return (Or_error.error_string err)
-                | Connected { data = Error err; _ } ->
-                    [%log faulty_peer_without_punishment]
-                      ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
-                        ; ("error", `String (Error.to_string_mach err))
-                        ]
-                      "Peer $peer failed to serve requested epoch ledger: \
-                       $error" ;
-                    return (Error err)
-                | Failed_to_connect err ->
-                    [%log faulty_peer_without_punishment]
-                      ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
-                        ; ("error", Error_json.error_to_yojson err)
-                        ]
-                      "Failed to connect to $peer to retrieve epoch ledger: \
-                       $error" ;
-                    return (Error err) ) )
+            | Error e ->
+                [%log info] "ERROR WHEN RESETTING SNAPSHOT@." ;
+                return (Error e) )
+        | `Target_changed _ ->
+            [%log info] "TARGET CHANGED@." ;
+            return (Or_error.error_string "Epoch ledger target changed") )
     in
     match requested_syncs with
     | One required_sync ->

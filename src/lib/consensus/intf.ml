@@ -622,25 +622,6 @@ module type S = sig
   module Hooks : sig
     open Data
 
-    module Rpcs : sig
-      include Network_peer.Rpc_intf.Rpc_interface_intf
-
-      val rpc_handlers :
-           context:(module CONTEXT)
-        -> local_state:Local_state.t
-        -> genesis_ledger_hash:Frozen_ledger_hash.t
-        -> rpc_handler list
-
-      type query =
-        { query :
-            'q 'r.
-               Network_peer.Peer.t
-            -> ('q, 'r) rpc
-            -> 'q
-            -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
-        }
-    end
-
     (* Check whether we are in the genesis epoch *)
     val is_genesis_epoch : constants:Constants.t -> Block_time.t -> bool
 
@@ -668,7 +649,7 @@ module type S = sig
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> select_status
 
-    (*Data required to evaluate VRFs for an epoch*)
+    (** Data required to evaluate VRFs for an epoch *)
     val get_epoch_data_for_vrf :
          constants:Constants.t
       -> Unix_timestamp.t
@@ -728,13 +709,25 @@ module type S = sig
 
     (**
      * Synchronize local state over the network.
+
+     * [glue_sync_ledger] is [Mina_networking.glue_sync_ledger], with the [Mina_networking.t] argument
+       already supplied
      *)
     val sync_local_state :
          context:(module CONTEXT)
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
+      -> glue_sync_ledger:
+           (   preferred:Network_peer.Peer.t list
+            -> (Frozen_ledger_hash.t * Mina_ledger.Sync_ledger.Query.t)
+               Pipe_lib.Linear_pipe.Reader.t
+            -> ( Frozen_ledger_hash.t
+               * Mina_ledger.Sync_ledger.Query.t
+               * Mina_ledger.Sync_ledger.Answer.t
+                 Network_peer.Envelope.Incoming.t )
+               Pipe.Writer.t
+            -> unit )
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
-      -> query_peer:Rpcs.query
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

@@ -891,7 +891,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
     | Rpc_handler :
@@ -924,8 +923,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Consensus_rpc rpc ->
-        Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
   let match_handler :
       type q r.
@@ -933,7 +930,7 @@ module Rpcs = struct
       -> (q, r) rpc
       -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
       -> 'a option =
-   fun (Rpc_handler { rpc = impl_rpc; f; cost; budget }) rpc ~do_ ->
+   fun (Rpc_handler { rpc = impl_rpc; f; cost = _; budget = _ }) rpc ~do_ ->
     match (rpc, impl_rpc) with
     | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
@@ -975,12 +972,6 @@ module Rpcs = struct
     | Get_best_tip, Get_best_tip ->
         Some (do_ f)
     | Get_best_tip, _ ->
-        None
-    | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
-        Consensus.Hooks.Rpcs.match_handler
-          (Rpc_handler { rpc = rpc_b; f; cost; budget })
-          rpc_a ~do_
-    | Consensus_rpc _, _ ->
         None
 end
 
@@ -1069,10 +1060,6 @@ let create (config : Config.t) ~sinks
        -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
   let module Context = struct
     let logger = config.logger
-
-    let consensus_constants = config.precomputed_values.consensus_constants
-
-    let constraint_constants = config.constraint_constants
   end in
   let open Context in
   let run_for_rpc_result conn data ~f action_msg msg_args =
@@ -1390,15 +1377,6 @@ let create (config : Config.t) ~sinks
         ; cost = unit
         }
     ]
-    @ Consensus.Hooks.Rpcs.(
-        List.map
-          (rpc_handlers
-             ~context:(module Context)
-             ~local_state:config.consensus_local_state
-             ~genesis_ledger_hash:
-               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )
-          ~f:(fun (Rpc_handler { rpc; f; cost; budget }) ->
-            Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget }) ))
   in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
