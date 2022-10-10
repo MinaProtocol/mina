@@ -88,6 +88,20 @@ module Common = struct
 
       let to_latest = Fn.id
     end
+
+    module V1 = struct
+      type t =
+        ( Currency.Fee.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t
+        , Token_id.Stable.V1.t
+        , Account_nonce.Stable.V1.t
+        , Global_slot.Stable.V1.t
+        , Memo.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, equal, sexp, hash, yojson]
+
+      let to_latest _ = failwith "Not implemented"
+    end
   end]
 
   let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : t) =
@@ -170,29 +184,27 @@ module Common = struct
 end
 
 module Body = struct
-  module Binable_arg = struct
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
-        type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
-          | Payment of Payment_payload.Stable.V2.t
-          | Stake_delegation of Stake_delegation.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = Binable_arg.Stable.V2.t =
+      type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving sexp, compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V1 = struct
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      (* omitting token commands, none were ever created
+         such omission doesn't affect serialization/Base58Check of payments, delegations
+      *)
+      [@@deriving sexp, compare, equal, sexp, hash, yojson]
+
+      let to_latest _ = failwith "Not implemented"
     end
   end]
 
@@ -276,6 +288,14 @@ module Stable = struct
     [@@deriving compare, equal, sexp, hash, yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V1 = struct
+    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, equal, sexp, hash, yojson]
+
+    (* don't need to coerce old transactions to newer version *)
+    let to_latest _ = failwith "Not implemented"
   end
 end]
 
