@@ -4,8 +4,6 @@ open Async_kernel
 open Pickles_types
 open Common
 open Import
-open Backend
-open Tuple_lib
 
 module Instance = struct
   type t =
@@ -80,9 +78,9 @@ let verify_heterogenous (ts : Instance.t list) =
         let alpha = sc plonk0.alpha in
         let step_domain = Branch_data.domain branch_data in
         let w =
-          Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
+          Tick_field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
-        let zetaw = Tick.Field.mul zeta w in
+        let zetaw = Tick_field.mul zeta w in
         let tick_plonk_minimal :
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
@@ -96,19 +94,21 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
-            (module Tick.Field)
-            evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+            (module Tick_field)
+            evals.evals.evals
+            ~rounds:(Nat.to_int Backend.Tick.Rounds.n)
+            ~zeta ~zetaw
           |> Plonk_types.Evals.to_in_circuit
         in
         let tick_domain =
           Plonk_checks.domain
-            (module Tick.Field)
+            (module Tick_field)
             step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
         let tick_env =
           Plonk_checks.scalars_env
-            (module Tick.Field)
+            (module Tick_field)
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~srs_length_log2:Common.Max_degree.step_log2
             ~field_of_hex:(fun s ->
@@ -119,7 +119,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let plonk =
           let p =
             Type1.derive_plonk
-              (module Tick.Field)
+              (module Tick_field)
               ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
               tick_combined_evals
           in
@@ -202,7 +202,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let shifted_value =
-          Shifted_value.Type1.to_field (module Tick.Field) ~shift:Shifts.tick1
+          Shifted_value.Type1.to_field (module Tick_field) ~shift:Shifts.tick1
         in
         let b_actual =
           let challenge_poly =
@@ -210,7 +210,7 @@ let verify_heterogenous (ts : Instance.t list) =
               (Wrap.challenge_polynomial
                  (Vector.to_array bulletproof_challenges) )
           in
-          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+          Tick_field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
         in
         let () =
           let [ Pow_2_roots_of_unity greatest_wrap_domain
