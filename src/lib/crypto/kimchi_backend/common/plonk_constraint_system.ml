@@ -364,6 +364,14 @@ struct
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
       Fp.t array array =
+    (* Ensure that the system is finalized. *)
+    ( match sys.gates with
+    | Unfinalized_rev _ ->
+        failwith "Cannot compute witness on an unfinalized constraint system"
+    | _ ->
+        () ) ;
+
+    (* Init the execution trace table. *)
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
