@@ -16,5 +16,4 @@
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
- (flags -w -22) ;; to allow ppx_version to be used in a functor body.
  (synopsis "Protocol version representation"))

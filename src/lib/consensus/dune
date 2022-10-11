@@ -4,7 +4,6 @@
  (inline_tests)
  (modules (:standard \ proof_of_stake_fuzzer))
  (library_flags (-linkall))
- (flags -w -22) ; Silence ppx_version's warnings
  (libraries
    ;; opam libraries
    ppx_inline_test.config

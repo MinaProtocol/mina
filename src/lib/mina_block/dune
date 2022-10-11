@@ -2,7 +2,6 @@
  (name mina_block)
  (public_name mina_block)
  (inline_tests)
- (flags -w -22) ; Silence ppx_version's warnings
  (libraries
    ;; opam libraries
    integers

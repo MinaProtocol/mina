@@ -1,7 +1,6 @@
 (library
  (name staged_ledger_diff)
  (public_name staged_ledger_diff)
- (flags -w -22) ; Silence ppx_version's warnings
  (libraries
    ;; opam libraries
    core_kernel
