@@ -120,7 +120,7 @@ let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
       []
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
-  | _ ->
+  | [], S _ | _ :: _, Z ->
       failwith "Vector: Length mismatch"
 
 let of_array_and_length_exn : type a n. a array -> n Nat.t -> (a, n) t =
@@ -137,7 +137,7 @@ let rec _take_from_list : type a n. a list -> n Nat.t -> (a, n) t =
       []
   | x :: xs, S n ->
       x :: _take_from_list xs n
-  | _ ->
+  | [], S _ ->
       failwith "take_from_list: Not enough to take"
 
 let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
