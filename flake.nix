@@ -36,9 +36,11 @@
 
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
+  inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
-    }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
+    , nix-utils, ... }:
     {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -160,6 +162,8 @@
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
+
+              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
             })
           ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
@@ -184,6 +188,8 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
+
+        debianPackages = pkgs.callPackage ./nix/debian.nix { };
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -340,6 +346,8 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
+        packages.mina-deb = debianPackages.mina;
+
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
           shellHook = ''
             ${oa.shellHook}
@@ -350,8 +358,7 @@
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-with-lsp";
-          buildInputs = oa.buildInputs
-            ++ [ pkgs.go_1_18 ];
+          buildInputs = oa.buildInputs ++ [ pkgs.go_1_18 ];
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
