@@ -428,8 +428,8 @@ end = struct
           Array.create ~len:num_rows Fp.zero )
     in
     (* Public input *)
-    for i = 0 to public_input_size - 1 do
-      res.(0).(i) <- external_values (i + 1)
+    for i = 0 to public_input_size do
+      res.(0).(i) <- external_values i
     done ;
     let find t k =
       match Hashtbl.find t k with
@@ -579,8 +579,8 @@ end = struct
         in
         let pub_selectors = [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |] in
         let pub_input_gate_specs_rev = ref [] in
-        for row = 0 to public_input_size - 1 do
-          let public_var = V.External (row + 1) in
+        for row = 0 to public_input_size do
+          let public_var = V.External row in
           wire' sys public_var (Row.Public_input row) 0 ;
           pub_input_gate_specs_rev :=
             { Gate_spec.kind = Generic
