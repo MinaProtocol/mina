@@ -2690,16 +2690,20 @@ module Hooks = struct
                   !local_state.next_epoch_snapshot.delegatee_table
               } ;
             Deferred.Or_error.ok_unit )
-      else (
-        [%log info] "GETTING EPOCH LEDGER@." ;
-        let%bind peers = random_peers 5 in
-        (* start with empty ledger *)
-        let genesis_ledger =
+      else
+        let num_sync_peers = 5 in
+        let%bind peers = random_peers num_sync_peers in
+        let ledger_hash_json =
+          Mina_base.Ledger_hash.to_yojson target_ledger_hash
+        in
+        [%log info] "Syncing epoch ledger from %d peers" num_sync_peers
+          ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
+        let db_ledger =
           Mina_ledger.Ledger.Db.create
             ~depth:Context.constraint_constants.ledger_depth ()
         in
         let sync_ledger =
-          Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system genesis_ledger
+          Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
         in
         let query_reader =
           Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
@@ -2712,28 +2716,32 @@ module Hooks = struct
           Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
             ~data:() ~equal:(fun () () -> true)
         with
-        | `Ok ledger_db -> (
-            [%log info] "GOT EPOCH LEDGER@." ;
+        | `Ok ledger -> (
+            [%log info] "Succeeded in syncing epoch ledger from peers"
+              ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
             let sparse_ledger =
               Mina_ledger.Sparse_ledger.of_any_ledger
                 (Mina_ledger.Ledger.Any_ledger.cast
                    (module Mina_ledger.Ledger.Db)
-                   ledger_db )
+                   ledger )
             in
+            assert (
+              Mina_base.Ledger_hash.equal target_ledger_hash
+                (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger) ) ;
             match
               reset_snapshot
                 ~context:(module Context)
                 local_state snapshot_id ~sparse_ledger
             with
             | Ok () ->
-                [%log info] "RESET SNAPSHOT@." ;
                 Deferred.Or_error.ok_unit
             | Error e ->
-                [%log info] "ERROR WHEN RESETTING SNAPSHOT@." ;
+                [%log error] "Could not reset snapshot from synced epoch ledger"
+                  ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                 return (Error e) )
         | `Target_changed _ ->
-            [%log info] "TARGET CHANGED@." ;
-            return (Or_error.error_string "Epoch ledger target changed") )
+            [%log info] "Target changed when syncing epoch ledger" ;
+            return (Or_error.error_string "Epoch ledger target changed")
     in
     match requested_syncs with
     | One required_sync ->
