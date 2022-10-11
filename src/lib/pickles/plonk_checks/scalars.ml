@@ -203,7 +203,7 @@ module Tick : S = struct
              in
              (cell (var (Witness 10, Curr)) * x_0)
              - ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
              + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
@@ -212,7 +212,7 @@ module Tick : S = struct
                        * cell (var (Witness 1, Curr))
                      - double x_2 - x_2 )
                  + ( field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
                    * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
@@ -382,7 +382,7 @@ module Tick : S = struct
                  - ( cell (var (Witness 3, Curr))
                    - ( double (cell (var (Witness 2, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
@@ -405,7 +405,7 @@ module Tick : S = struct
                  - ( cell (var (Witness 8, Curr))
                    - ( double (cell (var (Witness 3, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
@@ -428,7 +428,7 @@ module Tick : S = struct
                  - ( cell (var (Witness 10, Curr))
                    - ( double (cell (var (Witness 4, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
@@ -452,7 +452,7 @@ module Tick : S = struct
                  - ( cell (var (Witness 12, Curr))
                    - ( double (cell (var (Witness 5, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
@@ -477,7 +477,7 @@ module Tick : S = struct
                  - ( cell (var (Witness 14, Curr))
                    - ( double (cell (var (Witness 6, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
@@ -495,21 +495,21 @@ module Tick : S = struct
         , lazy
             (let x_0 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
              let x_1 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
@@ -543,7 +543,7 @@ module Tick : S = struct
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
@@ -559,7 +559,7 @@ module Tick : S = struct
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
@@ -584,105 +584,105 @@ module Tick : S = struct
         , lazy
             (let x_0 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 6, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 6, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 6, Curr))
              in
              let x_1 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 7, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 7, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 7, Curr))
              in
              let x_2 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 8, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 8, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 8, Curr))
              in
              let x_3 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 9, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 9, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 9, Curr))
              in
              let x_4 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 10, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 10, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 10, Curr))
              in
              let x_5 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 11, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 11, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 11, Curr))
              in
              let x_6 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 12, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 12, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 12, Curr))
              in
              let x_7 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 13, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 13, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 13, Curr))
              in
@@ -753,310 +753,310 @@ module Tick : S = struct
                                                  (cell (var (Witness 3, Curr)))
                                              + ( x_0
                                                + ( ( field
-                                                       "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                       "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                      * cell
                                                          (var (Witness 6, Curr))
                                                    + field
-                                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                    )
                                                    * cell
                                                        (var (Witness 6, Curr))
                                                  + field
-                                                     "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                     "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  ) ) )
                                          + ( x_1
                                            + ( ( field
-                                                   "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                   "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  * cell (var (Witness 7, Curr))
                                                + field
-                                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                )
                                                * cell (var (Witness 7, Curr))
                                              + field
-                                                 "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              ) ) )
                                      + ( x_2
                                        + ( ( field
-                                               "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                               "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              * cell (var (Witness 8, Curr))
                                            + field
-                                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                                            )
                                            * cell (var (Witness 8, Curr))
                                          + field
-                                             "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                             "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          ) ) )
                                  + ( x_3
                                    + ( ( field
-                                           "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          * cell (var (Witness 9, Curr))
                                        + field
-                                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                                        )
                                        * cell (var (Witness 9, Curr))
                                      + field
-                                         "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                         "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      ) ) )
                              + ( x_4
                                + ( ( field
-                                       "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                       "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      * cell (var (Witness 10, Curr))
                                    + field
-                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                    )
                                    * cell (var (Witness 10, Curr))
                                  + field
-                                     "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                     "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  ) ) )
                          + ( x_5
                            + ( ( field
-                                   "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                   "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  * cell (var (Witness 11, Curr))
                                + field
-                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                )
                                * cell (var (Witness 11, Curr))
                              + field
-                                 "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              ) ) )
                      + ( x_6
                        + ( ( field
-                               "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                               "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              * cell (var (Witness 12, Curr))
                            + field
-                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                            )
                            * cell (var (Witness 12, Curr))
                          + field
-                             "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                             "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          ) ) )
                  + ( x_7
                    + ( ( field
-                           "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          * cell (var (Witness 13, Curr))
                        + field
-                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                         "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                      ) )
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 3
                * ( ( ( ( cell (var (Witness 6, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 6, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 6, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 6, Curr)) )
              + alpha_pow 4
                * ( ( ( ( cell (var (Witness 7, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 7, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 7, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 7, Curr)) )
              + alpha_pow 5
                * ( ( ( ( cell (var (Witness 8, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 8, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 8, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 8, Curr)) )
              + alpha_pow 6
                * ( ( ( ( cell (var (Witness 9, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 9, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 9, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 9, Curr)) )
              + alpha_pow 7
                * ( ( ( ( cell (var (Witness 10, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 10, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 10, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 10, Curr)) )
              + alpha_pow 8
                * ( ( ( ( cell (var (Witness 11, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 11, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 11, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 11, Curr)) )
              + alpha_pow 9
                * ( ( ( ( cell (var (Witness 12, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 12, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 12, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 12, Curr)) )
              + alpha_pow 10
                * ( ( ( ( cell (var (Witness 13, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 13, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * field
-                "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 1
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 2
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 3
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 4
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 5
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 6
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 7
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 8
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 9
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 10
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 11
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 11
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 12
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 12
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 13
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 13
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 14
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 14
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ]
 end
@@ -1186,7 +1186,7 @@ module Tock : S = struct
              in
              (cell (var (Witness 10, Curr)) * x_0)
              - ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
              + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
@@ -1195,7 +1195,7 @@ module Tock : S = struct
                        * cell (var (Witness 1, Curr))
                      - double x_2 - x_2 )
                  + ( field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
                    * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
@@ -1365,7 +1365,7 @@ module Tock : S = struct
                  - ( cell (var (Witness 3, Curr))
                    - ( double (cell (var (Witness 2, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
@@ -1388,7 +1388,7 @@ module Tock : S = struct
                  - ( cell (var (Witness 8, Curr))
                    - ( double (cell (var (Witness 3, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
@@ -1411,7 +1411,7 @@ module Tock : S = struct
                  - ( cell (var (Witness 10, Curr))
                    - ( double (cell (var (Witness 4, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
@@ -1435,7 +1435,7 @@ module Tock : S = struct
                  - ( cell (var (Witness 12, Curr))
                    - ( double (cell (var (Witness 5, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
@@ -1460,7 +1460,7 @@ module Tock : S = struct
                  - ( cell (var (Witness 14, Curr))
                    - ( double (cell (var (Witness 6, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
@@ -1478,21 +1478,21 @@ module Tock : S = struct
         , lazy
             (let x_0 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
              let x_1 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
@@ -1526,7 +1526,7 @@ module Tock : S = struct
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
@@ -1542,7 +1542,7 @@ module Tock : S = struct
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
@@ -1567,105 +1567,105 @@ module Tock : S = struct
         , lazy
             (let x_0 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 6, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 6, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 6, Curr))
              in
              let x_1 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 7, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 7, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 7, Curr))
              in
              let x_2 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 8, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 8, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 8, Curr))
              in
              let x_3 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 9, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 9, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 9, Curr))
              in
              let x_4 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 10, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 10, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 10, Curr))
              in
              let x_5 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 11, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 11, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 11, Curr))
              in
              let x_6 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 12, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 12, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 12, Curr))
              in
              let x_7 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 13, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 13, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 13, Curr))
              in
@@ -1736,310 +1736,310 @@ module Tock : S = struct
                                                  (cell (var (Witness 3, Curr)))
                                              + ( x_0
                                                + ( ( field
-                                                       "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                      * cell
                                                          (var (Witness 6, Curr))
                                                    + field
-                                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                    )
                                                    * cell
                                                        (var (Witness 6, Curr))
                                                  + field
-                                                     "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                     "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  ) ) )
                                          + ( x_1
                                            + ( ( field
-                                                   "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                   "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  * cell (var (Witness 7, Curr))
                                                + field
-                                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                )
                                                * cell (var (Witness 7, Curr))
                                              + field
-                                                 "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              ) ) )
                                      + ( x_2
                                        + ( ( field
-                                               "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                               "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              * cell (var (Witness 8, Curr))
                                            + field
-                                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                                            )
                                            * cell (var (Witness 8, Curr))
                                          + field
-                                             "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                             "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          ) ) )
                                  + ( x_3
                                    + ( ( field
-                                           "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          * cell (var (Witness 9, Curr))
                                        + field
-                                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                                        )
                                        * cell (var (Witness 9, Curr))
                                      + field
-                                         "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                         "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      ) ) )
                              + ( x_4
                                + ( ( field
-                                       "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      * cell (var (Witness 10, Curr))
                                    + field
-                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                    )
                                    * cell (var (Witness 10, Curr))
                                  + field
-                                     "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                     "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  ) ) )
                          + ( x_5
                            + ( ( field
-                                   "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                   "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  * cell (var (Witness 11, Curr))
                                + field
-                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                )
                                * cell (var (Witness 11, Curr))
                              + field
-                                 "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              ) ) )
                      + ( x_6
                        + ( ( field
-                               "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                               "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              * cell (var (Witness 12, Curr))
                            + field
-                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                            )
                            * cell (var (Witness 12, Curr))
                          + field
-                             "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                             "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          ) ) )
                  + ( x_7
                    + ( ( field
-                           "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          * cell (var (Witness 13, Curr))
                        + field
-                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                         "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                      ) )
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 3
                * ( ( ( ( cell (var (Witness 6, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 6, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 6, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 6, Curr)) )
              + alpha_pow 4
                * ( ( ( ( cell (var (Witness 7, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 7, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 7, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 7, Curr)) )
              + alpha_pow 5
                * ( ( ( ( cell (var (Witness 8, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 8, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 8, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 8, Curr)) )
              + alpha_pow 6
                * ( ( ( ( cell (var (Witness 9, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 9, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 9, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 9, Curr)) )
              + alpha_pow 7
                * ( ( ( ( cell (var (Witness 10, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 10, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 10, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 10, Curr)) )
              + alpha_pow 8
                * ( ( ( ( cell (var (Witness 11, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 11, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 11, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 11, Curr)) )
              + alpha_pow 9
                * ( ( ( ( cell (var (Witness 12, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 12, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 12, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 12, Curr)) )
              + alpha_pow 10
                * ( ( ( ( cell (var (Witness 13, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 13, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * field
-                "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 1
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 2
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 3
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 4
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 5
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 6
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 7
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 8
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 9
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 10
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 11
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 11
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 12
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 12
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 13
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 13
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 14
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 14
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ]
 end
@@ -2136,28 +2136,28 @@ module Tick_with_lookup : S = struct
               * ( ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 0, Curr))
                   + (beta * cell (var (LookupSorted 0, Next))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 1, Next))
                   + (beta * cell (var (LookupSorted 1, Curr))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 2, Curr))
                   + (beta * cell (var (LookupSorted 2, Next))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 3, Next))
                   + (beta * cell (var (LookupSorted 3, Curr))) ) )
@@ -2179,13 +2179,13 @@ module Tick_with_lookup : S = struct
                   )
                 * pow
                     ( field
-                        "0x0100000000000000000000000000000000000000000000000000000000000000"
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
                       + beta
                     , 3 )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupTable, Curr))
                   + (beta * cell (var (LookupTable, Next))) ) ) ) )
@@ -2193,13 +2193,13 @@ module Tick_with_lookup : S = struct
         * ( unnormalized_lagrange_basis 0
           * ( cell (var (LookupAggreg, Curr))
             - field
-                "0x0100000000000000000000000000000000000000000000000000000000000000"
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
             ) )
       + alpha_pow 26
         * ( unnormalized_lagrange_basis (-4)
           * ( cell (var (LookupAggreg, Curr))
             - field
-                "0x0100000000000000000000000000000000000000000000000000000000000000"
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
             ) )
       + alpha_pow 27
         * ( unnormalized_lagrange_basis (-4)
@@ -2244,10 +2244,10 @@ module Tick_with_lookup : S = struct
             ( alpha_pow 24
             * ( vanishes_on_last_4_rows
               * ( field
-                    "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                 * ( cell (var (LookupAggreg, Curr))
                   * ( ( field
-                          "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                          "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                         * ( ( gamma
                             + pow (joint_combiner, 2)
                               * field
@@ -2265,12 +2265,12 @@ module Tick_with_lookup : S = struct
                             )
                           * pow
                               ( field
-                                  "0x0100000000000000000000000000000000000000000000000000000000000000"
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
                                 + beta
                               , 3 ) )
                       + pow
                           ( field
-                              "0x0100000000000000000000000000000000000000000000000000000000000000"
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                             + beta
                           , 3 )
                         * ( gamma
@@ -2291,7 +2291,7 @@ module Tick_with_lookup : S = struct
                     * ( gamma
                         * ( beta
                           + field
-                              "0x0100000000000000000000000000000000000000000000000000000000000000"
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                           )
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) ) ) ) )
@@ -2310,7 +2310,7 @@ module Tick_with_lookup : S = struct
              in
              (cell (var (Witness 10, Curr)) * x_0)
              - ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
              + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
@@ -2319,7 +2319,7 @@ module Tick_with_lookup : S = struct
                        * cell (var (Witness 1, Curr))
                      - double x_2 - x_2 )
                  + ( field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
                    * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
@@ -2489,7 +2489,7 @@ module Tick_with_lookup : S = struct
                  - ( cell (var (Witness 3, Curr))
                    - ( double (cell (var (Witness 2, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
@@ -2512,7 +2512,7 @@ module Tick_with_lookup : S = struct
                  - ( cell (var (Witness 8, Curr))
                    - ( double (cell (var (Witness 3, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
@@ -2535,7 +2535,7 @@ module Tick_with_lookup : S = struct
                  - ( cell (var (Witness 10, Curr))
                    - ( double (cell (var (Witness 4, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
@@ -2559,7 +2559,7 @@ module Tick_with_lookup : S = struct
                  - ( cell (var (Witness 12, Curr))
                    - ( double (cell (var (Witness 5, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
@@ -2584,7 +2584,7 @@ module Tick_with_lookup : S = struct
                  - ( cell (var (Witness 14, Curr))
                    - ( double (cell (var (Witness 6, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
@@ -2602,21 +2602,21 @@ module Tick_with_lookup : S = struct
         , lazy
             (let x_0 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
              let x_1 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
@@ -2650,7 +2650,7 @@ module Tick_with_lookup : S = struct
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
@@ -2666,7 +2666,7 @@ module Tick_with_lookup : S = struct
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
@@ -2691,105 +2691,105 @@ module Tick_with_lookup : S = struct
         , lazy
             (let x_0 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 6, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 6, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 6, Curr))
              in
              let x_1 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 7, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 7, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 7, Curr))
              in
              let x_2 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 8, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 8, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 8, Curr))
              in
              let x_3 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 9, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 9, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 9, Curr))
              in
              let x_4 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 10, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 10, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 10, Curr))
              in
              let x_5 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 11, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 11, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 11, Curr))
              in
              let x_6 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 12, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 12, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 12, Curr))
              in
              let x_7 =
                ( ( field
-                     "0x010000004f100f330953c4adfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 13, Curr))
                  + field
-                     "0xfeffff7f769896cc8d7ca6047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04A67C8DCC9698767FFFFFFE"
                  )
                  * cell (var (Witness 13, Curr))
                + field
-                   "0x02000080278887998429e2567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
                )
                * cell (var (Witness 13, Curr))
              in
@@ -2860,310 +2860,310 @@ module Tick_with_lookup : S = struct
                                                  (cell (var (Witness 3, Curr)))
                                              + ( x_0
                                                + ( ( field
-                                                       "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                       "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                      * cell
                                                          (var (Witness 6, Curr))
                                                    + field
-                                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                    )
                                                    * cell
                                                        (var (Witness 6, Curr))
                                                  + field
-                                                     "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                     "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  ) ) )
                                          + ( x_1
                                            + ( ( field
-                                                   "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                   "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  * cell (var (Witness 7, Curr))
                                                + field
-                                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                )
                                                * cell (var (Witness 7, Curr))
                                              + field
-                                                 "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              ) ) )
                                      + ( x_2
                                        + ( ( field
-                                               "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                               "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              * cell (var (Witness 8, Curr))
                                            + field
-                                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                                            )
                                            * cell (var (Witness 8, Curr))
                                          + field
-                                             "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                             "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          ) ) )
                                  + ( x_3
                                    + ( ( field
-                                           "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          * cell (var (Witness 9, Curr))
                                        + field
-                                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                                        )
                                        * cell (var (Witness 9, Curr))
                                      + field
-                                         "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                         "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      ) ) )
                              + ( x_4
                                + ( ( field
-                                       "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                       "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      * cell (var (Witness 10, Curr))
                                    + field
-                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                    )
                                    * cell (var (Witness 10, Curr))
                                  + field
-                                     "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                     "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  ) ) )
                          + ( x_5
                            + ( ( field
-                                   "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                   "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  * cell (var (Witness 11, Curr))
                                + field
-                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                )
                                * cell (var (Witness 11, Curr))
                              + field
-                                 "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              ) ) )
                      + ( x_6
                        + ( ( field
-                               "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                               "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              * cell (var (Witness 12, Curr))
                            + field
-                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                            )
                            * cell (var (Witness 12, Curr))
                          + field
-                             "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                             "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          ) ) )
                  + ( x_7
                    + ( ( field
-                           "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          * cell (var (Witness 13, Curr))
                        + field
-                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                         "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                      ) )
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 3
                * ( ( ( ( cell (var (Witness 6, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 6, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 6, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 6, Curr)) )
              + alpha_pow 4
                * ( ( ( ( cell (var (Witness 7, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 7, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 7, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 7, Curr)) )
              + alpha_pow 5
                * ( ( ( ( cell (var (Witness 8, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 8, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 8, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 8, Curr)) )
              + alpha_pow 6
                * ( ( ( ( cell (var (Witness 9, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 9, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 9, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 9, Curr)) )
              + alpha_pow 7
                * ( ( ( ( cell (var (Witness 10, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 10, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 10, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 10, Curr)) )
              + alpha_pow 8
                * ( ( ( ( cell (var (Witness 11, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 11, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 11, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 11, Curr)) )
              + alpha_pow 9
                * ( ( ( ( cell (var (Witness 12, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 12, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 12, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 12, Curr)) )
              + alpha_pow 10
                * ( ( ( ( cell (var (Witness 13, Curr))
                        + field
-                           "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 13, Curr))
                    + field
-                       "0xfbffffffec302d991bf94c09fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * field
-                "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 1
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 2
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 3
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 4
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 5
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 6
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 7
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 8
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 9
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 10
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 11
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 11
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 12
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 12
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 13
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 13
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ; ( Coefficient 14
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 14
               * field
-                  "0x00000000ed302d991bf94c09fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
               ) ) )
       ]
 end
@@ -3260,28 +3260,28 @@ module Tock_with_lookup : S = struct
               * ( ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 0, Curr))
                   + (beta * cell (var (LookupSorted 0, Next))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 1, Next))
                   + (beta * cell (var (LookupSorted 1, Curr))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 2, Curr))
                   + (beta * cell (var (LookupSorted 2, Next))) )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupSorted 3, Next))
                   + (beta * cell (var (LookupSorted 3, Curr))) ) )
@@ -3303,13 +3303,13 @@ module Tock_with_lookup : S = struct
                   )
                 * pow
                     ( field
-                        "0x0100000000000000000000000000000000000000000000000000000000000000"
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
                       + beta
                     , 3 )
                 * ( gamma
                     * ( beta
                       + field
-                          "0x0100000000000000000000000000000000000000000000000000000000000000"
+                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                       )
                   + cell (var (LookupTable, Curr))
                   + (beta * cell (var (LookupTable, Next))) ) ) ) )
@@ -3317,13 +3317,13 @@ module Tock_with_lookup : S = struct
         * ( unnormalized_lagrange_basis 0
           * ( cell (var (LookupAggreg, Curr))
             - field
-                "0x0100000000000000000000000000000000000000000000000000000000000000"
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
             ) )
       + alpha_pow 26
         * ( unnormalized_lagrange_basis (-4)
           * ( cell (var (LookupAggreg, Curr))
             - field
-                "0x0100000000000000000000000000000000000000000000000000000000000000"
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
             ) )
       + alpha_pow 27
         * ( unnormalized_lagrange_basis (-4)
@@ -3368,10 +3368,10 @@ module Tock_with_lookup : S = struct
             ( alpha_pow 24
             * ( vanishes_on_last_4_rows
               * ( field
-                    "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                 * ( cell (var (LookupAggreg, Curr))
                   * ( ( field
-                          "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                          "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                         * ( ( gamma
                             + pow (joint_combiner, 2)
                               * field
@@ -3389,12 +3389,12 @@ module Tock_with_lookup : S = struct
                             )
                           * pow
                               ( field
-                                  "0x0100000000000000000000000000000000000000000000000000000000000000"
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
                                 + beta
                               , 3 ) )
                       + pow
                           ( field
-                              "0x0100000000000000000000000000000000000000000000000000000000000000"
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                             + beta
                           , 3 )
                         * ( gamma
@@ -3415,7 +3415,7 @@ module Tock_with_lookup : S = struct
                     * ( gamma
                         * ( beta
                           + field
-                              "0x0100000000000000000000000000000000000000000000000000000000000000"
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                           )
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) ) ) ) )
@@ -3434,7 +3434,7 @@ module Tock_with_lookup : S = struct
              in
              (cell (var (Witness 10, Curr)) * x_0)
              - ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
              + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
@@ -3443,7 +3443,7 @@ module Tock_with_lookup : S = struct
                        * cell (var (Witness 1, Curr))
                      - double x_2 - x_2 )
                  + ( field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
                    * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
@@ -3613,7 +3613,7 @@ module Tock_with_lookup : S = struct
                  - ( cell (var (Witness 3, Curr))
                    - ( double (cell (var (Witness 2, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
@@ -3636,7 +3636,7 @@ module Tock_with_lookup : S = struct
                  - ( cell (var (Witness 8, Curr))
                    - ( double (cell (var (Witness 3, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
@@ -3659,7 +3659,7 @@ module Tock_with_lookup : S = struct
                  - ( cell (var (Witness 10, Curr))
                    - ( double (cell (var (Witness 4, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
@@ -3683,7 +3683,7 @@ module Tock_with_lookup : S = struct
                  - ( cell (var (Witness 12, Curr))
                    - ( double (cell (var (Witness 5, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
@@ -3708,7 +3708,7 @@ module Tock_with_lookup : S = struct
                  - ( cell (var (Witness 14, Curr))
                    - ( double (cell (var (Witness 6, Next)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
@@ -3726,21 +3726,21 @@ module Tock_with_lookup : S = struct
         , lazy
             (let x_0 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
              let x_1 =
                ( field
-                   "0x0100000000000000000000000000000000000000000000000000000000000000"
+                   "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
                  * ( endo_coefficient
                    - field
-                       "0x0100000000000000000000000000000000000000000000000000000000000000"
+                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                    ) )
                * cell (var (Witness 0, Curr))
              in
@@ -3774,7 +3774,7 @@ module Tock_with_lookup : S = struct
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
@@ -3790,7 +3790,7 @@ module Tock_with_lookup : S = struct
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
-                         "0x0100000000000000000000000000000000000000000000000000000000000000"
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
@@ -3815,105 +3815,105 @@ module Tock_with_lookup : S = struct
         , lazy
             (let x_0 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 6, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 6, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 6, Curr))
              in
              let x_1 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 7, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 7, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 7, Curr))
              in
              let x_2 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 8, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 8, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 8, Curr))
              in
              let x_3 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 9, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 9, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 9, Curr))
              in
              let x_4 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 10, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 10, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 10, Curr))
              in
              let x_5 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 11, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 11, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 11, Curr))
              in
              let x_6 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 12, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 12, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 12, Curr))
              in
              let x_7 =
                ( ( field
-                     "0x010000000bf96cd94938dcadfe32c26055555555555555555555555555555515"
+                     "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 13, Curr))
                  + field
-                     "0xfeffff7f907523c66e54ca047e4c231100000000000000000000000000000020"
+                     "0x2000000000000000000000000000000011234C7E04CA546EC62375907FFFFFFE"
                  )
                  * cell (var (Witness 13, Curr))
                + field
-                   "0x02000080857cb6ec241cee567f1961b0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0a"
+                   "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
                )
                * cell (var (Witness 13, Curr))
              in
@@ -3984,310 +3984,310 @@ module Tock_with_lookup : S = struct
                                                  (cell (var (Witness 3, Curr)))
                                              + ( x_0
                                                + ( ( field
-                                                       "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                      * cell
                                                          (var (Witness 6, Curr))
                                                    + field
-                                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                    )
                                                    * cell
                                                        (var (Witness 6, Curr))
                                                  + field
-                                                     "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                     "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  ) ) )
                                          + ( x_1
                                            + ( ( field
-                                                   "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                   "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  * cell (var (Witness 7, Curr))
                                                + field
-                                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                                )
                                                * cell (var (Witness 7, Curr))
                                              + field
-                                                 "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              ) ) )
                                      + ( x_2
                                        + ( ( field
-                                               "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                               "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              * cell (var (Witness 8, Curr))
                                            + field
-                                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                                            )
                                            * cell (var (Witness 8, Curr))
                                          + field
-                                             "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                             "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          ) ) )
                                  + ( x_3
                                    + ( ( field
-                                           "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          * cell (var (Witness 9, Curr))
                                        + field
-                                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                                        )
                                        * cell (var (Witness 9, Curr))
                                      + field
-                                         "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                         "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      ) ) )
                              + ( x_4
                                + ( ( field
-                                       "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      * cell (var (Witness 10, Curr))
                                    + field
-                                       "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                       "0x0000000000000000000000000000000000000000000000000000000000000003"
                                    )
                                    * cell (var (Witness 10, Curr))
                                  + field
-                                     "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                     "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  ) ) )
                          + ( x_5
                            + ( ( field
-                                   "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                   "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  * cell (var (Witness 11, Curr))
                                + field
-                                   "0x0300000000000000000000000000000000000000000000000000000000000000"
+                                   "0x0000000000000000000000000000000000000000000000000000000000000003"
                                )
                                * cell (var (Witness 11, Curr))
                              + field
-                                 "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              ) ) )
                      + ( x_6
                        + ( ( field
-                               "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                               "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              * cell (var (Witness 12, Curr))
                            + field
-                               "0x0300000000000000000000000000000000000000000000000000000000000000"
+                               "0x0000000000000000000000000000000000000000000000000000000000000003"
                            )
                            * cell (var (Witness 12, Curr))
                          + field
-                             "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                             "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          ) ) )
                  + ( x_7
                    + ( ( field
-                           "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          * cell (var (Witness 13, Curr))
                        + field
-                           "0x0300000000000000000000000000000000000000000000000000000000000000"
+                           "0x0000000000000000000000000000000000000000000000000000000000000003"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                         "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                      ) )
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 3
                * ( ( ( ( cell (var (Witness 6, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 6, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 6, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 6, Curr)) )
              + alpha_pow 4
                * ( ( ( ( cell (var (Witness 7, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 7, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 7, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 7, Curr)) )
              + alpha_pow 5
                * ( ( ( ( cell (var (Witness 8, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 8, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 8, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 8, Curr)) )
              + alpha_pow 6
                * ( ( ( ( cell (var (Witness 9, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 9, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 9, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 9, Curr)) )
              + alpha_pow 7
                * ( ( ( ( cell (var (Witness 10, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 10, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 10, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 10, Curr)) )
              + alpha_pow 8
                * ( ( ( ( cell (var (Witness 11, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 11, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 11, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 11, Curr)) )
              + alpha_pow 9
                * ( ( ( ( cell (var (Witness 12, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 12, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 12, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 12, Curr)) )
              + alpha_pow 10
                * ( ( ( ( cell (var (Witness 13, Curr))
                        + field
-                           "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                        )
                        * cell (var (Witness 13, Curr))
                      + field
-                         "0x0b00000000000000000000000000000000000000000000000000000000000000"
+                         "0x000000000000000000000000000000000000000000000000000000000000000B"
                      )
                      * cell (var (Witness 13, Curr))
                    + field
-                       "0xfbffffff20eb468cdda89409fc98462200000000000000000000000000000040"
+                       "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * field
-                "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 1
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 2
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 3
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 4
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 5
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 6
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 7
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 8
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 9
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 10
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 11
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 11
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 12
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 12
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 13
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 13
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ; ( Coefficient 14
         , lazy
             ( cell (var (Index Poseidon, Curr))
             * ( alpha_pow 14
               * field
-                  "0x0000000021eb468cdda89409fc98462200000000000000000000000000000040"
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
               ) ) )
       ]
 end
