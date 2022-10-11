@@ -20,6 +20,13 @@ val apply_transaction :
   -> Transaction.t
   -> Transaction_status.t Or_error.t
 
+val apply_zkapp_fee_payer :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> Hashless_ledger.t
+  -> Zkapp_command.t
+  -> Transaction_status.t Or_error.t
+
 val has_locked_tokens :
      global_slot:Mina_numbers.Global_slot.t
   -> account_id:Account_id.t

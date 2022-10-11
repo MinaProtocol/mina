@@ -133,3 +133,10 @@ let apply_transaction' ~constraint_constants ~txn_state_view l t =
 let apply_transaction ~constraint_constants ~txn_state_view l txn =
   Result.map ~f:Transaction_applied.transaction_status
     (apply_transaction' l ~constraint_constants ~txn_state_view txn)
+
+let apply_zkapp_fee_payer ~constraint_constants ~txn_state_view l zkapp_txn =
+  let apply_fee_payer () =
+    O1trace.sync_thread "apply_zkapp_fee_payer" (fun () ->
+        apply_zkapp_fee_payer ~constraint_constants ~txn_state_view l zkapp_txn )
+  in
+  Result.map ~f:Transaction_applied.transaction_status (apply_fee_payer ())

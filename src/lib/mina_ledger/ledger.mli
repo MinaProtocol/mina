@@ -244,6 +244,13 @@ val apply_zkapp_command_unchecked :
        * Currency.Amount.Signed.t ) )
      Or_error.t
 
+val apply_zkapp_fee_payer :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> t
+  -> Zkapp_command.t
+  -> Transaction_applied.t Or_error.t
+
 val has_locked_tokens :
      global_slot:Mina_numbers.Global_slot.t
   -> account_id:Account_id.t

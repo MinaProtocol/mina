@@ -332,9 +332,18 @@ module type S = sig
          * Amount.Signed.t ) )
        Or_error.t
 
+  val apply_zkapp_fee_payer :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+    -> ledger
+    -> Zkapp_command.t
+    -> Transaction_applied.t Or_error.t
+
   (** Apply all zkapp_command within a zkapp_command transaction. This behaves as
-      [apply_zkapp_command_unchecked], except that the [~init] and [~f] arguments
+      [apply_zkapp_command_unchecked], except that the 
+      1) [~init] and [~f] arguments
       are provided to allow for the accumulation of the intermediate states.
+      2) [only_fee_payer] to apply just the fee payer update
 
       Invariant: [f] is always applied at least once, so it is valid to use an
       [_ option] as the initial state and call [Option.value_exn] on the
@@ -365,6 +374,7 @@ module type S = sig
                Zkapp_command_logic.Local_state.t
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
+    -> ?only_fee_payer:bool
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
@@ -1622,7 +1632,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
-      ?(fee_excess = Amount.Signed.zero) (ledger : L.t) (c : Zkapp_command.t) :
+      ?(fee_excess = Amount.Signed.zero) ?(only_fee_payer = false)
+      (ledger : L.t) (c : Zkapp_command.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
@@ -1686,70 +1697,80 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
-    match step_all (f user_acc start) start with
-    | Error e ->
-        Error e
-    | Ok (s, failure_status_tbl) ->
-        let account_ids_originally_not_in_ledger =
-          List.filter_map original_account_states
-            ~f:(fun (acct_id, loc_and_acct) ->
-              if Option.is_none loc_and_acct then Some acct_id else None )
-        in
-        let successfully_applied =
-          Transaction_status.Failure.Collection.is_empty failure_status_tbl
-        in
-        (* accounts not originally in ledger, now present in ledger *)
-        let new_accounts =
-          List.filter_map account_ids_originally_not_in_ledger
-            ~f:(fun acct_id ->
-              let open Option.Let_syntax in
-              let%bind loc = L.location_of_account ledger acct_id in
-              let%bind acc = L.get ledger loc in
-              (*Check account ids because sparse ledger stores empty
-                accounts at new account locations*)
-              Option.some_if
-                (Account_id.equal (Account.identifier acc) acct_id)
-                acct_id )
-        in
-        let valid_result =
-          Ok
-            ( { Transaction_applied.Zkapp_command_applied.accounts = accounts ()
-              ; command =
-                  { With_status.data = c
-                  ; status =
-                      ( if successfully_applied then Applied
-                      else Failed failure_status_tbl )
-                  }
-              ; new_accounts
-              }
-            , s )
-        in
-        if successfully_applied then valid_result
-        else
-          let other_account_update_accounts_unchanged =
-            List.fold_until account_states_after_fee_payer ~init:true
-              ~f:(fun acc (_, loc_opt) ->
-                match
-                  let open Option.Let_syntax in
-                  let%bind loc, a = loc_opt in
-                  let%bind a' = L.get ledger loc in
-                  Option.some_if (not (Account.equal a a')) ()
-                with
-                | None ->
-                    Continue acc
-                | Some _ ->
-                    Stop false )
-              ~finish:Fn.id
+    let user_acc_next = f user_acc start in
+    if only_fee_payer then
+      Ok
+        ( { Transaction_applied.Zkapp_command_applied.accounts = accounts ()
+          ; command = { With_status.data = c; status = Applied }
+          ; new_accounts = []
+          }
+        , user_acc_next )
+    else
+      match step_all user_acc_next start with
+      | Error e ->
+          Error e
+      | Ok (s, failure_status_tbl) ->
+          let account_ids_originally_not_in_ledger =
+            List.filter_map original_account_states
+              ~f:(fun (acct_id, loc_and_acct) ->
+                if Option.is_none loc_and_acct then Some acct_id else None )
           in
-          (*Other zkapp_command failed, therefore, updates in those should not get applied*)
-          if
-            List.is_empty new_accounts
-            && other_account_update_accounts_unchanged
-          then valid_result
+          let successfully_applied =
+            Transaction_status.Failure.Collection.is_empty failure_status_tbl
+          in
+          (* accounts not originally in ledger, now present in ledger *)
+          let new_accounts =
+            List.filter_map account_ids_originally_not_in_ledger
+              ~f:(fun acct_id ->
+                let open Option.Let_syntax in
+                let%bind loc = L.location_of_account ledger acct_id in
+                let%bind acc = L.get ledger loc in
+                (*Check account ids because sparse ledger stores empty
+                  accounts at new account locations*)
+                Option.some_if
+                  (Account_id.equal (Account.identifier acc) acct_id)
+                  acct_id )
+          in
+          let valid_result =
+            Ok
+              ( { Transaction_applied.Zkapp_command_applied.accounts =
+                    accounts ()
+                ; command =
+                    { With_status.data = c
+                    ; status =
+                        ( if successfully_applied then Applied
+                        else Failed failure_status_tbl )
+                    }
+                ; new_accounts
+                }
+              , s )
+          in
+          if successfully_applied then valid_result
           else
-            Or_error.error_string
-              "Zkapp_command application failed but new accounts created or \
-               some of the other account_update updates applied"
+            let other_account_update_accounts_unchanged =
+              List.fold_until account_states_after_fee_payer ~init:true
+                ~f:(fun acc (_, loc_opt) ->
+                  match
+                    let open Option.Let_syntax in
+                    let%bind loc, a = loc_opt in
+                    let%bind a' = L.get ledger loc in
+                    Option.some_if (not (Account.equal a a')) ()
+                  with
+                  | None ->
+                      Continue acc
+                  | Some _ ->
+                      Stop false )
+                ~finish:Fn.id
+            in
+            (*Other zkapp_command failed, therefore, updates in those should not get applied*)
+            if
+              List.is_empty new_accounts
+              && other_account_update_accounts_unchanged
+            then valid_result
+            else
+              Or_error.error_string
+                "Zkapp_command application failed but new accounts created or \
+                 some of the other account_update updates applied"
 
   let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger c =
     apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ledger c
@@ -1757,6 +1778,19 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
            (account_update_applied, Option.value_exn state_res) )
+
+  let apply_zkapp_fee_payer ~constraint_constants ~txn_state_view ledger c =
+    let previous_hash = merkle_root ledger in
+    apply_zkapp_command_unchecked_aux ~constraint_constants
+      ~state_view:txn_state_view ~only_fee_payer:true ledger c ~init:None
+      ~f:(fun _acc (global_state, local_state) ->
+        Some (local_state, global_state.fee_excess) )
+    |> Result.map ~f:(fun (account_update_applied, _state_res) ->
+           { Transaction_applied.previous_hash
+           ; varying =
+               Transaction_applied.Varying.Command
+                 (Zkapp_command account_update_applied)
+           } )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account

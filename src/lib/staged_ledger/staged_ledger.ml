@@ -1952,10 +1952,17 @@ module T = struct
                       if valid_proofs then Ok ()
                       else Or_error.errorf "Verification key mismatch"
                     in
-                    Transaction_validator.apply_transaction
-                      ~constraint_constants validating_ledger
-                      ~txn_state_view:current_state_view
-                      (Command (User_command.forget_check txn)) )
+                    let txn_unchecked = User_command.forget_check txn in
+                    match txn_unchecked with
+                    | User_command.Zkapp_command zc ->
+                        Transaction_validator.apply_zkapp_fee_payer
+                          ~constraint_constants validating_ledger
+                          ~txn_state_view:current_state_view zc
+                    | _ ->
+                        Transaction_validator.apply_transaction
+                          ~constraint_constants validating_ledger
+                          ~txn_state_view:current_state_view
+                          (Command txn_unchecked) )
               with
               | Error e ->
                   [%log error]
