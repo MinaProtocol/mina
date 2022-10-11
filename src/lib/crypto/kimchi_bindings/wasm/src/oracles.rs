@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
 // use crate::wasm_flat_vector::WasmFlatVector;
-use ark_ff::Zero;
+use ark_ff::{Zero, One};
 
 //
 // CamlOracles
@@ -195,6 +195,16 @@ macro_rules! impl_oracles {
                         .map(|s: $F| -s)
                         .collect::<Vec<_>>(),
                 );
+                let p_comm = {
+                    index
+                        .srs
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
 
                 let proof: ProverProof<$G> = proof.into();
 

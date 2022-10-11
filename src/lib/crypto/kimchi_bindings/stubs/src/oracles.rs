@@ -10,6 +10,7 @@ use oracle::{
     FqSponge,
 };
 use paste::paste;
+use ark_ff::One;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
@@ -48,6 +49,17 @@ macro_rules! impl_oracles {
                         .map(|s| -s)
                         .collect::<Vec<_>>(),
                 );
+
+                let p_comm = {
+                    index
+                        .srs()
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
 
                 let proof: ProverProof<$G> = proof.into();
 
