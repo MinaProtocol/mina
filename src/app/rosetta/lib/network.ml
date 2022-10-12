@@ -6,7 +6,12 @@ module Get_status =
   query {
     genesisBlock {
       stateHash @ppxCustom(module: "Scalars.String_json")
-   }
+      protocolState {
+        consensusState {
+          blockHeight
+        }
+      }
+    }
     bestChain(maxLength: 1) {
       stateHash @ppxCustom(module: "Scalars.String_json")
       protocolState {
@@ -32,9 +37,6 @@ open Core_kernel
 open Async
 open Rosetta_lib
 open Rosetta_models
-
-(* TODO: Also change this to zero when .5361 finishes *)
-let genesis_block_height = Int64.one
 
 
 module Sql = struct
@@ -239,7 +241,11 @@ module Status = struct
         | Some chain ->
             M.return (Array.last chain)
       in
-      let genesis_block_state_hash = (res.genesisBlock).stateHash in
+      let genesis_block_height =
+        res.genesisBlock.protocolState.consensusState.blockHeight
+        |> Unsigned.UInt32.to_int64
+      in
+      let genesis_block_state_hash = res.genesisBlock.stateHash in
       let%bind (latest_db_block_height,latest_db_block_hash, latest_db_block_timestamp) = env.db_latest_block () in
       let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
@@ -274,7 +280,14 @@ module Status = struct
       module Mock = Impl (Result)
 
       let build ~best_chain_missing = {
-        Get_status.genesisBlock = {stateHash = "GENESIS_HASH"};
+        Get_status.genesisBlock = {
+          stateHash = "GENESIS_HASH";
+          protocolState = {
+            consensusState = {
+              blockHeight = Mina_numbers.Global_slot.of_int 1;
+            };
+          };
+        };
         bestChain = if best_chain_missing then None
           else Some [|{
               stateHash = "STATE_HASH_TIP";

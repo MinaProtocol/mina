@@ -2962,6 +2962,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -3156,6 +3172,20 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -6639,6 +6669,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "AuthorizationKind",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
@@ -7991,6 +8031,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -10031,6 +10087,17 @@
         },
         {
           "kind": "SCALAR",
+          "name": "PendingCoinbaseAuxHash",
+          "description":
+            "Base58Check-encoded hash of a pending coinbase auxiliary hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "StagedLedgerAuxHash",
           "description":
             "Base58Check-encoded hash of the staged ledger hash's aux_hash",
@@ -10141,6 +10208,23 @@
             },
             {
               "name": "stagedLedgerPendingCoinbaseAux",
+              "description":
+                "Base58Check-encoded staged ledger hash's pending_coinbase_aux",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PendingCoinbaseAuxHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerPendingCoinbaseHash",
               "description":
                 "Base58Check-encoded hash of the staged ledger hash's pending_coinbase_hash",
               "args": [],
@@ -13236,8 +13320,8 @@
               "description": "Find the account ID that owns a given token",
               "args": [
                 {
-                  "name": "token",
-                  "description": "Token to find the owner for",
+                  "name": "tokenId",
+                  "description": "Token ID to find the owner for",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,

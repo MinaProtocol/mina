@@ -30,7 +30,8 @@ async function picklesProof() {
 
   console.log("compile (proof system with two branches)...");
   let start = Date.now();
-  let { provers, verify } = compile(rules);
+  let { provers, verify, getVerificationKey } = await compile(rules);
+  getVerificationKey();
   let time = Date.now() - start;
   console.log(`compiled proof system in ${(time / 1000).toFixed(2)} sec`);
 
@@ -43,7 +44,7 @@ async function picklesProof() {
   console.log("verify...");
   let ok = await verify(publicInput, proof);
 
-  console.log("ok?", ok === 1);
+  console.log("ok?", ok === 1 || ok === true);
   if (!ok) throw Error(`${name} failed`);
 }
 
@@ -73,7 +74,10 @@ function createDummyRule(name, func, witnessTypes) {
     let { witnesses } = mainContext;
     witnesses = witnessTypes.map(
       witnesses
-        ? (type, i) => Circuit.witness(type, () => witnesses[i])
+        ? (type, i) =>
+            type.fromFields(
+              Circuit._witness(type, () => type.toFields(witnesses[i]))
+            )
         : emptyWitness
     );
     func(...witnesses);
@@ -84,14 +88,14 @@ function createDummyRule(name, func, witnessTypes) {
 }
 
 function emptyWitness(typ) {
-  return Circuit.witness(typ, () =>
-    typ.ofFields(Array(typ.sizeInFields()).fill(Field.zero))
+  return typ.fromFields(
+    Circuit._witness(typ, () => Array(typ.sizeInFields()).fill(Field.zero))
   );
 }
 
 let FieldTyp = {
   sizeInFields: () => 1,
   toFields: (f) => [f],
-  ofFields: ([f]) => f,
+  fromFields: ([f]) => f,
   check: () => {},
 };

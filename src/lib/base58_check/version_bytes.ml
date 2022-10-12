@@ -36,7 +36,8 @@ let state_body_hash : t = '\x11'
 
 let transaction_hash : t = '\x12'
 
-let user_command : t = '\x13'
+(* used only to deserialize transaction ids, pre-Berkeley hard fork *)
+let signed_command_legacy : t = '\x13'
 
 let user_command_memo : t = '\x14'
 

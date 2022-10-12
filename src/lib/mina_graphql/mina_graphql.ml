@@ -703,8 +703,16 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the staged ledger hash's aux_hash"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              Staged_ledger_hash.aux_hash (staged_ledger_hash t) )
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.aux_hash staged_ledger_hash )
         ; field "stagedLedgerPendingCoinbaseAux"
+            ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseAuxHash.typ ())
+            ~doc:"Base58Check-encoded staged ledger hash's pending_coinbase_aux"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.pending_coinbase_aux staged_ledger_hash )
+        ; field "stagedLedgerPendingCoinbaseHash"
             ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseHash.typ ())
             ~doc:
               "Base58Check-encoded hash of the staged ledger hash's \
@@ -4275,13 +4283,23 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            List.filter_map (Ledger.to_list ledger) ~f:(fun acc ->
-                let open Option.Let_syntax in
-                let%map () =
-                  Option.some_if (Token_id.equal token_id acc.token_id) ()
-                in
-                Types.AccountObj.Partial_account.of_full_account ~breadcrumb acc
-                |> Types.AccountObj.lift mina acc.public_key )
+            let accounts = Ledger.accounts ledger in
+            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
+                if Token_id.(Account_id.token_id acct_id <> token_id) then
+                  acct_objs
+                else
+                  (* account id in the ledger, lookup should always succeed *)
+                  let loc =
+                    Option.value_exn
+                    @@ Ledger.location_of_account ledger acct_id
+                  in
+                  let account = Option.value_exn @@ Ledger.get ledger loc in
+                  let partial_account =
+                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                      account
+                  in
+                  Types.AccountObj.lift mina account.public_key partial_account
+                  :: acct_objs )
         | None ->
             [] )
 
@@ -4290,7 +4308,7 @@ module Queries = struct
       ~typ:Types.account_id
       ~args:
         Arg.
-          [ arg "token" ~doc:"Token to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owner for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->

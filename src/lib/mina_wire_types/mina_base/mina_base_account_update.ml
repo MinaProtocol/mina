@@ -1,3 +1,9 @@
+module Authorization_kind = struct
+  module V1 = struct
+    type t = None_given | Signature | Proof
+  end
+end
+
 module Update = struct
   module Timing_info = struct
     module V1 = struct
@@ -84,6 +90,7 @@ module Body = struct
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
       ; caller : Mina_base_token_id.V1.t
+      ; authorization_kind : Authorization_kind.V1.t
       }
   end
 end

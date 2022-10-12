@@ -147,21 +147,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
       let fee = Currency.Fee.of_int 20_000_000 in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
         { sender = (fish1_kp, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = true
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       return
@@ -189,7 +186,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; send = Proof
         }
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
         { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
@@ -265,7 +263,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; voting_for = Set new_voting_for
         }
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
         { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
@@ -297,14 +296,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { zkapp_command_spec with fee = Currency.Fee.max_int }
       in
       let%bind.Deferred zkapp_command_insufficient_replace_fee =
-        let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
+        let spec_insufficient_replace_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with fee = Currency.Fee.of_int 5_000_000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_replace_fee
       in
       let%map.Deferred zkapp_command_insufficient_fee =
-        let spec_insufficient_fee : Transaction_snark.For_tests.Spec.t =
+        let spec_insufficient_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
           { zkapp_command_spec with fee = Currency.Fee.of_int 1000 }
         in
         Transaction_snark.For_tests.update_states ~constraint_constants
@@ -348,7 +349,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Non-existent account"
       in
       let fee = Currency.Fee.of_int 10_000_000 in
-      let spec : Transaction_snark.For_tests.Spec.t =
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
         { sender = (new_kp, Account.Nonce.zero)
         ; fee
         ; fee_payer = None
@@ -416,10 +417,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Call token_owner Token_id.default
+                (mk_account_update_body Signature Call token_owner
+                   Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Call token_accounts.(0)
+                    (mk_account_update_body Signature Call token_accounts.(0)
                        custom_token_id 10000 )
                     []
                 ]
@@ -434,13 +436,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Call token_owner Token_id.default
+                (mk_account_update_body Signature Call token_owner
+                   Token_id.default
                    (-2 * account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Call token_owner custom_token_id 0)
+                    (mk_account_update_body Signature Call token_owner
+                       custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Call token_accounts.(2)
-                           custom_token_id2 500 )
+                        (mk_account_update_body Signature Call
+                           token_accounts.(2) custom_token_id2 500 )
                         []
                     ]
                 ]
@@ -456,23 +460,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Call token_owner Token_id.default
+                (mk_account_update_body Signature Call token_owner
+                   Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Call token_accounts.(0)
+                    (mk_account_update_body Signature Call token_accounts.(0)
                        custom_token_id (-30) )
                     []
                 ; mk_node
-                    (mk_account_update_body Call token_accounts.(1)
+                    (mk_account_update_body Signature Call token_accounts.(1)
                        custom_token_id 30 )
                     []
                 ; mk_node
-                    (mk_account_update_body Call token_funder Token_id.default
-                       (-50) )
+                    (mk_account_update_body Signature Call token_funder
+                       Token_id.default (-50) )
                     []
                 ; mk_node
-                    (mk_account_update_body Call token_funder Token_id.default
-                       50 )
+                    (mk_account_update_body Signature Call token_funder
+                       Token_id.default 50 )
                     []
                 ]
             ]
@@ -487,25 +492,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Call token_owner Token_id.default
+                (mk_account_update_body Signature Call token_owner
+                   Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Call token_accounts.(1)
+                    (mk_account_update_body Signature Call token_accounts.(1)
                        custom_token_id (-5) )
                     []
                 ; mk_node
-                    (mk_account_update_body Call token_accounts.(0)
+                    (mk_account_update_body Signature Call token_accounts.(0)
                        custom_token_id 5 )
                     []
                 ; mk_node
-                    (mk_account_update_body Call token_owner custom_token_id 0)
+                    (mk_account_update_body Signature Call token_owner
+                       custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Call token_accounts.(2)
-                           custom_token_id2 (-210) )
+                        (mk_account_update_body Signature Call
+                           token_accounts.(2) custom_token_id2 (-210) )
                         []
                     ; mk_node
-                        (mk_account_update_body Call token_accounts.(3)
-                           custom_token_id2 210 )
+                        (mk_account_update_body Signature Call
+                           token_accounts.(3) custom_token_id2 210 )
                         []
                     ]
                 ]
