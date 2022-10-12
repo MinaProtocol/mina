@@ -154,7 +154,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
-              Balance.mina_of_string_exn balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -201,7 +201,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = None
           ; balance =
-              Balance.mina_of_string_exn balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing

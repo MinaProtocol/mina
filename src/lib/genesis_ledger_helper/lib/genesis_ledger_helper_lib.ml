@@ -354,7 +354,7 @@ module Accounts = struct
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%bind balance =
-      Int.gen_incl 10 500 >>| Currency.Balance.nanomina_of_int_exn
+      Int.gen_incl 10 500 >>| Currency.Balance.of_nanomina_int_exn
     in
     gen_with_balance balance
 

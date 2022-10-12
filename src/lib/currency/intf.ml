@@ -38,9 +38,9 @@ module type Basic = sig
 
   val to_string : t -> string
 
-  val mina_of_string_exn : string -> t
+  val of_mina_string_exn : string -> t
 
-  val string_of_mina_exn : t -> string
+  val to_mina_string : t -> string
 
   val to_uint64 : t -> uint64
 
@@ -55,23 +55,23 @@ module type Basic = sig
      possible and limit the use of _exn veriants to places where
      a fixed value is being converted and hence overflow cannot
      happen. *)
-  val mina_of_int_exn : int -> t
+  val of_mina_int_exn : int -> t
 
-  val centimina_of_int_exn : int -> t
+  val of_centimina_int_exn : int -> t
 
-  val nanomina_of_int_exn : int -> t
+  val of_nanomina_int_exn : int -> t
 
-  val mina_of_int : int -> t option
+  val of_mina_int : int -> t option
 
-  val centimina_of_int : int -> t option
+  val of_centimina_int : int -> t option
 
-  val nanomina_of_int : int -> t option
+  val of_nanomina_int : int -> t option
 
-  val int_of_mina : t -> int
+  val to_mina_int : t -> int
 
-  val int_of_centimina : t -> int
+  val to_centimina_int : t -> int
 
-  val int_of_nanomina : t -> int
+  val to_nanomina_int : t -> int
 
   [%%ifdef consensus_mechanism]
 

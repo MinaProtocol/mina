@@ -138,7 +138,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
       and amount =
         Int.gen_incl min_amount max_amount
-        >>| Currency.Amount.nanomina_of_int_exn
+        >>| Currency.Amount.of_nanomina_int_exn
       in
       let%map fee_transfer =
         Option.quickcheck_generator (fee_transfer ~coinbase_amount:amount)

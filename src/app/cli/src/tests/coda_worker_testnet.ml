@@ -564,7 +564,7 @@ module Payments : sig
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
-    let amount = Currency.Amount.nanomina_of_int_exn 10 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10 in
     let valid_until = None in
     let fee = Signed_command.minimum_fee in
     let%bind (_ : unit option list) =
@@ -627,7 +627,7 @@ end = struct
      This is most appropriate todo when #2336 is completed *)
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
-    let amount = Currency.Amount.nanomina_of_int_exn 10 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10 in
     let fee = Signed_command.minimum_fee in
     let valid_until = None in
     let%bind new_payment_readers =

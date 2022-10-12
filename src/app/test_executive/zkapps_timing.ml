@@ -52,8 +52,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              , timing_update
              , timed_account_keypair ) =
       let open Mina_base in
-      let fee = Currency.Fee.nanomina_of_int_exn 1_000_000 in
-      let amount = Currency.Amount.mina_of_int_exn 10 in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 0 in
       let memo =
         Signed_command_memo.create_from_string_exn
@@ -72,12 +72,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update =
             (let timing =
                Zkapp_basic.Set_or_keep.Set
-                 ( { initial_minimum_balance = Currency.Balance.mina_of_int_exn 5
+                 ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
                    ; cliff_time = Mina_numbers.Global_slot.of_int 10000
-                   ; cliff_amount = Currency.Amount.nanomina_of_int_exn 10_000
+                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
                    ; vesting_period = Mina_numbers.Global_slot.of_int 2
                    ; vesting_increment =
-                       Currency.Amount.nanomina_of_int_exn 1_000
+                       Currency.Amount.of_nanomina_int_exn 1_000
                    }
                    : Account_update.Update.Timing_info.value )
              in
@@ -100,8 +100,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_create_second_account_with_timing =
       let open Mina_base in
-      let fee = Currency.Fee.nanomina_of_int_exn 1_000_000 in
-      let amount = Currency.Amount.mina_of_int_exn 10 in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 2 in
       let memo =
         Signed_command_memo.create_from_string_exn
@@ -121,12 +121,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (* some maximal values to see GraphQL accepts them *)
             (let timing =
                Zkapp_basic.Set_or_keep.Set
-                 ( { initial_minimum_balance = Currency.Balance.mina_of_int_exn 8
+                 ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 8
                    ; cliff_time = Mina_numbers.Global_slot.max_value
                    ; cliff_amount = Currency.Amount.max_int
                    ; vesting_period = Mina_numbers.Global_slot.of_int 2
                    ; vesting_increment =
-                       Currency.Amount.nanomina_of_int_exn 1_000
+                       Currency.Amount.of_nanomina_int_exn 1_000
                    }
                    : Account_update.Update.Timing_info.value )
              in
@@ -141,8 +141,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in
-      let fee = Currency.Fee.nanomina_of_int_exn 1_000_000 in
-      let amount = Currency.Amount.nanomina_of_int_exn 1_500_000 in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_nanomina_int_exn 1_500_000 in
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn
@@ -174,8 +174,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_invalid_transfer_from_timed_account =
       let open Mina_base in
-      let fee = Currency.Fee.nanomina_of_int_exn 1_000_000 in
-      let amount = Currency.Amount.mina_of_int_exn 7 in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 7 in
       let nonce = Account.Nonce.of_int 2 in
       let memo =
         Signed_command_memo.create_from_string_exn
@@ -207,7 +207,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred zkapp_command_update_timing =
       let open Mina_base in
-      let fee = Currency.Fee.nanomina_of_int_exn 1_000_000 in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 4 in
       let memo =
@@ -218,11 +218,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Account_update.Update.dummy with
           timing =
             Zkapp_basic.Set_or_keep.Set
-              { initial_minimum_balance = Currency.Balance.mina_of_int_exn 9
+              { initial_minimum_balance = Currency.Balance.of_mina_int_exn 9
               ; cliff_time = Mina_numbers.Global_slot.of_int 4000
-              ; cliff_amount = Currency.Amount.nanomina_of_int_exn 100_000
+              ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100_000
               ; vesting_period = Mina_numbers.Global_slot.of_int 8
-              ; vesting_increment = Currency.Amount.nanomina_of_int_exn 2_000
+              ; vesting_increment = Currency.Amount.of_nanomina_int_exn 2_000
               }
         }
       in

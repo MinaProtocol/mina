@@ -437,7 +437,7 @@ struct
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
                     ( fee.Mina_base.Fee_with_prover.fee
-                    |> Currency.Fee.int_of_nanomina |> Float.of_int )) ;
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =

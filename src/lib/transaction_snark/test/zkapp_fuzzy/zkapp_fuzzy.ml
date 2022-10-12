@@ -20,17 +20,17 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
         Account_id.create fee_payer_pk Token_id.default )
   in
   let (initial_balance : Currency.Balance.t) =
-    Currency.Balance.mina_of_int_exn 1_000_000
+    Currency.Balance.of_mina_int_exn 1_000_000
   in
   let (fee_payer_accounts : Account.t array) =
     if is_timed then
       let initial_minimum_balance =
-        Currency.Balance.mina_of_int_exn 1_000_000
+        Currency.Balance.of_mina_int_exn 1_000_000
       in
       let cliff_time = Mina_numbers.Global_slot.of_int 1_000 in
       let cliff_amount = Currency.Amount.zero in
       let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Currency.Amount.mina_of_int_exn 100 in
+      let vesting_increment = Currency.Amount.of_mina_int_exn 100 in
       Array.map fee_payer_account_ids ~f:(fun fee_payer_account_id ->
           Account.create_timed fee_payer_account_id initial_balance
             ~initial_minimum_balance ~cliff_time ~cliff_amount ~vesting_period

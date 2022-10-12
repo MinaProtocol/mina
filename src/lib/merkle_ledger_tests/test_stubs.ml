@@ -3,9 +3,9 @@ open Core
 module Balance = struct
   include Currency.Balance
 
-  let to_int = int_of_nanomina
+  let to_int = to_nanomina_int
 
-  let of_int = nanomina_of_int_exn
+  let of_int = of_nanomina_int_exn
 end
 
 module Account = struct
@@ -213,9 +213,9 @@ module Base_inputs = struct
   module Balance = struct
     include Balance
 
-    let of_int = nanomina_of_int_exn
+    let of_int = of_nanomina_int_exn
 
-    let to_int = int_of_nanomina
+    let to_int = to_nanomina_int
   end
 
   module Account = Account

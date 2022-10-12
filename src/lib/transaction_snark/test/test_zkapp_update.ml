@@ -25,8 +25,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with signature" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let test_spec : Spec.t =
           { sender = (new_kp, Mina_base.Account.Nonce.zero)
           ; fee
@@ -50,8 +50,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with proof" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let test_spec : Spec.t =
           { sender = (new_kp, Mina_base.Account.Nonce.zero)
           ; fee
@@ -78,8 +78,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with None permission" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -107,8 +107,8 @@ module Make (Input : Input_intf) = struct
       =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -135,8 +135,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with None permission and Proof auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -164,8 +164,8 @@ module Make (Input : Input_intf) = struct
                  auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -193,8 +193,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with Either permission and Proof auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -222,8 +222,8 @@ module Make (Input : Input_intf) = struct
   let%test_unit "update a snapp account with Either permission and None auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        let fee = Fee.nanomina_of_int_exn 1_000_000 in
-        let amount = Amount.mina_of_int_exn 10_000_000_000 in
+        let fee = Fee.of_nanomina_int_exn 1_000_000 in
+        let amount = Amount.of_mina_int_exn 10_000_000_000 in
         let spec = List.hd_exn specs in
         let test_spec : Spec.t =
           { sender = spec.sender
@@ -254,8 +254,8 @@ module Make (Input : Input_intf) = struct
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
         Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
             let spec = List.hd_exn specs in
-            let fee = Fee.nanomina_of_int_exn 1_000_000 in
-            let amount = Amount.mina_of_int_exn 10_000_000_000 in
+            let fee = Fee.of_nanomina_int_exn 1_000_000 in
+            let amount = Amount.of_mina_int_exn 10_000_000_000 in
             let test_spec : Spec.t =
               { sender = spec.sender
               ; fee

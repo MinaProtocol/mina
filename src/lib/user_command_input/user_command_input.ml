@@ -190,8 +190,8 @@ let warn_if_unable_to_pay_account_creation_fee ~get_account
            receiver account doesn't appear to have been created already and \
            the transaction amount of %s is smaller than the account creation \
            fee of %s."
-          (string_of_mina_exn amount)
-          (string_of_mina_exn account_creation_fee) ;
+          (to_mina_string amount)
+          (to_mina_string account_creation_fee) ;
       ()
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
