@@ -1905,7 +1905,12 @@ module Base = struct
 
           let supply_increase { supply_increase; _ } = supply_increase
 
-          let set_supply_increase t supply_increase = { t with supply_increase }
+          let set_supply_increase ~should_update t supply_increase =
+            { t with
+              supply_increase =
+                Amount.Signed.if_ should_update ~then_:supply_increase
+                  ~else_:t.supply_increase
+            }
 
           let ledger { ledger; _ } = ledger
 
