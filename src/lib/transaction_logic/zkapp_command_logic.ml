@@ -1603,11 +1603,13 @@ module Make (Inputs : Inputs_intf) = struct
       let delta_settled =
         Amount.Signed.equal local_state.excess Amount.(Signed.of_unsigned zero)
       in
-      let is_empty_account_update =
-        Bool.(is_start' &&& is_last_account_update)
-      in
-      Bool.(
-        is_empty_account_update ||| not is_last_account_update ||| delta_settled)
+      (* 1) ignore local excess if it is_start because it will be promoted to global
+             excess and then set to zero later in the code
+         2) ignore everything but last account update since the excess wouldn't have
+            been settled
+         3) Excess should be settled after the last account update has been applied.
+      *)
+      Bool.(is_start' ||| not is_last_account_update ||| delta_settled)
     in
     let local_state =
       Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
