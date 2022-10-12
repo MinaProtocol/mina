@@ -72,17 +72,17 @@ let csv_data_of_strings ss =
       let payout_addr =
         Public_key.Compressed.of_base58_check_exn payout_address
       in
-      let balance = Currency.Balance.mina_of_string_exn balance in
+      let balance = Currency.Balance.of_mina_string_exn balance in
       let delegatee = Public_key.Compressed.of_base58_check_exn delegatee in
-      let delegation = Currency.Amount.mina_of_string_exn total_delegation in
+      let delegation = Currency.Amount.of_mina_string_exn total_delegation in
       let blocks_won = Int.of_string blocks_won in
       let payout_obligation =
-        Currency.Amount.mina_of_string_exn payout_obligation
+        Currency.Amount.of_mina_string_exn payout_obligation
       in
       let payout_received =
-        Currency.Amount.mina_of_string_exn payout_received
+        Currency.Amount.of_mina_string_exn payout_received
       in
-      let deficit = Currency.Amount.mina_of_string_exn deficit in
+      let deficit = Currency.Amount.of_mina_string_exn deficit in
       let check = Bool.of_string check in
       { payout_addr
       ; balance
@@ -103,7 +103,7 @@ let proof_level = Genesis_constants.Proof_level.Full
 
 let currency_string_of_int64 i64 =
   Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 i64)
-  |> Currency.Amount.string_of_mina_exn
+  |> Currency.Amount.to_mina_string
 
 (* map from global slots to state hash, ledger hash pairs *)
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
@@ -262,13 +262,13 @@ let write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee ~delegation
   let line =
     String.concat ~sep:","
       [ Public_key.Compressed.to_base58_check payout_addr
-      ; Currency.Balance.string_of_mina_exn balance
+      ; Currency.Balance.to_mina_string balance
       ; Public_key.Compressed.to_base58_check delegatee
-      ; Currency.Amount.string_of_mina_exn delegation
+      ; Currency.Amount.to_mina_string delegation
       ; Int.to_string blocks_won
-      ; Currency.Amount.string_of_mina_exn payout_obligation
-      ; Currency.Amount.string_of_mina_exn payout_received
-      ; Currency.Amount.string_of_mina_exn deficit
+      ; Currency.Amount.to_mina_string payout_obligation
+      ; Currency.Amount.to_mina_string payout_received
+      ; Currency.Amount.to_mina_string deficit
       ; Bool.to_string check
       ]
   in
@@ -572,7 +572,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                       ~f:(fun amt ->
                         `String
                           ( Int64.to_string amt |> Currency.Amount.of_string
-                          |> Currency.Amount.string_of_mina_exn ) ) )
+                          |> Currency.Amount.to_mina_string ) ) )
                 ; ("global_slot", `String (Int64.to_string user_cmd.global_slot))
                 ]
             in
@@ -586,7 +586,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                       ~f:(fun amt ->
                         `String
                           ( Int64.to_string amt |> Currency.Amount.of_string
-                          |> Currency.Amount.string_of_mina_exn ) ) )
+                          |> Currency.Amount.to_mina_string ) ) )
                 ; ("global_slot", `String (Int64.to_string user_cmd.global_slot))
                 ]
             in
@@ -792,7 +792,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                   "In epoch %d, delegatee %s had a deficit amount of %s to \
                    payout address %s; "
                   (input.epoch - 1)
-                  (Currency.Amount.string_of_mina_exn prev_epoch_deficit)
+                  (Currency.Amount.to_mina_string prev_epoch_deficit)
                   (Public_key.Compressed.to_base58_check payout_info.delegatee)
                   (Public_key.Compressed.to_base58_check payout_info.payout_pk) ;
                 let total_to_slot_3500_as_currency =
@@ -826,8 +826,8 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                         )
                       ; ( "remaining_deficit"
                         , `String
-                            (Currency.Amount.string_of_mina_exn
-                               remaining_deficit ) )
+                            (Currency.Amount.to_mina_string remaining_deficit)
+                        )
                       ]
                 else
                   [%log info]
@@ -919,9 +919,9 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
               "Delegatee %s has a delegated stake of %s, of that amount, \
                payout address %s contributed %s, a fraction of %0.5f"
               (Public_key.Compressed.to_base58_check payout_info.delegatee)
-              (Currency.Amount.string_of_mina_exn delegated_stake)
+              (Currency.Amount.to_mina_string delegated_stake)
               (Public_key.Compressed.to_base58_check payout_info.payout_pk)
-              (Currency.Amount.string_of_mina_exn delegated_amount)
+              (Currency.Amount.to_mina_string delegated_amount)
               fraction_of_stake ;
             let payout_obligation_per_block =
               Float.( * ) fraction_of_stake coinbase_amount
@@ -930,7 +930,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
               Float.( * )
                 (Float.of_int num_blocks_produced)
                 payout_obligation_per_block
-              |> Float.to_string |> Currency.Amount.mina_of_string_exn
+              |> Float.to_string |> Currency.Amount.of_mina_string_exn
             in
             [%log info]
               "In epoch %d, delegatee %s produced %d blocks; for payout \
@@ -941,7 +941,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
               num_blocks_produced
               (Public_key.Compressed.to_base58_check payout_info.payout_pk)
               payout_obligation_per_block
-              (Currency.Amount.string_of_mina_exn total_payout_obligation) ;
+              (Currency.Amount.to_mina_string total_payout_obligation) ;
             let payment_total_as_amount =
               Int64.to_string payment_total_in_epoch
               |> Currency.Amount.of_string
@@ -956,18 +956,18 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                  of %s"
                 input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
-                (Currency.Amount.string_of_mina_exn payment_total_as_amount)
+                (Currency.Amount.to_mina_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
-                (Currency.Amount.string_of_mina_exn total_payout_obligation)
+                (Currency.Amount.to_mina_string total_payout_obligation)
             else
               [%log info]
                 "In epoch %d, delegatee %s paid a total of %s to payout \
                  address %s, satisfying the payout obligation of %s"
                 input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
-                (Currency.Amount.string_of_mina_exn payment_total_as_amount)
+                (Currency.Amount.to_mina_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
-                (Currency.Amount.string_of_mina_exn total_payout_obligation) ;
+                (Currency.Amount.to_mina_string total_payout_obligation) ;
             ( match csv_out_channel_opt with
             | None ->
                 ()

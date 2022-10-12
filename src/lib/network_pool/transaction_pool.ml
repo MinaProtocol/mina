@@ -1456,7 +1456,7 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let minimum_fee =
-      Currency.Fee.int_of_nanomina Mina_compile_config.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1524,7 +1524,7 @@ let%test_module _ =
             { new_commands = []; removed_commands = []; reorg_best_tip = false }
         in
         let initial_balance =
-          Currency.Balance.mina_of_string_exn "900000000.0"
+          Currency.Balance.of_mina_string_exn "900000000.0"
         in
         let ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 () in
         Array.iteri test_keys ~f:(fun i kp ->
@@ -1730,7 +1730,7 @@ let%test_module _ =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
         (Signed_command_payload.create
-           ~fee:(Currency.Fee.nanomina_of_int_exn fee)
+           ~fee:(Currency.Fee.of_nanomina_int_exn fee)
            ~fee_payer_pk:(get_pk sender_idx) ~valid_until
            ~nonce:(Account.Nonce.of_int nonce)
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
@@ -1738,7 +1738,7 @@ let%test_module _ =
              (Signed_command_payload.Body.Payment
                 { source_pk = get_pk sender_idx
                 ; receiver_pk = get_pk receiver_idx
-                ; amount = Currency.Amount.nanomina_of_int_exn amount
+                ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
@@ -1746,7 +1746,7 @@ let%test_module _ =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
-      let amount = Currency.Amount.nanomina_of_int_exn amount in
+      let amount = Currency.Amount.of_nanomina_int_exn amount in
       let receiver_kp = test_keys.(receiver_idx) in
       let receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
@@ -1760,7 +1760,7 @@ let%test_module _ =
             let fee_payer_nonce = Account.Nonce.of_int nonce in
             Some (fee_payer_kp, fee_payer_nonce)
       in
-      let fee = Currency.Fee.nanomina_of_int_exn fee in
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
       let protocol_state_precondition =
         match valid_period with
         | None ->
@@ -2036,7 +2036,7 @@ let%test_module _ =
       let account = Option.value_exn @@ Mina_ledger.Ledger.get ledger loc in
       Mina_ledger.Ledger.set ledger loc
         { account with
-          balance = Currency.Balance.nanomina_of_int_exn balance
+          balance = Currency.Balance.of_nanomina_int_exn balance
         ; nonce = Account.Nonce.of_int nonce
         }
 
@@ -2461,7 +2461,7 @@ let%test_module _ =
           mk_payment ~sender_idx:0
             ~fee:
               ( minimum_fee
-              + Currency.Fee.int_of_nanomina Indexed_pool.replace_fee )
+              + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
             ~nonce:0 ~receiver_idx:1 ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
           mk_payment ~sender_idx:1 ~fee:minimum_fee ~nonce:0 ~receiver_idx:1
@@ -2470,7 +2470,7 @@ let%test_module _ =
           mk_payment ~sender_idx:2
             ~fee:
               ( minimum_fee
-              + Currency.Fee.int_of_nanomina Indexed_pool.replace_fee )
+              + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
             ~nonce:1 ~receiver_idx:4 ~amount:721_000_000_000 ()
         ; (* insufficient *)
           (let amount = 927_000_000_000 in
@@ -2489,7 +2489,7 @@ let%test_module _ =
              let account =
                Mock_base_ledger.get ledger location |> Option.value_exn
              in
-             Currency.Balance.int_of_nanomina account.balance - amount
+             Currency.Balance.to_nanomina_int account.balance - amount
            in
            mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount () )
         ]

@@ -105,7 +105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
-    let string_of_mina_exn amount =
+    let to_mina_string amount =
       let rec go num_stripped_zeros num =
         let open Int in
         if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
@@ -121,7 +121,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Int.(precision - num_stripped_zeros)
           num
 
-    let mina_of_string_exn input =
+    let of_mina_string_exn input =
       let parts = String.split ~on:'.' input in
       match parts with
       | [ whole ] ->
@@ -135,16 +135,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               ( whole ^ decimal
               ^ String.make Int.(precision - decimal_length) '0' )
       | _ ->
-          failwith "Currency.mina_of_string_exn: Invalid currency input"
+          failwith "Currency.of_mina_string_exn: Invalid currency input"
 
     module Arg = struct
       type typ = t [@@deriving sexp, hash, compare]
 
       type t = typ [@@deriving sexp, hash, compare]
 
-      let to_string = string_of_mina_exn
+      let to_string = to_mina_string
 
-      let of_string = mina_of_string_exn
+      let of_string = of_mina_string_exn
     end
 
     include Codable.Make_of_string (Arg)
@@ -365,11 +365,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* The number of nanounits in a unit. User for unit transformations. *)
     let unit_to_nano = 1_000_000_000
 
-    let int_of_nanomina = to_int
+    let to_nanomina_int = to_int
 
-    let int_of_centimina m = to_int m / centi_to_nano
+    let to_centimina_int m = to_int m / centi_to_nano
 
-    let int_of_mina m = to_int m / unit_to_nano
+    let to_mina_int m = to_int m / unit_to_nano
 
     let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
@@ -414,30 +414,30 @@ module Make_str (A : Wire_types.Concrete) = struct
        possible and limit the use of _exn veriants to places where
        a fixed value is being converted and hence overflow cannot
        happen. *)
-    let nanomina_of_int i = if Int.(i >= 0) then Some (of_int i) else None
+    let of_nanomina_int i = if Int.(i >= 0) then Some (of_int i) else None
 
-    let centimina_of_int i =
-      Option.(nanomina_of_int i >>= Fn.flip scale centi_to_nano)
+    let of_centimina_int i =
+      Option.(of_nanomina_int i >>= Fn.flip scale centi_to_nano)
 
-    let mina_of_int i =
-      Option.(nanomina_of_int i >>= Fn.flip scale unit_to_nano)
+    let of_mina_int i =
+      Option.(of_nanomina_int i >>= Fn.flip scale unit_to_nano)
 
-    let nanomina_of_int_exn i =
-      match nanomina_of_int i with
+    let of_nanomina_int_exn i =
+      match of_nanomina_int i with
       | None ->
           raise (Currency_overflow i)
       | Some m ->
           m
 
-    let centimina_of_int_exn i =
-      match centimina_of_int i with
+    let of_centimina_int_exn i =
+      match of_centimina_int i with
       | None ->
           raise (Currency_overflow i)
       | Some m ->
           m
 
-    let mina_of_int_exn i =
-      match mina_of_int i with
+    let of_mina_int_exn i =
+      match of_mina_int i with
       | None ->
           raise (Currency_overflow i)
       | Some m ->
@@ -899,7 +899,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_roundtrip" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                match mina_of_string_exn (string_of_mina_exn num) with
+                match of_mina_string_exn (to_mina_string num) with
                 | after_format ->
                     if Unsigned.equal after_format num then ()
                     else
@@ -909,7 +909,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                              (sprintf
                                 !"formatting: num=%{Unsigned} middle=%{String} \
                                   after=%{Unsigned}"
-                                num (string_of_mina_exn num) after_format ) ))
+                                num (to_mina_string num) after_format ) ))
                 | exception e ->
                     let err = Error.of_exn e in
                     Error.(
@@ -921,7 +921,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%test_unit "formatting_trailing_zeros" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
             qc_test_fast generator ~shrinker ~f:(fun num ->
-                let formatted = string_of_mina_exn num in
+                let formatted = to_mina_string num in
                 let has_decimal = String.contains formatted '.' in
                 let trailing_zero = String.is_suffix formatted ~suffix:"0" in
                 if has_decimal && trailing_zero then
@@ -930,7 +930,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (of_string
                          (sprintf
                             !"formatting: num=%{Unsigned} formatted=%{String}"
-                            num (string_of_mina_exn num) ) )) )
+                            num (to_mina_string num) ) )) )
         end )
     end
 

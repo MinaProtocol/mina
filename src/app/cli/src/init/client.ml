@@ -76,10 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.string_of_mina_exn account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.string_of_mina_exn account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -454,8 +454,8 @@ let batch_send_payments =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
           ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.nanomina_of_int_exn (Random.int 100)
-          ; fee = Currency.Fee.nanomina_of_int_exn (Random.int 100)
+          ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
+          ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
@@ -584,7 +584,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.string_of_mina_exn cancel_fee) ;
+           (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input
@@ -877,8 +877,7 @@ let currency_in_ledger =
          List.iter tokens ~f:(fun token ->
              let total =
                Token_id.Table.find_exn currency_tbl token
-               |> Currency.Balance.of_uint64
-               |> Currency.Balance.string_of_mina_exn
+               |> Currency.Balance.of_uint64 |> Currency.Balance.to_mina_string
              in
              if Token_id.equal token Token_id.default then
                Format.printf "MINA: %s@." total
@@ -1153,8 +1152,8 @@ let set_snark_work_fee =
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
-               (Currency.Fee.int_of_nanomina fee)
-               (Currency.Fee.int_of_nanomina response.setSnarkWorkFee.lastFee) )
+               (Currency.Fee.to_nanomina_int fee)
+               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) )
          )
 
 let import_key =
@@ -1406,7 +1405,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.string_of_mina_exn w.balance.total)
+                       (Currency.Balance.to_mina_string w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1747,7 +1746,7 @@ let compile_time_constants =
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
-                   (Currency.Amount.string_of_mina_exn
+                   (Currency.Amount.to_mina_string
                       precomputed_values.constraint_constants.coinbase_amount )
                )
              ; ( "block_window_duration_ms"

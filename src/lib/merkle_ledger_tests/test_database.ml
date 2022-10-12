@@ -461,7 +461,7 @@ let%test_module "test functor on in memory databases" =
             in
             let total =
               List.fold balances ~init:0 ~f:(fun accum balance ->
-                  Balance.int_of_nanomina balance + accum )
+                  Balance.to_nanomina_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
@@ -470,7 +470,7 @@ let%test_module "test functor on in memory databases" =
                 ignore @@ create_new_account_exn mdb account ) ;
             let retrieved_total =
               MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
-                  Balance.int_of_nanomina (Account.balance account) + total )
+                  Balance.to_nanomina_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
 
@@ -488,7 +488,7 @@ let%test_module "test functor on in memory databases" =
             let some_balances = List.take balances some_num in
             let total =
               List.fold some_balances ~init:0 ~f:(fun accum balance ->
-                  Balance.int_of_nanomina balance + accum )
+                  Balance.to_nanomina_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
@@ -507,7 +507,7 @@ let%test_module "test functor on in memory databases" =
                   let new_total = Balance.to_int current_balance + total in
 =======
                   let new_total =
-                    Balance.int_of_nanomina current_balance + total
+                    Balance.to_nanomina_int current_balance + total
                   in
 >>>>>>> b41c2fe812 (Fix compilation errors in apps.)
                   if Account_id.equal current_account_id last_account_id then

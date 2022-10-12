@@ -131,7 +131,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* contants regarding send amount and fees *)
-  let base_send_amount = Currency.Amount.mina_of_string_exn "0" in
+  let base_send_amount = Currency.Amount.of_mina_string_exn "0" in
   let fee_amount =
     match txn_fee_option with
     | None ->
@@ -141,9 +141,9 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
                 (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
                 10 ) )
     | Some f ->
-        Currency.Amount.to_fee (Currency.Amount.mina_of_string_exn f)
+        Currency.Amount.to_fee (Currency.Amount.of_mina_string_exn f)
   in
-  (* let acct_creation_fee = Currency.Amount.mina_of_string_exn "1" in *)
+  (* let acct_creation_fee = Currency.Amount.of_mina_string_exn "1" in *)
   let initial_send_amount =
     (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee*num_accounts *)
     let total_send_value =

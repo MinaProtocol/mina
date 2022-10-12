@@ -76,11 +76,11 @@ let global_slot =
   Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
 
 let txn_fee =
-  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.mina_of_string_exn
+  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn
 
 let txn_amount =
   Command.Arg_type.map Command.Param.string
-    ~f:Currency.Amount.mina_of_string_exn
+    ~f:Currency.Amount.of_mina_string_exn
 
 let txn_nonce =
   let open Mina_base in
