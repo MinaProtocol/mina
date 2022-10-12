@@ -39,6 +39,10 @@ module One_hot_vector = One_hot_vector.Make (Impl)
    - a set of IPA challenges (thought of as F-elements) corresponding to P's own inner-product argument
 *)
 
+type challenge = Challenge.Make(Impl).t
+
+type scalar_challenge = challenge Scalar_challenge.t
+
 (** Represents a proof (along with its accumulation state) which wraps a
     "step" proof S on the other curve.
 
@@ -53,18 +57,17 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       this latest wrap proof.
   *)
   ; proof_state :
-      ( Challenge.Make(Impl).t
-      , Challenge.Make(Impl).t Scalar_challenge.t
+      ( challenge
+      , scalar_challenge
       , Impl.Field.t Shifted_value.Type1.t
-      , ( ( Challenge.Make(Impl).t Scalar_challenge.t
+      , ( ( scalar_challenge
           , Impl.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
         , Impl.Boolean.var )
         Plonk_types.Opt.t
       , unit
       , Digest.Make(Impl).t
-      , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
-        Types.Step_bp_vec.t
+      , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
       , Impl.field Branch_data.Checked.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
@@ -100,21 +103,24 @@ end
 module Constant = struct
   open Kimchi_backend
 
+  type challenge = Challenge.Constant.t
+
+  type scalar_challenge = challenge Scalar_challenge.t
+
   type ('statement, 'max_proofs_verified, _) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
-        ( Challenge.Constant.t
-        , Challenge.Constant.t Scalar_challenge.t
+        ( challenge
+        , scalar_challenge
         , Tick.Field.t Shifted_value.Type1.t
-        , ( Challenge.Constant.t Scalar_challenge.t
+        , ( scalar_challenge
           , Tick.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , unit
         , Digest.Constant.t
-        , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
-          Types.Step_bp_vec.t
+        , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
         , Branch_data.t )
         Types.Wrap.Proof_state.In_circuit.t
     ; prev_proof_evals :
@@ -131,8 +137,6 @@ module Constant = struct
       (unit, 'max_proofs_verified, 'num_branches) t
   end
 end
-
-open Core_kernel
 
 let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
