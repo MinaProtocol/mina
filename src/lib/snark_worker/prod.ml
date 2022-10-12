@@ -86,7 +86,7 @@ module Inputs = struct
                         *)
                       , `String (Sexp.to_string (sexp_of_single_spec single)) )
                     ] ;
-                Error.raise e
+                Error e
             | Ok res ->
                 Cache.add cache ~statement ~proof:res ;
                 let total = Time.abs_diff (Time.now ()) start in
