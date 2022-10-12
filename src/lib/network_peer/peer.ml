@@ -7,7 +7,7 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving compare, hash, equal, sexp]
+      type t = string [@@deriving compare, hash, equal, sexp, yojson]
 
       let to_latest = Fn.id
     end

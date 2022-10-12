@@ -1,0 +1,22 @@
+(executable
+ (name rosetta_client)
+ (libraries async
+            async_kernel
+            async_unix
+            async.async_command
+            base
+            core
+            core_kernel
+            cohttp
+            cohttp-async
+            mina_base
+            mina_numbers
+            mina_state
+            network_peer
+            ppx_deriving_yojson.runtime
+            rosetta_lib
+            sync_status
+            uri
+            yojson)
+ (preprocess
+  (pps ppx_jane ppx_version ppx_deriving.make ppx_deriving_yojson)))
