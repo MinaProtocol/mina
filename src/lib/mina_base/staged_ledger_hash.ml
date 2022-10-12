@@ -59,6 +59,9 @@ module Aux_hash = struct
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 
+  let of_sha256 : Digestif.SHA256.t -> t =
+    Fn.compose of_bytes Digestif.SHA256.to_raw_string
+
   let gen : t Quickcheck.Generator.t =
     let char_generator =
       Base_quickcheck.Generator.of_list
@@ -81,6 +84,7 @@ module Aux_hash = struct
         ]
     in
     String.gen_with_length (length_in_bytes * 2) char_generator
+    |> Quickcheck.Generator.map ~f:(Fn.compose of_sha256 Digestif.SHA256.of_hex)
 end
 
 module Pending_coinbase_aux = struct

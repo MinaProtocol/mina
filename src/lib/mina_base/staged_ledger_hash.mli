@@ -57,6 +57,8 @@ module Aux_hash : sig
 
   val dummy : t
 
+  val of_sha256 : Digestif.SHA256.t -> t
+
   val gen : t Quickcheck.Generator.t
 end
 
