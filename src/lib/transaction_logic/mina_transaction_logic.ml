@@ -332,6 +332,7 @@ module type S = sig
     type t =
       { ledger : ledger
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
   end
@@ -409,6 +410,7 @@ module type S = sig
                Zkapp_command_logic.Local_state.t
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
+    -> ?supply_increase:Amount.Signed.t
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
@@ -975,6 +977,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     type t =
       { ledger : L.t
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
@@ -987,6 +990,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let fee_excess { fee_excess; _ } = fee_excess
 
     let set_fee_excess t fee_excess = { t with fee_excess }
+
+    let supply_increase { supply_increase; _ } = supply_increase
+
+    let set_supply_increase t supply_increase = { t with supply_increase }
 
     let global_slot_since_genesis { protocol_state; _ } =
       protocol_state.global_slot_since_genesis
@@ -1693,7 +1700,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
-      ?(fee_excess = Amount.Signed.zero) (ledger : L.t) (c : Zkapp_command.t) :
+      ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
+      (ledger : L.t) (c : Zkapp_command.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
@@ -1720,7 +1728,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess }
+      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
@@ -1731,6 +1739,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
+        ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
         ; account_update_index = Inputs.Index.zero
@@ -1812,7 +1821,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                     Stop false )
               ~finish:Fn.id
           in
-          (*Other zkapp_command failed, therefore, updates in those should not get applied*)
+          (* Other zkapp_command failed, therefore, updates in those should not get applied *)
           if
             List.is_empty new_accounts
             && other_account_update_accounts_unchanged

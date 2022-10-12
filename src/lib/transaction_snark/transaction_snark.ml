@@ -928,6 +928,7 @@ module Base = struct
       type t =
         { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
         ; fee_excess : Amount.Signed.var
+        ; supply_increase : Amount.Signed.var
         ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
         }
     end
@@ -1902,6 +1903,10 @@ module Base = struct
 
           let set_fee_excess t fee_excess = { t with fee_excess }
 
+          let supply_increase { supply_increase; _ } = supply_increase
+
+          let set_supply_increase t supply_increase = { t with supply_increase }
+
           let ledger { ledger; _ } = ledger
 
           let set_ledger ~should_update t ledger =
@@ -2048,6 +2053,7 @@ module Base = struct
               ( statement.source.ledger
               , V.create (fun () -> !witness.global_ledger) )
           ; fee_excess = Amount.Signed.(Checked.constant zero)
+          ; supply_increase = Amount.Signed.(Checked.constant zero)
           ; protocol_state =
               Mina_state.Protocol_state.Body.view_checked state_body
           }
@@ -2066,6 +2072,7 @@ module Base = struct
               statement.source.local_state.full_transaction_commitment
           ; token_id = statement.source.local_state.token_id
           ; excess = statement.source.local_state.excess
+          ; supply_increase = statement.source.local_state.supply_increase
           ; ledger =
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
@@ -2199,14 +2206,14 @@ module Base = struct
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Signed.Checked.assert_equal statement.supply_increase
-               Amount.(Signed.Checked.of_unsigned (var_of_t zero)) ) ) ;
+               global.supply_increase ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (let expected = statement.fee_excess in
-             let got =
+             let got : Fee_excess.var =
                { fee_token_l = Token_id.(Checked.constant default)
                ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
-               ; Fee_excess.fee_token_r = Token_id.(Checked.constant default)
+               ; fee_token_r = Token_id.(Checked.constant default)
                ; fee_excess_r =
                    Amount.Signed.Checked.to_fee (fst init).fee_excess
                }

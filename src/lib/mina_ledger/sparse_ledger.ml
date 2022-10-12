@@ -86,8 +86,11 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
   let open T in
   apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view
     ~fee_excess (ref ledger) c ~init:[]
-    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
-      ( { GS.ledger = !ledger; fee_excess; protocol_state }
+    ~f:(fun
+         acc
+         ({ ledger; fee_excess; supply_increase; protocol_state }, local_state)
+       ->
+      ( { GS.ledger = !ledger; fee_excess; supply_increase; protocol_state }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
   |> Result.map ~f:(fun (account_update_applied, states) ->
