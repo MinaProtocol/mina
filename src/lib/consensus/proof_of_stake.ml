@@ -2698,9 +2698,34 @@ module Hooks = struct
         in
         [%log info] "Syncing epoch ledger from %d peers" num_sync_peers
           ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
-        let db_ledger =
-          Mina_ledger.Ledger.Db.create
-            ~depth:Context.constraint_constants.ledger_depth ()
+        (* start with an existing epoch ledger, which may be faster
+           than syncing with an empty ledger, since ledgers accumulate
+           new leaves in increasing index order
+        *)
+        let%bind.Deferred.Or_error db_ledger =
+          let db_ledger_of_snapshot snapshot =
+            match snapshot.ledger with
+            | Ledger_snapshot.Ledger_db ledger ->
+                Ok ledger
+            | Ledger_snapshot.Genesis_epoch_ledger ledger ->
+                let module Ledger_transfer =
+                  Mina_ledger.Ledger_transfer.Make
+                    (Mina_ledger.Ledger)
+                    (Mina_ledger.Ledger.Db)
+                in
+                let fresh_db_ledger =
+                  Mina_ledger.Ledger.Db.create
+                    ~depth:Context.constraint_constants.ledger_depth ()
+                in
+                Ledger_transfer.transfer_accounts ~src:ledger
+                  ~dest:fresh_db_ledger
+          in
+          match snapshot_id with
+          | Staking_epoch_snapshot ->
+              return
+              @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
+          | Next_epoch_snapshot ->
+              return @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
         in
         let sync_ledger =
           Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
@@ -2740,7 +2765,7 @@ module Hooks = struct
                   ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                 return (Error e) )
         | `Target_changed _ ->
-            [%log info] "Target changed when syncing epoch ledger" ;
+            [%log error] "Target changed when syncing epoch ledger" ;
             return (Or_error.error_string "Epoch ledger target changed")
     in
     match requested_syncs with
