@@ -992,8 +992,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let supply_increase { supply_increase; _ } = supply_increase
 
-    let set_supply_increase ~should_update t supply_increase =
-      if should_update then { t with supply_increase } else t
+    let set_supply_increase t supply_increase = { t with supply_increase }
 
     let global_slot_since_genesis { protocol_state; _ } =
       protocol_state.global_slot_since_genesis

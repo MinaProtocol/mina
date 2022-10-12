@@ -820,7 +820,7 @@ module type Inputs_intf = sig
 
     val supply_increase : t -> Amount.Signed.t
 
-    val set_supply_increase : should_update:Bool.t -> t -> Amount.Signed.t -> t
+    val set_supply_increase : t -> Amount.Signed.t -> t
 
     val global_slot_since_genesis : t -> Global_slot.t
   end
@@ -1662,9 +1662,11 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* store supply increase in global state *)
     let global_state =
-      Global_state.set_supply_increase
-        ~should_update:Bool.(is_last_account_update &&& local_state.success)
-        global_state local_state.supply_increase
+      Global_state.set_supply_increase global_state
+        (Amount.Signed.if_
+           Bool.(is_last_account_update &&& local_state.success)
+           ~then_:local_state.supply_increase
+           ~else_:(Global_state.supply_increase global_state) )
     in
     (* The first account_update must succeed. *)
     Bool.(
