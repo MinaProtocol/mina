@@ -29,7 +29,6 @@ module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
     (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) =
 struct
-  open P
   open Impl
 
   type nonrec t = Field.t t
@@ -212,7 +211,7 @@ struct
     match t.sponge_state with
     | Squeezed n ->
         if n = rate then (
-          t.state <- block_cipher t.params t.state ;
+          t.state <- P.block_cipher t.params t.state ;
           t.sponge_state <- Squeezed 1 ;
           t.state.(0) )
         else (
