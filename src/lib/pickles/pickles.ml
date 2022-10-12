@@ -357,11 +357,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let log =
         let weight =
           let sys = Backend.Tick.R1CS_constraint_system.create () in
-          fun (c : Impls.Step.Constraint.t) ->
+          fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
             let prev = sys.next_row in
-            List.iter c ~f:(fun { annotation; basic } ->
-                Backend.Tick.R1CS_constraint_system.add_constraint sys
-                  ?label:annotation basic ) ;
+            Backend.Tick.R1CS_constraint_system.add_constraint sys
+              ?label:annotation basic ;
             let next = sys.next_row in
             next - prev
         in
@@ -374,11 +373,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
       let log =
         let sys = Backend.Tock.R1CS_constraint_system.create () in
-        let weight (c : Impls.Wrap.Constraint.t) =
+        let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
           let prev = sys.next_row in
-          List.iter c ~f:(fun { annotation; basic } ->
-              Backend.Tock.R1CS_constraint_system.add_constraint sys
-                ?label:annotation basic ) ;
+          Backend.Tock.R1CS_constraint_system.add_constraint sys
+            ?label:annotation basic ;
           let next = sys.next_row in
           next - prev
         in
