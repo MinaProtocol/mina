@@ -15,6 +15,9 @@ module Get_coinbase_and_genesis =
         blockchainState {
           date @ppxCustom(module: "Scalars.String_json")
         }
+        consensusState {
+          blockHeight
+        }
       }
       stateHash @ppxCustom(module: "Scalars.String_json")
     }
@@ -51,13 +54,13 @@ module Block_query = struct
     let of_partial_identifier' (identifier : Partial_block_identifier.t option) =
       of_partial_identifier (Option.value identifier ~default:{Partial_block_identifier.index = None; hash = None })
 
-    let is_genesis ~hash = function
+    let is_genesis ~hash ~block_height = function
       | Some (`This (`Height index)) ->
-          Int64.equal index Network.genesis_block_height
+          Int64.equal index block_height
       | Some (`That (`Hash hash')) ->
           String.equal hash hash'
       | Some (`Those (`Height index, `Hash hash')) ->
-          Int64.equal index Network.genesis_block_height
+          Int64.equal index block_height
           && String.equal hash hash'
       | None ->
           false
@@ -539,7 +542,7 @@ WITH RECURSIVE chain AS (
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
           let%map kind =
-            match ic.Archive_lib.Processor.Internal_command.typ with
+            match ic.Archive_lib.Processor.Internal_command.command_type with
             | "fee_transfer" ->
                 M.return `Fee_transfer
             | "coinbase" ->
@@ -572,7 +575,7 @@ WITH RECURSIVE chain AS (
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
-            match uc.Archive_lib.Processor.User_command.Signed_command.typ with
+            match uc.Archive_lib.Processor.User_command.Signed_command.command_type with
             | "payment" ->
                 M.return `Payment
             | "delegation" ->
@@ -721,10 +724,14 @@ module Specific = struct
           ~graphql_uri
       in
       let genesisBlock = res.Get_coinbase_and_genesis.genesisBlock in
+      let block_height =
+        genesisBlock.protocolState.consensusState.blockHeight
+        |> Unsigned.UInt32.to_int64
+      in
       let%bind block_info =
-        if Query.is_genesis ~hash:genesisBlock.stateHash query then
+        if Query.is_genesis ~block_height ~hash:genesisBlock.stateHash query then
           let genesis_block_identifier =
-            { Block_identifier.index= Network.genesis_block_height
+            { Block_identifier.index = block_height
             ; hash= genesisBlock.stateHash }
           in
           M.return

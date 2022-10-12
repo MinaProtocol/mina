@@ -93,7 +93,7 @@ val test_snapp_update :
          * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t
-  -> Transaction_snark.For_tests.Spec.t
+  -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
   -> snapp_pk:Account.key
   -> unit

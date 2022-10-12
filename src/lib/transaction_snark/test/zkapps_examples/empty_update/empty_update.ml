@@ -55,6 +55,7 @@ let deploy_account_update_body : Account_update.Body.t =
       }
   ; caller = Token_id.default
   ; use_full_commitment = true
+  ; authorization_kind = Signature
   }
 
 let deploy_account_update : Account_update.t =

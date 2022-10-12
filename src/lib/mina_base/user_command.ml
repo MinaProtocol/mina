@@ -200,19 +200,14 @@ let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) =
+let accounts_accessed (t : t) (status : Transaction_status.t) =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x
+      Signed_command.accounts_accessed x status
   | Zkapp_command ps ->
-      Zkapp_command.accounts_accessed ps
+      Zkapp_command.accounts_accessed ps status
 
-let to_base58_check (t : t) =
-  match t with
-  | Signed_command x ->
-      Signed_command.to_base58_check x
-  | Zkapp_command ps ->
-      Zkapp_command.to_base58_check ps
+let accounts_referenced (t : t) = accounts_accessed t Applied
 
 let fee_payer (t : t) =
   match t with
@@ -304,7 +299,7 @@ let to_valid_unsafe (t : t) =
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed user_command)
+        (accounts_referenced user_command)
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)

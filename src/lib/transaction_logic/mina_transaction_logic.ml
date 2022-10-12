@@ -541,8 +541,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | Some account ->
             Ok (`Existing location, account)
         | None ->
-            (* Needed to support sparse ledger. *)
-            Ok (`New, Account.create account_id Balance.zero) )
+            failwith "Ledger location with no account" )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -965,9 +964,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       type t = bool
 
       module Assert = struct
-        let is_true b = assert b
+        let is_true ~pos b =
+          try assert b
+          with Assert_failure _ ->
+            let file, line, col, _ecol = pos in
+            raise (Assert_failure (file, line, col))
 
-        let any bs = List.exists ~f:Fn.id bs |> is_true
+        let any ~pos bs = List.exists ~f:Fn.id bs |> is_true ~pos
       end
 
       let if_ = value_if
@@ -994,14 +997,23 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let is_empty t = List.join t |> List.is_empty
 
-      let assert_with_failure_status_tbl b failure_status_tbl =
+      let assert_with_failure_status_tbl ~pos b failure_status_tbl =
+        let file, line, col, ecol = pos in
         if (not b) && not (is_empty failure_status_tbl) then
           (* Raise a more useful error message if we have a failure
              description. *)
-          Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
-          @@ Transaction_status.Failure.Collection.Display.to_yojson
-          @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
-        else assert b
+          let failure_msg =
+            Yojson.Safe.to_string
+            @@ Transaction_status.Failure.Collection.Display.to_yojson
+            @@ Transaction_status.Failure.Collection.to_display
+                 failure_status_tbl
+          in
+          Error.raise @@ Error.of_string
+          @@ sprintf "File %S, line %d, characters %d-%d: %s" file line col ecol
+               failure_msg
+        else
+          try assert b
+          with Assert_failure _ -> raise (Assert_failure (file, line, col))
     end
 
     module Account_id = struct
@@ -1413,6 +1425,20 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | None_given ->
             (`Proof_verifies false, `Signature_verifies false)
 
+      let is_proved (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Proof ->
+            true
+        | Signature | None_given ->
+            false
+
+      let is_signed (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Signature ->
+            true
+        | Proof | None_given ->
+            false
+
       module Update = struct
         open Zkapp_basic
 
@@ -1626,7 +1652,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
-      List.map (Zkapp_command.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
@@ -1675,7 +1701,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             { perform } initial_state )
     in
     let account_states_after_fee_payer =
-      List.map (Zkapp_command.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
@@ -1700,16 +1726,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         (* accounts not originally in ledger, now present in ledger *)
         let new_accounts =
-          List.filter_map account_ids_originally_not_in_ledger
-            ~f:(fun acct_id ->
-              let open Option.Let_syntax in
-              let%bind loc = L.location_of_account ledger acct_id in
-              let%bind acc = L.get ledger loc in
-              (*Check account ids because sparse ledger stores empty
-                accounts at new account locations*)
-              Option.some_if
-                (Account_id.equal (Account.identifier acc) acct_id)
-                acct_id )
+          List.filter account_ids_originally_not_in_ledger ~f:(fun acct_id ->
+              Option.is_some @@ L.location_of_account ledger acct_id )
         in
         let valid_result =
           Ok
@@ -1776,10 +1794,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     | Some loc -> (
         match get ledger loc with
         | None ->
-            ( init_account
-            , `Added
-            , `Has_permission_to_receive
-                (Account.has_permission ~to_:`Receive init_account) )
+            failwith "Ledger location with no account"
         | Some receiver_account ->
             ( receiver_account
             , `Existed
@@ -2290,6 +2305,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment
+                ; authorization_kind = Signature
                 }
             ; authorization = None_given
             }
@@ -2317,6 +2333,7 @@ module For_tests = struct
                     }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = None_given
                 }
             ; authorization = None_given
             }

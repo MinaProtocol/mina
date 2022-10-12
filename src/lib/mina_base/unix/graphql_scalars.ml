@@ -63,6 +63,15 @@ module PendingCoinbaseHash =
       let doc = "Base58Check-encoded hash of a pending coinbase hash"
     end)
 
+module PendingCoinbaseAuxHash =
+  Make_scalar_using_base58_check
+    (Mina_base.Staged_ledger_hash.Pending_coinbase_aux)
+    (struct
+      let name = "PendingCoinbaseAuxHash"
+
+      let doc = "Base58Check-encoded hash of a pending coinbase auxiliary hash"
+    end)
+
 module FieldElem =
   Make_scalar_using_to_string
     (Mina_base.Zkapp_basic.F)
@@ -89,15 +98,6 @@ module TransactionStatusFailure :
       ~doc:"transaction status failure" ~coerce:serialize
 end
 
-module ZkappCommandBase58 =
-  Make_scalar_using_base58_check
-    (Mina_base.Zkapp_command)
-    (struct
-      let name = "ZkappCommandBase58"
-
-      let doc = "A Base58Check string representing the command"
-    end)
-
 (* TESTS *)
 
 module FieldElem_gen = struct
@@ -110,14 +110,6 @@ end
 
 module StagedledgerAuxHash_gen = struct
   include Mina_base.Staged_ledger_hash.Aux_hash
-end
-
-module ZkappCommandBase58_gen = struct
-  include Mina_base.Zkapp_command
-
-  let gen =
-    Stable.Latest.Wire.gen
-    |> Core_kernel.Quickcheck.Generator.map ~f:Stable.Latest.of_wire
 end
 
 let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
@@ -146,6 +138,3 @@ let%test_module "PendingCoinbaseHash" =
 
 let%test_module "StagedLedgerAuxHash" =
   (module Make_test (StagedLedgerAuxHash) (StagedledgerAuxHash_gen))
-
-let%test_module "ZkappCommandBase58" =
-  (module Make_test (ZkappCommandBase58) (ZkappCommandBase58_gen))

@@ -464,10 +464,7 @@ module Zkapp_verification_keys = struct
         , Pickles.Backend.Tick.Field.t )
         With_hash.t ) =
     let verification_key =
-      Binable.to_string
-        (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-        vk.data
-      |> Base64.encode_exn
+      Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
     let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
     let value = { hash; verification_key } in
@@ -792,7 +789,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Zkapp_precondition_account = struct
+module Zkapp_account_precondition_values = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -818,7 +815,7 @@ module Zkapp_precondition_account = struct
         ; option bool
         ]
 
-  let table_name = "zkapp_precondition_accounts"
+  let table_name = "zkapp_account_precondition_values"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -879,7 +876,7 @@ end
 module Zkapp_account_precondition = struct
   type t =
     { kind : Account_update.Account_precondition.Tag.t
-    ; precondition_account_id : int option
+    ; account_precondition_values_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
@@ -915,10 +912,12 @@ module Zkapp_account_precondition = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (account_precondition : Account_update.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind precondition_account_id =
+    let%bind account_precondition_values_id =
       match account_precondition with
       | Account_update.Account_precondition.Full acct ->
-          Zkapp_precondition_account.add_if_doesn't_exist (module Conn) acct
+          Zkapp_account_precondition_values.add_if_doesn't_exist
+            (module Conn)
+            acct
           >>| Option.some
       | _ ->
           return None
@@ -934,7 +933,7 @@ module Zkapp_account_precondition = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      { kind; precondition_account_id; nonce }
+      { kind; account_precondition_values_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1475,13 +1474,27 @@ module Zkapp_account_update_body = struct
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; caller : string
+    ; authorization_kind : string
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int; int; string; bool; int; int; int; int; int; int; bool; string ]
+        [ int
+        ; int
+        ; string
+        ; bool
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; bool
+        ; string
+        ; string
+        ]
 
   let table_name = "zkapp_account_update_body"
 
@@ -1526,6 +1539,9 @@ module Zkapp_account_update_body = struct
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
     let caller = Account_update.Call_type.to_string body.caller in
+    let authorization_kind =
+      Account_update.Authorization_kind.to_string body.authorization_kind
+    in
     let value =
       { account_identifier_id
       ; update_id
@@ -1539,6 +1555,7 @@ module Zkapp_account_update_body = struct
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; caller
+      ; authorization_kind
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1547,7 +1564,9 @@ module Zkapp_account_update_body = struct
         | "events_ids" | "sequence_events_ids" ->
             Some "int[]"
         | "caller" ->
-            Some "call_type_type"
+            Some "call_type"
+        | "authorization_kind" ->
+            Some "authorization_kind_type"
         | _ ->
             None )
       (module Conn)
@@ -1715,7 +1734,7 @@ end
 module User_command = struct
   module Signed_command = struct
     type t =
-      { typ : string
+      { command_type : string
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
@@ -1812,9 +1831,9 @@ module User_command = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "typ" -> Some "user_command_type" | _ -> None )
+                    | "command_type" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ =
+            { command_type =
                 ( match via with
                 | `Ident ->
                     Signed_command.tag_string t
@@ -1863,7 +1882,7 @@ module User_command = struct
                   ~tannot:(function
                     | "typ" -> Some "user_command_type" | _ -> None )
                   ~cols:Fields.names () ) )
-            { typ = user_cmd.typ
+            { command_type = user_cmd.command_type
             ; fee_payer_id
             ; source_id
             ; receiver_id
@@ -1963,7 +1982,8 @@ module User_command = struct
 end
 
 module Internal_command = struct
-  type t = { typ : string; receiver_id : int; fee : string; hash : string }
+  type t =
+    { command_type : string; receiver_id : int; fee : string; hash : string }
   [@@deriving hlist, fields]
 
   let typ =
@@ -1973,16 +1993,16 @@ module Internal_command = struct
   let table_name = "internal_commands"
 
   let find_opt (module Conn : CONNECTION)
-      ~(transaction_hash : Transaction_hash.t) ~(typ : string) =
+      ~(transaction_hash : Transaction_hash.t) ~(command_type : string) =
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name
             ~tannot:(function
-              | "typ" -> Some "internal_command_type" | _ -> None )
-            ~cols:[ "hash"; "typ" ] () ) )
-      (Transaction_hash.to_base58_check transaction_hash, typ)
+              | "command_type" -> Some "internal_command_type" | _ -> None )
+            ~cols:[ "hash"; "command_type" ] () ) )
+      (Transaction_hash.to_base58_check transaction_hash, command_type)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -1996,7 +2016,8 @@ module Internal_command = struct
     match%bind
       find_opt
         (module Conn)
-        ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
+        ~transaction_hash:internal_cmd.hash
+        ~command_type:internal_cmd.command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2012,7 +2033,7 @@ module Internal_command = struct
                 ~tannot:(function
                   | "typ" -> Some "internal_command_type" | _ -> None )
                 ~cols:Fields.names () ) )
-          { typ = internal_cmd.typ
+          { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
@@ -2060,7 +2081,7 @@ module Fee_transfer = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:(Kind.to_string kind)
+        ~transaction_hash ~command_type:(Kind.to_string kind)
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2076,7 +2097,7 @@ module Fee_transfer = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )
@@ -2092,10 +2113,12 @@ end
 module Coinbase = struct
   type t = { receiver_id : int; amount : int64; hash : string }
 
-  let coinbase_typ = "coinbase"
+  let coinbase_command_type = "coinbase"
 
   let typ =
-    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let encode t =
+      Ok (coinbase_command_type, t.receiver_id, t.amount, t.hash)
+    in
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
@@ -2108,7 +2131,7 @@ module Coinbase = struct
     match%bind
       Internal_command.find_opt
         (module Conn)
-        ~transaction_hash ~typ:coinbase_typ
+        ~transaction_hash ~command_type:coinbase_command_type
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2122,7 +2145,7 @@ module Coinbase = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (typ, receiver_id, fee, hash)
+                    (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql} )

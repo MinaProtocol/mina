@@ -2,7 +2,7 @@
 
 Mina is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
-- [Developer homepage](https://docs.minaprotocol.com/en/developers)
+- [Node Developer homepage](https://docs.minaprotocol.com/en/node-developers)
 - [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
@@ -40,7 +40,7 @@ Refer to [/dev](/dev).
 
 - Invoke `make macos-setup`
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup toolchain install 1.58.1`
+- Invoke `rustup toolchain install 1.63.0`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
 - Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.

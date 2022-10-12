@@ -1,3 +1,6 @@
+;; Don't build tests automatically
+(vendored_dirs tests)
+
 (library
  (name ppx_mina)
  (public_name ppx_mina)

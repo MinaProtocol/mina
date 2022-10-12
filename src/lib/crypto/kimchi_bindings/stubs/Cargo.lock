@@ -211,7 +211,6 @@ dependencies = [
  "ark-ff",
  "ark-poly",
  "ark-serialize",
- "array-init",
  "blake2",
  "groupmap",
  "itertools",
@@ -500,7 +499,6 @@ dependencies = [
  "ark-ff",
  "ark-poly",
  "ark-serialize",
- "array-init",
  "blake2",
  "cairo",
  "commitment_dlog",
@@ -681,7 +679,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a48b45c32924a3d95aea68f628ec93737bf7cfdb7b0d14344cf3d5176caa1302"
 dependencies = [
  "ocaml-boxroot-sys",
- "ocaml-derive 0.22.0",
+ "ocaml-derive",
  "ocaml-interop",
  "ocaml-sys",
 ]
@@ -693,16 +691,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5186393bfbee4ce2bc5bbb82beafb77e85c1d0a557e3cfc8c8a0d63d7845fed5"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "ocaml-derive"
-version = "0.1.0"
-dependencies = [
- "convert_case",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -720,11 +708,25 @@ dependencies = [
 [[package]]
 name = "ocaml-gen"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42eba625f5b0349ce7ebd5a93d9a9d46313501f84c58994f1d45df06e4b10611"
 dependencies = [
  "const-random",
  "ocaml",
- "ocaml-derive 0.1.0",
+ "ocaml-gen-derive",
  "paste",
+]
+
+[[package]]
+name = "ocaml-gen-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2124ff43d70aec3e9f6c29c61a99d8fd5783cabd905a37fef3ad54d0d09fdb9d"
+dependencies = [
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -773,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9423e2b32f7a043629287a536f21951e8c6a82482d0acb1eeebfc90bc2225b22"
+checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
 name = "pest"
