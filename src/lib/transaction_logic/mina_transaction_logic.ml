@@ -587,8 +587,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | Some account ->
             Ok (`Existing location, account)
         | None ->
-            (* Needed to support sparse ledger. *)
-            Ok (`New, Account.create account_id Balance.zero) )
+            failwith "Ledger location with no account" )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -1780,16 +1779,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         (* accounts not originally in ledger, now present in ledger *)
         let new_accounts =
-          List.filter_map account_ids_originally_not_in_ledger
-            ~f:(fun acct_id ->
-              let open Option.Let_syntax in
-              let%bind loc = L.location_of_account ledger acct_id in
-              let%bind acc = L.get ledger loc in
-              (*Check account ids because sparse ledger stores empty
-                accounts at new account locations*)
-              Option.some_if
-                (Account_id.equal (Account.identifier acc) acct_id)
-                acct_id )
+          List.filter account_ids_originally_not_in_ledger ~f:(fun acct_id ->
+              Option.is_some @@ L.location_of_account ledger acct_id )
         in
         let valid_result =
           Ok
@@ -1856,10 +1847,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     | Some loc -> (
         match get ledger loc with
         | None ->
-            ( init_account
-            , `Added
-            , `Has_permission_to_receive
-                (Account.has_permission ~to_:`Receive init_account) )
+            failwith "Ledger location with no account"
         | Some receiver_account ->
             ( receiver_account
             , `Existed

@@ -753,7 +753,7 @@ module Base = struct
           | Mint_tokens | Create_account ->
               assert false )
 
-    let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
+    let%snarkydef_ compute_as_prover ~constraint_constants ~txn_global_slot
         (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
@@ -841,7 +841,7 @@ module Base = struct
               ~fee_payer_account ~source_account ~receiver_account txn)
   end
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
+  let%snarkydef_ check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
     let%bind input =
       Transaction_union_payload.Checked.to_input_legacy payload
@@ -849,7 +849,7 @@ module Base = struct
     let%bind verifies =
       Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
-    [%with_label "check signature"]
+    [%with_label_ "check signature"]
       (Boolean.Assert.any [ Boolean.not is_user_command; verifies ])
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
@@ -1228,7 +1228,7 @@ module Base = struct
           in
           let `Min_balance _, timing =
             run_checked
-            @@ [%with_label "Check zkapp timing"]
+            @@ [%with_label.Snark_params.Tick "Check zkapp timing"]
                  (check_timing ~balance_check ~timed_balance_check ~account
                     ~txn_amount:None ~txn_global_slot )
           in
@@ -1992,7 +1992,7 @@ module Base = struct
     let check_protocol_state ~pending_coinbase_stack_init
         ~pending_coinbase_stack_before ~pending_coinbase_stack_after state_body
         =
-      [%with_label "Compute pending coinbase stack"]
+      [%with_label_ "Compute pending coinbase stack"]
         (let%bind state_body_hash =
            Mina_state.Protocol_state.Body.hash_checked state_body
          in
@@ -2000,7 +2000,7 @@ module Base = struct
            Pending_coinbase.Stack.Checked.push_state state_body_hash
              pending_coinbase_stack_init
          in
-         [%with_label "Check pending coinbase stack"]
+         [%with_label_ "Check pending coinbase stack"]
            (let%bind correct_coinbase_target_stack =
               Pending_coinbase.Stack.equal_var
                 computed_pending_coinbase_stack_after
@@ -2311,7 +2311,7 @@ module Base = struct
         Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
-  let%snarkydef add_burned_tokens acc_burned_tokens amount
+  let%snarkydef_ add_burned_tokens acc_burned_tokens amount
       ~is_coinbase_or_fee_transfer ~update_account =
     let%bind accumulate_burned_tokens =
       Boolean.all [ is_coinbase_or_fee_transfer; Boolean.not update_account ]
@@ -2325,7 +2325,7 @@ module Base = struct
     Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
       ~else_:acc_burned_tokens
 
-  let%snarkydef apply_tagged_transaction
+  let%snarkydef_ apply_tagged_transaction
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
@@ -2335,12 +2335,12 @@ module Base = struct
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
-      [%with_label "Check transaction signature"]
+      [%with_label_ "Check transaction signature"]
         (check_signature shifted ~payload ~is_user_command ~signer ~signature)
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
-      [%with_label "Fee-payer must sign the transaction"]
+      [%with_label_ "Fee-payer must sign the transaction"]
         ((* TODO: Enable multi-sig. *)
          Public_key.Compressed.Checked.Assert.equal signer_pk
            payload.common.fee_payer_pk )
@@ -2368,11 +2368,11 @@ module Base = struct
     in
     let%bind () =
       Checked.all_unit
-        [ [%with_label
+        [ [%with_label_
             "Token_locked value is compatible with the transaction kind"]
             (Boolean.Assert.any
                [ Boolean.not payload.body.token_locked; is_create_account ] )
-        ; [%with_label "Token_locked cannot be used with the default token"]
+        ; [%with_label_ "Token_locked cannot be used with the default token"]
             (Boolean.Assert.any
                [ Boolean.not payload.body.token_locked
                ; Boolean.not token_default
@@ -2381,9 +2381,9 @@ module Base = struct
     in
     let%bind () = Boolean.Assert.is_true token_default in
     let%bind () =
-      [%with_label "Validate tokens"]
+      [%with_label_ "Validate tokens"]
         (Checked.all_unit
-           [ [%with_label
+           [ [%with_label_
                "Fee token is default or command allows non-default fee"]
                (Boolean.Assert.any
                   [ fee_token_default
@@ -2394,9 +2394,9 @@ module Base = struct
            ; (* TODO: Remove this check and update the transaction snark once we
                 have an exchange rate mechanism. See issue #4447.
              *)
-             [%with_label "Fees in tokens disabled"]
+             [%with_label_ "Fees in tokens disabled"]
                (Boolean.Assert.is_true fee_token_default)
-           ; [%with_label "Command allows default token"]
+           ; [%with_label_ "Command allows default token"]
                Boolean.(
                  Assert.any
                    [ is_payment
@@ -2428,7 +2428,7 @@ module Base = struct
       Account_id.Checked.create payload.common.fee_payer_pk fee_token
     in
     let%bind () =
-      [%with_label "Check slot validity"]
+      [%with_label_ "Check slot validity"]
         ( Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
         >>= Boolean.Assert.is_true )
     in
@@ -2463,7 +2463,7 @@ module Base = struct
          i + coinbase    i + state + coinbase    i + state + coinbase
     *)
     let%bind () =
-      [%with_label "Compute coinbase stack"]
+      [%with_label_ "Compute coinbase stack"]
         (let%bind state_body_hash =
            Mina_state.Protocol_state.Body.hash_checked state_body
          in
@@ -2482,7 +2482,7 @@ module Base = struct
            Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
              ~else_:pending_coinbase_stack_with_state
          in
-         [%with_label "Check coinbase stack"]
+         [%with_label_ "Check coinbase stack"]
            (let%bind correct_coinbase_target_stack =
               Pending_coinbase.Stack.equal_var
                 computed_pending_coinbase_stack_after pending_coinbase_after
@@ -2499,7 +2499,7 @@ module Base = struct
               in
               Boolean.(equal_source ||| equal_source_with_state)
             in
-            [%with_label "target stack and valid init state"]
+            [%with_label_ "target stack and valid init state"]
               (Boolean.Assert.all
                  [ correct_coinbase_target_stack; valid_init_state ] ) ) )
     in
@@ -2508,7 +2508,7 @@ module Base = struct
        consistency.
     *)
     let%bind () =
-      [%with_label "A failing user command is a user command"]
+      [%with_label_ "A failing user command is a user command"]
         Boolean.(Assert.any [ is_user_command; not user_command_fails ])
     in
     let predicate_deferred =
@@ -2527,7 +2527,7 @@ module Base = struct
       Boolean.(is_own_account ||| predicate_result)
     in
     let%bind () =
-      [%with_label "Check account_precondition failure against predicted"]
+      [%with_label_ "Check account_precondition failure against predicted"]
         (let%bind predicate_failed =
            Boolean.((not predicate_result) &&& not predicate_deferred)
          in
@@ -2563,7 +2563,7 @@ module Base = struct
     (* new account fees added for coinbases/fee transfers, when calculating receiver amounts *)
     let new_account_fees = ref zero_fee in
     let%bind root_after_fee_payer_update =
-      [%with_label "Update fee payer"]
+      [%with_label_ "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
            ~depth:constraint_constants.ledger_depth root
            ~is_writeable:can_create_fee_payer_account fee_payer
@@ -2580,7 +2580,7 @@ module Base = struct
                Account.Nonce.Checked.succ_if account.nonce is_user_command
              in
              let%bind () =
-               [%with_label "Check fee nonce"]
+               [%with_label_ "Check fee nonce"]
                  (let%bind nonce_matches =
                     Account.Nonce.Checked.equal nonce account.nonce
                   in
@@ -2603,7 +2603,7 @@ module Base = struct
                Account.Checked.has_permission ~to_:`Receive account
              in
              let%bind () =
-               [%with_label
+               [%with_label_
                  "Fee payer balance update should be permitted for all commands"]
                  (Boolean.Assert.any
                     [ Boolean.not is_user_command; permitted_to_send ] )
@@ -2635,7 +2635,7 @@ module Base = struct
                Boolean.(is_empty_and_writeable ||| is_create_account)
              in
              let%bind amount =
-               [%with_label "Compute fee payer amount"]
+               [%with_label_ "Compute fee payer amount"]
                  (let fee_payer_amount =
                     let sgn = Sgn.Checked.neg_if_true is_user_command in
                     Amount.Signed.create_var
@@ -2656,7 +2656,7 @@ module Base = struct
                     add fee_payer_amount account_creation_fee) )
              in
              let%bind () =
-               [%with_label "Burned tokens in fee payer"]
+               [%with_label_ "Burned tokens in fee payer"]
                  (let%map amt =
                     add_burned_tokens !burned_tokens
                       (Amount.Checked.of_fee fee)
@@ -2666,7 +2666,7 @@ module Base = struct
              in
              let txn_global_slot = current_global_slot in
              let%bind timing =
-               [%with_label "Check fee payer timing"]
+               [%with_label_ "Check fee payer timing"]
                  (let%bind txn_amount =
                     let%bind sgn = Amount.Signed.Checked.sgn amount in
                     let%bind magnitude =
@@ -2676,11 +2676,11 @@ module Base = struct
                       ~else_:Amount.(var_of_t zero)
                   in
                   let balance_check ok =
-                    [%with_label "Check fee payer balance"]
+                    [%with_label_ "Check fee payer balance"]
                       (Boolean.Assert.is_true ok)
                   in
                   let timed_balance_check ok =
-                    [%with_label "Check fee payer timed balance"]
+                    [%with_label_ "Check fee payer timed balance"]
                       (Boolean.Assert.is_true ok)
                   in
                   let%bind `Min_balance _, timing =
@@ -2691,7 +2691,7 @@ module Base = struct
                     ~else_:account.timing )
              in
              let%bind balance =
-               [%with_label "Check payer balance"]
+               [%with_label_ "Check payer balance"]
                  (let%bind updated_balance =
                     Balance.Checked.add_signed_amount account.balance amount
                   in
@@ -2735,7 +2735,7 @@ module Base = struct
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
-      [%with_label "Compute receiver increase"]
+      [%with_label_ "Compute receiver increase"]
         (let%bind base_amount =
            let%bind zero_transfer =
              Boolean.any [ is_stake_delegation; is_create_account ]
@@ -2755,7 +2755,7 @@ module Base = struct
     let receiver_overflow = ref Boolean.false_ in
     let receiver_balance_update_permitted = ref Boolean.true_ in
     let%bind root_after_receiver_update =
-      [%with_label "Update receiver"]
+      [%with_label_ "Update receiver"]
         (Frozen_ledger_hash.modify_account_recv
            ~depth:constraint_constants.ledger_depth root_after_fee_payer_update
            receiver ~f:(fun ~is_empty_and_writeable account ->
@@ -2788,7 +2788,7 @@ module Base = struct
                Boolean.(is_empty_and_writeable &&& must_not_be_empty)
              in
              let%bind () =
-               [%with_label "Receiver existence failure matches predicted"]
+               [%with_label_ "Receiver existence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present )
              in
@@ -2799,7 +2799,7 @@ module Base = struct
                Boolean.(is_empty_and_writeable &&& not is_create_account)
              in
              let%bind () =
-               [%with_label
+               [%with_label_
                  "Check whether creation fails due to a non-default token"]
                  (let%bind token_should_not_create =
                     Boolean.(should_pay_to_create &&& Boolean.not token_default)
@@ -2808,7 +2808,7 @@ module Base = struct
                     Boolean.(token_should_not_create &&& is_user_command)
                   in
                   let%bind () =
-                    [%with_label
+                    [%with_label_
                       "Check that account creation is paid in the default \
                        token for non-user-commands"]
                       ((* This expands to
@@ -2823,7 +2823,7 @@ module Base = struct
                        Boolean.Assert.( = ) token_should_not_create
                          token_cannot_create )
                   in
-                  [%with_label "equal token_cannot_create"]
+                  [%with_label_ "equal token_cannot_create"]
                     (Boolean.Assert.( = ) token_cannot_create
                        user_command_failure.token_cannot_create ) )
              in
@@ -2848,7 +2848,7 @@ module Base = struct
                      account_creation_fee
                  in
                  let%bind () =
-                   [%with_label
+                   [%with_label_
                      "Receiver creation fee failure matches predicted"]
                      (Boolean.Assert.( = ) underflow
                         user_command_failure.amount_insufficient_to_create )
@@ -2877,7 +2877,7 @@ module Base = struct
                    receiver_amount
                in
                let%bind () =
-                 [%with_label "Overflow error only occurs in user commands"]
+                 [%with_label_ "Overflow error only occurs in user commands"]
                    Boolean.(Assert.any [ is_user_command; not overflow ])
                in
                receiver_overflow := overflow ;
@@ -2885,7 +2885,7 @@ module Base = struct
                  ~else_:balance
              in
              let%bind () =
-               [%with_label "Burned tokens in receiver"]
+               [%with_label_ "Burned tokens in receiver"]
                  (let%map amt =
                     add_burned_tokens !burned_tokens receiver_increase
                       ~is_coinbase_or_fee_transfer
@@ -2954,7 +2954,7 @@ module Base = struct
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
-      [%with_label "Update source"]
+      [%with_label_ "Update source"]
         (Frozen_ledger_hash.modify_account_send
            ~depth:constraint_constants.ledger_depth
            ~is_writeable:
@@ -2970,12 +2970,12 @@ module Base = struct
                 - the second receiver for a fee transfer
              *)
              let%bind () =
-               [%with_label "Check source presence failure matches predicted"]
+               [%with_label_ "Check source presence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_and_writeable
                     user_command_failure.source_not_present )
              in
              let%bind () =
-               [%with_label
+               [%with_label_
                  "Check source failure cases do not apply when fee-payer is \
                   source"]
                  (let num_failures =
@@ -2993,7 +2993,7 @@ module Base = struct
                      else
                        num_failures = num_failures
                   *)
-                  [%with_label "Check num_failures"]
+                  [%with_label_ "Check num_failures"]
                     (assert_r1cs not_fee_payer_is_source num_failures
                        num_failures ) )
              in
@@ -3036,16 +3036,16 @@ module Base = struct
              in
              let txn_global_slot = current_global_slot in
              let%bind timing =
-               [%with_label "Check source timing"]
+               [%with_label_ "Check source timing"]
                  (let balance_check ok =
-                    [%with_label
+                    [%with_label_
                       "Check source balance failure matches predicted"]
                       (Boolean.Assert.( = ) ok
                          (Boolean.not
                             user_command_failure.source_insufficient_balance ) )
                   in
                   let timed_balance_check ok =
-                    [%with_label
+                    [%with_label_
                       "Check source timed balance failure matches predicted"]
                       (let%bind not_ok =
                          Boolean.(
@@ -3071,7 +3071,7 @@ module Base = struct
                (* TODO: Remove the redundancy in balance calculation between
                   here and [check_timing].
                *)
-               [%with_label "Check source balance failure matches predicted"]
+               [%with_label_ "Check source balance failure matches predicted"]
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance )
              in
@@ -3126,7 +3126,7 @@ module Base = struct
            in
            let%bind () =
              (* TODO: Reject this in txn pool before fees-in-tokens. *)
-             [%with_label "Fee excess does not overflow"]
+             [%with_label_ "Fee excess does not overflow"]
                Boolean.(
                  Assert.any
                    [ not is_fee_transfer; not fee_transfer_excess_overflowed ])
@@ -3135,7 +3135,7 @@ module Base = struct
              ~else_:user_command_excess )
     in
     let%bind supply_increase =
-      [%with_label "Calculate supply increase"]
+      [%with_label_ "Calculate supply increase"]
         (let%bind expected_supply_increase =
            Amount.Signed.Checked.if_ is_coinbase
              ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
@@ -3189,7 +3189,7 @@ module Base = struct
         supply_increase : Amount.Signed.t
         pc: Pending_coinbase_stack_state.t
   *)
-  let%snarkydef main ~constraint_constants
+  let%snarkydef_ main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
     let%bind () = dummy_constraints () in
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
@@ -3235,18 +3235,18 @@ module Base = struct
       }
     in
     let%bind () =
-      [%with_label "local state check"]
+      [%with_label_ "local state check"]
         (make_checked (fun () ->
              Local_state.Checked.assert_equal statement.source.local_state
                statement.target.local_state ) )
     in
     Checked.all_unit
-      [ [%with_label "equal roots"]
+      [ [%with_label_ "equal roots"]
           (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
-      ; [%with_label "equal supply_increases"]
+      ; [%with_label_ "equal supply_increases"]
           (Currency.Amount.Signed.Checked.assert_equal supply_increase
              statement.supply_increase )
-      ; [%with_label "equal fee excesses"]
+      ; [%with_label_ "equal fee excesses"]
           (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
       ]
 
@@ -3321,7 +3321,7 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
      verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
-  let%snarkydef main (s : Statement.With_sok.Checked.t) =
+  let%snarkydef_ main (s : Statement.With_sok.Checked.t) =
     let%bind s1, s2 =
       exists
         Typ.(Statement.With_sok.typ * Statement.With_sok.typ)
@@ -3355,16 +3355,16 @@ module Merge = struct
     in
     let%map () =
       Checked.all_unit
-        [ [%with_label "equal fee excesses"]
+        [ [%with_label_ "equal fee excesses"]
             (Fee_excess.assert_equal_checked fee_excess s.fee_excess)
-        ; [%with_label "equal supply increases"]
+        ; [%with_label_ "equal supply increases"]
             (Amount.Signed.Checked.assert_equal supply_increase
                s.supply_increase )
-        ; [%with_label "equal source ledger hashes"]
+        ; [%with_label_ "equal source ledger hashes"]
             (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
-        ; [%with_label "equal target, source ledger hashes"]
+        ; [%with_label_ "equal target, source ledger hashes"]
             (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
-        ; [%with_label "equal target ledger hashes"]
+        ; [%with_label_ "equal target ledger hashes"]
             (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
         ]
     in
@@ -3567,7 +3567,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ]
+  generate_auxiliary_input ~input_typ:Statement.With_sok.typ
     ~return_typ:(Snarky_backendless.Typ.unit ())
     main statement
 
@@ -3611,14 +3611,14 @@ let constraint_system_digests ~constraint_constants () =
   [ ( "transaction-merge"
     , digest
         Merge.(
-          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+          Tick.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
               let open Tick in
               Checked.map ~f:ignore @@ main x )) )
   ; ( "transaction-base"
     , digest
         Base.(
-          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+          Tick.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (main ~constraint_constants)) )
   ]

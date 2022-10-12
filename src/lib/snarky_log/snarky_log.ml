@@ -46,9 +46,8 @@ let () = Snarky_log.to_file "output.json" @@
   Constraints.log_func ~input:Data_spec.[Field.typ; Field.typ] Field.Checked.mul
     ~apply_args:(fun mul -> mul Field.one Field.one)
     }] *)
-  let log_func ~(input : ('r_value, 'r_value, 'k_var, 'k_value) Data_spec.t)
-      ~return_typ ~(apply_args : 'k_value -> _ Checked.t) (f : 'k_var) : events
-      =
-    let f' = conv (fun c -> c) input return_typ f in
+  let log_func ~input_typ ~return_typ ~(apply_args : 'k_value -> _ Checked.t)
+      (f : 'k_var) : events =
+    let f' = conv (fun c -> c) input_typ return_typ f in
     log (apply_args f')
 end

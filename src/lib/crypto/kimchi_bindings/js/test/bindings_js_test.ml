@@ -632,21 +632,21 @@ let _ =
            let _ = go 1000 x in
            ()
          in
-         let input = Data_spec.[ Typ.field ] in
-         let _pk =
+         let () =
            time "generate_keypair" (fun () ->
-               constraint_system ~return_typ:Typ.unit ~exposing:input main
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
-         let pk =
+         let () =
            time "generate_keypair2" (fun () ->
-               constraint_system ~return_typ:Typ.unit ~exposing:input main
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let pi =
+         let (_ : Backend.Proof.t) =
            time "generate witness conv" (fun () ->
-               Impl.generate_witness_conv input main
+               Impl.generate_witness_conv ~input_typ:Typ.field
+                 ~return_typ:Typ.unit main
                  ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } () ->
                    time "create proof" (fun () ->
                        Backend.Proof.create pk ~auxiliary:auxiliary_inputs

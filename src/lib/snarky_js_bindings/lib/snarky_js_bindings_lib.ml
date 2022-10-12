@@ -1454,9 +1454,9 @@ module Circuit = struct
     Typ.array ~length:typ##sizeInFields Field.typ
 
   let witness_minimal (type a) (typ : a as_field_elements_minimal Js.t)
-      (f : (unit -> a) Js.callback) =
+      (f : (unit -> field_class Js.t Js.js_array Js.t) Js.callback) =
     Impl.exists (typ_minimal typ) ~compute:(fun () ->
-        typ##toFields (Js.Unsafe.fun_call f [||])
+        Js.Unsafe.fun_call f [||]
         |> Js.to_array
         |> Array.map ~f:of_js_field_unchecked )
     |> Array.map ~f:to_js_field |> Js.array
@@ -1477,23 +1477,22 @@ module Circuit = struct
       in
       Js.Unsafe.(fun_call c##.snarkyMain [| inject w; inject public |])
     in
-    (main, Impl.Data_spec.[ typ_ c##.snarkyPublicTyp ])
+    (main, typ_ c##.snarkyPublicTyp)
 
   let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
       keypair_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let cs =
-      Impl.constraint_system ~exposing:spec
-        ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
+      Impl.constraint_system ~input_typ ~return_typ:Snark_params.Tick.Typ.unit
+        (fun x -> main x)
     in
     let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
 
   let constraint_system (main : unit -> unit) =
     let cs =
-      Impl.constraint_system
-        ~exposing:Impl.Data_spec.[]
-        ~return_typ:Snark_params.Tick.Typ.unit main
+      Impl.constraint_system ~input_typ:Impl.Typ.unit
+        ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
     let rows = List.length cs.rows_rev in
     let digest =
@@ -1519,14 +1518,14 @@ module Circuit = struct
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
       Impl.generate_witness_conv ~return_typ:Snark_params.Tick.Typ.unit
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } () ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs )
-        spec (main ~w:priv) pub
+        ~input_typ (main ~w:priv) pub
     in
     new%js proof_constr p
 
@@ -2298,6 +2297,11 @@ let verify (public_input : public_input_js) (proof : proof)
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
   |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
+let dummy_base64_proof () =
+  let n2 = Pickles_types.Nat.N2.n in
+  let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+  Proof2.to_base64 proof |> Js.string
+
 let pickles =
   object%js
     val compile = pickles_compile
@@ -2305,6 +2309,8 @@ let pickles =
     val circuitDigest = pickles_digest
 
     val verify = verify
+
+    val dummyBase64Proof = dummy_base64_proof
 
     val proofToBase64 = proof_to_base64
 
