@@ -614,6 +614,7 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   | Persisted_frontier_loaded, Persisted_frontier_loaded ->
       h e
   | _ ->
-      failwith "TODO: better error message :)"
+      failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
+        ()
 
 (* TODO: tests on sexp and dispatch (etc) against all_event_types *)
