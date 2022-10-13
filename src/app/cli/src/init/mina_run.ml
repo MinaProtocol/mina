@@ -404,6 +404,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Send_zkapp_command.rpc (fun () p ->
+          Deferred.map
+            ( Mina_commands.setup_and_submit_snapp_command coda p
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ]
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =

@@ -46,6 +46,7 @@ val gen_zkapp_command_from :
      ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
+  -> ?create_new_accounts:bool
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
@@ -72,3 +73,14 @@ val gen_list_of_zkapp_command_from :
   -> ?length:int
   -> unit
   -> Zkapp_command.t list Quickcheck.Generator.t
+
+val gen_zkapp_commands_with_limited_keys :
+     keymap:Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
+  -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> ledger:Mina_ledger.Ledger.t
+  -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
+  -> ?num_account_updates:int
+  -> fee_payer_keypair:Signature_lib.Keypair.t
+  -> unit
+  -> Zkapp_command.t Quickcheck.Generator.t
