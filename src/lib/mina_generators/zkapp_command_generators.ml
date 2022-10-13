@@ -1319,6 +1319,10 @@ let gen_zkapp_command_from' ?failure
               (tag, None)
         in
         let zkapp_account =
+          (*if zkapp accounts are supplied then we want to generate only zkapp updates otherwise generate non-zkapp updates as well*)
+          (not
+             (List.is_empty (Option.value ~default:[] limited_zkapp_accounts)) )
+          ||
           match permissions_auth with
           | Proof ->
               true
