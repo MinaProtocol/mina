@@ -1,4 +1,5 @@
-open Core_kernel
+module Array = Core_kernel.Array
+module Int = Core_kernel.Int
 
 module type Field = sig
   include Sponge.Intf.Field
@@ -20,7 +21,7 @@ module Make
       end
     end) =
 struct
-  include Make_sponge.Rounds
+  let rounds_full = Make_sponge.Rounds.rounds_full
 
   let round_table start =
     let ({ round_constants; mds } : _ Sponge.Params.t) = B.params in
@@ -39,11 +40,8 @@ struct
     done ;
     res
 
-  open Impl
-  open Field
-  module Field = Field
-
   let block_cipher (params : _ Sponge.Params.t) init =
+    let open Impl in
     Impl.with_label __LOC__ (fun () ->
         let t =
           exists
@@ -55,7 +53,7 @@ struct
         in
         t.(0) <- init ;
         (let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
-        with_label __LOC__ (fun () ->
+        Impl.with_label __LOC__ (fun () ->
             Impl.assert_
               { basic = T (Poseidon { state = t })
               ; annotation = Some "plonk-poseidon"
@@ -63,7 +61,9 @@ struct
         t.(Int.(Array.length t - 1)) )
 
   let add_assign ~state i x =
-    state.(i) <- Util.seal (module Impl) (state.(i) + x)
+    state.(i) <- Util.seal (module Impl) Impl.Field.(state.(i) + x)
 
   let copy = Array.copy
+
+  module Field = Impl.Field
 end
