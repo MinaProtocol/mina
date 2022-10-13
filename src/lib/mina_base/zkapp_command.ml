@@ -944,6 +944,8 @@ module Digest = Call_forest.Digest
 module T = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@with_top_version_tag]
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -957,10 +959,6 @@ module T = struct
       [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
       let to_latest = Fn.id
-
-      let version_byte = Base58_check.Version_bytes.zkapp_command
-
-      let description = "Zkapp_command"
 
       module Wire = struct
         [%%versioned
@@ -1530,12 +1528,10 @@ struct
     create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end
 
-include Codable.Make_base58_check (Stable.Latest)
-
-(* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-include Codable.Make_base64 (Stable.Latest)
+(* so transaction ids have a version tag *)
+include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
 type account_updates =
   (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
