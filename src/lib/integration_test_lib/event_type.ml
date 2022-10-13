@@ -607,9 +607,11 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Block_gossip, Block_gossip ->
       h e
+  | Snark_work_gossip, Snark_work_gossip ->
+      h e
   | Transactions_gossip, Transactions_gossip ->
       h e
-  | Snark_work_gossip, Snark_work_gossip ->
+  | Snark_work_failed, Snark_work_failed ->
       h e
   | Persisted_frontier_loaded, Persisted_frontier_loaded ->
       h e
