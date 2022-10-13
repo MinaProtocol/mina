@@ -1,0 +1,27 @@
+(library
+ (name graphql_test)
+ (wrapped false)
+ (modules
+  echo_schema
+  schema_test
+  test_common
+  test_schema
+  variable_test
+  argument_test
+  introspection_test
+  error_test
+  custom_error_test
+  abstract_test
+  directives_test)
+ (libraries
+  graphql
+  yojson
+  graphql_wrapper
+  ppx_inline_test.config
+  core
+  graphql_parser)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_inline_test ppx_assert ppx_version)))
