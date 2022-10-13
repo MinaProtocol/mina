@@ -75,7 +75,9 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match%map.Async.Deferred k () with
+            match%map.Async.Deferred
+              Monitor.try_with_join_or_error ~here:[%here] k
+            with
             | Error e ->
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
