@@ -3885,7 +3885,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           }
         in
         let fee_excess =
-          (*capture only the difference in the fee excess*)
+          (* capture only the difference in the fee excess *)
           let fee_excess =
             match
               Amount.Signed.(
@@ -3906,6 +3906,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           ; fee_excess_r = Fee.Signed.zero
           }
         in
+        let supply_increase = target_global.supply_increase in
         let call_stack_hash s =
           List.hd s
           |> Option.value_map ~default:Call_stack_digest.empty
@@ -3942,7 +3943,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   ; ledger = Sparse_ledger.merkle_root target_local.ledger
                   }
               }
-          ; supply_increase = Amount.Signed.zero
+          ; supply_increase
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default
           }
