@@ -18,12 +18,20 @@ module Cmd = struct
       (let open Command.Let_syntax in
        let%map conf = parse_conf in
        Rosetta.call_and_display ~conf (module Network.Status))
+
+  let options =
+    Async.Command.async
+      ~summary:"Get network's options."
+      (let open Command.Let_syntax in
+       let%map conf = parse_conf in
+       Rosetta.call_and_display ~conf (module Network.Options))
 end
 
 
 let command =
   Async.Command.group
     ~summary:"Rosetta API client."
-    [ ("status", Cmd.status) ]
+    [ ("status", Cmd.status)
+    ; ("options", Cmd.options) ]
 
 let () = Command.run command

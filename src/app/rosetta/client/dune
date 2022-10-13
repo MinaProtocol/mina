@@ -9,6 +9,7 @@
             core_kernel
             cohttp
             cohttp-async
+            integers
             mina_base
             mina_numbers
             mina_state

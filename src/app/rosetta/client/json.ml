@@ -9,6 +9,7 @@ module Error = struct
          | Missing_key of string * Yojson.t
          | Missing_index of int * Yojson.t
          | Excessive_keys of string list * Yojson.t
+         | Unrecognised_variant of string list * Yojson.t
          | Core_error of Error.t * Yojson.t
          | Exn of exn * Yojson.t
 
@@ -26,6 +27,10 @@ module Error = struct
        Printf.sprintf "Object posesses excess keys: %s (%s)."
          (String.concat ~sep:", " ks)
          (Yojson.to_string json)
+    | Unrecognised_variant (variants, json) ->
+       Printf.sprintf "Unknown variant: %s (available options: %s)"
+         (Yojson.to_string json)
+         (String.concat ~sep:", " variants)
     | Core_error (e, json) ->
        Printf.sprintf "Core error: %s (%s.)" (Error.to_string_hum e) (Yojson.to_string json)
     | Exn (e, json) ->
@@ -42,6 +47,10 @@ module Error = struct
                (Printf.sprintf "Index %d out of array's bounds." index, json)
             | Excessive_keys (ks, json) ->
                (Printf.sprintf "Excess keys in object: %s." (String.concat ~sep:", " ks), json)
+            | Unrecognised_variant (variants, json) ->
+               (Printf.sprintf "Unknown variant; available options: %s."
+                  (String.concat ~sep:", " variants),
+                json)
             | Core_error (e, json) ->
                (Printf.sprintf "Core error: %s" (Error.to_string_hum e), json)
             | Exn (e, json) ->
@@ -67,6 +76,12 @@ module Validation = struct
          map (y :: acc) xs
     in
     map [] l
+
+  let (>>=?) m f =
+    let open Let_syntax in
+    match%bind m with
+    | None -> return None
+    | Some j -> f j >>| Option.some
 end
 
 type 'a validation = ('a, Error.t list) Result.t
@@ -83,6 +98,10 @@ module Expect = struct
         | Unexpected_json (exp, json) ->
            Unexpected_json (exp ^ " option", json)
         | e -> e)
+
+  let bool = function
+    | `Bool b -> V.return b
+    | #Yojson.t as j -> unexpected j "boolean"
   
   let int = function
     | `Int i -> V.return i
@@ -123,6 +142,12 @@ module Expect = struct
     | `Assoc kvs -> V.return kvs
     | #Yojson.t as j -> unexpected j "object"
 
+  let enum ~variants json =
+    let open V.Let_syntax in
+    let%bind repr = string json in
+    List.Assoc.find variants ~equal:String.equal repr
+    |> Result.of_option ~error:[Error.Unrecognised_variant (List.map ~f:fst variants, json)]
+
   let option expect = function
     | `Null -> V.return None
     | #Yojson.t as j ->
@@ -131,11 +156,14 @@ module Expect = struct
        |> Result.map ~f:Option.some
 end
 
-let get key json =
+let get_opt key json =
   let open Validation.Let_syntax in
-  let%bind kvs = Expect.obj json in
+  let%map kvs = Expect.obj json in
   List.Assoc.find ~equal:String.equal kvs key
-  |> Result.of_option ~error:[Error.Missing_key (key, json)]
+
+let get key json =
+  let open Validation in
+  get_opt key json >>= Result.of_option ~error:[Error.Missing_key (key, json)]
 
 let index i json =
   let open Validation.Let_syntax in
@@ -154,3 +182,36 @@ let assert_no_excess_keys ~keys json =
   else
     let l = Keyset.fold List.cons excess [] in
     Validation.fail @@ Error.Excessive_keys (l, json)
+
+(* For Yojson derivers. *)
+module UInt = struct
+  open Unsigned
+  
+  type t = UInt.t
+
+  let of_yojson : [< Yojson.Safe.t ] -> (t, string) Ppx_deriving_yojson_runtime.Result.result = function
+    | `Int i -> Ok (UInt.of_int i)
+    | `Intlit s as j ->
+       (try Ok (UInt.of_string s) with
+       | _ -> Error (Printf.sprintf "Invalid uint: %s" (Yojson.Safe.to_string j)))
+    | #Yojson.Safe.t as j ->
+       Error (Printf.sprintf "Invalid uint: %s" (Yojson.Safe.to_string j))
+
+  let to_yojson i = `Intlit (UInt.to_string i)
+end
+
+module UInt64 = struct
+  open Unsigned
+  
+  type t = UInt64.t
+
+  let of_yojson : [< Yojson.Safe.t ] -> (t, string) Ppx_deriving_yojson_runtime.Result.result = function
+    | `Int i -> Ok (UInt64.of_int i)
+    | `Intlit s as j ->
+       (try Ok (UInt64.of_string s) with
+       | _ -> Error (Printf.sprintf "Invalid uint64: %s" (Yojson.Safe.to_string j)))
+    | #Yojson.Safe.t as j ->
+       Error (Printf.sprintf "Invalid uint64: %s" (Yojson.Safe.to_string j))
+
+  let to_yojson i = `Intlit (UInt64.to_string i)
+end
