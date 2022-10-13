@@ -84,7 +84,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
+        let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false);
 
         VerifierIndex::<Pallas> {
             domain,
@@ -113,6 +113,9 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             chacha_comm,
 
             range_check_comm: None,
+            foreign_field_add_comm: None,
+
+            foreign_field_modulus: None,
 
             shift,
             zkpm: {
