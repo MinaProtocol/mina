@@ -1106,6 +1106,9 @@ let gen_zkapp_command_from' ?failure
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
+  let has_limited_accounts =
+    not (List.is_empty (Option.value ~default:[] limited_zkapp_accounts))
+  in
   (* make sure all ledger keys are in the keymap *)
   List.iter ledger_accounts ~f:(fun acct ->
       let acct_id = Account.identifier acct in
@@ -1117,7 +1120,10 @@ let gen_zkapp_command_from' ?failure
             else (acct, `Ordinary_participant)
         | Some a ->
             a ) ;
-      if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
+      if
+        (not has_limited_accounts)
+        && Option.is_none
+             (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf
           "gen_zkapp_command_from: public key %s is in ledger, but not keymap"

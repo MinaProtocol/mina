@@ -405,6 +405,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
     ; implement Daemon_rpcs.Send_zkapp_command.rpc (fun () p ->
+          Core.printf !"Sending zkapp command\n%!" ;
           Deferred.map
             ( Mina_commands.setup_and_submit_snapp_command coda p
             |> Participating_state.to_deferred_or_error )
