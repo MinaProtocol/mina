@@ -25,6 +25,60 @@ module type CONTEXT = sig
 
   val check_body_in_storage :
     Consensus.Body_reference.t -> Staged_ledger_diff.Body.t option
+
+  val building_breadcrumb_timeout : Core_kernel.Time.Span.t
+
+  val ancestry_verification_timeout : Core_kernel.Time.Span.t
+
+  val transaction_snark_verification_timeout : Core_kernel.Time.Span.t
+
+  val bitwap_download_timeout : Core_kernel.Time.Span.t
+
+  val peer_download_timeout : Core_kernel.Time.Span.t
+
+  val ancestry_download_timeout : Core_kernel.Time.Span.t
+
+  val download_body :
+       header:Mina_block.Validation.initial_valid_with_header
+    -> (module Interruptible.F)
+    -> Mina_block.Body.t Or_error.t Interruptible.t
+
+  val build_breadcrumb :
+       received_at:Time.t
+    -> sender:Network_peer.Envelope.Sender.t
+    -> parent:Frontier_base.Breadcrumb.t
+    -> transition:Mina_block.Validation.almost_valid_with_block
+    -> (module Interruptible.F)
+    -> ( Frontier_base.Breadcrumb.t
+       , [> `Invalid_staged_ledger_diff of Error.t
+         | `Invalid_staged_ledger_hash of Error.t
+         | `Fatal_error of exn ] )
+       Result.t
+       Interruptible.t
+
+  (** Retrieve ancestors of target hash. Function returns a list of elements,
+      each either header or block. List is sorted in parent-first order.
+
+      Resulting list forms a chain of consequent headers/blocks with the last element
+      corresponding to the target hash.
+
+      Element [`Meta] is expected only if corresponding transition is already in transition states
+      or frontier.
+        *)
+  val retrieve_chain :
+       some_ancestors:State_hash.t list
+    -> target:State_hash.t
+    -> parent_cache:State_hash.t State_hash.Table.t
+    -> sender:Network_peer.Envelope.Sender.t
+    -> lookup_transition:(State_hash.t -> [ `Present | `Not_present | `Invalid ])
+    -> (module Interruptible.F)
+    -> ( [ `Header of Mina_block.Header.t
+         | `Block of Mina_block.t
+         | `Meta of Substate.transition_meta ]
+       * Network_peer.Envelope.Sender.t )
+       list
+       Or_error.t
+       Interruptible.t
 end
 
 let genesis_state_hash (module Context : CONTEXT) =
@@ -39,9 +93,13 @@ let state_functions =
 
 type catchup_state =
   { transition_states : Transition_state.t State_hash.Table.t
-        (* Map from parent to list of children for children whose parent
-           is not in the transition states *)
   ; orphans : State_hash.t list State_hash.Table.t
+        (** Map from transition's state hash to list of its children for transitions
+    that are not in the transition states *)
+  ; parents : State_hash.t State_hash.Table.t
+        (** Map from transition's state_hash to parent for transitions that are not in transition states.
+    This map is like a cache for old methods of getting transition chain.
+  *)
   }
 
 let state_hash_of_header_with_validation hv =

@@ -50,13 +50,18 @@ let view_ ~(modify_substate : ('a, 'b) modify_substate_t) ~f =
   Fn.compose (Option.map ~f:snd)
     (modify_substate ~f:{ modifier = (fun st -> (st, f.viewer st)) })
 
+type transition_meta =
+  { state_hash : State_hash.t
+  ; blockchain_length : Mina_numbers.Length.t
+  ; parent_state_hash : State_hash.t
+  }
+
 module type State_functions = sig
   type state_t
 
   val modify_substate : ('a, state_t) modify_substate_t
 
-  val header_with_hash :
-    state_t -> Mina_block.Header.t State_hash.With_state_hashes.t
+  val transition_meta : state_t -> transition_meta
 
   val equal_state_levels : state_t -> state_t -> bool
 end
@@ -87,11 +92,7 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     else view ~state_functions ~f:predicate state
   in
   let rec loop state =
-    let hh = header_with_hash state in
-    let parent_hash =
-      With_hash.data hh |> Mina_block.Header.protocol_state
-      |> Mina_state.Protocol_state.previous_state_hash
-    in
+    let parent_hash = (transition_meta state).parent_state_hash in
     Option.value_map ~default:[]
       ~f:(fun parent_state ->
         if equal_state_levels parent_state state then
@@ -126,15 +127,6 @@ let collect_dependent_ancestry ~state_functions ~transition_states top_state =
   collect_states ~predicate:{ viewer } ~state_functions ~transition_states
     top_state
 
-(** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
-  while collected states are:
-  
-    1. In [Failed] substate
-    and
-    2. Have same state level as [top_state]
-
-    Returned list of states is in the parent-first order.
-*)
 let mark_processed_sm ~is_recursive_call subst =
   let reshape res =
     match res with
@@ -170,19 +162,10 @@ let mark_processed_sm ~is_recursive_call subst =
   | Processed _ ->
       Result.Error "already processed"
 
-let parent_hash (type state_t)
+let is_to_continue_mark_processed_recursion (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
-    state =
-  let hh = F.header_with_hash state in
-  With_hash.data hh |> Mina_block.Header.protocol_state
-  |> Mina_state.Protocol_state.previous_state_hash
-
-let is_to_continue_mark_processed_recursion (type state_t) ~state_functions
     ~transition_states state =
-  let parent_hash = parent_hash ~state_functions state in
-  let (module F : State_functions with type state_t = state_t) =
-    state_functions
-  in
+  let parent_hash = (F.transition_meta state).parent_state_hash in
   Option.value_map
     (State_hash.Table.find transition_states parent_hash)
     ~f:
@@ -194,11 +177,9 @@ let is_to_continue_mark_processed_recursion (type state_t) ~state_functions
          in frontier nor in transition_state. *)
       true
 
-let promote_waiting_for_parent (type state_t) ~state_functions ~logger
-    ~transition_states state_hash =
-  let (module F : State_functions with type state_t = state_t) =
-    state_functions
-  in
+let promote_waiting_for_parent (type state_t)
+    ~state_functions:(module F : State_functions with type state_t = state_t)
+    ~logger ~transition_states state_hash =
   let modifier subst =
     match subst.status with
     | Waiting_for_parent mk_status ->
@@ -230,7 +211,7 @@ let promote_waiting_for_parent (type state_t) ~state_functions ~logger
       match F.modify_substate ~f:{ modifier } state with
       | Some (data, true) ->
           State_hash.Table.set transition_states ~key:state_hash ~data ;
-          let parent_hash = parent_hash ~state_functions state in
+          let parent_hash = (F.transition_meta state).parent_state_hash in
           State_hash.Table.change transition_states parent_hash
             ~f:(Option.bind ~f:update_children)
       | _ ->
@@ -265,7 +246,7 @@ let update_children_on_processed (type state_t) ~transition_states ~parent_hash
    
   Pre-conditions:
    1. Order of [processed] respects parent-child relationship and parent always comes first
-   2. Respective substates for states from [processed] are in [Processing] status, having the actions determined
+   2. Respective substates for states from [processed] are in [Processing (Done _)] status
 
   Post-condition: list returned respects parent-child relationship and parent always comes first *)
 let mark_processed (type state_t) ~logger ~state_functions ~transition_states
@@ -290,10 +271,9 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
       Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
       let%map children = Result.ok res in
       State_hash.Table.set transition_states ~key:hash ~data:state' ;
-      let parent_hash = parent_hash ~state_functions state in
+      let parent_hash = (F.transition_meta state).parent_state_hash in
       update_children_on_processed ~transition_states ~state_functions
-        ~parent_hash
-        (F.header_with_hash state |> State_hash.With_state_hashes.state_hash) ;
+        ~parent_hash (F.transition_meta state).state_hash ;
       State_hash.Set.iter children.waiting_for_parent
         ~f:
           (promote_waiting_for_parent ~state_functions ~logger
@@ -373,6 +353,15 @@ let view_processing ~state_functions =
          }
 
 module For_tests = struct
+  (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
+  while collected states are:
+  
+    1. In [Failed] substate
+    and
+    2. Have same state level as [top_state]
+
+    Returned list of states is in the parent-first order.
+*)
   let collect_failed_ancestry ~state_functions ~transition_states top_state =
     let viewer s =
       match (s.status, s.received_via_gossip) with

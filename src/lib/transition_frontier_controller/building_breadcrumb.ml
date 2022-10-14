@@ -2,8 +2,6 @@ open Core_kernel
 open Context
 open Mina_base
 
-let building_breadcrumb_timeout = Time.Span.of_min 2.
-
 (** [validate_frontier_dependencies] converts [Mina_block.Validation.initial_valid_with_block]
     to [Mina_block.Validation.almost_valid_with_block].
   
@@ -21,18 +19,17 @@ let validate_frontier_dependencies ~transition_states
     let consensus_constants = Context.consensus_constants
   end in
   let is_block_in_frontier state_hash =
+    let f = function
+      | Transition_state.Building_breadcrumb
+          { substate = { status = Processed _; _ }; _ }
+      | Waiting_to_be_added_to_frontier _ ->
+          true
+      | _ ->
+          false
+    in
     Option.is_some (Transition_frontier.find Context.frontier state_hash)
-    || Option.value ~default:false
-         (let%map.Option state =
-            State_hash.Table.find transition_states state_hash
-          in
-          match state with
-          | Transition_state.Building_breadcrumb
-              { substate = { status = Processed _; _ }; _ }
-          | Waiting_to_be_added_to_frontier _ ->
-              true
-          | _ ->
-              false )
+    || Option.value_map ~default:false ~f
+         (State_hash.Table.find transition_states state_hash)
   in
   Mina_block.Validation.validate_frontier_dependencies
     ~to_header:Mina_block.header
@@ -117,18 +114,15 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
     let open Context in
     let module I = Interruptible.Make () in
     let action =
-      I.lift
-        (Frontier_base.Breadcrumb.build ~skip_staged_ledger_verification:`Proofs
-           ~logger ~precomputed_values ~verifier ~trust_system ~parent
-           ~transition ~sender:(Some sender)
-           ~transition_receipt_time:(Some received_at) () )
+      Context.build_breadcrumb ~received_at ~sender ~parent ~transition
+        (module I)
     in
     Async_kernel.Deferred.upon (I.force action)
       (upon_f ~transition_states ~state_hash ~mark_processed_and_promote
          ~timeout_controller ) ;
     Substate.In_progress
       { interrupt_ivar = I.interrupt_ivar
-      ; timeout = Time.(add @@ now ()) building_breadcrumb_timeout
+      ; timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout
       }
   in
   match impl with

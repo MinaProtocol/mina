@@ -47,4 +47,5 @@
    transaction_snark_work
    one_or_two
    mina_base.import
+   mina_numbers
 ))
