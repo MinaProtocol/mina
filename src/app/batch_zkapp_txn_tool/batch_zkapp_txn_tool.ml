@@ -8,16 +8,14 @@ type query =
   ; transaction_count : int
   ; max_parties_count : int option
   ; fee_payer_keypair : Signature_lib.Keypair.t
+  ; account_creator_keypair : Signature_lib.Keypair.t
   ; account_states : (Account_id.Stable.Latest.t * Account.t) list
   }
-
-(*let deploy_test_zkapps kps ~fee_payer_keypair ~ledger =
-  let fee_payer_nonce =
-  List.iter *)
 
 let get_ledger (constraint_constants : Genesis_constants.Constraint_constants.t)
     ~port =
   let open Deferred.Let_syntax in
+  Core.printf !"Getting ledger from the daemon\n%!" ;
   let%map ledger_accounts =
     match%map
       Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc None port
@@ -50,13 +48,25 @@ let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
   in
   account_of_id id ledger
 
+let is_zkapp_deployed kp ledger =
+  match
+    Option.try_with (fun () ->
+        let account = account_of_kp kp ledger in
+        Option.is_some account.zkapp )
+  with
+  | Some true ->
+      true
+  | _ ->
+      false
+
 let all_zkapps_deployed ~ledger (keypairs : Signature_lib.Keypair.t list) =
-  List.map keypairs ~f:(fun kp ->
-      let account = account_of_kp kp ledger in
-      Option.is_some account.zkapp )
+  Core.printf
+    !"Checking if test zkapps are deployed in all the accounts passed\n%!" ;
+  List.map keypairs ~f:(fun kp -> is_zkapp_deployed kp ledger)
   |> List.for_all ~f:Fn.id
 
 let send_zkapp_command ~port txn ~success =
+  Core.printf !"Sending a zkapp transaction..\n%!" ;
   Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_zkapp_command.rpc
     txn port ~success
     ~error:(fun e ->
@@ -64,80 +74,101 @@ let send_zkapp_command ~port txn ~success =
     ~join_error:Or_error.join
 
 let deploy_test_zkapps ~ledger ~port
-    ~(fee_payer_keypair : Signature_lib.Keypair.t) ~constraint_constants
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~(account_creator_keypair : Signature_lib.Keypair.t) ~constraint_constants
     (keypairs : Signature_lib.Keypair.t list) =
+  Core.printf !"Deploying zkapps..\n%!" ;
   let fee_payer_id =
     Account_id.create
       (Signature_lib.Public_key.compress fee_payer_keypair.public_key)
       Token_id.default
   in
+  let account_creator_id =
+    Account_id.create
+      (Signature_lib.Public_key.compress account_creator_keypair.public_key)
+      Token_id.default
+  in
   let fee_payer_account = account_of_id fee_payer_id ledger in
-  let nonce = ref fee_payer_account.nonce in
+  let account_creator = account_of_id account_creator_id ledger in
+  Core.printf
+    !"fee payer account %s\n%!"
+    (Account.to_yojson fee_payer_account |> Yojson.Safe.to_string) ;
+  let fee_payer_nonce = ref fee_payer_account.nonce in
+  let account_creator_nonce = ref account_creator.nonce in
   Deferred.List.iter keypairs ~f:(fun kp ->
-      match
-        Option.try_with (fun () ->
-            let account = account_of_kp kp ledger in
-            Option.is_some account.zkapp )
-      with
-      | Some true ->
-          (*deploy zkapp*)
-          let spec =
-            { Transaction_snark.For_tests.Spec.sender =
-                (fee_payer_keypair, !nonce)
-            ; fee = Currency.Fee.of_formatted_string "1.0"
-            ; fee_payer = None
-            ; receivers = []
-            ; amount = Currency.Amount.of_formatted_string "2.0"
-            ; zkapp_account_keypairs = [ kp ]
-            ; memo = Signed_command_memo.empty
-            ; new_zkapp_account = true
-            ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
-            ; events = []
-            ; sequence_events = []
-            ; preconditions = None
-            }
-          in
-          let zkapp_command =
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
-          in
-          nonce := Account.Nonce.succ !nonce ;
+      if not (is_zkapp_deployed kp ledger) then (
+        (*deploy zkapp*)
+        let spec =
+          { Transaction_snark.For_tests.Spec.sender =
+              (account_creator_keypair, !account_creator_nonce)
+          ; fee = Currency.Fee.of_formatted_string "1.0"
+          ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
+          ; receivers = []
+          ; amount = Currency.Amount.of_formatted_string "2000.0"
+          ; zkapp_account_keypairs = [ kp ]
+          ; memo = Signed_command_memo.empty
+          ; new_zkapp_account = true
+          ; snapp_update = Account_update.Update.dummy
+          ; current_auth = Permissions.Auth_required.Signature
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; sequence_events = []
+          ; preconditions = None
+          }
+        in
+        let zkapp_command =
+          Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+        in
+
+        let%map () =
           send_zkapp_command ~port zkapp_command ~success:(fun _ ->
               sprintf
                 !"Successfully deployed zkapp with pk: \
                   %{sexp:Signature_lib.Public_key.Compressed.t}"
                 (Signature_lib.Public_key.compress kp.public_key) )
-      | _ ->
-          return
-            (Core.printf
-               !"Already deployed Zkapp with pk: \
-                 %{sexp:Signature_lib.Public_key.Compressed.t}. Skipping"
-               (Signature_lib.Public_key.compress kp.public_key) ) )
+        in
+        fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
+        account_creator_nonce := Account.Nonce.succ !account_creator_nonce )
+      else
+        return
+          (Core.printf
+             !"Already deployed Zkapp with pk: \
+               %{sexp:Signature_lib.Public_key.Compressed.t}. Skipping"
+             (Signature_lib.Public_key.compress kp.public_key) ) )
 
-let rec wait_until_zkapps_deployed ~ledger ~port
-    ~(fee_payer_keypair : Signature_lib.Keypair.t) ~constraint_constants
+let rec wait_until_zkapps_deployed ?(deployed = false) ~ledger ~port
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~(account_creator_keypair : Signature_lib.Keypair.t) ~constraint_constants
     (keypairs : Signature_lib.Keypair.t list) =
-  if all_zkapps_deployed ~ledger keypairs then return ()
+  if all_zkapps_deployed ~ledger keypairs then (
+    Core.printf !"zkapp deployed\n%!" ;
+    return () )
   else
     let%bind () =
-      deploy_test_zkapps ~ledger ~port ~fee_payer_keypair ~constraint_constants
-        keypairs
+      if not deployed then
+        let%map () =
+          deploy_test_zkapps ~ledger ~port ~fee_payer_keypair
+            ~account_creator_keypair ~constraint_constants keypairs
+        in
+        Core.printf "sent transactions to deploy zkapps\n%!"
+      else return ()
     in
+    Core.printf !"waiting for them to be included..\n%!" ;
     let%bind () =
       Async.after
         (Time.Span.of_ms
-           (Float.of_int (constraint_constants.block_window_duration_ms * 3)) )
+           (Float.of_int constraint_constants.block_window_duration_ms) )
     in
     let%bind ledger = get_ledger constraint_constants ~port in
-    wait_until_zkapps_deployed ~ledger ~port ~fee_payer_keypair
-      ~constraint_constants keypairs
+    wait_until_zkapps_deployed ~deployed:true ~ledger ~port ~fee_payer_keypair
+      ~account_creator_keypair ~constraint_constants keypairs
 
 let generate_random_zkapps ~ledger ~vk ~prover
     ({ zkapp_keypairs = kps
      ; transaction_count = num_of_parties
      ; max_parties_count = parties_size
      ; fee_payer_keypair
+     ; account_creator_keypair = _
      ; account_states
      } :
       query ) =
@@ -196,9 +227,18 @@ let batch_test_zkapps =
     let open Command.Let_syntax in
     let%map_open keypair_path = anon @@ ("keypair-path" %: string)
     and parties_size =
-      flag "--parties-size" ~aliases:[ "parties-size" ]
-        ~doc:"NUM maximum number of parties in 1 zkapp commands" (optional int)
-    and fee_payer_privkey_path = Cli_lib.Flag.privkey_read_path
+      flag "--num-account-updates" ~aliases:[ "num-account-updates" ]
+        ~doc:"NUM maximum number of account updates in a zkapp command"
+        (optional int)
+    and fee_payer_privkey_path =
+      flag "--fee-payer-privkey-path"
+        ~aliases:[ "fee-payer-privkey-path" ]
+        ~doc:"FILE File to read fee payer private key from" (required string)
+    and account_creator_privkey_path =
+      flag "--account-creator-privkey-path"
+        ~aliases:[ "account-creator-privkey-path" ]
+        ~doc:"FILE File to read zkapp account creator private key from"
+        (required string)
     and rate_limit =
       flag "--apply-rate-limit" ~aliases:[ "apply-rate-limit" ]
         ~doc:
@@ -225,11 +265,12 @@ let batch_test_zkapps =
       flag "--batch-size" ~aliases:[ "batch-size" ]
         ~doc:
           "NUM Number of transactions generated at once before sending \
-           (default: 10). Note: generating large parties transactions is slow"
+           (default: 10). Note: generating large zkapp transactions is slow"
         (optional_with_default 10 int)
-    and _port = Cli_lib.Flag.Host_and_port.Client.daemon in
+    in
     ( keypair_path
     , fee_payer_privkey_path
+    , account_creator_privkey_path
     , parties_size
     , rate_limit
     , rate_limit_level
@@ -246,6 +287,7 @@ let batch_test_zkapps =
             port
             ( keypair_path
             , fee_payer_privkey_path
+            , account_creator_privkey_path
             , parties_size
             , rate_limit
             , rate_limit_level
@@ -260,6 +302,10 @@ let batch_test_zkapps =
          let%bind fee_payer_keypair =
            Secrets.Keypair.Terminal_stdin.read_exn ~which:"Fee payer"
              fee_payer_privkey_path
+         in
+         let%bind account_creator_keypair =
+           Secrets.Keypair.Terminal_stdin.read_exn
+             ~which:"zkApp account creator" account_creator_privkey_path
          in
          let%bind keypair_files = Sys.readdir keypair_path >>| Array.to_list in
          let%bind keypairs =
@@ -288,7 +334,7 @@ let batch_test_zkapps =
          let%bind ledger = get_ledger constraint_constants ~port in
          let%bind () =
            wait_until_zkapps_deployed ~ledger ~port ~fee_payer_keypair
-             ~constraint_constants keypairs
+             ~account_creator_keypair ~constraint_constants keypairs
          in
          let%bind ledger = get_ledger constraint_constants ~port in
          let per_batch = batch_size in
@@ -318,13 +364,14 @@ let batch_test_zkapps =
            if !total_count >= num_txns then Deferred.unit
            else
              let batch = min per_batch (num_txns - !total_count + 1) in
-             Core.printf "Generating %d parties transactions\n%!" batch ;
+             Core.printf "Generating %d zkapp transactions\n%!" batch ;
              let%bind parties_list, account_states' =
                generate_random_zkapps ~ledger ~vk ~prover
                  { zkapp_keypairs = keypairs
                  ; transaction_count = batch
                  ; max_parties_count = parties_size
                  ; fee_payer_keypair
+                 ; account_creator_keypair
                  ; account_states
                  }
              in
