@@ -284,6 +284,10 @@ let skip_time_received_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   (t, Unsafe.set_valid_time_received validation)
 
+let skip_time_received_validation_header `This_block_was_not_received_via_gossip
+    (t, validation) =
+  (t, Unsafe.set_valid_time_received validation)
+
 let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   let state = t |> With_hash.data |> Header.protocol_state in
   if

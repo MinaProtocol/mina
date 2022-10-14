@@ -62,6 +62,25 @@ val validate_time_received :
      , [> `Invalid_time_received of [ `Too_early | `Too_late of int64 ] ] )
      Result.t
 
+val skip_time_received_validation_header :
+     [ `This_block_was_not_received_via_gossip ]
+  -> ( [ `Time_received ] * unit Truth.false_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( [ `Time_received ] * unit Truth.true_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+
 val skip_time_received_validation :
      [ `This_block_was_not_received_via_gossip ]
   -> ( [ `Time_received ] * unit Truth.false_t

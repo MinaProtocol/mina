@@ -60,7 +60,16 @@ type t =
       ; source : [ `Catchup | `Gossip | `Internal ]
       ; children : children_sets
       }
-  | Invalid of { header : Mina_block.Header.with_hash; error : Error.t }
+  | Invalid of { transition_meta : Substate.transition_meta; error : Error.t }
+
+let transition_meta_of_header_with_hash hh =
+  let h = With_hash.data hh in
+  { state_hash = State_hash.With_state_hashes.state_hash hh
+  ; parent_state_hash =
+      Mina_state.Protocol_state.previous_state_hash
+      @@ Mina_block.Header.protocol_state h
+  ; blockchain_length = Mina_block.Header.blockchain_length h
+  }
 
 module State_functions : Substate.State_functions with type state_t = t = struct
   type state_t = t
@@ -82,23 +91,29 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     | _ ->
         None
 
-  let header_with_hash st =
+  let transition_meta st =
     let of_block = With_hash.map ~f:Mina_block.header in
     match st with
     | Received { header; _ } ->
-        header_with_hash_of_received_header header
+        transition_meta_of_header_with_hash
+        @@ header_with_hash_of_received_header header
     | Verifying_blockchain_proof { header; _ } ->
-        header_with_hash_of_received_header header
+        transition_meta_of_header_with_hash
+        @@ header_with_hash_of_received_header header
     | Downloading_body { header; _ } ->
-        Mina_block.Validation.header_with_hash header
+        transition_meta_of_header_with_hash
+        @@ Mina_block.Validation.header_with_hash header
     | Verifying_complete_works { block; _ } ->
-        Mina_block.Validation.block_with_hash block |> of_block
+        transition_meta_of_header_with_hash @@ of_block
+        @@ Mina_block.Validation.block_with_hash block
     | Building_breadcrumb { block; _ } ->
-        Mina_block.Validation.block_with_hash block |> of_block
+        transition_meta_of_header_with_hash @@ of_block
+        @@ Mina_block.Validation.block_with_hash block
     | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
-        Frontier_base.Breadcrumb.block_with_hash breadcrumb |> of_block
-    | Invalid { header; _ } ->
-        header
+        transition_meta_of_header_with_hash @@ of_block
+        @@ Frontier_base.Breadcrumb.block_with_hash breadcrumb
+    | Invalid { transition_meta; _ } ->
+        transition_meta
 
   let equal_state_levels a b =
     match (a, b) with
@@ -119,10 +134,6 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     | _, _ ->
         false
 end
-
-let state_hash =
-  Fn.compose State_hash.With_state_hashes.state_hash
-    State_functions.header_with_hash
 
 let children st =
   match st with
@@ -188,12 +199,12 @@ let mark_invalid ~transition_states ~error:err top_state_hash =
               block_vc
         | Invalid _ | Waiting_to_be_added_to_frontier _ ->
             () ) ;
-        let header = State_functions.header_with_hash state in
+        let transition_meta = State_functions.transition_meta state in
         let children = children state in
         State_hash.Set.iter children.processing_or_failed ~f:go ;
         State_hash.Set.iter children.processed ~f:go ;
         State_hash.Set.iter children.waiting_for_parent ~f:go ;
-        Invalid { header; error } )
+        Invalid { transition_meta; error } )
   in
   go top_state_hash
 

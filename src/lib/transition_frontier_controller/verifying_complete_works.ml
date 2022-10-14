@@ -2,8 +2,6 @@ open Mina_base
 open Core_kernel
 open Context
 
-let transaction_snark_verification_timeout = Time.Span.of_sec 30.
-
 (* Pre-condition: new [status] is Failed or Processing *)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
@@ -122,7 +120,8 @@ let promote_to ~mark_processed_and_promote ~context:(module Context : CONTEXT)
          ~ancestors_to_process:(List.map ~f:get_hash states) ) ;
     Substate.In_progress
       { interrupt_ivar = I.interrupt_ivar
-      ; timeout = Time.add (Time.now ()) transaction_snark_verification_timeout
+      ; timeout =
+          Time.add (Time.now ()) Context.transaction_snark_verification_timeout
       }
   in
   let ctx =

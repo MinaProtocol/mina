@@ -69,7 +69,10 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
       ~mark_processed_and_promote old_state
   in
   State_hash.Table.change transition_states state_hash ~f:(const state_opt) ;
-  let parent_hash = Substate.parent_hash ~state_functions old_state in
+  let parent_hash =
+    (Transition_state.State_functions.transition_meta old_state)
+      .parent_state_hash
+  in
   Substate.update_children_on_promotion ~state_functions ~transition_states
     ~parent_hash ~state_hash state_opt ;
   let check_processing =
@@ -86,6 +89,12 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
 (** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
 transitions processed. Then it promotes all of the transitions that can be promoted
 as the result of [mark_processed].
+
+  Pre-conditions:
+   1. Order of [state_hashes] respects parent-child relationship and parent always comes first
+   2. Respective substates for states from [processed] are in [Processing (Done _)] status
+
+  Post-condition: list returned respects parent-child relationship and parent always comes first 
 
 This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
@@ -134,7 +143,7 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
   in
   let breadcrumb_queue = Queue.create () in
-  (* TODO is it the right path ? *)
+  (* TODO is "block-db" the right path ? *)
   let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
   let module Context = struct
     include Context_
@@ -161,9 +170,43 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     let timeout_controller = Timeout_controller.create ()
 
     let check_body_in_storage = Block_storage.read_body block_storage
+
+    (* TODO Timeouts are for now set to these values, but we want them in config *)
+
+    let building_breadcrumb_timeout = Time.Span.of_min 2.
+
+    let bitwap_download_timeout = Time.Span.of_min 2.
+
+    let peer_download_timeout = Time.Span.of_min 2.
+
+    let ancestry_verification_timeout = Time.Span.of_sec 30.
+
+    let ancestry_download_timeout = Time.Span.of_sec 30.
+
+    let transaction_snark_verification_timeout = Time.Span.of_sec 30.
+
+    let download_body ~header:_ (module I : Interruptible.F) =
+      I.lift @@ Deferred.never ()
+
+    let build_breadcrumb ~received_at ~sender ~parent ~transition
+        (module I : Interruptible.F) =
+      I.lift
+        (Frontier_base.Breadcrumb.build ~skip_staged_ledger_verification:`Proofs
+           ~logger ~precomputed_values ~verifier ~trust_system ~parent
+           ~transition ~sender:(Some sender)
+           ~transition_receipt_time:(Some received_at) () )
+
+    let retrieve_chain ~some_ancestors:_ ~target:_ ~parent_cache:_ ~sender:_
+        ~lookup_transition:_ (module I : Interruptible.F) =
+      I.lift @@ Deferred.never ()
   end in
   let transition_states = State_hash.Table.create () in
-  let state = { transition_states; orphans = State_hash.Table.create () } in
+  let state =
+    { transition_states
+    ; orphans = State_hash.Table.create ()
+    ; parents = State_hash.Table.create ()
+    }
+  in
   let context = (module Context : CONTEXT) in
   let mark_processed_and_promote =
     mark_processed_and_promote ~context ~transition_states

@@ -13,12 +13,18 @@ module Make (Inputs : Inputs_intf) :
 
   let find_in_root_history frontier state_hash =
     let open Transition_frontier.Extensions in
-    let open Option.Let_syntax in
     let root_history =
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
-    let%map root_data = Root_history.lookup root_history state_hash in
+    let%map.Option root_data = Root_history.lookup root_history state_hash in
     Frontier_base.Root_data.Historical.transition root_data
+
+  let lookup ~frontier state_hash =
+    let open Transition_frontier in
+    Option.merge
+      (Option.map ~f:Breadcrumb.validated_transition @@ find frontier state_hash)
+      (find_in_root_history frontier state_hash)
+      ~f:Fn.const
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = Mina_block.Validated.t
@@ -35,23 +41,11 @@ module Make (Inputs : Inputs_intf) :
         |> Mina_block.header |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
-      let open Option.Let_syntax in
-      Option.merge
-        Transition_frontier.(
-          find context parent_hash >>| Breadcrumb.validated_transition)
-        (find_in_root_history context parent_hash)
-        ~f:Fn.const
+      lookup ~frontier:context parent_hash
   end)
 
   let prove ?length ~frontier state_hash =
-    let open Option.Let_syntax in
-    let%map requested_transition =
-      Option.merge
-        Transition_frontier.(
-          find frontier state_hash >>| Breadcrumb.validated_transition)
-        (find_in_root_history frontier state_hash)
-        ~f:Fn.const
-    in
+    let%map.Option requested_transition = lookup ~frontier state_hash in
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
