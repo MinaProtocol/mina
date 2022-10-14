@@ -1,6 +1,7 @@
 (library
  (name mina_block_unix)
  (public_name mina_block.unix)
+ (inline_tests)
  (libraries
    ;; opam libraries
    graphql-async

@@ -1,6 +1,7 @@
 (library
  (name currency_unix)
  (public_name currency.unix)
+ (inline_tests)
  (libraries
    ;; opam libraries
    graphql-async

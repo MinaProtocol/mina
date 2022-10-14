@@ -1,6 +1,7 @@
 (library
  (name data_hash_lib_unix)
  (public_name data_hash_lib.unix)
+ (inline_tests)
  (libraries
   ;; opam libraries
   graphql-async

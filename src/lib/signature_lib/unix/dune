@@ -1,6 +1,7 @@
 (library
  (name signature_lib_unix)
  (public_name signature_lib.unix)
+ (inline_tests)
  (libraries
   ;; opam libraries
   graphql-async
