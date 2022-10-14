@@ -2,8 +2,6 @@ open Mina_base
 open Core_kernel
 open Context
 
-let ancestry_verification_timeout = Time.Span.of_sec 30.
-
 (* Pre-condition: new [status] is Failed or Processing *)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
@@ -113,7 +111,9 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
                ~genesis_state_hash:(genesis_state_hash (module Context))
                headers
         in
-        let timeout = Time.add (Time.now ()) ancestry_verification_timeout in
+        let timeout =
+          Time.add (Time.now ()) Context.ancestry_verification_timeout
+        in
         Async_kernel.Deferred.upon (I.force action)
         @@ upon_f ~mark_processed_and_promote ~transition_states
              ~timeout_controller:Context.timeout_controller

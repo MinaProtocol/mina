@@ -2,10 +2,6 @@ open Mina_base
 open Core_kernel
 open Context
 
-let bitwap_download_timeout = Time.Span.of_min 2.
-
-let peer_download_timeout = Time.Span.of_min 2.
-
 (** Notify descedants of transition [state_hash] that its downloading
     failed.
     
@@ -151,15 +147,15 @@ let upon_f ~timeout_controller ~transition_states ~state_hash
   [Substate.In_progress] context.
 *)
 let make_download_body_ctx ~body_opt ~header ~transition_states
-    ~timeout_controller ~mark_processed_and_promote =
+    ~context:(module Context : CONTEXT) ~mark_processed_and_promote =
   let state_hash = state_hash_of_header_with_validation header in
   match body_opt with
   | Some body ->
       Substate.Done body
   | None ->
+      let open Context in
       let module I = Interruptible.Make () in
-      (* TODO launch downloading of bodies *)
-      let action = I.lift (Async_kernel.Deferred.never ()) in
+      let action = Context.download_body ~header (module I) in
       Async_kernel.Deferred.upon (I.force action)
         (upon_f ~timeout_controller ~transition_states ~state_hash
            ~mark_processed_and_promote ) ;
@@ -170,13 +166,13 @@ let make_download_body_ctx ~body_opt ~header ~transition_states
 (** Restart a failed ancestor. This function takes a transition state of ancestor and
     restarts the downloading process for it.  *)
 let restart_failed_ancestor ~transition_states ~mark_processed_and_promote
-    ~timeout_controller = function
+    ~context = function
   | Transition_state.Downloading_body
       ({ header; substate = { status = Failed _; _ } as s; _ } as r) -> (
       let state_hash = state_hash_of_header_with_validation header in
       let ctx =
         make_download_body_ctx ~body_opt:None ~header ~transition_states
-          ~mark_processed_and_promote ~timeout_controller
+          ~mark_processed_and_promote ~context
       in
       let data =
         Transition_state.Downloading_body
@@ -185,8 +181,9 @@ let restart_failed_ancestor ~transition_states ~mark_processed_and_promote
       State_hash.Table.set transition_states ~key:state_hash ~data ;
       match ctx with
       | Substate.In_progress { timeout; _ } ->
+          let (module Context) = context in
           Timeout_controller.register ~state_functions ~transition_states
-            ~state_hash ~timeout timeout_controller
+            ~state_hash ~timeout Context.timeout_controller
       | _ ->
           ()
       (* We don't need to update parent's childen sets because
@@ -198,8 +195,8 @@ let restart_failed_ancestor ~transition_states ~mark_processed_and_promote
 (** Promote a transition that is in [Verifying_blockchain_proof] state with
     [Processed] status to [Downloading_body] state.
 *)
-let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
-    ~transition_states ~substate ~gossip_data ~body_opt =
+let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
+    ~gossip_data ~body_opt =
   let header =
     match substate.Substate.status with
     | Processed h ->
@@ -230,10 +227,9 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.consensus_state
   in
-  let timeout_controller = Context.timeout_controller in
   let ctx =
     make_download_body_ctx ~body_opt ~header ~transition_states
-      ~mark_processed_and_promote ~timeout_controller
+      ~mark_processed_and_promote ~context
   in
   let substate = { substate with status = Processing ctx } in
   let block_vc =
@@ -241,14 +237,12 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
     | Transition_state.Not_a_gossip ->
         None
     | Gossiped_header vc ->
-        accept_gossip ~context:(module Context) ~valid_cb:vc consensus_state ;
+        accept_gossip ~context ~valid_cb:vc consensus_state ;
         None
     | Gossiped_block vc ->
         Some vc
     | Gossiped_both { block_vc; header_vc } ->
-        accept_gossip
-          ~context:(module Context)
-          ~valid_cb:header_vc consensus_state ;
+        accept_gossip ~context ~valid_cb:header_vc consensus_state ;
         Some block_vc
   in
   let state' =
@@ -257,7 +251,7 @@ let promote_to ~context:(module Context : CONTEXT) ~mark_processed_and_promote
   in
   let restart_f =
     restart_failed_ancestor ~transition_states ~mark_processed_and_promote
-      ~timeout_controller
+      ~context
   in
   if substate.received_via_gossip then
     List.iter ~f:restart_f
