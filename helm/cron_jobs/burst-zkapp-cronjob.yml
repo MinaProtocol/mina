@@ -1,0 +1,227 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: zkapp-burst-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+echo "booting mina daemon";
+mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/seed-lists/gossipqa_seeds.txt &
+sleep 300;
+echo "done sleeping";
+while true; do
+  STATUS=$(mina client status | grep "Sync status");
+  echo "$STATUS" | grep "Synced";
+  RESULT=$?;
+  if [ $RESULT -eq 0 ]; then
+    echo "daemon is synced";
+    break;
+  else
+    echo "waiting for daemon to sync";
+    sleep 60;
+  fi;
+done;
+
+
+mkdir /tmpkeys;
+mkdir /tmpkeys-fee-payer;
+mkdir /tmpkeys-zkapp-account-funder;
+chmod 700 /tmpkeys;
+chmod 700 /tmpkeys-fee-payer;
+chmod 700 /tmpkeys-zkapp-account-funder;
+
+
+cp /keys/zkapp-key-1/zkapp-account-1-key /tmpkeys;
+cp /keys/zkapp-key-2/zkapp-account-2-key /tmpkeys;
+cp /keys/zkapp-key-3/zkapp-account-3-key /tmpkeys;
+cp /keys/zkapp-key-4/zkapp-account-4-key /tmpkeys;
+cp /keys/zkapp-key-5/zkapp-account-5-key /tmpkeys;
+chmod 600 /tmpkeys/zkapp-account-1-key;
+chmod 600 /tmpkeys/zkapp-account-2-key;
+chmod 600 /tmpkeys/zkapp-account-3-key;
+chmod 600 /tmpkeys/zkapp-account-4-key;
+chmod 600 /tmpkeys/zkapp-account-5-key;
+
+cp /keys/fee-payer/fee-payer-key /tmpkeys-fee-payer;
+chmod 600 /tmpkeys-fee-payer/fee-payer-key;
+cp /keys/zkapp-account-funder/zkapp-account-funder-key /tmpkeys-zkapp-account-funder;
+chmod 600 /tmpkeys-zkapp-account-funder-key;
+
+echo "starting batch transactions";
+
+mina-batch-zkapp-test-txns send-batch --num-txns 1000 --fee-payer-privkey-path /tmpkeys-fee-payer/fee-payer-key --apply-rate-limit true --num-account-updates 3 --account-creator-privkey-path ./tmpkeys-zkapp-account-funder/zkapp-account-funder-key /tmpkeys
+
+echo "ran batch zkapps";
+
+            '
+            
+            env:
+            - name: MINA_PRIVKEY_PASS
+              value: "naughty blue worm"
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: minaprotocol/mina-daemon:1.3.2alpha1-fix-test-batch-zkapp-txns-tmp-c121783-focal-devnet
+            imagePullPolicy: IfNotPresent
+            name: zkapp-burst-cronjob-size20-4
+            resources:
+              limits:
+              requests:
+                memory: 32.0Gi
+                cpu: 20.0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /keys/zkapp-key-1/
+              name: zkapp-key-1
+            - mountPath: /keys/zkapp-key-2/
+              name: zkapp-key-2
+            - mountPath: /keys/zkapp-key-3/
+              name: zkapp-key-3
+            - mountPath: /keys/zkapp-key-4/
+              name: zkapp-key-4
+            - mountPath: /keys/zkapp-key-5/
+              name: zkapp-key-5
+            - mountPath: /keys/fee-payer/
+              name: fee-payer
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes: [
+            {
+              "name": "zkapp-key-1",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-1-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-1-key.pub"
+                  }
+                  ],
+                "secretName": "zkapp-account-1-key"
+              }
+            },
+            {
+              "name": "zkapp-key-2",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-2-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-2-key.pub"
+                  }
+                  ],
+                "secretName": "zkapp-account-2-key"
+              }
+            },
+            {
+              "name": "zkapp-key-3",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-3-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-3-key.pub"
+                  }
+                  ],
+                "secretName": "zkapp-account-3-key"
+              }
+            },
+            {
+              "name": "zkapp-key-4",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-4-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-4-key.pub"
+                  }
+                  ],
+                "secretName": "zkapp-account-4-key"
+              }
+            },
+            {
+              "name": "zkapp-key-5",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-5-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-5-key.pub"
+                  }
+                  ],
+                "secretName": "zkapp-account-5-key"
+              }
+            }
+            ,
+            {
+              "name": "fee-payer",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "fee-payer-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "fee-payer-key.pub"
+                  }
+                ],
+                "secretName": "fee-payer-key"
+              }
+            }
+            ,
+            {
+              "name": "zkapp-account-funder",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "zkapp-account-funder-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "zkapp-account-funder-key.pub"
+                  }
+                ],
+                "secretName": "zkapp-account-funder-key"
+              }
+            }
+
+          ]
+  schedule: 43 2 * * * 
+  # every day at 1pm GMT, which is 6am PST
+  successfulJobsHistoryLimit: 3
+  suspend: false
