@@ -25,7 +25,7 @@ skip_list = ["src/nonconsensus/snark_params/tick.ml"]
 # `original` is the name of the equivalent file in at the HEAD of the branch
 # you want to merge into (this is usually develop or compatible)
 # They basically have the same names, but different paths.
-def skip(original, _modified):
+def skip(original):
     for skip_item in skip_list:
         if skip_item in original:
             return True
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         print("The .ml files must have the same name, with different paths")
         sys.exit(1)
 
-    if not (skip (sys.argv[1], sys.argv[2])):  
+    if not (skip (sys.argv[1])):
         status_code = run_comparison('_build/default/src/lib/ppx_version/tools/print_versioned_types.exe','Versioned types',sys.argv[1],sys.argv[2])
         if status_code != 0:
             print(error_msg)
