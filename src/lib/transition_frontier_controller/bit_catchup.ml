@@ -15,26 +15,30 @@ open Context
 let promote_to_higher_state_impl ~mark_processed_and_promote ~context
     ~transition_states state =
   match state with
-  | Transition_state.Received { header; substate; gossip_data; body_opt } ->
+  | Transition_state.Received { header; substate; gossip_data; body_opt; aux }
+    ->
       Option.some
       @@ Verifying_blockchain_proof.promote_to ~mark_processed_and_promote
            ~context ~transition_states ~header ~substate ~gossip_data ~body_opt
-  | Verifying_blockchain_proof { header = _; substate; gossip_data; body_opt }
-    ->
+           ~aux
+  | Verifying_blockchain_proof
+      { header = _; substate; gossip_data; body_opt; aux } ->
       Option.some
       @@ Downloading_body.promote_to ~mark_processed_and_promote ~context
-           ~transition_states ~substate ~gossip_data ~body_opt
-  | Downloading_body { header; substate; block_vc; next_failed_ancestor = _ } ->
+           ~transition_states ~substate ~gossip_data ~body_opt ~aux
+  | Downloading_body
+      { header; substate; block_vc; next_failed_ancestor = _; aux } ->
       Option.some
       @@ Verifying_complete_works.promote_to ~mark_processed_and_promote
-           ~context ~transition_states ~header ~substate ~block_vc
-  | Verifying_complete_works { block; substate; block_vc } ->
+           ~context ~transition_states ~header ~substate ~block_vc ~aux
+  | Verifying_complete_works { block; substate; block_vc; aux } ->
       Option.some
       @@ Building_breadcrumb.promote_to ~mark_processed_and_promote ~context
-           ~transition_states ~block ~substate ~block_vc
-  | Building_breadcrumb { block = _; substate; block_vc } ->
+           ~transition_states ~block ~substate ~block_vc ~aux
+  | Building_breadcrumb { block = _; substate; block_vc; aux } ->
       Option.some
       @@ Waiting_to_be_added_to_frontier.promote_to ~context ~substate ~block_vc
+           ~aux
   | Waiting_to_be_added_to_frontier { breadcrumb; source; children = _ } ->
       let (module Context : CONTEXT) = context in
       Context.write_verified_transition

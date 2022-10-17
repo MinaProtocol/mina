@@ -8,6 +8,7 @@ val promote_to :
   -> context:(module Context.CONTEXT)
   -> transition_states:Transition_state.t State_hash.Table.t
   -> block:Mina_block.Validation.initial_valid_with_block
-  -> substate:'a Substate.common_substate
+  -> substate:unit Substate.common_substate
   -> block_vc:Mina_net2.Validation_callback.t option
+  -> aux:Transition_state.aux_data
   -> Transition_state.t

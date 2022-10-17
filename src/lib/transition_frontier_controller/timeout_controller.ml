@@ -70,7 +70,8 @@ let register ~state_functions ~transition_states ~state_hash ~timeout t =
 let unregister ~state_hash ~timeout t =
   t.events <- TimeoutSet.remove t.events (timeout, state_hash)
 
-(** [unregister_processing_ctx] unregsiters a transition when timeout_controller argument is provided and processing ctx is In_progress.
+(** [cancel_in_progress_ctx] unregsiters a transition when timeout_controller argument is provided and processing ctx is In_progress.
+  It also interrupts the action which was in progress.
   Does nothing otherwise    
   *)
 let cancel_in_progress_ctx ~timeout_controller ~state_hash = function
