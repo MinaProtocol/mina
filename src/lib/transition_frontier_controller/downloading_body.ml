@@ -234,7 +234,7 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
   let substate = { substate with status = Processing ctx } in
   let block_vc =
     match gossip_data with
-    | Gossip_types.Not_a_gossip ->
+    | Gossip.Not_a_gossip ->
         None
     | Gossiped_header vc ->
         accept_gossip ~context ~valid_cb:vc consensus_state ;

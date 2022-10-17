@@ -133,13 +133,8 @@ let handle_produced_transition ~logger ~state breadcrumb =
 
 let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-    ~(collected_transitions : Bootstrap_controller.Transition_cache.element list)
-    ~frontier
-    ~(network_transition_reader :
-       Types.produced_transition Pipe_lib.Strict_pipe.Reader.t )
-    ~(producer_transition_reader :
-       Transition_frontier.Breadcrumb.t Pipe_lib.Strict_pipe.Reader.t )
-    ~clear_reader ~verified_transition_writer =
+    ~collected_transitions ~frontier ~network_transition_reader
+    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
   let open Pipe_lib in
   (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)
   let breadcrumb_notification_reader, breadcrumb_notification_writer =
@@ -206,6 +201,19 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     let retrieve_chain ~some_ancestors:_ ~target:_ ~parent_cache:_ ~sender:_
         ~lookup_transition:_ (module I : Interruptible.F) =
       I.lift @@ Deferred.never ()
+
+    let genesis_state_hash =
+      let genesis_protocol_state =
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+      in
+      State_hash.With_state_hashes.state_hash genesis_protocol_state
+
+    let verify_blockchain_proofs (module I : Interruptible.F) =
+      Fn.compose I.lift
+      @@ Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+
+    let verify_transaction_proofs (module I : Interruptible.F) =
+      Fn.compose I.lift @@ Verifier.verify_transaction_snarks verifier
   end in
   let transition_states = State_hash.Table.create () in
   let state =

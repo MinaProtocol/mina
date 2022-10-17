@@ -55,4 +55,5 @@
    pickles.backend
    snark_params
    mina_numbers
+   ledger_proof
 ))

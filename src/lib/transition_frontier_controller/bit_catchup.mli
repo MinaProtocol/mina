@@ -6,9 +6,12 @@ val run :
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> time_controller:Block_time.Controller.t
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> collected_transitions:Bootstrap_controller.Transition_cache.element list
   -> frontier:Transition_frontier.t
-  -> network_transition_reader:Types.produced_transition Strict_pipe.Reader.t
+  -> network_transition_reader:Produced_transition.t Strict_pipe.Reader.t
   -> producer_transition_reader:Frontier_base.Breadcrumb.t Strict_pipe.Reader.t
   -> clear_reader:'a Strict_pipe.Reader.t
   -> verified_transition_writer:

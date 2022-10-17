@@ -1,8 +1,32 @@
 open Mina_base
 open Core_kernel
 
+(** Catchup state contains all the available information on
+    every transition that is not in frontier and:
+
+      1. was received through gossip
+      or
+      2. was fetched due to being an ancestor of a transition received through gossip.
+
+    Bit-catchup algorithm runs every transition through consequent states and eventually
+    adds it to frontier (if it's valid).
+*)
+type catchup_state =
+  { transition_states : Transition_state.t State_hash.Table.t
+        (** Map from a state_hash to state of the transition corresponding to it  *)
+  ; orphans : State_hash.t list State_hash.Table.t
+        (** Map from transition's state hash to list of its children for transitions
+    that are not in the transition states *)
+  ; parents : State_hash.t State_hash.Table.t
+        (** Map from transition's state_hash to parent for transitions that are not in transition states.
+    This map is like a cache for old methods of getting transition chain.
+  *)
+  }
+
 module type CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
+
+  val genesis_state_hash : State_hash.t
 
   val frontier : Transition_frontier.t
 
@@ -14,11 +38,13 @@ module type CONTEXT = sig
 
   val network : Mina_networking.t
 
+  (** Callback to write verified transitions after they're added to the frontier. *)
   val write_verified_transition :
        [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Catchup | `Gossip | `Internal ] ]
     -> unit
 
+  (** Callback to write built breadcrumbs so that they can be added to frontier *)
   val write_breadcrumb : Frontier_base.Breadcrumb.t -> unit
 
   val timeout_controller : Timeout_controller.t
@@ -26,6 +52,7 @@ module type CONTEXT = sig
   val outdated_root_cache :
     (State_hash.t, unit) Transition_handler.Core_extended_cache.Lru.t
 
+  (** Check is the body of a transition is present in the block storage, *)
   val check_body_in_storage :
     Consensus.Body_reference.t -> Staged_ledger_diff.Body.t option
 
@@ -41,11 +68,13 @@ module type CONTEXT = sig
 
   val ancestry_download_timeout : Core_kernel.Time.Span.t
 
+  (** Download body for the given header  *)
   val download_body :
        header:Mina_block.Validation.initial_valid_with_header
     -> (module Interruptible.F)
     -> Mina_block.Body.t Or_error.t Interruptible.t
 
+  (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
        received_at:Time.t
     -> sender:Network_peer.Envelope.Sender.t
@@ -82,28 +111,31 @@ module type CONTEXT = sig
        list
        Or_error.t
        Interruptible.t
-end
 
-let genesis_state_hash (module Context : CONTEXT) =
-  let genesis_protocol_state =
-    Precomputed_values.genesis_state_with_hashes Context.precomputed_values
-  in
-  State_hash.With_state_hashes.state_hash genesis_protocol_state
+  (** Batch-verify a list of blockchain proofs *)
+  val verify_blockchain_proofs :
+       (module Interruptible.F)
+    -> Mina_block.Validation.pre_initial_valid_with_header list
+    -> ( Mina_block.Validation.initial_valid_with_header list
+       , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
+       Result.t
+       Interruptible.t
+
+  (** Batch-verify transaction snarks (complete works).
+      
+      Returns [Result.Error] when there was a failure, [Result.Ok true] if
+      verification succeeded and [Result.Ok false] if verification
+      finished with a negative result (one of works is invalid).
+  *)
+  val verify_transaction_proofs :
+       (module Interruptible.F)
+    -> (Ledger_proof.t * Sok_message.t) list
+    -> unit Or_error.t Or_error.t Interruptible.t
+end
 
 let state_functions =
   (module Transition_state.State_functions : Substate.State_functions
     with type state_t = Transition_state.t )
-
-type catchup_state =
-  { transition_states : Transition_state.t State_hash.Table.t
-  ; orphans : State_hash.t list State_hash.Table.t
-        (** Map from transition's state hash to list of its children for transitions
-    that are not in the transition states *)
-  ; parents : State_hash.t State_hash.Table.t
-        (** Map from transition's state_hash to parent for transitions that are not in transition states.
-    This map is like a cache for old methods of getting transition chain.
-  *)
-  }
 
 let state_hash_of_header_with_validation hv =
   State_hash.With_state_hashes.state_hash
