@@ -4,6 +4,8 @@ open Core_kernel
 module type CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
 
+  val genesis_state_hash : State_hash.t
+
   val frontier : Transition_frontier.t
 
   val verifier : Verifier.t
@@ -38,11 +40,13 @@ module type CONTEXT = sig
 
   val ancestry_download_timeout : Core_kernel.Time.Span.t
 
+  (** Download body for the given header  *)
   val download_body :
        header:Mina_block.Validation.initial_valid_with_header
     -> (module Interruptible.F)
     -> Mina_block.Body.t Or_error.t Interruptible.t
 
+  (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
        received_at:Time.t
     -> sender:Network_peer.Envelope.Sender.t
@@ -79,13 +83,20 @@ module type CONTEXT = sig
        list
        Or_error.t
        Interruptible.t
-end
 
-let genesis_state_hash (module Context : CONTEXT) =
-  let genesis_protocol_state =
-    Precomputed_values.genesis_state_with_hashes Context.precomputed_values
-  in
-  State_hash.With_state_hashes.state_hash genesis_protocol_state
+  val verify_blockchain_proofs :
+       (module Interruptible.F)
+    -> Mina_block.Validation.pre_initial_valid_with_header list
+    -> ( Mina_block.Validation.initial_valid_with_header list
+       , [> `Invalid_proof | `Verifier_error of Error.t ] )
+       Result.t
+       Interruptible.t
+
+  val verify_transaction_proofs :
+       (module Interruptible.F)
+    -> (Ledger_proof.t * Sok_message.t) list
+    -> bool Or_error.t Interruptible.t
+end
 
 let state_functions =
   (module Transition_state.State_functions : Substate.State_functions

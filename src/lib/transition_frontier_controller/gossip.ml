@@ -4,10 +4,12 @@ open Async
 open Context
 open Gossip_types
 
-(** [verify_header_is_relevant] determines if a transition received through
-    gossip is relevant.
-
-  Depending on relevance status, metrics are updated for the peer who sent the transition.
+(** Determine if the header received via gossip is relevant
+    (to be added to catchup state), irrelevant (to be ignored)
+    or contains some useful data to be preserved 
+    (in case transition is already in catchup state).
+  
+    Depending on relevance status, metrics are updated for the peer who sent the transition.
 *)
 let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
     ~transition_states header_with_hash =
@@ -45,46 +47,21 @@ let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
   | Error error ->
       record_irrelevant error ; `Irrelevant
 
-(** Update gossip data kept for a transition to include information
-    that became potentially available from a recently received gossip *)
-let update_gossip_data ~context:(module Context : Context.CONTEXT) ~hash ~vc
-    ~gossip_type old =
-  let log_duplicate () =
-    [%log' warn Context.logger] "Duplicate %s gossip for $state_hash"
-      (match gossip_type with `Block -> "block" | `Header -> "header")
-      ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]
-  in
-  match (gossip_type, old) with
-  | `Block, Gossiped_header header_vc ->
-      Gossiped_both { block_vc = vc; header_vc }
-  | `Header, Gossiped_block block_vc ->
-      Gossiped_both { block_vc; header_vc = vc }
-  | `Block, Not_a_gossip ->
-      Gossiped_block vc
-  | `Header, Not_a_gossip ->
-      Gossiped_header vc
-  | `Header, Gossiped_header _ ->
-      log_duplicate () ; old
-  | `Header, Gossiped_both _ ->
-      log_duplicate () ; old
-  | `Block, Gossiped_block _ ->
-      log_duplicate () ; old
-  | `Block, Gossiped_both _ ->
-      log_duplicate () ; old
-
-(** [preserve_relevant_gossip st] takes data of a recently received gossip related to a
-    transition already present in the catchup state and is associated with state [st].
+(** [preserve_relevant_gossip] takes data of a recently received gossip related to a
+    transition already present in the catchup state. It preserves useful data of gossip
+    in the catchup state.
     
-    Function returns a pair of a new transition state and an ivar to interrupt processing
-    of the transition if one was active and is no longer relevant.
+    Function returns a pair of a new transition state and a hint of further action to be
+    performed in case the gossiped data triggering a change of state.
     *)
-let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~hash
+let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~state_hash
     ?gossip_type ?gossip_header st_orig =
+  let (module Ctx : CONTEXT) = context in
   let update_gossip_data =
     Option.value ~default:Fn.id
     @@ let%bind.Option vc = vc_opt in
        let%map.Option gossip_type = gossip_type in
-       update_gossip_data ~context ~hash ~vc ~gossip_type
+       update_gossip_data ~logger:Ctx.logger ~state_hash ~vc ~gossip_type
   in
   let consensus_state =
     Fn.compose Mina_state.Protocol_state.consensus_state

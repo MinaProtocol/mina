@@ -28,13 +28,20 @@ let mark_done ~transition_states state_hash =
   | _ ->
       None
 
+(** Take data of a recently received gossip related to a transition already present
+    in the catchup state. Preserve useful data of gossip in the catchup state.
+    
+    Function calls [Gossip.preserve_relevant_gossip] and executes a necessary
+    action based on the hint.
+    *)
 let preserve_relevant_gossip_and_promote ~mark_processed_and_promote
-    ~transition_states ?body ?vc ~context ~hash ?gossip_type ?gossip_header st =
+    ~transition_states ?body ?vc ~context ~state_hash ?gossip_type
+    ?gossip_header st =
   let st', hint =
-    Gossip.preserve_relevant_gossip ?body ?vc ~context ~hash ?gossip_type
+    Gossip.preserve_relevant_gossip ?body ?vc ~context ~state_hash ?gossip_type
       ?gossip_header st
   in
-  State_hash.Table.set transition_states ~key:hash ~data:st' ;
+  State_hash.Table.set transition_states ~key:state_hash ~data:st' ;
   match hint with
   | `Nop ->
       ()
@@ -46,28 +53,35 @@ let preserve_relevant_gossip_and_promote ~mark_processed_and_promote
         ~mark_processed_and_promote ~transition_states block
   | `Promote_and_interrupt ivar ->
       Ivar.fill_if_empty ivar () ;
-      mark_processed_and_promote [ hash ]
+      mark_processed_and_promote [ state_hash ]
 
-let pre_validate_header ~context hh =
+let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in
-  Mina_block.Validation.(
-    validate_delta_block_chain (wrap_header hh)
-    >>= validate_protocol_versions
-    >>= validate_genesis_protocol_state
-          ~genesis_state_hash:(genesis_state_hash context)
-    >>| skip_time_received_validation_header
-          `This_block_was_not_received_via_gossip)
+  let open Mina_block.Validation in
+  let open Context in
+  validate_delta_block_chain (wrap_header hh)
+  >>= validate_protocol_versions
+  >>= validate_genesis_protocol_state ~genesis_state_hash
+  >>| skip_time_received_validation_header
+        `This_block_was_not_received_via_gossip
 
-let lookup_transition ~transition_states ~frontier hash =
-  match State_hash.Table.find transition_states hash with
+(** Check transition's status in catchup state and frontier *)
+let lookup_transition ~transition_states ~frontier state_hash =
+  match State_hash.Table.find transition_states state_hash with
   | Some (Transition_state.Invalid _) ->
       `Invalid
   | Some _ ->
       `Present
   | None ->
-      if Option.is_some (Transition_frontier.find frontier hash) then `Present
+      if Option.is_some (Transition_frontier.find frontier state_hash) then
+        `Present
       else `Not_present
 
+(** Insert invalid transition to transition states and mark
+    children of the transition invalid.
+    
+    Pre-condition: transition doesn't exist in transition states.
+*)
 let insert_invalid_state_impl ~transition_states ~transition_meta ~children_list
     error =
   Hashtbl.add_exn transition_states ~key:transition_meta.Substate.state_hash
@@ -75,6 +89,11 @@ let insert_invalid_state_impl ~transition_states ~transition_meta ~children_list
   List.iter children_list
     ~f:(Transition_state.mark_invalid ~transition_states ~error)
 
+(** Insert invalid transition to transition states and remove
+    corresponding record from orphans.
+    
+    Pre-condition: transition doesn't exist in transition states.
+*)
 let insert_invalid_state ~state ~transition_meta error =
   let children_list =
     Option.value ~default:[]
@@ -130,8 +149,8 @@ let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
   | Some st, _ ->
       Ok
         (preserve_relevant_gossip_and_promote ~mark_processed_and_promote
-           ~transition_states:state.transition_states ?body ~context
-           ~hash:state_hash st )
+           ~transition_states:state.transition_states ?body ~context ~state_hash
+           st )
   | None, Some hh -> (
       match pre_validate_header ~context hh with
       | Ok vh ->
@@ -333,7 +352,7 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
              Fn.compose Blockchain_state.body_reference
                Protocol_state.blockchain_state) )
   in
-  let hash = State_hash.With_state_hashes.state_hash header_with_hash in
+  let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =
     Gossip.verify_header_is_relevant ~context ~sender
       ~transition_states:state.transition_states header_with_hash
@@ -347,10 +366,10 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
   | `Preserve_gossip_data ->
       let f =
         preserve_relevant_gossip_and_promote ~mark_processed_and_promote
-          ~transition_states:state.transition_states ?body ?vc ~context ~hash
-          ~gossip_type ~gossip_header
+          ~transition_states:state.transition_states ?body ?vc ~context
+          ~state_hash ~gossip_type ~gossip_header
       in
-      Option.iter ~f (State_hash.Table.find state.transition_states hash)
+      Option.iter ~f (State_hash.Table.find state.transition_states state_hash)
 
 (** [handle_collected_transition] adds a transition that was collected during bootstrap
     to the catchup state. *)

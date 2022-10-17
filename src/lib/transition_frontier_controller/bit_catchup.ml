@@ -203,6 +203,19 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     let retrieve_chain ~some_ancestors:_ ~target:_ ~parent_cache:_ ~sender:_
         ~lookup_transition:_ (module I : Interruptible.F) =
       I.lift @@ Deferred.never ()
+
+    let genesis_state_hash =
+      let genesis_protocol_state =
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+      in
+      State_hash.With_state_hashes.state_hash genesis_protocol_state
+
+    let verify_blockchain_proofs (module I : Interruptible.F) =
+      Fn.compose I.lift
+      @@ Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+
+    let verify_transaction_proofs (module I : Interruptible.F) =
+      Fn.compose I.lift @@ Verifier.verify_transaction_snarks verifier
   end in
   let transition_states = State_hash.Table.create () in
   let state =

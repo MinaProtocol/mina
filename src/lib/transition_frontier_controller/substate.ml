@@ -1,69 +1,17 @@
 open Mina_base
 open Core_kernel
-open Async_kernel
+include Substate_types
 
-type 'a processing_context =
-  | In_progress of { interrupt_ivar : unit Ivar.t; timeout : Time.t }
-  | Dependent
-  | Done of 'a
-
-type 'a ancestry_status =
-  (* Waiting for parent to be processed before starting the processing.
-     This state might be skipped when sequential processing is unnecessary. *)
-  | Waiting_for_parent of (unit -> 'a ancestry_status)
-  (* Processing of the state is in progress. *)
-  | Processing of 'a processing_context
-  (* Processing failed, but could be retried *)
-  | Failed of Error.t
-  (* State is processed and ready to be transitioned to higher state after
-     ancestry is also processed *)
-  | Processed of 'a
-
-type children_sets =
-  { processed : State_hash.Set.t
-  ; waiting_for_parent : State_hash.Set.t
-  ; processing_or_failed : State_hash.Set.t
-  }
-
-let empty_children_sets =
-  { processing_or_failed = State_hash.Set.empty
-  ; processed = State_hash.Set.empty
-  ; waiting_for_parent = State_hash.Set.empty
-  }
-
-type 'a common_substate =
-  { status : 'a ancestry_status; children : children_sets }
-
-type 'v modifier =
-  { modifier : 'a. 'a common_substate -> 'a common_substate * 'v }
-
-type 'v viewer = { viewer : 'a. 'a common_substate -> 'v }
-
-type ('a, 'b) modify_substate_t = f:'a modifier -> 'b -> ('b * 'a) option
-
-let view_ ~(modify_substate : ('a, 'b) modify_substate_t) ~f =
-  Fn.compose (Option.map ~f:snd)
-    (modify_substate ~f:{ modifier = (fun st -> (st, f.viewer st)) })
-
-type transition_meta =
-  { state_hash : State_hash.t
-  ; blockchain_length : Mina_numbers.Length.t
-  ; parent_state_hash : State_hash.t
-  }
-
-module type State_functions = sig
-  type state_t
-
-  val modify_substate : ('a, state_t) modify_substate_t
-
-  val transition_meta : state_t -> transition_meta
-
-  val equal_state_levels : state_t -> state_t -> bool
-end
-
+(** View the common substate.
+    
+    Viewer [~f] is applied to the common substate
+    and its result is returned by the function.
+  *)
 let view (type state_t)
-    ~state_functions:(module F : State_functions with type state_t = state_t) =
-  view_ ~modify_substate:F.modify_substate
+    ~state_functions:(module F : State_functions with type state_t = state_t) ~f
+    =
+  Fn.compose (Option.map ~f:snd)
+    (F.modify_substate ~f:{ modifier = (fun st -> (st, f.viewer st)) })
 
 (** [collect_states top_state] collects transitions from the top state (inclusive) down the ancestry chain 
   while:
@@ -124,7 +72,13 @@ let collect_dependent_ancestry ~state_functions ~transition_states top_state =
   collect_states ~predicate:{ viewer } ~state_functions ~transition_states
     top_state
 
-let mark_processed_sm ~is_recursive_call subst =
+(** Modify status of common substate to [Processed].
+    
+    Function returns [Result.Ok] with new modified common substate
+    and [children] of the substate when substate has [Processing (Done x)] status
+    and [Result.Error] otherwise.
+*)
+let mark_processed_modifier ~is_recursive_call subst =
   let reshape res =
     match res with
     | Result.Error _ as e ->
@@ -158,6 +112,14 @@ let mark_processed_sm ~is_recursive_call subst =
   | Processed _ ->
       Result.Error "already processed"
 
+(** Function determines whether to continue mark processed recursive
+    call.
+    
+    It takes transition and returns true iff:
+
+      * Transition's parent is not in the catchup state (which means it's in frontier)
+      * Transition's parent has a higher state level
+    *)
 let is_to_continue_mark_processed_recursion (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
     ~transition_states state =
@@ -173,7 +135,11 @@ let is_to_continue_mark_processed_recursion (type state_t)
          in frontier nor in transition_state. *)
       true
 
-let promote_waiting_for_parent (type state_t)
+(** Start processing a transition in [Waiting_for_parent] status.
+    
+   Function modifies the status of the transition and then updates parent's children.
+*)
+let kickstart_waiting_for_parent (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
     ~logger ~transition_states state_hash =
   let modifier subst =
@@ -214,6 +180,7 @@ let promote_waiting_for_parent (type state_t)
           [%log warn] "child $state_hash is not in waiting_for_parent state"
             ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] )
 
+(** Update children of the parent upon transition aquiring the [Processed] status *)
 let update_children_on_processed (type state_t) ~transition_states ~parent_hash
     ~state_functions:(module F : State_functions with type state_t = state_t)
     state_hash =
@@ -261,7 +228,10 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
       processed_set := State_hash.Set.remove !processed_set hash ;
       let%bind state', res =
         F.modify_substate
-          ~f:{ modifier = (fun st -> mark_processed_sm ~is_recursive_call st) }
+          ~f:
+            { modifier =
+                (fun st -> mark_processed_modifier ~is_recursive_call st)
+            }
           state
       in
       Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
@@ -272,7 +242,7 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
         ~parent_hash (F.transition_meta state).state_hash ;
       State_hash.Set.iter children.waiting_for_parent
         ~f:
-          (promote_waiting_for_parent ~state_functions ~logger
+          (kickstart_waiting_for_parent ~state_functions ~logger
              ~transition_states ) ;
       if
         is_recursive_call
@@ -289,6 +259,11 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
   in
   List.concat @@ List.map processed ~f:(handle false)
 
+(** Update children of transition's parent when the transition is promoted
+    to the higher state.
+
+    TODO more details
+*)
 let update_children_on_promotion (type state_t) ~state_functions
     ~transition_states ~parent_hash ~state_hash state_opt =
   let (module F : State_functions with type state_t = state_t) =
@@ -349,8 +324,8 @@ let view_processing ~state_functions =
          }
 
 module For_tests = struct
-  (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
-  while collected states are:
+  (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive)
+  down the ancestry chain that are:
   
     1. In [Failed] substate
     and

@@ -65,10 +65,7 @@ let launch_in_progress ~context:(module Context : CONTEXT)
     ~mark_processed_and_promote ~transition_states ~top_header rest_headers =
   let module I = Interruptible.Make () in
   let action =
-    I.lift
-    @@ Mina_block.Validation.validate_proofs ~verifier:Context.verifier
-         ~genesis_state_hash:(genesis_state_hash (module Context))
-         (top_header :: rest_headers)
+    Context.verify_blockchain_proofs (module I) (top_header :: rest_headers)
   in
   let timeout = Time.add (Time.now ()) Context.ancestry_verification_timeout in
   Async_kernel.Deferred.upon (I.force action)

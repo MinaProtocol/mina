@@ -1,6 +1,5 @@
 open Mina_base
 open Core_kernel
-open Substate
 
 type aux_data =
   { received_via_gossip : bool
@@ -11,22 +10,21 @@ type aux_data =
 type t =
   | Received of
       { header : Gossip_types.received_header
-      ; substate : unit common_substate
+      ; substate : unit Substate.t
       ; aux : aux_data
       ; gossip_data : Gossip_types.transition_gossip_t
       ; body_opt : Staged_ledger_diff.Body.t option
       }
   | Verifying_blockchain_proof of
       { header : Mina_block.Validation.pre_initial_valid_with_header
-      ; substate :
-          Mina_block.Validation.initial_valid_with_header common_substate
+      ; substate : Mina_block.Validation.initial_valid_with_header Substate.t
       ; aux : aux_data
       ; gossip_data : Gossip_types.transition_gossip_t
       ; body_opt : Staged_ledger_diff.Body.t option
       }
   | Downloading_body of
       { header : Mina_block.Validation.initial_valid_with_header
-      ; substate : Staged_ledger_diff.Body.t common_substate
+      ; substate : Staged_ledger_diff.Body.t Substate.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
             (** [next_failed_ancestor] is the next ancestor that is in [Downloading_body] state
@@ -36,26 +34,26 @@ type t =
       }
   | Verifying_complete_works of
       { block : Mina_block.Validation.initial_valid_with_block
-      ; substate : unit common_substate
+      ; substate : unit Substate.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
       }
   | Building_breadcrumb of
       { block : Mina_block.Validation.initial_valid_with_block
-      ; substate : Frontier_base.Breadcrumb.t common_substate
+      ; substate : Frontier_base.Breadcrumb.t Substate.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
       }
   | Waiting_to_be_added_to_frontier of
       { breadcrumb : Frontier_base.Breadcrumb.t
       ; source : [ `Catchup | `Gossip | `Internal ]
-      ; children : children_sets
+      ; children : Substate.children_sets
       }
   | Invalid of { transition_meta : Substate.transition_meta; error : Error.t }
 
 let transition_meta_of_header_with_hash hh =
   let h = With_hash.data hh in
-  { state_hash = State_hash.With_state_hashes.state_hash hh
+  { Substate.state_hash = State_hash.With_state_hashes.state_hash hh
   ; parent_state_hash =
       Mina_state.Protocol_state.previous_state_hash
       @@ Mina_block.Header.protocol_state h
@@ -65,7 +63,7 @@ let transition_meta_of_header_with_hash hh =
 module State_functions : Substate.State_functions with type state_t = t = struct
   type state_t = t
 
-  let modify_substate ~f:{ modifier = f } state =
+  let modify_substate ~f:{ Substate.modifier = f } state =
     match state with
     | Received ({ substate = s; _ } as obj) ->
         let substate, v = f s in
@@ -136,7 +134,7 @@ let children st =
   | Waiting_to_be_added_to_frontier { children; _ } ->
       children
   | Invalid _ ->
-      empty_children_sets
+      Substate.empty_children_sets
 
 let is_failed st =
   match st with
@@ -154,32 +152,30 @@ let mark_invalid ~transition_states ~error:err top_state_hash =
     sprintf "(from state hash %s) " (State_hash.to_base58_check top_state_hash)
   in
   let error = Error.tag ~tag err in
-  let rec go state_hash =
-    Hashtbl.change transition_states state_hash ~f:(fun st_opt ->
-        let%bind.Option state = st_opt in
-        let%map.Option () =
-          match state with Invalid _ -> None | _ -> Some ()
-        in
-        ( match state with
-        | Received { gossip_data; _ }
-        | Verifying_blockchain_proof { gossip_data; _ } ->
-            Gossip_types.drop_gossip_data `Reject gossip_data
-        | Downloading_body { block_vc; _ }
-        | Verifying_complete_works { block_vc; _ }
-        | Building_breadcrumb { block_vc; _ } ->
-            Option.iter
-              ~f:
-                (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
-                   `Reject )
-              block_vc
-        | Invalid _ | Waiting_to_be_added_to_frontier _ ->
-            () ) ;
-        let transition_meta = State_functions.transition_meta state in
-        let children = children state in
-        State_hash.Set.iter children.processing_or_failed ~f:go ;
-        State_hash.Set.iter children.processed ~f:go ;
-        State_hash.Set.iter children.waiting_for_parent ~f:go ;
-        Invalid { transition_meta; error } )
+  let rec go = State_hash.Table.change transition_states ~f
+  and f st_opt =
+    let%bind.Option state = st_opt in
+    let%map.Option () = match state with Invalid _ -> None | _ -> Some () in
+    ( match state with
+    | Received { gossip_data; _ }
+    | Verifying_blockchain_proof { gossip_data; _ } ->
+        Gossip_types.drop_gossip_data `Reject gossip_data
+    | Downloading_body { block_vc; _ }
+    | Verifying_complete_works { block_vc; _ }
+    | Building_breadcrumb { block_vc; _ } ->
+        Option.iter
+          ~f:
+            (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
+               `Reject )
+          block_vc
+    | Invalid _ | Waiting_to_be_added_to_frontier _ ->
+        () ) ;
+    let transition_meta = State_functions.transition_meta state in
+    let children = children state in
+    State_hash.Set.iter children.processing_or_failed ~f:go ;
+    State_hash.Set.iter children.processed ~f:go ;
+    State_hash.Set.iter children.waiting_for_parent ~f:go ;
+    Invalid { transition_meta; error }
   in
   go top_state_hash
 

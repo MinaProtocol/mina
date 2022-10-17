@@ -96,9 +96,7 @@ let mk_in_progress ~mark_processed_and_promote
            One_or_two.to_list (One_or_two.map proofs ~f:(fun p -> (p, msg))) )
   in
   let module I = Interruptible.Make () in
-  let action =
-    I.lift @@ Verifier.verify_transaction_snarks Context.verifier works
-  in
+  let action = Context.verify_transaction_proofs (module I) works in
   Async_kernel.Deferred.upon (I.force action)
     (upon_f ~timeout_controller:Context.timeout_controller
        ~block:block_with_validation ~mark_processed_and_promote
