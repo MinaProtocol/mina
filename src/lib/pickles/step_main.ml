@@ -7,7 +7,6 @@ open Hlist
 open Import
 open Impls.Step
 open Step_main_inputs
-open Step_verifier
 module B = Inductive_rule.B
 
 (* Converts from the one hot vector representation of a number
@@ -21,7 +20,7 @@ module B = Inductive_rule.B
 let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
     Field.t =
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
-  Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
+  Step_verifier.Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
 let verify_one
     ({ app_state
@@ -45,9 +44,9 @@ let verify_one
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~step_uses_lookup:d.step_uses_lookup ~sponge ~prev_challenges
-          proof_state.deferred_values prev_proof_evals )
+        Step_verifier.finalize_other_proof d.max_proofs_verified
+          ~step_domains:d.step_domains ~step_uses_lookup:d.step_uses_lookup
+          ~sponge ~prev_challenges proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -57,7 +56,8 @@ let verify_one
     in
     let sponge_after_index, hash_messages_for_next_step_proof =
       (* TODO: Don't rehash when it's not necessary *)
-      hash_messages_for_next_step_proof_opt ~index:d.wrap_key to_field_elements
+      Step_verifier.hash_messages_for_next_step_proof_opt ~index:d.wrap_key
+        to_field_elements
     in
     (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
@@ -86,7 +86,7 @@ let verify_one
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify
+        Step_verifier.verify
           ~lookup_parameters:
             { use = d.step_uses_lookup
             ; zero =
@@ -492,8 +492,8 @@ let step_main :
                   fun x -> fst (typ.var_to_fields x)
                 in
                 unstage
-                  (hash_messages_for_next_step_proof ~index:dlog_plonk_index
-                     to_field_elements )
+                  (Step_verifier.hash_messages_for_next_step_proof
+                     ~index:dlog_plonk_index to_field_elements )
               in
               let (app_state : var) =
                 match public_input with
