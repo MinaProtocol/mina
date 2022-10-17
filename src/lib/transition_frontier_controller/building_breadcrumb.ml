@@ -145,7 +145,7 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
     [Processed] status to [Building_breadcrumb] state.
 *)
 let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
-    ~substate ~block_vc =
+    ~substate ~block_vc ~aux =
   let parent_hash =
     Mina_block.Validation.block block
     |> Mina_block.header |> Mina_block.Header.protocol_state
@@ -153,8 +153,8 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
   in
   let build parent =
     building_breadcrumb_status ~context ~mark_processed_and_promote
-      ~transition_states ~received_at:substate.Substate.received_at
-      ~sender:substate.sender ~parent block
+      ~transition_states ~received_at:aux.Transition_state.received_at
+      ~sender:aux.sender ~parent block
   in
   let rec mk_status () =
     match State_hash.Table.find transition_states parent_hash with
@@ -181,4 +181,4 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
   in
   let status = mk_status () in
   Transition_state.Building_breadcrumb
-    { block; block_vc; substate = { substate with status } }
+    { block; block_vc; substate = { substate with status }; aux }

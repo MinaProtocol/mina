@@ -3,50 +3,9 @@ open Core_kernel
 open Async
 open Context
 
-(** [verify_heeader_is_relevant] determines if a transition received through
-    gossip is relevant.
-
-  Depending on relevance status, metrics are updated for the peer who sent the transition.
-*)
-let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
-    ~transition_states header_with_hash =
-  let open Transition_handler.Validator in
-  let hash = State_hash.With_state_hashes.state_hash header_with_hash in
-  let relevance_result =
-    let%bind.Result () =
-      Option.value_map (Hashtbl.find transition_states hash) ~default:(Ok ())
-        ~f:(fun st -> Error (`In_process st))
-    in
-    verify_header_is_relevant
-      ~context:(module Context)
-      ~frontier:Context.frontier header_with_hash
-  in
-  let open Context in
-  let record_irrelevant error =
-    don't_wait_for
-    @@ record_transition_is_irrelevant ~logger ~trust_system ~sender ~error
-         header_with_hash
-  in
-  (* This action is deferred because it may potentially trigger change of ban status
-     of a peer which requires writing to a synchonous pipe. *)
-  (* Although it's not evident from types, banning may be triiggered only for irrelevant
-     case, hence it's safe to do don't_wait_for *)
-  match relevance_result with
-  | Ok () ->
-      don't_wait_for
-        (record_transition_is_relevant ~logger ~trust_system ~sender
-           ~time_controller header_with_hash ) ;
-      `Relevant
-  | Error (`In_process (Transition_state.Invalid _) as error) ->
-      record_irrelevant error ; `Irrelevant
-  | Error (`In_process _ as error) ->
-      record_irrelevant error ; `Preserve_gossip_data
-  | Error error ->
-      record_irrelevant error ; `Irrelevant
-
 (** [mark_done state_hash] assigns a transition corresponding to [state_hash]
   with a [Processing] or [Failed] status new status [Processing (Done ())] and
-  returns in-progress context if the transition was in progress (receiving ancestry).
+  returns in-progress context if the transition was in progress of receiving ancestry.
 *)
 let mark_done ~transition_states state_hash =
   let%bind.Option st = State_hash.Table.find transition_states state_hash in
@@ -54,8 +13,7 @@ let mark_done ~transition_states state_hash =
     match st with
     | Transition_state.Received
         ({ substate = { status = Processing _; _ } as s; _ } as r)
-    | Transition_state.Received
-        ({ substate = { status = Failed _; _ } as s; _ } as r) ->
+    | Received ({ substate = { status = Failed _; _ } as s; _ } as r) ->
         Some
           (Transition_state.Received
              { r with substate = { s with status = Processing (Done ()) } } )
@@ -70,147 +28,25 @@ let mark_done ~transition_states state_hash =
   | _ ->
       None
 
-let create_gossip_data ?gossip_type vc_opt =
-  Option.value ~default:Transition_state.Not_a_gossip
-  @@ let%bind.Option gt = gossip_type in
-     let%map.Option vc = vc_opt in
-     match gt with
-     | `Header ->
-         Transition_state.Gossiped_header vc
-     | `Block ->
-         Gossiped_block vc
-
-(** Update gossip data kept for a transition to include information
-    that became potentially available from a recently received gossip *)
-let update_gossip_data ~context:(module Context : Context.CONTEXT) ~hash ~vc
-    ~gossip_type old =
-  let log_duplicate () =
-    [%log' warn Context.logger] "Duplicate %s gossip for $state_hash"
-      (match gossip_type with `Block -> "block" | `Header -> "header")
-      ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]
-  in
-  match (gossip_type, old) with
-  | `Block, Transition_state.Gossiped_header header_vc ->
-      Transition_state.Gossiped_both { block_vc = vc; header_vc }
-  | `Header, Transition_state.Gossiped_block block_vc ->
-      Gossiped_both { block_vc; header_vc = vc }
-  | `Block, Transition_state.Not_a_gossip ->
-      Gossiped_block vc
-  | `Header, Transition_state.Not_a_gossip ->
-      Gossiped_header vc
-  | `Header, Transition_state.Gossiped_header _ ->
-      log_duplicate () ; old
-  | `Header, Transition_state.Gossiped_both _ ->
-      log_duplicate () ; old
-  | `Block, Transition_state.Gossiped_block _ ->
-      log_duplicate () ; old
-  | `Block, Transition_state.Gossiped_both _ ->
-      log_duplicate () ; old
-
-(** [preserve_relevant_gossip st] takes data of a recently received gossip related to a
-    transition already present in the catchup state and is associated with state [st].
-    
-    Function returns a pair of a new transition state and an ivar to interrupt processing
-    of the transition if one was active and is no longer relevant.
-    *)
-let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~hash
-    ?gossip_type st =
-  let update_gossip_data =
-    Option.value ~default:Fn.id
-    @@ let%bind.Option vc = vc_opt in
-       let%map.Option gossip_type = gossip_type in
-       update_gossip_data ~context ~hash ~vc ~gossip_type
-  in
-  let consensus_state =
-    Fn.compose Mina_state.Protocol_state.consensus_state
-      Mina_block.Header.protocol_state
-  in
-  let update_body_opt = Option.first_some body_opt in
-  let update_block_vc =
-    match (gossip_type, vc_opt) with
-    | Some `Block, Some vc ->
-        Option.(Fn.compose some @@ value ~default:vc)
-    | _ ->
-        ident
-  in
-  let fire_callback =
-    Option.value_map ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-      ~default:ignore vc_opt
-  in
-  let accept_header consensus_state =
-    match gossip_type with
-    | Some `Block | None ->
-        ()
-    | Some `Header ->
-        Option.iter vc_opt ~f:(fun valid_cb ->
-            Context.accept_gossip ~context ~valid_cb consensus_state )
-  in
-  match (st, body_opt) with
-  | Transition_state.Invalid _, _ ->
-      fire_callback `Reject ;
-      (st, None)
-  | st, _ when Transition_state.is_failed st ->
-      fire_callback `Ignore ;
-      (st, None)
-  | Received ({ gossip_data; body_opt; _ } as r), _ ->
-      ( Received
-          { r with
-            gossip_data = update_gossip_data gossip_data
-          ; body_opt = update_body_opt body_opt
-          }
-      , None )
-  | Verifying_blockchain_proof ({ gossip_data; body_opt; _ } as r), _ ->
-      ( Verifying_blockchain_proof
-          { r with
-            gossip_data = update_gossip_data gossip_data
-          ; body_opt = update_body_opt body_opt
-          }
-      , None )
-  | ( Downloading_body
-        ( { block_vc
-          ; substate = { status = Processing (In_progress ctx); _ } as s
-          ; header
-          ; _
-          } as r )
-    , Some body ) ->
-      accept_header (consensus_state @@ Mina_block.Validation.header header) ;
-      ( Downloading_body
-          { r with
-            block_vc = update_block_vc block_vc
-          ; substate = { s with status = Processing (Done body) }
-          }
-      , Some ctx.interrupt_ivar )
-  | Downloading_body ({ block_vc; header; _ } as r), _ ->
-      accept_header (consensus_state @@ Mina_block.Validation.header header) ;
-      (Downloading_body { r with block_vc = update_block_vc block_vc }, None)
-  | Verifying_complete_works ({ block_vc; block; _ } as r), _ ->
-      accept_header
-        (consensus_state @@ Mina_block.(header @@ Validation.block block)) ;
-      ( Verifying_complete_works { r with block_vc = update_block_vc block_vc }
-      , None )
-  | Building_breadcrumb ({ block_vc; block; _ } as r), _ ->
-      accept_header
-        (consensus_state @@ Mina_block.(header @@ Validation.block block)) ;
-      (Building_breadcrumb { r with block_vc = update_block_vc block_vc }, None)
-  | Waiting_to_be_added_to_frontier { breadcrumb; _ }, _ ->
-      let consensus_state =
-        consensus_state
-        @@ Mina_block.(header @@ Frontier_base.Breadcrumb.block breadcrumb)
-      in
-      Option.iter vc_opt ~f:(fun valid_cb ->
-          accept_gossip ~context ~valid_cb consensus_state ) ;
-      (st, None)
-
 let preserve_relevant_gossip_and_promote ~mark_processed_and_promote
-    ~transition_states ?body ?vc ~context ~hash ?gossip_type st =
-  let st', interrupt_ivar_opt =
-    preserve_relevant_gossip ?body ?vc ~context ~hash ?gossip_type st
+    ~transition_states ?body ?vc ~context ~hash ?gossip_type ?gossip_header st =
+  let st', hint =
+    Gossip.preserve_relevant_gossip ?body ?vc ~context ~hash ?gossip_type
+      ?gossip_header st
   in
   State_hash.Table.set transition_states ~key:hash ~data:st' ;
-  Option.value ~default:()
-  @@ let%map.Option ivar = interrupt_ivar_opt in
-     Ivar.fill_if_empty ivar () ;
-     mark_processed_and_promote [ hash ]
+  match hint with
+  | `Nop ->
+      ()
+  | `Mark_verifying_blockchain_proof_processed iv_header ->
+      Verifying_blockchain_proof.mark_processed ~context
+        ~mark_processed_and_promote ~transition_states iv_header
+  | `Start_processing_verifying_complete_works block ->
+      Verifying_complete_works.start_processing ~context
+        ~mark_processed_and_promote ~transition_states block
+  | `Promote_and_interrupt ivar ->
+      Ivar.fill_if_empty ivar () ;
+      mark_processed_and_promote [ hash ]
 
 let pre_validate_header ~context hh =
   let open Result in
@@ -275,6 +111,14 @@ let split_retrieve_chain_element = function
   | `Meta m ->
       (m, None, None)
 
+(** Handle an ancestor returned by [retrieve_chain] function.
+  
+    The ancestor's block is pre-validated and added to transition states
+    (if not yet present there).
+
+    In case ancestor is already in transition states and body is available
+    from 
+*)
 let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
     ~sender el =
   let (module Context : CONTEXT) = context in
@@ -292,7 +136,7 @@ let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
       match pre_validate_header ~context hh with
       | Ok vh ->
           add_received ~context ~mark_processed_and_promote ~sender ~state ?body
-            (Transition_state.Pre_initial_valid vh) ;
+            (Gossip_types.Pre_initial_valid vh) ;
           Ok ()
       | Error e ->
           (* TODO every time this code is called we probably want to update some metrics
@@ -407,7 +251,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let header_with_hash =
-    Transition_state.header_with_hash_of_received_header received_header
+    Gossip_types.header_with_hash_of_received_header received_header
   in
   let header = With_hash.data header_with_hash in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
@@ -441,11 +285,10 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
         (Received
            { body_opt
            ; header = received_header
-           ; gossip_data = create_gossip_data ?gossip_type vc
-           ; substate =
-               { children
-               ; received_via_gossip = Option.is_some gossip_type
-               ; status
+           ; gossip_data = Gossip_types.create_gossip_data ?gossip_type vc
+           ; substate = { children; status }
+           ; aux =
+               { received_via_gossip = Option.is_some gossip_type
                ; sender
                ; received_at
                }
@@ -477,10 +320,8 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
 
 (** Add a gossip to catchup state *)
 let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
-    ~gossip_type ?vc received_header =
-  let header_with_hash =
-    Transition_state.header_with_hash_of_received_header received_header
-  in
+    ~gossip_type ?vc gossip_header =
+  let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
   let body =
     if is_some body then body
     else
@@ -494,7 +335,7 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
   in
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =
-    verify_header_is_relevant ~context ~sender
+    Gossip.verify_header_is_relevant ~context ~sender
       ~transition_states:state.transition_states header_with_hash
   in
   match relevance_status with
@@ -502,12 +343,12 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
       ()
   | `Relevant ->
       add_received ~mark_processed_and_promote ~context ~sender ~state
-        ~gossip_type ?vc ?body received_header
+        ~gossip_type ?vc ?body (Initial_valid gossip_header)
   | `Preserve_gossip_data ->
       let f =
         preserve_relevant_gossip_and_promote ~mark_processed_and_promote
           ~transition_states:state.transition_states ?body ?vc ~context ~hash
-          ~gossip_type
+          ~gossip_type ~gossip_header
       in
       Option.iter ~f (State_hash.Table.find state.transition_states hash)
 
@@ -532,7 +373,7 @@ let handle_collected_transition ~context:(module Context : CONTEXT)
   handle_gossip
     ~context:(module Context)
     ~mark_processed_and_promote ~state ~sender ?vc ?body ~gossip_type
-    (Initial_valid header_with_validation)
+    header_with_validation
 
 (** [handle_network_transition] adds a transition that was received through gossip
     to the catchup state. *)
@@ -553,4 +394,4 @@ let handle_network_transition ~context:(module Context : CONTEXT)
   handle_gossip
     ~context:(module Context)
     ~mark_processed_and_promote ~state ~sender ?body ?vc ~gossip_type
-    (Initial_valid header_with_validation)
+    header_with_validation

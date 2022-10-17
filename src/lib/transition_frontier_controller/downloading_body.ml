@@ -196,7 +196,7 @@ let restart_failed_ancestor ~transition_states ~mark_processed_and_promote
     [Processed] status to [Downloading_body] state.
 *)
 let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
-    ~gossip_data ~body_opt =
+    ~gossip_data ~body_opt ~aux =
   let header =
     match substate.Substate.status with
     | Processed h ->
@@ -234,7 +234,7 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
   let substate = { substate with status = Processing ctx } in
   let block_vc =
     match gossip_data with
-    | Transition_state.Not_a_gossip ->
+    | Gossip_types.Not_a_gossip ->
         None
     | Gossiped_header vc ->
         accept_gossip ~context ~valid_cb:vc consensus_state ;
@@ -247,13 +247,13 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
   in
   let state' =
     Transition_state.Downloading_body
-      { header; substate; block_vc; next_failed_ancestor }
+      { header; substate; block_vc; next_failed_ancestor; aux }
   in
   let restart_f =
     restart_failed_ancestor ~transition_states ~mark_processed_and_promote
       ~context
   in
-  if substate.received_via_gossip then
+  if aux.Transition_state.received_via_gossip then
     List.iter ~f:restart_f
     @@ Option.value_map ~default:[]
          ~f:(collect_failed_ancestry ~transition_states)

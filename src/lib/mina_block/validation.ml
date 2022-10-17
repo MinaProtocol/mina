@@ -614,3 +614,23 @@ let with_body (header_with_hash, validation) body =
 let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
 
 let to_header (b, v) = (With_hash.map ~f:Block.header b, v)
+
+let reset_proof_validation_header (h, validation) =
+  match validation with
+  | ( time_received
+    , genesis_state
+    , (`Proof, Truth.True ())
+    , delta_block_chain
+    , frontier_dependencies
+    , staged_ledger_diff
+    , protocol_versions ) ->
+      ( h
+      , ( time_received
+        , genesis_state
+        , (`Proof, Truth.False)
+        , delta_block_chain
+        , frontier_dependencies
+        , staged_ledger_diff
+        , protocol_versions ) )
+  | _ ->
+      failwith "why can't this be refuted?"
