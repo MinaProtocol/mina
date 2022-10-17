@@ -118,8 +118,9 @@ Please note, that default configuration of the node depends on the build profile
 used during compilation, so in order to connect to some networks it might be
 necessary to compile the daemon with a specific profile.
 
-Before this can be done, however, some setup is required. First a key pair needs to be generated so that the
-daemon can sign blocks that it produces. This can be done using the same `mina.exe` binary:
+Before this can be done, however, some setup is required. First a key
+pair needs to be generated so that the daemon can create an account to
+issue blocks from. This can be done using the same `mina.exe` binary:
 
 ```shell
 $ dune exec src/app/cli/src/mina.exe -- libp2p generate-keypair --privkey-path /path/to/key
