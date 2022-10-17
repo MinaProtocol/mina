@@ -17,17 +17,16 @@ module Make
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
-  open Impl
   module PC = Inner_curve
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Number = Snarky_backendless.Number.Run.Make (Impl)
+  open Impl
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
     let size_in_bits = Field.size_in_bits
 
-    module Constant = Other_field
+    module Constant = Inputs.Other_field
 
     type t = Impls.Step.Other_field.t
 
@@ -101,10 +100,10 @@ struct
 
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
-  module Ops = Step_main_inputs.Ops
+  module Ops = Step_main_inputs.Ops (* Looks like this is not parameterized *)
 
   module Inner_curve = struct
-    include Inner_curve
+    include Inputs.Inner_curve
 
     let ( + ) = Ops.add_fast
   end
