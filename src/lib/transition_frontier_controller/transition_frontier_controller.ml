@@ -2,9 +2,9 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Mina_block
-include Types
 
-let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
+let run_with_normal_or_super_catchup
+    ~context:(module Context : Transition_handler.Validator.CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~collected_transitions
     ~frontier ~network_transition_reader ~producer_transition_reader
     ~clear_reader ~verified_transition_writer =
@@ -147,9 +147,10 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
          (Strict_pipe.Writer.write verified_transition_writer) )
   |> don't_wait_for
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
+let run ~context:(module Context : Transition_handler.Validator.CONTEXT)
+    ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+    ~frontier ~network_transition_reader ~producer_transition_reader
+    ~clear_reader ~verified_transition_writer =
   match Transition_frontier.catchup_state frontier with
   | Hash _ ->
       run_with_normal_or_super_catchup

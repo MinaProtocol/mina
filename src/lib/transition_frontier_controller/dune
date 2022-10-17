@@ -48,4 +48,5 @@
    one_or_two
    mina_base.import
    mina_numbers
+   ledger_proof
 ))
