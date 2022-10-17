@@ -28,13 +28,15 @@ module FeeTransferType :
 end
 
 (* TESTS *)
-module FeeTransferType_gen = struct
-  include Filtered_external_transition.Fee_transfer_type
-
-  let gen = quickcheck_generator
-end
 
 let%test_module "FeeTransferType" =
-  ( module Graphql_basic_scalars.Make_test
-             (FeeTransferType)
-             (FeeTransferType_gen) )
+  ( module struct
+    module FeeTransferType_gen = struct
+      include Filtered_external_transition.Fee_transfer_type
+
+      let gen = quickcheck_generator
+    end
+
+    include
+      Graphql_basic_scalars.Make_test (FeeTransferType) (FeeTransferType_gen)
+  end )

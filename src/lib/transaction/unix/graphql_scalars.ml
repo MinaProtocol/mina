@@ -19,23 +19,29 @@ module TransactionId =
     end)
 
 (* TESTS *)
-module TransactionHash_gen = struct
-  include Mina_transaction.Transaction_hash
-  open Core_kernel
-
-  let gen =
-    Mina_base.Coinbase.Gen.gen
-      ~constraint_constants:
-        Genesis_constants.Constraint_constants.for_unit_tests
-    |> Quickcheck.Generator.map ~f:(fun (coinbase, _) -> hash_coinbase coinbase)
-end
-
-module TransactionId_gen = struct
-  include Mina_transaction.Transaction_id.User_command
-end
 
 let%test_module "TransactionHash" =
-  (module Make_test (TransactionHash) (TransactionHash_gen))
+  ( module struct
+    module TransactionHash_gen = struct
+      include Mina_transaction.Transaction_hash
+      open Core_kernel
+
+      let gen =
+        Mina_base.Coinbase.Gen.gen
+          ~constraint_constants:
+            Genesis_constants.Constraint_constants.for_unit_tests
+        |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
+               hash_coinbase coinbase )
+    end
+
+    include Make_test (TransactionHash) (TransactionHash_gen)
+  end )
 
 let%test_module "TransactionId" =
-  (module Make_test (TransactionId) (TransactionId_gen))
+  ( module struct
+    module TransactionId_gen = struct
+      include Mina_transaction.Transaction_id.User_command
+    end
+
+    include Make_test (TransactionId) (TransactionId_gen)
+  end )

@@ -100,18 +100,6 @@ end
 
 (* TESTS *)
 
-module FieldElem_gen = struct
-  include Mina_base.Zkapp_basic.F
-
-  let gen =
-    Core_kernel.Int.quickcheck_generator
-    |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
-end
-
-module StagedledgerAuxHash_gen = struct
-  include Mina_base.Staged_ledger_hash.Aux_hash
-end
-
 let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
 
 let%test_module "StateHash" =
@@ -131,10 +119,27 @@ let%test_module "TransactionStatusFailure" =
              (TransactionStatusFailure)
              (Mina_base.Transaction_status.Failure) )
 
-let%test_module "FieldElem" = (module Make_test (FieldElem) (FieldElem_gen))
+let%test_module "FieldElem" =
+  ( module struct
+    module FieldElem_gen = struct
+      include Mina_base.Zkapp_basic.F
+
+      let gen =
+        Core_kernel.Int.quickcheck_generator
+        |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+    end
+
+    include Make_test (FieldElem) (FieldElem_gen)
+  end )
 
 let%test_module "PendingCoinbaseHash" =
   (module Make_test (PendingCoinbaseHash) (Mina_base.Pending_coinbase.Hash))
 
 let%test_module "StagedLedgerAuxHash" =
-  (module Make_test (StagedLedgerAuxHash) (StagedledgerAuxHash_gen))
+  ( module struct
+    module StagedledgerAuxHash_gen = struct
+      include Mina_base.Staged_ledger_hash.Aux_hash
+    end
+
+    include Make_test (StagedLedgerAuxHash) (StagedledgerAuxHash_gen)
+  end )

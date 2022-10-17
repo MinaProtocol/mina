@@ -19,25 +19,27 @@ module VerificationKeyHash =
     end)
 
 (* TESTS *)
-module VerificationKey_gen = struct
-  include Pickles.Side_loaded.Verification_key
-
-  let gen =
-    String_gen.gen
-    |> Core_kernel.Quickcheck.Generator.map ~f:(fun name ->
-           Pickles.Tag.create ~name |> of_compiled )
-end
 
 let%test_module "VerificationKey" =
-  (module Make_test (VerificationKey) (VerificationKey_gen))
+  ( module struct
+    module VerificationKey_gen = struct
+      include Pickles.Side_loaded.Verification_key
 
-module VerificationKeyHash_gen = struct
-  include Pickles.Backend.Tick.Field
+      let gen = Core_kernel.Quickcheck.Generator.return dummy
+    end
 
-  let gen =
-    Core_kernel.Int.quickcheck_generator
-    |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
-end
+    include Make_test (VerificationKey) (VerificationKey_gen)
+  end )
 
 let%test_module "VerificationKeyHash" =
-  (module Make_test (VerificationKeyHash) (VerificationKeyHash_gen))
+  ( module struct
+    module VerificationKeyHash_gen = struct
+      include Pickles.Backend.Tick.Field
+
+      let gen =
+        Core_kernel.Int.quickcheck_generator
+        |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+    end
+
+    include Make_test (VerificationKeyHash) (VerificationKeyHash_gen)
+  end )

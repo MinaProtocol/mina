@@ -54,41 +54,52 @@ module BodyReference = struct
 end
 
 (* TESTS *)
-module Slot_gen = struct
-  include Slot
-
-  let gen =
-    Core_kernel.Quickcheck.Generator.map ~f:Slot.of_uint32
-      (Constants.for_unit_tests |> Lazy.force |> gen)
-end
 
 let%test_module "Epoch" = (module Make_test (Epoch_scalar) (Epoch))
 
-let%test_module "Slot" = (module Make_test (Slot_scalar) (Slot_gen))
+let%test_module "Slot" =
+  ( module struct
+    module Slot_gen = struct
+      include Slot
+
+      let gen =
+        Core_kernel.Quickcheck.Generator.map ~f:Slot.of_uint32
+          (Constants.for_unit_tests |> Lazy.force |> gen)
+    end
+
+    include Make_test (Slot_scalar) (Slot_gen)
+  end )
 
 module Slot = Slot_scalar
 module Epoch = Epoch_scalar
 
-module VrfScalar_gen = struct
-  include Snark_params.Tick.Inner_curve.Scalar
-end
+let%test_module "VrfScalar" =
+  ( module struct
+    module VrfScalar_gen = struct
+      include Snark_params.Tick.Inner_curve.Scalar
+    end
 
-let%test_module "VrfScalar" = (module Make_test (VrfScalar) (VrfScalar_gen))
-
-module VrfOutputTruncated_gen = struct
-  include Consensus_vrf.Output.Truncated
-
-  let gen = Core_kernel.Quickcheck.Generator.return dummy
-end
+    include Make_test (VrfScalar) (VrfScalar_gen)
+  end )
 
 let%test_module "VrfOutputTruncated" =
-  (module Make_test (VrfOutputTruncated) (VrfOutputTruncated_gen))
+  ( module struct
+    module VrfOutputTruncated_gen = struct
+      include Consensus_vrf.Output.Truncated
 
-module BodyReference_gen = struct
-  include Body_reference
+      let gen = Core_kernel.Quickcheck.Generator.return dummy
+    end
 
-  let gen = Blake2.gen
-end
+    include Make_test (VrfOutputTruncated) (VrfOutputTruncated_gen)
+  end )
 
 let%test_module "BodyReference" =
-  (module Make_test (BodyReference) (BodyReference_gen))
+  ( module struct
+    module BodyReference_gen = struct
+      include Body_reference
+
+      let gen = Blake2.gen
+    end
+
+    include Make_test (BodyReference) (BodyReference_gen)
+  end )
