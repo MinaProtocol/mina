@@ -1,44 +1,33 @@
-open Mina_block.Validation
 open Mina_base
 open Core_kernel
 open Substate
 
-type transition_gossip_t =
-  | Not_a_gossip
-  | Gossiped_header of Mina_net2.Validation_callback.t
-  | Gossiped_block of Mina_net2.Validation_callback.t
-  | Gossiped_both of
-      { block_vc : Mina_net2.Validation_callback.t
-      ; header_vc : Mina_net2.Validation_callback.t
-      }
-
-type received_header =
-  | Pre_initial_valid of pre_initial_valid_with_header
-  | Initial_valid of initial_valid_with_header
-
-let header_with_hash_of_received_header h =
-  match h with
-  | Pre_initial_valid h ->
-      Mina_block.Validation.header_with_hash h
-  | Initial_valid h ->
-      Mina_block.Validation.header_with_hash h
+type aux_data =
+  { received_via_gossip : bool
+  ; received_at : Time.t
+  ; sender : Network_peer.Envelope.Sender.t
+  }
 
 type t =
   | Received of
-      { header : received_header
+      { header : Gossip_types.received_header
       ; substate : unit common_substate
-      ; gossip_data : transition_gossip_t
+      ; aux : aux_data
+      ; gossip_data : Gossip_types.transition_gossip_t
       ; body_opt : Staged_ledger_diff.Body.t option
       }
   | Verifying_blockchain_proof of
-      { header : received_header
-      ; substate : initial_valid_with_header common_substate
-      ; gossip_data : transition_gossip_t
+      { header : Mina_block.Validation.pre_initial_valid_with_header
+      ; substate :
+          Mina_block.Validation.initial_valid_with_header common_substate
+      ; aux : aux_data
+      ; gossip_data : Gossip_types.transition_gossip_t
       ; body_opt : Staged_ledger_diff.Body.t option
       }
   | Downloading_body of
-      { header : initial_valid_with_header
+      { header : Mina_block.Validation.initial_valid_with_header
       ; substate : Staged_ledger_diff.Body.t common_substate
+      ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
             (** [next_failed_ancestor] is the next ancestor that is in [Downloading_body] state
           and failed at least once. This field might be outdated (i.e. the ancestor is
@@ -46,13 +35,15 @@ type t =
       ; next_failed_ancestor : State_hash.t option
       }
   | Verifying_complete_works of
-      { block : initial_valid_with_block
+      { block : Mina_block.Validation.initial_valid_with_block
       ; substate : unit common_substate
+      ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
       }
   | Building_breadcrumb of
-      { block : initial_valid_with_block
+      { block : Mina_block.Validation.initial_valid_with_block
       ; substate : Frontier_base.Breadcrumb.t common_substate
+      ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
       }
   | Waiting_to_be_added_to_frontier of
@@ -96,10 +87,10 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     match st with
     | Received { header; _ } ->
         transition_meta_of_header_with_hash
-        @@ header_with_hash_of_received_header header
+        @@ Gossip_types.header_with_hash_of_received_header header
     | Verifying_blockchain_proof { header; _ } ->
         transition_meta_of_header_with_hash
-        @@ header_with_hash_of_received_header header
+        @@ Mina_block.Validation.header_with_hash header
     | Downloading_body { header; _ } ->
         transition_meta_of_header_with_hash
         @@ Mina_block.Validation.header_with_hash header
@@ -158,22 +149,6 @@ let is_failed st =
   | _ ->
       false
 
-let drop_gossip_data validation_result gossip_data =
-  match gossip_data with
-  | Not_a_gossip ->
-      ()
-  | Gossiped_header vc ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired vc
-        validation_result
-  | Gossiped_block vc ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired vc
-        validation_result
-  | Gossiped_both { block_vc; header_vc } ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired block_vc
-        validation_result ;
-      Mina_net2.Validation_callback.fire_if_not_already_fired header_vc
-        validation_result
-
 let mark_invalid ~transition_states ~error:err top_state_hash =
   let tag =
     sprintf "(from state hash %s) " (State_hash.to_base58_check top_state_hash)
@@ -188,7 +163,7 @@ let mark_invalid ~transition_states ~error:err top_state_hash =
         ( match state with
         | Received { gossip_data; _ }
         | Verifying_blockchain_proof { gossip_data; _ } ->
-            drop_gossip_data `Reject gossip_data
+            Gossip_types.drop_gossip_data `Reject gossip_data
         | Downloading_body { block_vc; _ }
         | Verifying_complete_works { block_vc; _ }
         | Building_breadcrumb { block_vc; _ } ->
@@ -208,6 +183,16 @@ let mark_invalid ~transition_states ~error:err top_state_hash =
   in
   go top_state_hash
 
-let state_hash_of_received_header =
-  Fn.compose State_hash.With_state_hashes.state_hash
-    header_with_hash_of_received_header
+let modify_aux_data ~f = function
+  | Received ({ aux; _ } as r) ->
+      Received { r with aux = f aux }
+  | Verifying_blockchain_proof ({ aux; _ } as r) ->
+      Verifying_blockchain_proof { r with aux = f aux }
+  | Downloading_body ({ aux; _ } as r) ->
+      Downloading_body { r with aux = f aux }
+  | Verifying_complete_works ({ aux; _ } as r) ->
+      Verifying_complete_works { r with aux = f aux }
+  | Building_breadcrumb ({ aux; _ } as r) ->
+      Building_breadcrumb { r with aux = f aux }
+  | (Waiting_to_be_added_to_frontier _ as st) | (Invalid _ as st) ->
+      st

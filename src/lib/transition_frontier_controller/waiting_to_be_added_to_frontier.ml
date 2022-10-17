@@ -2,7 +2,7 @@ open Core_kernel
 open Context
 
 let promote_to ~context:(module Context : CONTEXT)
-    ~substate:{ Substate.children; received_via_gossip; status; _ } ~block_vc =
+    ~substate:{ Substate.children; status } ~block_vc ~aux =
   let breadcrumb =
     match status with
     | Processed b ->
@@ -19,6 +19,7 @@ let promote_to ~context:(module Context : CONTEXT)
   Context.write_breadcrumb breadcrumb ;
   Transition_state.Waiting_to_be_added_to_frontier
     { breadcrumb
-    ; source = (if received_via_gossip then `Gossip else `Catchup)
+    ; source =
+        (if aux.Transition_state.received_via_gossip then `Gossip else `Catchup)
     ; children
     }

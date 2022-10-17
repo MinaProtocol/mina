@@ -32,12 +32,7 @@ let empty_children_sets =
   }
 
 type 'a common_substate =
-  { status : 'a ancestry_status
-  ; received_via_gossip : bool
-  ; children : children_sets
-  ; received_at : Time.t
-  ; sender : Network_peer.Envelope.Sender.t
-  }
+  { status : 'a ancestry_status; children : children_sets }
 
 type 'v modifier =
   { modifier : 'a. 'a common_substate -> 'a common_substate * 'v }
@@ -77,7 +72,7 @@ let view (type state_t)
     and
     2. Have same state level as [top_state]
 
-    Returned list of states is in the parent-first order.
+    Returned list of states is in the child-first order.
 *)
 let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     top_state =
@@ -109,20 +104,22 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
 (** [collect_dependent_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
   while collected states are:
   
-    1. In [Waiting_for_parent], [Failed] or ([Processing] and received by gossip) substate
+    1. In [Waiting_for_parent], [Failed] or [Processing Dependent] substate
     and
     2. Have same state level as [top_state]
 
-    Returned list of states is in the parent-first order.
+    States with [Processed] status are skipped through.
+    Returned list of states is in the child-first order.
 *)
 let collect_dependent_ancestry ~state_functions ~transition_states top_state =
   let viewer s =
-    match (s.status, s.received_via_gossip) with
-    | Waiting_for_parent _, _ | Failed _, _ | Processing _, false ->
-        (`Take true, `Continue true)
-    (* Iteration is stopped once we encounter a Processed or a Processing with gossip received state  *)
-    | Processed _, _ | Processing _, true ->
+    match s.status with
+    | Processing (In_progress _) ->
         (`Take false, `Continue false)
+    | Waiting_for_parent _ | Failed _ | Processing _ ->
+        (`Take true, `Continue true)
+    | Processed _ ->
+        (`Take false, `Continue true)
   in
   collect_states ~predicate:{ viewer } ~state_functions ~transition_states
     top_state
@@ -151,8 +148,7 @@ let mark_processed_sm ~is_recursive_call subst =
   | Failed e ->
       Result.Error (sprintf "failed due to %s" (Error.to_string_mach e))
   | Processing (Done a_res) ->
-      Result.Ok
-        ({ subst with status = Processed a_res; children }, subst.children)
+      Result.Ok ({ status = Processed a_res; children }, subst.children)
   | Processing Dependent ->
       Result.Error "not started"
   | Processing (In_progress _) ->
@@ -360,12 +356,12 @@ module For_tests = struct
     and
     2. Have same state level as [top_state]
 
-    Returned list of states is in the parent-first order.
+    Returned list of states is in the child-first order.
 *)
   let collect_failed_ancestry ~state_functions ~transition_states top_state =
     let viewer s =
-      match (s.status, s.received_via_gossip) with
-      | Failed _, _ ->
+      match s.status with
+      | Failed _ ->
           (`Take true, `Continue true)
       | _ ->
           (`Take false, `Continue true)

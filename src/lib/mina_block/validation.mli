@@ -137,6 +137,10 @@ val reset_genesis_protocol_state_validation :
      , 'f )
      with_block
 
+val reset_proof_validation_header :
+     ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_header
+  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_header
+
 val validate_proofs :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
