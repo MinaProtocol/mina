@@ -1,53 +1,48 @@
 open Core_kernel
-open Common
-open Backend
-open Pickles_types
 module Impl = Impls.Step
-open Import
 
 let high_entropy_bits = 128
 
 let sponge_params_constant =
   Sponge.Params.(map pasta_p_kimchi ~f:Impl.Field.Constant.of_string)
 
-let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
-  Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
+let tick_field_random_oracle ?(length = Backend.Tick.Field.size_in_bits - 1) s =
+  Backend.Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
     unstage
-      (group_map
-         (module Tick.Field)
-         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b )
-  and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
+      (Common.group_map
+         (module Backend.Tick.Field)
+         ~a:Backend.Tick.Inner_curve.Params.a
+         ~b:Backend.Tick.Inner_curve.Params.b )
+  and str = Fn.compose Common.bits_to_bytes Backend.Tick.Field.to_bits in
   fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
-
-open Impl
-
-module Other_field = struct
-  type t = Tock.Field.t [@@deriving sexp]
-
-  include (Tock.Field : module type of Tock.Field with type t := t)
-
-  let size = Impls.Wrap.Bigint.to_bignum_bigint size
-end
 
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
-(* unused
-   module Unsafe = struct
-        let unpack_unboolean ?(length = Field.size_in_bits) x =
-          let res =
-            exists
-            (Typ.list Boolean.typ_unchecked ~length)
-              ~compute:
-                As_prover.(
-                  fun () -> List.take (Field.Constant.unpack (read_var x)) length)
-          in
-          Field.Assert.equal x (Field.project res) ;
-          res
-      end *)
+module Other_field = struct
+  type t = Backend.Tock.Field.t [@@deriving sexp]
+
+  include (
+    Backend.Tock.Field : module type of Backend.Tock.Field with type t := t )
+
+  let size = Impls.Wrap.Bigint.to_bignum_bigint size
+end
+
+(* module Unsafe = struct
+     let unpack_unboolean ?(length = Field.size_in_bits) x =
+       let res =
+         exists
+           (Typ.list Boolean.typ_unchecked ~length)
+           ~compute:
+             As_prover.(
+               fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+       in
+       Field.Assert.equal x (Field.project res) ;
+       res
+   end *)
 
 module Sponge = struct
   module Permutation =
@@ -64,14 +59,12 @@ module Sponge = struct
 
   let squeeze_field = squeeze
 
-  let squeeze = squeeze
-
   let absorb t input =
     match input with
     | `Field x ->
         absorb t x
     | `Bits bs ->
-        absorb t (Field.pack bs)
+        absorb t (Impl.Field.pack bs)
 end
 
 let%test_unit "sponge" =
@@ -79,12 +72,12 @@ let%test_unit "sponge" =
   T.test Tick_field_sponge.params
 
 module Input_domain = struct
-  let domain = Domain.Pow_2_roots_of_unity 6
+  let domain = Import.Domain.Pow_2_roots_of_unity 6
 
   let lagrange_commitments =
     lazy
-      (let domain_size = Domain.size domain in
-       time "lagrange" (fun () ->
+      (let domain_size = Import.Domain.size domain in
+       Common.time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
                  (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
@@ -100,14 +93,14 @@ module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Pallas
 
   module Inputs = struct
-    module Impl = Impl
+    module Impl = Impls.Step.Impl
 
     module Params = struct
       include C.Params
 
       let one = C.to_affine_exn C.one
 
-      let group_size_in_bits = Field.size_in_bits
+      let group_size_in_bits = Impl.Field.size_in_bits
     end
 
     module F = struct
@@ -178,25 +171,28 @@ module Inner_curve = struct
   let double t = t + t
 
   let scale t bs =
-    with_label __LOC__ (fun () ->
+    Impl.with_label __LOC__ (fun () ->
         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [ x; y ]
 
   let assert_equal (x1, y1) (x2, y2) =
-    Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2
+    let open Impl.Field.Assert in
+    equal x1 x2 ; equal y1 y2
 
   let scale_inv t bs =
     let res =
-      exists typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              C.scale
-                (C.of_affine (read typ t))
-                (Tock.Field.inv
-                   (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
-              |> C.to_affine_exn)
+      Impl.(
+        exists typ
+          ~compute:
+            As_prover.(
+              fun () ->
+                C.scale
+                  (C.of_affine (read typ t))
+                  (Backend.Tock.Field.inv
+                     (Backend.Tock.Field.of_bits
+                        (List.map ~f:(read Boolean.typ) bs) ) )
+                |> C.to_affine_exn))
     in
     assert_equal t (scale res bs) ;
     res
