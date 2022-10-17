@@ -35,18 +35,19 @@ end
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
-module Unsafe = struct
-  let unpack_unboolean ?(length = Field.size_in_bits) x =
-    let res =
-      exists
-        (Typ.list Boolean.typ_unchecked ~length)
-        ~compute:
-          As_prover.(
-            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
-    in
-    Field.Assert.equal x (Field.project res) ;
-    res
-end
+(* unused
+   module Unsafe = struct
+        let unpack_unboolean ?(length = Field.size_in_bits) x =
+          let res =
+            exists
+            (Typ.list Boolean.typ_unchecked ~length)
+              ~compute:
+                As_prover.(
+                  fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+          in
+          Field.Assert.equal x (Field.project res) ;
+          res
+      end *)
 
 module Sponge = struct
   module Permutation =
@@ -102,7 +103,6 @@ module Inner_curve = struct
     module Impl = Impl
 
     module Params = struct
-      open Impl.Field.Constant
       include C.Params
 
       let one = C.to_affine_exn C.one

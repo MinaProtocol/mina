@@ -5,7 +5,6 @@ open Import
 open Util
 open Types.Step
 open Pickles_types
-open Import
 module S = Sponge
 
 let lookup_verification_enabled = false
