@@ -329,8 +329,6 @@ let%test "lookup finalization" =
   in
   let deferred_values_typ =
     let open Impls.Step in
-    let open Step_main_inputs in
-    let open Step_verifier in
     Wrap.Proof_state.Deferred_values.In_circuit.typ
       (module Impls.Step)
       ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup:Maybe
