@@ -1,24 +1,23 @@
 open Core_kernel
-open Pickles_types
-open Import
-open Backend
 
 (* We maintain a global hash table which stores for each inductive proof system some
    data.
 *)
 type inner_curve_var =
-  Tick.Field.t Snarky_backendless.Cvar.t
-  * Tick.Field.t Snarky_backendless.Cvar.t
+  Backend.Tick.Field.t Snarky_backendless.Cvar.t
+  * Backend.Tick.Field.t Snarky_backendless.Cvar.t
 
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
-    { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
+    { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
-    ; branches : 'n2 Nat.t
-    ; wrap_domains : Domains.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
+    ; branches : 'n2 Pickles_types.Nat.t
+    ; wrap_domains : Import.Domains.t
+    ; wrap_key :
+        Backend.Tick.Inner_curve.Affine.t
+        Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t
     }
 end
 
@@ -36,10 +35,11 @@ module Side_loaded = struct
 
   module Permanent = struct
     type ('var, 'value, 'n1, 'n2) t =
-      { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
+      { max_proofs_verified :
+          (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; step_uses_lookup : Plonk_types.Opt.Flag.t
-      ; branches : 'n2 Nat.t
+      ; step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t
+      ; branches : 'n2 Pickles_types.Nat.t
       }
   end
 
@@ -63,7 +63,9 @@ module Side_loaded = struct
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
-    let proofs_verified = Nat.to_int (Nat.Add.n max_proofs_verified) in
+    let proofs_verified =
+      Pickles_types.Nat.to_int (Pickles_types.Nat.Add.n max_proofs_verified)
+    in
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
     { Basic.max_proofs_verified
     ; wrap_vk
@@ -80,28 +82,31 @@ module Compiled = struct
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; proofs_verifieds : (int, 'branches) Vector.t
+    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; wrap_domains : Domains.t
-    ; step_domains : (Domains.t, 'branches) Vector.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; wrap_domains : Import.Domains.t
+    ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+    ; step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t
     }
 
   (* This is the data associated to an inductive proof system with statement type
      ['a_var], which has ['branches] many "variants" each of which depends on at most
      ['max_proofs_verified] many previous statements. *)
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
+    { branches : 'branches Pickles_types.Nat.t
     ; max_proofs_verified :
-        (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (int, 'branches) Vector.t
+        (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
+    ; wrap_key :
+        Backend.Tick.Inner_curve.Affine.t
+        Pickles_types.Plonk_verification_key_evals.t
+        Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
-    ; wrap_domains : Domains.t
-    ; step_domains : (Domains.t, 'branches) Vector.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; wrap_domains : Import.Domains.t
+    ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+    ; step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t
     }
 
   type packed =
@@ -121,7 +126,7 @@ module Compiled = struct
     { Basic.max_proofs_verified
     ; wrap_domains
     ; public_input
-    ; branches = Vector.length step_domains
+    ; branches = Pickles_types.Vector.length step_domains
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
     ; step_uses_lookup
@@ -130,19 +135,22 @@ end
 
 module For_step = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
+    { branches : 'branches Pickles_types.Nat.t
     ; max_proofs_verified :
-        (module Nat.Add.Intf with type n = 'max_proofs_verified)
+        (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds :
-        [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
+        [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t
+        | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
+    ; wrap_key : inner_curve_var Pickles_types.Plonk_verification_key_evals.t
     ; wrap_domain :
-        [ `Known of Domain.t
+        [ `Known of Import.Domain.t
         | `Side_loaded of
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
-    ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; step_domains :
+        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
+        | `Side_loaded ]
+    ; step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t
     }
 
   let of_side_loaded (type a b c d e f)
@@ -158,7 +166,10 @@ module For_step = struct
       | _ ->
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
     in
-    let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
+    let T =
+      Pickles_types.Nat.eq_exn branches
+        Side_loaded_verification_key.Max_branches.n
+    in
     { branches
     ; max_proofs_verified
     ; public_input
@@ -183,10 +194,11 @@ module For_step = struct
     { branches
     ; max_proofs_verified
     ; proofs_verifieds =
-        `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
+        `Known
+          (Pickles_types.Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; public_input
     ; wrap_key =
-        Plonk_verification_key_evals.map (Lazy.force wrap_key)
+        Pickles_types.Plonk_verification_key_evals.map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
@@ -233,7 +245,9 @@ let lookup_basic :
       Side_loaded.to_basic (lookup_side_loaded t.id)
 
 let max_proofs_verified :
-    type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
+    type n1.
+    (_, _, n1, _) Tag.t -> (module Pickles_types.Nat.Add.Intf with type n = n1)
+    =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -251,7 +265,8 @@ let public_input :
       (lookup_side_loaded tag.id).permanent.public_input
 
 let uses_lookup :
-    type var value. (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t =
+    type var value.
+    (var, value, _, _) Tag.t -> Pickles_types.Plonk_types.Opt.Flag.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -260,7 +275,7 @@ let uses_lookup :
       (lookup_side_loaded tag.id).permanent.step_uses_lookup
 
 let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)
