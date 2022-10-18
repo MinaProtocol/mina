@@ -2,7 +2,11 @@ open Mina_base
 open Core_kernel
 open Context
 
-(* Pre-condition: new [status] is Failed or Processing *)
+(** Update transition's state for a transition in
+    [Transiiton_state.Verifying_blockchain_proof] state with [Substate.Processing] status.
+
+    Pre-condition: new status is either [Substate.Failed] or [Substate.Processing].
+*)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
   let f = function
@@ -14,7 +18,7 @@ let update_status_from_processing ~timeout_controller ~transition_states
         let gossip_data =
           match status with
           | Substate.Failed _ ->
-              Gossip_types.(
+              Gossip.(
                 drop_gossip_data `Ignore gd ;
                 Not_a_gossip)
           | _ ->
@@ -27,6 +31,9 @@ let update_status_from_processing ~timeout_controller ~transition_states
   in
   State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
 
+(** [upon_f] is a callback to be executed upon completion of
+  blockchain proof verification (or a failure).
+*)
 let upon_f ~top_header ~timeout_controller ~mark_processed_and_promote
     ~transition_states res =
   let top_state_hash = state_hash_of_header_with_validation top_header in
@@ -55,12 +62,15 @@ let upon_f ~top_header ~timeout_controller ~mark_processed_and_promote
       update_status_from_processing ~timeout_controller ~transition_states
         ~state_hash:top_state_hash (Failed e)
 
+(** Extract header from a transition in [Transition_state.Verifying_blockchain_proof] state *)
 let to_header_exn = function
   | Transition_state.Verifying_blockchain_proof { header; _ } ->
       header
   | _ ->
       failwith "to_header_exn: unexpected state"
 
+(** Launch blockchain proof verification and return the processing context
+    for the deferred action launched.  *)
 let launch_in_progress ~context:(module Context : CONTEXT)
     ~mark_processed_and_promote ~transition_states ~top_header rest_headers =
   let module I = Interruptible.Make () in
@@ -73,17 +83,35 @@ let launch_in_progress ~context:(module Context : CONTEXT)
        ~timeout_controller:Context.timeout_controller ~top_header ;
   Substate.In_progress { interrupt_ivar = I.interrupt_ivar; timeout }
 
-let launch_ancestry_verification ?prev_processing ~context ~transition_states
-    ~mark_processed_and_promote parent_hash =
+(** [launch_verification ?prev_processing state_hash] launches verification
+  of [state_hash] and some of its ancestors.
+
+  Function collects ancestors of [state_hash] which are not in [Processed] status and
+  for which blockchain verification isn't in progress at the moment. Transition
+  [state_hash] is also added to the collected list if it satisfies the condition
+  for inclusion.
+
+  If [prev_processing] argument is not provided, a new deferred action to batch-verify
+  blockchain proofs of all transitions in collected list is launched. Processing context
+  corresponding to the deferred action is assigned to the top transition of the collected
+  list (i.e. a transition that is descendant of all other transitions in the collected list)
+
+  If [prev_processing] argument is provided and list of collected transitions is empty,
+  the processing context contained in the argument is canceled. If collected transition
+  list is non-empty, processing context from [prev_processing] will be assigned to
+  top transition of the collected list .
+*)
+let launch_verification ?prev_processing ~context ~transition_states
+    ~mark_processed_and_promote state_hash =
   let states =
     Option.value ~default:[]
     @@ match%bind.Option
-         State_hash.Table.find transition_states parent_hash
+         State_hash.Table.find transition_states state_hash
        with
-       | Transition_state.Verifying_blockchain_proof _ as parent ->
+       | Transition_state.Verifying_blockchain_proof _ as st ->
            Some
              (Substate.collect_dependent_ancestry ~transition_states
-                ~state_functions parent )
+                ~state_functions st )
        | _ ->
            None
   in
@@ -120,30 +148,44 @@ let launch_ancestry_verification ?prev_processing ~context ~transition_states
   | _ :: _ ->
       failwith "Unexpected collected state in launch_ancestry_verification"
 
+(** Promote a transition that is in [Received] state with
+    [Processed] status to [Verifying_blockchain_proof] state.
+*)
 let promote_to ~context ~mark_processed_and_promote ~header ~transition_states
     ~substate:s ~gossip_data ~body_opt ~aux =
   let ctx =
     match header with
-    | Gossip_types.Initial_valid h ->
+    | Gossip.Initial_valid h ->
         let parent_hash =
           Mina_block.Validation.header h
           |> Mina_block.Header.protocol_state
           |> Mina_state.Protocol_state.previous_state_hash
         in
-        launch_ancestry_verification ~context ~mark_processed_and_promote
+        launch_verification ~context ~mark_processed_and_promote
           ~transition_states parent_hash ;
         Substate.Done h
     | _ ->
         Substate.Dependent
   in
   Transition_state.Verifying_blockchain_proof
-    { header = Gossip_types.pre_initial_valid_of_received_header header
+    { header = Gossip.pre_initial_valid_of_received_header header
     ; gossip_data
     ; body_opt
     ; substate = { s with status = Processing ctx }
     ; aux
     }
 
+(** Mark the transition in [Verifying_blockchain_proof] processed.
+
+   This function is called when a gossip for the transition is received.
+   When gossip is received, blockchain proof is verified before any
+   further processing. Hence blockchain verification for the transition
+   may be skipped upon receival of a gossip.
+
+   Blockhain proof verification is performed in batches, hence in progress
+   context is not discarded but passed to the next ancestor that is in 
+   [Verifying_blockchain_proof] and isn't [Processed].
+*)
 let mark_processed ~context ~mark_processed_and_promote ~transition_states
     header =
   let (module Context : CONTEXT) = context in
@@ -164,7 +206,7 @@ let mark_processed ~context ~mark_processed_and_promote ~transition_states
         |> Mina_block.Header.protocol_state
         |> Mina_state.Protocol_state.previous_state_hash
       in
-      launch_ancestry_verification ~context ~mark_processed_and_promote
+      launch_verification ~context ~mark_processed_and_promote
         ~transition_states
         ~prev_processing:(Context.timeout_controller, state_hash, processing_ctx)
         parent_hash

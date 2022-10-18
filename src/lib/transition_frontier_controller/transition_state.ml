@@ -1,65 +1,75 @@
 open Mina_base
 open Core_kernel
 
+(** Auxiliary data of a transition.
+    
+    It's used across many transition states to store details
+    of how the transition was received.
+*)
 type aux_data =
   { received_via_gossip : bool
+        (* TODO consider storing all senders and received_at times *)
   ; received_at : Time.t
   ; sender : Network_peer.Envelope.Sender.t
   }
 
+(** Transition state type.
+    
+    It contains all the available information about a transition which:
+
+        a) is known to be invalid
+        b) is in the process of verification and addition to the frontier
+
+    In case of transition being invalid, only the minimal informaton is stored.
+
+    Transition state type is meant to be used for transitions that were received by gossip or
+    that are ancestors of a transition received by gossip.
+*)
 type t =
   | Received of
       { header : Gossip_types.received_header
-      ; substate : unit Substate.t
+      ; substate : unit Substate_types.t
       ; aux : aux_data
       ; gossip_data : Gossip_types.transition_gossip_t
-      ; body_opt : Staged_ledger_diff.Body.t option
-      }
+      ; body_opt : Mina_block.Body.t option
+      }  (** Transition was received and awaits ancestry to also be fetched. *)
   | Verifying_blockchain_proof of
       { header : Mina_block.Validation.pre_initial_valid_with_header
-      ; substate : Mina_block.Validation.initial_valid_with_header Substate.t
+      ; substate : Mina_block.initial_valid_header Substate_types.t
       ; aux : aux_data
       ; gossip_data : Gossip_types.transition_gossip_t
-      ; body_opt : Staged_ledger_diff.Body.t option
-      }
+      ; body_opt : Mina_block.Body.t option
+      }  (** Transition goes through verification of its blockchain proof. *)
   | Downloading_body of
-      { header : Mina_block.Validation.initial_valid_with_header
-      ; substate : Staged_ledger_diff.Body.t Substate.t
+      { header : Mina_block.initial_valid_header
+      ; substate : Mina_block.Body.t Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
-            (** [next_failed_ancestor] is the next ancestor that is in [Downloading_body] state
-          and failed at least once. This field might be outdated (i.e. the ancestor is
-          of higher state or is not [Failed] anymore)*)
       ; next_failed_ancestor : State_hash.t option
-      }
+      }  (** Transition's body download is in progress. *)
   | Verifying_complete_works of
-      { block : Mina_block.Validation.initial_valid_with_block
-      ; substate : unit Substate.t
+      { block : Mina_block.initial_valid_block
+      ; substate : unit Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
-      }
+      }  (** Transition goes through verification of transaction snarks. *)
   | Building_breadcrumb of
-      { block : Mina_block.Validation.initial_valid_with_block
-      ; substate : Frontier_base.Breadcrumb.t Substate.t
+      { block : Mina_block.initial_valid_block
+      ; substate : Frontier_base.Breadcrumb.t Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
-      }
+      }  (** Transition's breadcrumb is being built. *)
   | Waiting_to_be_added_to_frontier of
       { breadcrumb : Frontier_base.Breadcrumb.t
       ; source : [ `Catchup | `Gossip | `Internal ]
-      ; children : Substate.children_sets
+      ; children : Substate_types.children_sets
       }
-  | Invalid of { transition_meta : Substate.transition_meta; error : Error.t }
+      (** Transition's breadcrumb is ready and waits in queue to be added to frontier. *)
+  | Invalid of
+      { transition_meta : Substate_types.transition_meta; error : Error.t }
+      (** Transition is invalid. *)
 
-let transition_meta_of_header_with_hash hh =
-  let h = With_hash.data hh in
-  { Substate.state_hash = State_hash.With_state_hashes.state_hash hh
-  ; parent_state_hash =
-      Mina_state.Protocol_state.previous_state_hash
-      @@ Mina_block.Header.protocol_state h
-  ; blockchain_length = Mina_block.Header.blockchain_length h
-  }
-
+(** Instantiation of [Substate.State_functions] for transition state type [t].  *)
 module State_functions : Substate.State_functions with type state_t = t = struct
   type state_t = t
 
@@ -84,22 +94,22 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     let of_block = With_hash.map ~f:Mina_block.header in
     match st with
     | Received { header; _ } ->
-        transition_meta_of_header_with_hash
+        Substate.transition_meta_of_header_with_hash
         @@ Gossip_types.header_with_hash_of_received_header header
     | Verifying_blockchain_proof { header; _ } ->
-        transition_meta_of_header_with_hash
+        Substate.transition_meta_of_header_with_hash
         @@ Mina_block.Validation.header_with_hash header
     | Downloading_body { header; _ } ->
-        transition_meta_of_header_with_hash
+        Substate.transition_meta_of_header_with_hash
         @@ Mina_block.Validation.header_with_hash header
     | Verifying_complete_works { block; _ } ->
-        transition_meta_of_header_with_hash @@ of_block
+        Substate.transition_meta_of_header_with_hash @@ of_block
         @@ Mina_block.Validation.block_with_hash block
     | Building_breadcrumb { block; _ } ->
-        transition_meta_of_header_with_hash @@ of_block
+        Substate.transition_meta_of_header_with_hash @@ of_block
         @@ Mina_block.Validation.block_with_hash block
     | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
-        transition_meta_of_header_with_hash @@ of_block
+        Substate.transition_meta_of_header_with_hash @@ of_block
         @@ Frontier_base.Breadcrumb.block_with_hash breadcrumb
     | Invalid { transition_meta; _ } ->
         transition_meta
@@ -124,6 +134,9 @@ module State_functions : Substate.State_functions with type state_t = t = struct
         false
 end
 
+(** Get children sets of a transition state.
+
+    In case of [Invalid] state, [Substate_types.empty_children_sets] is returned. *)
 let children st =
   match st with
   | Received { substate = { children; _ }; _ }
@@ -136,6 +149,9 @@ let children st =
   | Invalid _ ->
       Substate.empty_children_sets
 
+(** Returns true iff the state's status is [Failed].
+    
+    For [Invalid] and [Waiting_to_be_added_to_frontier], [false] is returned. *)
 let is_failed st =
   match st with
   | Received { substate = { status = Failed _; _ }; _ }
@@ -147,6 +163,7 @@ let is_failed st =
   | _ ->
       false
 
+(** Mark transition and all its descedandants invalid. *)
 let mark_invalid ~transition_states ~error:err top_state_hash =
   let tag =
     sprintf "(from state hash %s) " (State_hash.to_base58_check top_state_hash)
@@ -179,6 +196,7 @@ let mark_invalid ~transition_states ~error:err top_state_hash =
   in
   go top_state_hash
 
+(** Modify auxiliary data stored in the transition state. *)
 let modify_aux_data ~f = function
   | Received ({ aux; _ } as r) ->
       Received { r with aux = f aux }

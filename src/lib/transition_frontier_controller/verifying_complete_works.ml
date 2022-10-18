@@ -2,7 +2,11 @@ open Mina_base
 open Core_kernel
 open Context
 
-(* Pre-condition: new [status] is Failed or Processing *)
+(** Update transition's state for a transition in
+    [Transiiton_state.Verifying_complete_works] state with [Substate.Processing] status.
+
+    Pre-condition: new status is either [Substate.Failed] or [Substate.Processing].
+*)
 let update_status_from_processing ~timeout_controller ~transition_states
     ~state_hash status =
   let f = function
@@ -29,6 +33,9 @@ let update_status_from_processing ~timeout_controller ~transition_states
   in
   State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
 
+(** [upon_f] is a callback to be executed upon completion of
+  transaction snark verification for a transition (or a failure).
+*)
 let upon_f ~timeout_controller ~block ~mark_processed_and_promote
     ~transition_states ~ancestors_to_process res =
   let state_hash = state_hash_of_block_with_validation block in
@@ -53,19 +60,28 @@ let upon_f ~timeout_controller ~block ~mark_processed_and_promote
       update_status_from_processing ~timeout_controller ~transition_states
         ~state_hash (Failed e)
 
+(** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
 let get_body = function
   | Transition_state.Verifying_complete_works { block; _ } ->
       Mina_block.Validation.block block |> Mina_block.body
   | _ ->
       failwith "unexpected collected ancestor for Verifying_complete_works"
 
-let get_hash = function
+(** Extract state hash from a transition in [Transition_state.Verifying_complete_works] state *)
+let get_state_hash = function
   | Transition_state.Verifying_complete_works { block; _ } ->
       state_hash_of_block_with_validation block
   | _ ->
       failwith "unexpected collected ancestor for Verifying_complete_works"
 
-let mk_in_progress ~mark_processed_and_promote
+(** Launch transaction snark (complete work) verification
+    and return the processing context for the deferred action launched.
+    
+    Batch-verification is launched for the block provided and for all of its
+    ancestors that are neither in [Substate.Processed] status nor has an
+    verification action already launched for it and its ancestors.
+    *)
+let launch_in_progress ~mark_processed_and_promote
     ~context:(module Context : CONTEXT) ~transition_states block_with_validation
     =
   let block = Mina_block.Validation.block block_with_validation in
@@ -101,13 +117,16 @@ let mk_in_progress ~mark_processed_and_promote
     (upon_f ~timeout_controller:Context.timeout_controller
        ~block:block_with_validation ~mark_processed_and_promote
        ~transition_states
-       ~ancestors_to_process:(List.map ~f:get_hash states) ) ;
+       ~ancestors_to_process:(List.map ~f:get_state_hash states) ) ;
   Substate.In_progress
     { interrupt_ivar = I.interrupt_ivar
     ; timeout =
         Time.add (Time.now ()) Context.transaction_snark_verification_timeout
     }
 
+(** Promote a transition that is in [Downloading_body] state with
+    [Processed] status to [Verifying_complete_works] state.
+*)
 let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
     ~substate ~block_vc ~aux =
   let body =
@@ -120,7 +139,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
   let block = Mina_block.Validation.with_body header body in
   let ctx =
     if aux.Transition_state.received_via_gossip then
-      mk_in_progress ~mark_processed_and_promote ~context ~transition_states
+      launch_in_progress ~mark_processed_and_promote ~context ~transition_states
         block
     else Substate.Dependent
   in
@@ -145,7 +164,7 @@ let start_processing ~context ~mark_processed_and_promote ~transition_states
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_block_with_validation block in
   let ctx =
-    mk_in_progress ~mark_processed_and_promote ~context ~transition_states block
+    launch_in_progress ~mark_processed_and_promote ~context ~transition_states block
   in
   update_status_from_processing ~timeout_controller:Context.timeout_controller
     ~transition_states ~state_hash (Substate.Processing ctx)

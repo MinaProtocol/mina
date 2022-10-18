@@ -2,7 +2,7 @@ open Mina_base
 open Core_kernel
 open Async
 open Context
-open Gossip_types
+include Gossip_types
 
 (** Determine if the header received via gossip is relevant
     (to be added to catchup state), irrelevant (to be ignored)

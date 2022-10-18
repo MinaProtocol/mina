@@ -11,6 +11,10 @@ end
 
 module TimeoutSet = Set.Make (Key)
 
+(** Timeout controller is a set storing pairs of time and state hash.
+    
+    When a time is in the past, corresponding state hash will be interrupted.
+*)
 type t = { mutable events : TimeoutSet.t }
 
 let process_events (type state_t)
@@ -48,6 +52,7 @@ let process_events (type state_t)
               F.modify_substate ~f:(modifier target_t) st
             in
             st' ) ) ;
+    (* TODO Can the condition below ever happen? *)
     Option.iter (TimeoutSet.min_elt t.events) ~f:(fun (new_t, _) ->
         if
           Option.value_map old_min_t ~default:true ~f:(fun (prev_t, _) ->
@@ -55,6 +60,10 @@ let process_events (type state_t)
         then Async_kernel.upon (Async.at new_t) impl )
   in
   impl ()
+
+(* TODO Consider scheduling process_events only at certain points of execution, not upon every register call
+   Let register be executed only when possesing a token which can only be acquired in a bracket-like function call.
+*)
 
 let register ~state_functions ~transition_states ~state_hash ~timeout t =
   let old_min_t = TimeoutSet.min_elt t.events in

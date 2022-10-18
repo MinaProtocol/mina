@@ -121,12 +121,12 @@ let split_retrieve_chain_element = function
   | `Block b ->
       let h = Mina_block.header b in
       let hh = compute_header_hashes h in
-      ( Transition_state.transition_meta_of_header_with_hash hh
+      ( Substate.transition_meta_of_header_with_hash hh
       , Some hh
       , Some (Mina_block.body b) )
   | `Header h ->
       let hh = compute_header_hashes h in
-      (Transition_state.transition_meta_of_header_with_hash hh, Some hh, None)
+      (Substate.transition_meta_of_header_with_hash hh, Some hh, None)
   | `Meta m ->
       (m, None, None)
 
@@ -155,7 +155,7 @@ let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
       match pre_validate_header ~context hh with
       | Ok vh ->
           add_received ~context ~mark_processed_and_promote ~sender ~state ?body
-            (Gossip_types.Pre_initial_valid vh) ;
+            (Gossip.Pre_initial_valid vh) ;
           Ok ()
       | Error e ->
           (* TODO every time this code is called we probably want to update some metrics
@@ -270,7 +270,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let header_with_hash =
-    Gossip_types.header_with_hash_of_received_header received_header
+    Gossip.header_with_hash_of_received_header received_header
   in
   let header = With_hash.data header_with_hash in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
@@ -304,7 +304,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
         (Received
            { body_opt
            ; header = received_header
-           ; gossip_data = Gossip_types.create_gossip_data ?gossip_type vc
+           ; gossip_data = Gossip.create_gossip_data ?gossip_type vc
            ; substate = { children; status }
            ; aux =
                { received_via_gossip = Option.is_some gossip_type
@@ -316,7 +316,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
   match parent_presence with
   | `Invalid ->
       let transition_meta =
-        Transition_state.transition_meta_of_header_with_hash header_with_hash
+        Substate.transition_meta_of_header_with_hash header_with_hash
       in
       insert_invalid_state_impl ~transition_states:state.transition_states
         ~transition_meta ~children_list

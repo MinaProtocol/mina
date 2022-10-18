@@ -132,13 +132,8 @@ let handle_produced_transition ~logger ~state breadcrumb =
         ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]
 
 let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller
-    ~(collected_transitions : Bootstrap_controller.Transition_cache.element list)
-    ~frontier
-    ~(network_transition_reader :
-       Types.produced_transition Pipe_lib.Strict_pipe.Reader.t )
-    ~(producer_transition_reader :
-       Transition_frontier.Breadcrumb.t Pipe_lib.Strict_pipe.Reader.t )
+    ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+    ~frontier ~network_transition_reader ~producer_transition_reader
     ~clear_reader ~verified_transition_writer =
   let open Pipe_lib in
   (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)

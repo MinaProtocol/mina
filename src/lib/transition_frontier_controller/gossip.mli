@@ -1,5 +1,7 @@
 open Mina_base
 
+include module type of Gossip_types
+
 (** Determine if the header received via gossip is relevant
     (to be added to catchup state), irrelevant (to be ignored)
     or contains some useful data to be preserved 
