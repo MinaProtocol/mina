@@ -1,35 +1,30 @@
 open Core_kernel
-open Common
-open Backend
-module Me = Tock
-module Other = Tick
 module Impl = Impls.Wrap
-open Pickles_types
-open Import
 
 let high_entropy_bits = 128
 
 let sponge_params_constant =
   Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
 
-let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
-  Me.Field.of_bits (Ro.bits_random_oracle ~length s)
+let field_random_oracle ?(length = Backend.Tock.Field.size_in_bits - 1) s =
+  Backend.Tock.Field.of_bits (Ro.bits_random_oracle ~length s)
 
 let unrelated_g =
+  let open Common in
   let group_map =
     unstage
       (group_map
-         (module Me.Field)
-         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b )
-  and str = Fn.compose bits_to_bytes Me.Field.to_bits in
+         (module Backend.Tock.Field)
+         ~a:Backend.Tock.Inner_curve.Params.a
+         ~b:Backend.Tock.Inner_curve.Params.b )
+  and str = Fn.compose bits_to_bytes Backend.Tock.Field.to_bits in
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
-open Impl
-
 module Other_field = struct
-  type t = Impls.Step.Field.Constant.t [@@deriving sexp]
+  type t = Backend.Tick.Field.t [@@deriving sexp]
 
-  include (Tick.Field : module type of Tick.Field with type t := t)
+  include (
+    Backend.Tick.Field : module type of Backend.Tick.Field with type t := t )
 
   let size = Impls.Step.Bigint.to_bignum_bigint size
 end
@@ -38,7 +33,8 @@ let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
 module Unsafe = struct
-  let unpack_unboolean ?(length = Field.size_in_bits) x =
+  let unpack_unboolean ?(length = Impl.Field.size_in_bits) x =
+    let open Impl in
     let res =
       exists
         (Typ.list Boolean.typ_unchecked ~length)
@@ -73,50 +69,49 @@ let%test_unit "sponge" =
   T.test Tock_field_sponge.params
 
 module Input_domain = struct
-  let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
-    let domain_size = Domain.size domain in
-    time "lagrange" (fun () ->
+  let lagrange_commitments domain : Backend.Tock.Inner_curve.Affine.t array =
+    let domain_size = Import.Domain.size domain in
+    Common.time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i )
+               (Backend.Tick.Keypair.load_urs ())
+               domain_size i )
               .unshifted.(0)
             |> Common.finite_exn ) )
 
-  let domain = Domain.Pow_2_roots_of_unity 7
+  let domain = Import.Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Vesta
 
   module Inputs = struct
-    module Impl = Impl
+    module Impl = Impls.Wrap.Impl
 
     module Params = struct
       include C.Params
 
       let one = C.to_affine_exn C.one
 
-      let group_size_in_bits = Field.size_in_bits
+      let group_size_in_bits = Impl.Field.size_in_bits
     end
 
     module F = struct
       include struct
-        open Impl.Field
-
-        type nonrec t = t
+        type t = Impl.Field.t
 
         let ( * ), ( + ), ( - ), inv_exn, square, scale, if_, typ, constant =
+          let open Impl.Field in
           (( * ), ( + ), ( - ), inv, square, scale, if_, typ, constant)
 
-        let negate x = scale x Constant.(negate one)
+        let negate x = scale x Impl.Field.Constant.(negate one)
       end
 
       module Constant = struct
-        open Impl.Field.Constant
-
-        type nonrec t = t
+        type nonrec t = Impl.Field.Constant.t
 
         let ( * ), ( + ), ( - ), inv_exn, square, negate =
+          let open Impl.Field.Constant in
           (( * ), ( + ), ( - ), inv, square, negate)
       end
 
@@ -167,6 +162,8 @@ module Inner_curve = struct
 
   let double t = t + t
 
+  open Impl
+
   let scale t bs =
     with_label __LOC__ (fun () ->
         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
@@ -184,8 +181,9 @@ module Inner_curve = struct
             fun () ->
               C.scale
                 (C.of_affine (read typ t))
-                (Other.Field.inv
-                   (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
+                (Backend.Tick.Field.inv
+                   (Backend.Tick.Field.of_bits
+                      (List.map ~f:(read Boolean.typ) bs) ) )
               |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
