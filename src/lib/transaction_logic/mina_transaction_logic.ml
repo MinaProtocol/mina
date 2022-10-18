@@ -49,6 +49,13 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let new_accounts (t : t) =
+      match t.body with
+      | Payment { new_accounts; _ } ->
+          new_accounts
+      | Stake_delegation _ | Failed ->
+          []
   end
 
   module Zkapp_command_applied = struct
@@ -152,10 +159,35 @@ module Transaction_applied = struct
     | Coinbase c ->
         c.burned_tokens
 
+  let new_accounts : t -> Account_id.t list =
+   fun { varying; _ } ->
+    match varying with
+    | Command c -> (
+        match c with
+        | Signed_command sc ->
+            Signed_command_applied.new_accounts sc
+        | Zkapp_command zc ->
+            zc.new_accounts )
+    | Fee_transfer f ->
+        f.new_accounts
+    | Coinbase c ->
+        c.new_accounts
+
   let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
    fun t ->
     let open Or_error.Let_syntax in
     let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
+    let account_creation_fees =
+      let account_creation_fee_int =
+        Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        |> Currency.Fee.to_int
+      in
+      let num_accounts_created = List.length @@ new_accounts t in
+      (* int type is OK, no danger of overflow *)
+      Currency.Amount.(
+        Signed.of_unsigned
+        @@ of_int (account_creation_fee_int * num_accounts_created))
+    in
     let txn : Transaction.t =
       match t.varying with
       | Command
@@ -171,10 +203,22 @@ module Transaction_applied = struct
     let%bind expected_supply_increase =
       Transaction.expected_supply_increase txn
     in
-    Currency.Amount.Signed.(
-      add (of_unsigned expected_supply_increase) (negate burned_tokens))
-    |> Option.value_map ~default:(Or_error.error_string "overflow") ~f:(fun v ->
-           Ok v )
+    let rec process_decreases total = function
+      | [] ->
+          Some total
+      | amt :: amts ->
+          let%bind.Option sum =
+            Currency.Amount.Signed.(add @@ negate amt) total
+          in
+          process_decreases sum amts
+    in
+    let total =
+      process_decreases
+        (Currency.Amount.Signed.of_unsigned expected_supply_increase)
+        [ burned_tokens; account_creation_fees ]
+    in
+    Option.value_map total ~default:(Or_error.error_string "overflow")
+      ~f:(fun v -> Ok v)
 
   let transaction_with_status : t -> Transaction.t With_status.t =
    fun { varying; _ } ->
@@ -288,6 +332,7 @@ module type S = sig
     type t =
       { ledger : ledger
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
   end
@@ -365,6 +410,7 @@ module type S = sig
                Zkapp_command_logic.Local_state.t
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
+    -> ?supply_increase:Amount.Signed.t
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
@@ -930,6 +976,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     type t =
       { ledger : L.t
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
@@ -942,6 +989,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let fee_excess { fee_excess; _ } = fee_excess
 
     let set_fee_excess t fee_excess = { t with fee_excess }
+
+    let supply_increase { supply_increase; _ } = supply_increase
+
+    let set_supply_increase t supply_increase = { t with supply_increase }
 
     let global_slot_since_genesis { protocol_state; _ } =
       protocol_state.global_slot_since_genesis
@@ -1648,7 +1699,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
-      ?(fee_excess = Amount.Signed.zero) (ledger : L.t) (c : Zkapp_command.t) :
+      ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
+      (ledger : L.t) (c : Zkapp_command.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
@@ -1675,7 +1727,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess }
+      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
@@ -1686,6 +1738,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
+        ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
         ; account_update_index = Inputs.Index.zero
@@ -1759,7 +1812,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                     Stop false )
               ~finish:Fn.id
           in
-          (*Other zkapp_command failed, therefore, updates in those should not get applied*)
+          (* Other zkapp_command failed, therefore, updates in those should not get applied *)
           if
             List.is_empty new_accounts
             && other_account_update_accounts_unchanged
@@ -1786,7 +1839,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let init_account = Account.initialize receiver_account_id in
     match location_of_account ledger receiver_account_id with
     | None ->
-        (*new account, check that default permissions allow receiving *)
+        (* new account, check that default permissions allow receiving *)
         ( init_account
         , `Added
         , `Has_permission_to_receive
@@ -2004,7 +2057,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       has_permission_to_receive ~ledger:t receiver_id
     in
     let new_accounts2 = get_new_accounts action2 receiver_id in
-    (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
+    (* Note: Updating coinbase receiver timing only if there is no fee transfer.
+       This is so as to not add any extra constraints in transaction snark for checking
+       "receiver" timings. This is OK because timing rules will not be violated when
+       balance increases and will be checked whenever an amount is deducted from the
+       account (#5973)
+    *)
     let%bind coinbase_receiver_timing =
       match transferee_timing_prev with
       | None ->
