@@ -848,8 +848,9 @@ let%test_module "account timing check" =
           | Failed failuress ->
               let failures =
                 List.filter (List.concat failuress) ~f:(fun failure ->
-                    Transaction_status.Failure.equal failure
-                      Transaction_status.Failure.Cancelled )
+                    not
+                    @@ Transaction_status.Failure.equal failure
+                         Transaction_status.Failure.Cancelled )
               in
               if
                 not
