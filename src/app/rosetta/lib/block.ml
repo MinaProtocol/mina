@@ -416,7 +416,7 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.typ, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
+        {| SELECT u.id, u.comamnd_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
         pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
         blocks_user_commands.status,
@@ -448,9 +448,9 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash,i.typ,bic.sequence_no,bic.secondary_sequence_no) i.id, i.typ, i.receiver_id, i.fee, i.hash,
+        {| SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.command_type, i.receiver_id, i.fee, i.hash,
             pk.value as receiver,
-            bic.sequence_no, bic.secondary_sequence_no
+            bic.sequence_nocommand_, beic.secondarapp/rosetta/lib/y_sequence_no
         FROM internal_commands i
         INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
