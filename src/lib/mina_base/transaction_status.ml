@@ -242,6 +242,8 @@ module Failure = struct
         Ok Local_excess_overflow
     | "Local_supply_increase_overflow" ->
         Ok Local_supply_increase_overflow
+    | "Global_supply_increase_overflow" ->
+        Ok Global_supply_increase_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
