@@ -94,6 +94,7 @@ CREATE TABLE zkapp_permissions
 , edit_state               zkapp_auth_required_type    NOT NULL
 , send                     zkapp_auth_required_type    NOT NULL
 , receive                  zkapp_auth_required_type    NOT NULL
+, access                   zkapp_auth_required_type    NOT NULL
 , set_delegate             zkapp_auth_required_type    NOT NULL
 , set_permissions          zkapp_auth_required_type    NOT NULL
 , set_verification_key     zkapp_auth_required_type    NOT NULL

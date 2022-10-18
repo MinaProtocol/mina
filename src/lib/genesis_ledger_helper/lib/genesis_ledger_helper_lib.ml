@@ -53,6 +53,7 @@ module Accounts = struct
             { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -76,6 +77,7 @@ module Accounts = struct
                   Impossible
             in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
+            ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
@@ -233,6 +235,7 @@ module Accounts = struct
         let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -249,6 +252,7 @@ module Accounts = struct
               auth_required edit_state
           ; send = auth_required send
           ; receive = auth_required receive
+          ; access = auth_required access
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key

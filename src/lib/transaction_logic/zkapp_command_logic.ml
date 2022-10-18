@@ -474,6 +474,8 @@ module type Account_intf = sig
   module Permissions : sig
     type controller
 
+    val access : t -> controller
+
     val edit_state : t -> controller
 
     val send : t -> controller
@@ -1305,6 +1307,15 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    (* Check that the account can be accessed with the given authorization. *)
+    let local_state =
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.access a)
+      in
+      Local_state.add_check local_state Update_not_permitted_access
+        has_permission
+    in
     (* Update app state. *)
     let a, local_state =
       let app_state = Account_update.Update.app_state account_update in

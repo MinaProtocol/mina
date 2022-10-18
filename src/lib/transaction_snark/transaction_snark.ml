@@ -1157,6 +1157,8 @@ module Base = struct
 
           let receive : t -> controller = fun a -> a.data.permissions.receive
 
+          let access : t -> controller = fun a -> a.data.permissions.access
+
           let set_delegate : t -> controller =
            fun a -> a.data.permissions.set_delegate
 

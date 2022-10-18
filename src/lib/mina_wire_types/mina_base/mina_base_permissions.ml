@@ -8,6 +8,7 @@ module Poly = struct
   module V2 = struct
     type 'controller t =
       { edit_state : 'controller
+      ; access : 'controller
       ; send : 'controller
       ; receive : 'controller
       ; set_delegate : 'controller

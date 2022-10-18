@@ -1238,6 +1238,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Account
 
       module Permissions = struct
+        let access : t -> Controller.t = fun a -> a.permissions.access
+
         let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
 
         let send : t -> Controller.t = fun a -> a.permissions.send
