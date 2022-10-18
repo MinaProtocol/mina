@@ -14,9 +14,17 @@ module TimeoutSet = Set.Make (Key)
 (** Timeout controller is a set storing pairs of time and state hash.
     
     When a time is in the past, corresponding state hash will be interrupted.
+
+    Invariant: there is a deferred action that will trigger at time corresponding
+    to the minimal element of the controller's set. 
 *)
 type t = { mutable events : TimeoutSet.t }
 
+(** Process events that timed out (time is less than now).
+    
+    Function launches a timed action for the next minimum of time held
+    in the set.
+*)
 let process_events (type state_t)
     ~state_functions:
       (module F : Substate.State_functions with type state_t = state_t)
@@ -30,7 +38,6 @@ let process_events (type state_t)
             Container.Continue_or_stop.Continue (TimeoutSet.add to_p (t, h))
           else Container.Continue_or_stop.Stop to_p )
     in
-    let old_min_t = TimeoutSet.min_elt t.events in
     t.events <- TimeoutSet.diff t.events to_process ;
     let modifier target_timeout =
       { Substate.modifier =
@@ -52,19 +59,17 @@ let process_events (type state_t)
               F.modify_substate ~f:(modifier target_t) st
             in
             st' ) ) ;
-    (* TODO Can the condition below ever happen? *)
-    Option.iter (TimeoutSet.min_elt t.events) ~f:(fun (new_t, _) ->
-        if
-          Option.value_map old_min_t ~default:true ~f:(fun (prev_t, _) ->
-              Time.(prev_t > new_t) )
-        then Async_kernel.upon (Async.at new_t) impl )
+    if not (TimeoutSet.is_empty to_process) then
+      Option.iter (TimeoutSet.min_elt t.events) ~f:(fun (new_t, _) ->
+          Async_kernel.upon (Async.at new_t) impl )
   in
   impl ()
 
-(* TODO Consider scheduling process_events only at certain points of execution, not upon every register call
-   Let register be executed only when possesing a token which can only be acquired in a bracket-like function call.
-*)
+(** Register a timeout for transition.
 
+    Function adds a pair to the set and then launches a timed action
+    if the added timeout is the new minimum in the set.
+*)
 let register ~state_functions ~transition_states ~state_hash ~timeout t =
   let old_min_t = TimeoutSet.min_elt t.events in
   t.events <- TimeoutSet.add t.events (timeout, state_hash) ;
@@ -76,22 +81,35 @@ let register ~state_functions ~transition_states ~state_hash ~timeout t =
     Async_kernel.upon (Async.at timeout) (fun () ->
         process_events ~state_functions ~transition_states t )
 
-let unregister ~state_hash ~timeout t =
-  t.events <- TimeoutSet.remove t.events (timeout, state_hash)
+(** Remove a timeout for transition from the controller.
+
+    Function launches a timed action if the controller's set minimum
+    is updated upon removal.
+*)
+let unregister ~state_functions ~transition_states ~state_hash ~timeout t =
+  t.events <- TimeoutSet.remove t.events (timeout, state_hash) ;
+  Option.iter (TimeoutSet.min_elt t.events) ~f:(fun (new_t, _) ->
+      if Time.(new_t > timeout) then
+        Async_kernel.upon (Async.at new_t) (fun () ->
+            process_events ~state_functions ~transition_states t ) )
 
 (** [cancel_in_progress_ctx] unregsiters a transition when timeout_controller argument is provided and processing ctx is In_progress.
   It also interrupts the action which was in progress.
   Does nothing otherwise    
   *)
-let cancel_in_progress_ctx ~timeout_controller ~state_hash = function
+let cancel_in_progress_ctx ~state_functions ~transition_states
+    ~timeout_controller ~state_hash = function
   | Substate.In_progress { timeout; interrupt_ivar } ->
-      unregister ~state_hash ~timeout timeout_controller ;
+      unregister ~state_functions ~transition_states ~state_hash ~timeout
+        timeout_controller ;
       Async_kernel.Ivar.fill_if_empty interrupt_ivar ()
   | _ ->
       ()
 
 let create () = { events = TimeoutSet.empty }
 
+(** Clean up the controller and interrupt all the transitions
+    kept in it.  *)
 let cancel_all ~state_functions ~transition_states t =
   let events = t.events in
   t.events <- TimeoutSet.empty ;

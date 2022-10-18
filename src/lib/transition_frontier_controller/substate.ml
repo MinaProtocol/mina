@@ -262,7 +262,12 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
 (** Update children of transition's parent when the transition is promoted
     to the higher state.
 
-    TODO more details
+    This function removes the transition from parent's [Substate.processed] children
+    set and adds it either to [Substate.waiting_for_parent] or
+    [Substate.processing_or_failed] children set depending on the new status.
+
+    When a transition's previous state was [Transition_state.Waiting_to_be_added_to_frontier],
+    transition is not added to any of the parent's children sets.
 *)
 let update_children_on_promotion (type state_t) ~state_functions
     ~transition_states ~parent_hash ~state_hash state_opt =
