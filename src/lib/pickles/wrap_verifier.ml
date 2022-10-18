@@ -1,42 +1,42 @@
-module type Inputs = Intf.Wrap_main_inputs.S
-
 module S = Sponge
 module SC = Scalar_challenge
 
-let lookup_verification_enabled = false
+module G = struct
+  let lookup_verification_enabled = false
 
-(* given [chals], compute
-   \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
-let challenge_polynomial ~one ~add ~mul chals =
-  let ( + ) = add and ( * ) = mul in
-  Core_kernel.stage (fun pt ->
-      let k = Array.length chals in
-      let pow_two_pows =
-        let res = Core_kernel.Array.init k ~f:(fun _ -> pt) in
-        for i = 1 to k - 1 do
-          let y = res.(i - 1) in
-          res.(i) <- y * y
-        done ;
-        res
-      in
-      let prod f =
-        let r = ref (f 0) in
-        for i = 1 to k - 1 do
-          r := f i * !r
-        done ;
-        !r
-      in
-      prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
+  (* given [chals], compute
+     \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
+  let challenge_polynomial ~one ~add ~mul chals =
+    let ( + ) = add and ( * ) = mul in
+    Core_kernel.stage (fun pt ->
+        let k = Array.length chals in
+        let pow_two_pows =
+          let res = Core_kernel.Array.init k ~f:(fun _ -> pt) in
+          for i = 1 to k - 1 do
+            let y = res.(i - 1) in
+            res.(i) <- y * y
+          done ;
+          res
+        in
+        let prod f =
+          let r = ref (f 0) in
+          for i = 1 to k - 1 do
+            r := f i * !r
+          done ;
+          !r
+        in
+        prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
-let num_possible_domains = Pickles_types.Nat.S Wrap_hack.Padded_length.n
+  let num_possible_domains = Pickles_types.Nat.S Wrap_hack.Padded_length.n
 
-let all_possible_domains =
-  Core_kernel.Memo.unit (fun () ->
-      Pickles_types.Vector.init num_possible_domains ~f:(fun proofs_verified ->
-          (Common.wrap_domains ~proofs_verified).h ) )
+  let all_possible_domains =
+    Core_kernel.Memo.unit (fun () ->
+        Pickles_types.Vector.init num_possible_domains
+          ~f:(fun proofs_verified -> (Common.wrap_domains ~proofs_verified).h) )
+end
 
 module Make
-    (Inputs : Inputs
+    (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
                  and type Impl.Bigint.t = Backend.Tock.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
@@ -72,9 +72,9 @@ struct
     end
   end
 
-  let num_possible_domains = num_possible_domains
+  let num_possible_domains = G.num_possible_domains
 
-  let all_possible_domains = all_possible_domains
+  let all_possible_domains = G.all_possible_domains
 
   let print_g lab (x, y) =
     if Import.debug then
@@ -491,7 +491,7 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
-    if lookup_verification_enabled then failwith "TODO" else () ;
+    if G.lookup_verification_enabled then failwith "TODO" else () ;
     chal beta_0 beta_1 ;
     chal gamma_0 gamma_1 ;
     scalar_chal alpha_0 alpha_1 ;
@@ -727,7 +727,7 @@ struct
               , [] )
         in
         let joint_combiner =
-          if lookup_verification_enabled then failwith "TODO" else None
+          if G.lookup_verification_enabled then failwith "TODO" else None
         in
         assert_eq_marlin
           { alpha = plonk.alpha
@@ -752,7 +752,8 @@ struct
     Pickles_types.Vector.map chals ~f:(fun prechallenge ->
         scalar @@ Import.Bulletproof_challenge.pack prechallenge )
 
-  let challenge_polynomial = Field.(challenge_polynomial ~add ~mul ~one)
+  let challenge_polynomial chals =
+    Field.(G.challenge_polynomial ~add ~mul ~one chals)
 
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
@@ -1033,3 +1034,5 @@ struct
     ; b
     }
 end
+
+include Make (Wrap_main_inputs)

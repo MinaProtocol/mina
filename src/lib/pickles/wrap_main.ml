@@ -28,8 +28,6 @@ module SC = Scalar_challenge
    We use corresponding type variable names throughout this file.
 *)
 
-include Wrap_verifier.Make (Wrap_main_inputs)
-
 module Old_bulletproof_chals = struct
   type t =
     | T :
@@ -104,8 +102,10 @@ let wrap_main
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      (Wrap_main_inputs.Inner_curve.Constant.t index', branches) Vector.t Lazy.t
-      ) (step_widths : (int, branches) Vector.t)
+      ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      , branches )
+      Vector.t
+      Lazy.t ) (step_widths : (int, branches) Vector.t)
     (step_domains : (Domains.t, branches) Vector.t)
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
@@ -170,17 +170,19 @@ let wrap_main
             ~request:(fun () -> Req.Which_branch)
         in
         let which_branch =
-          One_hot_vector.of_index which_branch' ~length:branches
+          Wrap_verifier.One_hot_vector.of_index which_branch' ~length:branches
         in
         let actual_proofs_verified_mask =
           Util.ones_vector
             (module Impl)
             ~first_zero:
-              (Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
+              (Wrap_verifier.Pseudo.choose
+                 (which_branch, step_widths)
+                 ~f:Field.of_int )
             Max_proofs_verified.n
         in
         let domain_log2 =
-          Pseudo.choose
+          Wrap_verifier.Pseudo.choose
             ( which_branch
             , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
             ~f:Field.of_int
@@ -203,7 +205,7 @@ let wrap_main
                 typ
                   (module Impl)
                   Common.Lookup_parameters.tock_zero
-                  ~assert_16_bits:(assert_n_bits ~n:16)
+                  ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Opt.Flag.No ) )
                   (Shifted_value.Type2.typ Field.typ)
@@ -212,7 +214,7 @@ let wrap_main
         in
         let step_plonk_index =
           with_label __LOC__ (fun () ->
-              choose_key which_branch
+              Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
                    ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
         in
@@ -275,10 +277,11 @@ let wrap_main
                   in
                   Vector.map wrap_domain_indices ~f:(fun index ->
                       let which_branch =
-                        One_hot_vector.of_index index
+                        Wrap_verifier.One_hot_vector.of_index index
                           ~length:Wrap_verifier.num_possible_domains
                       in
-                      Pseudo.Domain.to_domain ~shifts ~domain_generator
+                      Wrap_verifier.Pseudo.Domain.to_domain ~shifts
+                        ~domain_generator
                         (which_branch, all_possible_domains) )
                 in
                 Vector.mapn
@@ -323,7 +326,7 @@ let wrap_main
                     in
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
-                          finalize_other_proof
+                          Wrap_verifier.finalize_other_proof
                             (module Wrap_hack.Padded_length)
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
@@ -353,7 +356,7 @@ let wrap_main
           let shift = Shifts.tick1 in
           exists
             (Plonk_types.Openings.Bulletproof.typ
-               ( Typ.transport Other_field.Packed.typ
+               ( Typ.transport Wrap_verifier.Other_field.Packed.typ
                    ~there:(fun x ->
                      (* When storing, make it a shifted value *)
                      match
@@ -388,9 +391,9 @@ let wrap_main
                      ~commitment_lengths:Commitment_lengths.commitment_lengths )
                   ~request:(fun () -> Req.Messages) )
           in
-          let sponge = Opt.create sponge_params in
+          let sponge = Wrap_verifier.Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              incrementally_verify_proof max_proofs_verified
+              Wrap_verifier.incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
                 ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:

@@ -2128,7 +2128,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 64000 do
@@ -3033,16 +3033,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let x =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
             in
-            let y =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
-            in
-            let z =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
-            in
+            (* y and z share the same [compute] function *)
+            let compute () = Field.Constant.zero in
+            let y = exists Field.typ ~compute in
+            let z = exists Field.typ ~compute in
             let g = Inner_curve.one in
             let sponge = Sponge.create sponge_params in
             Sponge.absorb sponge x ;
             ignore (Sponge.squeeze_field sponge : Field.t) ;
+
             ignore
               ( SC'.to_field_checked'
                   (module Impl)
@@ -3052,7 +3051,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 61000 do

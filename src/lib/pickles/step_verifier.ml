@@ -637,7 +637,8 @@ struct
         Vector.map chals ~f:(fun b -> Bulletproof_challenge.pack b |> scalar) )
 
   let challenge_polynomial =
-    Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+    let open Field in
+    Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
 
   module Pseudo = Pseudo.Make (Impl)
 
