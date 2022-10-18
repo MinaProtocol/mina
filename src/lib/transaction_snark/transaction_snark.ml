@@ -554,9 +554,9 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Base = struct
     module User_command_failure = struct
       (** The various ways that a user command may fail. These should be computed
-          before applying the snark, to ensure that only the base fee is charged
-          to the fee-payer if executing the user command will later fail.
-       *)
+        before applying the snark, to ensure that only the base fee is charged
+        to the fee-payer if executing the user command will later fail.
+    *)
       type 'bool t =
         { predicate_failed : 'bool (* User commands *)
         ; source_not_present : 'bool (* User commands *)
@@ -622,10 +622,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let any t = Boolean.any (to_list t)
 
       (** Compute which -- if any -- of the failure cases will be hit when
-          evaluating the given user command, and indicate whether the fee-payer
-          would need to pay the account creation fee if the user command were to
-          succeed (irrespective or whether it actually will or not).
-       *)
+        evaluating the given user command, and indicate whether the fee-payer
+        would need to pay the account creation fee if the user command were to
+        succeed (irrespective or whether it actually will or not).
+    *)
       let compute_unchecked
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~txn_global_slot ~(fee_payer_account : Account.t)
@@ -976,6 +976,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t =
           { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
           ; fee_excess : Amount.Signed.var
+          ; supply_increase : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
           }
       end
@@ -1968,6 +1969,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let set_fee_excess t fee_excess = { t with fee_excess }
 
+            let supply_increase { supply_increase; _ } = supply_increase
+
+            let set_supply_increase t supply_increase =
+              { t with supply_increase }
+
             let ledger { ledger; _ } = ledger
 
             let set_ledger ~should_update t ledger =
@@ -2115,6 +2121,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ( statement.source.ledger
                 , V.create (fun () -> !witness.global_ledger) )
             ; fee_excess = Amount.Signed.(Checked.constant zero)
+            ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
             }
@@ -2135,6 +2142,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 statement.source.local_state.full_transaction_commitment
             ; token_id = statement.source.local_state.token_id
             ; excess = statement.source.local_state.excess
+            ; supply_increase = statement.source.local_state.supply_increase
             ; ledger =
                 ( statement.source.local_state.ledger
                 , V.create (fun () -> !witness.local_state_init.ledger) )
@@ -2199,8 +2207,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         S.{ perform }
                         acc )
                 in
-                (* replace any transaction failure with unit value *)
-                (global_state, { local_state with failure_status_tbl = () })
+                (global_state, local_state)
               in
               let acc' =
                 match account_update_spec.is_start with
@@ -2210,8 +2217,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         S.{ perform }
                         acc
                     in
-                    (* replace any transaction failure with unit value *)
-                    (global_state, { local_state with failure_status_tbl = () })
+                    (global_state, local_state)
                 | `Compute_in_circuit ->
                     V.create (fun () ->
                         match As_prover.Ref.get start_zkapp_command with
@@ -2268,14 +2274,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         with_label __LOC__ (fun () ->
             run_checked
               (Amount.Signed.Checked.assert_equal statement.supply_increase
-                 Amount.(Signed.Checked.of_unsigned (var_of_t zero)) ) ) ;
+                 global.supply_increase ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
               (let expected = statement.fee_excess in
-               let got =
+               let got : Fee_excess.var =
                  { fee_token_l = Token_id.(Checked.constant default)
                  ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
-                 ; Fee_excess.fee_token_r = Token_id.(Checked.constant default)
+                 ; fee_token_r = Token_id.(Checked.constant default)
                  ; fee_excess_r =
                      Amount.Signed.Checked.to_fee (fst init).fee_excess
                  }
@@ -2506,7 +2512,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
          transaction1: s1 -> t1 = s1+ protocol_state_body + maybe_coinbase
          transaction2: t1 -> t1 + maybe_another_coinbase
-         (Note: protocol_state_body is not pushed again)
+           (Note: protocol_state_body is not pushed again)
 
          However, for each transaction, we need to constrain the protocol state
          body. This is done is by using the stack ([init_stack]) without the
@@ -2521,13 +2527,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       (* These are all the possible cases:
 
-         Init_stack     Source                 Target
+          Init_stack     Source                 Target
          --------------------------------------------------------------
-         i               i                       i + state
-         i               i                       i + state + coinbase
-         i               i + state               i + state
-         i               i + state               i + state + coinbase
-         i + coinbase    i + state + coinbase    i + state + coinbase
+           i               i                       i + state
+           i               i                       i + state + coinbase
+           i               i + state               i + state
+           i               i + state               i + state + coinbase
+           i + coinbase    i + state + coinbase    i + state + coinbase
       *)
       let%bind () =
         [%with_label_ "Compute coinbase stack"]
@@ -2621,7 +2627,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
       in
+      (* a couple of references, hard to thread the values *)
       let burned_tokens = ref Currency.Amount.(var_of_t zero) in
+      let zero_fee =
+        Currency.Amount.(Signed.create_var ~magnitude:(var_of_t zero))
+          ~sgn:Sgn.Checked.pos
+      in
+      (* new account fees added for coinbases/fee transfers, when calculating receiver amounts *)
+      let new_account_fees = ref zero_fee in
       let%bind root_after_fee_payer_update =
         [%with_label_ "Update fee payer"]
           (Frozen_ledger_hash.modify_account_send
@@ -2670,8 +2683,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                       [ Boolean.not is_user_command; permitted_to_send ] )
                in
                (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
-                 1. These accounts are not permitted to receive tokens and,
-                 2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+                  1. These accounts are not permitted to receive tokens and,
+                  2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
                let%bind update_account =
                  let%bind receiving_allowed =
                    Boolean.all
@@ -2712,6 +2725,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                     in
+                    new_account_fees := account_creation_fee ;
                     Amount.Signed.Checked.(
                       add fee_payer_amount account_creation_fee) )
                in
@@ -2876,12 +2890,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                          token for non-user-commands"]
                         ((* This expands to
                             [token_should_not_create =
-                            token_should_not_create && is_user_command]
+                              token_should_not_create && is_user_command]
                             which is
                             - [token_should_not_create = token_should_not_create]
-                            (ie. always satisfied) for user commands
+                              (ie. always satisfied) for user commands
                             - [token_should_not_create = false] for coinbases/fee
-                            transfers.
+                              transfers.
                          *)
                          Boolean.Assert.( = ) token_should_not_create
                            token_cannot_create )
@@ -2895,14 +2909,20 @@ module Make_str (A : Wire_types.Concrete) = struct
                     case.
                  *)
                  let%bind receiver_amount =
-                   let%bind account_creation_amount =
+                   let%bind account_creation_fee =
                      Amount.Checked.if_ should_pay_to_create
                        ~then_:account_creation_amount
                        ~else_:Amount.(var_of_t zero)
                    in
+                   let%bind new_account_fees_total =
+                     Amount.Signed.Checked.(
+                       add @@ negate @@ of_unsigned account_creation_fee)
+                       !new_account_fees
+                   in
+                   new_account_fees := new_account_fees_total ;
                    let%bind amount_for_new_account, `Underflow underflow =
                      Amount.Checked.sub_flagged receiver_increase
-                       account_creation_amount
+                       account_creation_fee
                    in
                    let%bind () =
                      [%with_label_
@@ -3050,9 +3070,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                     in
                     (* Equivalent to:
                        if fee_payer_is_source then
-                       num_failures = 0
+                         num_failures = 0
                        else
-                       num_failures = num_failures
+                         num_failures = num_failures
                     *)
                     [%with_label_ "Check num_failures"]
                       (assert_r1cs not_fee_payer_is_source num_failures
@@ -3203,10 +3223,19 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
                ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
            in
-           let%bind amt, `Overflow overflow =
+           let%bind amt0, `Overflow overflow0 =
              Amount.Signed.Checked.(
                add_flagged expected_supply_increase
                  (negate (of_unsigned !burned_tokens)))
+           in
+           let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
+           let%bind new_account_fees_total =
+             Amount.Signed.Checked.if_ user_command_fails ~then_:zero_fee
+               ~else_:!new_account_fees
+           in
+           let%bind amt, `Overflow overflow =
+             (* new_account_fees_total is negative if nonzero *)
+             Amount.Signed.Checked.(add_flagged amt0 new_account_fees_total)
            in
            let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
            amt )
@@ -3229,18 +3258,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     (* spec for [main statement]:
        constraints pass iff there exists
-       t : Tagged_transaction.t
+          t : Tagged_transaction.t
        such that
        - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
        - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
        - t has fee excess equal to [fee_excess]
        - t has supply increase equal to [supply_increase]
-       where statement includes
-       l1 : Frozen_ledger_hash.t,
-       l2 : Frozen_ledger_hash.t,
-       fee_excess : Amount.Signed.t,
-       supply_increase : Amount.Signed.t
-       pc: Pending_coinbase_stack_state.t
+         where statement includes
+          l1 : Frozen_ledger_hash.t,
+          l2 : Frozen_ledger_hash.t,
+          fee_excess : Amount.Signed.t,
+          supply_increase : Amount.Signed.t
+          pc: Pending_coinbase_stack_state.t
     *)
     let%snarkydef_ main ~constraint_constants
         (statement : Statement.With_sok.Checked.t) =
@@ -3733,19 +3762,29 @@ module Make_str (A : Wire_types.Concrete) = struct
       | `Sparse_ledger sparse_ledger ->
           sparse_ledger
     in
+    let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, states_rev =
-      List.fold_left ~init:(fee_excess, sparse_ledger, []) zkapp_commands
-        ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, zkapp_command)
+    let _, _, _, states_rev =
+      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [])
+        zkapp_commands
+        ~f:(fun
+             (fee_excess, supply_increase, sparse_ledger, statess_rev)
+             (_, _, zkapp_command)
            ->
           let _, states =
             Sparse_ledger.apply_zkapp_command_unchecked_with_states
               sparse_ledger ~constraint_constants ~state_view ~fee_excess
-              zkapp_command
+              ~supply_increase zkapp_command
             |> Or_error.ok_exn
           in
-          let final_state = fst (List.last_exn states) in
-          (final_state.fee_excess, final_state.ledger, states :: statess_rev) )
+          let final_state =
+            let global_state, _local_state = List.last_exn states in
+            global_state
+          in
+          ( final_state.fee_excess
+          , final_state.supply_increase
+          , final_state.ledger
+          , states :: statess_rev ) )
     in
     let states = List.rev states_rev in
     let states_rev =
@@ -3798,11 +3837,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     ( List.fold_right states_rev ~init:[]
         ~f:(fun
-             { Account_update_group.Zkapp_command_intermediate_state.kind
-             ; spec
-             ; state_before = { global = source_global; local = source_local }
-             ; state_after = { global = target_global; local = target_local }
-             }
+             ({ kind
+              ; spec
+              ; state_before = { global = source_global; local = source_local }
+              ; state_after = { global = target_global; local = target_local }
+              } :
+               Account_update_group.Zkapp_command_intermediate_state.t )
              witnesses
            ->
           (*Transaction snark says nothing about failure status*)
@@ -3950,7 +3990,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
           in
           let fee_excess =
-            (*capture only the difference in the fee excess*)
+            (* capture only the difference in the fee excess *)
             let fee_excess =
               match
                 Amount.Signed.(
@@ -3970,6 +4010,22 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; Mina_base.Fee_excess.fee_token_r = Token_id.default
             ; fee_excess_r = Fee.Signed.zero
             }
+          in
+          let supply_increase =
+            (* capture only the difference in supply increase *)
+            match
+              Amount.Signed.(
+                add target_global.supply_increase
+                  (negate source_global.supply_increase))
+            with
+            | None ->
+                failwith
+                  (sprintf
+                     !"unexpected supply increase. source %{sexp: \
+                       Amount.Signed.t} target %{sexp: Amount.Signed.t}"
+                     target_global.supply_increase source_global.supply_increase )
+            | Some supply_increase ->
+                supply_increase
           in
           let call_stack_hash s =
             List.hd s
@@ -4009,7 +4065,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; ledger = Sparse_ledger.merkle_root target_local.ledger
                     }
                 }
-            ; supply_increase = Amount.Signed.zero
+            ; supply_increase
             ; fee_excess
             ; sok_digest = Sok_message.Digest.default
             }
@@ -4096,7 +4152,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (pi, vk)
 
-    let of_zkapp_command_segment_exn ~statement ~witness
+    let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
         ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
       Base.Zkapp_command_snark.witness := Some witness ;
       let res =

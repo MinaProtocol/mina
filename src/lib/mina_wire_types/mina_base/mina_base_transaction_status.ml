@@ -13,6 +13,8 @@ module Failure = struct
       | Overflow
       | Global_excess_overflow
       | Local_excess_overflow
+      | Local_supply_increase_overflow
+      | Global_supply_increase_overflow
       | Signed_command_on_zkapp_account
       | Zkapp_account_not_present
       | Update_not_permitted_balance

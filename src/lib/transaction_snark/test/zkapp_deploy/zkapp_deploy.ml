@@ -4,13 +4,13 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Deploy_snapp_spec
 open Mina_base
 
-let%test_module "Snapp deploy tests" =
+let%test_module "zkApp deploy tests" =
   ( module struct
-    let memo = Signed_command_memo.create_from_string_exn "Snapp deploy tests"
+    let memo = Signed_command_memo.create_from_string_exn "zkApp deploy tests"
 
     let constraint_constants = U.constraint_constants
 
-    let%test_unit "create a new snapp account/deploy a smart contract" =
+    let%test_unit "create a new zkAapp account/deploy a smart contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -79,7 +79,7 @@ let%test_module "Snapp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to snapp account/deploy a smart \
+    let%test_unit "change a non-snapp account to zkApp account/deploy a smart \
                    contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -111,7 +111,7 @@ let%test_module "Snapp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to snapp account/deploy a smart \
+    let%test_unit "change a non-zkApp account to zkApp account/deploy a smart \
                    contract- different fee payer" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger

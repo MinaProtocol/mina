@@ -3,7 +3,7 @@ module Local_state = struct
     type ( 'stack_frame
          , 'call_stack
          , 'token_id
-         , 'excess
+         , 'signed_amount
          , 'ledger
          , 'bool
          , 'comm
@@ -15,7 +15,8 @@ module Local_state = struct
       ; transaction_commitment : 'comm
       ; full_transaction_commitment : 'comm
       ; token_id : 'token_id
-      ; excess : 'excess
+      ; excess : 'signed_amount
+      ; supply_increase : 'signed_amount
       ; ledger : 'ledger
       ; success : 'bool
       ; account_update_index : 'length
