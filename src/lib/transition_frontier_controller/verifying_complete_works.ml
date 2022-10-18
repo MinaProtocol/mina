@@ -12,8 +12,8 @@ let update_status_from_processing ~timeout_controller ~transition_states
   let f = function
     | Transition_state.Verifying_complete_works
         ({ substate = { status = Processing ctx; _ }; block_vc; _ } as r) ->
-        Timeout_controller.cancel_in_progress_ctx ~timeout_controller
-          ~state_hash ctx ;
+        Timeout_controller.cancel_in_progress_ctx ~transition_states
+          ~state_functions ~timeout_controller ~state_hash ctx ;
         let block_vc =
           match status with
           | Substate.Failed _ ->
@@ -164,7 +164,8 @@ let start_processing ~context ~mark_processed_and_promote ~transition_states
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_block_with_validation block in
   let ctx =
-    launch_in_progress ~mark_processed_and_promote ~context ~transition_states block
+    launch_in_progress ~mark_processed_and_promote ~context ~transition_states
+      block
   in
   update_status_from_processing ~timeout_controller:Context.timeout_controller
     ~transition_states ~state_hash (Substate.Processing ctx)

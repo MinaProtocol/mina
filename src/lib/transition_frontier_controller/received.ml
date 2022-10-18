@@ -185,8 +185,9 @@ let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
 
 Pre-condition: header's parent is neither present in transition states nor in transition frontier.
 *)
-and launch_ancestry_retrieval ~context ~mark_processed_and_promote
-    ~child_contexts ~received_at ~sender ~state header_with_hash =
+and launch_ancestry_retrieval ~context ~transition_states
+    ~mark_processed_and_promote ~child_contexts ~received_at ~sender ~state
+    header_with_hash =
   let (module Context : CONTEXT) = context in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let parent_hash =
@@ -255,8 +256,8 @@ and launch_ancestry_retrieval ~context ~mark_processed_and_promote
   @@ I.finally action ~f:(fun () ->
          List.iter child_contexts ~f:(fun (_, interrupt_ivar) ->
              Ivar.fill_if_empty interrupt_ivar () ) ;
-         Timeout_controller.unregister ~state_hash ~timeout
-           Context.timeout_controller ) ;
+         Timeout_controller.unregister ~transition_states ~state_functions
+           ~state_hash ~timeout Context.timeout_controller ) ;
   (I.interrupt_ivar, timeout)
 
 (** [add_received] adds a gossip to the state.
@@ -330,7 +331,8 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
       (* Children sets of parent are not updated because parent is not present *)
       let interrupt_ivar, timeout =
         launch_ancestry_retrieval ~mark_processed_and_promote ~context
-          ~child_contexts ~sender ~received_at ~state header_with_hash
+          ~transition_states ~child_contexts ~sender ~received_at ~state
+          header_with_hash
       in
       add_to_state @@ Processing (In_progress { timeout; interrupt_ivar }) ;
       Timeout_controller.register ~state_functions ~transition_states
