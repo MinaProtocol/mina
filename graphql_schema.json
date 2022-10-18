@@ -13320,8 +13320,8 @@
               "description": "Find the account ID that owns a given token",
               "args": [
                 {
-                  "name": "token",
-                  "description": "Token to find the owner for",
+                  "name": "tokenId",
+                  "description": "Token ID to find the owner for",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,

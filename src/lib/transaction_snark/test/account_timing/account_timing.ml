@@ -41,7 +41,6 @@ let%test_module "account timing check" =
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
       let equal_balances_computation =
-        let open Snarky_backendless.Checked in
         let%bind checked_timing =
           make_checked_timing_computation account txn_amount txn_global_slot
         in

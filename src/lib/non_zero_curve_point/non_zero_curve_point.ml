@@ -276,7 +276,7 @@ module Uncompressed = struct
     and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
     (x, y)
 
-  let%snarkydef compress_var ((x, y) : var) : Compressed.var Checked.t =
+  let%snarkydef_ compress_var ((x, y) : var) : Compressed.var Checked.t =
     let open Compressed_poly in
     let%map is_odd = parity_var y in
     { Poly.x; is_odd }

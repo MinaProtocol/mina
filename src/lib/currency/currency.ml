@@ -343,7 +343,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let typ : (var, t) Typ.t =
       let (Typ typ) = Field.typ in
       Typ.transport
-        (Typ { typ with check = range_check })
+        (Typ { typ with check = (fun x -> make_checked_ast @@ range_check x) })
         ~there:to_field ~back:of_field
 
     [%%endif]
@@ -1257,7 +1257,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let sub_flagged_checked =
           let f (x, y) =
-            Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
+            Tick.Checked.map (M.Checked.sub_flagged x y)
               ~f:(fun (r, `Underflow u) -> (r, u))
           in
           Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

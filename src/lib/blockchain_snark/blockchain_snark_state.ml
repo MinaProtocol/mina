@@ -101,7 +101,7 @@ let non_pc_registers_equal_var t1 t2 =
         transition consensus data is valid
         new consensus state is a function of the old consensus state
 *)
-let%snarkydef step ~(logger : Logger.t)
+let%snarkydef_ step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) new_state
     : _ Tick.Checked.t =
