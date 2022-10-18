@@ -11,6 +11,8 @@ let%test_module "Zkapp payments tests" =
   ( module struct
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
+    [@@@warning "-32"]
+
     let constraint_constants = U.constraint_constants
 
     let merkle_root_after_zkapp_command_exn t ~txn_state_view txn =
@@ -101,47 +103,47 @@ let%test_module "Zkapp payments tests" =
         ; memo
         }
 
-    let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
-      Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
-          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              Array.iter
-                (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
-                ~f:(fun { account; private_key = _ } ->
-                  Ledger.create_new_account_exn ledger
-                    (Account.identifier account)
-                    account ) ;
-              let t1 =
-                let i, j = (1, 2) in
-                signed_signed ~wallets i j
-              in
-              let hash_pre = Ledger.merkle_root ledger in
-              let _target =
-                let txn_state_view =
-                  Mina_state.Protocol_state.Body.view U.genesis_state_body
-                in
-                (*Testing merkle root change*)
-                let (`If_this_is_used_it_should_have_a_comment_justifying_it t1)
-                    =
-                  Zkapp_command.Valid.to_valid_unsafe t1
-                in
-                merkle_root_after_zkapp_command_exn ledger ~txn_state_view t1
-              in
-              let hash_post = Ledger.merkle_root ledger in
-              [%test_eq: Field.t] hash_pre hash_post ) )
+    (* let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
+         Test_util.with_randomness 123456789 (fun () ->
+             let wallets = U.Wallet.random_wallets () in
+             Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                 Array.iter
+                   (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
+                   ~f:(fun { account; private_key = _ } ->
+                     Ledger.create_new_account_exn ledger
+                       (Account.identifier account)
+                       account ) ;
+                 let t1 =
+                   let i, j = (1, 2) in
+                   signed_signed ~wallets i j
+                 in
+                 let hash_pre = Ledger.merkle_root ledger in
+                 let _target =
+                   let txn_state_view =
+                     Mina_state.Protocol_state.Body.view U.genesis_state_body
+                   in
+                   (*Testing merkle root change*)
+                   let (`If_this_is_used_it_should_have_a_comment_justifying_it t1)
+                       =
+                     Zkapp_command.Valid.to_valid_unsafe t1
+                   in
+                   merkle_root_after_zkapp_command_exn ledger ~txn_state_view t1
+                 in
+                 let hash_post = Ledger.merkle_root ledger in
+                 [%test_eq: Field.t] hash_pre hash_post ) )
 
-    let%test_unit "zkapps-based payment" =
-      let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command =
-                account_update_send ~constraint_constants (List.hd_exn specs)
-              in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                ( U.apply_zkapp_command ledger [ zkapp_command ]
-                  : Sparse_ledger.t ) ) )
-
+       let%test_unit "zkapps-based payment" =
+         let open Mina_transaction_logic.For_tests in
+         Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+             Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                 let zkapp_command =
+                   account_update_send ~constraint_constants (List.hd_exn specs)
+                 in
+                 Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+                 ignore
+                   ( U.apply_zkapp_command ledger [ zkapp_command ]
+                     : Sparse_ledger.t ) ) )
+    *)
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
@@ -157,9 +159,14 @@ let%test_module "Zkapp payments tests" =
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+              Format.eprintf "NUM ZKAPPS: %d@." (List.length zkapp_commands) ;
+              List.iter zkapp_commands ~f:(fun zk ->
+                  Format.eprintf "LEN ACCT UPS: %d@."
+                    (List.length
+                       (Zkapp_command.Call_forest.to_list zk.account_updates) ) ) ;
               ignore
                 (U.apply_zkapp_command ledger zkapp_commands : Sparse_ledger.t) ) )
-
+    (*
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -272,5 +279,5 @@ let%test_module "Zkapp payments tests" =
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:Transaction_status.Failure.Overflow ledger
-                    [ zkapp_command ] ) ) )
+                    [ zkapp_command ] ) ) ) *)
   end )

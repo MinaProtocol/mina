@@ -2137,8 +2137,7 @@ module Base = struct
                       S.{ perform }
                       acc )
               in
-              (* replace any transaction failure with unit value *)
-              (global_state, { local_state with failure_status_tbl = () })
+              (global_state, local_state)
             in
             let acc' =
               match account_update_spec.is_start with
@@ -2148,8 +2147,7 @@ module Base = struct
                       S.{ perform }
                       acc
                   in
-                  (* replace any transaction failure with unit value *)
-                  (global_state, { local_state with failure_status_tbl = () })
+                  (global_state, local_state)
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_zkapp_command with
@@ -2203,6 +2201,15 @@ module Base = struct
           run_checked
             (Frozen_ledger_hash.assert_equal (fst global.ledger)
                statement.target.ledger ) ) ;
+      as_prover (fun () ->
+          Format.eprintf "GLOBAL: %s@."
+            ( Amount.Signed.to_yojson
+                (As_prover.read Amount.Signed.typ global.supply_increase)
+            |> Yojson.Safe.to_string ) ;
+          Format.eprintf "STATEMENT: %s@.@."
+            ( Amount.Signed.to_yojson
+                (As_prover.read Amount.Signed.typ statement.supply_increase)
+            |> Yojson.Safe.to_string ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Signed.Checked.assert_equal statement.supply_increase
@@ -3664,6 +3671,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
       * Zkapp_command.t )
       list ) =
+  Format.eprintf "NUM ZKAPP COMMANDS HERE: %d@." (List.length zkapp_commands) ;
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
@@ -3675,17 +3683,29 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
   in
+  let supply_increase = Amount.(Signed.of_unsigned zero) in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
-  let _, _, states_rev =
-    List.fold_left ~init:(fee_excess, sparse_ledger, []) zkapp_commands
-      ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, zkapp_command) ->
+  let _, _, _, states_rev =
+    List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [])
+      zkapp_commands
+      ~f:(fun
+           (fee_excess, supply_increase, sparse_ledger, statess_rev)
+           (_, _, zkapp_command)
+         ->
         let _, states =
           Sparse_ledger.apply_zkapp_command_unchecked_with_states sparse_ledger
-            ~constraint_constants ~state_view ~fee_excess zkapp_command
+            ~constraint_constants ~state_view ~fee_excess ~supply_increase
+            zkapp_command
           |> Or_error.ok_exn
         in
-        let final_state = fst (List.last_exn states) in
-        (final_state.fee_excess, final_state.ledger, states :: statess_rev) )
+        let final_state =
+          let global_state, _local_state = List.last_exn states in
+          global_state
+        in
+        ( final_state.fee_excess
+        , final_state.supply_increase
+        , final_state.ledger
+        , states :: statess_rev ) )
   in
   let states = List.rev states_rev in
   let states_rev =
@@ -3736,13 +3756,15 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       :: _ ->
         ledger
   in
+  Format.eprintf "LEN STATES_REV: %d@." (List.length states_rev) ;
   ( List.fold_right states_rev ~init:[]
       ~f:(fun
-           { Account_update_group.Zkapp_command_intermediate_state.kind
-           ; spec
-           ; state_before = { global = source_global; local = source_local }
-           ; state_after = { global = target_global; local = target_local }
-           }
+           ({ kind
+            ; spec
+            ; state_before = { global = source_global; local = source_local }
+            ; state_after = { global = target_global; local = target_local }
+            } :
+             Account_update_group.Zkapp_command_intermediate_state.t )
            witnesses
          ->
         (*Transaction snark says nothing about failure status*)
@@ -3906,7 +3928,24 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           ; fee_excess_r = Fee.Signed.zero
           }
         in
-        let supply_increase = target_global.supply_increase in
+        let supply_increase =
+          (* capture only the difference in supply increase *)
+          match
+            Amount.Signed.(
+              add target_global.supply_increase
+                (negate source_global.supply_increase))
+          with
+          | None ->
+              failwith
+                (sprintf
+                   !"unexpected supply increase. source %{sexp: \
+                     Amount.Signed.t} target %{sexp: Amount.Signed.t}"
+                   target_global.supply_increase source_global.supply_increase )
+          | Some supply_increase ->
+              supply_increase
+        in
+        Format.eprintf "STATEMENT SUPPLY INCREASE: %s@."
+          (Amount.Signed.to_yojson supply_increase |> Yojson.Safe.to_string) ;
         let call_stack_hash s =
           List.hd s
           |> Option.value_map ~default:Call_stack_digest.empty
@@ -4029,8 +4068,21 @@ struct
     in
     (pi, vk)
 
-  let of_zkapp_command_segment_exn ~statement ~witness
+  let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
       ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
+    let statement' =
+      ( { source = statement.source
+        ; target = statement.target
+        ; supply_increase = statement.supply_increase
+        ; fee_excess = statement.fee_excess
+        ; sok_digest = ()
+        }
+        : _ Statement.Poly.t )
+    in
+    Format.eprintf "STATEMENT: %s\nWITNESS: %s\nSPEC:%s@."
+      (Statement.to_yojson statement' |> Yojson.Safe.to_string)
+      (Zkapp_command_segment.Witness.to_yojson witness |> Yojson.Safe.to_string)
+      (Zkapp_command_segment.Basic.to_yojson spec |> Yojson.Safe.to_string) ;
     Base.Zkapp_command_snark.witness := Some witness ;
     let res =
       match spec with
@@ -4109,6 +4161,7 @@ struct
     let s = { s with sok_digest } in
     let open Async in
     let%map (), (), proof =
+      Format.eprintf "MERGING@." ;
       merge
         ~handler:
           (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))

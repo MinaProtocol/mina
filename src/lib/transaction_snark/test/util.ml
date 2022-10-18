@@ -102,7 +102,9 @@ let apply_zkapp_command ledger zkapp_command =
       (`Ledger ledger) zkapp_command
   in
   let open Impl in
-  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
+  List.iteri (List.rev witnesses) ~f:(fun ndx (witness, spec, statement) ->
+      Format.eprintf "NDX: %d  THE STATEMENT: %s@." ndx
+        (Statement.With_sok.to_yojson statement |> Yojson.Safe.to_string) ;
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
@@ -124,7 +126,7 @@ let trivial_zkapp =
 let check_zkapp_command_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
-  (*TODO: merge multiple snapp transactions*)
+  (*TODO: merge multiple zkApp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
