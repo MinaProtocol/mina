@@ -1,5 +1,4 @@
 module SC = Scalar_challenge
-module P = Proof
 open Pickles_types
 open Hlist
 open Tuple_lib
@@ -16,21 +15,14 @@ let challenge_polynomial =
   let open Backend.Tick.Field in
   Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
 
-module Plonk_checks = struct
-  include Plonk_checks
+module Type1 =
+  Plonk_checks.Make
+    (Shifted_value.Type1)
+    (struct
+      let constant_term = Plonk_checks.Scalars.Tick.constant_term
 
-  module Type1 =
-    Plonk_checks.Make
-      (Shifted_value.Type1)
-      (struct
-        let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-        let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
-      end)
-
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
-end
+      let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+    end)
 
 let vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
@@ -53,7 +45,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    Plonk_checks.Type1.ft_eval0
+    Type1.ft_eval0
       (module Tick.Field)
       plonk ~env ~domain
       (Plonk_types.Evals.to_in_circuit combined_evals)
@@ -242,7 +234,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       ~domain:tick_domain tick_plonk_minimal tick_combined_evals
   in
   let plonk =
-    Plonk_checks.Type1.derive_plonk
+    Type1.derive_plonk
       (module Tick.Field)
       ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
@@ -398,18 +390,19 @@ let wrap
       , (_, actual_proofs_verified) Vector.t
       , (_, actual_proofs_verified) Vector.t
       , max_local_max_proofs_verifieds
-        H1.T(P.Base.Messages_for_next_proof_over_same_field.Wrap).t
+        H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t
       , ( (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t
         , max_proofs_verified )
         Vector.t )
-      P.Base.Step.t ) =
+      Proof.Base.Step.t ) =
   let messages_for_next_wrap_proof =
     let module M =
       H1.Map
-        (P.Base.Messages_for_next_proof_over_same_field.Wrap)
-        (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
+        (Proof.Base.Messages_for_next_proof_over_same_field.Wrap)
+        (Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
         (struct
-          let f = P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
+          let f =
+            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
         end)
     in
     M.f prev_statement.messages_for_next_wrap_proof
@@ -427,20 +420,20 @@ let wrap
                 might not be correct *)
              Common.hash_messages_for_next_step_proof
                ~app_state:to_field_elements
-               (P.Base.Messages_for_next_proof_over_same_field.Step.prepare
+               (Proof.Base.Messages_for_next_proof_over_same_field.Step.prepare
                   ~dlog_plonk_index
                   prev_statement.proof_state.messages_for_next_step_proof ) )
         }
     ; messages_for_next_wrap_proof =
         (let module M =
            H1.Map
-             (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
+             (Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
              (E01 (Digest.Constant))
              (struct
                let f (type n)
                    (m :
                      n
-                     P.Base.Messages_for_next_proof_over_same_field.Wrap
+                     Proof.Base.Messages_for_next_proof_over_same_field.Wrap
                      .Prepared
                      .t ) =
                  Wrap_hack.hash_messages_for_next_wrap_proof
@@ -462,13 +455,14 @@ let wrap
     | Step_accs ->
         let module M =
           H1.Map
-            (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
+            (Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
             (E01 (Step_acc))
             (struct
               let f :
                   type a.
                      a
-                     P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared
+                     Proof.Base.Messages_for_next_proof_over_same_field.Wrap
+                     .Prepared
                      .t
                   -> Step_acc.t =
                fun t -> t.challenge_polynomial_commitment
@@ -481,13 +475,14 @@ let wrap
     | Old_bulletproof_challenges ->
         let module M =
           H1.Map
-            (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
+            (Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
             (Challenges_vector.Constant)
             (struct
               let f
                   (t :
                     _
-                    P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared
+                    Proof.Base.Messages_for_next_proof_over_same_field.Wrap
+                    .Prepared
                     .t ) =
                 t.old_bulletproof_challenges
             end)
@@ -536,12 +531,14 @@ let wrap
   let sgs =
     let module M =
       H1.Map
-        (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
+        (Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
         (E01 (Tick.Curve.Affine))
         (struct
           let f :
               type n.
-                 n P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared.t
+                 n
+                 Proof.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared
+                 .t
               -> _ =
            fun t -> t.challenge_polynomial_commitment
         end)
@@ -558,7 +555,7 @@ let wrap
   in
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
     let messages_for_next_wrap_proof :
-        _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
+        _ Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
           proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
@@ -577,7 +574,7 @@ let wrap
     }
   in
   let messages_for_next_wrap_proof_prepared =
-    P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
+    Proof.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
       next_statement.proof_state.messages_for_next_wrap_proof
   in
   let%map.Promise next_proof =
@@ -633,4 +630,4 @@ let wrap
         ; ft_eval1 = proof.openings.ft_eval1
         }
     }
-    : _ P.Base.Wrap.t )
+    : _ Proof.Base.Wrap.t )
