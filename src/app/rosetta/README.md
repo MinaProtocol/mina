@@ -420,8 +420,8 @@ then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-openapi-generator generate -i api.json -g ocaml
-cp -p src/models/* $MINA/src/lib/rosetta_models/
+openapi-generator generate -i api.json -g ocaml -o out
+cp -p out/src/models/* out/src/support/enums.ml $MINA/src/lib/rosetta_models/
 ```
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
