@@ -1768,7 +1768,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok (s, failure_status_tbl) ->
+    | Ok (s, reversed_failure_status_tbl) ->
+        let failure_status_tbl = List.rev reversed_failure_status_tbl in
         let account_ids_originally_not_in_ledger =
           List.filter_map original_account_states
             ~f:(fun (acct_id, loc_and_acct) ->
@@ -1784,9 +1785,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let failure_status_tbl =
           if successfully_applied then failure_status_tbl
           else
-            let fee_payer_idx = List.length failure_status_tbl - 1 in
             List.mapi failure_status_tbl ~f:(fun idx fs ->
-                if phys_equal idx fee_payer_idx && List.is_empty fs then
+                if idx > 0 && List.is_empty fs then
                   [ Transaction_status.Failure.Cancelled ]
                 else fs )
         in
