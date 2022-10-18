@@ -4057,15 +4057,6 @@ struct
 
   let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
       ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
-    let statement' =
-      ( { source = statement.source
-        ; target = statement.target
-        ; supply_increase = statement.supply_increase
-        ; fee_excess = statement.fee_excess
-        ; sok_digest = ()
-        }
-        : _ Statement.Poly.t )
-    in
     Base.Zkapp_command_snark.witness := Some witness ;
     let res =
       match spec with

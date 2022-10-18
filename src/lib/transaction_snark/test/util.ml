@@ -102,7 +102,7 @@ let apply_zkapp_command ledger zkapp_command =
       (`Ledger ledger) zkapp_command
   in
   let open Impl in
-  List.iteri (List.rev witnesses) ~f:(fun ndx (witness, spec, statement) ->
+  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
