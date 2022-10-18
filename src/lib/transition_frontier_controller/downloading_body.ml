@@ -100,8 +100,8 @@ let update_status_from_processing ~timeout_controller ~transition_states
     | Transition_state.Downloading_body
         ( { substate = { status = Processing ctx; children; _ }; block_vc; _ }
         as r ) ->
-        Timeout_controller.cancel_in_progress_ctx ~timeout_controller
-          ~state_hash ctx ;
+        Timeout_controller.cancel_in_progress_ctx ~transition_states
+          ~state_functions ~timeout_controller ~state_hash ctx ;
         let block_vc =
           match status with
           | Substate.Failed _ ->

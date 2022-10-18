@@ -49,8 +49,8 @@ let update_status_from_processing ~timeout_controller ~transition_states
   let f = function
     | Transition_state.Building_breadcrumb
         ({ substate = { status = Processing ctx; _ }; block_vc; _ } as r) ->
-        Timeout_controller.cancel_in_progress_ctx ~timeout_controller
-          ~state_hash ctx ;
+        Timeout_controller.cancel_in_progress_ctx ~transition_states
+          ~state_functions ~timeout_controller ~state_hash ctx ;
         let block_vc =
           match status with
           | Substate.Failed _ ->

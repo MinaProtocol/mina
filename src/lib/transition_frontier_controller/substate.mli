@@ -62,6 +62,16 @@ val mark_processed :
   -> State_hash.t list
   -> State_hash.t list
 
+(** Update children of transition's parent when the transition is promoted
+    to the higher state.
+
+    This function removes the transition from parent's [Substate.processed] children
+    set and adds it either to [Substate.waiting_for_parent] or
+    [Substate.processing_or_failed] children set depending on the new status.
+
+    When a transition's previous state was [Transition_state.Waiting_to_be_added_to_frontier],
+    transition is not added to any of the parent's children sets.
+*)
 val update_children_on_promotion :
      state_functions:(module State_functions with type state_t = 'state_t)
   -> transition_states:'state_t State_hash.Table.t

@@ -13,8 +13,8 @@ let update_status_from_processing ~timeout_controller ~transition_states
     | Transition_state.Verifying_blockchain_proof
         ({ substate = { status = Processing ctx; _ }; gossip_data = gd; _ } as r)
       ->
-        Timeout_controller.cancel_in_progress_ctx ~timeout_controller
-          ~state_hash ctx ;
+        Timeout_controller.cancel_in_progress_ctx ~transition_states
+          ~state_functions ~timeout_controller ~state_hash ctx ;
         let gossip_data =
           match status with
           | Substate.Failed _ ->
@@ -105,9 +105,7 @@ let launch_verification ?prev_processing ~context ~transition_states
     ~mark_processed_and_promote state_hash =
   let states =
     Option.value ~default:[]
-    @@ match%bind.Option
-         State_hash.Table.find transition_states state_hash
-       with
+    @@ match%bind.Option State_hash.Table.find transition_states state_hash with
        | Transition_state.Verifying_blockchain_proof _ as st ->
            Some
              (Substate.collect_dependent_ancestry ~transition_states
@@ -119,8 +117,8 @@ let launch_verification ?prev_processing ~context ~transition_states
   | [] ->
       Option.iter prev_processing
         ~f:(fun (timeout_controller, state_hash, ctx) ->
-          Timeout_controller.cancel_in_progress_ctx ~timeout_controller
-            ~state_hash ctx )
+          Timeout_controller.cancel_in_progress_ctx ~transition_states
+            ~state_functions ~timeout_controller ~state_hash ctx )
   | Transition_state.Verifying_blockchain_proof ({ header = top_header; _ } as r)
     :: rest_states ->
       let key = state_hash_of_header_with_validation top_header in
@@ -131,8 +129,8 @@ let launch_verification ?prev_processing ~context ~transition_states
             ( timeout_controller
             , prev_hash
             , (Substate.In_progress { timeout; _ } as ctx) ) ->
-            Timeout_controller.unregister ~state_hash:prev_hash ~timeout
-              timeout_controller ;
+            Timeout_controller.unregister ~transition_states ~state_functions
+              ~state_hash:prev_hash ~timeout timeout_controller ;
             Timeout_controller.register ~state_functions ~transition_states
               ~state_hash:key ~timeout timeout_controller ;
             ctx
