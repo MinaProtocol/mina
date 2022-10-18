@@ -727,7 +727,6 @@ module type S = sig
                  Network_peer.Envelope.Incoming.t )
                Pipe.Writer.t
             -> unit )
-      -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

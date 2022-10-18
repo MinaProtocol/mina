@@ -2647,7 +2647,7 @@ module Hooks = struct
               ) )
 
   let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-      ~local_state ~glue_sync_ledger ~random_peers requested_syncs =
+      ~local_state ~glue_sync_ledger requested_syncs =
     let open Context in
     let open Local_state in
     let open Snapshot in
@@ -2691,12 +2691,10 @@ module Hooks = struct
               } ;
             Deferred.Or_error.ok_unit )
       else
-        let num_sync_peers = 5 in
-        let%bind peers = random_peers num_sync_peers in
         let ledger_hash_json =
           Mina_base.Ledger_hash.to_yojson target_ledger_hash
         in
-        [%log info] "Syncing epoch ledger from %d peers" num_sync_peers
+        [%log info] "Syncing epoch ledger"
           ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
         (* start with an existing epoch ledger, which may be faster
            than syncing with an empty ledger, since ledgers accumulate
@@ -2736,7 +2734,7 @@ module Hooks = struct
         let response_writer =
           Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
         in
-        glue_sync_ledger ~preferred:peers query_reader response_writer ;
+        glue_sync_ledger ~preferred:[] query_reader response_writer ;
         match%bind
           Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
             ~data:() ~equal:(fun () () -> true)
