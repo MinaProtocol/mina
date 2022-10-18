@@ -1,6 +1,7 @@
 (library
  (name graphql_basic_scalars)
  (public_name graphql_basic_scalars)
+ (inline_tests)
  (libraries
    ;; opam libraries
    async

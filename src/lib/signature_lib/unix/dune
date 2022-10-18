@@ -5,6 +5,7 @@
  (libraries
   ;; opam libraries
   graphql-async
+  graphql
   yojson
   core_kernel
   core

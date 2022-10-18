@@ -1,47 +1,57 @@
-open Graphql_basic_scalars
+open Graphql_basic_scalars.Utils
+open Graphql_basic_scalars.Testing
 
-module TransactionHash =
-  Make_scalar_using_base58_check
-    (Mina_transaction.Transaction_hash)
-    (struct
-      let name = "TransactionHash"
+module Make (Schema : Schema) = struct
+  module TransactionHash =
+    Make_scalar_using_base58_check
+      (Mina_transaction.Transaction_hash)
+      (struct
+        let name = "TransactionHash"
 
-      let doc = "Base58Check-encoded transaction hash"
-    end)
+        let doc = "Base58Check-encoded transaction hash"
+      end)
+      (Schema)
 
-module TransactionId =
-  Make_scalar_using_base64
-    (Mina_transaction.Transaction_id)
-    (struct
-      let name = "TransactionId"
+  module TransactionId =
+    Make_scalar_using_base64
+      (Mina_transaction.Transaction_id)
+      (struct
+        let name = "TransactionId"
 
-      let doc = "Base64-encoded transaction"
-    end)
+        let doc = "Base64-encoded transaction"
+      end)
+      (Schema)
+end
 
-(* TESTS *)
+include Make (Schema)
 
-let%test_module "TransactionHash" =
+let%test_module "Roundtrip tests" =
   ( module struct
-    module TransactionHash_gen = struct
-      include Mina_transaction.Transaction_hash
-      open Core_kernel
+    include Make (Test_schema)
 
-      let gen =
-        Mina_base.Coinbase.Gen.gen
-          ~constraint_constants:
-            Genesis_constants.Constraint_constants.for_unit_tests
-        |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
-               hash_coinbase coinbase )
-    end
+    let%test_module "TransactionHash" =
+      ( module struct
+        module TransactionHash_gen = struct
+          include Mina_transaction.Transaction_hash
+          open Core_kernel
 
-    include Make_test (TransactionHash) (TransactionHash_gen)
-  end )
+          let gen =
+            Mina_base.Coinbase.Gen.gen
+              ~constraint_constants:
+                Genesis_constants.Constraint_constants.for_unit_tests
+            |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
+                   hash_coinbase coinbase )
+        end
 
-let%test_module "TransactionId" =
-  ( module struct
-    module TransactionId_gen = struct
-      include Mina_transaction.Transaction_id.User_command
-    end
+        include Make_test (TransactionHash) (TransactionHash_gen)
+      end )
 
-    include Make_test (TransactionId) (TransactionId_gen)
+    let%test_module "TransactionId" =
+      ( module struct
+        module TransactionId_gen = struct
+          include Mina_transaction.Transaction_id.User_command
+        end
+
+        include Make_test (TransactionId) (TransactionId_gen)
+      end )
   end )

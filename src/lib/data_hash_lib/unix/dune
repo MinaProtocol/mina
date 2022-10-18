@@ -5,6 +5,7 @@
  (libraries
   ;; opam libraries
   graphql-async
+  graphql
   yojson
   ppx_inline_test.config
   core_kernel

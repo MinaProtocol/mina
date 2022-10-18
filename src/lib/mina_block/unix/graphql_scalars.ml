@@ -1,40 +1,49 @@
-module PrecomputedBlockProof :
-  Graphql_basic_scalars.Json_intf with type t = Mina_block.Precomputed.Proof.t =
-struct
-  open Mina_block.Precomputed.Proof
+open Graphql_basic_scalars.Utils
+open Graphql_basic_scalars.Testing
 
-  type nonrec t = t
+module Make (Schema : Schema) = struct
+  module type Json_intf =
+    Json_intf_any_typ with type ('a, 'b) typ := ('a, 'b) Schema.typ
 
-  let parse json = Yojson.Basic.Util.to_string json |> of_bin_string
+  module PrecomputedBlockProof :
+    Json_intf with type t = Mina_block.Precomputed.Proof.t = struct
+    open Mina_block.Precomputed.Proof
 
-  let serialize t = `String (to_bin_string t)
+    type nonrec t = t
 
-  let typ () =
-    Graphql_async.Schema.scalar "PrecomputedBlockProof"
-      ~doc:"Base-64 encoded proof" ~coerce:serialize
+    let parse json = Yojson.Basic.Util.to_string json |> of_bin_string
+
+    let serialize t = `String (to_bin_string t)
+
+    let typ () =
+      Schema.scalar "PrecomputedBlockProof" ~doc:"Base-64 encoded proof"
+        ~coerce:serialize
+  end
 end
 
-(* TESTS *)
+include Make (Schema)
 
-let%test_module "PrecomputedBlockProof" =
+let%test_module "Roundtrip tests" =
   ( module struct
-    module PrecomputedBlockProof_gen = struct
-      open Core_kernel
-      module Nat = Pickles_types.Nat
-      include Mina_block.Precomputed.Proof
+    include Make (Test_schema)
 
-      let compare = Poly.compare
+    let%test_module "PrecomputedBlockProof" =
+      ( module struct
+        module PrecomputedBlockProof_gen = struct
+          open Core_kernel
+          module Nat = Pickles_types.Nat
+          include Mina_block.Precomputed.Proof
 
-      (* Sample gotten from: lib/prover/prover.ml *)
-      let example : t =
-        Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+          let compare = Poly.compare
 
-      (* TODO: find better ways to generate `Mina_block.Precomputed.Proof.t` values *)
-      let gen = Quickcheck.Generator.return example
-    end
+          (* Sample gotten from: lib/prover/prover.ml *)
+          let example : t =
+            Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
 
-    include
-      Graphql_basic_scalars.Make_test
-        (PrecomputedBlockProof)
-        (PrecomputedBlockProof_gen)
+          (* TODO: find better ways to generate `Mina_block.Precomputed.Proof.t` values *)
+          let gen = Quickcheck.Generator.return example
+        end
+
+        include Make_test (PrecomputedBlockProof) (PrecomputedBlockProof_gen)
+      end )
   end )
