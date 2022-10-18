@@ -252,6 +252,7 @@ module Node = struct
                         incrementNonce
                         receive
                         send
+                        access
                         setDelegate
                         setPermissions
                         setZkappUri
@@ -471,6 +472,7 @@ module Node = struct
     ; increment_nonce = to_auth_required account_permissions.incrementNonce
     ; receive = to_auth_required account_permissions.receive
     ; send = to_auth_required account_permissions.send
+    ; access = to_auth_required account_permissions.access
     ; set_delegate = to_auth_required account_permissions.setDelegate
     ; set_permissions = to_auth_required account_permissions.setPermissions
     ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri

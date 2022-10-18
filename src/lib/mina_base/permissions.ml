@@ -536,6 +536,7 @@ let%test_unit "json value" =
     (user_default |> to_json full |> Yojson.Safe.to_string)
     ( {json|{
         editState: "Signature",
+        access: "None",
         send: "Signature",
         receive: "None",
         setDelegate: "Signature",

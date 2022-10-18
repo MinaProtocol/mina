@@ -401,6 +401,9 @@ let update_permissions =
        and receive =
          Param.flag "--receive" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
+       and access =
+         Param.flag "--access" ~doc:"Proof|Signature|Either|None"
+           Param.(optional_with_default "None" string)
        and set_permissions =
          Param.flag "--set-permissions" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
@@ -438,6 +441,7 @@ let update_permissions =
            { Permissions.Poly.edit_state = Util.auth_of_string edit_state
            ; send = Util.auth_of_string send
            ; receive = Util.auth_of_string receive
+           ; access = Util.auth_of_string access
            ; set_permissions = Util.auth_of_string set_permissions
            ; set_delegate = Util.auth_of_string set_delegate
            ; set_verification_key = Util.auth_of_string set_verification_key

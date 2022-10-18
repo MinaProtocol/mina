@@ -62,6 +62,7 @@ let%test_module "Initialize state test" =
                   { edit_state = Proof
                   ; send = Proof
                   ; receive = Proof
+                  ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key = Proof

@@ -1096,6 +1096,10 @@ module Types = struct
               ~doc:"Authorization required to receive tokens"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "access" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to access the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
           ; field "setDelegate" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the delegate"
               ~args:Arg.[]
