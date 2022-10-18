@@ -20,6 +20,7 @@ module Failure = struct
         | Global_excess_overflow
         | Local_excess_overflow
         | Local_supply_increase_overflow
+        | Global_supply_increase_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -105,8 +106,8 @@ module Failure = struct
       ~source_minimum_balance_violation:add ~receiver_already_exists:add
       ~token_owner_not_caller:add ~overflow:add ~global_excess_overflow:add
       ~local_excess_overflow:add ~local_supply_increase_overflow:add
-      ~signed_command_on_zkapp_account:add ~zkapp_account_not_present:add
-      ~update_not_permitted_balance:add
+      ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
+      ~zkapp_account_not_present:add ~update_not_permitted_balance:add
       ~update_not_permitted_timing_existing_account:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
       ~update_not_permitted_verification_key:add
@@ -157,6 +158,8 @@ module Failure = struct
         "Local_excess_overflow"
     | Local_supply_increase_overflow ->
         "Local_supply_increase_overflow"
+    | Global_supply_increase_overflow ->
+        "Global_supply_increase_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -358,6 +361,8 @@ module Failure = struct
         "The resulting local fee excess is too large to store"
     | Local_supply_increase_overflow ->
         "The resulting local supply increase is too large to store"
+    | Global_supply_increase_overflow ->
+        "The resulting global supply increase is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->

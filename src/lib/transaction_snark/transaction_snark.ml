@@ -2201,15 +2201,6 @@ module Base = struct
           run_checked
             (Frozen_ledger_hash.assert_equal (fst global.ledger)
                statement.target.ledger ) ) ;
-      as_prover (fun () ->
-          Format.eprintf "GLOBAL: %s@."
-            ( Amount.Signed.to_yojson
-                (As_prover.read Amount.Signed.typ global.supply_increase)
-            |> Yojson.Safe.to_string ) ;
-          Format.eprintf "STATEMENT: %s@.@."
-            ( Amount.Signed.to_yojson
-                (As_prover.read Amount.Signed.typ statement.supply_increase)
-            |> Yojson.Safe.to_string ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Signed.Checked.assert_equal statement.supply_increase
@@ -3671,7 +3662,6 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
       * Zkapp_command.t )
       list ) =
-  Format.eprintf "NUM ZKAPP COMMANDS HERE: %d@." (List.length zkapp_commands) ;
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
@@ -3756,7 +3746,6 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       :: _ ->
         ledger
   in
-  Format.eprintf "LEN STATES_REV: %d@." (List.length states_rev) ;
   ( List.fold_right states_rev ~init:[]
       ~f:(fun
            ({ kind
@@ -3944,8 +3933,6 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           | Some supply_increase ->
               supply_increase
         in
-        Format.eprintf "STATEMENT SUPPLY INCREASE: %s@."
-          (Amount.Signed.to_yojson supply_increase |> Yojson.Safe.to_string) ;
         let call_stack_hash s =
           List.hd s
           |> Option.value_map ~default:Call_stack_digest.empty
@@ -4079,10 +4066,6 @@ struct
         }
         : _ Statement.Poly.t )
     in
-    Format.eprintf "STATEMENT: %s\nWITNESS: %s\nSPEC:%s@."
-      (Statement.to_yojson statement' |> Yojson.Safe.to_string)
-      (Zkapp_command_segment.Witness.to_yojson witness |> Yojson.Safe.to_string)
-      (Zkapp_command_segment.Basic.to_yojson spec |> Yojson.Safe.to_string) ;
     Base.Zkapp_command_snark.witness := Some witness ;
     let res =
       match spec with
@@ -4161,7 +4144,6 @@ struct
     let s = { s with sok_digest } in
     let open Async in
     let%map (), (), proof =
-      Format.eprintf "MERGING@." ;
       merge
         ~handler:
           (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))

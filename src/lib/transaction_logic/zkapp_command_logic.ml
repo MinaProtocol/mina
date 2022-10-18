@@ -1660,12 +1660,24 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Global_excess_overflow
         Bool.(not global_excess_update_failed)
     in
-    (* store supply increase in global state *)
+    (* add local supply increase in global state *)
+    let new_global_supply_increase, global_supply_increase_update_failed =
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged
+          (Global_state.supply_increase global_state)
+          local_state.supply_increase
+      in
+      (res, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Global_supply_increase_overflow
+        Bool.(not global_supply_increase_update_failed)
+    in
     let global_state =
       Global_state.set_supply_increase global_state
         (Amount.Signed.if_
            Bool.(is_last_account_update &&& local_state.success)
-           ~then_:local_state.supply_increase
+           ~then_:new_global_supply_increase
            ~else_:(Global_state.supply_increase global_state) )
     in
     (* The first account_update must succeed. *)
