@@ -1,10 +1,3 @@
-open Core_kernel
-open Import
-open Pickles_types
-open Types
-open Common
-open Backend
-
 (* The step-proof "reduced" me-only contains the data of the standard me-only
    but without the wrap verification key. The purpose of this type is for sending
    step me-onlys on the wire. There is no need to send the wrap-key since everyone
@@ -35,11 +28,12 @@ module Step = struct
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
       } =
-    { Types.Step.Proof_state.Messages_for_next_step_proof.app_state
+    { Import.Types.Step.Proof_state.Messages_for_next_step_proof.app_state
     ; challenge_polynomial_commitments
     ; dlog_plonk_index
     ; old_bulletproof_challenges =
-        Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
+        Pickles_types.Vector.map ~f:Common.Ipa.Step.compute_challenges
+          old_bulletproof_challenges
     }
 end
 
@@ -51,50 +45,57 @@ module Wrap = struct
 
       module V2 = struct
         type t =
-          Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
-          Scalar_challenge.Stable.V2.t
-          Bulletproof_challenge.Stable.V1.t
-          Wrap_bp_vec.Stable.V1.t
+          Limb_vector.Constant.Hex64.Stable.V1.t
+          Pickles_types.Vector.Vector_2.Stable.V1.t
+          Import.Scalar_challenge.Stable.V2.t
+          Import.Bulletproof_challenge.Stable.V1.t
+          Import.Types.Wrap_bp_vec.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
 
-        let to_latest = Fn.id
+        let to_latest = Core_kernel.Fn.id
       end
     end]
 
     type t =
-      Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-      Wrap_bp_vec.t
+      Import.Challenge.Constant.t Import.Scalar_challenge.t
+      Import.Bulletproof_challenge.t
+      Import.Types.Wrap_bp_vec.t
     [@@deriving sexp, compare, yojson, hash, equal]
 
     let () =
-      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
-       fun () -> Type_equal.T
+      let _f : unit -> (t, Stable.Latest.t) Core_kernel.Type_equal.t =
+       fun () -> Core_kernel.Type_equal.T
       in
       ()
 
     module Prepared = struct
-      type t = (Tock.Field.t, Tock.Rounds.n) Vector.t
+      type t =
+        (Backend.Tock.Field.t, Backend.Tock.Rounds.n) Pickles_types.Vector.t
     end
   end
 
   type 'max_local_max_proofs_verified t =
-    ( Tock.Inner_curve.Affine.t
-    , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
-    Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+    ( Backend.Tock.Inner_curve.Affine.t
+    , ( Challenges_vector.t
+      , 'max_local_max_proofs_verified )
+      Pickles_types.Vector.t )
+    Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
 
   module Prepared = struct
     type 'max_local_max_proofs_verified t =
-      ( Tock.Inner_curve.Affine.t
-      , (Challenges_vector.Prepared.t, 'max_local_max_proofs_verified) Vector.t
-      )
-      Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+      ( Backend.Tock.Inner_curve.Affine.t
+      , ( Challenges_vector.Prepared.t
+        , 'max_local_max_proofs_verified )
+        Pickles_types.Vector.t )
+      Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
   end
 
   let prepare
       ({ challenge_polynomial_commitment; old_bulletproof_challenges } : _ t) =
-    { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+    { Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof
       .challenge_polynomial_commitment
     ; old_bulletproof_challenges =
-        Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
+        Pickles_types.Vector.map ~f:Common.Ipa.Wrap.compute_challenges
+          old_bulletproof_challenges
     }
 end
