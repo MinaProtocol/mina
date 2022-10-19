@@ -97,6 +97,7 @@ module Internal_command_info = struct
   type t =
     { kind: Kind.t
     ; receiver: [`Pk of string]
+    ; receiver_account_creation_fee_paid: Unsigned_extended.UInt64.t option
     ; fee: Unsigned_extended.UInt64.t
     ; token: [`Token_id of string]
     ; sequence_no: int
@@ -114,16 +115,26 @@ module Internal_command_info = struct
        * produce more balance changing operations in the mempool or a block.
        * *)
       let plan : 'a Op.t list = 
+        let mk_account_creation_fee related =
+          match t.receiver_account_creation_fee_paid with
+          | None -> []
+          | Some fee ->
+            [{Op.label= `Account_creation_fee_via_fee_receiver fee
+             ; related_to= Some related}]
+        in
         (match t.kind with
         | `Coinbase ->
             (* The coinbase transaction is really incrementing by the coinbase
            * amount  *)
           [{Op.label= `Coinbase_inc; related_to= None}]
+          @ (mk_account_creation_fee `Coinbase_inc)
         | `Fee_transfer ->
           [{Op.label= `Fee_receiver_inc; related_to= None}]
+        @ (mk_account_creation_fee `Fee_receiver_inc)
         | `Fee_transfer_via_coinbase ->
             [ {Op.label= `Fee_receiver_inc; related_to= None}
             ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+            @ (mk_account_creation_fee `Fee_receiver_inc)
         )
       in
       Op_build.build
@@ -195,6 +206,7 @@ module Internal_command_info = struct
   let dummies =
     [ { kind= `Coinbase
       ; receiver= `Pk "Eve"
+      ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 20_000_000_000
       ; token= (`Token_id Amount_of.Token_id.default)
       ; sequence_no=1
@@ -202,6 +214,7 @@ module Internal_command_info = struct
       ; hash= "COINBASE_1" }
     ; { kind= `Fee_transfer
       ; receiver= `Pk "Alice"
+      ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 30_000_000_000
       ; token= (`Token_id Amount_of.Token_id.default)
       ; sequence_no=1
@@ -387,7 +400,10 @@ WITH RECURSIVE chain AS (
         ; source: string
         ; receiver: string
         ; status: string option
-        ; failure_reason: string option }
+        ; failure_reason: string option
+        ; fee_payer_account_creation_fee_paid: int64 option
+        ; receiver_account_creation_fee_paid: int64 option
+        }
       [@@deriving hlist]
 
       let fee_payer t = `Pk t.fee_payer
@@ -400,13 +416,22 @@ WITH RECURSIVE chain AS (
 
       let failure_reason t = t.failure_reason
 
+      let fee_payer_account_creation_fee_paid t =
+        t.fee_payer_account_creation_fee_paid
+
+      let receiver_account_creation_fee_paid t =
+        t.receiver_account_creation_fee_paid
+
       let typ = Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ string
             ; string
             ; string
             ; option string
-            ; option string ]
+            ; option string
+            ; option int64
+            ; option int64
+            ]
     end
 
     let typ =
@@ -416,16 +441,23 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.comamnd_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
+        {| SELECT u.id, u.command_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
         pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
         blocks_user_commands.status,
-        blocks_user_commands.failure_reason
+        blocks_user_commands.failure_reason,
+        ac_payer.creation_fee,
+        ac_receiver.creation_fee
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
-        INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
-        INNER JOIN public_keys pk2 ON pk2.id = u.source_id
-        INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
+        INNER JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
+        INNER JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
+        INNER JOIN accounts_created ac_payer ON ac_payer.account_identifier_id = ai_payer.id
+        INNER JOIN account_identifiers ai_source on ai_source.id = u.source_id
+        INNER JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
+        INNER JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
+        INNER JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
+        INNER JOIN accounts_created ac_receiver on ac_receiver.account_identifier_id = ai_receiver.id
         WHERE blocks_user_commands.block_id = ?
       |}
 
@@ -435,11 +467,12 @@ WITH RECURSIVE chain AS (
 
   module Internal_commands = struct
     module Extras = struct
-      let receiver (x,_,_) = `Pk x
-      let sequence_no (_,seq_no,_) = seq_no
-      let secondary_sequence_no (_,_,secondary_seq_no) = secondary_seq_no
+      let receiver (_,x,_,_) = `Pk x
+      let receiver_account_creation_fee_paid (fee,_,_,_) = fee
+      let sequence_no (_,_,seq_no,_) = seq_no
+      let secondary_sequence_no (_,_,_,secondary_seq_no) = secondary_seq_no
 
-      let typ = Caqti_type.(tup3 string int int)
+      let typ = Caqti_type.(tup4 (option int64) string int int)
     end
 
     let typ =
@@ -449,11 +482,13 @@ WITH RECURSIVE chain AS (
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.command_type, i.receiver_id, i.fee, i.hash,
-            pk.value as receiver,
-            bic.sequence_nocommand_, beic.secondarapp/rosetta/lib/y_sequence_no
+            ac.creation_fee, pk.value as receiver,
+            bic.sequence_no, bic.secondary_sequence_no
         FROM internal_commands i
         INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
-        INNER JOIN public_keys pk ON pk.id = i.receiver_id
+        INNER JOIN account_identifiers ai on ai.id = i.receiver_id
+        INNER JOIN accounts_created ac on ac.account_identifier_id = ai.id
+        INNER JOIN public_keys pk ON pk.id = ai.public_key_id
         WHERE bic.block_id = ?
       |}
 
@@ -533,6 +568,7 @@ WITH RECURSIVE chain AS (
           let token_id = Mina_base.Token_id.(to_string default) in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
+          ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
           ; fee= Unsigned.UInt64.of_string ic.fee
           ; token= `Token_id token_id
           ; sequence_no=Internal_commands.Extras.sequence_no extras
@@ -563,10 +599,36 @@ WITH RECURSIVE chain AS (
           let token = Mina_base.Token_id.(to_string default) in
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
-            | None ->
+            | None -> (
+              match
+                ( User_commands.Extras.fee_payer_account_creation_fee_paid
+                    extras
+                , User_commands.Extras.receiver_account_creation_fee_paid
+                    extras )
+              with
+              | None, None ->
                M.return
                @@ `Applied
                     User_command_info.Account_creation_fees_paid.By_no_one
+              | Some fee_payer, None ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_fee_payer
+                          (Unsigned.UInt64.of_int64 fee_payer))
+              | None, Some receiver ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_receiver
+                          (Unsigned.UInt64.of_int64 receiver))
+              | Some _, Some _ ->
+                  M.fail
+                    (Errors.create
+                       ~context:
+                         "The archive database is storing creation fees paid \
+                          by two different pks. This is impossible."
+                       `Invariant_violation) )
             | Some status ->
                 M.return @@ `Failed status
           in
