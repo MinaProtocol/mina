@@ -25,8 +25,6 @@
 
 open Core_kernel
 open Pickles_types
-open Common
-open Import
 module V = Pickles_base.Side_loaded_verification_key
 
 include (
@@ -68,17 +66,15 @@ module Width : sig
 
   val zero : t
 
-  open Impls.Step
-
   module Checked : sig
     type t
 
-    val to_field : t -> Field.t
+    val to_field : t -> Impls.Step.Field.t
 
-    val to_bits : t -> Boolean.var list
+    val to_bits : t -> Impls.Step.Boolean.var list
   end
 
-  val typ : (Checked.t, t) Typ.t
+  val typ : (Checked.t, t) Impls.Step.Typ.t
 
   module Max = Nat.N2
 
