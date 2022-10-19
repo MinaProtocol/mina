@@ -20,6 +20,14 @@ type 'a jsonable = 'a -> json
 type 'a maybe_json = Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or
 
 module Jsonable : sig
+  module type S = sig
+    type t
+
+    val to_yojson : t jsonable
+
+    val of_yojson : t maybe_json
+  end
+
   module type S1 = sig
     type 'a t
 
@@ -54,6 +62,12 @@ type 'a hashable =
   Ppx_hash_lib.Std.Hash.state -> 'a -> Ppx_hash_lib.Std.Hash.state
 
 module Hash_foldable : sig
+  module type S = sig
+    type t
+
+    val hash_fold_t : t hashable
+  end
+
   module type S1 = sig
     type 'a t
 
@@ -83,6 +97,14 @@ type 'a comparable = ('a, int) rel2
 type 'a equalable = ('a, bool) rel2
 
 module Comparable : sig
+  module type S = sig
+    type t
+
+    val compare : t comparable
+
+    val equal : t equalable
+  end
+
   module type S1 = sig
     type 'a t
 
@@ -120,6 +142,16 @@ module type VERSIONED = sig
 end
 
 module Serializable : sig
+  module type S = sig
+    type t
+
+    include Sexpable.S with type t := t
+
+    include Binable.S with type t := t
+
+    include Jsonable.S with type t := t
+  end
+
   module type S1 = sig
     type 'a t
 
