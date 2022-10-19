@@ -712,3 +712,28 @@ module Vector_18 = struct
     in
     ()
 end
+
+module Vector_20 = struct
+  module T = With_length (Nat.N20)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N20.n) vec
+
+      include Make.Binable (Nat.N20)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end

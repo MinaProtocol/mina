@@ -14,7 +14,7 @@ module Rounds : sig
 end = struct
   open Pickles_types
   module Wrap = Nat.N15
-  module Step = Nat.N16
+  module Step = Nat.N20
 
   (* Think about versioning here! These vector types *will* change
      serialization if the numbers above change, and so will require a new
@@ -50,17 +50,17 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_16.Stable.V1.t
+        type 'a t = 'a Vector.Vector_20.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_16.t
+    type 'a t = 'a Vector.Vector_20.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_16.of_list_exn
+    let of_list_exn = Vector.Vector_20.of_list_exn
 
     let to_list = Vector.to_list
   end
