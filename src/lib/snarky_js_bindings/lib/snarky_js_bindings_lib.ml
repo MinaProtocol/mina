@@ -22,7 +22,7 @@ let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 let log_and_raise_error_with_message ~exn ~msg =
   match Js.Optdef.to_option msg with
   | None ->
-      raise exn
+      raise_error (Core_kernel.Exn.to_string exn)
   | Some msg ->
       let stack = Printexc.get_backtrace () in
       let msg =
@@ -30,7 +30,7 @@ let log_and_raise_error_with_message ~exn ~msg =
           (Core_kernel.Exn.to_string exn)
           stack
       in
-      ignore (raise_error msg)
+      raise_error msg
 
 class type field_class =
   object
@@ -1021,7 +1021,7 @@ let () =
       let x2, y2 = As_group.value p2 in
       try Field.Assert.equal x1 x2
       with exn -> (
-        log_and_raise_error_with_message ~exn ~msg ;
+        ignore (log_and_raise_error_with_message ~exn ~msg) ;
         try Field.Assert.equal y1 y2
         with exn -> log_and_raise_error_with_message ~exn ~msg ) ) ;
 
