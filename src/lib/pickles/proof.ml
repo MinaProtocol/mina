@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Common
 open Backend
 
 let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
