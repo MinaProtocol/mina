@@ -1247,6 +1247,7 @@ CREATE TABLE public.zkapp_permissions (
     edit_state public.zkapp_auth_required_type NOT NULL,
     send public.zkapp_auth_required_type NOT NULL,
     receive public.zkapp_auth_required_type NOT NULL,
+    access public.zkapp_auth_required_type NOT NULL,
     set_delegate public.zkapp_auth_required_type NOT NULL,
     set_permissions public.zkapp_auth_required_type NOT NULL,
     set_verification_key public.zkapp_auth_required_type NOT NULL,
@@ -2610,12 +2611,12 @@ COPY public.zkapp_account_update_failures (id, index, failures) FROM stdin;
 -- Data for Name: zkapp_permissions; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_sequence_state, set_token_symbol, increment_nonce, set_voting_for) FROM stdin;
-1	signature	signature	none	signature	proof	signature	none	signature	signature	none	none
-2	signature	signature	signature	signature	signature	signature	none	none	none	none	none
-3	signature	signature	none	signature	signature	signature	none	none	none	none	none
-4	signature	signature	proof	signature	signature	signature	none	none	none	none	none
-5	proof	signature	none	signature	signature	signature	signature	proof	signature	signature	signature
+COPY public.zkapp_permissions (id, edit_state, send, receive, access, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_sequence_state, set_token_symbol, increment_nonce, set_voting_for) FROM stdin;
+1	signature	signature	none	none	signature	proof	signature	none	signature	signature	none	none
+2	signature	signature	signature	none	signature	signature	signature	none	none	none	none	none
+3	signature	signature	none	none	signature	signature	signature	none	none	none	none	none
+4	signature	signature	proof	none	signature	signature	signature	none	none	none	none	none
+5	proof	signature	none	none	signature	signature	signature	signature	proof	signature	signature	signature
 \.
 
 
