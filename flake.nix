@@ -364,7 +364,7 @@
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-with-lsp";
-          buildInputs = oa.buildInputs ++ [ pkgs.go_1_18 ] ++ devShellPackages;
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
