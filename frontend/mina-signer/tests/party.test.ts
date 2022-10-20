@@ -25,6 +25,7 @@ let mockedZkappCommand = {
             editState: "Proof",
             send: "Signature",
             receive: "Proof",
+            access: "None",
             setDelegate: "Signature",
             setPermissions: "Signature",
             setVerificationKey: "Signature",
