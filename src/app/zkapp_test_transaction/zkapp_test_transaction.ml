@@ -48,28 +48,26 @@ module Flags = struct
       and debug =
         Param.flag "--debug" Param.no_arg
           ~doc:"Debug mode, generates transaction snark"
-      and graphql =
-        Param.flag "--graphql" Param.no_arg ~doc:"prints only graphql query"
       in
-      (keyfile, fee, nonce, memo, debug, graphql))
+      (keyfile, fee, nonce, memo, debug))
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo
-      ~graphql () =
+  let create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo ()
+      =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
         ~memo
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that creates a zkApp account"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file for the zkApp account to be created"
@@ -81,24 +79,24 @@ let create_zkapp_account =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo
-         ~graphql ))
+      ))
 
 let upgrade_zkapp =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~graphql
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~verification_key ~zkapp_uri ~auth () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~verification_key ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that updates the verification key"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file for the zkApp account to be upgraded"
@@ -125,17 +123,16 @@ let upgrade_zkapp =
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~verification_key ~zkapp_uri ~auth ~graphql ))
+         ~verification_key ~zkapp_uri ~auth ))
 
 let transfer_funds_one_receiver =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount
-      ~graphql () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       transfer_funds ~debug ~keyfile ~fee ~nonce ~memo
         ~receivers:(Deferred.return [ (receiver, amount) ])
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -144,7 +141,7 @@ let transfer_funds_one_receiver =
       ~summary:
         "Generate a zkApp Transaction that makes one transfer to the receiver \
          account"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and receiver =
          Param.flag "--receiver"
            ~doc:"PUBLIC_KEY the public key of the receiver"
@@ -155,16 +152,15 @@ let transfer_funds_one_receiver =
          failwithf "Fee must at least be %s"
            (Currency.Fee.to_formatted_string Flags.min_fee)
            () ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount
-         ~graphql ))
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount ))
 
 let transfer_funds =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers ~graphql () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   let read_key_and_amount count =
@@ -213,7 +209,7 @@ let transfer_funds =
       ~summary:
         "Generate a zkApp transaction that makes multiple transfers from one \
          account"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags in
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
@@ -221,23 +217,23 @@ let transfer_funds =
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers ~graphql ))
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers ))
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-      ~graphql () =
+      () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
@@ -255,24 +251,24 @@ let update_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~graphql ))
+         ~app_state ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
-      ~graphql ~auth () =
+      ~auth () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that updates the zkApp URI"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
@@ -295,24 +291,24 @@ let update_zkapp_uri =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth ~graphql ))
+         ~zkapp_uri ~auth ))
 
 let update_sequence_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~graphql
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~sequence_state () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~sequence_state
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
@@ -361,24 +357,24 @@ let update_sequence_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~sequence_state ~graphql ))
+         ~sequence_state ))
 
 let update_token_symbol =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~graphql
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       ~token_symbol ~auth () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~token_symbol ~auth
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that updates token symbol"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
@@ -401,17 +397,17 @@ let update_token_symbol =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth ~graphql ))
+         ~token_symbol ~auth ))
 
 let update_permissions =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~graphql
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~permissions ~current_auth () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~permissions ~current_auth
     in
-    Util.print_snapp_transaction ~graphql zkapp_command ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -420,7 +416,7 @@ let update_permissions =
       ~summary:
         "Generate a zkApp transaction that updates the permissions of a zkApp \
          account"
-      (let%map keyfile, fee, nonce, memo, debug, graphql = Flags.common_flags
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
@@ -487,8 +483,7 @@ let update_permissions =
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~permissions
-         ~current_auth:(Util.auth_of_string current_auth)
-         ~graphql ))
+         ~current_auth:(Util.auth_of_string current_auth) ))
 
 let test_zkapp_with_genesis_ledger =
   Command.(

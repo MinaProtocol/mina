@@ -575,7 +575,7 @@ if ${VALUE_TRANSFERS}; then
   echo "Set up zkapp account"
   printf "\n"
 
-  QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --graphql --fee 5 | sed 1,5d)
+  QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,5d)
   python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
 
   echo "Starting to send value transfer transactions every: ${TRANSACTION_FREQUENCY} seconds"
@@ -590,15 +590,21 @@ if ${VALUE_TRANSFERS}; then
   ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
 
   nonce=1
+  state=0
 
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
     
-    QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --receiver-amount 1 --graphql --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,3d)
+    QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,3d)
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
     let nonce++
 
+
+    QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state | sed 1,5d)
+    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+    let nonce++
+    let state++
   done
 
   set -e
