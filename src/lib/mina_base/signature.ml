@@ -4,7 +4,13 @@ open Core_kernel
 open Snark_params.Tick
 
 module Arg = struct
-  type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.Latest.t
+  (* top version tag for compatibility with pre-Berkeley hard fork
+     Base58Check-serialized signatures
+  *)
+  type t =
+    ( Field.t
+    , Inner_curve.Scalar.t )
+    Signature_poly.Stable.Latest.With_top_version_tag.t
   [@@deriving bin_io_unversioned]
 
   let description = "Signature"
@@ -59,3 +65,10 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 [%%define_locally
 Stable.Latest.
   (of_base58_check_exn, of_base58_check, of_yojson, to_yojson, to_base58_check)]
+
+let%test "Base58Check is stable" =
+  let expected =
+    "7mWxjLYgbJUkZNcGouvhVj5tJ8yu9hoexb9ntvPK8t5LHqzmrL6QJjjKtf5SgmxB4QWkDw7qoMMbbNGtHVpsbJHPyTy2EzRQ"
+  in
+  let got = to_base58_check dummy in
+  String.equal got expected

@@ -75,4 +75,17 @@ final: prev: {
       sed -i 's/.*libp2p_ipc.*//' go.mod
     '';
   };
+
+  # Tool for testing implementation of the rosetta api
+  rosetta-cli = final.buildGoModule rec {
+    pname = "rosetta-cli";
+    version = "0.10.0";
+    src = final.fetchFromGitHub {
+      owner = "coinbase";
+      repo = "rosetta-cli";
+      rev = "085f95c85c99f607a82fb1814594d95dc9fefb55";
+      sha256 = "I3fNRiMwuk5FWiECu31Z5A23djUR0GHugy1OqNruzj8=";
+    };
+    vendorSha256 = "sha256-ooFpB17Yu9aILx3kl2o6WVbbX110YeSdcC0RIaBUwzM=";
+  };
 }
