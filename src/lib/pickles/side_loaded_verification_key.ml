@@ -41,11 +41,11 @@ let input_size ~of_int ~add ~mul w =
   let open Composition_types in
   (* This should be an affine function in [a]. *)
   let size a =
-    let (T (typ, _conv, _conv_inv)) =
+    let (T (Typ typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
         ~uses_lookup:No
     in
-    Impls.Step.Data_spec.size [ typ ]
+    typ.size_in_field_elements
   in
   let f0 = size Nat.N0.n in
   let slope = size Nat.N1.n - f0 in
@@ -351,11 +351,11 @@ let%test_unit "input_size" =
       [%test_eq: int]
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
-         let (T (typ, _conv, _conv_inv)) =
+         let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
          in
-         Impls.Step.Data_spec.size [ typ ] ) )
+         typ.size_in_field_elements ) )
 
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in

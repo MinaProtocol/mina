@@ -197,13 +197,6 @@ let accounts_accessed (t : t) (status : Transaction_status.t) =
 
 let accounts_referenced (t : t) = accounts_accessed t Applied
 
-let to_base58_check (t : t) =
-  match t with
-  | Signed_command x ->
-      Signed_command.to_base58_check x
-  | Zkapp_command ps ->
-      Zkapp_command.to_base58_check ps
-
 let fee_payer (t : t) =
   match t with
   | Signed_command x ->

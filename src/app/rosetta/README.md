@@ -236,6 +236,57 @@ Examples queries via Rosetta:
 
 Any queries that rely on historical data will fail until the archive database is populated. This happens automatically with the relevant entrypoints.
 
+### Running natively
+
+When `src/app/rosetta` is compiled it's also possible to run Rosetta natively,
+without using the docker image. This is more convenient in some cases, for
+instance when testing development changes to the Rosetta server.
+
+In order to work, Rosetta needs a PostgreSQL database containing an archive
+data collected from a Mina daemon. It also requires a connection to the Mina
+daemon itself in order to fetch some data directly from it.
+
+It might be convenient to set up the database inside a docker container anyway,
+for instance like so:
+
+```shell
+$ docker run -d --name pg-mina-archive -p 5432:5432 -e POSTGRES_PASSWORD='*******' -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=mina_archive -e POSTGRES_USER=pguser postgres:14.5
+```
+
+The `POSTGRES_HOST_AUTH_METHOD=trust` instructs the database not to require
+password for authentication. This is fine in development environments, but
+highly discouraged in production. Note that, whether you want to set auth
+method to `trust` or not, `POSTGRES_PASSWORD` is still required and must be
+set.
+
+Of course, it is also possible to set up the database natively, in which case
+the settings above should be replicated.
+
+For instructions on how to set up a daemon, see the `README-dev.md` file and
+follow instructions in there. 
+
+Once this is done, the Rosetta server can be launched with the following
+command:
+
+```shell
+$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe --port 3087 --graphql-uri http://localhost:3085/graphql --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+```
+
+The `--graphql-uri` parameter gives address at which Rosetta can connect to
+the daemon's GraphQL service. It should point to the address where the Mina
+daemon is running.
+
+The `--archive-uri` parameter describes the connection to the database we
+have just set up. It has the following form:
+
+```
+postgres://{POSTGRES_USER}:{POSTGRES_USER}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}
+```
+
+`POSTGRES_USER` and `POSTGRES_DB` should be identical to those given in the
+previous step. `POSTGRES_HOST` will usually be just `localhost` and
+`POSTGRES_PORT`, unless specifically set up otherwise is `5432`.
+
 ## Design Choices
 
 ### Database Bootstrap Scripts

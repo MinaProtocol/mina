@@ -385,7 +385,7 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
+                let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false);
 
                 let index =
                     DlogVerifierIndex {
@@ -405,6 +405,9 @@ macro_rules! impl_verification_key {
                         // TODO
                         chacha_comm: None,
                         range_check_comm: None,
+                        foreign_field_add_comm: None,
+
+                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();
