@@ -5,7 +5,7 @@ open Mina_net2
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 
-let%test_module "coda network tests" =
+let%test_module "Mina network tests" =
   ( module struct
     let logger = Logger.create ()
 

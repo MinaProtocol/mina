@@ -2694,7 +2694,7 @@ module Hooks = struct
         let ledger_hash_json =
           Mina_base.Ledger_hash.to_yojson target_ledger_hash
         in
-        [%log info] "Syncing epoch ledger"
+        [%log info] "Syncing epoch ledger with hash $target_ledger_hash"
           ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
         (* start with an existing epoch ledger, which may be faster
            than syncing with an empty ledger, since ledgers accumulate
@@ -2740,7 +2740,9 @@ module Hooks = struct
             ~data:() ~equal:(fun () () -> true)
         with
         | `Ok ledger -> (
-            [%log info] "Succeeded in syncing epoch ledger from peers"
+            [%log info]
+              "Succeeded in syncing epoch ledger with hash $target_ledger_hash \
+               from peers"
               ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
             let sparse_ledger =
               Mina_ledger.Sparse_ledger.of_any_ledger
