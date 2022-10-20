@@ -592,6 +592,10 @@ let () =
   add_op1 "not" Boolean.not ;
   add_op2 "and" Boolean.( &&& ) ;
   add_op2 "or" Boolean.( ||| ) ;
+  arg_optdef_arg_method bool_class "assertEquals"
+    (fun this (y : As_bool.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value (As_bool.value y)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   optdef_arg_method bool_class "assertTrue"
     (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Boolean.Assert.is_true this##.value
