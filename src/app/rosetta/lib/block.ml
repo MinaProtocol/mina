@@ -443,7 +443,7 @@ WITH RECURSIVE chain AS (
       Caqti_request.collect Caqti_type.int typ
         {| SELECT u.id, u.command_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
-        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
+        pk_payer.value as fee_payer, pk_source.value as source, pk_receiver.value as receiver,
         blocks_user_commands.status,
         blocks_user_commands.failure_reason,
         ac_payer.creation_fee,

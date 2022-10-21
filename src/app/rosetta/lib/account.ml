@@ -108,18 +108,9 @@ module Sql = struct
         address =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
-      if has_canonical_height then (
-        match%bind Conn.find_opt query_canonical (address, requested_block_height) with
-        | Some ((slot,balance,nonce)) ->
-            return (Some (slot, balance, nonce))
-        | None ->
-          return None)
-      else (
-        match%bind Conn.find_opt query_pending (address, requested_block_height) with
-        | Some ((slot,balance,nonce)) ->
-            return (Some (slot, balance, nonce))
-        | None ->
-          return None)
+      Conn.find_opt
+        (if has_canonical_height then query_canonical else query_pending)
+        (address, requested_block_height)
   end
 
   (* TODO: either address will have to include a token id, or we pass the
