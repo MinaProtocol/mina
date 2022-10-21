@@ -28,7 +28,7 @@ ARCHIVE=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
-ZKAPP_TRANSFERS=false
+ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
 
@@ -100,8 +100,8 @@ help() {
   echo "                                  |   Default: ${PG_DB}"
   echo "-vt |--value-transfer-txns        | Whether to execute periodic value transfer transactions (presence of argument)"
   echo "                                  |   Default: ${VALUE_TRANSFERS}"
-  echo "-zt |--zkapp-transfer-txns        | Whether to execute periodic zkapp transfer transactions (presence of argument)"
-  echo "                                  |   Default: ${ZKAPP_TRANSFERS}"
+  echo "-zt |--zkapp-transactions         | Whether to execute periodic zkapp transactions (presence of argument)"
+  echo "                                  |   Default: ${ZKAPP_TRANSACTIONS}"
   echo "-tf |--transactions-frequency <#> | Frequency of periodic transactions execution (in seconds)"
   echo "                                  |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf |--snark-worker-fee <#>       | SNARK Worker fee"
@@ -254,6 +254,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
     ;;
   -vt | --value-transfer-txns) VALUE_TRANSFERS=true ;;
+  -zt | --zkapp-transactions) ZKAPP_TRANSACTIONS=true ;;
   -tf | --transactions-frequency)
     TRANSACTION_FREQUENCY="${2}"
     shift
@@ -326,6 +327,15 @@ if ${VALUE_TRANSFERS}; then
   fi
 fi
 
+if ${ZKAPP_TRANSACTIONS}; then
+  if [ "${WHALES}" -eq "0" ] || [ "${FISH}" -eq "0" ]; then
+    echo "Send zkApp transactions requires at least one 'Fish' node running and at least one whale account acting as the fee payer account!"
+    printf "\n"
+
+    exit 1
+  fi
+fi
+
 echo "Starting the Network with:"
 echo -e "\t1 seed"
 
@@ -337,6 +347,7 @@ echo -e "\t${WHALES} whales"
 echo -e "\t${FISH} fish"
 echo -e "\t${NODES} non block-producing nodes"
 echo -e "\tSending transactions: ${VALUE_TRANSFERS}"
+echo -e "\tSending zkApp transactions: ${ZKAPP_TRANSACTIONS}"
 printf "\n"
 echo "================================"
 printf "\n"
@@ -557,12 +568,13 @@ echo "================================"
 printf "\n"
 
 # ================================================
-# Start sending transactions
+# Start sending transactions and zkApp transactions
 
-if ${VALUE_TRANSFERS}; then
+if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
   FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
   ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
   ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
+
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
@@ -572,39 +584,49 @@ if ${VALUE_TRANSFERS}; then
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
     sleep 1
   done
-  echo "Set up zkapp account"
-  printf "\n"
 
-  QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,5d)
-  python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+  if ${ZKAPP_TRANSACTIONS}; then
+    echo "Set up zkapp account"
+    printf "\n"
 
-  echo "Starting to send value transfer transactions every: ${TRANSACTION_FREQUENCY} seconds"
+    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,5d)
+    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+  fi
+
+  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
   printf "\n"
 
   set +e
 
-  ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
-  ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
+  if ${VALUE_TRANSFER}; then
+    ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
+    ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
 
-  sleep ${TRANSACTION_FREQUENCY}
-  ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    sleep ${TRANSACTION_FREQUENCY}
+    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+  fi
 
   nonce=1
   state=0
 
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
-    
-    QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,3d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-    let nonce++
+
+    if ${VALUE_TRANSFER}; then
+      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    fi
+
+    if ${ZKAPP_TRANSACTIONS}; then
+      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,3d)
+      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      let nonce++
 
 
-    QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state | sed 1,5d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-    let nonce++
-    let state++
+      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state | sed 1,5d)
+      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      let nonce++
+      let state++
+    fi
   done
 
   set -e
