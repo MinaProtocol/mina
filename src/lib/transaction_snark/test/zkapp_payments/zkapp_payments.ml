@@ -11,6 +11,8 @@ let%test_module "Zkapp payments tests" =
   ( module struct
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
+    [@@@warning "-32"]
+
     let constraint_constants = U.constraint_constants
 
     let merkle_root_after_zkapp_command_exn t ~txn_state_view txn =

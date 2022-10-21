@@ -266,22 +266,22 @@ module Snarkable = struct
     let compare_var x y =
       Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
-    let%snarkydef increment_if_var bs (b : Boolean.var) =
+    let%snarkydef_ increment_if_var bs (b : Boolean.var) =
       let open Impl in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (b :> Field.Var.t) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef increment_var bs =
+    let%snarkydef_ increment_var bs =
       let open Impl in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (Field.Var.constant Field.one) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+    let%snarkydef_ equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       Field.Checked.equal (pack_var n) (pack_var n')
 
-    let%snarkydef assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+    let%snarkydef_ assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       Field.Checked.Assert.equal (pack_var n) (pack_var n')
 
     let if_ (cond : Boolean.var) ~(then_ : Unpacked.var) ~(else_ : Unpacked.var)
