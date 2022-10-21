@@ -38,15 +38,8 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup3 int64 int64 int64)
         {sql|
-SELECT DISTINCT
-  pk_id, -- this is only used as a slug to combine the rows but ignored in the OCaml
-  block_global_slot_since_genesis,
-  balance,
-  nonce
-FROM (
-(
   WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -65,9 +58,9 @@ FROM (
                 ON b.id = pending_chain.parent_id AND pending_chain.id <> pending_chain.parent_id
                 AND pending_chain.chain_status <> 'canonical'
 
-               )
+              )
 
-              SELECT pks.id AS pk_id,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+              SELECT DISTINCT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -89,24 +82,14 @@ FROM (
 
               ORDER BY (full_chain.height) DESC
               LIMIT 1
-              )
-            )
-AS combo
 |sql}
 
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup3 int64 int64 int64)
         {sql|
-SELECT DISTINCT
-  pk_id, -- this is only used as a slug to combine the rows but ignored in the OCaml
-  block_global_slot_since_genesis,
-  balance,
-  nonce
-FROM (
-  (
-                SELECT pks.id AS pk_id, b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+                SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
 
                 FROM blocks b
                 INNER JOIN accounts_accessed ac ON ac.block_id = b.id
@@ -119,9 +102,6 @@ FROM (
 
                 ORDER BY (b.height) DESC
                 LIMIT 1
-  )
-)
-AS combo
 |sql}
 
     let run (module Conn : Caqti_async.CONNECTION) requested_block_height
@@ -130,16 +110,16 @@ AS combo
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
       if has_canonical_height then (
         match%bind Conn.find_opt query_canonical (address, requested_block_height) with
-        | Some ((_pk,slot,balance,nonce)) ->
-            return @@ Some (slot, balance, nonce)
+        | Some ((slot,balance,nonce)) ->
+            return (Some (slot, balance, nonce))
         | None ->
-          return @@ None)
+          return None)
       else (
         match%bind Conn.find_opt query_pending (address, requested_block_height) with
-        | Some ((_pk,slot,balance,nonce)) ->
-            return @@ Some (slot, balance, nonce)
+        | Some ((slot,balance,nonce)) ->
+            return (Some (slot, balance, nonce))
         | None ->
-          return @@ None)
+          return None)
   end
 
   (* TODO: either address will have to include a token id, or we pass the
@@ -355,7 +335,7 @@ module Balance = struct
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in
-            Result.return @@ (dummy_block_identifier, balance_info, Unsigned.UInt64.zero) )
+            Result.return (dummy_block_identifier, balance_info, Unsigned.UInt64.zero) )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
