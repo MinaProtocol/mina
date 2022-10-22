@@ -29,6 +29,8 @@ Account_id.Digest.
   , to_input
   , gen
   , gen_non_default
+  , to_field_unsafe
+  , of_field
   , to_string
   , of_string
   , comparator
