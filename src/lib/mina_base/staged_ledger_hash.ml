@@ -73,7 +73,11 @@ module Pending_coinbase_aux = struct
           Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let of_base58_check_exn s = Base58_check.decode_exn s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
@@ -89,7 +93,8 @@ module Pending_coinbase_aux = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
@@ -103,7 +108,7 @@ module Non_snark = struct
         ; aux_hash : Aux_hash.Stable.V1.t
         ; pending_coinbase_aux : Pending_coinbase_aux.Stable.V1.t
         }
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson, fields]
 
       let to_latest = Fn.id
     end
@@ -224,6 +229,9 @@ let ledger_hash ({ non_snark; _ } : t) = Non_snark.ledger_hash non_snark
 
 let aux_hash ({ non_snark; _ } : t) = Non_snark.aux_hash non_snark
 
+let pending_coinbase_aux ({ non_snark; _ } : t) =
+  Non_snark.pending_coinbase_aux non_snark
+
 let pending_coinbase_hash ({ pending_coinbase_hash; _ } : t) =
   pending_coinbase_hash
 
@@ -267,11 +275,8 @@ let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
       (Non_snark.var_to_input non_snark)
       (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
 
-let data_spec =
-  let open Data_spec in
-  [ Non_snark.typ; Pending_coinbase.Hash.typ ]
-
 let typ : (var, t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Non_snark.typ; Pending_coinbase.Hash.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist

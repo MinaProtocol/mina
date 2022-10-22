@@ -357,59 +357,6 @@ module type S = sig
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
-type local_state =
-  ( Stack_frame.value
-  , Stack_frame.value list
-  , Token_id.t
-  , Currency.Amount.Signed.t
-  , Mina_ledger.Sparse_ledger.t
-  , bool
-  , Zkapp_command.Transaction_commitment.t
-  , Mina_numbers.Index.t
-  , Transaction_status.Failure.Collection.t )
-  Mina_transaction_logic.Zkapp_command_logic.Local_state.t
-
-type global_state = Mina_ledger.Sparse_ledger.Global_state.t
-
-(** Represents before/after pairs of states, corresponding to zkapp_command in a list of zkapp_command transactions.
- *)
-module Zkapp_command_intermediate_state : sig
-  type state = { global : global_state; local : local_state }
-
-  type t =
-    { kind : [ `Same | `New | `Two_new ]
-    ; spec : Zkapp_command_segment.Basic.t
-    ; state_before : state
-    ; state_after : state
-    }
-end
-
-(** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
-    number of snark proofs needed to prove all of the zkapp_command.
-
-    This function is intended to take the zkapp_command from multiple transactions as
-    its input, which may be converted from a [Zkapp_command.t list] using
-    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-    the same length, with 1 more state than the number of zkapp_command for each
-    transaction.
-
-    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
-    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
-    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
-    where [s0] is the initial state before any of the transactions have been
-    applied.
-
-    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
-    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
-    will need to be passed as part of the snark witness while applying that
-    pair.
-*)
-val group_by_zkapp_command_rev :
-     Account_update.t list list
-  -> (global_state * local_state) list list
-  -> Zkapp_command_intermediate_state.t list
-
 (** [zkapp_command_witnesses_exn ledger zkapp_commands] generates the zkapp_command segment witnesses
     and corresponding statements needed to prove the application of each
     zkapp_command transaction in [zkapp_commands] on top of ledger. If multiple zkapp_command are
@@ -507,7 +454,30 @@ module Base : sig
 end
 
 module For_tests : sig
-  module Spec : sig
+  module Deploy_snapp_spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; preconditions : Account_update.Preconditions.t option
+      ; authorization_kind : Account_update.Authorization_kind.t
+      }
+    [@@deriving sexp]
+  end
+
+  val deploy_snapp :
+       ?no_auth:bool
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Deploy_snapp_spec.t
+    -> Zkapp_command.t
+
+  module Update_states_spec : sig
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
@@ -519,6 +489,7 @@ module For_tests : sig
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
@@ -527,12 +498,6 @@ module For_tests : sig
       }
     [@@deriving sexp]
   end
-
-  val deploy_snapp :
-       ?no_auth:bool
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Spec.t
-    -> Zkapp_command.t
 
   val update_states :
        ?zkapp_prover:
@@ -544,7 +509,7 @@ module For_tests : sig
          )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Spec.t
+    -> Update_states_spec.t
     -> Zkapp_command.t Async.Deferred.t
 
   val create_trivial_predicate_snapp :
@@ -581,5 +546,26 @@ module For_tests : sig
               Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Zkapp_command.t
+  module Multiple_transfers_spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      ; preconditions : Account_update.Preconditions.t option
+      }
+    [@@deriving sexp]
+  end
+
+  val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
 end

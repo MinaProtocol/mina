@@ -77,20 +77,6 @@ Make (struct
   let decode = Iso.of_string
 end)
 
-module Make_base64 (T : sig
-  type t [@@deriving bin_io]
-end) =
-struct
-  let to_base64 = Fn.compose Base64.encode_string (Binable.to_string (module T))
-
-  let of_base64 s =
-    match Base64.decode s with
-    | Ok bin ->
-        Ok (Binable.of_string (module T) bin)
-    | Error (`Msg msg) ->
-        Or_error.error_string msg
-end
-
 module Make_base58_check (T : sig
   type t [@@deriving bin_io]
 
@@ -138,4 +124,31 @@ module type Base58_check_intf = sig
   val to_base58_check : t -> string
 
   include Base58_check_base_intf with type t := t
+end
+
+module Make_base64 (T : sig
+  type t [@@deriving bin_io]
+end) =
+struct
+  let to_base64 (t : T.t) : string =
+    Binable.to_string (module T) t
+    |> (* raises only on errors from invalid optional arguments *)
+    Base64.encode_exn
+
+  let of_base64 b64 : T.t Or_error.t =
+    match Base64.decode b64 with
+    | Ok s -> (
+        try Ok (Binable.of_string (module T) s)
+        with Bin_prot.Common.Read_error _ as e ->
+          Error (Error.of_exn ~backtrace:`Get e) )
+    | Error (`Msg msg) ->
+        Error (Error.of_string msg)
+end
+
+module type Base64_intf = sig
+  type t
+
+  val to_base64 : t -> string
+
+  val of_base64 : string -> t Or_error.t
 end

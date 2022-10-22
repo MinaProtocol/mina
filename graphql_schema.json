@@ -2962,6 +2962,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -3156,6 +3172,20 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -6147,8 +6177,9 @@
             "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
-              "name": "sourceFeePaymentLedgerHash",
-              "description": "Base58Check-encoded hash of the source ledger",
+              "name": "sourceFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source first pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6163,15 +6194,16 @@
               "deprecationReason": null
             },
             {
-              "name": "targetFeePaymentLedgerHash",
-              "description": "Base58Check-encoded hash of the target ledger",
+              "name": "targetFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target first pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -6179,15 +6211,16 @@
               "deprecationReason": null
             },
             {
-              "name": "sourcePartiesLedgerHash",
-              "description": "Base58Check-encoded hash of the source ledger",
+              "name": "sourceSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source second pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -6195,8 +6228,9 @@
               "deprecationReason": null
             },
             {
-              "name": "targetPartiesLedgerHash",
-              "description": "Base58Check-encoded hash of the target ledger",
+              "name": "targetSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target second pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6419,6 +6453,16 @@
               "deprecationReason": null
             }
           ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "ID",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
           "possibleTypes": null
         },
         {
@@ -6657,6 +6701,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "AuthorizationKind",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -8018,6 +8072,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "authorizationKind",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8252,30 +8322,20 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "ZkappCommandBase58",
-          "description": "A Base58Check string representing the command",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "ZkappCommandResult",
           "description": null,
           "fields": [
             {
               "name": "id",
-              "description": "A Base58Check string representing the command",
+              "description": "A Base64 string representing the zkApp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "ZkappCommandBase58",
+                  "name": "TransactionId",
                   "ofType": null
                 }
               },
@@ -8349,7 +8409,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8677,8 +8741,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "ID",
-          "description": null,
+          "name": "TransactionId",
+          "description": "Base64-encoded transaction",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -8729,7 +8793,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9037,7 +9105,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TransactionId",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -10051,6 +10123,17 @@
         },
         {
           "kind": "SCALAR",
+          "name": "PendingCoinbaseAuxHash",
+          "description":
+            "Base58Check-encoded hash of a pending coinbase auxiliary hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "StagedLedgerAuxHash",
           "description":
             "Base58Check-encoded hash of the staged ledger hash's aux_hash",
@@ -10161,6 +10244,23 @@
             },
             {
               "name": "stagedLedgerPendingCoinbaseAux",
+              "description":
+                "Base58Check-encoded staged ledger hash's pending_coinbase_aux",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PendingCoinbaseAuxHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerPendingCoinbaseHash",
               "description":
                 "Base58Check-encoded hash of the staged ledger hash's pending_coinbase_hash",
               "args": [],
@@ -10767,7 +10867,7 @@
         {
           "kind": "SCALAR",
           "name": "VerificationKey",
-          "description": "verification key in Base58Check format",
+          "description": "verification key in Base64 format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -10781,7 +10881,7 @@
           "fields": [
             {
               "name": "verificationKey",
-              "description": "Verification key in Base58Check format",
+              "description": "verification key in Base64 format",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11409,7 +11509,7 @@
             },
             {
               "name": "receiptChainHash",
-              "description": "Top hash of the receipt chain merkle-list",
+              "description": "Top hash of the receipt chain Merkle-list",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -13256,8 +13356,8 @@
               "description": "Find the account ID that owns a given token",
               "args": [
                 {
-                  "name": "token",
-                  "description": "Token to find the owner for",
+                  "name": "tokenId",
+                  "description": "Token ID to find the owner for",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,

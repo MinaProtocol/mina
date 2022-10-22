@@ -577,7 +577,7 @@ module T = struct
           Fee_transfer.receivers t
       | Command t ->
           let t = (t :> User_command.t) in
-          User_command.accounts_accessed t
+          User_command.accounts_referenced t
       | Coinbase c ->
           let ft_receivers =
             Option.map ~f:Coinbase.Fee_transfer.receiver c.fee_transfer
@@ -2543,7 +2543,8 @@ let%test_module "staged ledger tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
-        .sequence_zkapp_command_with_ledger ~length:num_zkapps ~vk ?failure ()
+        .sequence_zkapp_command_with_ledger ~max_token_updates:1
+          ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function
@@ -3817,7 +3818,7 @@ let%test_module "staged ledger tests" =
             }
           in
           let memo = Signed_command_memo.dummy in
-          let test_spec : Spec.t =
+          let test_spec : Update_states_spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
             ; fee_payer = None

@@ -60,11 +60,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "zkApp create account with timing"
       in
       let zkapp_keypair = Signature_lib.Keypair.create () in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo
@@ -82,11 +82,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       let timing_account_id =
@@ -111,11 +108,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "zkApp, 2nd account with timing"
       in
       let zkapp_keypair = Signature_lib.Keypair.create () in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo
@@ -134,11 +131,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Signature
-        ; sequence_events = []
-        ; events = []
-        ; call_data = Snark_params.Tick.Field.zero
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       return
@@ -158,7 +152,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let receiver_key =
         keypair.public_key |> Signature_lib.Public_key.compress
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec
+            : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
@@ -168,7 +163,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
@@ -191,7 +185,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let receiver_key =
         keypair.public_key |> Signature_lib.Public_key.compress
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec
+            : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
@@ -201,7 +196,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
@@ -232,7 +226,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               }
         }
       in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None

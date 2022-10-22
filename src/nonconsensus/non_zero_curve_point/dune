@@ -21,6 +21,10 @@
    random_oracle_nonconsensus
    snark_params_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_mina ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_compare h_list.ppx))

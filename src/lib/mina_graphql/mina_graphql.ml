@@ -209,6 +209,8 @@ module Types = struct
 
     let transaction_hash = TransactionHash.typ ()
 
+    let transaction_id = TransactionId.typ ()
+
     let precomputed_block_proof = PrecomputedBlockProof.typ ()
   end
 
@@ -617,7 +619,7 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the target second pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              target.second_ledger_pass )
+              target.second_pass_ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -711,8 +713,16 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the staged ledger hash's aux_hash"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              Staged_ledger_hash.aux_hash (staged_ledger_hash t) )
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.aux_hash staged_ledger_hash )
         ; field "stagedLedgerPendingCoinbaseAux"
+            ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseAuxHash.typ ())
+            ~doc:"Base58Check-encoded staged ledger hash's pending_coinbase_aux"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.pending_coinbase_aux staged_ledger_hash )
+        ; field "stagedLedgerPendingCoinbaseHash"
             ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseHash.typ ())
             ~doc:
               "Base58Check-encoded hash of the staged ledger hash's \
@@ -1147,8 +1157,7 @@ module Types = struct
     let account_vk =
       obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
         ~fields:(fun _ ->
-          [ field "verificationKey"
-              ~doc:"Verification key in Base58Check format"
+          [ field "verificationKey" ~doc:"verification key in Base64 format"
               ~typ:
                 (non_null @@ Pickles_unix.Graphql_scalars.VerificationKey.typ ())
               ~args:Arg.[]
@@ -1250,7 +1259,7 @@ module Types = struct
                             $error" ;
                          None ) )
              ; field "receiptChainHash" ~typ:chain_hash
-                 ~doc:"Top hash of the receipt chain merkle-list"
+                 ~doc:"Top hash of the receipt chain Merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.receipt_chain_hash )
@@ -1509,7 +1518,7 @@ module Types = struct
         typ =
       interface "UserCommand" ~doc:"Common interface for user commands"
         ~fields:(fun _ ->
-          [ abstract_field "id" ~typ:(non_null guid) ~args:[]
+          [ abstract_field "id" ~typ:(non_null transaction_id) ~args:[]
           ; abstract_field "hash" ~typ:(non_null transaction_hash) ~args:[]
           ; abstract_field "kind" ~typ:(non_null kind) ~args:[]
               ~doc:"String describing the kind of user command"
@@ -1582,9 +1591,9 @@ module Types = struct
         , (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t )
         field
         list =
-      [ field_no_status "id" ~typ:(non_null guid) ~args:[]
+      [ field_no_status "id" ~typ:(non_null transaction_id) ~args:[]
           ~resolve:(fun _ user_command ->
-            Signed_command.to_base58_check user_command.With_hash.data )
+            Signed_command user_command.With_hash.data )
       ; field_no_status "hash" ~typ:(non_null transaction_hash) ~args:[]
           ~resolve:(fun _ user_command -> user_command.With_hash.hash)
       ; field_no_status "kind" ~typ:(non_null kind) ~args:[]
@@ -1746,12 +1755,10 @@ module Types = struct
       in
       obj "ZkappCommandResult" ~fields:(fun _ ->
           [ field_no_status "id"
-              ~doc:"A Base58Check string representing the command"
-              ~typ:
-                ( non_null
-                @@ Mina_base_unix.Graphql_scalars.ZkappCommandBase58.typ () )
-              ~args:[]
-              ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
+              ~doc:"A Base64 string representing the zkApp command"
+              ~typ:(non_null transaction_id) ~args:[]
+              ~resolve:(fun _ zkapp_command ->
+                Zkapp_command zkapp_command.With_hash.data )
           ; field_no_status "hash"
               ~doc:"A cryptographic hash of the zkApp command"
               ~typ:(non_null transaction_hash) ~args:[]
@@ -4028,7 +4035,7 @@ module Queries = struct
           match txns_opt with
           | Some txns ->
               List.filter_map txns ~f:(fun serialized_txn ->
-                  Signed_command.of_base58_check serialized_txn
+                  Signed_command.of_base64 serialized_txn
                   |> Result.map ~f:(fun signed_command ->
                          (* These commands get piped through [forget_check]
                             below; this is just to make the types work
@@ -4286,13 +4293,23 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            List.filter_map (Ledger.to_list ledger) ~f:(fun acc ->
-                let open Option.Let_syntax in
-                let%map () =
-                  Option.some_if (Token_id.equal token_id acc.token_id) ()
-                in
-                Types.AccountObj.Partial_account.of_full_account ~breadcrumb acc
-                |> Types.AccountObj.lift mina acc.public_key )
+            let accounts = Ledger.accounts ledger in
+            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
+                if Token_id.(Account_id.token_id acct_id <> token_id) then
+                  acct_objs
+                else
+                  (* account id in the ledger, lookup should always succeed *)
+                  let loc =
+                    Option.value_exn
+                    @@ Ledger.location_of_account ledger acct_id
+                  in
+                  let account = Option.value_exn @@ Ledger.get ledger loc in
+                  let partial_account =
+                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                      account
+                  in
+                  Types.AccountObj.lift mina account.public_key partial_account
+                  :: acct_objs )
         | None ->
             [] )
 
@@ -4301,7 +4318,7 @@ module Queries = struct
       ~typ:Types.account_id
       ~args:
         Arg.
-          [ arg "token" ~doc:"Token to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owner for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->
@@ -4329,11 +4346,11 @@ module Queries = struct
             match serialized_txn with
             | `Signed_command cmd ->
                 Or_error.(
-                  Signed_command.of_base58_check cmd
+                  Signed_command.of_base64 cmd
                   >>| fun c -> User_command.Signed_command c)
             | `Zkapp_command cmd ->
                 Or_error.(
-                  Zkapp_command.of_base58_check cmd
+                  Zkapp_command.of_base64 cmd
                   >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"
