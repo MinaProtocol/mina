@@ -2417,8 +2417,16 @@ module Ledger = struct
     ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
+  type timing =
+    < isTimed : bool_class Js.t Js.readonly_prop
+    ; initialMinimumBalance : js_uint64 Js.readonly_prop
+    ; cliffTime : js_uint32 Js.readonly_prop
+    ; cliffAmount : js_uint64 Js.readonly_prop
+    ; vestingPeriod : js_uint32 Js.readonly_prop
+    ; vestingIncrement : js_uint64 Js.readonly_prop >
+    Js.t
+
   type account =
-    (* TODO: timing *)
     < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
@@ -2428,7 +2436,8 @@ module Ledger = struct
     ; delegate : public_key Js.optdef Js.readonly_prop
     ; votingFor : field_class Js.t Js.readonly_prop
     ; zkapp : zkapp_account Js.optdef Js.readonly_prop
-    ; permissions : permissions Js.readonly_prop >
+    ; permissions : permissions Js.readonly_prop
+    ; timing : timing Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2621,6 +2630,8 @@ module Ledger = struct
   module To_js = struct
     let field x = to_js_field @@ Field.constant x
 
+    let boolean b = new%js bool_constr (As_bool.of_js_bool @@ Js.bool b)
+
     let uint32 n =
       object%js
         val value =
@@ -2684,8 +2695,7 @@ module Ledger = struct
         val lastSequenceSlot =
           Mina_numbers.Global_slot.to_int a.last_sequence_slot
 
-        val provedState =
-          new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
+        val provedState = boolean a.proved_state
       end
 
     let permissions (p : Mina_base.Permissions.t) : permissions =
@@ -2733,6 +2743,24 @@ module Ledger = struct
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
       end
 
+    let timing (t : Mina_base.Account_timing.t) : timing =
+      let t = Mina_base.Account_timing.to_record t in
+      object%js
+        val isTimed = boolean t.is_timed
+
+        val initialMinimumBalance =
+          uint64 @@ Currency.Balance.to_uint64 t.initial_minimum_balance
+
+        val cliffTime = uint32 t.cliff_time
+
+        val cliffAmount = uint64 @@ Currency.Amount.to_uint64 t.cliff_amount
+
+        val vestingPeriod = uint32 t.vesting_period
+
+        val vestingIncrement =
+          uint64 @@ Currency.Amount.to_uint64 t.vesting_increment
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2754,6 +2782,8 @@ module Ledger = struct
         val zkapp = option zkapp_account a.zkapp
 
         val permissions = permissions a.permissions
+
+        val timing = timing a.timing
       end
   end
 
