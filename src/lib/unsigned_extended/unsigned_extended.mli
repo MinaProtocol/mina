@@ -13,6 +13,8 @@ module UInt64 : sig
     module V1 : sig
       type t = Unsigned.UInt64.t
       [@@deriving bin_io, sexp, hash, compare, equal, yojson, version]
+
+      module With_all_version_tags : Bin_prot.Binable.S with type t = t
     end
 
     module Latest = V1
@@ -32,6 +34,8 @@ module UInt32 : sig
     module V1 : sig
       type t = Unsigned.UInt32.t
       [@@deriving bin_io, sexp, hash, compare, equal, yojson, version]
+
+      module With_all_version_tags : Bin_prot.Binable.S with type t = t
     end
 
     module Latest = V1

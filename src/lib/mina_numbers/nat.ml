@@ -257,6 +257,8 @@ module Make32 () : UInt32 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt32.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -291,6 +293,8 @@ module Make64 () : UInt64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt64.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 

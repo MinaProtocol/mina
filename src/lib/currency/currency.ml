@@ -105,6 +105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
         else (num_stripped_zeros, num)
       in
+
       let whole = Unsigned.div amount precision_exp in
       let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
       if Int.(remainder = 0) then to_string whole
@@ -895,6 +896,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type t = Unsigned_extended.UInt64.Stable.V1.t
         [@@deriving sexp, compare, hash, equal]
 
@@ -917,6 +920,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [%%versioned:
         module Stable : sig
           module V1 : sig
+            [@@@with_all_version_tags]
+
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
 
             (* not automatically derived *)
@@ -1027,6 +1032,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@@no_toplevel_latest_type]
 
         module V1 = struct
+          [@@@with_all_version_tags]
+
           type t = Unsigned_extended.UInt64.Stable.V1.t
           [@@deriving sexp, compare, hash, equal, yojson]
 

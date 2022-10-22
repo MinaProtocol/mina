@@ -293,6 +293,8 @@ module type Full = sig
 
         (* not automatically derived *)
         val dhall_type : Ppx_dhall_type.Dhall_type.t
+
+        module With_all_version_tags : Bin_prot.Binable.S with type t = t
       end
     end]
 
@@ -345,6 +347,8 @@ module type Full = sig
 
         (* not automatically derived *)
         val dhall_type : Ppx_dhall_type.Dhall_type.t
+
+        module With_all_version_tags : Bin_prot.Binable.S with type t = t
       end
     end]
 
