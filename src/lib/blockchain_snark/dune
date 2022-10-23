@@ -33,6 +33,7 @@
    random_oracle
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    data_hash_lib
    ppx_version.runtime
  )

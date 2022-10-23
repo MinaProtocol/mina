@@ -48,7 +48,7 @@ let%test_module "pallas" =
 
     let%test_unit "test snarky instance" =
       Kimchi_pasta.Pallas_based_plonk.Keypair.set_urs_info [] ;
-      let (_ : Impl.R1CS_constraint_system.t) =
+      let (_ : Impl.constraint_system) =
         Impl.constraint_system ~input_typ:Field.typ ~return_typ:Typ.unit main
       in
       let (_ : Impl.Proof_inputs.t) =
@@ -65,7 +65,7 @@ let%test_module "vesta" =
 
     let%test_unit "test snarky instance" =
       Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] ;
-      let (_ : Impl.R1CS_constraint_system.t) =
+      let (_ : Impl.constraint_system) =
         Impl.constraint_system ~input_typ:Field.typ ~return_typ:Typ.unit main
       in
       let (_ : Impl.Proof_inputs.t) =

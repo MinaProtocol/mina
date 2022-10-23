@@ -57,6 +57,7 @@
    mina_ledger
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    merkle_ledger
    mina_base.util
    ppx_version.runtime

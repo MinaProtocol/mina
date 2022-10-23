@@ -3,6 +3,7 @@ let () = Pickles.Backend.Tock.Keypair.set_urs_info Cache_dir.cache
 let () = Pickles.Backend.Tick.Keypair.set_urs_info Cache_dir.cache
 
 module Tock = struct
+  module R1CS_constraint_system = Pickles.Backend.Tock.R1CS_constraint_system
   module Full = Pickles.Impls.Wrap
   module Run = Pickles.Impls.Wrap
 
@@ -15,6 +16,7 @@ module Tock = struct
 end
 
 module Tick = struct
+  module R1CS_constraint_system = Pickles.Backend.Tick.R1CS_constraint_system
   module Full = Pickles.Impls.Step
   module Run = Pickles.Impls.Step
 
