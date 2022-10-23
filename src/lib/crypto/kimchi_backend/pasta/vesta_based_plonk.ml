@@ -33,15 +33,7 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make
-    (Field)
-    (Kimchi_bindings.Protocol.Gates.Vector.Fp)
-    (struct
-      let params =
-        Sponge.Params.(
-          map pasta_p_kimchi ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x) ))
-    end)
+  Kimchi_pasta_constraint_system.Vesta_constraint_system
 
 module Var = Var
 

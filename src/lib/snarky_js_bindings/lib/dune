@@ -21,6 +21,7 @@
    kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    kimchi_backend.common
    kimchi_bindings
    kimchi_types

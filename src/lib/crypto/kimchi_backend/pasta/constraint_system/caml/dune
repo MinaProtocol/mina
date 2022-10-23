@@ -1,7 +1,7 @@
 (library
  (inline_tests)
- (name kimchi_backend)
- (public_name kimchi_backend)
+ (name kimchi_pasta_constraint_system_caml)
+ (public_name kimchi_backend.pasta.constraint_system.caml)
  (flags -warn-error -27)
  (instrumentation
   (backend bisect_ppx))
@@ -9,24 +9,20 @@
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
   ;; opam libraries
-  integers
-  core_kernel
   ppx_inline_test.config
   sexplib0
+  core_kernel
   bin_prot.shape
-  base.base_internalhash_types
+  base.caml
   ;; local libraries
+  sponge
+  pickles_types
+  kimchi_backend.common
+  promise
   kimchi_bindings
+  kimchi_pasta_basic
   kimchi_types
   pasta_bindings
   snarkette
-  snarky.backendless
-  key_cache
-  hex
-  kimchi_backend.common
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_backend.pasta.constraint_system
-  pickles_types
-  sponge
-  snarky.intf))
+  ppx_version.runtime)
+ (implements kimchi_backend.pasta.constraint_system))

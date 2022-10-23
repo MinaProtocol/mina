@@ -1549,7 +1549,7 @@ module Circuit = struct
       Impl.constraint_system ~input_typ:Impl.Typ.unit
         ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
-    let rows = List.length cs.rows_rev in
+    let rows = Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len in
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
