@@ -337,7 +337,13 @@ module Make
 
   val set_auxiliary_input_size : t -> int -> unit
 
+  val get_prev_challenges : t -> int option
+
+  val set_prev_challenges : t -> int -> unit
+
   val get_rows_len : t -> int
+
+  val next_row : t -> int
 
   val add_constraint :
        ?label:string
@@ -497,7 +503,7 @@ end = struct
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
   (** Returns the number of previous challenges. *)
-  let get_prev_challenges t = Set_once.get_exn t.prev_challenges [%here]
+  let get_prev_challenges t = Set_once.get t.prev_challenges
 
   (* Non-public part of the witness. *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
@@ -513,6 +519,8 @@ end = struct
   let get_public_input_size (sys : t) = get_public_input_size sys
 
   let get_rows_len (sys : t) = get_rows_len sys
+
+  let next_row (sys : t) = sys.next_row
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
