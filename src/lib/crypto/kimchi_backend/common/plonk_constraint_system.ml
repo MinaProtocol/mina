@@ -320,8 +320,56 @@ module Make
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
-    end) =
-struct
+    end) : sig
+  open Core_kernel
+
+  type nonrec t = (Fp.t, Gates.t) t
+
+  val create : unit -> t
+
+  val get_public_input_size : t -> int Set_once.t
+
+  val get_primary_input_size : t -> int
+
+  val set_primary_input_size : t -> int -> unit
+
+  val get_auxiliary_input_size : t -> int
+
+  val set_auxiliary_input_size : t -> int -> unit
+
+  val get_rows_len : t -> int
+
+  val add_constraint :
+       ?label:string
+    -> t
+    -> ( Fp.t Snarky_backendless.Cvar.t
+       , Fp.t )
+       Snarky_backendless.Constraint.basic
+    -> unit
+
+  val compute_witness : t -> (int -> Fp.t) -> Fp.t array array
+
+  val finalize : t -> unit
+
+  val finalize_and_get_gates : t -> Gates.t
+
+  val digest : t -> Md5.t
+
+  val to_json :
+       t
+    -> ([ `Null
+        | `Bool of bool
+        | `Int of int
+        | `Intlit of string
+        | `Float of float
+        | `String of string
+        | `Assoc of (string * 'json) list
+        | `List of 'json list
+        | `Tuple of 'json list
+        | `Variant of string * 'json option ]
+        as
+        'json )
+end = struct
   open Core_kernel
   open Pickles_types
 
