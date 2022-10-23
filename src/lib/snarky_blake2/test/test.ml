@@ -36,14 +36,14 @@ let%test_module "blake2-equality test" =
 
     let%test_unit "constraint count" =
       assert (
-        Impl.constraint_count
-          (let open Impl in
-          let%bind bits =
-            exists
-              (Typ.array ~length:512 Boolean.typ_unchecked)
-              ~compute:(As_prover.return (Array.create ~len:512 true))
-          in
-          blake2s bits)
+        Impl.constraint_count (fun () ->
+            let open Impl in
+            let%bind bits =
+              exists
+                (Typ.array ~length:512 Boolean.typ_unchecked)
+                ~compute:(As_prover.return (Array.create ~len:512 true))
+            in
+            blake2s bits )
         <= 21278 )
 
     let%test_unit "blake2 equality" =

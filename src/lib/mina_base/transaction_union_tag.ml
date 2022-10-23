@@ -222,19 +222,19 @@ module Unpacked = struct
             make_checked_ast
             @@ let%bind () = run_checked_ast @@ base_typ.check t in
                let%bind () =
-                 [%with_label_ "Only one tag is set"]
-                   (Boolean.Assert.exactly_one
-                      [ is_payment
-                      ; is_stake_delegation
-                      ; is_create_account
-                      ; is_mint_tokens
-                      ; is_fee_transfer
-                      ; is_coinbase
-                      ] )
+                 [%with_label_ "Only one tag is set"] (fun () ->
+                     Boolean.Assert.exactly_one
+                       [ is_payment
+                       ; is_stake_delegation
+                       ; is_create_account
+                       ; is_mint_tokens
+                       ; is_fee_transfer
+                       ; is_coinbase
+                       ] )
                in
-               [%with_label_ "User command flag is correctly set"]
-                 (Boolean.Assert.exactly_one
-                    [ is_user_command; is_fee_transfer; is_coinbase ] ) )
+               [%with_label_ "User command flag is correctly set"] (fun () ->
+                   Boolean.Assert.exactly_one
+                     [ is_user_command; is_fee_transfer; is_coinbase ] ) )
       }
 
   let constant

@@ -364,7 +364,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let next = sys.next_row in
             next - prev
         in
-        Constraints.log ~weight (Impls.Step.make_checked main)
+        Constraints.log ~weight (fun () -> Impls.Step.make_checked main)
       in
       if profile_constraints then
         Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
@@ -383,9 +383,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let log =
           Constraints.log ~weight
             Impls.Wrap.(
-              make_checked (fun () : unit ->
-                  let x = with_label __LOC__ (fun () -> exists typ) in
-                  main x () ))
+              fun () ->
+                make_checked (fun () : unit ->
+                    let x = with_label __LOC__ (fun () -> exists typ) in
+                    main x () ))
         in
         log
       in

@@ -23,9 +23,8 @@ struct
 
   let to_input_legacy (t : var) =
     let to_bits (t : var) =
-      with_label
-        (sprintf "to_bits: %s" __LOC__)
-        (Field.Checked.choose_preimage_var t ~length:N.length_in_bits)
+      with_label (sprintf "to_bits: %s" __LOC__) (fun () ->
+          Field.Checked.choose_preimage_var t ~length:N.length_in_bits )
     in
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.Legacy.bitstring bits )

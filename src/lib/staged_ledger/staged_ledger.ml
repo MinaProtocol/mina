@@ -3248,7 +3248,7 @@ let%test_module "staged ledger tests" =
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
-      let f_pop_and_add =
+      let f_pop_and_add () =
         let open Snark_params.Tick in
         let open Pending_coinbase in
         let proof_emitted =
