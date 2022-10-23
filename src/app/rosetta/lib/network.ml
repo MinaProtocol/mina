@@ -394,7 +394,7 @@ module Options = struct
     let handle (_network : Network_request.t) =
       M.return @@
       { Network_options_response.version=
-          Version.create "1.4.9" "v1.0"
+          Version.create "1.4.9" "1.0.0"
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all
