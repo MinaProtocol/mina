@@ -34,6 +34,7 @@
    kimchi_types
    pasta_bindings
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    bitstring_lib
    snarky.intf
    pickles.backend

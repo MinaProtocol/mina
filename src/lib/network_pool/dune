@@ -73,6 +73,7 @@
    kimchi_backend
    kimchi_backend_common
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    genesis_ledger
    staged_ledger_diff
  )

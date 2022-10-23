@@ -1,7 +1,7 @@
 (library
  (inline_tests)
- (name kimchi_pasta)
- (public_name kimchi_backend.pasta)
+ (name kimchi_pasta_basic)
+ (public_name kimchi_backend.pasta.basic)
  (flags -warn-error -27)
  (instrumentation
   (backend bisect_ppx))
@@ -20,7 +20,6 @@
   kimchi_backend.common
   promise
   kimchi_bindings
-  kimchi_pasta_basic
   kimchi_types
   pasta_bindings
   snarkette

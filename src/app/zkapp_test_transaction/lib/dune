@@ -19,6 +19,7 @@
    ;;local libraries
    pickles
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle
    coda_runtime_config
    transaction_witness

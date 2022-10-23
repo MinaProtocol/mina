@@ -15,6 +15,7 @@
    kimchi_backend
    kimchi_backend.common
    kimchi_pasta
+   kimchi_backend.pasta.basic
    mina_metrics.none
    run_in_thread.fake
    snarky.backendless

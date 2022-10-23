@@ -22,6 +22,7 @@
    mina_base
    mina_base.import
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pasta_bindings
    pickles
    pickles_types

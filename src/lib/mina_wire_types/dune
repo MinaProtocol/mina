@@ -13,6 +13,7 @@
     kimchi_types
     kimchi_bindings
     kimchi_backend.pasta
+    kimchi_backend.pasta.basic
     )
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_version ppx_optcomp))

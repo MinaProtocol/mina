@@ -1,3 +1,5 @@
+module Basic = Kimchi_pasta_basic
+
 module Pallas_based_plonk : sig
   module Field = Basic.Fq
   module Curve = Basic.Pallas
@@ -42,12 +44,6 @@ module Pasta : sig
   module Vesta = Basic.Vesta
   module Pallas = Basic.Pallas
   module Precomputed = Precomputed
-end
-
-module Basic : sig
-  module Rounds = Basic.Rounds
-  module Bigint256 = Basic.Bigint256
-  module Fp = Basic.Fp
 end
 
 module Precomputed : sig

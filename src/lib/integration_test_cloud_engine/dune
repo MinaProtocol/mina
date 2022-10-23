@@ -46,6 +46,7 @@
    pickles_types
    backend
    kimchi_pasta
+   kimchi_backend.pasta.basic
    with_hash
    data_hash_lib
    generated_graphql_queries

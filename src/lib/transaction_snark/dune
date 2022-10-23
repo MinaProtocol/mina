@@ -56,6 +56,7 @@
    transaction_witness
    mina_ledger
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    merkle_ledger
    mina_base.util
    ppx_version.runtime

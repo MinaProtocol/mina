@@ -105,6 +105,7 @@
    random_oracle
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles_types
    pickles
    pickles.backend

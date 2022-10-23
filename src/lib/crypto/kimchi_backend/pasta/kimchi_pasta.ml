@@ -1,3 +1,5 @@
+module Basic = Kimchi_pasta_basic
+
 module Pallas_based_plonk = struct
   module Field = Pallas_based_plonk.Field
   module Curve = Pallas_based_plonk.Curve
@@ -42,12 +44,6 @@ module Pasta = struct
   module Vesta = Pasta.Vesta
   module Pallas = Pasta.Pallas
   module Precomputed = Pasta.Precomputed
-end
-
-module Basic = struct
-  module Rounds = Basic.Rounds
-  module Bigint256 = Basic.Bigint256
-  module Fp = Basic.Fp
 end
 
 module Precomputed = Precomputed
