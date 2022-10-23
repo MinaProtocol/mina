@@ -136,6 +136,7 @@ module Events = struct
                 go (event :: acc) tl_var
               with
               | Snarky_backendless.Snark0.Runtime_error (_, Failure s, _)
+              | Failure s
               when String.equal s empty_stack_msg
               ->
                 List.rev acc
