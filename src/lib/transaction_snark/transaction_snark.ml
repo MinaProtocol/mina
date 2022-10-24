@@ -4497,8 +4497,8 @@ module For_tests = struct
       }
   end
 
-  let deploy_snapp ?(no_auth = false) ~constraint_constants
-      (spec : Deploy_snapp_spec.t) =
+  let deploy_snapp ?(no_auth = false) ?(change_permissions = true)
+      ~constraint_constants (spec : Deploy_snapp_spec.t) =
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
@@ -4515,11 +4515,13 @@ module For_tests = struct
         { update with
           verification_key = Zkapp_basic.Set_or_keep.Set vk
         ; permissions =
-            Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                edit_state = Permissions.Auth_required.Proof
-              ; edit_sequence_state = Proof
-              }
+            ( if change_permissions then
+              Zkapp_basic.Set_or_keep.Set
+                { Permissions.user_default with
+                  edit_state = Permissions.Auth_required.Proof
+                ; edit_sequence_state = Proof
+                }
+            else Zkapp_basic.Set_or_keep.Set Permissions.user_default )
         }
     in
     let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }

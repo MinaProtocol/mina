@@ -154,6 +154,7 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
+    -proof-level none
     $@
 }
 
@@ -585,6 +586,9 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     sleep 1
   done
 
+  # Sleep 15 secs to wait for transition frontier
+  sleep 15
+
   if ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
     printf "\n"
@@ -622,7 +626,7 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
       let nonce++
 
 
-      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state | sed 1,5d)
+      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
       python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
       let nonce++
       let state++

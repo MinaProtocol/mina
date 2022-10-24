@@ -323,7 +323,8 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     }
   in
   let zkapp_command =
-    Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+    Transaction_snark.For_tests.deploy_snapp ~change_permissions:false
+      ~constraint_constants spec
   in
   let%map () = if debug then gen_proof zkapp_command else return () in
   zkapp_command
@@ -424,7 +425,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with app_state }
-    ; current_auth = Permissions.Auth_required.Proof
+    ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
@@ -500,7 +501,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Proof
+    ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events

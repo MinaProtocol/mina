@@ -465,6 +465,7 @@ module For_tests : sig
 
   val deploy_snapp :
        ?no_auth:bool
+    -> ?change_permissions:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Deploy_snapp_spec.t
     -> Zkapp_command.t
