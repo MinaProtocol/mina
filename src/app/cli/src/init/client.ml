@@ -2073,18 +2073,17 @@ let hash_transaction =
   let open Command.Let_syntax in
   Command.basic
     ~summary:"Compute the hash of a transaction from its transaction ID"
-    (let%map_open transaction =
+    (let%map_open transaction_id =
        flag "--transaction-id" ~doc:"ID ID of the transaction to hash"
          (required string)
      in
      fun () ->
-       let signed_command =
-         Signed_command.of_base64 transaction |> Or_error.ok_exn
-       in
-       let hash =
-         Transaction_hash.hash_command (Signed_command signed_command)
-       in
-       printf "%s\n" (Transaction_hash.to_base58_check hash) )
+       match Transaction_hash.hash_of_transaction_id transaction_id with
+       | Ok hash ->
+           printf "%s\n" (Transaction_hash.to_base58_check hash)
+       | Error err ->
+           Format.eprintf "Could not hash transaction: %s@."
+             (Error.to_string_hum err) )
 
 let humanize_graphql_error
     ~(graphql_endpoint : Uri.t Cli_lib.Flag.Types.with_name) = function

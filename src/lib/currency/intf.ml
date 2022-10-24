@@ -289,6 +289,8 @@ module type Full = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
+        [@@@with_all_version_tags]
+
         type t [@@deriving sexp, compare, hash, yojson, equal]
 
         (* not automatically derived *)
@@ -341,6 +343,8 @@ module type Full = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
+        [@@@with_all_version_tags]
+
         type t [@@deriving sexp, compare, hash, equal, yojson]
 
         (* not automatically derived *)

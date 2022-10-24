@@ -1369,7 +1369,7 @@ module Base = struct
 
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
-              ( Mina_base.Token_id.Stable.V1.t
+              ( Mina_base.Token_id.Stable.V2.t
               , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =
