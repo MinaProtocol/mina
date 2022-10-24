@@ -336,10 +336,10 @@ module Make_weierstrass_checked
           return acc
       | b :: bs ->
           let%bind acc' =
-            with_label (sprintf "acc_%d" i)
-              (let%bind add_pt = Shifted.add acc pt in
-               let don't_add_pt = acc in
-               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
+            with_label (sprintf "acc_%d" i) (fun () ->
+                let%bind add_pt = Shifted.add acc pt in
+                let don't_add_pt = acc in
+                Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
           and pt' = double pt in
           go (i + 1) bs acc' pt'
     in

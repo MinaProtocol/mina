@@ -42,6 +42,7 @@ module Failure = struct
       | Protocol_state_precondition_unsatisfied
       | Incorrect_nonce
       | Invalid_fee_excess
+      | Cancelled
   end
 
   module Collection = struct
