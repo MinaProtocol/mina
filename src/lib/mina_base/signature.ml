@@ -3,19 +3,16 @@
 open Core_kernel
 open Snark_params.Tick
 
-module Arg = struct
-  (* top version tag for compatibility with pre-Berkeley hard fork
-     Base58Check-serialized signatures
-  *)
-  type t =
-    ( Field.t
-    , Inner_curve.Scalar.t )
-    Signature_poly.Stable.Latest.With_top_version_tag.t
-  [@@deriving bin_io_unversioned]
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      [@@@with_all_version_tags]
 
-  let description = "Signature"
-
-  let version_byte = Base58_check.Version_bytes.signature
+      type ('field, 'scalar) t = 'field * 'scalar
+      [@@deriving sexp, compare, equal, hash]
+    end
+  end]
 end
 
 [%%versioned
@@ -26,12 +23,26 @@ module Stable = struct
     type t =
       ( (Field.t[@version_asserted])
       , (Inner_curve.Scalar.t[@version_asserted]) )
-      Signature_poly.Stable.V1.t
+      Poly.Stable.V1.t
     [@@deriving sexp, compare, equal, hash]
 
-    type _unused = unit constraint t = Arg.t
+    module Codable_arg = struct
+      (* version tag for compatibility with pre-Berkeley hard fork
+         Base58Check-serialized signatures
+      *)
+      type t =
+        (Field.t, Inner_curve.Scalar.t) Poly.Stable.V1.With_all_version_tags.t
+      [@@deriving bin_io_unversioned]
 
-    include Codable.Make_base58_check (Arg)
+      let description = "Signature"
+
+      let version_byte = Base58_check.Version_bytes.signature
+    end
+
+    (* Base58Check encodes t *)
+    let _f : unit -> (t, Codable_arg.t) Type_equal.t = fun () -> Type_equal.T
+
+    include Codable.Make_base58_check (Codable_arg)
 
     let to_latest = Fn.id
 
