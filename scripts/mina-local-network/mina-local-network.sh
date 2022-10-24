@@ -596,10 +596,6 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
-  printf "\n"
-
-  set +e
 
   if ${VALUE_TRANSFER}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
@@ -608,6 +604,11 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     sleep ${TRANSACTION_FREQUENCY}
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
   fi
+
+  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
+  printf "\n"
+
+  set +e
 
   nonce=1
   state=0
