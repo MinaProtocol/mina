@@ -38,7 +38,7 @@ end
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
-                 and type Impl.Bigint.t = Backend.Tock.Bigint.R.t
+                 and type Impl.Bigint.t = Backend.Tock.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs

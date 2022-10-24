@@ -133,7 +133,7 @@ module Step = struct
     let open Types.Step.Statement in
     let lookup :
         ( Challenge.Constant.t
-        , Impl.Field.t
+        , Challenge.t
         , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
         , Other_field.t Pickles_types.Shifted_value.Type2.t )
         Types.Wrap.Lookup_parameters.t =
