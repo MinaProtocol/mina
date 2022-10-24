@@ -154,7 +154,6 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
-    -proof-level none
     $@
 }
 
