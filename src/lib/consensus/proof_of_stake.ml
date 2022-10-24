@@ -698,35 +698,35 @@ module Data = struct
       in
       let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__
-          (Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth
-             ledger staker_addr )
+        with_label __LOC__ (fun () ->
+            Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth
+              ledger staker_addr )
       in
       let%bind () =
-        [%with_label_ "Account is for the default token"]
-          (make_checked (fun () ->
-               Token_id.(
-                 Checked.Assert.equal account.token_id
-                   (Checked.constant default)) ) )
+        [%with_label_ "Account is for the default token"] (fun () ->
+            make_checked (fun () ->
+                Token_id.(
+                  Checked.Assert.equal account.token_id
+                    (Checked.constant default)) ) )
       in
       let%bind () =
-        [%with_label_ "Block stake winner matches account pk"]
-          (Public_key.Compressed.Checked.Assert.equal block_stake_winner
-             account.public_key )
+        [%with_label_ "Block stake winner matches account pk"] (fun () ->
+            Public_key.Compressed.Checked.Assert.equal block_stake_winner
+              account.public_key )
       in
       let%bind () =
-        [%with_label_ "Block creator matches delegate pk"]
-          (Public_key.Compressed.Checked.Assert.equal block_creator
-             account.delegate )
+        [%with_label_ "Block creator matches delegate pk"] (fun () ->
+            Public_key.Compressed.Checked.Assert.equal block_creator
+              account.delegate )
       in
       let%bind delegate =
-        [%with_label_ "Decompress delegate pk"]
-          (Public_key.decompress_var account.delegate)
+        [%with_label_ "Decompress delegate pk"] (fun () ->
+            Public_key.decompress_var account.delegate )
       in
       let%map evaluation =
-        with_label __LOC__
-          (T.Checked.eval_and_check_public_key shifted ~private_key
-             ~public_key:delegate message )
+        with_label __LOC__ (fun () ->
+            T.Checked.eval_and_check_public_key shifted ~private_key
+              ~public_key:delegate message )
       in
       (evaluation, account)
 
@@ -2130,7 +2130,7 @@ module Data = struct
       in
       let%bind slot_diff =
         [%with_label_ "Next global slot is less that previous global slot"]
-          (Global_slot.Checked.sub next_global_slot prev_global_slot)
+          (fun () -> Global_slot.Checked.sub next_global_slot prev_global_slot)
       in
       let%bind () =
         let%bind global_slot_increased =
@@ -2189,7 +2189,7 @@ module Data = struct
       in
       let%bind () =
         [%with_label_ "Total currency is greater than or equal to zero"]
-          (Boolean.Assert.is_true (Boolean.not overflow))
+          (fun () -> Boolean.Assert.is_true (Boolean.not overflow))
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window ~constants ~prev:prev_global_slot
@@ -3789,7 +3789,9 @@ let%test_module "Proof of stake tests" =
               ; is_new_stack = true
               }
         in
-        let%map `Success _, var = Snark_params.Tick.handle result handler in
+        let%map `Success _, var =
+          Snark_params.Tick.handle (fun () -> result) handler
+        in
         As_prover.read (typ ~constraint_constants) var
       in
       let checked_value =
