@@ -2,12 +2,12 @@ open Pickles_types
 open Import
 open Backend
 
-type dlog_opening = (Tock.Curve.Affine.t, Tock.Field.t) Types.Step.Bulletproof.t
+type dlog_opening = (Wrap.Curve.Affine.t, Wrap.Field.t) Types.Step.Bulletproof.t
 
 module Constant = struct
   (* Out-of-circuit type for wrap proofs *)
   type t =
-    { messages : Tock.Curve.Affine.t Plonk_types.Messages.t
+    { messages : Wrap.Curve.Affine.t Plonk_types.Messages.t
     ; opening : dlog_opening
     }
   [@@deriving hlist]
@@ -31,7 +31,7 @@ end
 open Impls.Step
 
 let typ : (Checked.t, Constant.t) Typ.t =
-  let shift = Shifted_value.Type2.Shift.create (module Tock.Field) in
+  let shift = Shifted_value.Type2.Shift.create (module Wrap.Field) in
   Typ.of_hlistable ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ Plonk_types.Messages.typ
@@ -40,18 +40,18 @@ let typ : (Checked.t, Constant.t) Typ.t =
         { lookup = No; runtime = No }
         ~bool:Boolean.typ ~dummy:Inner_curve.Params.one
         ~commitment_lengths:(Commitment_lengths.create ~of_int:(fun x -> x))
-    ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
+    ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Wrap.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->
               (* When storing, make it a shifted value *)
               match
-                Shifted_value.Type2.of_field (module Tock.Field) ~shift x
+                Shifted_value.Type2.of_field (module Wrap.Field) ~shift x
               with
               | Shifted_value x ->
                   x )
             ~back:(fun x ->
               Shifted_value.Type2.to_field
-                (module Tock.Field)
+                (module Wrap.Field)
                 ~shift (Shifted_value x) )
         (* When reading, unshift *)
         |> Typ.transport_var

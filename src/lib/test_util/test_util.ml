@@ -78,4 +78,4 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     result
 end
 
-include Make (Snark_params.Tick)
+include Make (Snark_params.Step)

@@ -50,7 +50,7 @@ type var =
   Poly.t
 
 include
-  Snark_params.Tick.Snarkable.S with type value := Value.t and type var := var
+  Snark_params.Step.Snarkable.S with type value := Value.t and type var := var
 
 val create_value :
      blockchain_state:Blockchain_state.Value.t

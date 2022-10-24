@@ -1,5 +1,5 @@
 open Core_kernel
-module Field = Snark_params.Tick.Field
+module Field = Snark_params.Step.Field
 module Token_id = Mina_base.Token_id
 
 module Unsigned = struct

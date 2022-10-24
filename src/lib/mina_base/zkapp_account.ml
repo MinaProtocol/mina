@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 open Zkapp_basic
 
 module Event = struct
@@ -145,7 +145,7 @@ module Events = struct
           in
           assert (equal events popped) )
     in
-    match Snark_params.Tick.Run.run_and_check f with
+    match Snark_params.Step.Run.run_and_check f with
     | Ok () ->
         ()
     | Error err ->
@@ -162,7 +162,7 @@ module Sequence_events = struct
   end)
 
   let is_empty_var (e : var) =
-    Snark_params.Tick.Field.(
+    Snark_params.Step.Field.(
       Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
 
   let empty_state_element =

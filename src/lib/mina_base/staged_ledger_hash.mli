@@ -1,5 +1,5 @@
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 type t [@@deriving sexp, equal, compare, hash, yojson]
 

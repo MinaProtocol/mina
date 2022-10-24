@@ -20,7 +20,7 @@ module Update = struct
   module V1 = struct
     type t =
       { app_state :
-          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+          Snark_params.Step.Field.t Mina_base_zkapp_basic.Set_or_keep.V1.t
           Mina_base_zkapp_state.V.V1.t
       ; delegate :
           Public_key.Compressed.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
@@ -72,7 +72,7 @@ module Body = struct
 
   module Events' = struct
     module V1 = struct
-      type t = Snark_params.Tick.Field.t array list
+      type t = Snark_params.Step.Field.t array list
     end
   end
 
@@ -86,7 +86,7 @@ module Body = struct
       ; increment_nonce : bool
       ; events : Events'.V1.t
       ; sequence_events : Events'.V1.t
-      ; call_data : Pickles.Backend.Tick.Field.V1.t
+      ; call_data : Pickles.Backend.Step.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
       ; caller : Mina_base_token_id.V1.t

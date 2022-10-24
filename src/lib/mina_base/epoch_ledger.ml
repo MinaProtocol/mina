@@ -1,6 +1,6 @@
 open Core_kernel
 open Currency
-open Snark_params.Tick
+open Snark_params.Step
 
 module Poly = struct
   [%%versioned

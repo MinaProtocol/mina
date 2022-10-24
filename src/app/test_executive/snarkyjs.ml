@@ -146,7 +146,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               |> List.hd_exn
             in
             let module Set_or_keep = Mina_base.Zkapp_basic.Set_or_keep in
-            let module Field = Snark_params.Tick0.Field in
+            let module Field = Snark_params.Step0.Field in
             let expected = Set_or_keep.Set (Field.of_int 3) in
             if Set_or_keep.equal Field.equal zkapp_first_state expected then (
               [%log info] "Ledger sees state update in zkapp execution" ;

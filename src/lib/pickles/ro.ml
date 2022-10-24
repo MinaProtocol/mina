@@ -18,9 +18,9 @@ let ro lab length f =
     incr r ;
     f (bits_random_oracle ~length (sprintf "%s_%d" lab !r))
 
-let tock = ro "fq" Tock.Field.size_in_bits Tock.Field.of_bits
+let wrap = ro "fq" Wrap.Field.size_in_bits Wrap.Field.of_bits
 
-let tick = ro "fp" Tick.Field.size_in_bits Tick.Field.of_bits
+let step = ro "fp" Step.Field.size_in_bits Step.Field.of_bits
 
 let chal = ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
 

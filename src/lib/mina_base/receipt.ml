@@ -4,7 +4,7 @@
 
 open Core_kernel
 module B58_lib = Base58_check
-open Snark_params.Tick
+open Snark_params.Step
 
 module Signed_command_elt = struct
   type t = Signed_command_payload of Signed_command.Payload.t
@@ -137,7 +137,7 @@ module Chain_hash = struct
         in
         let checked =
           let comp =
-            let open Snark_params.Tick.Checked.Let_syntax in
+            let open Snark_params.Step.Checked.Let_syntax in
             let payload =
               Transaction_union_payload.(
                 Checked.constant (of_user_command_payload payload))
@@ -163,7 +163,7 @@ module Chain_hash = struct
             (Zkapp_command_commitment commitment) base
         in
         let checked =
-          let open Snark_params.Tick.Checked.Let_syntax in
+          let open Snark_params.Step.Checked.Let_syntax in
           let comp =
             let%bind index =
               let open Mina_numbers.Index.Checked in

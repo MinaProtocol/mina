@@ -2250,18 +2250,18 @@ module Types = struct
     end
 
     module Field = struct
-      type input = Snark_params.Tick0.Field.t
+      type input = Snark_params.Step0.Field.t
 
       let arg_typ =
         scalar "Field"
           ~coerce:(fun field ->
             match field with
             | `String s ->
-                Ok (Snark_params.Tick.Field.of_string s)
+                Ok (Snark_params.Step.Field.of_string s)
             | _ ->
                 Error "Expected a string representing a field element" )
           ~to_json:(function
-            | (f : input) -> `String (Snark_params.Tick.Field.to_string f) )
+            | (f : input) -> `String (Snark_params.Step.Field.to_string f) )
     end
 
     module Nonce = struct
@@ -2491,7 +2491,7 @@ module Types = struct
     end
 
     module SignatureInput = struct
-      open Snark_params.Tick
+      open Snark_params.Step
 
       type input =
         | Raw of Signature.t
@@ -2598,8 +2598,8 @@ module Types = struct
           ~coerce:(fun message public_key c s scaled_message_hash vrf_threshold ->
             { Consensus_vrf.Layout.Evaluation.message
             ; public_key = Public_key.decompress_exn public_key
-            ; c = Snark_params.Tick.Inner_curve.Scalar.of_string c
-            ; s = Snark_params.Tick.Inner_curve.Scalar.of_string s
+            ; c = Snark_params.Step.Inner_curve.Scalar.of_string c
+            ; s = Snark_params.Step.Inner_curve.Scalar.of_string s
             ; scaled_message_hash =
                 Consensus_vrf.Group.of_string_list_exn scaled_message_hash
             ; vrf_threshold
@@ -2610,8 +2610,8 @@ module Types = struct
           ~split:(fun f (x : input) ->
             f x.message
               (Public_key.compress x.public_key)
-              (Snark_params.Tick.Inner_curve.Scalar.to_string x.c)
-              (Snark_params.Tick.Inner_curve.Scalar.to_string x.s)
+              (Snark_params.Step.Inner_curve.Scalar.to_string x.c)
+              (Snark_params.Step.Inner_curve.Scalar.to_string x.s)
               (Consensus_vrf.Group.to_string_list_exn x.scaled_message_hash)
               x.vrf_threshold )
           ~fields:

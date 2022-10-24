@@ -6,7 +6,7 @@ let field_of_bool = Mina_base_util.field_of_bool
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 open Signature_lib
 
 [%%endif]
@@ -382,11 +382,11 @@ end
 
 [%%ifdef consensus_mechanism]
 
-module F = Pickles.Backend.Tick.Field
+module F = Pickles.Backend.Step.Field
 
 [%%else]
 
-module F = Snark_params.Tick.Field
+module F = Snark_params.Step.Field
 
 [%%endif]
 

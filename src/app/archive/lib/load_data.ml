@@ -165,7 +165,7 @@ let update_of_id pool update_id =
            with
            | Ok vk ->
                let data = vk in
-               let hash = Pickles.Backend.Tick.Field.of_string hash in
+               let hash = Pickles.Backend.Step.Field.of_string hash in
                { With_hash.data; hash }
            | Error err ->
                failwithf "Could not Base64-decode verification key: %s"
@@ -304,7 +304,7 @@ let staking_data_of_id pool id =
           Epoch_ledger.Poly.t )
   in
   let seed =
-    Option.map epoch_seed ~f:Snark_params.Tick.Field.of_string
+    Option.map epoch_seed ~f:Snark_params.Step.Field.of_string
     |> Or_ignore.of_option
   in
   let start_checkpoint =

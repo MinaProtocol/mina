@@ -1127,7 +1127,7 @@ let array_map2 t1 t2 ~f =
 module Poseidon_sponge_checked =
   Sponge.Make_sponge (Pickles.Step_main_inputs.Sponge.Permutation)
 module Poseidon_sponge =
-  Sponge.Make_sponge (Sponge.Poseidon (Pickles.Tick_field_sponge.Inputs))
+  Sponge.Make_sponge (Sponge.Poseidon (Pickles.Step_field_sponge.Inputs))
 
 let sponge_params_checked =
   Sponge.Params.(
@@ -1538,7 +1538,7 @@ module Circuit = struct
       keypair_class Js.t =
     let main, input_typ = main_and_input c in
     let cs =
-      Impl.constraint_system ~input_typ ~return_typ:Snark_params.Tick.Typ.unit
+      Impl.constraint_system ~input_typ ~return_typ:Snark_params.Step.Typ.unit
         (fun x -> main x)
     in
     let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
@@ -1547,7 +1547,7 @@ module Circuit = struct
   let constraint_system (main : unit -> unit) =
     let cs =
       Impl.constraint_system ~input_typ:Impl.Typ.unit
-        ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
+        ~return_typ:Snark_params.Step.Typ.unit (fun () -> main)
     in
     let rows = List.length cs.rows_rev in
     let digest =
@@ -1576,7 +1576,7 @@ module Circuit = struct
     let main, input_typ = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
-      Impl.generate_witness_conv ~return_typ:Snark_params.Tick.Typ.unit
+      Impl.generate_witness_conv ~return_typ:Snark_params.Step.Typ.unit
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } () ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs )

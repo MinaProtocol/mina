@@ -8,7 +8,7 @@ open Signature_lib
 open Snark_params
 open Num_util
 module Time = Block_time
-module Run = Snark_params.Tick.Run
+module Run = Snark_params.Step.Run
 module Length = Mina_numbers.Length
 
 module type CONTEXT = sig
@@ -19,7 +19,7 @@ module type CONTEXT = sig
   val consensus_constants : Constants.t
 end
 
-let make_checked t = Snark_params.Tick.Run.make_checked t
+let make_checked t = Snark_params.Step.Run.make_checked t
 
 let name = "proof_of_stake"
 
@@ -82,7 +82,7 @@ let compute_delegatee_table_genesis_ledger keys ledger =
 
 module Segment_id = Mina_numbers.Nat.Make32 ()
 
-module Typ = Snark_params.Tick.Typ
+module Typ = Snark_params.Step.Typ
 
 module Configuration = struct
   [%%versioned
@@ -133,7 +133,7 @@ module Data = struct
     let update (seed : t) vrf_result =
       let open Random_oracle in
       hash ~init:Hash_prefix_states.epoch_seed
-        [| (seed :> Tick.Field.t); vrf_result |]
+        [| (seed :> Step.Field.t); vrf_result |]
       |> of_hash
 
     let update_var (seed : var) vrf_result =
@@ -688,11 +688,11 @@ module Data = struct
       | Producer_private_key : Scalar.value Snarky_backendless.Request.t
       | Producer_public_key : Public_key.t Snarky_backendless.Request.t
 
-    let%snarkydef.Snark_params.Tick get_vrf_evaluation
+    let%snarkydef.Snark_params.Step get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         shifted ~block_stake_winner ~block_creator ~ledger ~message =
       let open Mina_base in
-      let open Snark_params.Tick in
+      let open Snark_params.Step in
       let%bind private_key =
         request_witness Scalar.typ (As_prover.return Producer_private_key)
       in
@@ -731,11 +731,11 @@ module Data = struct
       (evaluation, account)
 
     module Checked = struct
-      let%snarkydef.Tick check
+      let%snarkydef.Step check
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
           ~block_creator ~global_slot ~seed =
-        let open Snark_params.Tick in
+        let open Snark_params.Step in
         let%bind winner_addr =
           request_witness
             (Mina_base.Account.Index.Unpacked.typ
@@ -783,7 +783,7 @@ module Data = struct
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
           -> genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t
-          -> Snark_params.Tick.Handler.t =
+          -> Snark_params.Step.Handler.t =
        fun ~constraint_constants ~genesis_epoch_ledger ->
         let pk, sk = genesis_winner in
         let dummy_sparse_ledger =
@@ -925,7 +925,7 @@ module Data = struct
       val resolve : t -> graphql_type
 
       val to_input :
-        t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+        t -> Snark_params.Step.Field.t Random_oracle.Input.Chunked.t
 
       val null : t
     end) =
@@ -989,8 +989,8 @@ module Data = struct
             Value.t ) =
         let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
-          [ field (seed :> Tick.Field.t)
-          ; field (start_checkpoint :> Tick.Field.t)
+          [ field (seed :> Step.Field.t)
+          ; field (start_checkpoint :> Step.Field.t)
           ; Length.to_input epoch_length
           ; Epoch_ledger.to_input ledger
           ; Lock_checkpoint.to_input lock_checkpoint
@@ -1021,7 +1021,7 @@ module Data = struct
       include Mina_base.State_hash
 
       let to_input (t : t) =
-        Random_oracle.Input.Chunked.field (t :> Tick.Field.t)
+        Random_oracle.Input.Chunked.field (t :> Step.Field.t)
 
       let null = Mina_base.State_hash.(of_hash zero)
 
@@ -1308,12 +1308,12 @@ module Data = struct
       (min_window_density, next_sub_window_densities)
 
     module Checked = struct
-      let%snarkydef.Tick update_min_window_density ~(constants : Constants.var)
+      let%snarkydef.Step update_min_window_density ~(constants : Constants.var)
           ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
           ~prev_min_window_density =
         (* Please see Min_window_density.update_min_window_density for documentation *)
-        let open Tick in
-        let open Tick.Checked.Let_syntax in
+        let open Step in
+        let open Step.Checked.Let_syntax in
         let%bind prev_global_sub_window =
           Global_sub_window.Checked.of_global_slot ~constants prev_global_slot
         in
@@ -1564,8 +1564,8 @@ module Data = struct
 
         let update_several_times_checked ~f ~prev_global_slot ~next_global_slots
             ~prev_sub_window_densities ~prev_min_window_density ~constants =
-          let open Tick.Checked in
-          let open Tick.Checked.Let_syntax in
+          let open Step.Checked in
+          let open Step.Checked.Let_syntax in
           List.fold next_global_slots
             ~init:
               ( prev_global_slot
@@ -1657,7 +1657,7 @@ module Data = struct
       let update_min_window_density ~constants:_ ~prev_global_slot:_
           ~next_global_slot:_ ~prev_sub_window_densities
           ~prev_min_window_density =
-        Tick.Checked.return (prev_min_window_density, prev_sub_window_densities)
+        Step.Checked.return (prev_min_window_density, prev_sub_window_densities)
     end
   end
 
@@ -1743,7 +1743,7 @@ module Data = struct
       end
     end
 
-    open Snark_params.Tick
+    open Snark_params.Step
 
     type var =
       ( Length.Checked.t
@@ -1762,7 +1762,7 @@ module Data = struct
       let sub_windows_per_window =
         constraint_constants.sub_windows_per_window
       in
-      Snark_params.Tick.Typ.of_hlistable
+      Snark_params.Step.Typ.of_hlistable
         [ Length.typ
         ; Length.typ
         ; Length.typ
@@ -1852,8 +1852,8 @@ module Data = struct
         ; Global_slot.Checked.to_input curr_global_slot
         ; Mina_numbers.Global_slot.Checked.to_input global_slot_since_genesis
         ; packed
-            ((has_ancestor_in_same_checkpoint_window :> Tick.Field.Var.t), 1)
-        ; packed ((supercharge_coinbase :> Tick.Field.Var.t), 1)
+            ((has_ancestor_in_same_checkpoint_window :> Step.Field.Var.t), 1)
+        ; packed ((supercharge_coinbase :> Step.Field.Var.t), 1)
         ; Epoch_data.Staking.var_to_input staking_epoch_data
         ; Epoch_data.Next.var_to_input next_epoch_data
         ; Public_key.Compressed.Checked.to_input block_stake_winner
@@ -2106,7 +2106,7 @@ module Data = struct
 
     let compute_supercharge_coinbase ~(winner_account : Mina_base.Account.var)
         ~global_slot =
-      let open Snark_params.Tick in
+      let open Snark_params.Step in
       let%map winner_locked =
         Mina_base.Account.Checked.has_locked_tokens ~global_slot winner_account
       in
@@ -2120,7 +2120,7 @@ module Data = struct
            Mina_base.Frozen_ledger_hash.var ) ~genesis_ledger_hash
         ~constraint_constants
         ~(protocol_constants : Mina_base.Protocol_constants_checked.var) =
-      let open Snark_params.Tick in
+      let open Snark_params.Step in
       let%bind constants =
         Constants.Checked.create ~constraint_constants ~protocol_constants
       in
@@ -2464,7 +2464,7 @@ module Data = struct
         } ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~pending_coinbase:
           { Mina_base.Pending_coinbase_witness.pending_coinbases; is_new_stack }
-        : Snark_params.Tick.Handler.t =
+        : Snark_params.Step.Handler.t =
       let ledger_handler = unstage (Mina_ledger.Sparse_ledger.handler ledger) in
       let pending_coinbase_handler =
         unstage
@@ -3489,7 +3489,7 @@ module Hooks = struct
       (protocol_state, consensus_transition)
 
     include struct
-      let%snarkydef.Tick next_state_checked ~constraint_constants
+      let%snarkydef.Step next_state_checked ~constraint_constants
           ~(prev_state : Protocol_state.var)
           ~(prev_state_hash : Mina_base.State_hash.var) transition
           supply_increase =
@@ -3728,7 +3728,7 @@ let%test_module "Proof of stake tests" =
                 next_consensus_state.blockchain_length) ) ) ;
       (* build pieces needed to apply "update_var" *)
       let checked_computation =
-        let open Snark_params.Tick in
+        let open Snark_params.Step in
         (* work in Checked monad *)
         let%bind previous_state =
           exists
@@ -3790,12 +3790,12 @@ let%test_module "Proof of stake tests" =
               }
         in
         let%map `Success _, var =
-          Snark_params.Tick.handle (fun () -> result) handler
+          Snark_params.Step.handle (fun () -> result) handler
         in
         As_prover.read (typ ~constraint_constants) var
       in
       let checked_value =
-        Or_error.ok_exn @@ Snark_params.Tick.run_and_check checked_computation
+        Or_error.ok_exn @@ Snark_params.Step.run_and_check checked_computation
       in
       let diff =
         Sexp_diff_kernel.Algo.diff

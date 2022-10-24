@@ -88,5 +88,5 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
   in
   let message = Signed_command.to_input_legacy user_command_payload in
   Schnorr.Legacy.verify signed_transaction.signature
-    (Snark_params.Tick.Inner_curve.of_affine public_key)
+    (Snark_params.Step.Inner_curve.of_affine public_key)
     message

@@ -6,10 +6,10 @@ module Compressed = struct
   end
 
   module V1 = struct
-    type t = (Snark_params.Tick.Field.t, bool) Poly.V1.t
+    type t = (Snark_params.Step.Field.t, bool) Poly.V1.t
   end
 end
 
 module V1 = struct
-  type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
+  type t = Snark_params.Step.Field.t * Snark_params.Step.Field.t
 end

@@ -54,7 +54,7 @@ module Field = struct
     Core_kernel.Option.value_exn ~message:"project: invalid bits" (of_bits bits)
 end
 
-module Tock = struct
+module Wrap = struct
   module Field = struct
     type t = Pasta.Fq.t
 
@@ -64,7 +64,7 @@ module Tock = struct
 
     let project bits =
       Core_kernel.Option.value_exn
-        ~message:"Snark_params_nonconsensus.Tock.Field.project"
+        ~message:"Snark_params_nonconsensus.Wrap.Field.project"
         (Pasta.Fq.of_bits bits)
   end
 end
@@ -89,7 +89,7 @@ module Inner_curve = struct
     *)
     type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp]
 
-    type _unused = unit constraint t = Tock.Field.t
+    type _unused = unit constraint t = Wrap.Field.t
 
     let size = Pasta.Fq.order
 
@@ -118,9 +118,9 @@ module Inner_curve = struct
 
     let gen_uniform = gen_uniform_incl one (zero - one)
 
-    let unpack t = Tock.Field.unpack t
+    let unpack t = Wrap.Field.unpack t
 
-    let of_bits bits = Tock.Field.project bits
+    let of_bits bits = Wrap.Field.project bits
 
     let project = of_bits
   end

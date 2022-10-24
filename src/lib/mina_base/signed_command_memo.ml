@@ -218,8 +218,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   [%%ifdef consensus_mechanism]
 
-  module Boolean = Tick.Boolean
-  module Typ = Tick.Typ
+  module Boolean = Step.Boolean
+  module Typ = Step.Typ
 
   (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
      make it a little different

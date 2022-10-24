@@ -1,6 +1,6 @@
 open Core_kernel
 open Snark_params
-open Tick
+open Step
 open Mina_base
 open Mina_state
 open Pickles_types
@@ -104,7 +104,7 @@ let non_pc_registers_equal_var t1 t2 =
 let%snarkydef_ step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) new_state
-    : _ Tick.Checked.t =
+    : _ Step.Checked.t =
   let new_state_hash =
     State_hash.var_of_hash_packed (Data_as_hash.hash new_state)
   in
@@ -336,7 +336,7 @@ let%snarkydef_ step ~(logger : Logger.t)
 module Statement = struct
   type t = Protocol_state.Value.t
 
-  let to_field_elements (t : t) : Tick.Field.t array =
+  let to_field_elements (t : t) : Step.Field.t array =
     [| (Protocol_state.hashes t).state_hash |]
 end
 
@@ -350,7 +350,7 @@ let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
 
 let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
-  let open Tick in
+  let open Step in
   check
     (Fn.flip handle (wrap_handler handler w) (fun () ->
          let%bind curr =
@@ -404,18 +404,18 @@ end
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
-  let digest = Tick.R1CS_constraint_system.digest in
+  let digest = Step.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
     , digest
         (let main x =
-           let open Tick in
+           let open Step in
            let%map _ =
              step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                x
            in
            ()
          in
-         Tick.constraint_system ~input_typ:typ
+         Step.constraint_system ~input_typ:typ
            ~return_typ:(Snarky_backendless.Typ.unit ())
            main ) )
   ]

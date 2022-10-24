@@ -73,18 +73,18 @@ module Wrap = struct
       ()
 
     module Prepared = struct
-      type t = (Tock.Field.t, Tock.Rounds.n) Vector.t
+      type t = (Wrap.Field.t, Wrap.Rounds.n) Vector.t
     end
   end
 
   type 'max_local_max_proofs_verified t =
-    ( Tock.Inner_curve.Affine.t
+    ( Wrap.Inner_curve.Affine.t
     , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
     Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
 
   module Prepared = struct
     type 'max_local_max_proofs_verified t =
-      ( Tock.Inner_curve.Affine.t
+      ( Wrap.Inner_curve.Affine.t
       , (Challenges_vector.Prepared.t, 'max_local_max_proofs_verified) Vector.t
       )
       Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t

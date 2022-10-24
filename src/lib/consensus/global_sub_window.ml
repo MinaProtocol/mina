@@ -1,5 +1,5 @@
 open Unsigned
-open Snark_params.Tick
+open Snark_params.Step
 
 type t = uint32
 

@@ -86,7 +86,7 @@ let%test_module "Add events test" =
         let open Zkapps_add_events in
         List.init num_events ~f:(fun outer ->
             Array.init event_length ~f:(fun inner ->
-                Snark_params.Tick.Field.of_int (outer + inner) ) )
+                Snark_params.Step.Field.of_int (outer + inner) ) )
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
@@ -174,7 +174,7 @@ let%test_module "Add events test" =
     module Events_verifier = Merkle_list_verifier.Make (struct
       type proof_elem = Mina_base.Zkapp_account.Event.t
 
-      type hash = Snark_params.Tick.Field.t [@@deriving equal]
+      type hash = Snark_params.Step.Field.t [@@deriving equal]
 
       let hash (parent_hash : hash) (proof_elem : proof_elem) =
         let elem_hash = Mina_base.Zkapp_account.Event.hash proof_elem in

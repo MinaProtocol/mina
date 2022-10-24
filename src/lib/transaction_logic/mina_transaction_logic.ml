@@ -352,11 +352,11 @@ module type S = sig
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
   val update_sequence_state :
-       Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+       Snark_params.Step.Field.t Pickles_types.Vector.Vector_5.t
     -> Zkapp_account.Sequence_events.t
     -> txn_global_slot:Global_slot.t
     -> last_sequence_slot:Global_slot.t
-    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
+    -> Snark_params.Step.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -1006,7 +1006,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Global_state = Global_state
 
     module Field = struct
-      type t = Snark_params.Tick.Field.t
+      type t = Snark_params.Step.Field.t
 
       let if_ = value_if
     end
@@ -1653,7 +1653,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : Transaction_commitment.t
       ; full_transaction_commitment : Transaction_commitment.t
-      ; field : Snark_params.Tick.Field.t
+      ; field : Snark_params.Step.Field.t
       ; failure : Transaction_status.Failure.t option >
 
     let perform ~constraint_constants:_ (type r)
@@ -2367,7 +2367,7 @@ module For_tests = struct
                 ; increment_nonce = not use_full_commitment
                 ; events = []
                 ; sequence_events = []
-                ; call_data = Snark_params.Tick.Field.zero
+                ; call_data = Snark_params.Step.Field.zero
                 ; call_depth = 0
                 ; preconditions =
                     { Account_update.Preconditions.network =
@@ -2395,7 +2395,7 @@ module For_tests = struct
                 ; increment_nonce = false
                 ; events = []
                 ; sequence_events = []
-                ; call_data = Snark_params.Tick.Field.zero
+                ; call_data = Snark_params.Step.Field.zero
                 ; call_depth = 0
                 ; preconditions =
                     { Account_update.Preconditions.network =

@@ -67,7 +67,7 @@ let validate_keypair =
       let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
       let verified =
         Schnorr.Legacy.verify signature
-          (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
+          (Snark_params.Step.Inner_curve.of_affine keypair.public_key)
           message
       in
       if verified then printf "Verified a transaction using specified keypair\n"

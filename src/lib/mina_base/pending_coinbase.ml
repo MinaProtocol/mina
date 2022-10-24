@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base_import
 open Snarky_backendless
 open Snark_params
-open Snark_params.Tick
+open Snark_params.Step
 open Let_syntax
 open Currency
 
@@ -120,7 +120,7 @@ module type Data_hash_intf = sig
 
   val var_to_hash_packed : var -> Field.Var.t
 
-  val equal_var : var -> var -> Boolean.var Tick.Checked.t
+  val equal_var : var -> var -> Boolean.var Step.Checked.t
 
   val to_bytes : t -> string
 
@@ -276,7 +276,7 @@ module State_stack = struct
     }
 
   let typ : (var, t) Typ.t =
-    Snark_params.Tick.Typ.of_hlistable
+    Snark_params.Step.Typ.of_hlistable
       [ Stack_hash.typ; Stack_hash.typ ]
       ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
       ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -286,13 +286,13 @@ module State_stack = struct
   let to_bytes (t : t) = Stack_hash.to_bytes t.init ^ Stack_hash.to_bytes t.curr
 
   let equal_var (v1 : var) (v2 : var) =
-    let open Tick.Checked.Let_syntax in
+    let open Step.Checked.Let_syntax in
     let%bind b1 = Stack_hash.equal_var v1.init v2.init in
     let%bind b2 = Stack_hash.equal_var v1.curr v2.curr in
     Boolean.(b1 && b2)
 
-  let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-      var Tick0.Checked.t =
+  let if_ (cond : Step0.Boolean.var) ~(then_ : var) ~(else_ : var) :
+      var Step0.Checked.t =
     let%bind init = Stack_hash.if_ cond ~then_:then_.init ~else_:else_.init in
     let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
     { Poly.init; curr }
@@ -464,7 +464,7 @@ module Update = struct
   type var = (Action.var, Amount.var) Poly.t
 
   let typ =
-    let open Snark_params.Tick.Typ in
+    let open Snark_params.Step.Typ in
     of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       [ Action.typ; Amount.typ ]
@@ -601,7 +601,7 @@ module T = struct
       { Poly.data; state }
 
     let typ : (var, t) Typ.t =
-      Snark_params.Tick.Typ.of_hlistable
+      Snark_params.Step.Typ.of_hlistable
         [ Coinbase_stack.typ; State_stack.typ ]
         ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
         ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -622,10 +622,10 @@ module T = struct
       Coinbase_stack.to_bytes t.Poly.data ^ State_stack.to_bytes t.Poly.state
 
     let equal_var var1 var2 =
-      let open Tick.Checked.Let_syntax in
+      let open Step.Checked.Let_syntax in
       let%bind b1 = Coinbase_stack.equal_var var1.Poly.data var2.Poly.data in
       let%bind b2 = State_stack.equal_var var1.Poly.state var2.Poly.state in
-      let open Tick0.Boolean in
+      let open Step0.Boolean in
       b1 &&& b2
 
     let empty = { Poly.data = Coinbase_stack.empty; state = State_stack.empty }
@@ -662,8 +662,8 @@ module T = struct
     let push_state (state_body_hash : State_body_hash.t) (t : t) =
       { t with state = State_stack.push t.state state_body_hash }
 
-    let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-        var Tick0.Checked.t =
+    let if_ (cond : Step0.Boolean.var) ~(then_ : var) ~(else_ : var) :
+        var Step0.Checked.t =
       let%bind data =
         Coinbase_stack.Checked.if_ cond ~then_:then_.data ~else_:else_.data
       in
@@ -676,7 +676,7 @@ module T = struct
       type t = var
 
       let push_coinbase (coinbase : Coinbase_data.var) (t : t) :
-          t Tick0.Checked.t =
+          t Step0.Checked.t =
         let%map data = Coinbase_stack.Checked.push t.data coinbase in
         { t with data }
 
@@ -685,7 +685,7 @@ module T = struct
         { t with state }
 
       let check_merge ~transition1:((s, t) : t * t)
-          ~transition2:((s', t') : t * t) : Boolean.var Tick0.Checked.t =
+          ~transition2:((s', t') : t * t) : Boolean.var Step0.Checked.t =
         let%bind valid_coinbase_stacks =
           Coinbase_stack.Checked.check_merge (s.data, t.data) (s'.data, t'.data)
         in
@@ -753,7 +753,7 @@ module T = struct
 
     module Merkle_tree =
       Snarky_backendless.Merkle_tree.Checked
-        (Tick)
+        (Step)
         (struct
           type value = Field.t
 
@@ -762,7 +762,7 @@ module T = struct
           let typ = Field.typ
 
           let merge ~height h1 h2 =
-            Tick.make_checked (fun () ->
+            Step.make_checked (fun () ->
                 Random_oracle.Checked.hash
                   ~init:(Hash_prefix.coinbase_merkle_tree height)
                   [| h1; h2 |] )
@@ -1334,7 +1334,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
       let unchecked = Stack.push_coinbase cb base in
       let checked =
         let comp =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let cb_var = Coinbase_data.(var_of_t coinbase_data) in
           let%map res =
             Stack.Checked.push_coinbase cb_var (Stack.var_of_t base)
@@ -1374,7 +1374,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
       let checked_merkle_root =
         let comp =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let amount_var = Amount.var_of_t amount in
           let action_var = Update.Action.var_of_t action in
           let coinbase_receiver_var =
@@ -1433,7 +1433,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
       let f_pop_coinbase = Checked.pop_coinbases ~constraint_constants in
       let checked_merkle_root =
         let comp =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let amount_var = Amount.var_of_t amount in
           let action_var = Update.Action.(var_of_t action) in
           let coinbase_receiver_var =
@@ -1470,7 +1470,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
       in
       let checked_merkle_root_after_pop =
         let comp =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let%map current, _previous =
             handle
               (fun () ->

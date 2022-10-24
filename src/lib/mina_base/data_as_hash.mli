@@ -1,4 +1,4 @@
-open Snark_params.Tick
+open Snark_params.Step
 
 (** An in-circuit commitment to some data, without explicitly exposing this
     data within the circuit.

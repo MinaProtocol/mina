@@ -1,6 +1,6 @@
 open Core_kernel
 open Snarky_backendless
-open Snark_params.Tick
+open Snark_params.Step
 open Unsigned
 module Length = Mina_numbers.Length
 

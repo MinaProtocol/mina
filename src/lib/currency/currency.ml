@@ -3,7 +3,7 @@
 open Core_kernel
 open Snark_bits
 open Snark_params
-open Tick
+open Step
 
 [%%ifdef consensus_mechanism]
 
@@ -182,9 +182,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let equal_var = Field.Checked.equal
 
-    let m = Snark_params.Tick.m
+    let m = Snark_params.Step.m
 
-    let make_checked = Snark_params.Tick.make_checked
+    let make_checked = Snark_params.Step.make_checked
 
     let var_to_bits_ (t : var) = Field.Checked.unpack ~length:length_in_bits t
 
@@ -230,7 +230,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind actual = image_from_bits_unsafe t in
       with_label "range_check" (fun () -> Field.Checked.Assert.equal actual t)
 
-    let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
+    let seal x = make_checked (fun () -> Pickles.Util.seal Step.m x)
 
     let modulus_as_field =
       lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
@@ -628,7 +628,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let value = Field.Var.add xv yv in
           let%bind magnitude =
-            Tick.Field.Checked.mul (sgn :> Field.Var.t) value
+            Step.Field.Checked.mul (sgn :> Field.Var.t) value
           in
           let%bind res_magnitude, `Overflow overflow =
             range_check_flagged `Add_or_sub magnitude
@@ -655,7 +655,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let%bind res_value = seal (Field.Var.add xv yv) in
           let%bind magnitude =
-            Tick.Field.Checked.mul (sgn :> Field.Var.t) res_value
+            Step.Field.Checked.mul (sgn :> Field.Var.t) res_value
           in
           let%map () = range_check magnitude in
           { Signed_var.repr = { magnitude; sgn }; value = Some res_value }
@@ -1223,7 +1223,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ( module struct
       [%%ifdef consensus_mechanism]
 
-      open Tick
+      open Step
 
       module type Sub_flagged_S = sig
         type t
@@ -1245,7 +1245,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         module Checked : sig
           val sub_flagged :
-            var -> var -> (var * [ `Underflow of Boolean.var ]) Tick.Checked.t
+            var -> var -> (var * [ `Underflow of Boolean.var ]) Step.Checked.t
         end
       end
 
@@ -1257,7 +1257,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let sub_flagged_checked =
           let f (x, y) =
-            Tick.Checked.map (M.Checked.sub_flagged x y)
+            Step.Checked.map (M.Checked.sub_flagged x y)
               ~f:(fun (r, `Underflow u) -> (r, u))
           in
           Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

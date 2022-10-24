@@ -378,7 +378,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let check_signature ?signature_kind ({ payload; signer; signature } : t) =
     Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
-      (Snark_params.Tick.Inner_curve.of_affine signer)
+      (Snark_params.Step.Inner_curve.of_affine signer)
       (to_input_legacy payload)
 
   let public_keys t =

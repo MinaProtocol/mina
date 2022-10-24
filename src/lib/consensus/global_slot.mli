@@ -23,7 +23,7 @@ module Stable : sig
   end
 end]
 
-val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+val to_input : t -> Snark_params.Step.Field.t Random_oracle.Input.Chunked.t
 
 val of_slot_number : constants:Constants.t -> Mina_numbers.Global_slot.t -> t
 
@@ -63,10 +63,10 @@ val diff : constants:Constants.t -> t -> Epoch.t * Slot.t -> t
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 module Checked : sig
-  open Snark_params.Tick
+  open Snark_params.Step
 
   type t =
     (Mina_numbers.Global_slot.Checked.t, Mina_numbers.Length.Checked.t) Poly.t

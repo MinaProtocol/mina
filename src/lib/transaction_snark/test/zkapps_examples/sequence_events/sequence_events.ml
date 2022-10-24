@@ -86,7 +86,7 @@ let%test_module "Sequence events test" =
         let open Zkapps_sequence_events in
         List.init num_events ~f:(fun outer ->
             Array.init event_length ~f:(fun inner ->
-                Snark_params.Tick.Field.of_int (outer + inner) ) )
+                Snark_params.Step.Field.of_int (outer + inner) ) )
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn

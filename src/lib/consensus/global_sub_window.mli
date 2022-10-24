@@ -15,7 +15,7 @@ val sub : t -> t -> Unsigned.UInt32.t
 val ( >= ) : t -> t -> bool
 
 module Checked : sig
-  open Snark_params.Tick
+  open Snark_params.Step
 
   type t
 

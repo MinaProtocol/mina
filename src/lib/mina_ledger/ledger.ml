@@ -334,7 +334,7 @@ module Ledger_inner = struct
         (merkle_path ledger new_loc, Account.empty)
 
   let _handler t =
-    let open Snark_params.Tick in
+    let open Snark_params.Step in
     let path_exn idx =
       List.map (merkle_path_at_index_exn t idx) ~f:(function
         | `Left h ->

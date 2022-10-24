@@ -192,7 +192,7 @@ module Checked = struct
         t ) =
     (* failure_status is the unit value, no need to represent it *)
     let open Random_oracle.Input.Chunked in
-    let open Snark_params.Tick.Field.Var in
+    let open Snark_params.Step.Field.Var in
     Array.reduce_exn ~f:append
       [| field (stack_frame :> t)
        ; field (call_stack :> t)

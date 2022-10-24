@@ -11,7 +11,7 @@ module VerificationKey =
 
 module VerificationKeyHash =
   Make_scalar_using_to_string
-    (Pickles.Backend.Tick.Field)
+    (Pickles.Backend.Step.Field)
     (struct
       let name = "VerificationKeyHash"
 

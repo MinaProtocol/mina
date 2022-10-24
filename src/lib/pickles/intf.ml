@@ -295,6 +295,6 @@ module type Statement = sig
 end
 
 module type Statement_var =
-  Statement with type field := Backend.Tick.Field.t Snarky_backendless.Cvar.t
+  Statement with type field := Backend.Step.Field.t Snarky_backendless.Cvar.t
 
-module type Statement_value = Statement with type field := Backend.Tick.Field.t
+module type Statement_value = Statement with type field := Backend.Step.Field.t

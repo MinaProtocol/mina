@@ -6,7 +6,7 @@ open Js_of_ocaml
  * *************** *)
 
 module Field = struct
-  include Snark_params.Tick.Field
+  include Snark_params.Step.Field
 
   (* Converts a byterray into a [Field.t], raises an exception if the number obtained is larger than the order *)
   let of_bytes bytearray =
@@ -20,7 +20,7 @@ module Field = struct
     let big = Array.foldi bytearray ~init:zero ~f:aux in
     if N.(size - one < big) then
       failwith "the given field is larger than the order" ;
-    Snark_params.Tick.Bigint.(to_field (of_bignum_bigint big))
+    Snark_params.Step.Bigint.(to_field (of_bignum_bigint big))
 
   (* Converts a field element into an hexadecimal string (encoding the field element in little-endian) *)
   let to_hex field =

@@ -30,7 +30,7 @@ let push ~account_update ~calls t =
 
 let hash (t : t) = Zkapp_command.Call_forest.hash t
 
-open Snark_params.Tick.Run
+open Snark_params.Step.Run
 
 module Checked = struct
   module F = Zkapp_command.Digest.Forest.Checked

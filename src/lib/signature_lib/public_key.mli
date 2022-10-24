@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Snark_params
-open Tick
+open Step
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 

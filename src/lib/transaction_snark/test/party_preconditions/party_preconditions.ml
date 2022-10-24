@@ -18,7 +18,7 @@ let%test_module "Protocol state precondition tests" =
       { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Step.Field.of_int i) )
       }
 
     let precondition_exact
@@ -74,7 +74,7 @@ let%test_module "Protocol state precondition tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions =
@@ -118,7 +118,7 @@ let%test_module "Protocol state precondition tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions =
@@ -191,7 +191,7 @@ let%test_module "Protocol state precondition tests" =
                         ; increment_nonce = true
                         ; events = []
                         ; sequence_events = []
-                        ; call_data = Snark_params.Tick.Field.zero
+                        ; call_data = Snark_params.Step.Field.zero
                         ; call_depth = 0
                         ; preconditions =
                             { Account_update.Preconditions.network =
@@ -222,7 +222,7 @@ let%test_module "Protocol state precondition tests" =
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
-                        ; call_data = Snark_params.Tick.Field.zero
+                        ; call_data = Snark_params.Step.Field.zero
                         ; call_depth = 0
                         ; preconditions =
                             { Account_update.Preconditions.network =
@@ -316,7 +316,7 @@ let%test_module "Account precondition tests" =
       { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Step.Field.of_int i) )
       }
 
     let precondition_exact (account : Account.t) =
@@ -414,7 +414,7 @@ let%test_module "Account precondition tests" =
                     ; new_zkapp_account = false
                     ; snapp_update
                     ; current_auth = Permissions.Auth_required.Signature
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; events = []
                     ; sequence_events = []
                     ; preconditions =
@@ -483,7 +483,7 @@ let%test_module "Account precondition tests" =
                     ; new_zkapp_account = false
                     ; snapp_update
                     ; current_auth = Permissions.Auth_required.Signature
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; events = []
                     ; sequence_events = []
                     ; preconditions =
@@ -535,7 +535,7 @@ let%test_module "Account precondition tests" =
                     ; new_zkapp_account = false
                     ; snapp_update
                     ; current_auth = Permissions.Auth_required.Signature
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; events = []
                     ; sequence_events = []
                     ; preconditions =
@@ -603,7 +603,7 @@ let%test_module "Account precondition tests" =
                     ; increment_nonce = true
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =
@@ -632,7 +632,7 @@ let%test_module "Account precondition tests" =
                     ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =

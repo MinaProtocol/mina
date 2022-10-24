@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Snark_bits
-open Snark_params.Tick
+open Snark_params.Step
 
 type uint64 = Unsigned.uint64
 
@@ -271,7 +271,7 @@ end
 module type Full = sig
   [%%ifdef consensus_mechanism]
 
-  open Snark_params.Tick
+  open Snark_params.Step
 
   module Signed_var : sig
     type 'mag repr = ('mag, Sgn.var) Signed_poly.t

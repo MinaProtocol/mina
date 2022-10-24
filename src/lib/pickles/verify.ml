@@ -18,19 +18,19 @@ module Instance = struct
         -> t
 end
 
-(* TODO: Just stick this in plonk_checks.ml *)
+(* TODO: Just sstep this in plonk_checks.ml *)
 module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
-    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Step)
   module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Wrap)
 end
 
 let verify_heterogenous (ts : Instance.t list) =
   let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
-  let module Tick_field = Backend.Tick.Field in
-  let tick_field : _ Plonk_checks.field = (module Tick_field) in
+  let module Step_field = Backend.Step.Field in
+  let step_field : _ Plonk_checks.field = (module Step_field) in
   let check, result =
     let r = ref [] in
     let result () =
@@ -69,7 +69,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let open Types.Wrap.Proof_state in
         let sc =
-          SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
+          SC.to_field_constant step_field ~endo:Endo.Wrap_inner_curve.scalar
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.xi
@@ -79,20 +79,20 @@ let verify_heterogenous (ts : Instance.t list) =
             ; bulletproof_challenges
             ; b
             } =
-          Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
+          Deferred_values.map_challenges ~f:Challenge.Constant.to_step_field
             ~scalar:sc statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
         let step_domain = Branch_data.domain branch_data in
         let w =
-          Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
+          Step.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
-        let zetaw = Tick.Field.mul zeta w in
-        let tick_plonk_minimal :
+        let zetaw = Step.Field.mul zeta w in
+        let step_plonk_minimal :
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
-          let chal = Challenge.Constant.to_tick_field in
+          let chal = Challenge.Constant.to_step_field in
           { zeta
           ; alpha
           ; beta = chal plonk0.beta
@@ -100,34 +100,34 @@ let verify_heterogenous (ts : Instance.t list) =
           ; joint_combiner = Option.map ~f:sc plonk0.joint_combiner
           }
         in
-        let tick_combined_evals =
+        let step_combined_evals =
           Plonk_checks.evals_of_split_evals
-            (module Tick.Field)
-            evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+            (module Step.Field)
+            evals.evals.evals ~rounds:(Nat.to_int Step.Rounds.n) ~zeta ~zetaw
           |> Plonk_types.Evals.to_in_circuit
         in
-        let tick_domain =
+        let step_domain =
           Plonk_checks.domain
-            (module Tick.Field)
-            step_domain ~shifts:Common.tick_shifts
-            ~domain_generator:Backend.Tick.Field.domain_generator
+            (module Step.Field)
+            step_domain ~shifts:Common.step_shifts
+            ~domain_generator:Backend.Step.Field.domain_generator
         in
-        let tick_env =
+        let step_env =
           Plonk_checks.scalars_env
-            (module Tick.Field)
-            ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+            (module Step.Field)
+            ~endo:Endo.Step_inner_curve.base ~mds:Step_field_sponge.params.mds
             ~srs_length_log2:Common.Max_degree.step_log2
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
               |> Kimchi_pasta.Pasta.Fp.of_bigint )
-            ~domain:tick_domain tick_plonk_minimal tick_combined_evals
+            ~domain:step_domain step_plonk_minimal step_combined_evals
         in
         let plonk =
           let p =
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
-              ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-              tick_combined_evals
+              (module Step.Field)
+              ~shift:Shifts.step1 ~env:step_env step_plonk_minimal
+              step_combined_evals
           in
           { p with
             zeta = plonk0.zeta
@@ -145,11 +145,11 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let absorb, squeeze =
-          let open Tick_field_sponge.Bits in
+          let open Step_field_sponge.Bits in
           let sponge =
-            let s = create Tick_field_sponge.params in
+            let s = create Step_field_sponge.params in
             absorb s
-              (Digest.Constant.to_tick_field
+              (Digest.Constant.to_step_field
                  statement.proof_state.sponge_digest_before_evaluations ) ;
             s
           in
@@ -167,8 +167,8 @@ let verify_heterogenous (ts : Instance.t list) =
             statement.messages_for_next_step_proof.old_bulletproof_challenges
         in
         (let challenges_digest =
-           let open Tick_field_sponge.Field in
-           let sponge = create Tick_field_sponge.params in
+           let open Step_field_sponge.Field in
+           let sponge = create Step_field_sponge.params in
            Vector.iter old_bulletproof_challenges
              ~f:(Vector.iter ~f:(absorb sponge)) ;
            squeeze sponge
@@ -185,12 +185,12 @@ let verify_heterogenous (ts : Instance.t list) =
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
-           into a "batch dlog Tick acc verifier" *)
+           into a "batch dlog Step acc verifier" *)
         let actual_proofs_verified = Vector.length old_bulletproof_challenges in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
-          Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
-            ~domain:tick_domain ~ft_eval1:evals.ft_eval1
+          Wrap.combined_inner_product ~env:step_env ~plonk:step_plonk_minimal
+            ~domain:step_domain ~ft_eval1:evals.ft_eval1
             ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
             evals.evals ~old_bulletproof_challenges ~r:r_actual ~xi ~zeta ~zetaw
         in
@@ -198,9 +198,9 @@ let verify_heterogenous (ts : Instance.t list) =
           check
             ( lazy
                 (sprintf
-                   !"%s: %{sexp:Tick_field.t} != %{sexp:Tick_field.t}"
+                   !"%s: %{sexp:Step_field.t} != %{sexp:Step_field.t}"
                    lab x y )
-            , Tick_field.equal x y )
+            , Step_field.equal x y )
         in
         Timer.clock __LOC__ ;
         let bulletproof_challenges =
@@ -208,7 +208,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let shifted_value =
-          Shifted_value.Type1.to_field (module Tick.Field) ~shift:Shifts.tick1
+          Shifted_value.Type1.to_field (module Step.Field) ~shift:Shifts.step1
         in
         let b_actual =
           let challenge_poly =
@@ -216,7 +216,7 @@ let verify_heterogenous (ts : Instance.t list) =
               (Wrap.challenge_polynomial
                  (Vector.to_array bulletproof_challenges) )
           in
-          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+          Step.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
         in
         let () =
           let [ Pow_2_roots_of_unity greatest_wrap_domain
@@ -250,7 +250,7 @@ let verify_heterogenous (ts : Instance.t list) =
         (plonk, bulletproof_challenges) )
     |> List.unzip
   in
-  let open Backend.Tock.Proof in
+  let open Backend.Wrap.Proof in
   let open Promise.Let_syntax in
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
@@ -298,7 +298,7 @@ let verify_heterogenous (ts : Instance.t list) =
              }
            in
            let input =
-             tock_unpadded_public_input_of_statement prepared_statement
+             wrap_unpadded_public_input_of_statement prepared_statement
            in
            ( key.index
            , t.proof

@@ -20,7 +20,7 @@ mutation MyMutation {
     (Zkapp_command.arg_query_string zkapp_command)
 
 let parse_field_element_or_hash_string s ~f =
-  match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
+  match Or_error.try_with (fun () -> Snark_params.Step.Field.of_string s) with
   | Ok field ->
       f field
   | Error e1 ->
@@ -206,7 +206,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   ()
 
 module App_state = struct
-  type t = Snark_params.Tick.Field.t
+  type t = Snark_params.Step.Field.t
 
   let of_string str : t Zkapp_basic.Set_or_keep.t =
     match str with
@@ -218,13 +218,13 @@ module App_state = struct
 end
 
 module Events = struct
-  type t = Snark_params.Tick.Field.t
+  type t = Snark_params.Step.Field.t
 
   let of_string_array (arr : string Array.t) =
     Array.map arr ~f:(fun s ->
         match s with
         | "" ->
-            Snark_params.Tick.Field.zero
+            Snark_params.Step.Field.zero
         | _ ->
             parse_field_element_or_hash_string s ~f:Fn.id )
 end
@@ -255,7 +255,7 @@ module Util = struct
          ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep) )
     |> Zkapp_state.V.of_list_exn
 
-  let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
+  let sequence_state_of_list array_lst : Snark_params.Step.Field.t array list =
     List.map ~f:Events.of_string_array array_lst
 
   let auth_of_string s : Permissions.Auth_required.t =
@@ -352,7 +352,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; snapp_update =
         { Account_update.Update.dummy with verification_key; zkapp_uri }
     ; current_auth = auth
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None
@@ -393,7 +393,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None
@@ -421,7 +421,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with app_state }
     ; current_auth = Permissions.Auth_required.Proof
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None
@@ -458,7 +458,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with zkapp_uri }
     ; current_auth = auth
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None
@@ -497,7 +497,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
     ; current_auth = Permissions.Auth_required.Proof
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events
     ; preconditions = None
@@ -534,7 +534,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with token_symbol }
     ; current_auth = auth
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None
@@ -572,7 +572,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with permissions }
     ; current_auth
-    ; call_data = Snark_params.Tick.Field.zero
+    ; call_data = Snark_params.Step.Field.zero
     ; events = []
     ; sequence_events = []
     ; preconditions = None

@@ -3,7 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce

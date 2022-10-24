@@ -88,7 +88,7 @@ module type S = sig
 end
 
 (* The constraints are basically the same, but the literals in them differ. *)
-module Tick : S = struct
+module Step : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -173,7 +173,7 @@ end
 let () =
   output_string
     {ocaml|
-module Tock : S = struct
+module Wrap : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -256,7 +256,7 @@ let () =
       ]
 end
 
-module Tick_with_lookup : S = struct
+module Step_with_lookup : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -339,7 +339,7 @@ let () =
       ]
 end
 
-module Tock_with_lookup : S = struct
+module Wrap_with_lookup : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )

@@ -17,7 +17,7 @@ module Protocol_state = struct
         ( ( Mina_base_ledger_hash.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
           , Currency.Amount.V1.t Numeric.V1.t )
           Mina_base_epoch_ledger.Poly.V1.t
-        , Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+        , Snark_params.Step.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
         , Data_hash_lib.State_hash.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
         , Data_hash_lib.State_hash.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
         , Mina_numbers.Length.V1.t Numeric.V1.t )
@@ -68,14 +68,14 @@ module Account = struct
       { balance : Currency.Balance.V1.t Numeric.V1.t
       ; nonce : Mina_numbers.Account_nonce.V1.t Numeric.V1.t
       ; receipt_chain_hash :
-          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+          Snark_params.Step.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; delegate :
           Public_key.Compressed.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; state :
-          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+          Snark_params.Step.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
           Mina_base_zkapp_state.V.V1.t
       ; sequence_state :
-          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+          Snark_params.Step.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; proved_state : bool Mina_base_zkapp_basic.Or_ignore.V1.t
       ; is_new : bool Mina_base_zkapp_basic.Or_ignore.V1.t
       }

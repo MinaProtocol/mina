@@ -431,7 +431,7 @@ module Network = struct
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec = struct
-    let tick_interval =
+    let step_interval =
       Core.Time.Span.of_ms (Int.to_float block_window_duration)
 
     let rolling_interval =
@@ -1441,7 +1441,7 @@ module Block_latency = struct
   end
 
   module Latency_time_spec = struct
-    let tick_interval =
+    let step_interval =
       Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
 
     let rolling_interval =

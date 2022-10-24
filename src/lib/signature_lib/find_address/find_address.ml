@@ -103,7 +103,7 @@ let desired_prefix =
     This value corresponds to a byte-string of all zeros.
 *)
 let min_value : Public_key.Compressed.t =
-  { x = Snark_params.Tick.Field.zero; is_odd = false }
+  { x = Snark_params.Step.Field.zero; is_odd = false }
 
 (** The base58-check representation of `min_value`. *)
 let min_value_compressed = Public_key.Compressed.to_base58_check min_value
@@ -210,7 +210,7 @@ let true_prefixes =
     encodes to a desired bit-string when we convert it to bytes.
 *)
 let field_elements =
-  let open Snark_params.Tick.Field in
+  let open Snark_params.Step.Field in
   let two = of_int 2 in
   let rec go current_pow_2 pow acc =
     if Int.( < ) pow size_in_bits then
@@ -239,10 +239,10 @@ let field_elements =
 let field_elements =
   List.sort field_elements ~compare:(fun field1 field2 ->
       let pk1 =
-        { min_value with x = Snark_params.Tick.Field.add min_value.x field1 }
+        { min_value with x = Snark_params.Step.Field.add min_value.x field1 }
       in
       let pk2 =
-        { min_value with x = Snark_params.Tick.Field.add min_value.x field2 }
+        { min_value with x = Snark_params.Step.Field.add min_value.x field2 }
       in
       -String.compare
          (Public_key.Compressed.to_base58_check pk1)
@@ -283,7 +283,7 @@ let find_base_pk prefix =
     ~finish:(fun _ -> None)
     field_elements
     ~f:(fun (i, pk, pk_compressed) field ->
-      let pk' = { pk with x = Snark_params.Tick.Field.add pk.x field } in
+      let pk' = { pk with x = Snark_params.Step.Field.add pk.x field } in
       let pk_string = Public_key.Compressed.to_base58_check pk' in
       let actual_prefix = String.prefix pk_string len in
       let compared = String.compare actual_prefix prefix in
@@ -367,7 +367,7 @@ let print_values prefix =
           *)
           List.fold2_exn ~init:base_pk.x field_elements field_selectors
             ~f:(fun field selected_field selected ->
-              if selected then Snark_params.Tick.Field.add field selected_field
+              if selected then Snark_params.Step.Field.add field selected_field
               else field )
         in
         (* Test both odd and even versions of the public key. *)

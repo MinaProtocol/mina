@@ -19,7 +19,7 @@ let%test_module "Fee payer tests" =
       { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Step.Field.of_int i) )
       }
 
     let%test_unit "update a snapp account with signature and fee paid by the \
@@ -39,7 +39,7 @@ let%test_module "Fee payer tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -66,7 +66,7 @@ let%test_module "Fee payer tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -92,7 +92,7 @@ let%test_module "Fee payer tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -122,7 +122,7 @@ let%test_module "Fee payer tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None

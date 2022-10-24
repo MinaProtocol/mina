@@ -3,7 +3,7 @@ open Core_kernel
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module Inner_curve = Snark_params.Tick.Inner_curve
+module Inner_curve = Snark_params.Step.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
@@ -83,8 +83,8 @@ let%test_module "Composability test" =
 
     (** The type of call to dispatch. *)
     type calls_kind =
-      | Add_and_call of Snark_params.Tick.Run.Field.Constant.t * calls_kind
-      | Add of Snark_params.Tick.Run.Field.Constant.t
+      | Add_and_call of Snark_params.Step.Run.Field.Constant.t * calls_kind
+      | Add of Snark_params.Step.Run.Field.Constant.t
 
     module P = (val p_module)
 
@@ -145,7 +145,7 @@ let%test_module "Composability test" =
     end
 
     module Update_state_account_update = struct
-      let old_state = Snark_params.Tick.Field.zero
+      let old_state = Snark_params.Step.Field.zero
 
       (** The request handler to use when running this account_update.
 
@@ -289,7 +289,7 @@ let%test_module "Composability test" =
 
     let test_recursive num_calls =
       let increments =
-        Array.init num_calls ~f:(fun _ -> Snark_params.Tick.Field.random ())
+        Array.init num_calls ~f:(fun _ -> Snark_params.Step.Field.random ())
       in
       let calls_kind =
         (* Recursively call [i+1] times. *)
@@ -300,7 +300,7 @@ let%test_module "Composability test" =
         go (num_calls - 1)
       in
       let expected_result =
-        Array.reduce_exn ~f:Snark_params.Tick.Field.add increments
+        Array.reduce_exn ~f:Snark_params.Step.Field.add increments
       in
       let account =
         []
@@ -314,10 +314,10 @@ let%test_module "Composability test" =
       let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
-      assert (Snark_params.Tick.Field.equal expected_result first_state) ;
+      assert (Snark_params.Step.Field.equal expected_result first_state) ;
       (* Check that the rest of the state is unmodified. *)
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
+        ~f:(fun x -> assert (Snark_params.Step.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update nonrecursive" = test_recursive 1

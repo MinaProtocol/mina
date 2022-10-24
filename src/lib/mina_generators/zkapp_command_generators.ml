@@ -198,12 +198,12 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
                 Zkapp_state.V.to_list predicate_account.state |> Array.of_list
               in
               let%bind ndx = Int.gen_incl 0 (Array.length fields - 1) in
-              let%bind field = Snark_params.Tick.Field.gen in
+              let%bind field = Snark_params.Step.Field.gen in
               fields.(ndx) <- Or_ignore.Check field ;
               let state = Zkapp_state.V.of_list_exn (Array.to_list fields) in
               return { predicate_account with state }
           | Sequence_state ->
-              let%bind field = Snark_params.Tick.Field.gen in
+              let%bind field = Snark_params.Step.Field.gen in
               let sequence_state = Or_ignore.Check field in
               return { predicate_account with sequence_state }
           | Proved_state ->
@@ -830,7 +830,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
       let%bind array_len = Int.gen_uniform_incl 0 max_array_len in
       let%map fields =
         Quickcheck.Generator.list_with_length array_len
-          Snark_params.Tick.Field.gen
+          Snark_params.Step.Field.gen
       in
       Array.of_list fields
     in
@@ -841,7 +841,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   let%bind sequence_events =
     field_array_list_gen ~max_array_len:2 ~max_list_len:1
   in
-  let%bind call_data = Snark_params.Tick.Field.gen in
+  let%bind call_data = Snark_params.Step.Field.gen in
   let first_use_of_account =
     let account_id = Account_id.create public_key token_id in
     match account_ids_seen with
@@ -1337,7 +1337,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                       let%map app_state =
                         let%map fields =
                           let field_gen =
-                            Snark_params.Tick.Field.gen
+                            Snark_params.Step.Field.gen
                             >>| fun x -> Set_or_keep.Set x
                           in
                           Quickcheck.Generator.list_with_length 8 field_gen
@@ -1360,7 +1360,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                       let token_symbol = Set_or_keep.Set "CODA" in
                       return { Account_update.Update.dummy with token_symbol }
                   | `Voting_for ->
-                      let%map field = Snark_params.Tick.Field.gen in
+                      let%map field = Snark_params.Step.Field.gen in
                       let voting_for = Set_or_keep.Set field in
                       { Account_update.Update.dummy with voting_for }
                   | `Send | `Receive ->

@@ -1,6 +1,6 @@
 open Unsigned
 open Core
-open Snark_params.Tick
+open Snark_params.Step
 module T = Mina_numbers.Global_slot
 module Length = Mina_numbers.Length
 

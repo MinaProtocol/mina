@@ -216,11 +216,11 @@ val apply_transaction :
     made available here so we can use this logic in the Zkapp_command generators
 *)
 val update_sequence_state :
-     Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+     Snark_params.Step.Field.t Pickles_types.Vector.Vector_5.t
   -> Zkapp_account.Sequence_events.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> last_sequence_slot:Mina_numbers.Global_slot.t
-  -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+  -> Snark_params.Step.Field.t Pickles_types.Vector.Vector_5.t
      * Mina_numbers.Global_slot.t
 
 val apply_zkapp_command_unchecked :

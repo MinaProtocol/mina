@@ -90,7 +90,7 @@ module Repr = struct
     module V2 = struct
       type t =
         { commitments :
-            Backend.Tock.Curve.Affine.Stable.V1.t
+            Backend.Wrap.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
         ; data : Data.Stable.V1.t
         }
@@ -105,12 +105,12 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+      { commitments : Backend.Wrap.Curve.Affine.t Plonk_verification_key_evals.t
       ; index :
           (Impls.Wrap.Verification_key.t
           [@to_yojson
-            Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
-              Backend.Tick.Field.to_yojson] )
+            Verifier_index_json.to_yojson Backend.Wrap.Field.to_yojson
+              Backend.Step.Field.to_yojson] )
       ; data : Data.t
       }
     [@@deriving fields, to_yojson]
@@ -129,7 +129,7 @@ module Stable = struct
         in
         { domain =
             { log_size_of_group = log2_size
-            ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
+            ; group_gen = Backend.Wrap.Field.domain_generator ~log2_size
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
@@ -153,7 +153,7 @@ module Stable = struct
              ; endomul_scalar_comm = g c.endomul_scalar_comm
              ; chacha_comm = None
              } )
-        ; shifts = Common.tock_shifts ~log2_size
+        ; shifts = Common.wrap_shifts ~log2_size
         ; lookup_index = None
         }
       in
@@ -168,7 +168,7 @@ module Stable = struct
           let to_binable { commitments; data; index = _ } =
             { Repr.commitments; data }
 
-          let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+          let of_binable r = of_repr (Backend.Wrap.Keypair.load_urs ()) r
         end)
   end
 end]
@@ -191,6 +191,6 @@ let dummy_commitments g =
 let dummy =
   lazy
     (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
-     let g = Backend.Tock.Curve.(to_affine_exn one) in
+     let g = Backend.Wrap.Curve.(to_affine_exn one) in
      { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
      |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )

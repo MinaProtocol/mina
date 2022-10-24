@@ -1,8 +1,8 @@
 open Core_kernel
 open Common
 open Backend
-module Me = Tock
-module Other = Tick
+module Me = Wrap
+module Other = Step
 module Impl = Impls.Wrap
 open Pickles_types
 open Import
@@ -29,7 +29,7 @@ open Impl
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
 
-  include (Tick.Field : module type of Tick.Field with type t := t)
+  include (Step.Field : module type of Step.Field with type t := t)
 
   let size = Impls.Step.Bigint.to_bignum_bigint size
 end
@@ -55,9 +55,9 @@ module Sponge = struct
     Sponge_inputs.Make
       (Impl)
       (struct
-        include Tock_field_sponge.Inputs
+        include Wrap_field_sponge.Inputs
 
-        let params = Tock_field_sponge.params
+        let params = Wrap_field_sponge.params
       end)
 
   module S = Sponge.Make_sponge (Permutation)
@@ -69,8 +69,8 @@ module Sponge = struct
 end
 
 let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
-  T.test Tock_field_sponge.params
+  let module T = Make_sponge.Test (Impl) (Wrap_field_sponge.Field) (Sponge.S) in
+  T.test Wrap_field_sponge.params
 
 module Input_domain = struct
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
@@ -78,7 +78,7 @@ module Input_domain = struct
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i )
+               (Step.Keypair.load_urs ()) domain_size i )
               .unshifted.(0)
             |> Common.finite_exn ) )
 
@@ -203,6 +203,6 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
+      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Step.Keypair.load_urs ())
       |> Common.finite_exn )
 end

@@ -37,10 +37,10 @@ let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
   pad_vector ~dummy:Dummy.Ipa.Wrap.challenges_computed chalss
 
 (* Specialized padding function. *)
-let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
+let pad_accumulator (xs : (Wrap.Proof.Challenge_polynomial.t, _) Vector.t) =
   pad_vector xs
     ~dummy:
-      { Tock.Proof.Challenge_polynomial.commitment =
+      { Wrap.Proof.Challenge_polynomial.commitment =
           Lazy.force Dummy.Ipa.Wrap.sg
       ; challenges = Vector.to_array Dummy.Ipa.Wrap.challenges_computed
       }
@@ -49,7 +49,7 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
 (* Hash the me only, padding first. *)
 let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
     (t :
-      ( Tick.Curve.Affine.t
+      ( Step.Curve.Affine.t
       , (_, n) Vector.t )
       Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
   let t =
@@ -57,9 +57,9 @@ let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
       old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
     }
   in
-  Tock_field_sponge.digest Tock_field_sponge.params
+  Wrap_field_sponge.digest Wrap_field_sponge.params
     (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
-     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
+     .to_field_elements t ~g1:(fun ((x, y) : Step.Curve.Affine.t) -> [ x; y ])
     )
 
 (* Pad the messages_for_next_wrap_proof of a proof *)
@@ -103,9 +103,9 @@ module Checked = struct
      inside the circuit. *)
   let dummy_messages_for_next_wrap_proof_sponge_states =
     lazy
-      (let module S = Tock_field_sponge.Field in
+      (let module S = Wrap_field_sponge.Field in
       let full_state s = (S.state s, s.sponge_state) in
-      let sponge = S.create Tock_field_sponge.params in
+      let sponge = S.create Wrap_field_sponge.params in
       let s0 = full_state sponge in
       Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
       let s1 = full_state sponge in
@@ -123,7 +123,7 @@ module Checked = struct
   let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
       (t :
         ( Wrap_main_inputs.Inner_curve.t
-        , ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, n) Vector.t )
+        , ((Impls.Wrap.Field.t, Backend.Wrap.Rounds.n) Vector.t, n) Vector.t )
         Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
     let open Wrap_main_inputs in
     let sponge =
@@ -157,14 +157,14 @@ module Checked = struct
           .challenge_polynomial_commitment = g
         ; old_bulletproof_challenges =
             Vector.init n ~f:(fun _ ->
-                Vector.init Tock.Rounds.n ~f:(fun _ -> Tock.Field.random ()) )
+                Vector.init Wrap.Rounds.n ~f:(fun _ -> Wrap.Field.random ()) )
         }
       in
       Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
         ~equal:Field.Constant.equal
         (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.typ
            Wrap_main_inputs.Inner_curve.typ
-           (Vector.typ Field.typ Backend.Tock.Rounds.n)
+           (Vector.typ Field.typ Backend.Wrap.Rounds.n)
            ~length:n )
         Field.typ
         (fun t -> make_checked (fun () -> hash_messages_for_next_wrap_proof n t))

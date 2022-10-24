@@ -7,8 +7,8 @@ open Backend
    data.
 *)
 type inner_curve_var =
-  Tick.Field.t Snarky_backendless.Cvar.t
-  * Tick.Field.t Snarky_backendless.Cvar.t
+  Step.Field.t Snarky_backendless.Cvar.t
+  * Step.Field.t Snarky_backendless.Cvar.t
 
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
@@ -16,7 +16,7 @@ module Basic = struct
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
+    ; wrap_key : Step.Inner_curve.Affine.t Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; step_uses_lookup : Plonk_types.Opt.Flag.t
     }
@@ -99,7 +99,7 @@ module Compiled = struct
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
+    ; wrap_key : Step.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
@@ -264,7 +264,7 @@ let uses_lookup :
       (lookup_side_loaded tag.id).permanent.step_uses_lookup
 
 let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+    type a. (_, a, _, _) Tag.t -> a -> Step.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)

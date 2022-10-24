@@ -88,15 +88,15 @@ module Make (N : Vector.Nat_intf) = struct
     let bits = bits @ List.init (n_expected - n) ~f:(fun _ -> Int64.zero) in
     Vector.of_list_and_length_exn bits N.n
 
-  let of_tick_field x =
-    of_bits (List.take (Backend.Tick.Field.to_bits x) length)
+  let of_step_field x =
+    of_bits (List.take (Backend.Step.Field.to_bits x) length)
 
-  let of_tock_field x =
-    of_bits (List.take (Backend.Tock.Field.to_bits x) length)
+  let of_wrap_field x =
+    of_bits (List.take (Backend.Wrap.Field.to_bits x) length)
 
-  let to_tick_field t = Backend.Tick.Field.of_bits (to_bits t)
+  let to_step_field t = Backend.Step.Field.of_bits (to_bits t)
 
-  let to_tock_field t = Backend.Tock.Field.of_bits (to_bits t)
+  let to_wrap_field t = Backend.Wrap.Field.of_bits (to_bits t)
 
   let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
 

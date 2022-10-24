@@ -10,29 +10,29 @@ let evals =
   let open Plonk_types in
   let e =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        let a () = Array.create ~len:n (Ro.tock ()) in
+        let a () = Array.create ~len:n (Ro.wrap ()) in
         (a (), a ()) )
   in
   let ex =
     { All_evals.With_public_input.evals = e
-    ; public_input = (Ro.tock (), Ro.tock ())
+    ; public_input = (Ro.wrap (), Ro.wrap ())
     }
   in
-  { All_evals.ft_eval1 = Ro.tock (); evals = ex }
+  { All_evals.ft_eval1 = Ro.wrap (); evals = ex }
 
 let evals_combined =
   Plonk_types.All_evals.map evals ~f1:Fn.id
-    ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
+    ~f2:(Array.reduce_exn ~f:Backend.Wrap.Field.( + ))
 
 module Ipa = struct
   module Wrap = struct
     let challenges =
-      Vector.init Tock.Rounds.n ~f:(fun _ ->
+      Vector.init Wrap.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
+      Vector.map challenges ~f:(fun { prechallenge } : Wrap.Field.t ->
           Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
@@ -41,12 +41,12 @@ module Ipa = struct
 
   module Step = struct
     let challenges =
-      Vector.init Tick.Rounds.n ~f:(fun _ ->
+      Vector.init Step.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
+      Vector.map challenges ~f:(fun { prechallenge } : Step.Field.t ->
           Ipa.Step.compute_challenge prechallenge )
 
     let sg =

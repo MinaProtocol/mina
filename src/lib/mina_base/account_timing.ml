@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Snark_params
-open Tick
+open Step
 open Currency
 open Mina_numbers
 

@@ -5,7 +5,7 @@
 open Core_kernel
 open Mina_base_util
 open Snark_params
-open Tick
+open Step
 open Currency
 open Mina_numbers
 open Fold_lib
@@ -66,7 +66,7 @@ module Index = struct
   [%%ifdef consensus_mechanism]
 
   module Unpacked = struct
-    type var = Tick.Boolean.var list
+    type var = Step.Boolean.var list
 
     type value = Vector.t
 
@@ -74,7 +74,7 @@ module Index = struct
       List.map x ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
       |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
-    let typ ~ledger_depth : (var, value) Tick.Typ.t =
+    let typ ~ledger_depth : (var, value) Step.Typ.t =
       Typ.transport
         (Typ.list ~length:ledger_depth Boolean.typ)
         ~there:(to_bits ~ledger_depth) ~back:of_bits
@@ -214,7 +214,7 @@ module Token_symbol = struct
 
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
-  let if_ = Tick.Run.Field.if_
+  let if_ = Step.Run.Field.if_
 
   [%%endif]
 end
@@ -614,26 +614,26 @@ module Checked = struct
     let%bind else_branch =
       make_checked (fun () ->
           let _, slot_diff =
-            Tick.Run.run_checked
+            Step.Run.run_checked
               (Global_slot.Checked.sub_or_zero global_slot cliff_time)
           in
           let cliff_decrement = cliff_amount in
           let min_balance_less_cliff_decrement, _ =
-            Tick.Run.run_checked
+            Step.Run.run_checked
               (Balance.Checked.sub_amount_flagged initial_minimum_balance
                  cliff_decrement )
           in
           let num_periods, _ =
-            Tick.Run.run_checked
+            Step.Run.run_checked
               (Global_slot.Checked.div_mod slot_diff vesting_period)
           in
           let vesting_decrement =
-            Tick.Run.Field.mul
+            Step.Run.Field.mul
               (Global_slot.Checked.to_field num_periods)
               (Amount.pack_var vesting_increment)
           in
           let min_balance_less_cliff_and_vesting_decrements =
-            Tick.Run.run_checked
+            Step.Run.run_checked
               (Balance.Checked.sub_or_zero min_balance_less_cliff_decrement
                  (Balance.Checked.Unsafe.of_field vesting_decrement) )
           in

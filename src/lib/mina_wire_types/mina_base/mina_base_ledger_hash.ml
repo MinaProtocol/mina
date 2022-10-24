@@ -1,3 +1,3 @@
 module V1 = struct
-  type t = Snark_params.Tick.Field.t
+  type t = Snark_params.Step.Field.t
 end

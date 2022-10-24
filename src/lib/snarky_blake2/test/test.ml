@@ -4,7 +4,7 @@ open Snarky_blake2
 let%test_module "blake2-equality test" =
   ( module struct
     (* Delete once the snarky pr lands *)
-    module Impl = Snark_params.Tick
+    module Impl = Snark_params.Step
     include Make (Impl)
 
     let checked_to_unchecked typ1 typ2 checked input =

@@ -78,7 +78,7 @@ module type S = sig
 end
 
 (* The constraints are basically the same, but the literals in them differ. *)
-module Tick : S = struct
+module Step : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -1061,7 +1061,7 @@ module Tick : S = struct
       ]
 end
 
-module Tock : S = struct
+module Wrap : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -2044,7 +2044,7 @@ module Tock : S = struct
       ]
 end
 
-module Tick_with_lookup : S = struct
+module Step_with_lookup : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )
@@ -3168,7 +3168,7 @@ module Tick_with_lookup : S = struct
       ]
 end
 
-module Tock_with_lookup : S = struct
+module Wrap_with_lookup : S = struct
   let constant_term (type a)
       ({ add = ( + )
        ; sub = ( - )

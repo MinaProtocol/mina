@@ -13,9 +13,9 @@ let lookup_verification_enabled = false
 
 module Make
     (Inputs : Intf.Step_main_inputs.S
-                with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
+                with type Impl.field = Backend.Step.Field.t
+                 and type Impl.Bigint.t = Backend.Step.Bigint.R.t
+                 and type Inner_curve.Constant.Scalar.t = Backend.Wrap.Field.t) =
 struct
   open Inputs
   open Impl
@@ -41,7 +41,7 @@ struct
         As_prover.(
           fun () ->
             printf
-              !"%s: %{sexp:Backend.Tick.Field.t}, %{sexp:Backend.Tick.Field.t}\n\
+              !"%s: %{sexp:Backend.Step.Field.t}, %{sexp:Backend.Step.Field.t}\n\
                 %!"
               lab (read_var x) (read_var y))
 
@@ -59,7 +59,7 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
+            printf !"%s: %{sexp:Backend.Step.Field.t}\n%!" lab (read_var x))
 
   let print_bool lab x =
     if debug then
@@ -666,10 +666,10 @@ struct
           in
           Field.sub (go x 0) Field.one )
 
-  let shifts ~log2_size = Common.tick_shifts ~log2_size
+  let shifts ~log2_size = Common.step_shifts ~log2_size
 
   let domain_generator ~log2_size =
-    Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
+    Backend.Step.Field.domain_generator ~log2_size |> Impl.Field.constant
 
   let side_loaded_domain (type branches) =
     let open Side_loaded_verification_key in
@@ -715,8 +715,8 @@ struct
             let d_unchecked =
               Plonk_checks.domain
                 (module Field.Constant)
-                (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
-                ~domain_generator:Backend.Tick.Field.domain_generator
+                (Pow_2_roots_of_unity ds.h) ~shifts:Common.step_shifts
+                ~domain_generator:Backend.Step.Field.domain_generator
             in
             let checked_domain () =
               side_loaded_domain ~log2_size:(Field.of_int ds.h)
@@ -762,7 +762,7 @@ struct
           go Field.one (List.rev bits_lsb) )
 
     let mod_max_degree =
-      let k = Nat.to_int Backend.Tick.Rounds.n in
+      let k = Nat.to_int Backend.Step.Rounds.n in
       fun d ->
         let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
         Number.mod_pow_2 d (`Two_to_the k)
@@ -821,9 +821,9 @@ struct
       Plonk_checks.Make
         (Shifted_value.Type1)
         (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
+          let constant_term = Plonk_checks.Scalars.Step.constant_term
 
-          let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+          let index_terms = Plonk_checks.Scalars.Step_with_lookup.index_terms
         end)
   end
 
@@ -992,7 +992,7 @@ struct
                 | No ->
                     None
                 | Yes ->
-                    Some Plonk_checks.tick_lookup_constant_term_part
+                    Some Plonk_checks.step_lookup_constant_term_part
                 | Maybe -> (
                     match plonk.lookup with
                     | Maybe ((b : Boolean.var), _) ->
@@ -1000,7 +1000,7 @@ struct
                           (fun env ->
                             Field.(
                               (b :> t)
-                              * Plonk_checks.tick_lookup_constant_term_part env)
+                              * Plonk_checks.step_lookup_constant_term_part env)
                             )
                     | None | Some _ ->
                         assert false ) )

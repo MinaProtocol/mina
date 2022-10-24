@@ -5,7 +5,7 @@ open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%endif]
 

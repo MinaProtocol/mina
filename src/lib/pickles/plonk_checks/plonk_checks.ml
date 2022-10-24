@@ -217,7 +217,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
-let tick_lookup_constant_term_part (type a)
+let step_lookup_constant_term_part (type a)
     ({ add = ( + )
      ; sub = ( - )
      ; mul = ( * )

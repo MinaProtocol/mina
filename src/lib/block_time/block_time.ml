@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Snark_params
-open Tick
+open Step
 open Unsigned_extended
 open Snark_bits
 
@@ -122,12 +122,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     module B = Bits
     module Bits = Bits.UInt64
-    include B.Snarkable.UInt64 (Tick)
+    include B.Snarkable.UInt64 (Step)
     module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
 
     let to_input (t : t) =
       Random_oracle_input.Chunked.packed
-        (Tick.Field.project (Bits.to_bits t), 64)
+        (Step.Field.project (Bits.to_bits t), 64)
 
     module Checked = struct
       type t = N.var
@@ -153,7 +153,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end]
 
       module Bits = B.UInt64
-      include B.Snarkable.UInt64 (Tick)
+      include B.Snarkable.UInt64 (Step)
 
       let of_time_span s = UInt64.of_int64 (Int64.of_float (Time.Span.to_ms s))
 
@@ -205,8 +205,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     [%%endif]
 
-    let field_var_to_unpacked (x : Tick.Field.Var.t) =
-      Tick.Field.Checked.unpack ~length:64 x
+    let field_var_to_unpacked (x : Step.Field.Var.t) =
+      Step.Field.Checked.unpack ~length:64 x
 
     let epoch = of_time Time.epoch
 
@@ -221,8 +221,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let of_span_since_epoch s = UInt64.add s epoch
 
     let diff_checked x y =
-      let pack = Tick.Field.Var.project in
-      Span.unpack_var Tick.Field.Checked.(pack x - pack y)
+      let pack = Step.Field.Var.project in
+      Span.unpack_var Step.Field.Checked.(pack x - pack y)
 
     let modulus t span = UInt64.rem t span
 

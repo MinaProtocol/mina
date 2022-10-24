@@ -1,7 +1,7 @@
 open Core
 open Currency
 open Snark_params
-open Tick
+open Step
 open Signature_lib
 open Mina_base
 
@@ -19,8 +19,8 @@ let%test_module "account timing check" =
       in
       let%map `Min_balance min_balance, timing =
         Transaction_snark.Base.check_timing
-          ~balance_check:Tick.Boolean.Assert.is_true
-          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
+          ~balance_check:Step.Boolean.Assert.is_true
+          ~timed_balance_check:Step.Boolean.Assert.is_true ~account
           ~txn_amount:(Some txn_amount) ~txn_global_slot
       in
       (min_balance, timing)
@@ -59,11 +59,11 @@ let%test_module "account timing check" =
           Balance.Checked.equal checked_min_balance
             (Balance.var_of_t unchecked_min_balance)
         in
-        Snarky_backendless.As_prover.read Tick.Boolean.typ
+        Snarky_backendless.As_prover.read Step.Boolean.typ
           equal_balances_checked
       in
       let equal_balances =
-        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
+        Or_error.ok_exn @@ Step.run_and_check equal_balances_computation
       in
       equal_balances
 
@@ -75,7 +75,7 @@ let%test_module "account timing check" =
         in
         As_prover.read Account.Timing.typ checked_timing
       in
-      Or_error.is_error @@ Tick.run_and_check checked_timing_computation
+      Or_error.is_error @@ Step.run_and_check checked_timing_computation
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
@@ -917,7 +917,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -986,7 +986,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1065,7 +1065,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1272,7 +1272,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1357,7 +1357,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1431,7 +1431,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1506,7 +1506,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1585,7 +1585,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1658,7 +1658,7 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1800,7 +1800,7 @@ let%test_module "account timing check" =
                  in
                  { Account_update.Update.dummy with timing } )
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None
@@ -1881,7 +1881,7 @@ let%test_module "account timing check" =
                  in
                  { Account_update.Update.dummy with timing } )
             ; current_auth = Permissions.Auth_required.Signature
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None

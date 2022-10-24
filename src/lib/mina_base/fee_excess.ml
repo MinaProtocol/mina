@@ -43,7 +43,7 @@ open Currency
 [%%ifdef consensus_mechanism]
 
 open Snark_params
-open Tick
+open Step
 
 [%%endif]
 
@@ -247,7 +247,7 @@ let eliminate_fee_excess (fee_token_l, fee_excess_l) (fee_token_m, fee_excess_m)
 *)
 let%snarkydef_ eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     (fee_token_m, fee_excess_m) (fee_token_r, fee_excess_r) =
-  let open Tick in
+  let open Step in
   let open Checked.Let_syntax in
   let combine (fee_token, fee_excess) fee_excess_m =
     let%bind fee_token_equal =

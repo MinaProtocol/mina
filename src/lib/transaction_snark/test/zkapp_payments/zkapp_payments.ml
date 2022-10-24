@@ -2,7 +2,7 @@ open Core
 open Mina_ledger
 open Currency
 open Snark_params
-open Tick
+open Step
 module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 open Mina_base
@@ -197,7 +197,7 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; events = []
                     ; sequence_events = []
                     ; preconditions = None
@@ -263,7 +263,7 @@ let%test_module "Zkapp payments tests" =
                     ; memo
                     ; new_zkapp_account = false
                     ; snapp_update = Account_update.Update.dummy
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; events = []
                     ; sequence_events = []
                     ; preconditions = None

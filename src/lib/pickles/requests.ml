@@ -24,7 +24,7 @@ module Wrap = struct
           Vector.t
           t
       | Which_branch : int t
-      | Step_accs : (Tock.Inner_curve.Affine.t, max_proofs_verified) Vector.t t
+      | Step_accs : (Wrap.Inner_curve.Affine.t, max_proofs_verified) Vector.t t
       | Old_bulletproof_challenges :
           max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
       | Proof_state :
@@ -36,7 +36,7 @@ module Wrap = struct
                 Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                 option
               , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-                , Tock.Rounds.n )
+                , Wrap.Rounds.n )
                 Vector.t
               , Digest.Constant.t
               , bool )
@@ -46,10 +46,10 @@ module Wrap = struct
           , Digest.Constant.t )
           Types.Step.Proof_state.t
           t
-      | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
+      | Messages : Wrap.Inner_curve.Affine.t Plonk_types.Messages.t t
       | Openings_proof :
-          ( Tock.Inner_curve.Affine.t
-          , Tick.Field.t )
+          ( Wrap.Inner_curve.Affine.t
+          , Step.Field.t )
           Plonk_types.Openings.Bulletproof.t
           t
       | Wrap_domain_indices : (Field.Constant.t, max_proofs_verified) Vector.t t
@@ -73,23 +73,23 @@ module Wrap = struct
 
       type _ t +=
         | Evals :
-            (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t vec t
+            (Wrap.Field.t, Wrap.Field.t array) Plonk_types.All_evals.t vec t
         | Which_branch : int t
-        | Step_accs : Tock.Inner_curve.Affine.t vec t
+        | Step_accs : Wrap.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
             max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Tock.Field.t Shifted_value.Type2.t
+                , Wrap.Field.t Shifted_value.Type2.t
                 , ( Challenge.Constant.t Scalar_challenge.t
-                  , Tock.Field.t Shifted_value.Type2.t )
+                  , Wrap.Field.t Shifted_value.Type2.t )
                   Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
                   .t
                   option
                 , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
-                  , Tock.Rounds.n )
+                  , Wrap.Rounds.n )
                   Vector.t
                 , Digest.Constant.t
                 , bool )
@@ -99,13 +99,13 @@ module Wrap = struct
             , Digest.Constant.t )
             Types.Step.Proof_state.t
             t
-        | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
+        | Messages : Wrap.Inner_curve.Affine.t Plonk_types.Messages.t t
         | Openings_proof :
-            ( Tock.Inner_curve.Affine.t
-            , Tick.Field.t )
+            ( Wrap.Inner_curve.Affine.t
+            , Step.Field.t )
             Plonk_types.Openings.Bulletproof.t
             t
-        | Wrap_domain_indices : (Tock.Field.t, max_proofs_verified) Vector.t t
+        | Wrap_domain_indices : (Wrap.Field.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end
@@ -139,7 +139,7 @@ module Step = struct
           , local_branches )
           H3.T(Per_proof_witness.Constant.No_app_state).t
           t
-      | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
+      | Wrap_index : Wrap.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
       | Return_value : return_value -> unit t
       | Auxiliary_value : auxiliary_value -> unit t
@@ -188,7 +188,7 @@ module Step = struct
             , local_branches )
             H3.T(Per_proof_witness.Constant.No_app_state).t
             t
-        | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
+        | Wrap_index : Wrap.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
         | Return_value : return_value -> unit t
         | Auxiliary_value : auxiliary_value -> unit t

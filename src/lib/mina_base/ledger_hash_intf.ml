@@ -1,6 +1,6 @@
 open Snark_params
 open Snarky_backendless
-open Tick
+open Step
 
 module type S = sig
   include Ledger_hash_intf0.S

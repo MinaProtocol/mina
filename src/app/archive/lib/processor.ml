@@ -234,12 +234,12 @@ module Zkapp_state_data = struct
   let table_name = "zkapp_state_data"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fp : Pickles.Backend.Tick.Field.t) =
+      (fp : Pickles.Backend.Step.Field.t) =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "field" ], Caqti_type.string)
       (module Conn)
-      (Pickles.Backend.Tick.Field.to_string fp)
+      (Pickles.Backend.Step.Field.to_string fp)
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -252,7 +252,7 @@ module Zkapp_state_data_array = struct
   let table_name = "zkapp_state_data_array"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fps : Pickles.Backend.Tick.Field.t array) =
+      (fps : Pickles.Backend.Step.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
@@ -302,7 +302,7 @@ module Zkapp_states_nullable = struct
   let table_name = "zkapp_states_nullable"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fps : (Pickles.Backend.Tick.Field.t option, 'n) Vector.vec) =
+      (fps : (Pickles.Backend.Step.Field.t option, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int option list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
@@ -365,7 +365,7 @@ module Zkapp_states = struct
   let table_name = "zkapp_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
+      (fps : (Pickles.Backend.Step.Field.t, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
@@ -423,7 +423,7 @@ module Zkapp_sequence_states = struct
   let table_name = "zkapp_sequence_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
+      (fps : (Pickles.Backend.Step.Field.t, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
@@ -461,12 +461,12 @@ module Zkapp_verification_keys = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (vk :
         ( Pickles.Side_loaded.Verification_key.t
-        , Pickles.Backend.Tick.Field.t )
+        , Pickles.Backend.Step.Field.t )
         With_hash.t ) =
     let verification_key =
       Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
-    let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
+    let hash = Pickles.Backend.Step.Field.to_string vk.hash in
     let value = { hash; verification_key } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)

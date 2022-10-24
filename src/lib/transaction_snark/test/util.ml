@@ -2,7 +2,7 @@ open Core
 open Currency
 open Mina_base
 open Signature_lib
-module Tick = Snark_params.Tick
+module Step = Snark_params.Step
 module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
@@ -238,7 +238,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure
               failwith "zkapp_command expected" ) )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
-  let open Tick in
+  let open Step in
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
@@ -445,7 +445,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           let state =
             (* NB: The [previous_state_hash] is a dummy, do not use. *)
             Mina_state.Protocol_state.create
-              ~previous_state_hash:Snark_params.Tick0.Field.zero
+              ~previous_state_hash:Snark_params.Step0.Field.zero
               ~body:genesis_state_body
           in
           let consensus_state_at_slot =

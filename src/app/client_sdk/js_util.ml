@@ -1,7 +1,7 @@
 (* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
-open Snark_params.Tick
+open Snark_params.Step
 open Mina_base
 module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo

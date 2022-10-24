@@ -24,7 +24,7 @@ end
 module type Time_average_spec_intf = sig
   include Metric_spec_intf
 
-  val tick_interval : Core.Time.Span.t
+  val step_interval : Core.Time.Span.t
 
   val rolling_interval : Core.Time.Span.t
 end
@@ -62,7 +62,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
         buckets := Some ((value +. datum, num_entries + 1) :: t)
 
   let () =
-    let rec tick () =
+    let rec step () =
       upon
         (after (Time_ns.Span.of_ns @@ Time.Span.to_ns bucket_interval))
         (fun () ->
@@ -71,9 +71,9 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
           Gauge.set v (render_average buckets_val) ;
           buckets :=
             Some (empty_bucket_entry :: List.take buckets_val (num_buckets - 1)) ;
-          tick () )
+          step () )
     in
-    tick ()
+    step ()
 end
 
 module Moving_time_average (Spec : Time_average_spec_intf) () :
@@ -84,21 +84,21 @@ module Moving_time_average (Spec : Time_average_spec_intf) () :
     let open Time.Span in
     let ( = ) = Float.equal in
     let ( mod ) = Float.mod_float in
-    if not (to_ns rolling_interval mod to_ns tick_interval = 0.0) then
+    if not (to_ns rolling_interval mod to_ns step_interval = 0.0) then
       failwith
         "invalid intervals provided to Moving_time_average -- the \
-         tick_interval does not evenly divide the rolling_interval"
+         step_interval does not evenly divide the rolling_interval"
 
   include
     Moving_bucketed_average
       (struct
         include Spec
 
-        let bucket_interval = tick_interval
+        let bucket_interval = step_interval
 
         let num_buckets =
           Float.to_int
-            (Time.Span.to_ns rolling_interval /. Time.Span.to_ns tick_interval)
+            (Time.Span.to_ns rolling_interval /. Time.Span.to_ns step_interval)
 
         let render_average buckets =
           let total_sum, count_sum =

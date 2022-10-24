@@ -1,19 +1,18 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Backend
 
 module Max_degree = struct
-  let step_log2 = Nat.to_int Backend.Tick.Rounds.n
+  let step_log2 = Nat.to_int Backend.Step.Rounds.n
 
   let step = 1 lsl step_log2
 
-  let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
+  let wrap_log2 = Nat.to_int Backend.Wrap.Rounds.n
 
   let wrap = 1 lsl wrap_log2
 end
 
-let tick_shifts, tock_shifts =
+let step_shifts, wrap_shifts =
   let mk g =
     let f =
       Memo.general ~cache_size_bound:20 ~hashable:Int.hashable (fun log2_size ->
@@ -34,9 +33,9 @@ let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
-  Tick_field_sponge.digest Tick_field_sponge.params
+  Step_field_sponge.digest Step_field_sponge.params
     (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
-       ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
+       ~comm:(fun (x : Wrap.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
 let dlog_pcs_batch (type proofs_verified total)
@@ -75,21 +74,21 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tock.Field)
+  let wrap1 : Backend.Wrap.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Backend.Wrap.Field)
 
-  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tock.Field)
+  let wrap2 : Backend.Wrap.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Backend.Wrap.Field)
 
-  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tick.Field)
+  let step1 : Backend.Step.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Backend.Step.Field)
 
-  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tick.Field)
+  let step2 : Backend.Step.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Backend.Step.Field)
 end
 
 module Lookup_parameters = struct
-  let tick_zero : _ Composition_types.Zero_values.t =
+  let step_zero : _ Composition_types.Zero_values.t =
     { value =
         { challenge = Challenge.Constant.zero
         ; scalar =
@@ -103,7 +102,7 @@ module Lookup_parameters = struct
         }
     }
 
-  let tock_zero : _ Composition_types.Zero_values.t =
+  let wrap_zero : _ Composition_types.Zero_values.t =
     { value =
         { challenge = Challenge.Constant.zero
         ; scalar =
@@ -115,8 +114,8 @@ module Lookup_parameters = struct
         }
     }
 
-  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
-    { use = No; zero = tick_zero }
+  let step ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
+    { use = No; zero = step_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
@@ -133,8 +132,6 @@ let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
       Infinity
 
 module Ipa = struct
-  open Backend
-
   (* TODO: Make all this completely generic over backend *)
 
   let compute_challenge (type f) ~endo_to_field
@@ -147,7 +144,8 @@ module Ipa = struct
 
   module Wrap = struct
     let field =
-      (module Tock.Field : Kimchi_backend.Field.S with type t = Tock.Field.t)
+      (module Backend.Wrap.Field : Kimchi_backend.Field.S
+        with type t = Backend.Wrap.Field.t )
 
     let endo_to_field = Endo.Step_inner_curve.to_field
 
@@ -158,7 +156,7 @@ module Ipa = struct
     let compute_sg chals =
       let comm =
         Kimchi_bindings.Protocol.SRS.Fq.b_poly_commitment
-          (Backend.Tock.Keypair.load_urs ())
+          (Backend.Wrap.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
       comm.unshifted.(0) |> finite_exn
@@ -166,7 +164,8 @@ module Ipa = struct
 
   module Step = struct
     let field =
-      (module Tick.Field : Kimchi_backend.Field.S with type t = Tick.Field.t)
+      (module Backend.Step.Field : Kimchi_backend.Field.S
+        with type t = Backend.Step.Field.t )
 
     let endo_to_field = Endo.Wrap_inner_curve.to_field
 
@@ -177,7 +176,7 @@ module Ipa = struct
     let compute_sg chals =
       let comm =
         Kimchi_bindings.Protocol.SRS.Fp.b_poly_commitment
-          (Backend.Tick.Keypair.load_urs ())
+          (Backend.Step.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
       comm.unshifted.(0) |> finite_exn
@@ -191,7 +190,7 @@ module Ipa = struct
         Array.of_list_map comm_chals ~f:(fun (comm, _) ->
             Or_infinity.Finite comm )
       in
-      let urs = Backend.Tick.Keypair.load_urs () in
+      let urs = Backend.Step.Keypair.load_urs () in
       Promise.run_in_thread (fun () ->
           Kimchi_bindings.Protocol.SRS.Fp.batch_accumulator_check urs
             (Array.map comms ~f:or_infinite_conv)
@@ -199,29 +198,29 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement prev_statement =
+let wrap_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
-    (Backend.Tock.Field.Vector.length input)
-    ~f:(Backend.Tock.Field.Vector.get input)
+    (Backend.Wrap.Field.Vector.length input)
+    ~f:(Backend.Wrap.Field.Vector.get input)
 
-let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
+let wrap_public_input_of_statement s = wrap_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
+let step_public_input_of_statement ~max_proofs_verified ~uses_lookup
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n ~uses_lookup
+        ~wrap_rounds:Wrap.Rounds.n ~uses_lookup
     in
     Impls.Step.generate_public_input input prev_statement
   in
   List.init
-    (Backend.Tick.Field.Vector.length input)
-    ~f:(Backend.Tick.Field.Vector.get input)
+    (Backend.Step.Field.Vector.length input)
+    ~f:(Backend.Step.Field.Vector.get input)
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
 

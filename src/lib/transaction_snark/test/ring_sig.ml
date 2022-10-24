@@ -4,13 +4,13 @@ open Currency
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module Inner_curve = Snark_params.Tick.Inner_curve
+module Inner_curve = Snark_params.Step.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
-open Snark_params.Tick
-open Snark_params.Tick.Let_syntax
+open Snark_params.Step
+open Snark_params.Step.Let_syntax
 
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =

@@ -1,4 +1,4 @@
-open Snark_params.Tick
+open Snark_params.Step
 
 type 'a t
 

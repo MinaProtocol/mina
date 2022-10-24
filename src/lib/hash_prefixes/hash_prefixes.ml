@@ -74,7 +74,7 @@ let coinbase = create "Coinbase"
 
 let checkpoint_list = create "MinaCheckpoints"
 
-let bowe_gabizon_hash = create "MinaTockBGHash"
+let bowe_gabizon_hash = create "MinaWrapBGHash"
 
 let zkapp_precondition = create "MinaZkappPred"
 

@@ -3,7 +3,7 @@ open Core_kernel
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module Inner_curve = Snark_params.Tick.Inner_curve
+module Inner_curve = Snark_params.Step.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment

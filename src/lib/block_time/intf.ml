@@ -61,15 +61,15 @@ module type S = sig
     module Bits : Bits_intf.Convertible_bits with type t := t
 
     include
-      Tick.Snarkable.Bits.Faithful
+      Step.Snarkable.Bits.Faithful
         with type Unpacked.value = t
          and type Packed.value = t
-         and type Packed.var = private Tick.Field.Var.t
+         and type Packed.var = private Step.Field.Var.t
 
-    val to_input : t -> Tick.Field.t Random_oracle_input.Chunked.t
+    val to_input : t -> Step.Field.t Random_oracle_input.Chunked.t
 
     module Checked : sig
-      open Snark_params.Tick
+      open Snark_params.Step
 
       type t
 
@@ -111,7 +111,7 @@ module type S = sig
       module Bits : Bits_intf.Convertible_bits with type t := t
 
       include
-        Tick.Snarkable.Bits.Faithful
+        Step.Snarkable.Bits.Faithful
           with type Unpacked.value = t
            and type Packed.value = t
 
@@ -145,16 +145,16 @@ module type S = sig
 
       val zero : t
 
-      val to_input : t -> Tick.Field.t Random_oracle_input.Chunked.t
+      val to_input : t -> Step.Field.t Random_oracle_input.Chunked.t
 
       module Checked : sig
         type t
 
-        val typ : (t, Stable.V1.t) Snark_params.Tick.Typ.t
+        val typ : (t, Stable.V1.t) Snark_params.Step.Typ.t
 
-        open Snark_params.Tick
+        open Snark_params.Step
 
-        val to_input : t -> Tick.Field.Var.t Random_oracle_input.Chunked.t
+        val to_input : t -> Step.Field.Var.t Random_oracle_input.Chunked.t
 
         val to_field : t -> Field.Var.t
 
@@ -164,12 +164,12 @@ module type S = sig
       end
     end
 
-    val field_var_to_unpacked : Tick.Field.Var.t -> Unpacked.var Tick.Checked.t
+    val field_var_to_unpacked : Step.Field.Var.t -> Unpacked.var Step.Checked.t
 
     val diff_checked :
-      Unpacked.var -> Unpacked.var -> Span.Unpacked.var Tick.Checked.t
+      Unpacked.var -> Unpacked.var -> Span.Unpacked.var Step.Checked.t
 
-    val unpacked_to_number : Span.Unpacked.var -> Tick.Number.t
+    val unpacked_to_number : Span.Unpacked.var -> Step.Number.t
 
     val add : t -> Span.t -> t
 

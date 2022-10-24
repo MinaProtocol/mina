@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base_import
 open Snark_params
 open Snarky_backendless
-open Tick
+open Step
 open Let_syntax
 
 let merge_var ~height h1 h2 =
@@ -10,7 +10,7 @@ let merge_var ~height h1 h2 =
 
 module Merkle_tree =
   Snarky_backendless.Merkle_tree.Checked
-    (Tick)
+    (Step)
     (struct
       type value = Field.t
 
@@ -19,7 +19,7 @@ module Merkle_tree =
       let typ = Field.typ
 
       let merge ~height h1 h2 =
-        Tick.make_checked (fun () -> merge_var ~height h1 h2)
+        Step.make_checked (fun () -> merge_var ~height h1 h2)
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 

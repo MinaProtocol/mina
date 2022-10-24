@@ -3,7 +3,7 @@
 *)
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 open Mina_base
 open Signature_lib
 

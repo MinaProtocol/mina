@@ -22,13 +22,13 @@ struct
   let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
-    type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
+    type t = Wrap.Field.t array Double.t Plonk_types.Evals.t * Wrap.Field.t
   end
 
   module Plonk_checks = struct
     include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Step)
+    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Wrap)
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -96,15 +96,15 @@ struct
     in
     let lte = branch_data.lte in
     let module X_hat = struct
-      type t = Tock.Field.t Double.t
+      type t = Wrap.Field.t Double.t
     end in
     let module Statement_with_hashes = struct
       type t =
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
-        , Tick.Field.t Shifted_value.Type1.t
+        , Step.Field.t Shifted_value.Type1.t
         , ( Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.Type1.t )
+          , Step.Field.t Shifted_value.Type1.t )
           Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , Digest.Constant.t
@@ -116,7 +116,7 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+      Wrap.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
@@ -126,7 +126,7 @@ struct
         -> (local_max_proofs_verified, local_max_proofs_verified) P.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
-        -> [ `Sg of Tock.Curve.Affine.t ]
+        -> [ `Sg of Wrap.Curve.Affine.t ]
            * Unfinalized.Constant.t
            * Statement_with_hashes.t
            * X_hat.t
@@ -152,19 +152,19 @@ struct
         in
         let to_field =
           SC.to_field_constant
-            (module Tick.Field)
+            (module Step.Field)
             ~endo:Endo.Wrap_inner_curve.scalar
         in
         let alpha = to_field plonk0.alpha in
         let zeta = to_field plonk0.zeta in
         let zetaw =
-          Tick.Field.(
+          Step.Field.(
             zeta * domain_generator ~log2_size:(Domain.log2_size domain))
         in
         let combined_evals =
           Plonk_checks.evals_of_split_evals
-            (module Tick.Field)
-            t.prev_evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta
+            (module Step.Field)
+            t.prev_evals.evals.evals ~rounds:(Nat.to_int Step.Rounds.n) ~zeta
             ~zetaw
           |> Plonk_types.Evals.to_in_circuit
         in
@@ -172,30 +172,30 @@ struct
           { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
             .zeta
           ; alpha
-          ; beta = Challenge.Constant.to_tick_field plonk0.beta
-          ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
+          ; beta = Challenge.Constant.to_step_field plonk0.beta
+          ; gamma = Challenge.Constant.to_step_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
           }
         in
         let env =
           Plonk_checks.scalars_env
-            (module Tick.Field)
+            (module Step.Field)
             ~srs_length_log2:Common.Max_degree.step_log2
-            ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+            ~endo:Endo.Step_inner_curve.base ~mds:Step_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
               |> Kimchi_pasta.Pasta.Fp.of_bigint )
             ~domain:
               (Plonk_checks.domain
-                 (module Tick.Field)
-                 domain ~shifts:Common.tick_shifts
-                 ~domain_generator:Backend.Tick.Field.domain_generator )
+                 (module Step.Field)
+                 domain ~shifts:Common.step_shifts
+                 ~domain_generator:Backend.Step.Field.domain_generator )
             plonk_minimal combined_evals
         in
         time "plonk_checks" (fun () ->
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
-              ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
+              (module Step.Field)
+              ~env ~shift:Shifts.step1 plonk_minimal combined_evals )
       in
       let data = Types_map.lookup_basic tag in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
@@ -258,10 +258,10 @@ struct
             }
         }
       in
-      let module O = Tock.Oracles in
+      let module O = Wrap.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement prev_statement_with_hashes
+          wrap_public_input_of_statement prev_statement_with_hashes
         in
         O.create dlog_vk
           ( Vector.map2
@@ -272,7 +272,7 @@ struct
               (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
               prev_challenges
               ~f:(fun commitment chals ->
-                { Tock.Proof.Challenge_polynomial.commitment
+                { Wrap.Proof.Challenge_polynomial.commitment
                 ; challenges = Vector.to_array chals
                 } )
           |> Wrap_hack.pad_accumulator )
@@ -280,7 +280,7 @@ struct
       in
       let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
-        Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
+        Scalar_challenge.map ~f:Challenge.Constant.of_wrap_field (f o)
       in
       let plonk0 =
         { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
@@ -290,7 +290,7 @@ struct
         ; zeta = scalar_chal O.zeta
         ; joint_combiner =
             Option.map
-              ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
+              ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_wrap_field)
               (O.joint_combiner_chal o)
         }
       in
@@ -299,7 +299,7 @@ struct
       let sponge_digest_before_evaluations = O.digest_before_evaluations o in
       let to_field =
         SC.to_field_constant
-          (module Tock.Field)
+          (module Wrap.Field)
           ~endo:Endo.Step_inner_curve.scalar
       in
       let module As_field = struct
@@ -314,13 +314,13 @@ struct
         let joint_combiner = O.joint_combiner o
       end in
       let w =
-        Tock.Field.domain_generator ~log2_size:dlog_vk.domain.log_size_of_group
+        Wrap.Field.domain_generator ~log2_size:dlog_vk.domain.log_size_of_group
       in
-      let zetaw = Tock.Field.mul As_field.zeta w in
+      let zetaw = Wrap.Field.mul As_field.zeta w in
       let new_bulletproof_challenges, b =
         let prechals =
           Array.map (O.opening_prechallenges o) ~f:(fun x ->
-              Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
+              Scalar_challenge.map ~f:Challenge.Constant.of_wrap_field x )
         in
         let chals =
           Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
@@ -328,7 +328,7 @@ struct
         let challenge_polynomial = unstage (challenge_polynomial chals) in
         let open As_field in
         let b =
-          let open Tock.Field in
+          let open Wrap.Field in
           challenge_polynomial zeta + (r * challenge_polynomial zetaw)
         in
         let prechals =
@@ -336,7 +336,7 @@ struct
             ( Array.map prechals ~f:(fun x ->
                   { Bulletproof_challenge.prechallenge = x } )
             |> Array.to_list )
-            Tock.Rounds.n
+            Wrap.Rounds.n
         in
         (prechals, b)
       in
@@ -370,36 +370,36 @@ struct
             }
         }
       in
-      let tock_domain =
+      let wrap_domain =
         Plonk_checks.domain
-          (module Tock.Field)
+          (module Wrap.Field)
           (Pow_2_roots_of_unity dlog_vk.domain.log_size_of_group)
-          ~shifts:Common.tock_shifts
-          ~domain_generator:Backend.Tock.Field.domain_generator
+          ~shifts:Common.wrap_shifts
+          ~domain_generator:Backend.Wrap.Field.domain_generator
       in
-      let tock_combined_evals =
+      let wrap_combined_evals =
         Plonk_checks.evals_of_split_evals
-          (module Tock.Field)
-          t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
+          (module Wrap.Field)
+          t.proof.openings.evals ~rounds:(Nat.to_int Wrap.Rounds.n)
           ~zeta:As_field.zeta ~zetaw
         |> Plonk_types.Evals.to_in_circuit
       in
-      let tock_plonk_minimal =
+      let wrap_plonk_minimal =
         { plonk0 with
           zeta = As_field.zeta
         ; alpha = As_field.alpha
         ; joint_combiner = As_field.joint_combiner
         }
       in
-      let tock_env =
+      let wrap_env =
         Plonk_checks.scalars_env
-          (module Tock.Field)
-          ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
+          (module Wrap.Field)
+          ~domain:wrap_domain ~srs_length_log2:Common.Max_degree.wrap_log2
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
-          ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
-          tock_plonk_minimal tock_combined_evals
+          ~endo:Endo.Wrap_inner_curve.base ~mds:Wrap_field_sponge.params.mds
+          wrap_plonk_minimal wrap_combined_evals
       in
       let combined_inner_product =
         let e = t.proof.openings.evals in
@@ -413,36 +413,36 @@ struct
         let open As_field in
         let combine ~which_eval ~ft_eval pt =
           let f (x, y) = match which_eval with `Fst -> x | `Snd -> y in
-          let v : Tock.Field.t array list =
+          let v : Wrap.Field.t array list =
             let a = List.map ~f a in
             List.append
               (Vector.to_list (Vector.map b_polys ~f:(fun f -> [| f pt |])))
               ([| f x_hat |] :: [| ft_eval |] :: a)
           in
-          let open Tock.Field in
+          let open Wrap.Field in
           Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
             ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
             v
         in
         let ft_eval0 =
           Plonk_checks.Type2.ft_eval0
-            (module Tock.Field)
-            ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1 ~lookup_constant_term_part:None
+            (module Wrap.Field)
+            ~domain:wrap_domain ~env:wrap_env wrap_plonk_minimal
+            wrap_combined_evals x_hat_1 ~lookup_constant_term_part:None
         in
-        let open Tock.Field in
+        let open Wrap.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
         + (r * combine ~which_eval:`Snd ~ft_eval:t.proof.openings.ft_eval1 zetaw)
       in
-      let chal = Challenge.Constant.of_tock_field in
+      let chal = Challenge.Constant.of_wrap_field in
       let plonk =
         Plonk_checks.Type2.derive_plonk
-          (module Tock.Field)
-          ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
-          tock_combined_evals
+          (module Wrap.Field)
+          ~env:wrap_env ~shift:Shifts.wrap2 wrap_plonk_minimal
+          wrap_combined_evals
       in
       let shifted_value =
-        Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
+        Shifted_value.Type2.of_field (module Wrap.Field) ~shift:Shifts.wrap2
       in
       ( `Sg challenge_polynomial_commitment
       , { Types.Step.Proof_state.Per_proof.deferred_values =
@@ -466,7 +466,7 @@ struct
             }
         ; should_finalize = must_verify
         ; sponge_digest_before_evaluations =
-            Digest.Constant.of_tock_field sponge_digest_before_evaluations
+            Digest.Constant.of_wrap_field sponge_digest_before_evaluations
         }
       , prev_statement_with_hashes
       , x_hat
@@ -497,7 +497,7 @@ struct
                , ns )
                H2.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> (vars, k) Length.t
-            -> (Tock.Curve.Affine.t, k) Vector.t
+            -> (Wrap.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
                * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
@@ -686,7 +686,7 @@ struct
         (let to_fold_in =
            extract_from_proofs
              ( module struct
-               type res = Tick.Curve.Affine.t
+               type res = Step.Curve.Affine.t
 
                let f (T t : _ P.t) =
                  t.statement.proof_state.messages_for_next_wrap_proof
@@ -698,15 +698,15 @@ struct
            map2 to_fold_in
              (Lazy.force messages_for_next_step_proof_prepared)
                .old_bulletproof_challenges ~f:(fun commitment chals ->
-               { Tick.Proof.Challenge_polynomial.commitment
+               { Step.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
+    let%map.Promise (next_proof : Step.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n ~uses_lookup
+          ~wrap_rounds:Wrap.Rounds.n ~uses_lookup
       in
       let { Domains.h } =
         List.nth_exn (Vector.to_list step_domains) branch_data.index
@@ -718,7 +718,7 @@ struct
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
                     next_statement_hashed ->
               let%map.Promise proof =
-                Backend.Tick.Proof.create_async ~primary:public_inputs
+                Backend.Step.Proof.create_async ~primary:public_inputs
                   ~auxiliary:auxiliary_inputs
                   ~message:(Lazy.force prev_challenge_polynomial_commitments)
                   pk

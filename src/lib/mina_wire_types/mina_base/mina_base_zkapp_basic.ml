@@ -16,7 +16,7 @@ end
 
 module F = struct
   module V1 = struct
-    type t = Pickles.Backend.Tick.Field.V1.t
+    type t = Pickles.Backend.Step.Field.V1.t
   end
 end
 
@@ -24,7 +24,7 @@ end
 
 module F = struct
   module V1 = struct
-    type t = Snark_params.Tick.Field.V1.t
+    type t = Snark_params.Step.Field.V1.t
   end
 end
 

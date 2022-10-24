@@ -38,7 +38,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -63,7 +63,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -92,7 +92,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.None
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -121,7 +121,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -149,7 +149,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -178,7 +178,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -207,7 +207,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -236,7 +236,7 @@ module Make (Input : Input_intf) = struct
           ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.None
-          ; call_data = Snark_params.Tick.Field.zero
+          ; call_data = Snark_params.Step.Field.zero
           ; events = []
           ; sequence_events = []
           ; preconditions = None
@@ -267,7 +267,7 @@ module Make (Input : Input_intf) = struct
               ; new_zkapp_account = false
               ; snapp_update
               ; current_auth = Permissions.Auth_required.Signature
-              ; call_data = Snark_params.Tick.Field.zero
+              ; call_data = Snark_params.Step.Field.zero
               ; events = []
               ; sequence_events = []
               ; preconditions = None

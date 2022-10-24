@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 open Signature_lib
-open Snark_params.Tick
+open Snark_params.Step
 open Currency
 module Tag = Transaction_union_tag
 module Payload = Transaction_union_payload

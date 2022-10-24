@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base_import
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%versioned
 module Stable = struct

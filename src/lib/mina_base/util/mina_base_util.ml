@@ -3,7 +3,7 @@
 open Core_kernel
 
 let field_of_bool =
-  Snark_params.Tick.(fun b -> if b then Field.one else Field.zero)
+  Snark_params.Step.(fun b -> if b then Field.one else Field.zero)
 
 let bit_length_to_triple_length n =
   let r = n mod 3 in

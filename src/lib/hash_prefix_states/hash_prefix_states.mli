@@ -1,5 +1,5 @@
 open Snark_params
-open Tick
+open Step
 open Random_oracle
 
 val signature : Field.t State.t

@@ -61,7 +61,7 @@ val check_zkapp_command_with_merges_exn :
 
 (** Verification key of a trivial smart contract *)
 val trivial_zkapp :
-  ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+  ( [> `VK of (Side_loaded_verification_key.t, Step.Field.t) With_hash.t ]
   * [> `Prover of
        ( unit
        , unit
@@ -82,7 +82,7 @@ val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
-  -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+  -> vk:(Side_loaded_verification_key.t, Step.Field.t) With_hash.t
   -> zkapp_prover:
        ( unit
        , unit

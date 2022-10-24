@@ -5,7 +5,7 @@ open Fold_lib
 open Tuple_lib
 open Unsigned
 open Snark_bits
-open Snark_params.Tick
+open Snark_params.Step
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -64,7 +64,7 @@ end
 module type S_checked = sig
   type unchecked
 
-  open Snark_params.Tick
+  open Snark_params.Step
 
   type var
 
@@ -106,7 +106,7 @@ module type S_checked = sig
   val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
   (** warning: this typ does not work correctly with the generic if_ *)
-  val typ : (t, unchecked) Snark_params.Tick.Typ.t
+  val typ : (t, unchecked) Snark_params.Step.Typ.t
 
   val equal : t -> t -> Boolean.var Checked.t
 
@@ -143,7 +143,7 @@ module type S = sig
   module Checked : S_checked with type unchecked := t
 
   (** warning: this typ does not work correctly with the generic if_ *)
-  val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+  val typ : (Checked.t, t) Snark_params.Step.Typ.t
 
   [%%endif]
 end

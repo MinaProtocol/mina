@@ -338,7 +338,7 @@ end
 *)
 
 module type S = sig
-  open Snark_params.Tick
+  open Snark_params.Step
 
   type curve
 
@@ -377,7 +377,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : module type of Snark_params.Tick) (Curve : sig
+    (Impl : module type of Snark_params.Step) (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -502,17 +502,17 @@ module Message = struct
         network_id_testnet
 
   module Legacy = struct
-    open Tick
+    open Step
 
     type t = (Field.t, bool) Random_oracle.Input.Legacy.t [@@deriving sexp]
 
     let make_derive ~network_id t ~private_key ~public_key =
       let input =
-        let x, y = Tick.Inner_curve.to_affine_exn public_key in
+        let x, y = Step.Inner_curve.to_affine_exn public_key in
         Random_oracle.Input.Legacy.append t
           { field_elements = [| x; y |]
           ; bitstrings =
-              [| Tock.Field.unpack private_key
+              [| Wrap.Field.unpack private_key
                ; Fold_lib.Fold.(
                    to_list (string_bits (String.of_char network_id)))
               |]
@@ -521,8 +521,8 @@ module Message = struct
       Random_oracle.Input.Legacy.to_bits ~unpack:Field.unpack input
       |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
       |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
-      |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
-      |> Tock.Field.project
+      |> Fn.flip List.take (Int.min 256 (Wrap.Field.size_in_bits - 1))
+      |> Wrap.Field.project
 
     let derive = make_derive ~network_id
 
@@ -569,28 +569,28 @@ module Message = struct
   end
 
   module Chunked = struct
-    open Tick
+    open Step
 
     type t = Field.t Random_oracle.Input.Chunked.t [@@deriving sexp]
 
     let make_derive ~network_id t ~private_key ~public_key =
       let input =
-        let x, y = Tick.Inner_curve.to_affine_exn public_key in
+        let x, y = Step.Inner_curve.to_affine_exn public_key in
         let id =
           Fold_lib.Fold.(to_list (string_bits (String.of_char network_id)))
         in
         Random_oracle.Input.Chunked.append t
           { field_elements =
-              [| x; y; Field.project (Tock.Field.unpack private_key) |]
+              [| x; y; Field.project (Wrap.Field.unpack private_key) |]
           ; packeds = [| (Field.project id, List.length id) |]
           }
       in
-      Array.map (Random_oracle.pack_input input) ~f:Tick.Field.unpack
+      Array.map (Random_oracle.pack_input input) ~f:Step.Field.unpack
       |> Array.to_list |> List.concat |> Array.of_list |> Blake2.bits_to_string
       |> Blake2.digest_string |> Blake2.to_raw_string |> Blake2.string_to_bits
       |> Array.to_list
-      |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
-      |> Tock.Field.project
+      |> Fn.flip List.take (Int.min 256 (Wrap.Field.size_in_bits - 1))
+      |> Wrap.Field.project
 
     let derive = make_derive ~network_id
 
@@ -637,44 +637,44 @@ module Message = struct
   end
 end
 
-module Legacy = Make (Tick) (Tick.Inner_curve) (Message.Legacy)
-module Chunked = Make (Tick) (Tick.Inner_curve) (Message.Chunked)
+module Legacy = Make (Step) (Step.Inner_curve) (Message.Legacy)
+module Chunked = Make (Step) (Step.Inner_curve) (Message.Chunked)
 
 [%%ifdef consensus_mechanism]
 
 let gen_legacy =
   let open Quickcheck.Let_syntax in
-  let%map pk = Private_key.gen and msg = Tick.Field.gen in
+  let%map pk = Private_key.gen and msg = Step.Field.gen in
   (pk, Random_oracle.Input.Legacy.field_elements [| msg |])
 
 let gen_chunked =
   let open Quickcheck.Let_syntax in
-  let%map pk = Private_key.gen and msg = Tick.Field.gen in
+  let%map pk = Private_key.gen and msg = Step.Field.gen in
   (pk, Random_oracle.Input.Chunked.field_elements [| msg |])
 
 (* Use for reading only. *)
-let legacy_message_typ () : (Message.Legacy.var, Message.Legacy.t) Tick.Typ.t =
+let legacy_message_typ () : (Message.Legacy.var, Message.Legacy.t) Step.Typ.t =
   let to_hlist { Random_oracle.Input.Legacy.field_elements; bitstrings } =
     H_list.[ field_elements; bitstrings ]
   in
   let of_hlist ([ field_elements; bitstrings ] : (unit, _) H_list.t) =
     { Random_oracle.Input.Legacy.field_elements; bitstrings }
   in
-  let open Tick.Typ in
+  let open Step.Typ in
   of_hlistable
-    [ array ~length:0 Tick.Field.typ
-    ; array ~length:0 (list ~length:0 Tick.Boolean.typ)
+    [ array ~length:0 Step.Field.typ
+    ; array ~length:0 (list ~length:0 Step.Boolean.typ)
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 (* Use for reading only. *)
-let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
+let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Step.Typ.t
     =
-  let open Tick.Typ in
+  let open Step.Typ in
   let const_typ =
     Typ
-      { check = (fun _ -> Tick.make_checked_ast @@ Tick.Checked.return ())
+      { check = (fun _ -> Step.make_checked_ast @@ Step.Checked.return ())
       ; var_to_fields = (fun t -> ([||], t))
       ; var_of_fields = (fun (_, t) -> t)
       ; value_to_fields = (fun t -> ([||], t))
@@ -691,8 +691,8 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
     { Random_oracle.Input.Chunked.field_elements; packeds }
   in
   of_hlistable
-    [ array ~length:0 Tick.Field.typ
-    ; array ~length:0 (Tick.Field.typ * const_typ)
+    [ array ~length:0 Step.Field.typ
+    ; array ~length:0 (Step.Field.typ * const_typ)
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -700,17 +700,17 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
 let%test_unit "schnorr checked + unchecked" =
   Quickcheck.test ~trials:5 gen_legacy ~f:(fun (pk, msg) ->
       let s = Legacy.sign pk msg in
-      let pubkey = Tick.Inner_curve.(scale one pk) in
+      let pubkey = Step.Inner_curve.(scale one pk) in
       assert (Legacy.verify s pubkey msg) ;
-      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
-         Tick.Typ.(
-           tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
+      (Step.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+         Step.Typ.(
+           tuple3 Step.Inner_curve.typ (legacy_message_typ ())
              Legacy.Signature.typ)
-         Tick.Boolean.typ
+         Step.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
+           let open Step.Checked in
            let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
+             Step.Inner_curve.Checked.Shifted.create ()
            in
            Legacy.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true) )
@@ -719,17 +719,17 @@ let%test_unit "schnorr checked + unchecked" =
 let%test_unit "schnorr checked + unchecked" =
   Quickcheck.test ~trials:5 gen_chunked ~f:(fun (pk, msg) ->
       let s = Chunked.sign pk msg in
-      let pubkey = Tick.Inner_curve.(scale one pk) in
+      let pubkey = Step.Inner_curve.(scale one pk) in
       assert (Chunked.verify s pubkey msg) ;
-      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
-         Tick.Typ.(
-           tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
+      (Step.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+         Step.Typ.(
+           tuple3 Step.Inner_curve.typ (chunked_message_typ ())
              Chunked.Signature.typ)
-         Tick.Boolean.typ
+         Step.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
+           let open Step.Checked in
            let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
+             Step.Inner_curve.Checked.Shifted.create ()
            in
            Chunked.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true) )

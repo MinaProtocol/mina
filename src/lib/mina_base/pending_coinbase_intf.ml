@@ -13,7 +13,7 @@
 open Core_kernel
 open Snark_params
 open Snarky_backendless
-open Tick
+open Step
 open Signature_lib
 open Currency
 
@@ -64,7 +64,7 @@ module type S = sig
 
     val var_to_hash_packed : var -> Field.Var.t
 
-    val equal_var : var -> var -> Boolean.var Tick.Checked.t
+    val equal_var : var -> var -> Boolean.var Step.Checked.t
 
     val to_bytes : t -> string
 
@@ -124,7 +124,7 @@ module type S = sig
 
     val to_bytes : t -> string
 
-    val equal_var : var -> var -> Boolean.var Tick.Checked.t
+    val equal_var : var -> var -> Boolean.var Step.Checked.t
 
     val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
@@ -148,14 +148,14 @@ module type S = sig
     module Checked : sig
       type t = var
 
-      val push_coinbase : Coinbase_data.var -> t -> t Tick.Checked.t
+      val push_coinbase : Coinbase_data.var -> t -> t Step.Checked.t
 
-      val push_state : State_body_hash.var -> t -> t Tick.Checked.t
+      val push_state : State_body_hash.var -> t -> t Step.Checked.t
 
-      val if_ : Boolean.var -> then_:t -> else_:t -> t Tick.Checked.t
+      val if_ : Boolean.var -> then_:t -> else_:t -> t Step.Checked.t
 
       val check_merge :
-        transition1:t * t -> transition2:t * t -> Boolean.var Tick.Checked.t
+        transition1:t * t -> transition2:t * t -> Boolean.var Step.Checked.t
 
       val empty : t
 
@@ -264,7 +264,7 @@ module type S = sig
       | Find_index_of_oldest_stack : Address.value Request.t
       | Get_previous_stack : State_stack.t Request.t
 
-    val get : depth:int -> var -> Address.var -> Stack.var Tick.Checked.t
+    val get : depth:int -> var -> Address.var -> Stack.var Step.Checked.t
 
     (**
        [update_stack t ~is_new_stack updated_stack] implements the following spec:
@@ -279,7 +279,7 @@ module type S = sig
       -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
-      -> var Tick.Checked.t
+      -> var Step.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
@@ -292,6 +292,6 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> proof_emitted:Boolean.var
-      -> (var * Stack.var) Tick.Checked.t
+      -> (var * Stack.var) Step.Checked.t
   end
 end

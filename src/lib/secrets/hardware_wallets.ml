@@ -13,7 +13,7 @@ let create_hd_account_summary =
 
 let hardware_wallet_script = "codaledgercli"
 
-module type Tick_intf = sig
+module type Step_intf = sig
   type field
 
   module Bigint : sig
@@ -25,7 +25,7 @@ module type Tick_intf = sig
   end
 end
 
-let decode_field (type field) (module Tick : Tick_intf with type field = field)
+let decode_field (type field) (module Step : Step_intf with type field = field)
     : string -> field =
  fun field ->
   Bytes.of_string field
@@ -33,7 +33,7 @@ let decode_field (type field) (module Tick : Tick_intf with type field = field)
   |> Bytes.to_list |> List.rev |> Bytes.of_char_list |> Bytes.to_string
   |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
          Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-  |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
+  |> Step.Bigint.of_bignum_bigint |> Step.Bigint.to_field
 
 type public_key = { status : string; x : string; y : string }
 [@@deriving yojson]
@@ -65,8 +65,8 @@ let decode_public_key : string -> (Public_key.t, string) Result.t =
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun { status; x; y } ->
          decode_status_code status ~f:(fun () ->
-             ( decode_field (module Snark_params.Tick) x
-             , decode_field (module Snark_params.Tick) y ) ) )
+             ( decode_field (module Snark_params.Step) x
+             , decode_field (module Snark_params.Step) y ) ) )
 
 type signature = { status : string; field : string; scalar : string }
 [@@deriving yojson]
@@ -78,8 +78,8 @@ let decode_signature : string -> (Signature.t, string) Result.t =
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun { status; field; scalar } ->
          decode_status_code status ~f:(fun () ->
-             ( decode_field (module Snark_params.Tick) field
-             , decode_field (module Snark_params.Tock) scalar ) ) )
+             ( decode_field (module Snark_params.Step) field
+             , decode_field (module Snark_params.Wrap) scalar ) ) )
 
 let compute_public_key ~hd_index =
   let prog, args =
@@ -102,7 +102,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
   in
   let fields = Random_oracle.Legacy.pack_input input in
   let messages =
-    Array.map fields ~f:(fun field -> Tick.Field.to_string field)
+    Array.map fields ~f:(fun field -> Step.Field.to_string field)
   in
   if Array.length messages <> 2 then
     Deferred.Result.fail "Malformed user command"

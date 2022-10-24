@@ -66,7 +66,7 @@ let genesis ~constraint_constants ~consensus_constants ~genesis_ledger
   }
 
 let typ =
-  let open Snark_params.Tick.Typ in
+  let open Snark_params.Step.Typ in
   of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     [ Blockchain_state.typ

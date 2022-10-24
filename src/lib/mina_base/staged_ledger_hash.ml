@@ -3,7 +3,7 @@
 open Core_kernel
 open Mina_base_util
 open Fold_lib
-open Snark_params.Tick
+open Snark_params.Step
 
 module Aux_hash = struct
   let length_in_bits = 256

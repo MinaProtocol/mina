@@ -64,7 +64,7 @@ let check :
                 if
                   not
                     (Signature_lib.Schnorr.Chunked.verify s
-                       (Backend.Tick.Inner_curve.of_affine pk)
+                       (Backend.Step.Inner_curve.of_affine pk)
                        (Random_oracle_input.Chunked.field msg) )
                 then
                   return

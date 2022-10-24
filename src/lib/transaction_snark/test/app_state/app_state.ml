@@ -12,7 +12,7 @@ struct
     { Account_update.Update.dummy with
       app_state =
         Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-            Zkapp_basic.Set_or_keep.Set (Snark_params.Tick.Field.of_int i) )
+            Zkapp_basic.Set_or_keep.Set (Snark_params.Step.Field.of_int i) )
     }
 end
 

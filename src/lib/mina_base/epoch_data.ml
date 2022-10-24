@@ -39,7 +39,7 @@ type var =
   Poly.t
 
 let if_ cond ~(then_ : var) ~(else_ : var) =
-  let open Snark_params.Tick.Checked.Let_syntax in
+  let open Snark_params.Step.Checked.Let_syntax in
   let%map ledger = Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
   and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed
   and start_checkpoint =

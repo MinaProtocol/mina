@@ -127,7 +127,7 @@ let convert_signature_command =
   in
   fun () ->
   let open Deferred.Let_syntax in
-  let open Snark_params.Tick in
+  let open Snark_params.Step in
   let field = Field.of_string field_str
   and scalar = Inner_curve.Scalar.of_string scalar_str
   in

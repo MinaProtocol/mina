@@ -3,7 +3,7 @@ open Core_kernel
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module Inner_curve = Snark_params.Tick.Inner_curve
+module Inner_curve = Snark_params.Step.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
@@ -94,7 +94,7 @@ let%test_module "Initialize state test" =
     end
 
     module Update_state_account_update = struct
-      let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
+      let new_state = List.init 8 ~f:(fun _ -> Snark_params.Step.Field.one)
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
@@ -194,7 +194,7 @@ let%test_module "Initialize state test" =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
+        ~f:(fun x -> assert (Snark_params.Step.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update" =
@@ -211,7 +211,7 @@ let%test_module "Initialize state test" =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Step.Field.(equal one) x))
         zkapp_state
 
     let%test_unit "Initialize and multiple update" =
@@ -230,7 +230,7 @@ let%test_module "Initialize state test" =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Step.Field.(equal one) x))
         zkapp_state
 
     let%test_unit "Update without initialize fails" =

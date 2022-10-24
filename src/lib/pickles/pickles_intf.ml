@@ -5,7 +5,7 @@ module type S = sig
   open Async_kernel
   open Pickles_types
   open Hlist
-  module Tick_field_sponge = Tick_field_sponge
+  module Step_field_sponge = Step_field_sponge
   module Util = Util
   module Step_main_inputs = Step_main_inputs
   module Backend = Backend

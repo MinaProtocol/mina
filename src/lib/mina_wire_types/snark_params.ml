@@ -1,4 +1,4 @@
-module Tick = struct
+module Step = struct
   module Field = struct
     type t = Pasta_bindings.Fp.t
   end
@@ -12,7 +12,7 @@ module Tick = struct
   end
 end
 
-module Tock = struct
+module Wrap = struct
   module Field = struct
     type t = Pasta_bindings.Fq.t
   end

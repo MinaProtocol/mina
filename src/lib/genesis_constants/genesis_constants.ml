@@ -26,7 +26,7 @@ end
 
 module Fork_constants = struct
   type t =
-    { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
+    { previous_state_hash : Pickles.Backend.Step.Field.Stable.Latest.t
     ; previous_length : Mina_numbers.Length.Stable.Latest.t
     ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
     }
@@ -71,7 +71,7 @@ module Constraint_constants = struct
             Some
               { previous_length = Unsigned.UInt32.to_int previous_length
               ; previous_state_hash =
-                  Pickles.Backend.Tick.Field.to_string previous_state_hash
+                  Pickles.Backend.Step.Field.to_string previous_state_hash
               ; previous_global_slot =
                   Unsigned.UInt32.to_int previous_global_slot
               }

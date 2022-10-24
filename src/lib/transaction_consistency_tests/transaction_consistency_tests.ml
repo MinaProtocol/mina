@@ -142,10 +142,10 @@ let%test_module "transaction logic consistency" =
                              ledgers do not match"
                         ; Atom
                             ( Sparse_ledger.merkle_root target1
-                            |> Snark_params.Tick.Field.to_string )
+                            |> Snark_params.Step.Field.to_string )
                         ; Atom
                             ( Sparse_ledger.merkle_root target2
-                            |> Snark_params.Tick.Field.to_string )
+                            |> Snark_params.Step.Field.to_string )
                         ] ) ) )
         | Ok target, _ | _, Ok target ->
             (target, None)

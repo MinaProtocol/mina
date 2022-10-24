@@ -3,7 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%ifdef consensus_mechanism]
 
@@ -89,8 +89,8 @@ struct
   *)
   module Bs =
     Snark_bits.Bits.Make_field
-      (Snark_params.Tick.Field)
-      (Snark_params.Tick.Bigint)
+      (Snark_params.Step.Field)
+      (Snark_params.Step.Bigint)
 
   include (Bs : module type of Bs with type t := t)
 

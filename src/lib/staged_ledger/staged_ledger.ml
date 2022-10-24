@@ -3249,7 +3249,7 @@ let%test_module "staged ledger tests" =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
       let f_pop_and_add () =
-        let open Snark_params.Tick in
+        let open Snark_params.Step in
         let open Pending_coinbase in
         let proof_emitted =
           if Option.is_some proof then Boolean.true_ else Boolean.false_
@@ -3270,7 +3270,7 @@ let%test_module "staged ledger tests" =
           ~supercharge_coinbase state_body_hash_var
       in
       let checked_root_after_update =
-        let open Snark_params.Tick in
+        let open Snark_params.Step in
         let open Pending_coinbase in
         let comp =
           let%map result =
@@ -3814,7 +3814,7 @@ let%test_module "staged ledger tests" =
             ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
-            ; call_data = Snark_params.Tick.Field.zero
+            ; call_data = Snark_params.Step.Field.zero
             ; events = []
             ; sequence_events = []
             ; preconditions = None

@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-module Field = Snark_params.Tick.Field
+module Field = Snark_params.Step.Field
 
 module Make (Schema : Graphql_intf.Schema) = struct
   module Graphql = Fields_derivers_graphql.Graphql_raw.Make (Schema)

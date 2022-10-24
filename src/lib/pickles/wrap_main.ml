@@ -44,13 +44,13 @@ let pack_statement max_proofs_verified ~lookup t =
     (module Impl)
     (Statement.spec
        (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup )
+       max_proofs_verified Backend.Wrap.Rounds.n lookup )
     (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
-let shifts ~log2_size = Common.tock_shifts ~log2_size
+let shifts ~log2_size = Common.wrap_shifts ~log2_size
 
 let domain_generator ~log2_size =
-  Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
+  Backend.Wrap.Field.domain_generator ~log2_size |> Impl.Field.constant
 
 let split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
   Typ.transport
@@ -90,7 +90,7 @@ let commitment_lookup_config =
   { Plonk_types.Lookup_config.lookup = No; runtime = No }
 
 let lookup_config_for_pack =
-  { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
+  { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.wrap_zero
   ; use = No
   }
 
@@ -202,7 +202,7 @@ let wrap_main
               let typ =
                 typ
                   (module Impl)
-                  Common.Lookup_parameters.tock_zero
+                  Common.Lookup_parameters.wrap_zero
                   ~assert_16_bits:(assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Opt.Flag.No ) )
@@ -230,7 +230,7 @@ let wrap_main
                     (struct
                       let f (type n) (n : n Nat.t) =
                         Vector.typ
-                          (Vector.typ Field.typ Backend.Tock.Rounds.n)
+                          (Vector.typ Field.typ Backend.Wrap.Rounds.n)
                           n
                     end)
                 in
@@ -350,7 +350,7 @@ let wrap_main
           }
         in
         let openings_proof =
-          let shift = Shifts.tick1 in
+          let shift = Shifts.step1 in
           exists
             (Plonk_types.Openings.Bulletproof.typ
                ( Typ.transport Other_field.Packed.typ
@@ -358,14 +358,14 @@ let wrap_main
                      (* When storing, make it a shifted value *)
                      match
                        Shifted_value.Type1.of_field
-                         (module Backend.Tick.Field)
+                         (module Backend.Step.Field)
                          ~shift x
                      with
                      | Shifted_value x ->
                          x )
                    ~back:(fun x ->
                      Shifted_value.Type1.to_field
-                       (module Backend.Tick.Field)
+                       (module Backend.Step.Field)
                        ~shift (Shifted_value x) )
                (* When reading, unshift *)
                |> Typ.transport_var
@@ -373,7 +373,7 @@ let wrap_main
                     ~there:(fun (Shifted_value.Type1.Shifted_value x) -> x)
                     ~back:(fun x -> Shifted_value x) )
                Inner_curve.typ
-               ~length:(Nat.to_int Backend.Tick.Rounds.n) )
+               ~length:(Nat.to_int Backend.Step.Rounds.n) )
             ~request:(fun () -> Req.Openings_proof)
         in
         let ( sponge_digest_before_evaluations_actual

@@ -1351,7 +1351,7 @@ module Transaction_commitment = struct
 
   let empty = Outside_hash_image.t
 
-  let typ = Snark_params.Tick.Field.typ
+  let typ = Snark_params.Step.Field.typ
 
   let create ~(account_updates_hash : Digest.Forest.t) : t =
     (account_updates_hash :> t)

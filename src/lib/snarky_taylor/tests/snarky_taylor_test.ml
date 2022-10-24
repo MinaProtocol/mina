@@ -6,7 +6,7 @@ open Snarky_integer
 open Snarky_taylor
 
 let%test_unit "instantiate" =
-  let module M = Snark_params.Tick.Run in
+  let module M = Snark_params.Step.Run in
   let m : M.field m = (module M) in
   let open M in
   let params =

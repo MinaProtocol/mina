@@ -7,7 +7,7 @@
     soft fork release. *)
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 open Fold_lib
 open Mina_base_util
 

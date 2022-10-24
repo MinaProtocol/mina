@@ -350,7 +350,7 @@ let step_main :
             (Vector.typ'
                (Vector.map
                   ~f:(fun uses_lookup ->
-                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+                    Unfinalized.typ ~wrap_rounds:Backend.Wrap.Rounds.n
                       ~uses_lookup )
                   (Vector.extend lookup_usage lte Max_proofs_verified.n No) ) )
             ~request:(fun () -> Req.Unfinalized_proofs)

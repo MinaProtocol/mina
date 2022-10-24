@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%versioned
 module Stable = struct
@@ -21,7 +21,7 @@ module Stable = struct
     [%%ifdef consensus_mechanism]
 
     let gen =
-      let open Snark_params.Tick.Inner_curve.Scalar in
+      let open Snark_params.Step.Inner_curve.Scalar in
       let upperbound = Bignum_bigint.(pred size |> to_string) |> of_string in
       gen_uniform_incl one upperbound
 

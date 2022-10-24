@@ -36,7 +36,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Backend = Backend
   module Sponge_inputs = Sponge_inputs
   module Util = Util
-  module Tick_field_sponge = Tick_field_sponge
+  module Step_field_sponge = Step_field_sponge
   module Impls = Impls
   module Inductive_rule = Inductive_rule
   module Tag = Tag
@@ -356,10 +356,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
       let log =
         let weight =
-          let sys = Backend.Tick.R1CS_constraint_system.create () in
+          let sys = Backend.Step.R1CS_constraint_system.create () in
           fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
             let prev = sys.next_row in
-            Backend.Tick.R1CS_constraint_system.add_constraint sys
+            Backend.Step.R1CS_constraint_system.add_constraint sys
               ?label:annotation basic ;
             let next = sys.next_row in
             next - prev
@@ -372,10 +372,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let log_wrap main typ name id =
       let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
       let log =
-        let sys = Backend.Tock.R1CS_constraint_system.create () in
+        let sys = Backend.Wrap.R1CS_constraint_system.create () in
         let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
           let prev = sys.next_row in
-          Backend.Tock.R1CS_constraint_system.add_constraint sys
+          Backend.Wrap.R1CS_constraint_system.add_constraint sys
             ?label:annotation basic ;
           let next = sys.next_row in
           next - prev
@@ -588,7 +588,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (struct
               let etyp =
                 Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                  ~wrap_rounds:Tock.Rounds.n ~uses_lookup:Maybe
+                  ~wrap_rounds:Wrap.Rounds.n ~uses_lookup:Maybe
               (* TODO *)
 
               let f (T b : _ Branch_data.t) =
@@ -662,7 +662,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let module V = H4.To_vector (Lazy_keys) in
         lazy
           (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-               Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+               Step.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
       in
       Timer.clock __LOC__ ;
       let wrap_requests, wrap_main =
@@ -923,7 +923,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
 
     let srs_precomputation () : unit =
-      let srs = Tock.Keypair.load_urs () in
+      let srs = Wrap.Keypair.load_urs () in
       List.iter [ 0; 1; 2 ] ~f:(fun i ->
           Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis srs
             (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) )
@@ -1140,9 +1140,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let%test_module "test no side-loaded" =
     ( module struct
-      let () = Tock.Keypair.set_urs_info []
+      let () = Wrap.Keypair.set_urs_info []
 
-      let () = Tick.Keypair.set_urs_info []
+      let () = Step.Keypair.set_urs_info []
 
       (*
     let%test_unit "test deserialization and verification for side-loaded keys" =
@@ -1159,13 +1159,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       let statement =
         let transaction =
-          Backend.Tick.Field.t_of_sexp
+          Backend.Step.Field.t_of_sexp
             (Atom
                "0x2340A5795E22C7C923991D225400D0052B3A995C35BCCDC612E6205287419EC1"
             )
         in
         let at_account_update =
-          Backend.Tick.Field.t_of_sexp
+          Backend.Step.Field.t_of_sexp
             (Atom
                "0x2340A5795E22C7C923991D225400D0052B3A995C35BCCDC612E6205287419EC1"
             )
@@ -1206,7 +1206,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let g =
             exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-                Tick.Inner_curve.(to_affine_exn one) )
+                Step.Inner_curve.(to_affine_exn one) )
           in
           ignore
             ( SC.to_field_checked'
@@ -1840,11 +1840,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Promise.block_on_async_exn (fun () -> step input) )
           in
           let sponge =
-            Tick_field_sponge.Field.create Tick_field_sponge.params
+            Step_field_sponge.Field.create Step_field_sponge.params
           in
-          Tick_field_sponge.Field.absorb sponge input ;
-          Tick_field_sponge.Field.absorb sponge blinding_value ;
-          let result' = Tick_field_sponge.Field.squeeze sponge in
+          Step_field_sponge.Field.absorb sponge input ;
+          Step_field_sponge.Field.absorb sponge blinding_value ;
+          let result' = Step_field_sponge.Field.squeeze sponge in
           assert (Field.Constant.equal result result') ;
           assert (
             Promise.block_on_async_exn (fun () ->
@@ -2045,7 +2045,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let etyp =
               Impls.Step.input ~uses_lookup:No
                 ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
+                ~wrap_rounds:Wrap.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
             let main () () =
@@ -2092,7 +2092,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let module V = H4.To_vector (Lazy_keys) in
             lazy
               (Vector.map [ step_keypair ] ~f:(fun (_, vk) ->
-                   Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+                   Step.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
           in
           let wrap_main _ =
             let module SC' = SC in
@@ -2211,7 +2211,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 in
                 let%map.Promise proof =
-                  let module Pairing_acc = Tock.Inner_curve.Affine in
+                  let module Pairing_acc = Wrap.Inner_curve.Affine in
                   (* The prover for wrapping a proof *)
                   let wrap (type actual_branching)
                       ~(max_proofs_verified : Max_proofs_verified.n Nat.t)
@@ -2233,8 +2233,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           H1.T
                             (P.Base.Messages_for_next_proof_over_same_field.Wrap)
                           .t
-                        , ( ( Tock.Field.t
-                            , Tock.Field.t array )
+                        , ( ( Wrap.Field.t
+                            , Wrap.Field.t array )
                             Plonk_types.All_evals.t
                           , Max_proofs_verified.n )
                           Vector.t )
@@ -2299,9 +2299,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             (M.f prev_messages_for_next_wrap_proof) )
                       }
                     in
-                    let module O = Tick.Oracles in
+                    let module O = Step.Oracles in
                     let public_input =
-                      tick_public_input_of_statement ~max_proofs_verified
+                      step_public_input_of_statement ~max_proofs_verified
                         ~uses_lookup:No prev_statement_with_hashes
                     in
                     let prev_challenges =
@@ -2322,7 +2322,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           H1.Map
                             (P.Base.Messages_for_next_proof_over_same_field.Wrap
                              .Prepared)
-                            (E01 (Tick.Curve.Affine))
+                            (E01 (Step.Curve.Affine))
                             (struct
                               let f :
                                   type n.
@@ -2336,7 +2336,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                fun t -> t.challenge_polynomial_commitment
                             end)
                         in
-                        let module V = H1.To_vector (Tick.Curve.Affine) in
+                        let module V = H1.To_vector (Step.Curve.Affine) in
                         V.f Max_local_max_proofs_verifieds.length
                           (M.f prev_messages_for_next_wrap_proof)
                       in
@@ -2344,7 +2344,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Vector.(
                           map2 (Vector.trim sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
-                              { Tick.Proof.Challenge_polynomial.commitment
+                              { Step.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
                               } )
                           |> to_list)
@@ -2354,7 +2354,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let step_vk, _ = Lazy.force step_vk in
                     let next_statement : _ Types.Wrap.Statement.In_circuit.t =
                       let scalar_chal f =
-                        Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
+                        Scalar_challenge.map ~f:Challenge.Constant.of_step_field
                           (f o)
                       in
                       let sponge_digest_before_evaluations =
@@ -2370,14 +2370,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             Option.map (O.joint_combiner_chal o)
                               ~f:
                                 (Scalar_challenge.map
-                                   ~f:Challenge.Constant.of_tick_field )
+                                   ~f:Challenge.Constant.of_step_field )
                         }
                       in
                       let r = scalar_chal O.u in
                       let xi = scalar_chal O.v in
                       let to_field =
                         SC.to_field_constant
-                          (module Tick.Field)
+                          (module Step.Field)
                           ~endo:Endo.Wrap_inner_curve.scalar
                       in
                       let module As_field = struct
@@ -2398,44 +2398,44 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       let w = step_vk.domain.group_gen in
                       (* Debug *)
-                      [%test_eq: Tick.Field.t] w
-                        (Tick.Field.domain_generator
+                      [%test_eq: Step.Field.t] w
+                        (Step.Field.domain_generator
                            ~log2_size:(Domain.log2_size domain) ) ;
-                      let zetaw = Tick.Field.mul As_field.zeta w in
-                      let tick_plonk_minimal =
+                      let zetaw = Step.Field.mul As_field.zeta w in
+                      let step_plonk_minimal =
                         { plonk0 with
                           zeta = As_field.zeta
                         ; alpha = As_field.alpha
                         ; joint_combiner = As_field.joint_combiner
                         }
                       in
-                      let tick_combined_evals =
+                      let step_combined_evals =
                         Plonk_checks.evals_of_split_evals
-                          (module Tick.Field)
+                          (module Step.Field)
                           proof.openings.evals
-                          ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
+                          ~rounds:(Nat.to_int Step.Rounds.n) ~zeta:As_field.zeta
                           ~zetaw
                       in
-                      let tick_domain =
+                      let step_domain =
                         Plonk_checks.domain
-                          (module Tick.Field)
-                          domain ~shifts:Common.tick_shifts
-                          ~domain_generator:Backend.Tick.Field.domain_generator
+                          (module Step.Field)
+                          domain ~shifts:Common.step_shifts
+                          ~domain_generator:Backend.Step.Field.domain_generator
                       in
-                      let tick_combined_evals =
-                        Plonk_types.Evals.to_in_circuit tick_combined_evals
+                      let step_combined_evals =
+                        Plonk_types.Evals.to_in_circuit step_combined_evals
                       in
-                      let tick_env =
+                      let step_env =
                         Plonk_checks.scalars_env
-                          (module Tick.Field)
+                          (module Step.Field)
                           ~endo:Endo.Step_inner_curve.base
-                          ~mds:Tick_field_sponge.params.mds
+                          ~mds:Step_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
                           ~field_of_hex:(fun s ->
                             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
                             |> Kimchi_pasta.Pasta.Fp.of_bigint )
-                          ~domain:tick_domain tick_plonk_minimal
-                          tick_combined_evals
+                          ~domain:step_domain step_plonk_minimal
+                          step_combined_evals
                       in
                       let combined_inner_product =
                         let open As_field in
@@ -2446,17 +2446,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           { evals = proof.openings.evals; public_input = x_hat }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
-                          ~env:tick_env ~domain:tick_domain
+                          ~env:step_env ~domain:step_domain
                           ~ft_eval1:proof.openings.ft_eval1
-                          ~plonk:tick_plonk_minimal
+                          ~plonk:step_plonk_minimal
                       in
-                      let chal = Challenge.Constant.of_tick_field in
+                      let chal = Challenge.Constant.of_step_field in
                       let sg_new, new_bulletproof_challenges, b =
                         let prechals =
                           Array.map (O.opening_prechallenges o) ~f:(fun x ->
                               let x =
                                 Scalar_challenge.map
-                                  ~f:Challenge.Constant.of_tick_field x
+                                  ~f:Challenge.Constant.of_step_field x
                               in
                               x )
                         in
@@ -2469,7 +2469,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let open As_field in
                         let b =
-                          let open Tick.Field in
+                          let open Step.Field in
                           challenge_polynomial zeta
                           + (r * challenge_polynomial zetaw)
                         in
@@ -2477,7 +2477,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           Array.map prechals
                             ~f:
                               (Scalar_challenge.map ~f:(fun _ ->
-                                   Challenge.Constant.of_tick_field
+                                   Challenge.Constant.of_step_field
                                      (Impls.Step.Field.Constant.of_int 100) ) )
                         in
                         let chals =
@@ -2485,7 +2485,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Ipa.Step.compute_challenge x )
                         in
                         let sg_new =
-                          let urs = Backend.Tick.Keypair.load_urs () in
+                          let urs = Backend.Step.Keypair.load_urs () in
                           Kimchi_bindings.Protocol.SRS.Fp
                           .batch_accumulator_generate urs 1 chals
                         in
@@ -2504,14 +2504,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       let plonk =
                         Wrap.Plonk_checks.Type1.derive_plonk
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-                          tick_combined_evals
+                          (module Step.Field)
+                          ~shift:Shifts.step1 ~env:step_env step_plonk_minimal
+                          step_combined_evals
                       in
                       let shift_value =
                         Shifted_value.Type1.of_field
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1
+                          (module Step.Field)
+                          ~shift:Shifts.step1
                       in
                       let branch_data : Composition_types.Branch_data.t =
                         { proofs_verified =
@@ -2547,7 +2547,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               ; b = shift_value b
                               ; bulletproof_challenges =
                                   Vector.of_array_and_length_exn
-                                    new_bulletproof_challenges Tick.Rounds.n
+                                    new_bulletproof_challenges Step.Rounds.n
                               ; combined_inner_product =
                                   shift_value combined_inner_product
                               ; branch_data
@@ -2561,7 +2561,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   }
                               }
                           ; sponge_digest_before_evaluations =
-                              Digest.Constant.of_tick_field
+                              Digest.Constant.of_step_field
                                 sponge_digest_before_evaluations
                           ; messages_for_next_wrap_proof
                           }
@@ -2582,7 +2582,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
                                     ; public_inputs
                                     } () ->
-                              Backend.Tock.Proof.create_async
+                              Backend.Wrap.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
@@ -2596,7 +2596,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                       messages_for_next_wrap_proof_prepared
                                         .old_bulletproof_challenges
                                       ~f:(fun sg chals ->
-                                        { Tock.Proof.Challenge_polynomial
+                                        { Wrap.Proof.Challenge_polynomial
                                           .commitment = sg
                                         ; challenges = Vector.to_array chals
                                         } )
@@ -2970,7 +2970,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let etyp =
               Impls.Step.input ~uses_lookup:No
                 ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
+                ~wrap_rounds:Wrap.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
             let main () () =
@@ -3017,7 +3017,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let module V = H4.To_vector (Lazy_keys) in
             lazy
               (Vector.map [ step_keypair ] ~f:(fun (_, vk) ->
-                   Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+                   Step.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
           in
           let wrap_main _ =
             let module SC' = SC in
@@ -3136,7 +3136,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 in
                 let%map.Promise proof =
-                  let module Pairing_acc = Tock.Inner_curve.Affine in
+                  let module Pairing_acc = Wrap.Inner_curve.Affine in
                   (* The prover for wrapping a proof *)
                   let wrap (type actual_branching)
                       ~(max_proofs_verified : Max_proofs_verified.n Nat.t)
@@ -3158,8 +3158,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           H1.T
                             (P.Base.Messages_for_next_proof_over_same_field.Wrap)
                           .t
-                        , ( ( Tock.Field.t
-                            , Tock.Field.t array )
+                        , ( ( Wrap.Field.t
+                            , Wrap.Field.t array )
                             Plonk_types.All_evals.t
                           , Max_proofs_verified.n )
                           Vector.t )
@@ -3224,9 +3224,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             (M.f prev_messages_for_next_wrap_proof) )
                       }
                     in
-                    let module O = Tick.Oracles in
+                    let module O = Step.Oracles in
                     let public_input =
-                      tick_public_input_of_statement ~uses_lookup:No
+                      step_public_input_of_statement ~uses_lookup:No
                         ~max_proofs_verified prev_statement_with_hashes
                     in
                     let prev_challenges =
@@ -3247,7 +3247,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           H1.Map
                             (P.Base.Messages_for_next_proof_over_same_field.Wrap
                              .Prepared)
-                            (E01 (Tick.Curve.Affine))
+                            (E01 (Step.Curve.Affine))
                             (struct
                               let f :
                                   type n.
@@ -3261,7 +3261,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                fun t -> t.challenge_polynomial_commitment
                             end)
                         in
-                        let module V = H1.To_vector (Tick.Curve.Affine) in
+                        let module V = H1.To_vector (Step.Curve.Affine) in
                         V.f Max_local_max_proofs_verifieds.length
                           (M.f prev_messages_for_next_wrap_proof)
                       in
@@ -3269,7 +3269,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Vector.(
                           map2 (Vector.trim sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
-                              { Tick.Proof.Challenge_polynomial.commitment
+                              { Step.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
                               } )
                           |> to_list)
@@ -3279,7 +3279,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let step_vk, _ = Lazy.force step_vk in
                     let next_statement : _ Types.Wrap.Statement.In_circuit.t =
                       let scalar_chal f =
-                        Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
+                        Scalar_challenge.map ~f:Challenge.Constant.of_step_field
                           (f o)
                       in
                       let sponge_digest_before_evaluations =
@@ -3295,14 +3295,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             Option.map (O.joint_combiner_chal o)
                               ~f:
                                 (Scalar_challenge.map
-                                   ~f:Challenge.Constant.of_tick_field )
+                                   ~f:Challenge.Constant.of_step_field )
                         }
                       in
                       let r = scalar_chal O.u in
                       let xi = scalar_chal O.v in
                       let to_field =
                         SC.to_field_constant
-                          (module Tick.Field)
+                          (module Step.Field)
                           ~endo:Endo.Wrap_inner_curve.scalar
                       in
                       let module As_field = struct
@@ -3323,44 +3323,44 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       let w = step_vk.domain.group_gen in
                       (* Debug *)
-                      [%test_eq: Tick.Field.t] w
-                        (Tick.Field.domain_generator
+                      [%test_eq: Step.Field.t] w
+                        (Step.Field.domain_generator
                            ~log2_size:(Domain.log2_size domain) ) ;
-                      let zetaw = Tick.Field.mul As_field.zeta w in
-                      let tick_plonk_minimal =
+                      let zetaw = Step.Field.mul As_field.zeta w in
+                      let step_plonk_minimal =
                         { plonk0 with
                           zeta = As_field.zeta
                         ; alpha = As_field.alpha
                         ; joint_combiner = As_field.joint_combiner
                         }
                       in
-                      let tick_combined_evals =
+                      let step_combined_evals =
                         Plonk_checks.evals_of_split_evals
-                          (module Tick.Field)
+                          (module Step.Field)
                           proof.openings.evals
-                          ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
+                          ~rounds:(Nat.to_int Step.Rounds.n) ~zeta:As_field.zeta
                           ~zetaw
                       in
-                      let tick_domain =
+                      let step_domain =
                         Plonk_checks.domain
-                          (module Tick.Field)
-                          domain ~shifts:Common.tick_shifts
-                          ~domain_generator:Backend.Tick.Field.domain_generator
+                          (module Step.Field)
+                          domain ~shifts:Common.step_shifts
+                          ~domain_generator:Backend.Step.Field.domain_generator
                       in
-                      let tick_combined_evals =
-                        Plonk_types.Evals.to_in_circuit tick_combined_evals
+                      let step_combined_evals =
+                        Plonk_types.Evals.to_in_circuit step_combined_evals
                       in
-                      let tick_env =
+                      let step_env =
                         Plonk_checks.scalars_env
-                          (module Tick.Field)
+                          (module Step.Field)
                           ~endo:Endo.Step_inner_curve.base
-                          ~mds:Tick_field_sponge.params.mds
+                          ~mds:Step_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
                           ~field_of_hex:(fun s ->
                             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
                             |> Kimchi_pasta.Pasta.Fp.of_bigint )
-                          ~domain:tick_domain tick_plonk_minimal
-                          tick_combined_evals
+                          ~domain:step_domain step_plonk_minimal
+                          step_combined_evals
                       in
                       let combined_inner_product =
                         let open As_field in
@@ -3371,21 +3371,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           { evals = proof.openings.evals; public_input = x_hat }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
-                          ~env:tick_env ~domain:tick_domain
+                          ~env:step_env ~domain:step_domain
                           ~ft_eval1:proof.openings.ft_eval1
-                          ~plonk:tick_plonk_minimal
+                          ~plonk:step_plonk_minimal
                       in
-                      let chal = Challenge.Constant.of_tick_field in
+                      let chal = Challenge.Constant.of_step_field in
                       let new_bulletproof_challenges, b =
                         let prechals =
                           Array.map (O.opening_prechallenges o) ~f:(fun x ->
                               let x =
                                 Scalar_challenge.map
-                                  ~f:Challenge.Constant.of_tick_field x
+                                  ~f:Challenge.Constant.of_step_field x
                               in
                               x )
                         in
-                        let b = Tick.Field.random () in
+                        let b = Step.Field.random () in
                         let prechals =
                           Array.map prechals ~f:(fun x ->
                               { Bulletproof_challenge.prechallenge = x } )
@@ -3394,14 +3394,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       let plonk =
                         Wrap.Plonk_checks.Type1.derive_plonk
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-                          tick_combined_evals
+                          (module Step.Field)
+                          ~shift:Shifts.step1 ~env:step_env step_plonk_minimal
+                          step_combined_evals
                       in
                       let shift_value =
                         Shifted_value.Type1.of_field
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1
+                          (module Step.Field)
+                          ~shift:Shifts.step1
                       in
                       let branch_data : Composition_types.Branch_data.t =
                         { proofs_verified =
@@ -3438,7 +3438,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               ; b = shift_value b
                               ; bulletproof_challenges =
                                   Vector.of_array_and_length_exn
-                                    new_bulletproof_challenges Tick.Rounds.n
+                                    new_bulletproof_challenges Step.Rounds.n
                               ; combined_inner_product =
                                   shift_value combined_inner_product
                               ; branch_data
@@ -3452,7 +3452,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   }
                               }
                           ; sponge_digest_before_evaluations =
-                              Digest.Constant.of_tick_field
+                              Digest.Constant.of_step_field
                                 sponge_digest_before_evaluations
                           ; messages_for_next_wrap_proof
                           }
@@ -3473,7 +3473,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
                                     ; public_inputs
                                     } () ->
-                              Backend.Tock.Proof.create_async
+                              Backend.Wrap.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
@@ -3487,7 +3487,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                       messages_for_next_wrap_proof_prepared
                                         .old_bulletproof_challenges
                                       ~f:(fun sg chals ->
-                                        { Tock.Proof.Challenge_polynomial
+                                        { Wrap.Proof.Challenge_polynomial
                                           .commitment = sg
                                         ; challenges = Vector.to_array chals
                                         } )
@@ -3695,7 +3695,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let g =
             exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-                Tick.Inner_curve.(to_affine_exn one) )
+                Step.Inner_curve.(to_affine_exn one) )
           in
           ignore
             ( SC.to_field_checked'

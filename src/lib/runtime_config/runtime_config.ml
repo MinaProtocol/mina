@@ -138,17 +138,17 @@ module Json_layout = struct
 
       module Zkapp_account = struct
         module Field = struct
-          type t = Snark_params.Tick.Field.t
+          type t = Snark_params.Step.Field.t
           [@@deriving sexp, bin_io_unversioned]
 
           (* can't be automatically derived *)
           let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
-          let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
+          let to_yojson t = `String (Snark_params.Step.Field.to_string t)
 
           let of_yojson = function
             | `String s ->
-                Ok (Snark_params.Tick.Field.of_string s)
+                Ok (Snark_params.Step.Field.of_string s)
             | _ ->
                 Error
                   "Invalid JSON in runtime config Zkapp_account.state, \

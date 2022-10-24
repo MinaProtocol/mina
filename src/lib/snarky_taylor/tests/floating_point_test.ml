@@ -6,7 +6,7 @@ open Util
 open Snarky_taylor.Floating_point
 
 let%test_unit "of-quotient" =
-  let module M = Snark_params.Tick.Run in
+  let module M = Snark_params.Step.Run in
   let m : M.field m = (module M) in
   let gen =
     let open Quickcheck in

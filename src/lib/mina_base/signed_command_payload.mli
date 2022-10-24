@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Mina_base_import
-open Snark_params.Tick
+open Snark_params.Step
 
 (* This represents the random oracle input corresponding to the old form of the token
    ID, which was a 64-bit integer. The default token id was the number 1.
@@ -131,7 +131,7 @@ module Common : sig
     val to_input_legacy :
          var
       -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
-         Snark_params.Tick.Checked.t
+         Snark_params.Step.Checked.t
 
     val constant : t -> var
   end

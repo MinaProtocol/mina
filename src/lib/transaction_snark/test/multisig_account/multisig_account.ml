@@ -3,7 +3,7 @@ open Mina_ledger
 open Signature_lib
 open Mina_base
 open Snark_params
-open Tick
+open Step
 open Pickles_types
 module U = Transaction_snark_tests.Util
 module Impl = Pickles.Impls.Step

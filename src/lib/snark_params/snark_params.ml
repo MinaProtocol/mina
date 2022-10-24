@@ -36,20 +36,20 @@ module Make_snarkable (Impl : Snarky_backendless.Snark_intf.S) = struct
   end
 end
 
-module Tock0 = struct
-  include Crypto_params.Tock
-  module Snarkable = Make_snarkable (Crypto_params.Tock)
+module Wrap0 = struct
+  include Crypto_params.Wrap
+  module Snarkable = Make_snarkable (Crypto_params.Wrap)
 end
 
-module Tick0 = struct
-  include Crypto_params.Tick
-  module Snarkable = Make_snarkable (Crypto_params.Tick)
+module Step0 = struct
+  include Crypto_params.Step
+  module Snarkable = Make_snarkable (Crypto_params.Step)
 end
 
 let%test_unit "group-map test" =
-  let params = Crypto_params.Tock.group_map_params () in
-  let module M = Crypto_params.Tick.Run in
-  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
+  let params = Crypto_params.Wrap.group_map_params () in
+  let module M = Crypto_params.Step.Run in
+  Quickcheck.test ~trials:3 Step0.Field.gen ~f:(fun t ->
       let checked_output =
         M.run_and_check (fun () ->
             let x, y =
@@ -61,15 +61,15 @@ let%test_unit "group-map test" =
         |> Or_error.ok_exn
       in
       let ((x, y) as actual) =
-        Group_map.to_group (module Tick0.Field) ~params t
+        Group_map.to_group (module Step0.Field) ~params t
       in
-      [%test_eq: Tick0.Field.t]
-        Tick0.Field.(
+      [%test_eq: Step0.Field.t]
+        Step0.Field.(
           (x * x * x)
-          + (Tick0.Inner_curve.Params.a * x)
-          + Tick0.Inner_curve.Params.b)
-        Tick0.Field.(y * y) ;
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output actual )
+          + (Step0.Inner_curve.Params.a * x)
+          + Step0.Inner_curve.Params.b)
+        Step0.Field.(y * y) ;
+      [%test_eq: Step0.Field.t * Step0.Field.t] checked_output actual )
 
 module Make_inner_curve_scalar (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
@@ -129,14 +129,14 @@ struct
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
 end
 
-module Tock = struct
+module Wrap = struct
   include (
-    Tock0 : module type of Tock0 with module Inner_curve := Tock0.Inner_curve )
+    Wrap0 : module type of Wrap0 with module Inner_curve := Wrap0.Inner_curve )
 
-  module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
+  module Fq = Snarky_field_extensions.Field_extensions.F (Wrap0)
 
   module Inner_curve = struct
-    include Tock0.Inner_curve
+    include Wrap0.Inner_curve
 
     include
       Sexpable.Of_sexpable
@@ -151,13 +151,13 @@ module Tock = struct
           let of_sexpable = of_affine
         end)
 
-    include Make_inner_curve_aux (Tock0) (Tick0)
+    include Make_inner_curve_aux (Wrap0) (Step0)
 
     module Checked = struct
       include
         Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
           (struct
-            include Tock0.Inner_curve
+            include Wrap0.Inner_curve
           end)
           (Params)
           (struct
@@ -171,25 +171,25 @@ module Tock = struct
   end
 end
 
-module Tick = struct
+module Step = struct
   include (
-    Tick0 :
-      module type of Tick0
-        with module Field := Tick0.Field
-         and module Inner_curve := Tick0.Inner_curve )
+    Step0 :
+      module type of Step0
+        with module Field := Step0.Field
+         and module Inner_curve := Step0.Inner_curve )
 
   module Field = struct
-    include Tick0.Field
-    include Hashable.Make (Tick0.Field)
-    module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
+    include Step0.Field
+    include Hashable.Make (Step0.Field)
+    module Bits = Bits.Make_field (Step0.Field) (Step0.Bigint)
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end
 
-  module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
+  module Fq = Snarky_field_extensions.Field_extensions.F (Step0)
 
   module Inner_curve = struct
-    include Crypto_params.Tick.Inner_curve
+    include Crypto_params.Step.Inner_curve
 
     include
       Sexpable.Of_sexpable
@@ -204,12 +204,12 @@ module Tick = struct
           let of_sexpable = of_affine
         end)
 
-    include Make_inner_curve_aux (Tick0) (Tock0)
+    include Make_inner_curve_aux (Step0) (Wrap0)
 
     module Checked = struct
       include
         Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
-          (Crypto_params.Tick.Inner_curve)
+          (Crypto_params.Step.Inner_curve)
           (Params)
           (struct
             let add =
@@ -225,14 +225,14 @@ module Tick = struct
     let typ = Checked.typ
   end
 
-  module Util = Snark_util.Make (Tick0)
+  module Util = Snark_util.Make (Step0)
 
   let m : Run.field Snarky_backendless.Snark.m = (module Run)
 
   let make_checked c = Run.make_checked c
 end
 
-(* Let n = Tick.Field.size_in_bits.
+(* Let n = Step.Field.size_in_bits.
    Let k = n - 3.
    The reason k = n - 3 is as follows. Inside [meets_target], we compare
    a value against 2^k. 2^k requires k + 1 bits. The comparison then unpacks
@@ -242,18 +242,18 @@ end
    However, instead of using `Field.size_in_bits - 3` we choose `Field.size_in_bits - 8`
    to clamp the easiness. To something not-to-quick on a personal laptop from mid 2010s.
 *)
-let target_bit_length = Tick.Field.size_in_bits - 8
+let target_bit_length = Step.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
 
 module Group_map = struct
   let to_group x =
-    Group_map.to_group (module Tick.Field) ~params:(Tock.group_map_params ()) x
+    Group_map.to_group (module Step.Field) ~params:(Wrap.group_map_params ()) x
 
   module Checked = struct
     let to_group x =
       Snarky_group_map.Checked.to_group
-        (module Tick.Run)
-        ~params:(Tock.group_map_params ()) x
+        (module Step.Run)
+        ~params:(Wrap.group_map_params ()) x
   end
 end

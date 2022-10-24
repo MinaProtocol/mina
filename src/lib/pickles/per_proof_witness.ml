@@ -82,7 +82,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       Plonk_types.All_evals.In_circuit.t
         (** The evaluations from the step proof that this proof wraps *)
   ; prev_challenges :
-      ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
+      ((Impl.Field.t, Step.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
         (** The challenges c_0, ... c_{k - 1} corresponding to each W_i. *)
   ; prev_challenge_polynomial_commitments :
       (Step_main_inputs.Inner_curve.t, 'max_proofs_verified) Vector.t
@@ -106,9 +106,9 @@ module Constant = struct
     ; proof_state :
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
-        , Tick.Field.t Shifted_value.Type1.t
+        , Step.Field.t Shifted_value.Type1.t
         , ( Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.Type1.t )
+          , Step.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , unit
@@ -118,11 +118,11 @@ module Constant = struct
         , Branch_data.t )
         Types.Wrap.Proof_state.In_circuit.t
     ; prev_proof_evals :
-        (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
+        (Step.Field.t, Step.Field.t array) Plonk_types.All_evals.t
     ; prev_challenges :
-        ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
+        ((Step.Field.t, Step.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
     ; prev_challenge_polynomial_commitments :
-        (Tick.Inner_curve.Affine.t, 'max_proofs_verified) Vector.t
+        (Step.Inner_curve.Affine.t, 'max_proofs_verified) Vector.t
     }
   [@@deriving hlist]
 
@@ -161,6 +161,6 @@ let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
         (module Impl)
         (* Assume we have lookup iff we have runtime tables *)
         { lookup; runtime = lookup }
-    ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
+    ; Vector.typ (Vector.typ Field.typ Step.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]

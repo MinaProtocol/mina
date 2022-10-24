@@ -4,7 +4,7 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%endif]
 

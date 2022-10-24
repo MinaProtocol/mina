@@ -4,17 +4,17 @@ open Vrf_lib.Standalone
 let%test_module "vrf-test" =
   ( module struct
     (* Nothing in here is secure, it's just for the test *)
-    module Impl = Snark_params.Tick
-    module Other_impl = Snark_params.Tock
+    module Impl = Snark_params.Step
+    module Other_impl = Snark_params.Wrap
     module B = Bigint
 
     module Scalar = struct
       include (
-        Snark_params.Tick.Inner_curve.Scalar :
-          module type of Snark_params.Tick.Inner_curve.Scalar
-            with type t = Snark_params.Tick.Inner_curve.Scalar.t
-             and type var := Snark_params.Tick.Inner_curve.Scalar.var
-            with module Checked := Snark_params.Tick.Inner_curve.Scalar.Checked )
+        Snark_params.Step.Inner_curve.Scalar :
+          module type of Snark_params.Step.Inner_curve.Scalar
+            with type t = Snark_params.Step.Inner_curve.Scalar.t
+             and type var := Snark_params.Step.Inner_curve.Scalar.var
+            with module Checked := Snark_params.Step.Inner_curve.Scalar.Checked )
 
       let of_bits = Other_impl.Field.project
 
@@ -53,10 +53,10 @@ let%test_module "vrf-test" =
       type var = Field.Var.t * Field.Var.t
 
       include (
-        Snark_params.Tick.Inner_curve :
-          module type of Snark_params.Tick.Inner_curve
-            with type var := Snark_params.Tick.Inner_curve.var
-            with module Checked := Snark_params.Tick.Inner_curve.Checked )
+        Snark_params.Step.Inner_curve :
+          module type of Snark_params.Step.Inner_curve
+            with type var := Snark_params.Step.Inner_curve.var
+            with module Checked := Snark_params.Step.Inner_curve.Checked )
 
       type 'a or_infinity = 'a Kimchi_types.or_infinity =
         | Infinity
@@ -64,7 +64,7 @@ let%test_module "vrf-test" =
       [@@deriving equal]
 
       let equal x y =
-        Snark_params.Tick.Inner_curve.(
+        Snark_params.Step.Inner_curve.(
           equal_or_infinity Field.equal (to_affine_or_infinity x)
             (to_affine_or_infinity y))
 
@@ -72,8 +72,8 @@ let%test_module "vrf-test" =
         include
           Snarky_curves.Make_weierstrass_checked
             (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
-            (Snark_params.Tick.Inner_curve)
-            (Snark_params.Tick.Inner_curve.Params)
+            (Snark_params.Step.Inner_curve)
+            (Snark_params.Step.Inner_curve.Params)
             (struct
               let add = None
             end)

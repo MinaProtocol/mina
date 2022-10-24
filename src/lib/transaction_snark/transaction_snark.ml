@@ -75,7 +75,7 @@ module Pending_coinbase_stack_state = struct
     end]
 
     let typ pending_coinbase =
-      Tick.Typ.of_hlistable
+      Step.Typ.of_hlistable
         [ pending_coinbase; pending_coinbase ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -166,12 +166,12 @@ module Statement = struct
         local_state_typ =
       let registers =
         let open Registers in
-        Tick.Typ.of_hlistable
+        Step.Typ.of_hlistable
           [ ledger_hash; pending_coinbase; local_state_typ ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
       in
-      Tick.Typ.of_hlistable
+      Step.Typ.of_hlistable
         [ registers; registers; amount; fee_excess; sok_digest ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -243,7 +243,7 @@ module Statement = struct
       , Local_state.Checked.t )
       Poly.t
 
-    let typ : (var, t) Tick.Typ.t =
+    let typ : (var, t) Step.Typ.t =
       Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
@@ -260,7 +260,7 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+          !"Generating unchecked top hash from:@.%{sexp: Step.Field.t \
             Random_oracle.Input.Chunked.t}@."
           input ;
       input
@@ -271,7 +271,7 @@ module Statement = struct
       type t = var
 
       let to_input { source; target; supply_increase; fee_excess; sok_digest } =
-        let open Tick in
+        let open Step in
         let open Checked.Let_syntax in
         let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
         let source = Registers.Checked.to_input source
@@ -302,8 +302,8 @@ module Statement = struct
         input
 
       let to_field_elements t =
-        let open Tick.Checked.Let_syntax in
-        Tick.Run.run_checked (to_input t >>| Random_oracle.Checked.pack_input)
+        let open Step.Checked.Let_syntax in
+        Step.Run.run_checked (to_input t >>| Random_oracle.Checked.pack_input)
     end
   end
 
@@ -404,7 +404,7 @@ let to_yojson = Stable.Latest.to_yojson
 
 let create ~statement ~proof = { statement; proof }
 
-open Tick
+open Step
 open Let_syntax
 
 let chain if_ b ~then_ ~else_ =
@@ -1228,7 +1228,7 @@ module Base = struct
           in
           let `Min_balance _, timing =
             run_checked
-            @@ [%with_label.Snark_params.Tick "Check zkapp timing"] (fun () ->
+            @@ [%with_label.Snark_params.Step "Check zkapp timing"] (fun () ->
                    check_timing ~balance_check ~timed_balance_check ~account
                      ~txn_amount:None ~txn_global_slot )
           in
@@ -1834,7 +1834,7 @@ module Base = struct
                   in
                   run_checked
                     (let%bind (module S) =
-                       Tick.Inner_curve.Checked.Shifted.create ()
+                       Step.Inner_curve.Checked.Shifted.create ()
                      in
                      signature_verifies
                        ~shifted:(module S)
@@ -3209,7 +3209,7 @@ module Base = struct
   let%snarkydef_ main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
     let%bind () = dummy_constraints () in
-    let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
+    let%bind (module Shifted) = Step.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__ (fun () ->
           exists Transaction_union.typ ~request:(As_prover.return Transaction) )
@@ -3308,7 +3308,7 @@ module Transition_data = struct
 end
 
 module Merge = struct
-  open Tick
+  open Step
 
   type _ Snarky_backendless.Request.t +=
     | Statements_to_merge :
@@ -3333,10 +3333,10 @@ module Merge = struct
 
   (* spec for [main top_hash]:
      constraints pass iff
-     there exist digest, s1, s3, fee_excess, supply_increase pending_coinbase_stack12.source, pending_coinbase_stack23.target, tock_vk such that
-     H(digest,s1, s3, pending_coinbase_stack12.source, pending_coinbase_stack23.target, fee_excess, supply_increase, tock_vk) = top_hash,
-     verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
-     verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
+     there exist digest, s1, s3, fee_excess, supply_increase pending_coinbase_stack12.source, pending_coinbase_stack23.target, wrap_vk such that
+     H(digest,s1, s3, pending_coinbase_stack12.source, pending_coinbase_stack23.target, fee_excess, supply_increase, wrap_vk) = top_hash,
+     verify_transition wrap_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
+     verify_transition wrap_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
   let%snarkydef_ main (s : Statement.With_sok.Checked.t) =
     let%bind s1, s2 =
@@ -3481,21 +3481,21 @@ module type S = sig
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Transaction.Valid.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_user_command :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_fee_transfer :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_zkapp_command_segment_exn :
@@ -3522,7 +3522,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
   in
-  let open Tick in
+  let open Step in
   ignore
     ( Or_error.ok_exn
         (run_and_check
@@ -3583,7 +3583,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
   in
-  let open Tick in
+  let open Step in
   let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
   generate_auxiliary_input ~input_typ:Statement.With_sok.typ
     ~return_typ:(Snarky_backendless.Typ.unit ())
@@ -3625,18 +3625,18 @@ let verify (ts : (t * _) list) ~key =
   else Async.return false
 
 let constraint_system_digests ~constraint_constants () =
-  let digest = Tick.R1CS_constraint_system.digest in
+  let digest = Step.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
     , digest
         Merge.(
-          Tick.constraint_system ~input_typ:Statement.With_sok.typ
+          Step.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
-              let open Tick in
+              let open Step in
               Checked.map ~f:ignore @@ main x )) )
   ; ( "transaction-base"
     , digest
         Base.(
-          Tick.constraint_system ~input_typ:Statement.With_sok.typ
+          Step.constraint_system ~input_typ:Statement.With_sok.typ
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (main ~constraint_constants)) )
   ]
@@ -4178,9 +4178,9 @@ module For_tests = struct
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
+      ; sequence_events : Step.Field.t array list
+      ; events : Step.Field.t array list
+      ; call_data : Step.Field.t
       ; preconditions : Account_update.Preconditions.t option
       ; authorization_kind : Account_update.Authorization_kind.t
       }
@@ -4511,7 +4511,7 @@ module For_tests = struct
       ; new_zkapp_account
       ; sequence_events = []
       ; events = []
-      ; call_data = Tick.Field.zero
+      ; call_data = Step.Field.zero
       ; preconditions
       ; authorization_kind
       }
@@ -4616,9 +4616,9 @@ module For_tests = struct
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
+      ; sequence_events : Step.Field.t array list
+      ; events : Step.Field.t array list
+      ; call_data : Step.Field.t
       ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]
@@ -4764,9 +4764,9 @@ module For_tests = struct
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
+      ; sequence_events : Step.Field.t array list
+      ; events : Step.Field.t array list
+      ; call_data : Step.Field.t
       ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]

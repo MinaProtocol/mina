@@ -5,7 +5,7 @@ open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%endif]
 
@@ -340,7 +340,7 @@ module Update = struct
     let open Quickcheck.Let_syntax in
     let%bind app_state =
       let%bind fields =
-        let field_gen = Snark_params.Tick.Field.gen in
+        let field_gen = Snark_params.Step.Field.gen in
         Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
       in
       (* won't raise because length is correct *)
@@ -831,7 +831,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Pickles.Backend.Tick.Field.Stable.V1.t array list
+        type t = Pickles.Backend.Step.Field.Stable.V1.t array list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id
@@ -852,7 +852,7 @@ module Body = struct
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_data : Pickles.Backend.Step.Field.Stable.V1.t
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Call_type.Stable.V1.t
@@ -906,7 +906,7 @@ module Body = struct
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_data : Pickles.Backend.Step.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
@@ -961,7 +961,7 @@ module Body = struct
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_data : Pickles.Backend.Step.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
@@ -987,7 +987,7 @@ module Body = struct
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
         ; sequence_events : Events'.Stable.V1.t
-        ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+        ; call_data : Pickles.Backend.Step.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
         ; caller : Token_id.Stable.V1.t
@@ -1235,7 +1235,7 @@ module Body = struct
         [ Public_key.Compressed.Checked.to_input public_key
         ; Token_id.Checked.to_input token_id
         ; Update.Checked.to_input update
-        ; Snark_params.Tick.Run.run_checked
+        ; Snark_params.Step.Run.run_checked
             (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)

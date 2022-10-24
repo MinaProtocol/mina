@@ -4,7 +4,7 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%endif]
 
@@ -495,7 +495,7 @@ module Account = struct
     let%bind delegate = Eq_data.gen Public_key.Compressed.gen in
     let%bind state =
       let%bind fields =
-        let field_gen = Snark_params.Tick.Field.gen in
+        let field_gen = Snark_params.Step.Field.gen in
         Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
       in
       (* won't raise because length is correct *)

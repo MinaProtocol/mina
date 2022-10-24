@@ -40,7 +40,7 @@ module Digest = struct
               s
           end)
 
-      open Snark_params.Tick
+      open Snark_params.Step
 
       let to_input t =
         Random_oracle.Input.Chunked.packeds
@@ -56,7 +56,7 @@ module Digest = struct
   end]
 
   module Checked = struct
-    open Snark_params.Tick
+    open Snark_params.Step
 
     type t = Boolean.var array
 

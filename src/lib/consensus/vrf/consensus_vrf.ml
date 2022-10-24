@@ -3,15 +3,15 @@ open Fold_lib
 open Snark_params
 
 module Scalar = struct
-  type t = Tick.Inner_curve.Scalar.t
+  type t = Step.Inner_curve.Scalar.t
 
   type value = t
 
-  type var = Tick.Inner_curve.Scalar.var
+  type var = Step.Inner_curve.Scalar.var
 
-  let to_string = Tick.Inner_curve.Scalar.to_string
+  let to_string = Step.Inner_curve.Scalar.to_string
 
-  let of_string = Tick.Inner_curve.Scalar.of_string
+  let of_string = Step.Inner_curve.Scalar.of_string
 
   let to_yojson t = `String (to_string t)
 
@@ -23,11 +23,11 @@ module Scalar = struct
     | _ ->
         Error "Consensus_vrf.of_yojson: Expected a string"
 
-  let typ : (var, value) Tick.Typ.t = Tick.Inner_curve.Scalar.typ
+  let typ : (var, value) Step.Typ.t = Step.Inner_curve.Scalar.typ
 end
 
 module Group = struct
-  open Tick
+  open Step
 
   type t = Inner_curve.t [@@deriving sexp]
 
@@ -96,15 +96,15 @@ module Message = struct
       ({ global_slot; seed; delegator } : value) =
     let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
-      [| field (seed :> Tick.field)
+      [| field (seed :> Step.field)
        ; Global_slot.to_input global_slot
        ; Mina_base.Account.Index.to_input
            ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
 
   let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
-      (var, value) Tick.Typ.t =
-    Tick.Typ.of_hlistable
+      (var, value) Step.Typ.t =
+    Step.Typ.of_hlistable
       [ Global_slot.typ
       ; Mina_base.Epoch_seed.typ
       ; Mina_base.Account.Index.Unpacked.typ
@@ -116,7 +116,7 @@ module Message = struct
   let hash_to_group ~constraint_constants msg =
     Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_message
       (Random_oracle.pack_input (to_input ~constraint_constants msg))
-    |> Group_map.to_group |> Tick.Inner_curve.of_affine
+    |> Group_map.to_group |> Step.Inner_curve.of_affine
 
   module Checked = struct
     let to_input ({ global_slot; seed; delegator } : var) =
@@ -129,7 +129,7 @@ module Message = struct
 
     let hash_to_group msg =
       let input = to_input msg in
-      Tick.make_checked (fun () ->
+      Step.make_checked (fun () ->
           Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
             (Random_oracle.Checked.pack_input input)
           |> Group_map.Checked.to_group )
@@ -190,7 +190,7 @@ module Output = struct
       let description = "Vrf Truncated Output"
     end)
 
-    open Tick
+    open Step
 
     let length_in_bits = Int.min 256 (Field.size_in_bits - 2)
 
@@ -225,11 +225,11 @@ module Output = struct
       |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
     let var_to_input (t : var) =
-      Array.map t ~f:(fun b -> ((b :> Tick.Field.Var.t), 1))
+      Array.map t ~f:(fun b -> ((b :> Step.Field.Var.t), 1))
       |> Random_oracle.Input.Chunked.packeds
   end
 
-  open Tick
+  open Step
 
   let typ = Field.typ
 
@@ -252,7 +252,7 @@ module Output = struct
 
   module Checked = struct
     let truncate x =
-      Tick.make_checked (fun () ->
+      Step.make_checked (fun () ->
           Random_oracle.Checked.Digest.to_bits ~length:Truncated.length_in_bits
             x
           |> Array.of_list )
@@ -285,9 +285,9 @@ module Output = struct
     Quickcheck.test ~trials:10 gen_message_and_curve_point
       ~f:
         (Test_util.test_equal ~equal:Field.equal
-           Snark_params.Tick.Typ.(
+           Snark_params.Step.Typ.(
              Message.typ ~constraint_constants
-             * Snark_params.Tick.Inner_curve.typ)
+             * Snark_params.Step.Inner_curve.typ)
            typ
            (fun (msg, g) -> Checked.hash msg g)
            (fun (msg, g) -> hash ~constraint_constants msg g) )
@@ -303,7 +303,7 @@ module Threshold = struct
 
   let params =
     Snarky_taylor.Exp.params ~base
-      ~field_size_in_bits:Snark_params.Tick.Field.size_in_bits
+      ~field_size_in_bits:Snark_params.Step.Field.size_in_bits
 
   let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
 
@@ -341,7 +341,7 @@ module Threshold = struct
         ~(total_stake : Currency.Amount.var) (vrf_output : Output.Truncated.var)
         =
       let open Currency in
-      let open Snark_params.Tick in
+      let open Snark_params.Step in
       let open Snarky_integer in
       let open Snarky_taylor in
       make_checked (fun () ->
@@ -383,16 +383,16 @@ module Evaluation_hash = struct
          ; g_to_input g2
         |]
     in
-    let tick_output =
+    let step_output =
       Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_evaluation
         (Random_oracle.pack_input input)
     in
     (* This isn't great cryptographic practice.. *)
-    Tick.Field.unpack tick_output |> Tick.Inner_curve.Scalar.project
+    Step.Field.unpack step_output |> Step.Inner_curve.Scalar.project
 
   module Checked = struct
     let hash_for_proof message public_key g1 g2 =
-      let open Tick.Checked.Let_syntax in
+      let open Step.Checked.Let_syntax in
       let input =
         let g_to_input (f1, f2) =
           Random_oracle_input.Chunked.field_elements [| f1; f2 |]
@@ -404,14 +404,14 @@ module Evaluation_hash = struct
            ; g_to_input g2
           |]
       in
-      let%bind tick_output =
-        Tick.make_checked (fun () ->
+      let%bind step_output =
+        Step.make_checked (fun () ->
             Random_oracle.Checked.hash
               ~init:Mina_base.Hash_prefix.vrf_evaluation
               (Random_oracle.Checked.pack_input input) )
       in
       (* This isn't great cryptographic practice.. *)
-      Tick.Field.Checked.unpack_full tick_output
+      Step.Field.Checked.unpack_full step_output
   end
 end
 
@@ -422,7 +422,7 @@ module Output_hash = struct
 
     module V1 = struct
       module T = struct
-        type t = (Snark_params.Tick.Field.t[@version_asserted])
+        type t = (Snark_params.Step.Field.t[@version_asserted])
         [@@deriving sexp, compare, hash]
       end
 
@@ -444,7 +444,7 @@ module Output_hash = struct
 end
 
 module Integrated =
-  Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message) (Output_hash)
+  Vrf_lib.Integrated.Make (Step) (Scalar) (Group) (Message) (Output_hash)
 
 module Standalone (Constraint_constants : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -453,7 +453,7 @@ struct
   open Constraint_constants
 
   include
-    Vrf_lib.Standalone.Make (Tick) (Tick.Inner_curve.Scalar) (Group)
+    Vrf_lib.Standalone.Make (Step) (Step.Inner_curve.Scalar) (Group)
       (struct
         include Message
 

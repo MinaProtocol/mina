@@ -3,8 +3,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-module Field = Snark_params.Tick.Field
-module Scalar = Snark_params.Tick.Inner_curve.Scalar
+module Field = Snark_params.Step.Field
+module Scalar = Snark_params.Step.Inner_curve.Scalar
 open Signature_lib
 
 (* see RFC 0038, section "marshal-keys" for a specification *)

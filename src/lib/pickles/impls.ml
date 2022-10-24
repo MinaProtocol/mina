@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+module Wrap_impl = Snarky_backendless.Snark.Run.Make (Wrap)
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
@@ -31,10 +31,10 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+  module Impl = Snarky_backendless.Snark.Run.Make (Step)
   include Impl
-  module Verification_key = Tick.Verification_key
-  module Proving_key = Tick.Proving_key
+  module Verification_key = Step.Verification_key
+  module Proving_key = Step.Proving_key
 
   module Keypair = struct
     type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
@@ -42,16 +42,16 @@ module Step = struct
     let create = Fields.create
 
     let generate ~prev_challenges cs =
-      let open Tick.Keypair in
+      let open Step.Keypair in
       let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
   module Other_field = struct
-    (* Tick.Field.t = p < q = Tock.Field.t *)
-    let size_in_bits = Tock.Field.size_in_bits
+    (* Step.Field.t = p < q = Wrap.Field.t *)
+    let size_in_bits = Wrap.Field.size_in_bits
 
-    module Constant = Tock.Field
+    module Constant = Wrap.Field
 
     type t = (* Low bits, high bit *)
       Field.t * Boolean.var
@@ -69,7 +69,7 @@ module Step = struct
              but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
           *)
           let modulus = Impl.Field.size in
-          if B.compare modulus lo <= 0 then Tick.Field.zero
+          if B.compare modulus lo <= 0 then Step.Field.zero
           else Impl.Bigint.(to_field (of_bignum_bigint lo))
         in
         (lo, hi)
@@ -88,7 +88,7 @@ module Step = struct
       in
       let str_list =
         List.map forbidden_shifted_values ~f:(fun (a, b) ->
-            (Tick.Field.to_string a, b) )
+            (Step.Field.to_string a, b) )
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
 
@@ -96,14 +96,14 @@ module Step = struct
       Typ.transport
         (Typ.tuple2 Field.typ Boolean.typ)
         ~there:(fun x ->
-          match Tock.Field.to_bits x with
+          match Wrap.Field.to_bits x with
           | [] ->
               assert false
           | low :: high ->
               (Field.Constant.project high, low) )
         ~back:(fun (high, low) ->
           let high = Field.Constant.unpack high in
-          Tock.Field.of_bits (low :: high) )
+          Wrap.Field.of_bits (low :: high) )
 
     let check t =
       let open Internal_Basic in
@@ -178,10 +178,10 @@ module Wrap = struct
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Wrap_field = Tock.Field
-  module Step_field = Tick.Field
-  module Verification_key = Tock.Verification_key
-  module Proving_key = Tock.Proving_key
+  module Wrap_field = Wrap.Field
+  module Step_field = Step.Field
+  module Verification_key = Wrap.Verification_key
+  module Proving_key = Wrap.Proving_key
 
   module Keypair = struct
     type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
@@ -189,13 +189,13 @@ module Wrap = struct
     let create = Fields.create
 
     let generate ~prev_challenges cs =
-      let open Tock.Keypair in
+      let open Wrap.Keypair in
       let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
   module Other_field = struct
-    module Constant = Tick.Field
+    module Constant = Step.Field
     open Impl
 
     type t = Field.t
@@ -229,11 +229,11 @@ module Wrap = struct
       assert ([%equal: string list] str_list expected_list)
 
     let typ_unchecked, check =
-      (* Tick -> Tock *)
+      (* Step -> Wrap *)
       let (Typ t0 as typ_unchecked) =
         Typ.transport Field.typ
-          ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
-          ~back:(Fn.compose Tick.Field.of_bits Tock.Field.to_bits)
+          ~there:(Fn.compose Wrap.Field.of_bits Step.Field.to_bits)
+          ~back:(Fn.compose Step.Field.of_bits Wrap.Field.to_bits)
       in
       let check t =
         let open Internal_Basic in

@@ -218,8 +218,8 @@ module type State_hooks = sig
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.Signed.var
-    -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
-       Snark_params.Tick.Checked.t
+    -> ([ `Success of Snark_params.Step.Boolean.var ] * consensus_state_var)
+       Snark_params.Step.Checked.t
 
   val genesis_winner : Public_key.Compressed.t * Private_key.t
 
@@ -381,13 +381,13 @@ module type S = sig
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
         -> genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t
-        -> Snark_params.Tick.Handler.t
+        -> Snark_params.Step.Handler.t
 
       val handler :
            t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> pending_coinbase:Mina_base.Pending_coinbase_witness.t
-        -> Snark_params.Tick.Handler.t
+        -> Snark_params.Step.Handler.t
 
       val ledger_depth : t -> int
     end
@@ -402,7 +402,7 @@ module type S = sig
         end]
       end
 
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
+      include Snark_params.Step.Snarkable.S with type value := Value.t
 
       val genesis : Value.t
     end
@@ -465,7 +465,7 @@ module type S = sig
 
       val typ :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> (var, Value.t) Snark_params.Tick.Typ.t
+        -> (var, Value.t) Snark_params.Step.Typ.t
 
       val negative_one :
            genesis_ledger:Mina_ledger.Ledger.t Lazy.t
@@ -491,7 +491,7 @@ module type S = sig
         -> constants:Constants.t
         -> Value.t
 
-      open Snark_params.Tick
+      open Snark_params.Step
 
       val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 

@@ -14,24 +14,24 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
-  let invalid = (Public_key.Compressed.empty, Pickles.Backend.Tick.Field.zero)
+  let invalid = (Public_key.Compressed.empty, Pickles.Backend.Step.Field.zero)
 
   module Digest = struct
     [%%ifdef consensus_mechanism]
 
     let of_bigstring_exn =
-      Binable.of_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
+      Binable.of_bigstring (module Pickles.Backend.Step.Field.Stable.Latest)
 
     let to_bigstring =
-      Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
+      Binable.to_bigstring (module Pickles.Backend.Step.Field.Stable.Latest)
 
     [%%else]
 
     let of_bigstring_exn =
-      Binable.of_bigstring (module Snark_params.Tick.Field.Stable.Latest)
+      Binable.of_bigstring (module Snark_params.Step.Field.Stable.Latest)
 
     let to_bigstring =
-      Binable.to_bigstring (module Snark_params.Tick.Field.Stable.Latest)
+      Binable.to_bigstring (module Snark_params.Step.Field.Stable.Latest)
 
     [%%endif]
 
@@ -61,7 +61,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Pickles.Backend.Tick.Field.Stable.V1.t
+        type t = Pickles.Backend.Step.Field.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
@@ -79,7 +79,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Snark_params.Tick.Field.Stable.V1.t
+        type t = Snark_params.Step.Field.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
@@ -104,9 +104,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     (* Just matters that this no one can find a preimage to this with poseidon.
        Chose 1 for consistency for the old uint64 based token IDs *)
-    let default : t = Snark_params.Tick.Field.one
+    let default : t = Snark_params.Step.Field.one
 
-    let gen : t Quickcheck.Generator.t = Snark_params.Tick.Field.gen
+    let gen : t Quickcheck.Generator.t = Snark_params.Step.Field.gen
 
     let gen_non_default =
       Quickcheck.Generator.filter gen ~f:(fun x -> not (equal x default))
@@ -136,7 +136,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end
 
-    let typ = Snark_params.Tick.Field.typ
+    let typ = Snark_params.Step.Field.typ
 
     [%%endif]
   end
@@ -188,11 +188,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let var_of_t ((key, tid) : t) =
     ( Public_key.Compressed.var_of_t key
-    , Snark_params.Tick.Field.Var.constant tid )
+    , Snark_params.Step.Field.Var.constant tid )
 
   module Checked = struct
     open Snark_params
-    open Tick
+    open Step
 
     let create key tid = (key, tid)
 
@@ -212,15 +212,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let equal (pk1, tid1) (pk2, tid2) =
       let%bind pk_equal = Public_key.Compressed.Checked.equal pk1 pk2 in
-      let%bind tid_equal = Snark_params.Tick.Field.Checked.equal tid1 tid2 in
-      Tick.Boolean.(pk_equal && tid_equal)
+      let%bind tid_equal = Snark_params.Step.Field.Checked.equal tid1 tid2 in
+      Step.Boolean.(pk_equal && tid_equal)
 
     let if_ b ~then_:(pk_then, tid_then) ~else_:(pk_else, tid_else) =
       let%bind pk =
         Public_key.Compressed.Checked.if_ b ~then_:pk_then ~else_:pk_else
       in
       let%map tid =
-        Snark_params.Tick.Field.Checked.if_ b ~then_:tid_then ~else_:tid_else
+        Snark_params.Step.Field.Checked.if_ b ~then_:tid_then ~else_:tid_else
       in
       (pk, tid)
   end

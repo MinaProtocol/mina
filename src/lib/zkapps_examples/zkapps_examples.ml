@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
-open Snark_params.Tick
-open Snark_params.Tick.Run
+open Snark_params.Step
+open Snark_params.Step.Run
 open Currency
 open Signature_lib
 open Mina_base
@@ -18,7 +18,7 @@ module Account_update_under_construction = struct
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
           let fields = Array.map ~f:Field.Var.constant fields in
@@ -86,7 +86,7 @@ module Account_update_under_construction = struct
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
-          let open Snark_params.Tick in
+          let open Snark_params.Step in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
           let fields = Array.map ~f:Field.Var.constant fields in
@@ -209,7 +209,7 @@ module Account_update_under_construction = struct
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
-        let open Snark_params.Tick in
+        let open Snark_params.Step in
         let (Typ typ) = typ in
         let fields, aux = typ.value_to_fields x in
         let fields = Array.map ~f:Field.Var.constant fields in

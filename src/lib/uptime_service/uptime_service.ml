@@ -31,7 +31,7 @@ module Proof_data = struct
 end
 
 let sign_blake2_hash ~private_key s =
-  let module Field = Snark_params.Tick.Field in
+  let module Field = Snark_params.Step.Field in
   let blake2 = Blake2.digest_string s in
   let field_elements = [||] in
   let bitstrings =

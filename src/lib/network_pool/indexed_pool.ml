@@ -1965,7 +1965,7 @@ let%test_module _ =
                     ; increment_nonce = double_increment_sender
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
@@ -1987,7 +1987,7 @@ let%test_module _ =
                     ; increment_nonce = increment_receiver
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
+                    ; call_data = Snark_params.Step.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept

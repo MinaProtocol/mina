@@ -284,31 +284,31 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     (block : Snark_transition.value) state_for_handler pending_coinbase =
   let wrap hash proof =
     let module Wrap = Keys.Wrap in
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
+    Wrap.prove
+      (Wrap.Keypair.pk Wrap.keys)
       Wrap.input
       { Wrap.Prover_state.proof }
       Wrap.main
-      (Wrap_input.of_tick_field hash)
+      (Wrap_input.of_step_field hash)
   in
   let next_state_top_hash = Keys.Step.instance_hash next_state in
   let prover_state =
     { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+    ; wrap_vk = Wrap.Keypair.vk Keys.Wrap.keys
     ; prev_state = chain.state
     ; expected_next_state = Some next_state
     ; update = block
     }
   in
   let main x =
-    Tick.handle (Keys.Step.main ~logger x)
+    Step.handle (Keys.Step.main ~logger x)
       (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
   in
   let res =
     Or_error.try_with (fun () ->
         let prev_proof =
-          Tick.prove
-            (Tick.Keypair.pk Keys.Step.keys)
+          Step.prove
+            (Step.Keypair.pk Keys.Step.keys)
             (Keys.Step.input ()) prover_state main next_state_top_hash
         in
         { Blockchain.state = next_state
@@ -329,7 +329,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   let next_state_top_hash = Keys.Step.instance_hash next_state in
   let prover_state =
     { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+    ; wrap_vk = Wrap.Keypair.vk Keys.Wrap.keys
     ; prev_state = chain.state
     ; expected_next_state = Some next_state
     ; update = block
@@ -337,13 +337,13 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     }
   in
   let main x =
-    Tick.handle (Keys.Step.main ~logger x)
+    Step.handle (Keys.Step.main ~logger x)
       (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
   in
   let res =
     Or_error.map
-      (Tick.check
-         (main @@ Tick.Field.Var.constant next_state_top_hash)
+      (Step.check
+         (main @@ Step.Field.Var.constant next_state_top_hash)
          prover_state )
       ~f:(fun () ->
         { Blockchain.state = next_state

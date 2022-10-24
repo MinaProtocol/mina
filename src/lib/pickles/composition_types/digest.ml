@@ -27,11 +27,11 @@ module Constant = struct
 
   open Backend
 
-  let to_tick_field x = Tick.Field.of_bits (to_bits x)
+  let to_step_field x = Step.Field.of_bits (to_bits x)
 
-  let to_tock_field x = Tock.Field.of_bits (to_bits x)
+  let to_wrap_field x = Wrap.Field.of_bits (to_bits x)
 
-  let of_tick_field x = of_bits (Tick.Field.to_bits x)
+  let of_step_field x = of_bits (Step.Field.to_bits x)
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct

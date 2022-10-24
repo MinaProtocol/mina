@@ -3,7 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 module Signed_command_elt : sig
   type t = Signed_command_payload of Signed_command.Payload.t

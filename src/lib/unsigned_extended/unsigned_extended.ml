@@ -3,7 +3,7 @@
 open Core_kernel
 include Intf
 open Snark_params
-open Tick
+open Step
 
 module type Unsigned_intf = Unsigned.S
 

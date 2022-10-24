@@ -203,7 +203,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth =
             (* current set_permissions permission requires Signature *)
             Permissions.Auth_required.Signature
-        ; call_data = Snark_params.Tick.Field.zero
+        ; call_data = Snark_params.Step.Field.zero
         ; events = []
         ; sequence_events = []
         ; preconditions = None
@@ -232,7 +232,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
-               Snark_params.Tick.Field.gen )
+               Snark_params.Step.Field.gen )
         in
         List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
         |> Zkapp_state.V.of_list_exn
@@ -275,7 +275,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
-        ; call_data = Snark_params.Tick.Field.zero
+        ; call_data = Snark_params.Step.Field.zero
         ; events = []
         ; sequence_events = []
         ; preconditions = None
@@ -360,7 +360,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
         ; current_auth = Permissions.Auth_required.None
-        ; call_data = Snark_params.Tick.Field.zero
+        ; call_data = Snark_params.Step.Field.zero
         ; events = []
         ; sequence_events = []
         ; preconditions = None
@@ -571,7 +571,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
         in
         List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
-            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal )
+            compatible req ledg ~equal:Pickles.Backend.Step.Field.equal )
       in
       let delegates_compat =
         compatible requested_update.delegate ledger_update.delegate
@@ -583,7 +583,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~equal:
             [%equal:
               ( Pickles.Side_loaded.Verification_key.t
-              , Pickles.Backend.Tick.Field.t )
+              , Pickles.Backend.Step.Field.t )
               With_hash.t]
       in
       let permissions_compat =

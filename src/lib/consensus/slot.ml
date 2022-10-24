@@ -16,7 +16,7 @@ module Checked = struct
   include T.Checked
 
   let in_seed_update_range ~(constants : Constants.var) (slot : var) =
-    let open Tick in
+    let open Step in
     let module Length = Mina_numbers.Length in
     let constant c =
       Length.Checked.Unsafe.of_field (Field.Var.constant (Field.of_int c))
@@ -46,7 +46,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let test x =
     Test_util.test_equal
       (Snarky_backendless.Typ.tuple2 Constants.typ typ)
-      Tick.Boolean.typ
+      Step.Boolean.typ
       (fun (c, x) -> Checked.in_seed_update_range ~constants:c x)
       (fun (c, x) -> in_seed_update_range ~constants:c x)
       (constants, x)

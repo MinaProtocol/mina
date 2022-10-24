@@ -1,5 +1,5 @@
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 include Data_hash.Make_full_size (struct
   let description = "State body hash"

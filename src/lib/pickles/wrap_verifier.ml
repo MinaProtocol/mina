@@ -44,9 +44,9 @@ let all_possible_domains =
 
 module Make
     (Inputs : Inputs
-                with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
-                 and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
+                with type Impl.field = Wrap.Field.t
+                 and type Impl.Bigint.t = Wrap.Bigint.R.t
+                 and type Inner_curve.Constant.Scalar.t = Step.Field.t) =
 struct
   open Inputs
   open Impl
@@ -89,7 +89,7 @@ struct
         As_prover.(
           fun () ->
             printf
-              !"%s: %{sexp:Backend.Tock.Field.t}, %{sexp:Backend.Tock.Field.t}\n\
+              !"%s: %{sexp:Backend.Wrap.Field.t}, %{sexp:Backend.Wrap.Field.t}\n\
                 %!"
               lab (read_var x) (read_var y))
 
@@ -785,7 +785,7 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Wrap)
   end
 
   let field_array_if b ~then_ ~else_ =

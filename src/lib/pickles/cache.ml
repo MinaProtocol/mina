@@ -7,7 +7,7 @@ module Step = struct
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * int
-        * Backend.Tick.R1CS_constraint_system.t
+        * Backend.Step.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, n, h ->
@@ -35,7 +35,7 @@ module Step = struct
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
                   Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
-                    (Backend.Tick.Keypair.load_urs ()) )
+                    (Backend.Step.Keypair.load_urs ()) )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
@@ -44,14 +44,14 @@ module Step = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            { Backend.Tick.Keypair.index; cs } ) )
+            { Backend.Step.Keypair.index; cs } ) )
       (fun (_, header, _, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
-                   t.Backend.Tick.Keypair.index )
+                   t.Backend.Step.Keypair.index )
               header path ) )
 
   let vk_storable =
@@ -63,7 +63,7 @@ module Step = struct
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset path ->
                   Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
-                    (Backend.Tick.Keypair.load_urs ())
+                    (Backend.Step.Keypair.load_urs ())
                     path )
                 path
             in
@@ -94,7 +94,7 @@ module Step = struct
           with
         | Ok (pk, dirty) ->
             Common.time "step keypair create" (fun () ->
-                (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty) )
+                (Keypair.create ~pk ~vk:(Backend.Step.Keypair.vk pk), dirty) )
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
@@ -144,7 +144,7 @@ module Wrap = struct
       type t =
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
-        * Backend.Tock.R1CS_constraint_system.t
+        * Backend.Wrap.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, h ->
@@ -162,7 +162,7 @@ module Wrap = struct
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
                   Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
-                    (Backend.Tock.Keypair.load_urs ()) )
+                    (Backend.Wrap.Keypair.load_urs ()) )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
@@ -171,7 +171,7 @@ module Wrap = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            { Backend.Tock.Keypair.index; cs } ) )
+            { Backend.Wrap.Keypair.index; cs } ) )
       (fun (_, header, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
@@ -192,7 +192,7 @@ module Wrap = struct
                Key_cache.Sync.read cache s_p k )
          with
          | Ok (pk, d) ->
-             (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
+             (Keypair.create ~pk ~vk:(Backend.Wrap.Keypair.vk pk), d)
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->

@@ -42,7 +42,7 @@ let input_size ~of_int ~add ~mul w =
   (* This should be an affine function in [a]. *)
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
-      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
+      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Wrap.Rounds.n
         ~uses_lookup:No
     in
     typ.size_in_field_elements
@@ -145,7 +145,7 @@ module Domains = struct
 end
 
 let max_domains =
-  { Domains.h = Domain.Pow_2_roots_of_unity (Nat.to_int Backend.Tick.Rounds.n) }
+  { Domains.h = Domain.Pow_2_roots_of_unity (Nat.to_int Backend.Step.Rounds.n) }
 
 module Vk = struct
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
@@ -167,7 +167,7 @@ module R = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+      type t = Backend.Wrap.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
       [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
@@ -180,7 +180,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type t =
-        ( Backend.Tock.Curve.Affine.t
+        ( Backend.Wrap.Curve.Affine.t
         , Pickles_base.Proofs_verified.Stable.V1.t
         , Vk.t )
         Poly.Stable.V2.t
@@ -213,15 +213,15 @@ module Stable = struct
         in
         (* we only compute the wrap_vk if the srs can be loaded *)
         let srs =
-          try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None
+          try Some (Backend.Wrap.Keypair.load_urs ()) with _ -> None
         in
         let wrap_vk =
           Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
               { domain =
                   { log_size_of_group = log2_size
-                  ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
+                  ; group_gen = Backend.Wrap.Field.domain_generator ~log2_size
                   }
-              ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; max_poly_size = 1 lsl Nat.to_int Backend.Wrap.Rounds.n
               ; max_quot_size
               ; public
               ; prev_challenges = 2 (* Due to Wrap_hack *)
@@ -243,7 +243,7 @@ module Stable = struct
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
                    ; chacha_comm = None
                    } )
-              ; shifts = Common.tock_shifts ~log2_size
+              ; shifts = Common.wrap_shifts ~log2_size
               ; lookup_index = None
               } )
         in
@@ -298,7 +298,7 @@ Stable.Latest.
 let dummy : t =
   { max_proofs_verified = N2
   ; wrap_index =
-      (let g = Backend.Tock.Curve.(to_affine_exn one) in
+      (let g = Backend.Wrap.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
        ; coefficients_comm = Vector.init Plonk_types.Columns.n ~f:(fun _ -> g)
        ; generic_comm = g
@@ -353,7 +353,7 @@ let%test_unit "input_size" =
         (let (T a) = Nat.of_int n in
          let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
-             ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+             ~wrap_rounds:Backend.Wrap.Rounds.n ~uses_lookup:No
          in
          typ.size_in_field_elements ) )
 

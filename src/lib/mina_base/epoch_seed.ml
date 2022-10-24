@@ -16,7 +16,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = (Snark_params.Tick.Field.t[@version_asserted])
+      type t = (Snark_params.Step.Field.t[@version_asserted])
       [@@deriving sexp, compare, hash]
     end
 

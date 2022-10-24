@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 
 [%%versioned
 module Stable = struct
@@ -29,7 +29,7 @@ let to_input t =
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 type var = { token_owner : Boolean.var; token_locked : Boolean.var }
 

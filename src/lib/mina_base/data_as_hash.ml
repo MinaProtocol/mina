@@ -1,5 +1,5 @@
 open Snark_params
-open Tick
+open Step
 
 type 'a t = Field.Var.t * 'a As_prover.Ref.t
 

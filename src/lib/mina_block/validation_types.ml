@@ -23,7 +23,7 @@ type ( 'time_received
    constraint 'genesis_state = [ `Genesis_state ] * (unit, _) Truth.t
    constraint 'proof = [ `Proof ] * (unit, _) Truth.t
    (* TODO: This type seems wrong... we sometimes have a proof if it was received
-      via gossip, but sometimes we do not and just stick a dummy proof here.
+      via gossip, but sometimes we do not and just sstep a dummy proof here.
       It seems that the better thing to do would be to mark this accordingly instead
       of having a dummy (though I wonder why we need to cache this in the first
       place). *)

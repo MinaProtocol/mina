@@ -81,12 +81,12 @@ end
 module Snark_params = struct
   module O = Snark_params
   module W = WT.Snark_params
-  include Assert_equal0 (O.Tick.Field) (W.Tick.Field)
-  include Assert_equal0 (O.Tock.Field) (W.Tock.Field)
-  include Assert_equal0 (O.Tick.Inner_curve) (W.Tick.Inner_curve)
-  include Assert_equal0 (O.Tock.Inner_curve) (W.Tock.Inner_curve)
-  include Assert_equal0 (O.Tick.Inner_curve.Scalar) (W.Tick.Inner_curve.Scalar)
-  include Assert_equal0 (O.Tock.Inner_curve.Scalar) (W.Tock.Inner_curve.Scalar)
+  include Assert_equal0 (O.Step.Field) (W.Step.Field)
+  include Assert_equal0 (O.Wrap.Field) (W.Wrap.Field)
+  include Assert_equal0 (O.Step.Inner_curve) (W.Step.Inner_curve)
+  include Assert_equal0 (O.Wrap.Inner_curve) (W.Wrap.Inner_curve)
+  include Assert_equal0 (O.Step.Inner_curve.Scalar) (W.Step.Inner_curve.Scalar)
+  include Assert_equal0 (O.Wrap.Inner_curve.Scalar) (W.Wrap.Inner_curve.Scalar)
 end
 
 module Public_key = struct
@@ -117,7 +117,7 @@ module Pickles = struct
     Assert_equal0V2
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
-  include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
+  include Assert_equal0V1 (O.Backend.Step.Field.Stable) (W.Backend.Step.Field)
   include Assert_equal2 (O.Proof) (W.Proof)
 end
 

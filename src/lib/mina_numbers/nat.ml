@@ -12,7 +12,7 @@ module Make_checked
     (N : Unsigned_extended.S)
     (Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
-  open Snark_params.Tick
+  open Snark_params.Step
 
   type var = Field.Var.t
 
@@ -90,7 +90,7 @@ struct
   type t = var
 
   let is_succ ~pred ~succ =
-    let open Snark_params.Tick in
+    let open Snark_params.Step in
     let open Field in
     Checked.(equal (pred + Var.constant one) succ)
 
@@ -185,7 +185,7 @@ end
 
 [%%endif]
 
-open Snark_params.Tick
+open Snark_params.Step
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]

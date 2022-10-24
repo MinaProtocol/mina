@@ -136,8 +136,8 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
            ~amount:(Graphql_lib.Encoders.amount amount)
            ~fee:(Graphql_lib.Encoders.fee fee)
            ~nonce:(Graphql_lib.Encoders.nonce nonce)
-           ~field:(Snark_params.Tick.Field.to_string field)
-           ~scalar:(Snark_params.Tick.Inner_curve.Scalar.to_string scalar)
+           ~field:(Snark_params.Step.Field.to_string field)
+           ~scalar:(Snark_params.Step.Inner_curve.Scalar.to_string scalar)
            ())
   in
   let%map res = exec_graphql_request ~graphql_target_node graphql_query in

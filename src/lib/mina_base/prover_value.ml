@@ -1,4 +1,4 @@
-open Snark_params.Tick.Run
+open Snark_params.Step.Run
 
 type 'a t = 'a As_prover.Ref.t
 

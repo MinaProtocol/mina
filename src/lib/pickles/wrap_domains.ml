@@ -30,7 +30,7 @@ struct
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
+             let g = Backend.Wrap.Inner_curve.(to_affine_exn one) in
              Verification_key.dummy_commitments g ) )
     in
     Timer.clock __LOC__ ;

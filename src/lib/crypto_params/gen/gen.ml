@@ -3,16 +3,16 @@
 open Ppxlib
 open Core_kernel
 module Impl = Pickles.Impls.Step.Internal_Basic
-module Group = Pickles.Backend.Tick.Inner_curve
+module Group = Pickles.Backend.Step.Inner_curve
 
 let group_map_params =
   Group_map.Params.create
-    (module Pickles.Backend.Tick.Field)
+    (module Pickles.Backend.Step.Field)
     Group.Params.{ a; b }
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
+    type t = Pickles.Backend.Step.Field.Stable.Latest.t Group_map.Params.t
     [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -24,7 +24,7 @@ let group_map_params_structure ~loc =
       lazy
         (let module T = struct
            type t =
-             Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
+             Pickles.Backend.Step.Field.Stable.Latest.t Group_map.Params.t
            [@@deriving bin_io_unversioned]
          end in
         Core_kernel.Binable.of_string

@@ -10,24 +10,24 @@ let high_entropy_bits = 128
 let sponge_params_constant =
   Sponge.Params.(map pasta_p_kimchi ~f:Impl.Field.Constant.of_string)
 
-let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
-  Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
+let step_field_random_oracle ?(length = Step.Field.size_in_bits - 1) s =
+  Step.Field.of_bits (Ro.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
     unstage
       (group_map
-         (module Tick.Field)
-         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b )
-  and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
-  fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
+         (module Step.Field)
+         ~a:Step.Inner_curve.Params.a ~b:Step.Inner_curve.Params.b )
+  and str = Fn.compose bits_to_bytes Step.Field.to_bits in
+  fun (x, y) -> group_map (step_field_random_oracle (str x ^ str y))
 
 open Impl
 
 module Other_field = struct
-  type t = Tock.Field.t [@@deriving sexp]
+  type t = Wrap.Field.t [@@deriving sexp]
 
-  include (Tock.Field : module type of Tock.Field with type t := t)
+  include (Wrap.Field : module type of Wrap.Field with type t := t)
 
   let size = Impls.Wrap.Bigint.to_bignum_bigint size
 end
@@ -53,9 +53,9 @@ module Sponge = struct
     Sponge_inputs.Make
       (Impl)
       (struct
-        include Tick_field_sponge.Inputs
+        include Step_field_sponge.Inputs
 
-        let params = Tick_field_sponge.params
+        let params = Step_field_sponge.params
       end)
 
   module S = Sponge.Make_sponge (Permutation)
@@ -74,8 +74,8 @@ module Sponge = struct
 end
 
 let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tick_field_sponge.Field) (Sponge.S) in
-  T.test Tick_field_sponge.params
+  let module T = Make_sponge.Test (Impl) (Step_field_sponge.Field) (Sponge.S) in
+  T.test Step_field_sponge.params
 
 module Input_domain = struct
   let domain = Domain.Pow_2_roots_of_unity 6
@@ -87,7 +87,7 @@ module Input_domain = struct
            Array.init domain_size ~f:(fun i ->
                let v =
                  (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
-                    (Backend.Tock.Keypair.load_urs ())
+                    (Backend.Wrap.Keypair.load_urs ())
                     domain_size i )
                    .unshifted
                in
@@ -194,8 +194,8 @@ module Inner_curve = struct
             fun () ->
               C.scale
                 (C.of_affine (read typ t))
-                (Tock.Field.inv
-                   (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
+                (Wrap.Field.inv
+                   (Wrap.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
               |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
@@ -290,6 +290,6 @@ let%test_unit "scale fast 2 small" =
 module Generators = struct
   let h =
     lazy
-      ( Kimchi_bindings.Protocol.SRS.Fq.urs_h (Backend.Tock.Keypair.load_urs ())
+      ( Kimchi_bindings.Protocol.SRS.Fq.urs_h (Backend.Wrap.Keypair.load_urs ())
       |> Common.finite_exn )
 end

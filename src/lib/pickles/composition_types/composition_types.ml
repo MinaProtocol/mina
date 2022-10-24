@@ -322,7 +322,7 @@ module Wrap = struct
             ; Scalar_challenge.typ scalar_challenge
             ; Vector.typ
                 (Bulletproof_challenge.typ scalar_challenge)
-                Backend.Tick.Rounds.n
+                Backend.Step.Rounds.n
             ; index
             ]
             ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -682,7 +682,7 @@ module Wrap = struct
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
-          ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
+          ; Vector (B Bulletproof_challenge, Backend.Step.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
           ; Lookup_parameters.opt_spec impl lookup
           ]
@@ -1103,7 +1103,7 @@ module Step = struct
         in
         let open In_circuit in
         Spec.typ impl fq ~assert_16_bits
-          (spec impl Backend.Tock.Rounds.n lookup_config)
+          (spec impl Backend.Wrap.Rounds.n lookup_config)
         |> Snarky_backendless.Typ.transport
              ~there:(to_data ~option_map:Option.map)
              ~back:(of_data ~option_map:Option.map)
@@ -1218,14 +1218,14 @@ module Step = struct
 end
 
 module Nvector = Vector.With_length
-module Wrap_bp_vec = Backend.Tock.Rounds_vector
-module Step_bp_vec = Backend.Tick.Rounds_vector
+module Wrap_bp_vec = Backend.Wrap.Rounds_vector
+module Step_bp_vec = Backend.Step.Rounds_vector
 
 module Challenges_vector = struct
   type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
+    (Backend.Wrap.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
-    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
+    type 'n t = (Backend.Wrap.Field.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end

@@ -12,9 +12,9 @@ module type S = sig
       end
     end]
 
-    val of_field : Snark_params.Tick.Field.t -> t
+    val of_field : Snark_params.Step.Field.t -> t
 
-    val to_field_unsafe : t -> Snark_params.Tick.Field.t
+    val to_field_unsafe : t -> Snark_params.Step.Field.t
 
     include Stringable.S with type t := t
 
@@ -22,7 +22,7 @@ module type S = sig
 
     include Hashable_binable with type t := t
 
-    val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+    val to_input : t -> Snark_params.Step.Field.t Random_oracle.Input.Chunked.t
 
     val default : t
 
@@ -54,7 +54,7 @@ module type S = sig
       end
     end
 
-    val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+    val typ : (Checked.t, t) Snark_params.Step.Typ.t
 
     [%%endif]
   end
@@ -78,7 +78,7 @@ module type S = sig
 
   val token_id : t -> Digest.t
 
-  val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+  val to_input : t -> Snark_params.Step.Field.t Random_oracle.Input.Chunked.t
 
   val gen : t Quickcheck.Generator.t
 
@@ -90,13 +90,13 @@ module type S = sig
 
   type var
 
-  val typ : (var, t) Snark_params.Tick.Typ.t
+  val typ : (var, t) Snark_params.Step.Typ.t
 
   val var_of_t : t -> var
 
   module Checked : sig
     open Snark_params
-    open Tick
+    open Step
 
     val create : Public_key.Compressed.var -> Digest.Checked.t -> var
 
@@ -105,7 +105,7 @@ module type S = sig
     val token_id : var -> Digest.Checked.t
 
     val to_input :
-      var -> Snark_params.Tick.Field.Var.t Random_oracle.Input.Chunked.t
+      var -> Snark_params.Step.Field.Var.t Random_oracle.Input.Chunked.t
 
     val equal : var -> var -> Boolean.var Checked.t
 

@@ -13,7 +13,7 @@ module Block_data : sig
 
   val typ :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> (var, t) Snark_params.Tick.Typ.t
+    -> (var, t) Snark_params.Step.Typ.t
 end
 
 module Poly : sig

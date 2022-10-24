@@ -1,5 +1,5 @@
 open Core_kernel
-open Snark_params.Tick.Run
+open Snark_params.Step.Run
 open Signature_lib
 open Mina_base
 

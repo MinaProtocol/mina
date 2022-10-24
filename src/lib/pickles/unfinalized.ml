@@ -20,7 +20,7 @@ type t =
     , Boolean.var )
     Plonk_types.Opt.t
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
-    , Tock.Rounds.n )
+    , Wrap.Rounds.n )
     Pickles_types.Vector.t
   , Field.t
   , Boolean.var )
@@ -28,26 +28,26 @@ type t =
 
 module Plonk_checks = struct
   include Plonk_checks
-  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
+  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Wrap)
 end
 
 module Constant = struct
   type t =
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
-    , Tock.Field.t Shifted_value.t
+    , Wrap.Field.t Shifted_value.t
     , ( Challenge.Constant.t Scalar_challenge.t
-      , Tock.Field.t Shifted_value.t )
+      , Wrap.Field.t Shifted_value.t )
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
       option
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-      , Tock.Rounds.n )
+      , Wrap.Rounds.n )
       Vector.t
     , Digest.Constant.t
     , bool )
     Types.Step.Proof_state.Per_proof.In_circuit.t
 
-  let shift = Shifted_value.Shift.create (module Tock.Field)
+  let shift = Shifted_value.Shift.create (module Wrap.Field)
 
   let dummy () : t =
     let one_chal = Challenge.Constant.dummy in
@@ -59,8 +59,8 @@ module Constant = struct
     let chals :
         _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
       { alpha = Common.Ipa.Wrap.endo_to_field alpha
-      ; beta = Challenge.Constant.to_tock_field beta
-      ; gamma = Challenge.Constant.to_tock_field gamma
+      ; beta = Challenge.Constant.to_wrap_field beta
+      ; gamma = Challenge.Constant.to_wrap_field gamma
       ; zeta = Common.Ipa.Wrap.endo_to_field zeta
       ; joint_combiner = None
       }
@@ -70,28 +70,28 @@ module Constant = struct
     in
     let env =
       Plonk_checks.scalars_env
-        (module Tock.Field)
+        (module Wrap.Field)
         ~srs_length_log2:Common.Max_degree.wrap_log2
-        ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
+        ~endo:Endo.Wrap_inner_curve.base ~mds:Wrap_field_sponge.params.mds
         ~field_of_hex:
-          (Core_kernel.Fn.compose Tock.Field.of_bigint
+          (Core_kernel.Fn.compose Wrap.Field.of_bigint
              Kimchi_pasta.Pasta.Bigint256.of_hex_string )
         ~domain:
           (Plonk_checks.domain
-             (module Tock.Field)
-             (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
-             ~domain_generator:Tock.Field.domain_generator )
+             (module Wrap.Field)
+             (wrap_domains ~proofs_verified:2).h ~shifts:Common.wrap_shifts
+             ~domain_generator:Wrap.Field.domain_generator )
         chals evals
     in
     let plonk =
-      Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+      Plonk_checks.derive_plonk (module Wrap.Field) ~env ~shift chals evals
     in
     { deferred_values =
         { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
-        ; combined_inner_product = Shifted_value (tock ())
+        ; combined_inner_product = Shifted_value (wrap ())
         ; xi = Scalar_challenge.create one_chal
         ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
-        ; b = Shifted_value (tock ())
+        ; b = Shifted_value (wrap ())
         }
     ; should_finalize = false
     ; sponge_digest_before_evaluations = Digest.Constant.dummy
@@ -103,4 +103,4 @@ let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-    ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup
+    ~zero:Common.Lookup_parameters.step_zero ~uses_lookup

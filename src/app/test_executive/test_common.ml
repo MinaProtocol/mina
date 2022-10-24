@@ -136,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
       in
       List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
-          compatible_item req ledg ~equal:Pickles.Backend.Tick.Field.equal )
+          compatible_item req ledg ~equal:Pickles.Backend.Step.Field.equal )
     in
     let delegates_compat =
       compatible_item requested_update.delegate ledger_update.delegate
@@ -148,7 +148,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~equal:
           [%equal:
             ( Pickles.Side_loaded.Verification_key.t
-            , Pickles.Backend.Tick.Field.t )
+            , Pickles.Backend.Step.Field.t )
             With_hash.t]
     in
     let permissions_compat =

@@ -155,7 +155,7 @@ let create
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+        ~wrap_rounds:Backend.Wrap.Rounds.n ~uses_lookup:No
       (* TODO *)
     in
     Fix_domains.domains

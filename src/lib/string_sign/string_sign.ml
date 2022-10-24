@@ -1,6 +1,6 @@
 (* string_sign.ml -- signatures for strings *)
 
-module Inner_curve = Snark_params.Tick.Inner_curve
+module Inner_curve = Snark_params.Step.Inner_curve
 open Signature_lib
 
 let nybble_bits = function

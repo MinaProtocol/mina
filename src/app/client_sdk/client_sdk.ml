@@ -131,7 +131,7 @@ let _ =
            in
            let verified =
              Schnorr.Legacy.verify signature
-               (Snark_params.Tick.Inner_curve.of_affine pk)
+               (Snark_params.Step.Inner_curve.of_affine pk)
                message
            in
            if verified then Js._true
@@ -394,10 +394,10 @@ let _ =
              |> String.of_char_list
            in
            bits_to_bytes
-             (List.init Snark_params.Tick.Field.size_in_bits ~f:(fun i ->
+             (List.init Snark_params.Step.Field.size_in_bits ~f:(fun i ->
                   Bigint.(
                     equal
-                      (shift_right Snark_params.Tick.Field.size i land one)
+                      (shift_right Snark_params.Step.Field.size i land one)
                       one) ) )
          in
          Hex.encode @@ field_order_bytes

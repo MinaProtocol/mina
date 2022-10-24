@@ -36,8 +36,8 @@ module Pending_coinbase_stack_state : sig
     end]
 
     val typ :
-         ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
-      -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
+         ('pending_coinbase_var, 'pending_coinbase) Step.Typ.t
+      -> ('pending_coinbase_var t, 'pending_coinbase t) Step.Typ.t
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
@@ -54,7 +54,7 @@ module Pending_coinbase_stack_state : sig
 
   type var = Pending_coinbase.Stack.var Poly.t
 
-  open Tick
+  open Step
 
   val typ : (var, t) Typ.t
 
@@ -172,7 +172,7 @@ module Statement : sig
       , Local_state.Checked.t )
       Poly.t
 
-    open Tick
+    open Step
 
     val typ : (var, t) Typ.t
 
@@ -256,7 +256,7 @@ val check_transaction :
   -> zkapp_account2:Zkapp_account.t option
   -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
-  -> Tick.Handler.t
+  -> Step.Handler.t
   -> unit
 
 val check_user_command :
@@ -268,7 +268,7 @@ val check_user_command :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> supply_increase:Amount.Signed.t
   -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
-  -> Tick.Handler.t
+  -> Step.Handler.t
   -> unit
 
 val generate_transaction_witness :
@@ -283,7 +283,7 @@ val generate_transaction_witness :
   -> zkapp_account2:Zkapp_account.t option
   -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
-  -> Tick.Handler.t
+  -> Step.Handler.t
   -> unit
 
 module Zkapp_command_segment : sig
@@ -322,21 +322,21 @@ module type S = sig
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Transaction.Valid.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_user_command :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_fee_transfer :
        statement:Statement.With_sok.t
     -> init_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t Transaction_protocol_state.t
-    -> Tick.Handler.t
+    -> Step.Handler.t
     -> t Async.Deferred.t
 
   val of_zkapp_command_segment_exn :
@@ -400,12 +400,12 @@ val constraint_system_digests :
 
 (* Every circuit must have at least 1 of each type of constraint.
    This function can be used to add the missing constraints *)
-val dummy_constraints : unit -> unit Tick.Checked.t
+val dummy_constraints : unit -> unit Step.Checked.t
 
 module Base : sig
   val check_timing :
-       balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
-    -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
+       balance_check:(Step.Boolean.var -> unit Step.Checked.t)
+    -> timed_balance_check:(Step.Boolean.var -> unit Step.Checked.t)
     -> account:
          ( 'b
          , 'c
@@ -416,7 +416,7 @@ module Base : sig
          , 'g
          , 'h
          , 'i
-         , ( Tick.Boolean.var
+         , ( Step.Boolean.var
            , Mina_numbers.Global_slot.Checked.var
            , Currency.Balance.var
            , Currency.Amount.var )
@@ -428,12 +428,12 @@ module Base : sig
     -> txn_amount:Currency.Amount.var option
     -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
     -> ( [> `Min_balance of Currency.Balance.var ]
-       * ( Tick.Boolean.var
+       * ( Step.Boolean.var
          , Mina_numbers.Global_slot.Checked.var
          , Currency.Balance.var
          , Currency.Amount.var )
          Account_timing.As_record.t )
-       Tick.Checked.t
+       Step.Checked.t
 
   module Zkapp_command_snark : sig
     val main :
@@ -483,9 +483,9 @@ module For_tests : sig
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
+      ; sequence_events : Step.Field.t array list
+      ; events : Step.Field.t array list
+      ; call_data : Step.Field.t
       ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]
@@ -514,13 +514,13 @@ module For_tests : sig
 
   val trivial_zkapp_account :
        ?permissions:Permissions.t
-    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> vk:(Side_loaded_verification_key.t, Step.Field.t) With_hash.t
     -> Account.key
     -> Account.t
 
   val create_trivial_zkapp_account :
        ?permissions:Permissions.t
-    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> vk:(Side_loaded_verification_key.t, Step.Field.t) With_hash.t
     -> ledger:Mina_ledger.Ledger.t
     -> Account.key
     -> unit
@@ -528,7 +528,7 @@ module For_tests : sig
   val create_trivial_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
-    -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+    -> [> `VK of (Side_loaded_verification_key.t, Step.Field.t) With_hash.t ]
        * [> `Prover of
             ( unit
             , unit
@@ -551,9 +551,9 @@ module For_tests : sig
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
             (* Authorization for the update being performed *)
-      ; sequence_events : Tick.Field.t array list
-      ; events : Tick.Field.t array list
-      ; call_data : Tick.Field.t
+      ; sequence_events : Step.Field.t array list
+      ; events : Step.Field.t array list
+      ; call_data : Step.Field.t
       ; preconditions : Account_update.Preconditions.t option
       }
     [@@deriving sexp]

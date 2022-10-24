@@ -4,7 +4,7 @@
 
 open Mina_base_import
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 open Mina_numbers
 
 module type Gen_intf = sig

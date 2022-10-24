@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
+open Snark_params.Step
 module T = Mina_numbers.Length
 
 (*constants actually required for blockchain snark*)
