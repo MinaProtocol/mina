@@ -28,7 +28,7 @@ let
     dune-rpc = dune;
     dyn = dune;
     fiber = dune;
-    ocaml-lsp-server = "1.11.6";
+    ocaml-lsp-server = "1.14.1";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
     omd = "1.3.1";
