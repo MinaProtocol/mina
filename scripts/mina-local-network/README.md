@@ -34,12 +34,19 @@
             src/app/logproc/logproc.exe
         ```
 
-      - If you’d like to work with the `zkApps` locally.
+      - If you’d like to work with `zkApps` using `SnarkyJS` locally.
         - Build the `SnarkyJS`:
 
           ```shell
+          ./scripts/update-snarkyjs-bindings.sh
+          ```
+          
+          or 
+          
+          ```shell
           ./scripts/build-snarkyjs-node.sh
           ```
+          
 
 5. Within the `Mina` repository root directory, execute the `./scripts/mina-local-network/mina-local-network.sh`, for example:
 
@@ -59,7 +66,7 @@
 
 ## SnarkyJS and zkApps
 
-- Now, if you’d like to work with the `zkApps` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using the `zkApp-CLI` like this: `zk project foo`).
+- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using `zkApp-CLI` like this: `zk project foo`).
   - Suppose you’ve created `zkApp` at following path: 
     - `~/projcts/zkapps/foo`
   - Go to `zkApp` project root (☝️).
@@ -70,6 +77,8 @@
     ```shell
     npm i ${HOME}/<path_to_Mina_repo>/src/lib/snarky_js_bindings/snarkyjs
     ```
+    
+  - Note: you can also refer to [this repo](https://github.com/o1-labs/e2e-zkapp/) for setting up scripts you can re-use for your particular environment.
 
 ## Notes
 
