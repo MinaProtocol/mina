@@ -149,7 +149,7 @@ mina_signer: ocaml_checks
 	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
 	&& dune b src/app/client_sdk/client_sdk.bc.js \
 	&& (cd frontend/mina-signer; \
-	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run build; \
 	cd ../..)
 	$(info Build complete)
 
