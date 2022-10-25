@@ -50,8 +50,7 @@
   cache_dir.fake
   run_in_thread.fake
   mina_metrics.none
-  bindings_js
-  node_backend
+  js_backend
   mina_transaction)
  (preprocessor_deps ../../config.mlh)
  (instrumentation

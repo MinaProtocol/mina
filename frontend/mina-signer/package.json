@@ -3,12 +3,12 @@
   "description": "Node API for signing transactions on various networks for Mina Protocol",
   "version": "1.5.0",
   "scripts": {
-    "build": "tsc && cp src/client_sdk.min.js dist/src/client_sdk.bc.js",
+    "build": "tsc && cp src/client_sdk.bc.js dist/src",
     "clean": "rm -rf dist",
-    "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js && esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
+    "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js",
     "make-jsoo": "make -C ../.. client_sdk && npm run copy-jsoo",
-    "test": "jest",
-    "prepublishOnly": "npm run make-jsoo && npm run copy-wasm && npm run build && npm run test"
+    "test": "for f in ./tests/*.test.ts; do jest $f || exit 1; done",
+    "prepublishOnly": "npm run make-jsoo && npm run build && npm run test"
   },
   "keywords": [
     "mina",
