@@ -335,7 +335,7 @@ module Status = struct
             ( Result.return
             @@ { Network_status_response.current_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
+                   ; hash= "LATEST_BLOCK_HASH" }
                ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
                ; genesis_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 1
@@ -367,9 +367,9 @@ module Status = struct
           ~expected:
             ( Result.return
             @@ { Network_status_response.current_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
-               ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
+                   { Block_identifier.index= Int64.of_int_exn 10_000
+                   ; hash= "ANOTHER_HASH" }
+               ; current_block_timestamp= Int64.of_int_exn 20_000
                ; genesis_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 1
                    ; hash= "GENESIS_HASH" }
@@ -421,7 +421,7 @@ module Options = struct
           ~actual:(Mock.handle dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.9" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.9" "1.0.0"
                ; allow=
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all
