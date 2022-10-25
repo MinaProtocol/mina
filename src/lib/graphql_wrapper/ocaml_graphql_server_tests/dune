@@ -1,5 +1,5 @@
 (library
- (name graphql_test)
+ (name ocaml_graphql_server_tests)
  (wrapped false)
  (modules
   echo_schema
