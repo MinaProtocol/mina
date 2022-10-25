@@ -79,7 +79,7 @@ let
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.pname}-release" {
-        buildInputs = [ pkgs.makeWrapper pkgs.xorg.lndir ];
+        buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
         outputs = package.outputs;
       } (map (output: ''
         mkdir -p ${placeholder output}
