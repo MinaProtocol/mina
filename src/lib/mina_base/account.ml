@@ -312,7 +312,7 @@ module Binable_arg = struct
     module V2 = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
+        , Token_id.Stable.V2.t
         , Token_permissions.Stable.V1.t
         , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t

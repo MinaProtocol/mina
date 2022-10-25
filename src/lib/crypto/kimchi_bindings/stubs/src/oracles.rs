@@ -1,4 +1,5 @@
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use ark_ff::One;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
@@ -48,6 +49,17 @@ macro_rules! impl_oracles {
                         .map(|s| -s)
                         .collect::<Vec<_>>(),
                 );
+
+                let p_comm = {
+                    index
+                        .srs()
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
 
                 let proof: ProverProof<$G> = proof.into();
 

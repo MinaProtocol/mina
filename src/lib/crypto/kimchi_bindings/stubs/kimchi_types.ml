@@ -130,6 +130,7 @@ type nonrec gate_type =
   | CairoTransition
   | RangeCheck0
   | RangeCheck1
+  | ForeignFieldAdd
 
 type nonrec 'f circuit_gate =
   { typ : gate_type

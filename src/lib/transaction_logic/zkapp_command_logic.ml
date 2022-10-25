@@ -174,7 +174,7 @@ module Local_state = struct
       type ( 'stack_frame
            , 'call_stack
            , 'token_id
-           , 'excess
+           , 'signed_amount
            , 'ledger
            , 'bool
            , 'comm
@@ -186,7 +186,8 @@ module Local_state = struct
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
         ; token_id : 'token_id
-        ; excess : 'excess
+        ; excess : 'signed_amount
+        ; supply_increase : 'signed_amount
         ; ledger : 'ledger
         ; success : 'bool
         ; account_update_index : 'length
@@ -196,8 +197,8 @@ module Local_state = struct
     end
   end]
 
-  let typ stack_frame call_stack token_id excess ledger bool comm length
-      failure_status_tbl =
+  let typ stack_frame call_stack token_id excess supply_increase ledger bool
+      comm length failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
       [ stack_frame
       ; call_stack
@@ -205,6 +206,7 @@ module Local_state = struct
       ; comm
       ; token_id
       ; excess
+      ; supply_increase
       ; ledger
       ; bool
       ; length
@@ -220,7 +222,7 @@ module Local_state = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
-          , Token_id.Stable.V1.t
+          , Token_id.Stable.V2.t
           , ( Currency.Amount.Stable.V1.t
             , Sgn.Stable.V1.t )
             Currency.Signed_poly.Stable.V1.t
@@ -816,6 +818,10 @@ module type Inputs_intf = sig
 
     val set_fee_excess : t -> Amount.Signed.t -> t
 
+    val supply_increase : t -> Amount.Signed.t
+
+    val set_supply_increase : t -> Amount.Signed.t -> t
+
     val global_slot_since_genesis : t -> Global_slot.t
   end
 end
@@ -1220,24 +1226,41 @@ module Make (Inputs : Inputs_intf) = struct
       let local_state =
         Local_state.add_check local_state Overflow (Bool.not failed1)
       in
+      let account_creation_fee =
+        Amount.of_constant_fee constraint_constants.account_creation_fee
+      in
       let local_state =
         (* Conditionally subtract account creation fee from fee excess *)
-        let account_creation_fee =
-          Amount.of_constant_fee constraint_constants.account_creation_fee
-        in
         let excess_minus_creation_fee, `Overflow excess_update_failed =
           Amount.Signed.add_flagged local_state.excess
             Amount.Signed.(negate (of_unsigned account_creation_fee))
         in
         let local_state =
-          Local_state.add_check local_state
-            Amount_insufficient_to_create_account
+          Local_state.add_check local_state Local_excess_overflow
             Bool.(not (account_is_new &&& excess_update_failed))
         in
         { local_state with
           excess =
             Amount.Signed.if_ account_is_new ~then_:excess_minus_creation_fee
               ~else_:local_state.excess
+        }
+      in
+      let local_state =
+        (* Conditionally subtract account creation fee from supply increase *)
+        let ( supply_increase_minus_creation_fee
+            , `Overflow supply_increase_update_failed ) =
+          Amount.Signed.add_flagged local_state.supply_increase
+            Amount.Signed.(negate (of_unsigned account_creation_fee))
+        in
+        let local_state =
+          Local_state.add_check local_state Local_supply_increase_overflow
+            Bool.(not (account_is_new &&& supply_increase_update_failed))
+        in
+        { local_state with
+          supply_increase =
+            Amount.Signed.if_ account_is_new
+              ~then_:supply_increase_minus_creation_fee
+              ~else_:local_state.supply_increase
         }
       in
       let is_receiver = Amount.Signed.is_pos balance_change in
@@ -1387,7 +1410,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Reset zkApp state to [None] if it is unmodified. *)
     let a = Account.unmake_zkapp a in
-    (* Update snapp URI. *)
+    (* Update zkApp URI. *)
     let a, local_state =
       let zkapp_uri = Account_update.Update.zkapp_uri account_update in
       let has_permission =
@@ -1570,7 +1593,6 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Local_excess_overflow
         (Bool.not overflowed)
     in
-
     (* If a's token ID differs from that in the local state, then
        the local state excess gets moved into the execution state's fee excess.
 
@@ -1603,15 +1625,19 @@ module Make (Inputs : Inputs_intf) = struct
       let delta_settled =
         Amount.Signed.equal local_state.excess Amount.(Signed.of_unsigned zero)
       in
-      Bool.((not is_last_account_update) ||| delta_settled)
+      (* 1) ignore local excess if it is_start because it will be promoted to global
+             excess and then set to zero later in the code
+         2) ignore everything but last account update since the excess wouldn't have
+            been settled
+         3) Excess should be settled after the last account update has been applied.
+      *)
+      Bool.(is_start' ||| not is_last_account_update ||| delta_settled)
     in
     let local_state =
       Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
     in
-    let update_local_excess = Bool.(is_start' ||| is_last_account_update) in
-    let update_global_state =
-      Bool.(update_local_excess &&& local_state.success)
-    in
+    let is_start_or_last = Bool.(is_start' ||| is_last_account_update) in
+    let update_global_state = Bool.(is_start_or_last &&& local_state.success) in
     let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in
       let res, `Overflow overflow =
@@ -1631,7 +1657,7 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       { local_state with
         excess =
-          Amount.Signed.if_ update_local_excess
+          Amount.Signed.if_ is_start_or_last
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.excess
       }
@@ -1639,6 +1665,26 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       Local_state.add_check local_state Global_excess_overflow
         Bool.(not global_excess_update_failed)
+    in
+    (* add local supply increase in global state *)
+    let new_global_supply_increase, global_supply_increase_update_failed =
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged
+          (Global_state.supply_increase global_state)
+          local_state.supply_increase
+      in
+      (res, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Global_supply_increase_overflow
+        Bool.(not global_supply_increase_update_failed)
+    in
+    let global_state =
+      Global_state.set_supply_increase global_state
+        (Amount.Signed.if_
+           Bool.(is_last_account_update &&& local_state.success)
+           ~then_:new_global_supply_increase
+           ~else_:(Global_state.supply_increase global_state) )
     in
     (* The first account_update must succeed. *)
     Bool.(
@@ -1661,6 +1707,7 @@ module Make (Inputs : Inputs_intf) = struct
          - ledger = Frozen_ledger_hash.empty_hash
          - success = true
          - account_update_index = Index.zero
+         - supply_increase = Amount.Signed.zero
       *)
       { local_state with
         token_id =
@@ -1677,6 +1724,10 @@ module Make (Inputs : Inputs_intf) = struct
       ; account_update_index =
           Inputs.Index.if_ is_last_account_update ~then_:Inputs.Index.zero
             ~else_:(Inputs.Index.succ local_state.account_update_index)
+      ; supply_increase =
+          Amount.Signed.if_ is_last_account_update
+            ~then_:Amount.(Signed.of_unsigned zero)
+            ~else_:local_state.supply_increase
       }
     in
     (global_state, local_state)
