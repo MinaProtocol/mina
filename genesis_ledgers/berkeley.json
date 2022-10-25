@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-06-20T20:00:01Z"
+    "genesis_state_timestamp": "2022-10-25T05:00:01Z"
   },
   "ledger": {
     "name": "berkeley",
