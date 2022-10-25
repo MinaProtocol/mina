@@ -231,13 +231,13 @@ let () =
              (required int))
        in
        fun () ->
+         let open Mina_generators.Zkapp_command_generators in
+         let open Transaction_status.Failure in
          let max_account_updates = 3 in
          generate_zkapp_commands_and_apply_them_consecutively ~trials
            ~max_account_updates () ;
          generate_zkapp_commands_and_apply_them_freshly ~trials
            ~max_account_updates () ;
-         let open Mina_generators.Zkapp_command_generators in
-         let open Transaction_status.Failure in
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:Invalid_protocol_state_precondition
            ~expected_failure_status:Protocol_state_precondition_unsatisfied ;

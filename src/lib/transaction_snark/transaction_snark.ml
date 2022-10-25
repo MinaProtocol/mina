@@ -260,8 +260,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
-            Random_oracle.Input.Chunked.t}@."
+          !"@[<v>Generating unchecked top hash from:@,\
+            %{sexp: Tick.Field.t Random_oracle.Input.Chunked.t}@]@."
           input ;
       input
 
@@ -294,8 +294,8 @@ module Statement = struct
               if !top_hash_logging_enabled then
                 let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: Field.t \
-                    Random_oracle.Input.Chunked.t}@."
+                  !"@[<v>Generating checked top hash from:@,\
+                    %{sexp: Field.t Random_oracle.Input.Chunked.t}@]@."
                   input
               else return ())
         in
@@ -849,8 +849,8 @@ module Base = struct
     let%bind verifies =
       Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
-    [%with_label_ "check signature"]
-      (Boolean.Assert.any [ Boolean.not is_user_command; verifies ])
+    [%with_label_ "check signature"] (fun () ->
+        Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
       ~txn_global_slot =
@@ -1228,9 +1228,9 @@ module Base = struct
           in
           let `Min_balance _, timing =
             run_checked
-            @@ [%with_label.Snark_params.Tick "Check zkapp timing"]
-                 (check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:None ~txn_global_slot )
+            @@ [%with_label.Snark_params.Tick "Check zkapp timing"] (fun () ->
+                   check_timing ~balance_check ~timed_balance_check ~account
+                     ~txn_amount:None ~txn_global_slot )
           in
           (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
@@ -1369,7 +1369,7 @@ module Base = struct
 
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
-              ( Mina_base.Token_id.Stable.V1.t
+              ( Mina_base.Token_id.Stable.V2.t
               , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =
@@ -1992,38 +1992,38 @@ module Base = struct
     let check_protocol_state ~pending_coinbase_stack_init
         ~pending_coinbase_stack_before ~pending_coinbase_stack_after state_body
         =
-      [%with_label_ "Compute pending coinbase stack"]
-        (let%bind state_body_hash =
-           Mina_state.Protocol_state.Body.hash_checked state_body
-         in
-         let%bind computed_pending_coinbase_stack_after =
-           Pending_coinbase.Stack.Checked.push_state state_body_hash
-             pending_coinbase_stack_init
-         in
-         [%with_label_ "Check pending coinbase stack"]
-           (let%bind correct_coinbase_target_stack =
-              Pending_coinbase.Stack.equal_var
-                computed_pending_coinbase_stack_after
-                pending_coinbase_stack_after
-            in
-            let%bind valid_init_state =
-              (* Stack update is performed once per scan state tree and the
-                 following is true only for the first transaction per block per
-                 tree*)
-              let%bind equal_source =
-                Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
-                  pending_coinbase_stack_before
-              in
-              (*for the rest, both source and target are the same*)
-              let%bind equal_source_with_state =
+      [%with_label_ "Compute pending coinbase stack"] (fun () ->
+          let%bind state_body_hash =
+            Mina_state.Protocol_state.Body.hash_checked state_body
+          in
+          let%bind computed_pending_coinbase_stack_after =
+            Pending_coinbase.Stack.Checked.push_state state_body_hash
+              pending_coinbase_stack_init
+          in
+          [%with_label_ "Check pending coinbase stack"] (fun () ->
+              let%bind correct_coinbase_target_stack =
                 Pending_coinbase.Stack.equal_var
                   computed_pending_coinbase_stack_after
-                  pending_coinbase_stack_before
+                  pending_coinbase_stack_after
               in
-              Boolean.(equal_source ||| equal_source_with_state)
-            in
-            Boolean.Assert.all
-              [ correct_coinbase_target_stack; valid_init_state ] ) )
+              let%bind valid_init_state =
+                (* Stack update is performed once per scan state tree and the
+                   following is true only for the first transaction per block per
+                   tree*)
+                let%bind equal_source =
+                  Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                    pending_coinbase_stack_before
+                in
+                (*for the rest, both source and target are the same*)
+                let%bind equal_source_with_state =
+                  Pending_coinbase.Stack.equal_var
+                    computed_pending_coinbase_stack_after
+                    pending_coinbase_stack_before
+                in
+                Boolean.(equal_source ||| equal_source_with_state)
+              in
+              Boolean.Assert.all
+                [ correct_coinbase_target_stack; valid_init_state ] ) )
 
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
         (statement : Statement.With_sok.Checked.t) =
@@ -2333,15 +2333,15 @@ module Base = struct
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
-      [%with_label_ "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
+      [%with_label_ "Check transaction signature"] (fun () ->
+          check_signature shifted ~payload ~is_user_command ~signer ~signature )
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
-      [%with_label_ "Fee-payer must sign the transaction"]
-        ((* TODO: Enable multi-sig. *)
-         Public_key.Compressed.Checked.Assert.equal signer_pk
-           payload.common.fee_payer_pk )
+      [%with_label_ "Fee-payer must sign the transaction"] (fun () ->
+          (* TODO: Enable multi-sig. *)
+          Public_key.Compressed.Checked.Assert.equal signer_pk
+            payload.common.fee_payer_pk )
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
@@ -2368,42 +2368,46 @@ module Base = struct
       Checked.all_unit
         [ [%with_label_
             "Token_locked value is compatible with the transaction kind"]
-            (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked; is_create_account ] )
+            (fun () ->
+              Boolean.Assert.any
+                [ Boolean.not payload.body.token_locked; is_create_account ] )
         ; [%with_label_ "Token_locked cannot be used with the default token"]
-            (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked
-               ; Boolean.not token_default
-               ] )
+            (fun () ->
+              Boolean.Assert.any
+                [ Boolean.not payload.body.token_locked
+                ; Boolean.not token_default
+                ] )
         ]
     in
     let%bind () = Boolean.Assert.is_true token_default in
     let%bind () =
-      [%with_label_ "Validate tokens"]
-        (Checked.all_unit
-           [ [%with_label_
-               "Fee token is default or command allows non-default fee"]
-               (Boolean.Assert.any
-                  [ fee_token_default
-                  ; is_payment
-                  ; is_stake_delegation
-                  ; is_fee_transfer
-                  ] )
-           ; (* TODO: Remove this check and update the transaction snark once we
-                have an exchange rate mechanism. See issue #4447.
-             *)
-             [%with_label_ "Fees in tokens disabled"]
-               (Boolean.Assert.is_true fee_token_default)
-           ; [%with_label_ "Command allows default token"]
-               Boolean.(
-                 Assert.any
-                   [ is_payment
-                   ; is_stake_delegation
-                   ; is_create_account
-                   ; is_fee_transfer
-                   ; is_coinbase
-                   ])
-           ] )
+      [%with_label_ "Validate tokens"] (fun () ->
+          Checked.all_unit
+            [ [%with_label_
+                "Fee token is default or command allows non-default fee"]
+                (fun () ->
+                  Boolean.Assert.any
+                    [ fee_token_default
+                    ; is_payment
+                    ; is_stake_delegation
+                    ; is_fee_transfer
+                    ] )
+            ; (* TODO: Remove this check and update the transaction snark once we
+                 have an exchange rate mechanism. See issue #4447.
+              *)
+              [%with_label_ "Fees in tokens disabled"] (fun () ->
+                  Boolean.Assert.is_true fee_token_default )
+            ; [%with_label_ "Command allows default token"]
+                Boolean.(
+                  fun () ->
+                    Assert.any
+                      [ is_payment
+                      ; is_stake_delegation
+                      ; is_create_account
+                      ; is_fee_transfer
+                      ; is_coinbase
+                      ])
+            ] )
     in
     let current_global_slot =
       Mina_state.Protocol_state.Body.consensus_state state_body
@@ -2426,9 +2430,10 @@ module Base = struct
       Account_id.Checked.create payload.common.fee_payer_pk fee_token
     in
     let%bind () =
-      [%with_label_ "Check slot validity"]
-        ( Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
-        >>= Boolean.Assert.is_true )
+      [%with_label_ "Check slot validity"] (fun () ->
+          Global_slot.Checked.(
+            current_global_slot <= payload.common.valid_until)
+          >>= Boolean.Assert.is_true )
     in
 
     (* Check coinbase stack. Protocol state body is pushed into the Pending
@@ -2461,45 +2466,45 @@ module Base = struct
          i + coinbase    i + state + coinbase    i + state + coinbase
     *)
     let%bind () =
-      [%with_label_ "Compute coinbase stack"]
-        (let%bind state_body_hash =
-           Mina_state.Protocol_state.Body.hash_checked state_body
-         in
-         let%bind pending_coinbase_stack_with_state =
-           Pending_coinbase.Stack.Checked.push_state state_body_hash
-             pending_coinbase_stack_init
-         in
-         let%bind computed_pending_coinbase_stack_after =
-           let coinbase =
-             (Account_id.Checked.public_key receiver, payload.body.amount)
-           in
-           let%bind stack' =
-             Pending_coinbase.Stack.Checked.push_coinbase coinbase
-               pending_coinbase_stack_with_state
-           in
-           Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
-             ~else_:pending_coinbase_stack_with_state
-         in
-         [%with_label_ "Check coinbase stack"]
-           (let%bind correct_coinbase_target_stack =
-              Pending_coinbase.Stack.equal_var
-                computed_pending_coinbase_stack_after pending_coinbase_after
+      [%with_label_ "Compute coinbase stack"] (fun () ->
+          let%bind state_body_hash =
+            Mina_state.Protocol_state.Body.hash_checked state_body
+          in
+          let%bind pending_coinbase_stack_with_state =
+            Pending_coinbase.Stack.Checked.push_state state_body_hash
+              pending_coinbase_stack_init
+          in
+          let%bind computed_pending_coinbase_stack_after =
+            let coinbase =
+              (Account_id.Checked.public_key receiver, payload.body.amount)
             in
-            let%bind valid_init_state =
-              let%bind equal_source =
-                Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
-                  pending_coinbase_stack_before
-              in
-              let%bind equal_source_with_state =
+            let%bind stack' =
+              Pending_coinbase.Stack.Checked.push_coinbase coinbase
+                pending_coinbase_stack_with_state
+            in
+            Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
+              ~else_:pending_coinbase_stack_with_state
+          in
+          [%with_label_ "Check coinbase stack"] (fun () ->
+              let%bind correct_coinbase_target_stack =
                 Pending_coinbase.Stack.equal_var
-                  pending_coinbase_stack_with_state
-                  pending_coinbase_stack_before
+                  computed_pending_coinbase_stack_after pending_coinbase_after
               in
-              Boolean.(equal_source ||| equal_source_with_state)
-            in
-            [%with_label_ "target stack and valid init state"]
-              (Boolean.Assert.all
-                 [ correct_coinbase_target_stack; valid_init_state ] ) ) )
+              let%bind valid_init_state =
+                let%bind equal_source =
+                  Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                    pending_coinbase_stack_before
+                in
+                let%bind equal_source_with_state =
+                  Pending_coinbase.Stack.equal_var
+                    pending_coinbase_stack_with_state
+                    pending_coinbase_stack_before
+                in
+                Boolean.(equal_source ||| equal_source_with_state)
+              in
+              [%with_label_ "target stack and valid init state"] (fun () ->
+                  Boolean.Assert.all
+                    [ correct_coinbase_target_stack; valid_init_state ] ) ) )
     in
     (* Interrogate failure cases. This value is created without constraints;
        the failures should be checked against potential failures to ensure
@@ -2507,7 +2512,8 @@ module Base = struct
     *)
     let%bind () =
       [%with_label_ "A failing user command is a user command"]
-        Boolean.(Assert.any [ is_user_command; not user_command_fails ])
+        Boolean.(
+          fun () -> Assert.any [ is_user_command; not user_command_fails ])
     in
     let predicate_deferred =
       (* Account_precondition check is to be performed later if this is true. *)
@@ -2526,13 +2532,14 @@ module Base = struct
     in
     let%bind () =
       [%with_label_ "Check account_precondition failure against predicted"]
-        (let%bind predicate_failed =
-           Boolean.((not predicate_result) &&& not predicate_deferred)
-         in
-         assert_r1cs
-           (predicate_failed :> Field.Var.t)
-           (is_user_command :> Field.Var.t)
-           (user_command_failure.predicate_failed :> Field.Var.t) )
+        (fun () ->
+          let%bind predicate_failed =
+            Boolean.((not predicate_result) &&& not predicate_deferred)
+          in
+          assert_r1cs
+            (predicate_failed :> Field.Var.t)
+            (is_user_command :> Field.Var.t)
+            (user_command_failure.predicate_failed :> Field.Var.t) )
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -2561,169 +2568,171 @@ module Base = struct
     (* new account fees added for coinbases/fee transfers, when calculating receiver amounts *)
     let new_account_fees = ref zero_fee in
     let%bind root_after_fee_payer_update =
-      [%with_label_ "Update fee payer"]
-        (Frozen_ledger_hash.modify_account_send
-           ~depth:constraint_constants.ledger_depth root
-           ~is_writeable:can_create_fee_payer_account fee_payer
-           ~f:(fun ~is_empty_and_writeable account ->
-             (* this account is:
-                - the fee-payer for payments
-                - the fee-payer for stake delegation
-                - the fee-payer for account creation
-                - the fee-payer for token minting
-                - the fee-receiver for a coinbase
-                - the second receiver for a fee transfer
-             *)
-             let%bind next_nonce =
-               Account.Nonce.Checked.succ_if account.nonce is_user_command
-             in
-             let%bind () =
-               [%with_label_ "Check fee nonce"]
-                 (let%bind nonce_matches =
-                    Account.Nonce.Checked.equal nonce account.nonce
-                  in
-                  Boolean.Assert.any
-                    [ Boolean.not is_user_command; nonce_matches ] )
-             in
-             let%bind receipt_chain_hash =
-               let current = account.receipt_chain_hash in
-               let%bind r =
-                 Receipt.Chain_hash.Checked.cons_signed_command_payload
-                   (Signed_command_payload payload) current
-               in
-               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
-                 ~else_:current
-             in
-             let permitted_to_send =
-               Account.Checked.has_permission ~to_:`Send account
-             in
-             let permitted_to_receive =
-               Account.Checked.has_permission ~to_:`Receive account
-             in
-             let%bind () =
-               [%with_label_
-                 "Fee payer balance update should be permitted for all commands"]
-                 (Boolean.Assert.any
-                    [ Boolean.not is_user_command; permitted_to_send ] )
-             in
-             (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
-                1. These accounts are not permitted to receive tokens and,
-                2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
-             let%bind update_account =
-               let%bind receiving_allowed =
-                 Boolean.all
-                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
-               in
-               Boolean.any [ is_user_command; receiving_allowed ]
-             in
-             let%bind is_empty_and_writeable =
-               (* If this is a coinbase with zero fee, do not create the
-                  account, since the fee amount won't be enough to pay for it.
-               *)
-               Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
-             in
-             let%bind should_pay_to_create =
-               (* Coinbases and fee transfers may create, or we may be creating
-                  a new token account. These are mutually exclusive, so we can
-                  encode this as a boolean.
-               *)
-               let%bind is_create_account =
-                 Boolean.(is_create_account &&& not user_command_fails)
-               in
-               Boolean.(is_empty_and_writeable ||| is_create_account)
-             in
-             let%bind amount =
-               [%with_label_ "Compute fee payer amount"]
-                 (let fee_payer_amount =
-                    let sgn = Sgn.Checked.neg_if_true is_user_command in
-                    Amount.Signed.create_var
-                      ~magnitude:(Amount.Checked.of_fee fee)
-                      ~sgn
-                  in
-                  (* Account creation fee for fee transfers/coinbases. *)
-                  let%bind account_creation_fee =
-                    let%map magnitude =
-                      Amount.Checked.if_ should_pay_to_create
-                        ~then_:account_creation_amount
+      [%with_label_ "Update fee payer"] (fun () ->
+          Frozen_ledger_hash.modify_account_send
+            ~depth:constraint_constants.ledger_depth root
+            ~is_writeable:can_create_fee_payer_account fee_payer
+            ~f:(fun ~is_empty_and_writeable account ->
+              (* this account is:
+                 - the fee-payer for payments
+                 - the fee-payer for stake delegation
+                 - the fee-payer for account creation
+                 - the fee-payer for token minting
+                 - the fee-receiver for a coinbase
+                 - the second receiver for a fee transfer
+              *)
+              let%bind next_nonce =
+                Account.Nonce.Checked.succ_if account.nonce is_user_command
+              in
+              let%bind () =
+                [%with_label_ "Check fee nonce"] (fun () ->
+                    let%bind nonce_matches =
+                      Account.Nonce.Checked.equal nonce account.nonce
+                    in
+                    Boolean.Assert.any
+                      [ Boolean.not is_user_command; nonce_matches ] )
+              in
+              let%bind receipt_chain_hash =
+                let current = account.receipt_chain_hash in
+                let%bind r =
+                  Receipt.Chain_hash.Checked.cons_signed_command_payload
+                    (Signed_command_payload payload) current
+                in
+                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                  ~else_:current
+              in
+              let permitted_to_send =
+                Account.Checked.has_permission ~to_:`Send account
+              in
+              let permitted_to_receive =
+                Account.Checked.has_permission ~to_:`Receive account
+              in
+              let%bind () =
+                [%with_label_
+                  "Fee payer balance update should be permitted for all \
+                   commands"] (fun () ->
+                    Boolean.Assert.any
+                      [ Boolean.not is_user_command; permitted_to_send ] )
+              in
+              (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
+                 1. These accounts are not permitted to receive tokens and,
+                 2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+              let%bind update_account =
+                let%bind receiving_allowed =
+                  Boolean.all
+                    [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+                in
+                Boolean.any [ is_user_command; receiving_allowed ]
+              in
+              let%bind is_empty_and_writeable =
+                (* If this is a coinbase with zero fee, do not create the
+                   account, since the fee amount won't be enough to pay for it.
+                *)
+                Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
+              in
+              let%bind should_pay_to_create =
+                (* Coinbases and fee transfers may create, or we may be creating
+                   a new token account. These are mutually exclusive, so we can
+                   encode this as a boolean.
+                *)
+                let%bind is_create_account =
+                  Boolean.(is_create_account &&& not user_command_fails)
+                in
+                Boolean.(is_empty_and_writeable ||| is_create_account)
+              in
+              let%bind amount =
+                [%with_label_ "Compute fee payer amount"] (fun () ->
+                    let fee_payer_amount =
+                      let sgn = Sgn.Checked.neg_if_true is_user_command in
+                      Amount.Signed.create_var
+                        ~magnitude:(Amount.Checked.of_fee fee)
+                        ~sgn
+                    in
+                    (* Account creation fee for fee transfers/coinbases. *)
+                    let%bind account_creation_fee =
+                      let%map magnitude =
+                        Amount.Checked.if_ should_pay_to_create
+                          ~then_:account_creation_amount
+                          ~else_:Amount.(var_of_t zero)
+                      in
+                      Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
+                    in
+                    new_account_fees := account_creation_fee ;
+                    Amount.Signed.Checked.(
+                      add fee_payer_amount account_creation_fee) )
+              in
+              let%bind () =
+                [%with_label_ "Burned tokens in fee payer"] (fun () ->
+                    let%map amt =
+                      add_burned_tokens !burned_tokens
+                        (Amount.Checked.of_fee fee)
+                        ~is_coinbase_or_fee_transfer ~update_account
+                    in
+                    burned_tokens := amt )
+              in
+              let txn_global_slot = current_global_slot in
+              let%bind timing =
+                [%with_label_ "Check fee payer timing"] (fun () ->
+                    let%bind txn_amount =
+                      let%bind sgn = Amount.Signed.Checked.sgn amount in
+                      let%bind magnitude =
+                        Amount.Signed.Checked.magnitude amount
+                      in
+                      Amount.Checked.if_ (Sgn.Checked.is_neg sgn)
+                        ~then_:magnitude
                         ~else_:Amount.(var_of_t zero)
                     in
-                    Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
-                  in
-                  new_account_fees := account_creation_fee ;
-                  Amount.Signed.Checked.(
-                    add fee_payer_amount account_creation_fee) )
-             in
-             let%bind () =
-               [%with_label_ "Burned tokens in fee payer"]
-                 (let%map amt =
-                    add_burned_tokens !burned_tokens
-                      (Amount.Checked.of_fee fee)
-                      ~is_coinbase_or_fee_transfer ~update_account
-                  in
-                  burned_tokens := amt )
-             in
-             let txn_global_slot = current_global_slot in
-             let%bind timing =
-               [%with_label_ "Check fee payer timing"]
-                 (let%bind txn_amount =
-                    let%bind sgn = Amount.Signed.Checked.sgn amount in
-                    let%bind magnitude =
-                      Amount.Signed.Checked.magnitude amount
+                    let balance_check ok =
+                      [%with_label_ "Check fee payer balance"] (fun () ->
+                          Boolean.Assert.is_true ok )
                     in
-                    Amount.Checked.if_ (Sgn.Checked.is_neg sgn) ~then_:magnitude
-                      ~else_:Amount.(var_of_t zero)
-                  in
-                  let balance_check ok =
-                    [%with_label_ "Check fee payer balance"]
-                      (Boolean.Assert.is_true ok)
-                  in
-                  let timed_balance_check ok =
-                    [%with_label_ "Check fee payer timed balance"]
-                      (Boolean.Assert.is_true ok)
-                  in
-                  let%bind `Min_balance _, timing =
-                    check_timing ~balance_check ~timed_balance_check ~account
-                      ~txn_amount:(Some txn_amount) ~txn_global_slot
-                  in
-                  Account_timing.if_ update_account ~then_:timing
-                    ~else_:account.timing )
-             in
-             let%bind balance =
-               [%with_label_ "Check payer balance"]
-                 (let%bind updated_balance =
-                    Balance.Checked.add_signed_amount account.balance amount
-                  in
-                  Balance.Checked.if_ update_account ~then_:updated_balance
-                    ~else_:account.balance )
-             in
-             let%map public_key =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:(Account_id.Checked.public_key fee_payer)
-                 ~else_:account.public_key
-             and token_id =
-               make_checked (fun () ->
-                   Token_id.Checked.if_ is_empty_and_writeable
-                     ~then_:(Account_id.Checked.token_id fee_payer)
-                     ~else_:account.token_id )
-             and delegate =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:(Account_id.Checked.public_key fee_payer)
-                 ~else_:account.delegate
-             in
-             { Account.Poly.balance
-             ; public_key
-             ; token_id
-             ; token_permissions = account.token_permissions
-             ; token_symbol = account.token_symbol
-             ; nonce = next_nonce
-             ; receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+                    let timed_balance_check ok =
+                      [%with_label_ "Check fee payer timed balance"] (fun () ->
+                          Boolean.Assert.is_true ok )
+                    in
+                    let%bind `Min_balance _, timing =
+                      check_timing ~balance_check ~timed_balance_check ~account
+                        ~txn_amount:(Some txn_amount) ~txn_global_slot
+                    in
+                    Account_timing.if_ update_account ~then_:timing
+                      ~else_:account.timing )
+              in
+              let%bind balance =
+                [%with_label_ "Check payer balance"] (fun () ->
+                    let%bind updated_balance =
+                      Balance.Checked.add_signed_amount account.balance amount
+                    in
+                    Balance.Checked.if_ update_account ~then_:updated_balance
+                      ~else_:account.balance )
+              in
+              let%map public_key =
+                Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                  ~then_:(Account_id.Checked.public_key fee_payer)
+                  ~else_:account.public_key
+              and token_id =
+                make_checked (fun () ->
+                    Token_id.Checked.if_ is_empty_and_writeable
+                      ~then_:(Account_id.Checked.token_id fee_payer)
+                      ~else_:account.token_id )
+              and delegate =
+                Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                  ~then_:(Account_id.Checked.public_key fee_payer)
+                  ~else_:account.delegate
+              in
+              { Account.Poly.balance
+              ; public_key
+              ; token_id
+              ; token_permissions = account.token_permissions
+              ; token_symbol = account.token_symbol
+              ; nonce = next_nonce
+              ; receipt_chain_hash
+              ; delegate
+              ; voting_for = account.voting_for
+              ; timing
+              ; permissions = account.permissions
+              ; zkapp = account.zkapp
+              ; zkapp_uri = account.zkapp_uri
+              } ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2733,372 +2742,381 @@ module Base = struct
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
-      [%with_label_ "Compute receiver increase"]
-        (let%bind base_amount =
-           let%bind zero_transfer =
-             Boolean.any [ is_stake_delegation; is_create_account ]
-           in
-           Amount.Checked.if_ zero_transfer
-             ~then_:(Amount.var_of_t Amount.zero)
-             ~else_:payload.body.amount
-         in
-         (* The fee for entering the coinbase transaction is paid up front. *)
-         let%bind coinbase_receiver_fee =
-           Amount.Checked.if_ is_coinbase
-             ~then_:(Amount.Checked.of_fee fee)
-             ~else_:(Amount.var_of_t Amount.zero)
-         in
-         Amount.Checked.sub base_amount coinbase_receiver_fee )
+      [%with_label_ "Compute receiver increase"] (fun () ->
+          let%bind base_amount =
+            let%bind zero_transfer =
+              Boolean.any [ is_stake_delegation; is_create_account ]
+            in
+            Amount.Checked.if_ zero_transfer
+              ~then_:(Amount.var_of_t Amount.zero)
+              ~else_:payload.body.amount
+          in
+          (* The fee for entering the coinbase transaction is paid up front. *)
+          let%bind coinbase_receiver_fee =
+            Amount.Checked.if_ is_coinbase
+              ~then_:(Amount.Checked.of_fee fee)
+              ~else_:(Amount.var_of_t Amount.zero)
+          in
+          Amount.Checked.sub base_amount coinbase_receiver_fee )
     in
     let receiver_overflow = ref Boolean.false_ in
     let receiver_balance_update_permitted = ref Boolean.true_ in
     let%bind root_after_receiver_update =
-      [%with_label_ "Update receiver"]
-        (Frozen_ledger_hash.modify_account_recv
-           ~depth:constraint_constants.ledger_depth root_after_fee_payer_update
-           receiver ~f:(fun ~is_empty_and_writeable account ->
-             (* this account is:
-                - the receiver for payments
-                - the delegated-to account for stake delegation
-                - the created account for an account creation
-                - the receiver for minted tokens
-                - the receiver for a coinbase
-                - the first receiver for a fee transfer
-             *)
-             let permitted_to_receive =
-               Account.Checked.has_permission ~to_:`Receive account
-             in
-             (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
-             let%bind payment_or_internal_command =
-               Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
-             in
-             let%bind update_account =
-               Boolean.any
-                 [ Boolean.not payment_or_internal_command
-                 ; permitted_to_receive
-                 ]
-             in
-             receiver_balance_update_permitted := permitted_to_receive ;
-             let%bind is_empty_failure =
-               let%bind must_not_be_empty =
-                 Boolean.(is_stake_delegation ||| is_mint_tokens)
-               in
-               Boolean.(is_empty_and_writeable &&& must_not_be_empty)
-             in
-             let%bind () =
-               [%with_label_ "Receiver existence failure matches predicted"]
-                 (Boolean.Assert.( = ) is_empty_failure
-                    user_command_failure.receiver_not_present )
-             in
-             let%bind is_empty_and_writeable =
-               Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
-             in
-             let%bind should_pay_to_create =
-               Boolean.(is_empty_and_writeable &&& not is_create_account)
-             in
-             let%bind () =
-               [%with_label_
-                 "Check whether creation fails due to a non-default token"]
-                 (let%bind token_should_not_create =
-                    Boolean.(should_pay_to_create &&& Boolean.not token_default)
+      [%with_label_ "Update receiver"] (fun () ->
+          Frozen_ledger_hash.modify_account_recv
+            ~depth:constraint_constants.ledger_depth root_after_fee_payer_update
+            receiver ~f:(fun ~is_empty_and_writeable account ->
+              (* this account is:
+                 - the receiver for payments
+                 - the delegated-to account for stake delegation
+                 - the created account for an account creation
+                 - the receiver for minted tokens
+                 - the receiver for a coinbase
+                 - the first receiver for a fee transfer
+              *)
+              let permitted_to_receive =
+                Account.Checked.has_permission ~to_:`Receive account
+              in
+              (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
+              let%bind payment_or_internal_command =
+                Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
+              in
+              let%bind update_account =
+                Boolean.any
+                  [ Boolean.not payment_or_internal_command
+                  ; permitted_to_receive
+                  ]
+              in
+              receiver_balance_update_permitted := permitted_to_receive ;
+              let%bind is_empty_failure =
+                let%bind must_not_be_empty =
+                  Boolean.(is_stake_delegation ||| is_mint_tokens)
+                in
+                Boolean.(is_empty_and_writeable &&& must_not_be_empty)
+              in
+              let%bind () =
+                [%with_label_ "Receiver existence failure matches predicted"]
+                  (fun () ->
+                    Boolean.Assert.( = ) is_empty_failure
+                      user_command_failure.receiver_not_present )
+              in
+              let%bind is_empty_and_writeable =
+                Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
+              in
+              let%bind should_pay_to_create =
+                Boolean.(is_empty_and_writeable &&& not is_create_account)
+              in
+              let%bind () =
+                [%with_label_
+                  "Check whether creation fails due to a non-default token"]
+                  (fun () ->
+                    let%bind token_should_not_create =
+                      Boolean.(
+                        should_pay_to_create &&& Boolean.not token_default)
+                    in
+                    let%bind token_cannot_create =
+                      Boolean.(token_should_not_create &&& is_user_command)
+                    in
+                    let%bind () =
+                      [%with_label_
+                        "Check that account creation is paid in the default \
+                         token for non-user-commands"] (fun () ->
+                          (* This expands to
+                             [token_should_not_create =
+                               token_should_not_create && is_user_command]
+                             which is
+                             - [token_should_not_create = token_should_not_create]
+                               (ie. always satisfied) for user commands
+                             - [token_should_not_create = false] for coinbases/fee
+                               transfers.
+                          *)
+                          Boolean.Assert.( = ) token_should_not_create
+                            token_cannot_create )
+                    in
+                    [%with_label_ "equal token_cannot_create"] (fun () ->
+                        Boolean.Assert.( = ) token_cannot_create
+                          user_command_failure.token_cannot_create ) )
+              in
+              let%bind balance =
+                (* [receiver_increase] will be zero in the stake delegation
+                   case.
+                *)
+                let%bind receiver_amount =
+                  let%bind account_creation_fee =
+                    Amount.Checked.if_ should_pay_to_create
+                      ~then_:account_creation_amount
+                      ~else_:Amount.(var_of_t zero)
                   in
-                  let%bind token_cannot_create =
-                    Boolean.(token_should_not_create &&& is_user_command)
+                  let%bind new_account_fees_total =
+                    Amount.Signed.Checked.(
+                      add @@ negate @@ of_unsigned account_creation_fee)
+                      !new_account_fees
+                  in
+                  new_account_fees := new_account_fees_total ;
+                  let%bind amount_for_new_account, `Underflow underflow =
+                    Amount.Checked.sub_flagged receiver_increase
+                      account_creation_fee
                   in
                   let%bind () =
                     [%with_label_
-                      "Check that account creation is paid in the default \
-                       token for non-user-commands"]
-                      ((* This expands to
-                          [token_should_not_create =
-                            token_should_not_create && is_user_command]
-                          which is
-                          - [token_should_not_create = token_should_not_create]
-                            (ie. always satisfied) for user commands
-                          - [token_should_not_create = false] for coinbases/fee
-                            transfers.
-                       *)
-                       Boolean.Assert.( = ) token_should_not_create
-                         token_cannot_create )
+                      "Receiver creation fee failure matches predicted"]
+                      (fun () ->
+                        Boolean.Assert.( = ) underflow
+                          user_command_failure.amount_insufficient_to_create )
                   in
-                  [%with_label_ "equal token_cannot_create"]
-                    (Boolean.Assert.( = ) token_cannot_create
-                       user_command_failure.token_cannot_create ) )
-             in
-             let%bind balance =
-               (* [receiver_increase] will be zero in the stake delegation
-                  case.
-               *)
-               let%bind receiver_amount =
-                 let%bind account_creation_fee =
-                   Amount.Checked.if_ should_pay_to_create
-                     ~then_:account_creation_amount
-                     ~else_:Amount.(var_of_t zero)
-                 in
-                 let%bind new_account_fees_total =
-                   Amount.Signed.Checked.(
-                     add @@ negate @@ of_unsigned account_creation_fee)
-                     !new_account_fees
-                 in
-                 new_account_fees := new_account_fees_total ;
-                 let%bind amount_for_new_account, `Underflow underflow =
-                   Amount.Checked.sub_flagged receiver_increase
-                     account_creation_fee
-                 in
-                 let%bind () =
-                   [%with_label_
-                     "Receiver creation fee failure matches predicted"]
-                     (Boolean.Assert.( = ) underflow
-                        user_command_failure.amount_insufficient_to_create )
-                 in
-                 Currency.Amount.Checked.if_ user_command_fails
-                   ~then_:Amount.(var_of_t zero)
-                   ~else_:amount_for_new_account
-               in
+                  Currency.Amount.Checked.if_ user_command_fails
+                    ~then_:Amount.(var_of_t zero)
+                    ~else_:amount_for_new_account
+                in
 
-               (* NOTE: Instead of capturing this as part of the user command
-                  failures, we capture it inline here and bubble it out to a
-                  reference. This behavior is still in line with the
-                  out-of-snark transaction logic.
+                (* NOTE: Instead of capturing this as part of the user command
+                   failures, we capture it inline here and bubble it out to a
+                   reference. This behavior is still in line with the
+                   out-of-snark transaction logic.
 
-                  Updating [user_command_fails] to include this value from here
-                  onwards will ensure that we do not update the source or
-                  receiver accounts. The only places where [user_command_fails]
-                  may have already affected behaviour are
-                  * when the fee-payer is paying the account creation fee, and
-                  * when a new token is created.
-                  In both of these, this account is new, and will have a
-                  balance of 0, so we can guarantee that there is no overflow.
-               *)
-               let%bind balance, `Overflow overflow =
-                 Balance.Checked.add_amount_flagged account.balance
-                   receiver_amount
-               in
-               let%bind () =
-                 [%with_label_ "Overflow error only occurs in user commands"]
-                   Boolean.(Assert.any [ is_user_command; not overflow ])
-               in
-               receiver_overflow := overflow ;
-               Balance.Checked.if_ overflow ~then_:account.balance
-                 ~else_:balance
-             in
-             let%bind () =
-               [%with_label_ "Burned tokens in receiver"]
-                 (let%map amt =
-                    add_burned_tokens !burned_tokens receiver_increase
-                      ~is_coinbase_or_fee_transfer
-                      ~update_account:permitted_to_receive
-                  in
-                  burned_tokens := amt )
-             in
-             let%bind user_command_fails =
-               Boolean.(!receiver_overflow ||| user_command_fails)
-             in
-             let%bind is_empty_and_writeable =
-               (* Do not create a new account if the user command will fail or if receiving is not permitted *)
-               Boolean.all
-                 [ is_empty_and_writeable
-                 ; Boolean.not user_command_fails
-                 ; update_account
-                 ]
-             in
-             let%bind balance =
-               Balance.Checked.if_ update_account ~then_:balance
-                 ~else_:account.balance
-             in
-             let%bind may_delegate =
-               (* Only default tokens may participate in delegation. *)
-               Boolean.(is_empty_and_writeable &&& token_default)
-             in
-             let%map delegate =
-               Public_key.Compressed.Checked.if_ may_delegate
-                 ~then_:(Account_id.Checked.public_key receiver)
-                 ~else_:account.delegate
-             and public_key =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:(Account_id.Checked.public_key receiver)
-                 ~else_:account.public_key
-             and token_id =
-               make_checked (fun () ->
-                   Token_id.Checked.if_ is_empty_and_writeable ~then_:token
-                     ~else_:account.token_id )
-             and token_owner =
-               (* TODO: Delete token permissions *)
-               Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
-                 ~else_:account.token_permissions.token_owner
-             and token_locked =
-               Boolean.if_ is_empty_and_writeable
-                 ~then_:payload.body.token_locked
-                 ~else_:account.token_permissions.token_locked
-             in
-             { Account.Poly.balance
-             ; public_key
-             ; token_id
-             ; token_permissions =
-                 { Token_permissions.token_owner; token_locked }
-             ; token_symbol = account.token_symbol
-             ; nonce = account.nonce
-             ; receipt_chain_hash = account.receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing = account.timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+                   Updating [user_command_fails] to include this value from here
+                   onwards will ensure that we do not update the source or
+                   receiver accounts. The only places where [user_command_fails]
+                   may have already affected behaviour are
+                   * when the fee-payer is paying the account creation fee, and
+                   * when a new token is created.
+                   In both of these, this account is new, and will have a
+                   balance of 0, so we can guarantee that there is no overflow.
+                *)
+                let%bind balance, `Overflow overflow =
+                  Balance.Checked.add_amount_flagged account.balance
+                    receiver_amount
+                in
+                let%bind () =
+                  [%with_label_ "Overflow error only occurs in user commands"]
+                    Boolean.(
+                      fun () -> Assert.any [ is_user_command; not overflow ])
+                in
+                receiver_overflow := overflow ;
+                Balance.Checked.if_ overflow ~then_:account.balance
+                  ~else_:balance
+              in
+              let%bind () =
+                [%with_label_ "Burned tokens in receiver"] (fun () ->
+                    let%map amt =
+                      add_burned_tokens !burned_tokens receiver_increase
+                        ~is_coinbase_or_fee_transfer
+                        ~update_account:permitted_to_receive
+                    in
+                    burned_tokens := amt )
+              in
+              let%bind user_command_fails =
+                Boolean.(!receiver_overflow ||| user_command_fails)
+              in
+              let%bind is_empty_and_writeable =
+                (* Do not create a new account if the user command will fail or if receiving is not permitted *)
+                Boolean.all
+                  [ is_empty_and_writeable
+                  ; Boolean.not user_command_fails
+                  ; update_account
+                  ]
+              in
+              let%bind balance =
+                Balance.Checked.if_ update_account ~then_:balance
+                  ~else_:account.balance
+              in
+              let%bind may_delegate =
+                (* Only default tokens may participate in delegation. *)
+                Boolean.(is_empty_and_writeable &&& token_default)
+              in
+              let%map delegate =
+                Public_key.Compressed.Checked.if_ may_delegate
+                  ~then_:(Account_id.Checked.public_key receiver)
+                  ~else_:account.delegate
+              and public_key =
+                Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                  ~then_:(Account_id.Checked.public_key receiver)
+                  ~else_:account.public_key
+              and token_id =
+                make_checked (fun () ->
+                    Token_id.Checked.if_ is_empty_and_writeable ~then_:token
+                      ~else_:account.token_id )
+              and token_owner =
+                (* TODO: Delete token permissions *)
+                Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
+                  ~else_:account.token_permissions.token_owner
+              and token_locked =
+                Boolean.if_ is_empty_and_writeable
+                  ~then_:payload.body.token_locked
+                  ~else_:account.token_permissions.token_locked
+              in
+              { Account.Poly.balance
+              ; public_key
+              ; token_id
+              ; token_permissions =
+                  { Token_permissions.token_owner; token_locked }
+              ; token_symbol = account.token_symbol
+              ; nonce = account.nonce
+              ; receipt_chain_hash = account.receipt_chain_hash
+              ; delegate
+              ; voting_for = account.voting_for
+              ; timing = account.timing
+              ; permissions = account.permissions
+              ; zkapp = account.zkapp
+              ; zkapp_uri = account.zkapp_uri
+              } ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
-      [%with_label_ "Update source"]
-        (Frozen_ledger_hash.modify_account_send
-           ~depth:constraint_constants.ledger_depth
-           ~is_writeable:
-             (* [modify_account_send] does this failure check for us. *)
-             user_command_failure.source_not_present root_after_receiver_update
-           source ~f:(fun ~is_empty_and_writeable account ->
-             (* this account is:
-                - the source for payments
-                - the delegator for stake delegation
-                - the token owner for account creation
-                - the token owner for token minting
-                - the fee-receiver for a coinbase
-                - the second receiver for a fee transfer
-             *)
-             let%bind () =
-               [%with_label_ "Check source presence failure matches predicted"]
-                 (Boolean.Assert.( = ) is_empty_and_writeable
-                    user_command_failure.source_not_present )
-             in
-             let%bind () =
-               [%with_label_
-                 "Check source failure cases do not apply when fee-payer is \
-                  source"]
-                 (let num_failures =
-                    let open Field.Var in
-                    add
-                      (user_command_failure.source_insufficient_balance :> t)
-                      (user_command_failure.source_bad_timing :> t)
-                  in
-                  let not_fee_payer_is_source =
-                    (Boolean.not fee_payer_is_source :> Field.Var.t)
-                  in
-                  (* Equivalent to:
-                     if fee_payer_is_source then
-                       num_failures = 0
-                     else
-                       num_failures = num_failures
-                  *)
-                  [%with_label_ "Check num_failures"]
-                    (assert_r1cs not_fee_payer_is_source num_failures
-                       num_failures ) )
-             in
-             let permitted_to_update_delegate =
-               Account.Checked.has_permission ~to_:`Set_delegate account
-             in
-             let permitted_to_send =
-               Account.Checked.has_permission ~to_:`Send account
-             in
-             let permitted_to_receive =
-               Account.Checked.has_permission ~to_:`Receive account
-             in
-             (*Account remains unchanged if not permitted to send, receive, or set delegate*)
-             let%bind payment_permitted =
-               Boolean.all
-                 [ is_payment
-                 ; permitted_to_send
-                 ; !receiver_balance_update_permitted
-                 ]
-             in
-             let%bind update_account =
-               let%bind delegation_permitted =
-                 Boolean.all
-                   [ is_stake_delegation; permitted_to_update_delegate ]
-               in
-               let%bind fee_receiver_update_permitted =
-                 Boolean.all
-                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
-               in
-               Boolean.any
-                 [ payment_permitted
-                 ; delegation_permitted
-                 ; fee_receiver_update_permitted
-                 ]
-             in
-             let%bind amount =
-               (* Only payments should affect the balance at this stage. *)
-               if_ payment_permitted ~typ:Amount.typ ~then_:payload.body.amount
-                 ~else_:Amount.(var_of_t zero)
-             in
-             let txn_global_slot = current_global_slot in
-             let%bind timing =
-               [%with_label_ "Check source timing"]
-                 (let balance_check ok =
-                    [%with_label_
-                      "Check source balance failure matches predicted"]
-                      (Boolean.Assert.( = ) ok
-                         (Boolean.not
-                            user_command_failure.source_insufficient_balance ) )
-                  in
-                  let timed_balance_check ok =
-                    [%with_label_
-                      "Check source timed balance failure matches predicted"]
-                      (let%bind not_ok =
-                         Boolean.(
-                           (not ok)
-                           &&& not
-                                 user_command_failure
-                                   .source_insufficient_balance)
-                       in
-                       Boolean.Assert.( = ) not_ok
-                         user_command_failure.source_bad_timing )
-                  in
-                  let%bind `Min_balance _, timing =
-                    check_timing ~balance_check ~timed_balance_check ~account
-                      ~txn_amount:(Some amount) ~txn_global_slot
-                  in
-                  Account_timing.if_ update_account ~then_:timing
-                    ~else_:account.timing )
-             in
-             let%bind balance, `Underflow underflow =
-               Balance.Checked.sub_amount_flagged account.balance amount
-             in
-             let%bind () =
-               (* TODO: Remove the redundancy in balance calculation between
-                  here and [check_timing].
-               *)
-               [%with_label_ "Check source balance failure matches predicted"]
-                 (Boolean.Assert.( = ) underflow
-                    user_command_failure.source_insufficient_balance )
-             in
-             let%map delegate =
-               let%bind may_delegate =
-                 Boolean.all [ is_stake_delegation; update_account ]
-               in
-               Public_key.Compressed.Checked.if_ may_delegate
-                 ~then_:(Account_id.Checked.public_key receiver)
-                 ~else_:account.delegate
-             in
-             (* NOTE: Technically we update the account here even in the case
-                of [user_command_fails], but we throw the resulting hash away
-                in [final_root] below, so it shouldn't matter.
-             *)
-             { Account.Poly.balance
-             ; public_key = account.public_key
-             ; token_id = account.token_id
-             ; token_permissions = account.token_permissions
-             ; token_symbol = account.token_symbol
-             ; nonce = account.nonce
-             ; receipt_chain_hash = account.receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+      [%with_label_ "Update source"] (fun () ->
+          Frozen_ledger_hash.modify_account_send
+            ~depth:constraint_constants.ledger_depth
+            ~is_writeable:
+              (* [modify_account_send] does this failure check for us. *)
+              user_command_failure.source_not_present root_after_receiver_update
+            source ~f:(fun ~is_empty_and_writeable account ->
+              (* this account is:
+                 - the source for payments
+                 - the delegator for stake delegation
+                 - the token owner for account creation
+                 - the token owner for token minting
+                 - the fee-receiver for a coinbase
+                 - the second receiver for a fee transfer
+              *)
+              let%bind () =
+                [%with_label_ "Check source presence failure matches predicted"]
+                  (fun () ->
+                    Boolean.Assert.( = ) is_empty_and_writeable
+                      user_command_failure.source_not_present )
+              in
+              let%bind () =
+                [%with_label_
+                  "Check source failure cases do not apply when fee-payer is \
+                   source"] (fun () ->
+                    let num_failures =
+                      let open Field.Var in
+                      add
+                        (user_command_failure.source_insufficient_balance :> t)
+                        (user_command_failure.source_bad_timing :> t)
+                    in
+                    let not_fee_payer_is_source =
+                      (Boolean.not fee_payer_is_source :> Field.Var.t)
+                    in
+                    (* Equivalent to:
+                       if fee_payer_is_source then
+                         num_failures = 0
+                       else
+                         num_failures = num_failures
+                    *)
+                    [%with_label_ "Check num_failures"] (fun () ->
+                        assert_r1cs not_fee_payer_is_source num_failures
+                          num_failures ) )
+              in
+              let permitted_to_update_delegate =
+                Account.Checked.has_permission ~to_:`Set_delegate account
+              in
+              let permitted_to_send =
+                Account.Checked.has_permission ~to_:`Send account
+              in
+              let permitted_to_receive =
+                Account.Checked.has_permission ~to_:`Receive account
+              in
+              (*Account remains unchanged if not permitted to send, receive, or set delegate*)
+              let%bind payment_permitted =
+                Boolean.all
+                  [ is_payment
+                  ; permitted_to_send
+                  ; !receiver_balance_update_permitted
+                  ]
+              in
+              let%bind update_account =
+                let%bind delegation_permitted =
+                  Boolean.all
+                    [ is_stake_delegation; permitted_to_update_delegate ]
+                in
+                let%bind fee_receiver_update_permitted =
+                  Boolean.all
+                    [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+                in
+                Boolean.any
+                  [ payment_permitted
+                  ; delegation_permitted
+                  ; fee_receiver_update_permitted
+                  ]
+              in
+              let%bind amount =
+                (* Only payments should affect the balance at this stage. *)
+                if_ payment_permitted ~typ:Amount.typ ~then_:payload.body.amount
+                  ~else_:Amount.(var_of_t zero)
+              in
+              let txn_global_slot = current_global_slot in
+              let%bind timing =
+                [%with_label_ "Check source timing"] (fun () ->
+                    let balance_check ok =
+                      [%with_label_
+                        "Check source balance failure matches predicted"]
+                        (fun () ->
+                          Boolean.Assert.( = ) ok
+                            (Boolean.not
+                               user_command_failure.source_insufficient_balance ) )
+                    in
+                    let timed_balance_check ok =
+                      [%with_label_
+                        "Check source timed balance failure matches predicted"]
+                        (fun () ->
+                          let%bind not_ok =
+                            Boolean.(
+                              (not ok)
+                              &&& not
+                                    user_command_failure
+                                      .source_insufficient_balance)
+                          in
+                          Boolean.Assert.( = ) not_ok
+                            user_command_failure.source_bad_timing )
+                    in
+                    let%bind `Min_balance _, timing =
+                      check_timing ~balance_check ~timed_balance_check ~account
+                        ~txn_amount:(Some amount) ~txn_global_slot
+                    in
+                    Account_timing.if_ update_account ~then_:timing
+                      ~else_:account.timing )
+              in
+              let%bind balance, `Underflow underflow =
+                Balance.Checked.sub_amount_flagged account.balance amount
+              in
+              let%bind () =
+                (* TODO: Remove the redundancy in balance calculation between
+                   here and [check_timing].
+                *)
+                [%with_label_ "Check source balance failure matches predicted"]
+                  (fun () ->
+                    Boolean.Assert.( = ) underflow
+                      user_command_failure.source_insufficient_balance )
+              in
+              let%map delegate =
+                let%bind may_delegate =
+                  Boolean.all [ is_stake_delegation; update_account ]
+                in
+                Public_key.Compressed.Checked.if_ may_delegate
+                  ~then_:(Account_id.Checked.public_key receiver)
+                  ~else_:account.delegate
+              in
+              (* NOTE: Technically we update the account here even in the case
+                 of [user_command_fails], but we throw the resulting hash away
+                 in [final_root] below, so it shouldn't matter.
+              *)
+              { Account.Poly.balance
+              ; public_key = account.public_key
+              ; token_id = account.token_id
+              ; token_permissions = account.token_permissions
+              ; token_symbol = account.token_symbol
+              ; nonce = account.nonce
+              ; receipt_chain_hash = account.receipt_chain_hash
+              ; delegate
+              ; voting_for = account.voting_for
+              ; timing
+              ; permissions = account.permissions
+              ; zkapp = account.zkapp
+              ; zkapp_uri = account.zkapp_uri
+              } ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee
@@ -3126,35 +3144,36 @@ module Base = struct
              (* TODO: Reject this in txn pool before fees-in-tokens. *)
              [%with_label_ "Fee excess does not overflow"]
                Boolean.(
-                 Assert.any
-                   [ not is_fee_transfer; not fee_transfer_excess_overflowed ])
+                 fun () ->
+                   Assert.any
+                     [ not is_fee_transfer; not fee_transfer_excess_overflowed ])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
              ~else_:user_command_excess )
     in
     let%bind supply_increase =
-      [%with_label_ "Calculate supply increase"]
-        (let%bind expected_supply_increase =
-           Amount.Signed.Checked.if_ is_coinbase
-             ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
-             ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
-         in
-         let%bind amt0, `Overflow overflow0 =
-           Amount.Signed.Checked.(
-             add_flagged expected_supply_increase
-               (negate (of_unsigned !burned_tokens)))
-         in
-         let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
-         let%bind new_account_fees_total =
-           Amount.Signed.Checked.if_ user_command_fails ~then_:zero_fee
-             ~else_:!new_account_fees
-         in
-         let%bind amt, `Overflow overflow =
-           (* new_account_fees_total is negative if nonzero *)
-           Amount.Signed.Checked.(add_flagged amt0 new_account_fees_total)
-         in
-         let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
-         amt )
+      [%with_label_ "Calculate supply increase"] (fun () ->
+          let%bind expected_supply_increase =
+            Amount.Signed.Checked.if_ is_coinbase
+              ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
+              ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
+          in
+          let%bind amt0, `Overflow overflow0 =
+            Amount.Signed.Checked.(
+              add_flagged expected_supply_increase
+                (negate (of_unsigned !burned_tokens)))
+          in
+          let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
+          let%bind new_account_fees_total =
+            Amount.Signed.Checked.if_ user_command_fails ~then_:zero_fee
+              ~else_:!new_account_fees
+          in
+          let%bind amt, `Overflow overflow =
+            (* new_account_fees_total is negative if nonzero *)
+            Amount.Signed.Checked.(add_flagged amt0 new_account_fees_total)
+          in
+          let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
+          amt )
     in
     let%map final_root =
       (* Ensure that only the fee-payer was charged if this was an invalid user
@@ -3192,8 +3211,8 @@ module Base = struct
     let%bind () = dummy_constraints () in
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
-      with_label __LOC__
-        (exists Transaction_union.typ ~request:(As_prover.return Transaction))
+      with_label __LOC__ (fun () ->
+          exists Transaction_union.typ ~request:(As_prover.return Transaction) )
     in
     let%bind pending_coinbase_init =
       exists Pending_coinbase.Stack.typ ~request:(As_prover.return Init_stack)
@@ -3233,19 +3252,19 @@ module Base = struct
       }
     in
     let%bind () =
-      [%with_label_ "local state check"]
-        (make_checked (fun () ->
-             Local_state.Checked.assert_equal statement.source.local_state
-               statement.target.local_state ) )
+      [%with_label_ "local state check"] (fun () ->
+          make_checked (fun () ->
+              Local_state.Checked.assert_equal statement.source.local_state
+                statement.target.local_state ) )
     in
     Checked.all_unit
-      [ [%with_label_ "equal roots"]
-          (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
-      ; [%with_label_ "equal supply_increases"]
-          (Currency.Amount.Signed.Checked.assert_equal supply_increase
-             statement.supply_increase )
-      ; [%with_label_ "equal fee excesses"]
-          (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
+      [ [%with_label_ "equal roots"] (fun () ->
+            Frozen_ledger_hash.assert_equal root_after statement.target.ledger )
+      ; [%with_label_ "equal supply_increases"] (fun () ->
+            Currency.Amount.Signed.Checked.assert_equal supply_increase
+              statement.supply_increase )
+      ; [%with_label_ "equal fee excesses"] (fun () ->
+            Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
       ]
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
@@ -3329,17 +3348,17 @@ module Merge = struct
       Fee_excess.combine_checked s1.Statement.fee_excess s2.Statement.fee_excess
     in
     let%bind () =
-      with_label __LOC__
-        (let%bind valid_pending_coinbase_stack_transition =
-           Pending_coinbase.Stack.Checked.check_merge
-             ~transition1:
-               ( s1.source.pending_coinbase_stack
-               , s1.target.pending_coinbase_stack )
-             ~transition2:
-               ( s2.source.pending_coinbase_stack
-               , s2.target.pending_coinbase_stack )
-         in
-         Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
+      with_label __LOC__ (fun () ->
+          let%bind valid_pending_coinbase_stack_transition =
+            Pending_coinbase.Stack.Checked.check_merge
+              ~transition1:
+                ( s1.source.pending_coinbase_stack
+                , s1.target.pending_coinbase_stack )
+              ~transition2:
+                ( s2.source.pending_coinbase_stack
+                , s2.target.pending_coinbase_stack )
+          in
+          Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
     in
     let%bind supply_increase =
       Amount.Signed.Checked.add s1.supply_increase s2.supply_increase
@@ -3353,17 +3372,17 @@ module Merge = struct
     in
     let%map () =
       Checked.all_unit
-        [ [%with_label_ "equal fee excesses"]
-            (Fee_excess.assert_equal_checked fee_excess s.fee_excess)
-        ; [%with_label_ "equal supply increases"]
-            (Amount.Signed.Checked.assert_equal supply_increase
-               s.supply_increase )
-        ; [%with_label_ "equal source ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
-        ; [%with_label_ "equal target, source ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
-        ; [%with_label_ "equal target ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
+        [ [%with_label_ "equal fee excesses"] (fun () ->
+              Fee_excess.assert_equal_checked fee_excess s.fee_excess )
+        ; [%with_label_ "equal supply increases"] (fun () ->
+              Amount.Signed.Checked.assert_equal supply_increase
+                s.supply_increase )
+        ; [%with_label_ "equal source ledger hashes"] (fun () ->
+              Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger )
+        ; [%with_label_ "equal target, source ledger hashes"] (fun () ->
+              Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger )
+        ; [%with_label_ "equal target ledger hashes"] (fun () ->
+              Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger )
         ]
     in
     (s1, s2)
@@ -3508,11 +3527,12 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     ( Or_error.ok_exn
         (run_and_check
            (handle
-              (Checked.map ~f:As_prover.return
-                 (let open Checked in
-                 exists Statement.With_sok.typ
-                   ~compute:(As_prover.return statement)
-                 >>= Base.main ~constraint_constants) )
+              (fun () ->
+                Checked.map ~f:As_prover.return
+                  (let open Checked in
+                  exists Statement.With_sok.typ
+                    ~compute:(As_prover.return statement)
+                  >>= Base.main ~constraint_constants) )
               handler ) )
       : unit )
 
@@ -3564,7 +3584,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
       ~sok_digest
   in
   let open Tick in
-  let main x = handle (Base.main ~constraint_constants x) handler in
+  let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
   generate_auxiliary_input ~input_typ:Statement.With_sok.typ
     ~return_typ:(Snarky_backendless.Typ.unit ())
     main statement
