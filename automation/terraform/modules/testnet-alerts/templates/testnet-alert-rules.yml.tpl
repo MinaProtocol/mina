@@ -140,7 +140,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
 
   - alert: CriticallyLowMinWindowDensity
-    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) <= 30
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density ${rule_filter}) <= 30
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -151,7 +151,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: LowFillRate
-    expr: min by (testnet) (Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -162,7 +162,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowFillRate-36efb1cd9b5d461db6976bc1938fab9e"
 
   - alert: NoTransactionsInSeveralBlocks
-    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) >= 5
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) >= 5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -172,7 +172,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
 
   - alert: NoCoinbaseInBlocks
-    expr: min by (testnet) (Coda_Transition_frontier_best_tip_coinbase ${rule_filter}) < 1
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_best_tip_coinbase ${rule_filter}) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -288,7 +288,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoTransactionsInAtLeastOneBlock-049250ff7ae84de990233c7b6d35f763"
 
   - alert: LowMinWindowDensity
-    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) <= 35
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density ${rule_filter}) <= 35
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -309,7 +309,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
 
   - alert: FewBlocksPerHour
-    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
+    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
