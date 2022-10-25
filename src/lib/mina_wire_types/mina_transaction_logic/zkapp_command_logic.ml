@@ -29,7 +29,7 @@ module Local_state = struct
       type t =
         ( Mina_base.Stack_frame.Digest.V1.t
         , Mina_base.Call_stack_digest.V1.t
-        , Mina_base.Token_id.V1.t
+        , Mina_base.Token_id.V2.t
         , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
         , Mina_base.Ledger_hash.V1.t
         , bool

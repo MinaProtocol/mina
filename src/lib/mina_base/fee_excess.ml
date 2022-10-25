@@ -122,7 +122,7 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      ( Token_id.Stable.V1.t
+      ( Token_id.Stable.V2.t
       , (Fee.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving compare, equal, hash, sexp, yojson]

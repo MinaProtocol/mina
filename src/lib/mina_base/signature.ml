@@ -18,6 +18,8 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
+    [@@@with_all_version_tags]
+
     type t =
       ( (Field.t[@version_asserted])
       , (Inner_curve.Scalar.t[@version_asserted]) )

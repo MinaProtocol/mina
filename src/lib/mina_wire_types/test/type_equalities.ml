@@ -177,7 +177,7 @@ module Mina_base = struct
       (W.Account_update.Fee_payer)
   include Assert_equal0V1 (O.Account_id.Digest.Stable) (W.Account_id.Digest)
   include Assert_equal0V2 (O.Account_id.Stable) (W.Account_id)
-  include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
+  include Assert_equal0V2 (O.Token_id.Stable) (W.Token_id)
   include Assert_equal1V1 (O.Zkapp_state.V.Stable) (W.Zkapp_state.V)
   include
     Assert_equal1V1

@@ -294,8 +294,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         if !top_hash_logging_enabled then
           Format.eprintf
-            !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
-              Random_oracle.Input.Chunked.t}@."
+            !"@[<v>Generating unchecked top hash from:@,\
+              %{sexp: Tick.Field.t Random_oracle.Input.Chunked.t}@]@."
             input ;
         input
 
@@ -329,8 +329,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 if !top_hash_logging_enabled then
                   let%map input = Random_oracle.read_typ' input in
                   Format.eprintf
-                    !"Generating checked top hash from:@.%{sexp: Field.t \
-                      Random_oracle.Input.Chunked.t}@."
+                    !"@[<v>Generating checked top hash from:@,\
+                      %{sexp: Field.t Random_oracle.Input.Chunked.t}@]@."
                     input
                 else return ())
           in
@@ -554,9 +554,9 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Base = struct
     module User_command_failure = struct
       (** The various ways that a user command may fail. These should be computed
-          before applying the snark, to ensure that only the base fee is charged
-          to the fee-payer if executing the user command will later fail.
-       *)
+        before applying the snark, to ensure that only the base fee is charged
+        to the fee-payer if executing the user command will later fail.
+    *)
       type 'bool t =
         { predicate_failed : 'bool (* User commands *)
         ; source_not_present : 'bool (* User commands *)
@@ -622,10 +622,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let any t = Boolean.any (to_list t)
 
       (** Compute which -- if any -- of the failure cases will be hit when
-          evaluating the given user command, and indicate whether the fee-payer
-          would need to pay the account creation fee if the user command were to
-          succeed (irrespective or whether it actually will or not).
-       *)
+        evaluating the given user command, and indicate whether the fee-payer
+        would need to pay the account creation fee if the user command were to
+        succeed (irrespective or whether it actually will or not).
+    *)
       let compute_unchecked
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~txn_global_slot ~(fee_payer_account : Account.t)
@@ -1419,7 +1419,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let unhash (h : Stack_frame.Digest.Checked.t)
               (frame :
-                ( Mina_base.Token_id.Stable.V1.t
+                ( Mina_base.Token_id.Stable.V2.t
                 , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t
                 )
                 Stack_frame.Stable.V1.t
@@ -2516,7 +2516,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
          transaction1: s1 -> t1 = s1+ protocol_state_body + maybe_coinbase
          transaction2: t1 -> t1 + maybe_another_coinbase
-         (Note: protocol_state_body is not pushed again)
+           (Note: protocol_state_body is not pushed again)
 
          However, for each transaction, we need to constrain the protocol state
          body. This is done is by using the stack ([init_stack]) without the
@@ -2531,13 +2531,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       (* These are all the possible cases:
 
-         Init_stack     Source                 Target
+          Init_stack     Source                 Target
          --------------------------------------------------------------
-         i               i                       i + state
-         i               i                       i + state + coinbase
-         i               i + state               i + state
-         i               i + state               i + state + coinbase
-         i + coinbase    i + state + coinbase    i + state + coinbase
+           i               i                       i + state
+           i               i                       i + state + coinbase
+           i               i + state               i + state
+           i               i + state               i + state + coinbase
+           i + coinbase    i + state + coinbase    i + state + coinbase
       *)
       let%bind () =
         [%with_label_ "Compute coinbase stack"] (fun () ->
@@ -2689,8 +2689,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         [ Boolean.not is_user_command; permitted_to_send ] )
                 in
                 (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
-                  1. These accounts are not permitted to receive tokens and,
-                  2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+                   1. These accounts are not permitted to receive tokens and,
+                   2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
                 let%bind update_account =
                   let%bind receiving_allowed =
                     Boolean.all
@@ -2899,12 +2899,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                            token for non-user-commands"] (fun () ->
                             (* This expands to
                                [token_should_not_create =
-                               token_should_not_create && is_user_command]
+                                 token_should_not_create && is_user_command]
                                which is
                                - [token_should_not_create = token_should_not_create]
-                               (ie. always satisfied) for user commands
+                                 (ie. always satisfied) for user commands
                                - [token_should_not_create = false] for coinbases/fee
-                               transfers.
+                                 transfers.
                             *)
                             Boolean.Assert.( = ) token_should_not_create
                               token_cannot_create )
@@ -3082,9 +3082,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       (* Equivalent to:
                          if fee_payer_is_source then
-                         num_failures = 0
+                           num_failures = 0
                          else
-                         num_failures = num_failures
+                           num_failures = num_failures
                       *)
                       [%with_label_ "Check num_failures"] (fun () ->
                           assert_r1cs not_fee_payer_is_source num_failures
@@ -3277,18 +3277,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     (* spec for [main statement]:
        constraints pass iff there exists
-       t : Tagged_transaction.t
+          t : Tagged_transaction.t
        such that
        - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
        - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
        - t has fee excess equal to [fee_excess]
        - t has supply increase equal to [supply_increase]
-       where statement includes
-       l1 : Frozen_ledger_hash.t,
-       l2 : Frozen_ledger_hash.t,
-       fee_excess : Amount.Signed.t,
-       supply_increase : Amount.Signed.t
-       pc: Pending_coinbase_stack_state.t
+         where statement includes
+          l1 : Frozen_ledger_hash.t,
+          l2 : Frozen_ledger_hash.t,
+          fee_excess : Amount.Signed.t,
+          supply_increase : Amount.Signed.t
+          pc: Pending_coinbase_stack_state.t
     *)
     let%snarkydef_ main ~constraint_constants
         (statement : Statement.With_sok.Checked.t) =
