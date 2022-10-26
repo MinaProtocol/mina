@@ -1,0 +1,10 @@
+(library
+ (name dsu)
+ (public_name dsu)
+ (libraries
+   ;; opam libraries
+   base.base_internalhash_types
+   core_kernel
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_mina ppx_inline_test)))
