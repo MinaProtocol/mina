@@ -302,7 +302,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
+    if log_entries <> [] then
       [%log spam] "Parsing events from $n logs"
         ~metadata:[ ("n", `Int (List.length log_entries)) ]
     else [%log spam] "No logs were pulled" ;
