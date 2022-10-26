@@ -39,6 +39,7 @@
    snark_params
    snarky.backendless
    sparse_ledger_lib
+   splittable_random
    storage
    syncable_ledger
    test_util
