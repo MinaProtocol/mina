@@ -268,3 +268,20 @@ type init_state =
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
+
+module For_tests : sig
+  open Currency
+  open Mina_numbers
+
+  val validate_timing_with_min_balance :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
+
+  val validate_timing :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> Account.Timing.t Or_error.t
+end

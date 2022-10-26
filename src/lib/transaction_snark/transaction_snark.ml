@@ -5879,7 +5879,7 @@ let%test_module "account timing check" =
     open Core_kernel
     open Mina_numbers
     open Currency
-    open Transaction_validator.For_tests
+    open Ledger.For_tests
 
     (* test that unchecked and checked calculations for timing agree *)
 

@@ -26,6 +26,7 @@
    async.async_rpc
    async_rpc_kernel
    async_unix
+   splittable_random
    ;; local libraries
    run_in_thread
    sgn
