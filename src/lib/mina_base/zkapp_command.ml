@@ -2054,4 +2054,10 @@ let%test_module "Test" =
     let%test_unit "full circuit" =
       Run_in_thread.block_on_async_exn
       @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
+
+    let%test "latest zkApp version" =
+      (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+         for latest version, then update this test
+      *)
+      Stable.Latest.version = 1
   end )
