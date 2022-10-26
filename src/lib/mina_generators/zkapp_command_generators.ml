@@ -18,10 +18,16 @@ type failure =
 
 type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
 
-let gen_account_precondition_from_account ?failure ~first_use_of_account account
-    =
+let gen_account_precondition_from_account ?failure ~first_use_of_account:_
+    account =
   let open Quickcheck.Let_syntax in
-  let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
+  let { Account.Poly.balance
+      ; nonce
+      ; delegate
+      ; receipt_chain_hash = _
+      ; zkapp
+      ; _
+      } =
     account
   in
   (* choose constructor *)
@@ -76,8 +82,9 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
       let receipt_chain_hash =
-        if first_use_of_account then Or_ignore.Check receipt_chain_hash
-        else Or_ignore.Ignore
+        (*TODO: not working if first_use_of_account then Or_ignore.Check receipt_chain_hash
+          else *)
+        Or_ignore.Ignore
       in
       let%bind delegate =
         match delegate with
