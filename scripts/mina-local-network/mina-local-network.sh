@@ -578,15 +578,29 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
+  
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
     sleep 1
   done
+  
+  SYNCED=0
 
-  # Sleep 15 secs to wait for transition frontier
-  sleep 15
+  echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"
+  printf "\n"
+
+  set +e
+
+  while [ $SYNCED -eq 0 ]; do
+    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+    SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
+    sleep 1
+  done
+
+  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
+  printf "\n"
 
   if ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
@@ -596,7 +610,6 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-
   if ${VALUE_TRANSFER}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
@@ -604,11 +617,6 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     sleep ${TRANSACTION_FREQUENCY}
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
   fi
-
-  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
-  printf "\n"
-
-  set +e
 
   nonce=1
   state=0
