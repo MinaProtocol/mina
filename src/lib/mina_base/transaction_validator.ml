@@ -1,13 +1,13 @@
 open Base
 
 let within_mask l ~f =
-  let l' =
+  let mask =
     Ledger.register_mask l (Ledger.Mask.create ~depth:(Ledger.depth l) ())
   in
-  let r = f l' in
-  if Result.is_ok r then Ledger.commit l' ;
+  let r = f mask in
+  if Result.is_ok r then Ledger.commit mask ;
   ignore
-    (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ l' : Ledger.unattached_mask) ;
+    (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask : Ledger.unattached_mask) ;
   r
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =

@@ -1778,13 +1778,14 @@ module T = struct
     |> not
 
   let with_ledger_mask base_ledger ~f =
-    let l =
+    let mask =
       Ledger.register_mask base_ledger
         (Ledger.Mask.create ~depth:(Ledger.depth base_ledger) ())
     in
-    let r = f l in
+    let r = f mask in
     ignore
-      (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ l : Ledger.unattached_mask) ;
+      ( Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask
+        : Ledger.unattached_mask ) ;
     r
 
   let create_diff
