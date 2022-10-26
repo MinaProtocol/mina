@@ -494,10 +494,8 @@ module Update = struct
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
-      ; Set_or_keep.to_input
-          (Set_or_keep.map ~f:Account.hash_zkapp_uri zkapp_uri)
-          ~dummy:(Account.hash_zkapp_uri_opt None)
-          ~f:field
+      ; Set_or_keep.to_input zkapp_uri ~dummy:"" ~f:(fun zkapp_uri ->
+            Zkapp_account.zkapp_uri_to_input zkapp_uri )
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
       ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
@@ -535,8 +533,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
-             ~non_preimage:(Account.hash_zkapp_uri_opt None)
+          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
