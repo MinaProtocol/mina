@@ -37,6 +37,7 @@
    zkapps_sequence_events
    zkapps_examples
    yojson
+   mina_wire_types
    )
   (inline_tests)
   (preprocess
