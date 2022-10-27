@@ -74,8 +74,6 @@ module Prefix_mask = struct
     | [ false; true ] ->
         failwith "Invalid mask"
 
-  let create = there
-
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
       (f Checked.t, proofs_verified) Impl.Typ.t =
@@ -108,7 +106,7 @@ module One_hot = struct
     | _ ->
         failwith "Invalid mask"
 
-  let to_input ~zero ~one (type f) (t : t) =
+  let to_input ~zero ~one (t : t) =
     let one_hot =
       match t with
       | N0 ->
