@@ -19,6 +19,19 @@ let raise_error s =
 
 let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 
+let log_and_raise_error_with_message ~exn ~msg =
+  match Js.Optdef.to_option msg with
+  | None ->
+      raise_error (Core_kernel.Exn.to_string exn)
+  | Some msg ->
+      let stack = Printexc.get_backtrace () in
+      let msg =
+        Printf.sprintf "%s\n%s%s" (Js.to_string msg)
+          (Core_kernel.Exn.to_string exn)
+          stack
+      in
+      raise_error msg
+
 class type field_class =
   object
     method value : Impl.Field.t Js.prop
@@ -247,6 +260,23 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+let arg_optdef_arg_method (type a b) class_ (name : string)
+    (f : _ Js.t -> b -> a Js.Optdef.t -> _) =
+  let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
+  let meth =
+    let wrapper =
+      Js.Unsafe.eval_string
+        {js|
+        (function(f) {
+          return function(argVal, xOptdef) {
+            return f(this, argVal, xOptdef);
+          };
+        })|js}
+    in
+    Js.Unsafe.(fun_call wrapper [| inject (Js.wrap_callback f) |])
+  in
+  Js.Unsafe.set prototype (Js.string name) meth
+
 let to_js_bigint =
   let bigint_constr = Js.Unsafe.eval_string {js|BigInt|js} in
   fun (s : Js.js_string Js.t) ->
@@ -314,8 +344,11 @@ let () =
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
    let cmp_method (name, f) =
-     method_ name (fun this (y : As_field.t) : unit ->
-         f ~bit_length this##.value (As_field.value y) )
+     arg_optdef_arg_method field_class name
+       (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit
+       ->
+         try f ~bit_length this##.value (As_field.value y)
+         with exn -> log_and_raise_error_with_message ~exn ~msg )
    in
    let bool_cmp_method (name, f) =
      method_ name (fun this (y : As_field.t) : bool_class Js.t ->
@@ -335,11 +368,15 @@ let () =
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
-  method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      Field.Assert.equal this##.value (As_field.value y) ) ;
 
-  method_ "assertBoolean" (fun this : unit ->
-      Impl.assert_ (Constraint.boolean this##.value) ) ;
+  arg_optdef_arg_method field_class "assertEquals"
+    (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Field.Assert.equal this##.value (As_field.value y)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero)) ) ;
@@ -555,11 +592,18 @@ let () =
   add_op1 "not" Boolean.not ;
   add_op2 "and" Boolean.( &&& ) ;
   add_op2 "or" Boolean.( ||| ) ;
-  method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
-      Boolean.Assert.( = ) this##.value (As_bool.value y) ) ;
-  method_ "assertTrue" (fun this : unit -> Boolean.Assert.is_true this##.value) ;
-  method_ "assertFalse" (fun this : unit ->
-      Boolean.Assert.( = ) this##.value Boolean.false_ ) ;
+  arg_optdef_arg_method bool_class "assertEquals"
+    (fun this (y : As_bool.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value (As_bool.value y)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method bool_class "assertTrue"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.is_true this##.value
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method bool_class "assertFalse"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value Boolean.false_
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   add_op2 "equals" equal ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
@@ -965,11 +1009,22 @@ let () =
            (As_group.value (As_group.of_group_obj p1))
            (Scalar_challenge s##.value)
          |> mk) ; *)
-  method_ "assertEquals"
-    (fun (p1 : group_class Js.t) (p2 : As_group.t) : unit ->
+  arg_optdef_arg_method group_class "assertEquals"
+    (fun
+      (p1 : group_class Js.t)
+      (p2 : As_group.t)
+      (msg : Js.js_string Js.t Js.Optdef.t)
+      :
+      unit
+    ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
       let x2, y2 = As_group.value p2 in
-      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2 ) ;
+      try Field.Assert.equal x1 x2
+      with exn -> (
+        ignore (log_and_raise_error_with_message ~exn ~msg) ;
+        try Field.Assert.equal y1 y2
+        with exn -> log_and_raise_error_with_message ~exn ~msg ) ) ;
+
   method_ "equals"
     (fun (p1 : group_class Js.t) (p2 : As_group.t) : bool_class Js.t ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
@@ -2362,8 +2417,16 @@ module Ledger = struct
     ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
+  type timing =
+    < isTimed : bool_class Js.t Js.readonly_prop
+    ; initialMinimumBalance : js_uint64 Js.readonly_prop
+    ; cliffTime : js_uint32 Js.readonly_prop
+    ; cliffAmount : js_uint64 Js.readonly_prop
+    ; vestingPeriod : js_uint32 Js.readonly_prop
+    ; vestingIncrement : js_uint64 Js.readonly_prop >
+    Js.t
+
   type account =
-    (* TODO: timing *)
     < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
@@ -2373,7 +2436,8 @@ module Ledger = struct
     ; delegate : public_key Js.optdef Js.readonly_prop
     ; votingFor : field_class Js.t Js.readonly_prop
     ; zkapp : zkapp_account Js.optdef Js.readonly_prop
-    ; permissions : permissions Js.readonly_prop >
+    ; permissions : permissions Js.readonly_prop
+    ; timing : timing Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2566,6 +2630,8 @@ module Ledger = struct
   module To_js = struct
     let field x = to_js_field @@ Field.constant x
 
+    let boolean b = new%js bool_constr (As_bool.of_js_bool @@ Js.bool b)
+
     let uint32 n =
       object%js
         val value =
@@ -2629,8 +2695,7 @@ module Ledger = struct
         val lastSequenceSlot =
           Mina_numbers.Global_slot.to_int a.last_sequence_slot
 
-        val provedState =
-          new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
+        val provedState = boolean a.proved_state
       end
 
     let permissions (p : Mina_base.Permissions.t) : permissions =
@@ -2678,6 +2743,24 @@ module Ledger = struct
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
       end
 
+    let timing (t : Mina_base.Account_timing.t) : timing =
+      let t = Mina_base.Account_timing.to_record t in
+      object%js
+        val isTimed = boolean t.is_timed
+
+        val initialMinimumBalance =
+          uint64 @@ Currency.Balance.to_uint64 t.initial_minimum_balance
+
+        val cliffTime = uint32 t.cliff_time
+
+        val cliffAmount = uint64 @@ Currency.Amount.to_uint64 t.cliff_amount
+
+        val vestingPeriod = uint32 t.vesting_period
+
+        val vestingIncrement =
+          uint64 @@ Currency.Amount.to_uint64 t.vesting_increment
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2699,6 +2782,8 @@ module Ledger = struct
         val zkapp = option zkapp_account a.zkapp
 
         val permissions = permissions a.permissions
+
+        val timing = timing a.timing
       end
   end
 

@@ -845,7 +845,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -899,7 +899,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -910,7 +910,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Token_id.Stable.V1.t
+          ; caller : Token_id.Stable.V2.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -954,7 +954,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -980,7 +980,7 @@ module Body = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
-        ; token_id : Token_id.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
         ; update : Update.Stable.V1.t
         ; balance_change :
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -990,7 +990,7 @@ module Body = struct
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
-        ; caller : Token_id.Stable.V1.t
+        ; caller : Token_id.Stable.V2.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]

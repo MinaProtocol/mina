@@ -846,7 +846,12 @@ let%test_module "account timing check" =
                 (Transaction_status.Failure.to_string expected_failure)
                 ()
           | Failed failuress ->
-              let failures = List.concat failuress in
+              let failures =
+                List.filter (List.concat failuress) ~f:(fun failure ->
+                    not
+                    @@ Transaction_status.Failure.equal failure
+                         Transaction_status.Failure.Cancelled )
+              in
               if
                 not
                   (List.equal Transaction_status.Failure.equal failures
