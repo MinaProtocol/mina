@@ -5,22 +5,12 @@
 var BigInt_ = joo_global_object.BigInt;
 // Provides: Uint8Array_
 var Uint8Array_ = joo_global_object.Uint8Array;
-// Provides: _0n
-var _0n = joo_global_object.BigInt(0);
-// Provides: _1n
-var _1n = joo_global_object.BigInt(1);
-// Provides: _2n
-var _2n = joo_global_object.BigInt(2);
-// Provides: _8n
-var _8n = joo_global_object.BigInt(8);
-// Provides: _32n
-var _32n = joo_global_object.BigInt(32);
 
 // Provides: caml_bigint_to_bytes
-// Requires: BigInt_, Uint8Array_, _8n
+// Requires: BigInt_, Uint8Array_
 function caml_bigint_to_bytes(x, length) {
   var bytes = [];
-  for (; x > 0; x >>= _8n) {
+  for (; x > 0; x >>= BigInt_(8)) {
     bytes.push(Number(x & BigInt_(0xff)));
   }
   var array = new Uint8Array_(bytes);
@@ -33,13 +23,13 @@ function caml_bigint_to_bytes(x, length) {
 }
 
 // Provides: caml_bigint_of_bytes
-// Requires: BigInt_, _0n, _8n
+// Requires: BigInt_
 function caml_bigint_of_bytes(bytes) {
-  var x = _0n;
-  var bitPosition = _0n;
+  var x = BigInt_(0);
+  var bitPosition = BigInt_(0);
   for (var i = 0; i < bytes.length; i++) {
     x += BigInt_(bytes[i]) << bitPosition;
-    bitPosition += _8n;
+    bitPosition += BigInt_(8);
   }
   return x;
 }
