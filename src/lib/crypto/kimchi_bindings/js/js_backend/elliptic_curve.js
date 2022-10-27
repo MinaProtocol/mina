@@ -2,6 +2,9 @@
    caml_finite_field_inverse, caml_pasta_p_bigint, caml_pasta_q_bigint, 
 */
 
+// TODO: constants, like generator points and cube roots for endomorphisms, should be drawn from
+// a common source, i.e. generated from the Rust code
+
 // Provides: caml_pallas_generator_projective
 // Requires: BigInt_
 var caml_pallas_generator_projective = {
