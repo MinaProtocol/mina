@@ -237,6 +237,10 @@ module Protocol = struct
     module Stable = struct
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
+              ( 'length
+              , 'delta
+              , 'genesis_state_timestamp )
+              Mina_wire_types.Genesis_constants.Protocol.Poly.V1.t =
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length
@@ -325,8 +329,10 @@ module T = struct
     ; txpool_max_size : int
     ; num_accounts : int option
     ; transaction_expiry_hr : int
-    ; max_proof_zkapp_command : int
-    ; max_zkapp_command : int
+    ; zkapp_proof_update_cost : float
+    ; zkapp_signed_single_update_cost : float
+    ; zkapp_signed_pair_update_cost : float
+    ; zkapp_transaction_cost_limit : float
     ; max_event_elements : int
     ; max_sequence_event_elements : int
     }
@@ -381,8 +387,13 @@ let compiled : t =
   ; txpool_max_size = pool_max_size
   ; num_accounts = None
   ; transaction_expiry_hr = Mina_compile_config.transaction_expiry_hr
-  ; max_proof_zkapp_command = Mina_compile_config.max_proof_zkapp_command
-  ; max_zkapp_command = Mina_compile_config.max_zkapp_command
+  ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
+  ; zkapp_signed_single_update_cost =
+      Mina_compile_config.zkapp_signed_single_update_cost
+  ; zkapp_signed_pair_update_cost =
+      Mina_compile_config.zkapp_signed_pair_update_cost
+  ; zkapp_transaction_cost_limit =
+      Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_sequence_event_elements =
       Mina_compile_config.max_sequence_event_elements

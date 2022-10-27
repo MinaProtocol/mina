@@ -5,11 +5,7 @@ use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex;
-use mina_curves::pasta::{
-    fp::Fp,
-    pallas::Pallas as GAffineOther,
-    vesta::{Vesta as GAffine, VestaParameters},
-};
+use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine, VestaParameters};
 use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -136,7 +132,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
     t.srs = srs.0.clone();
-    let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
+    let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

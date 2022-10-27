@@ -77,6 +77,9 @@ end
 module type S = sig
   type t [@@deriving sexp, yojson, hash]
 
+  (* type of signed commands, pre-Berkeley hard fork *)
+  type t_v1
+
   include Comparable.S with type t := t
 
   include Hashable.S with type t := t
@@ -171,6 +174,8 @@ module type S = sig
 
   val check_valid_keys : t -> bool
 
+  module Base58_check_v1 : Codable.Base58_check_intf with type t := t_v1
+
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -193,11 +198,15 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed : t -> Account_id.t list
+  (** account ids accessed, given a transaction status *)
+  val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+
+  (** all account ids mentioned in a command *)
+  val accounts_referenced : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
-  include Codable.Base58_check_intf with type t := t
+  val of_base58_check_exn_v1 : string -> t_v1 Or_error.t
 
   include Codable.Base64_intf with type t := t
 end
@@ -232,15 +241,24 @@ module type Full = sig
         Poly.Stable.V1.t
       [@@deriving sexp, hash, yojson, version]
 
-      val version_byte : char (* for base58_check *)
-
       include Comparable.S with type t := t
 
       include Hashable.S with type t := t
 
-      val accounts_accessed : t -> Account_id.t list
+      val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+
+      val accounts_referenced : t -> Account_id.t list
+    end
+
+    module V1 : sig
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, sexp, hash, yojson]
     end
   end]
 
-  include S with type t = Stable.V2.t
+  include S with type t = Stable.V2.t and type t_v1 = Stable.V1.t
 end

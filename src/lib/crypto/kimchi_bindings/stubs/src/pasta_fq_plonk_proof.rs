@@ -14,11 +14,7 @@ use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionC
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
-use mina_curves::pasta::{
-    fp::Fp,
-    fq::Fq,
-    pallas::{Pallas as GAffine, PallasParameters},
-};
+use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
 use oracle::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -34,7 +30,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
@@ -44,14 +40,14 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
         prev_sgs
             .into_iter()
-            .map(Into::<GAffine>::into)
+            .map(Into::<Pallas>::into)
             .enumerate()
             .map(|(i, sg)| {
                 let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                     .iter()
                     .map(Into::<Fq>::into)
                     .collect();
-                let comm = PolyComm::<GAffine> {
+                let comm = PolyComm::<Pallas> {
                     unshifted: vec![sg],
                     shifted: None,
                 };
@@ -64,7 +60,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");
-    let index: &ProverIndex<GAffine> = &index.as_ref().0;
+    let index: &ProverIndex<Pallas> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
@@ -89,10 +85,10 @@ pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> bool {
-    let group_map = <GAffine as CommitmentCurve>::Map::setup();
+    let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
     batch_verify::<
-        GAffine,
+        Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &[(&index.into(), &proof.into())].to_vec())
@@ -114,7 +110,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     let group_map = GroupMap::<Fp>::setup();
 
     batch_verify::<
-        GAffine,
+        Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
@@ -124,8 +120,8 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
-    fn comm() -> PolyComm<GAffine> {
-        let g = GAffine::prime_subgroup_generator();
+    fn comm() -> PolyComm<Pallas> {
+        let g = Pallas::prime_subgroup_generator();
         PolyComm {
             shifted: Some(g),
             unshifted: vec![g, g, g],
@@ -138,7 +134,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     };
     let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
 
-    let g = GAffine::prime_subgroup_generator();
+    let g = Pallas::prime_subgroup_generator();
     let proof = OpeningProof {
         lr: vec![(g, g), (g, g), (g, g)],
         z1: Fq::one(),

@@ -105,6 +105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
         else (num_stripped_zeros, num)
       in
+
       let whole = Unsigned.div amount precision_exp in
       let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
       if Int.(remainder = 0) then to_string whole
@@ -228,7 +229,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     *)
     let range_check t =
       let%bind actual = image_from_bits_unsafe t in
-      with_label "range_check" (Field.Checked.Assert.equal actual t)
+      with_label "range_check" (fun () -> Field.Checked.Assert.equal actual t)
 
     let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
 
@@ -343,7 +344,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let typ : (var, t) Typ.t =
       let (Typ typ) = Field.typ in
       Typ.transport
-        (Typ { typ with check = range_check })
+        (Typ { typ with check = (fun x -> make_checked_ast @@ range_check x) })
         ~there:to_field ~back:of_field
 
     [%%endif]
@@ -895,6 +896,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type t = Unsigned_extended.UInt64.Stable.V1.t
         [@@deriving sexp, compare, hash, equal]
 
@@ -917,6 +920,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [%%versioned:
         module Stable : sig
           module V1 : sig
+            [@@@with_all_version_tags]
+
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
 
             (* not automatically derived *)
@@ -1027,6 +1032,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@@no_toplevel_latest_type]
 
         module V1 = struct
+          [@@@with_all_version_tags]
+
           type t = Unsigned_extended.UInt64.Stable.V1.t
           [@@deriving sexp, compare, hash, equal, yojson]
 
@@ -1257,7 +1264,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let sub_flagged_checked =
           let f (x, y) =
-            Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
+            Tick.Checked.map (M.Checked.sub_flagged x y)
               ~f:(fun (r, `Underflow u) -> (r, u))
           in
           Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

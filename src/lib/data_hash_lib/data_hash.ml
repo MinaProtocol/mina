@@ -73,7 +73,7 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let%snarkydef var_to_bits t =
+  let%snarkydef_ var_to_bits t =
     match t.bits with
     | Some bits ->
         return (bits :> Boolean.var list)
