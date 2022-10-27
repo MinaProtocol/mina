@@ -260,8 +260,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
-            Random_oracle.Input.Chunked.t}@."
+          !"@[<v>Generating unchecked top hash from:@,\
+            %{sexp: Tick.Field.t Random_oracle.Input.Chunked.t}@]@."
           input ;
       input
 
@@ -294,8 +294,8 @@ module Statement = struct
               if !top_hash_logging_enabled then
                 let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: Field.t \
-                    Random_oracle.Input.Chunked.t}@."
+                  !"@[<v>Generating checked top hash from:@,\
+                    %{sexp: Field.t Random_oracle.Input.Chunked.t}@]@."
                   input
               else return ())
         in
@@ -1369,7 +1369,7 @@ module Base = struct
 
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
-              ( Mina_base.Token_id.Stable.V1.t
+              ( Mina_base.Token_id.Stable.V2.t
               , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =

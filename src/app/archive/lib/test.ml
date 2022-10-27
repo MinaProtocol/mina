@@ -121,9 +121,9 @@ let%test_module "Archive node unit tests" =
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
-        ~fee_transfer:
-          (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~min_fee:Currency.Fee.zero )
+        ~fee_transfer:(fun ~coinbase_amount ->
+          Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
+            ~min_fee:Currency.Fee.zero coinbase_amount )
 
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
@@ -271,8 +271,8 @@ let%test_module "Archive node unit tests" =
                 ~precomputed_values ~verifier () )
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
                 ?logger:None ~precomputed_values ~verifier ?trust_system:None
-                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts) )
-        )
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
+                () ) )
         ~f:(fun breadcrumbs ->
           Thread_safe.block_on_async_exn
           @@ fun () ->

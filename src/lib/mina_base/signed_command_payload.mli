@@ -167,6 +167,8 @@ module Stable : sig
   end
 
   module V1 : sig
+    [@@@with_all_version_tags]
+
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]
 

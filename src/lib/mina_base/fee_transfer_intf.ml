@@ -8,7 +8,7 @@ module type Full = sig
         type t = private
           { receiver_pk : Public_key.Compressed.Stable.V1.t
           ; fee : Currency.Fee.Stable.V1.t
-          ; fee_token : Token_id.Stable.V1.t
+          ; fee_token : Token_id.Stable.V2.t
           }
         [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
       end

@@ -68,11 +68,36 @@ module UInt64 = struct
         let length = 64
       end)
 
+  (* this module allows use to generate With_all_version_tags from the
+     Binable.Of_binable functor below, needed to decode transaction ids
+     for V1 signed commands; it does not add any tags
+  *)
+  module Int64_for_version_tags = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t = (Int64.t[@version_asserted])
+
+        let to_latest = Fn.id
+
+        module With_all_version_tags = struct
+          type typ = t [@@deriving bin_io_unversioned]
+
+          type t = typ [@@deriving bin_io_unversioned]
+        end
+      end
+    end]
+  end
+
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = Unsigned.UInt64.t
 
       let to_latest = Fn.id
@@ -89,15 +114,15 @@ module UInt64 = struct
         , to_yojson
         , of_yojson )]
 
-      include Bin_prot.Utils.Make_binable_without_uuid (struct
-        module Binable = Int64
-
+      module M = struct
         type t = Unsigned.UInt64.t
 
         let to_binable = Unsigned.UInt64.to_int64
 
         let of_binable = Unsigned.UInt64.of_int64
-      end)
+      end
+
+      include Binable.Of_binable (Int64_for_version_tags.Stable.V1) (M)
     end
   end]
 
@@ -118,11 +143,36 @@ module UInt32 = struct
         let length = 32
       end)
 
+  (* this module allows use to generate With_all_version_tags from the
+     Binable.Of_binable functor below, needed to decode transaction ids
+     for V1 signed commands; it does not add any tags
+  *)
+  module Int32_for_version_tags = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t = (Int32.t[@version_asserted])
+
+        let to_latest = Fn.id
+
+        module With_all_version_tags = struct
+          type typ = t [@@deriving bin_io_unversioned]
+
+          type t = typ [@@deriving bin_io_unversioned]
+        end
+      end
+    end]
+  end
+
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = Unsigned.UInt32.t
 
       let to_latest = Fn.id
@@ -139,15 +189,15 @@ module UInt32 = struct
         , to_yojson
         , of_yojson )]
 
-      include Bin_prot.Utils.Make_binable_without_uuid (struct
-        module Binable = Int32
-
+      module M = struct
         type t = Unsigned.UInt32.t
 
         let to_binable = Unsigned.UInt32.to_int32
 
         let of_binable = Unsigned.UInt32.of_int32
-      end)
+      end
+
+      include Binable.Of_binable (Int32_for_version_tags.Stable.V1) (M)
     end
   end]
 
