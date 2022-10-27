@@ -1,0 +1,3 @@
+export { PublicKey };
+
+class PublicKey {}
