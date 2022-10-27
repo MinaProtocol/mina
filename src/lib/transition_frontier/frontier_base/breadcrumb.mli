@@ -8,7 +8,6 @@ open Core_kernel
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_block
 open Network_peer
 
 type t [@@deriving sexp, equal, compare, to_yojson]
