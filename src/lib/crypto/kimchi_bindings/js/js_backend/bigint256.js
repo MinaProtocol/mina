@@ -1,13 +1,22 @@
-/* global caml_js_to_bool, caml_jsstring_of_string, caml_string_of_jsstring,
-   caml_bytes_of_uint8array, caml_bytes_to_uint8array,
-   caml_bigint_of_bytes, caml_bigint_to_bytes, BigInt_
+/* global joo_global_object, caml_js_to_bool, caml_jsstring_of_string, caml_string_of_jsstring,
+   caml_ml_bytes_length, caml_bytes_unsafe_get, caml_create_bytes, caml_bytes_unsafe_set
 */
 
-// Provides: caml_bigint_256_of_bytes
-// Requires: caml_bytes_to_uint8array, caml_bigint_of_bytes
-function caml_bigint_256_of_bytes(ocaml_bytes) {
-  var bytes = caml_bytes_to_uint8array(ocaml_bytes);
-  return [caml_bigint_of_bytes(bytes)];
+// Provides: BigInt_
+var BigInt_ = joo_global_object.BigInt;
+// Provides: Uint8Array_
+var Uint8Array_ = joo_global_object.Uint8Array;
+
+// Provides: caml_bigint_of_bytes
+// Requires: BigInt_
+function caml_bigint_of_bytes(bytes) {
+  var x = BigInt_(0);
+  var bitPosition = BigInt_(0);
+  for (var i = 0; i < bytes.length; i++) {
+    x += BigInt_(bytes[i]) << bitPosition;
+    bitPosition += BigInt_(8);
+  }
+  return x;
 }
 
 // Provides: caml_bigint_256_of_decimal_string
@@ -16,11 +25,33 @@ function caml_bigint_256_of_decimal_string(s) {
   return [BigInt_(caml_jsstring_of_string(s))];
 }
 
+// Provides: caml_bigint_256_of_bytes
+// Requires: Uint8Array_, caml_ml_bytes_length, caml_bytes_unsafe_get, BigInt_
+function caml_bigint_256_of_bytes(ocamlBytes) {
+  var length = caml_ml_bytes_length(ocamlBytes);
+  if (length > 32) throw Error(length + " bytes don't fit into bigint256");
+  var x = BigInt_(0);
+  var bitPosition = BigInt_(0);
+  for (var i = 0; i < length; i++) {
+    var byte = caml_bytes_unsafe_get(ocamlBytes, i);
+    x += BigInt_(byte) << bitPosition;
+    bitPosition += BigInt_(8);
+  }
+  return [x];
+}
+
 // Provides: caml_bigint_256_to_bytes
-// Requires: caml_bigint_to_bytes, caml_bytes_of_uint8array
+// Requires: caml_create_bytes, BigInt_, caml_bytes_unsafe_set, Uint8Array_, BigInt_
 function caml_bigint_256_to_bytes(x) {
-  var bytes = caml_bigint_to_bytes(x[0], 32);
-  return caml_bytes_of_uint8array(bytes);
+  x = x[0];
+  var ocamlBytes = caml_create_bytes(32);
+  for (var i = 0; x > 0; x >>= BigInt_(8), i++) {
+    if (i >= 32)
+      throw Error("bigint256 doesn't fit into 32 bytes.");
+    var byte = Number(x & BigInt_(0xff));
+    caml_bytes_unsafe_set(ocamlBytes, i, byte);
+  }
+  return ocamlBytes;
 }
 
 // Provides: caml_bigint_256_to_string
