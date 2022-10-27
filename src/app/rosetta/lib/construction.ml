@@ -279,6 +279,7 @@ module Metadata = struct
 
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
+    let () = Format.printf "len = %d@." len in
     let med = fees.(len / 2) in
     let iqr =
       let threeq = fees.(3 * len / 4) in

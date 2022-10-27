@@ -17,7 +17,7 @@ module Token_id = struct
                  Mina_base.Token_id.of_string token_id
                in
                true
-             with Failure _ -> false ->
+             with _ -> false ->
           M.return (Some token_id)
       | Some bad ->
           M.fail
