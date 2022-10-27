@@ -26,6 +26,16 @@
    mina_base.import
    mina_numbers
    ppx_version.runtime
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend
+   sgn_type
+   sgn
+   mina_transaction_logic
+   block_time
+   kimchi_backend.pasta
+   mina_wire_types
  )
  (preprocess
   (pps base_quickcheck.ppx_quickcheck ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
