@@ -52,7 +52,15 @@ module type Full = sig
 
     val of_base58_check_exn : string -> t
 
+    val compare : t -> t -> int
+
+    val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
+
     val dummy : t
+
+    val of_sha256 : Digestif.SHA256.t -> t
+
+    val gen : t Quickcheck.Generator.t
   end
 
   module Pending_coinbase_aux : sig
