@@ -8,6 +8,7 @@
  (modes js)
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
+ (link_flags (-noautolink))
  (libraries
   ;; opam libraries
   js_of_ocaml
