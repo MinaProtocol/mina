@@ -28,16 +28,22 @@ module type Full = sig
   val to_fee_transfer : t -> Fee_transfer.Single.t
 
   module Gen : sig
-    val gen :
-         ?min_fee:Currency.Fee.t
-      -> max_fee:Currency.Fee.t
-      -> t Quickcheck.Generator.t
+    (** [gen ?min_fee max_fee] generates fee transfers between [min_fee] and
+        [max_fee].
 
-    (** Creates coinbase fee transfers with fees between [min_fee] and [coinbase_amount]*)
+        @param min_fee defaults to zero *)
+    val gen :
+      ?min_fee:Currency.Fee.t -> Currency.Fee.t -> t Quickcheck.Generator.t
+
+    (** [with_random_receivers ~key ?min_fee coinbase_amount] creates coinbase
+        fee transfers with fees between [min_fee] and [coinbase_amount]
+
+        @param min_fee defaults to {!val:Currency.Fee.zero}
+     *)
     val with_random_receivers :
          keys:Signature_keypair.t array
       -> ?min_fee:Currency.Fee.t
-      -> coinbase_amount:Currency.Amount.t
+      -> Currency.Amount.t
       -> t Quickcheck.Generator.t
   end
 end
