@@ -1,6 +1,6 @@
 /* global caml_js_to_bool, caml_jsstring_of_string, caml_string_of_jsstring,
    caml_bytes_of_uint8array, caml_bytes_to_uint8array,
-   caml_bigint_of_bytes, caml_bigint_to_bytes, BigInt_, _1n
+   caml_bigint_of_bytes, caml_bigint_to_bytes, BigInt_
 */
 
 // Provides: caml_bigint_256_of_bytes
@@ -30,9 +30,9 @@ function caml_bigint_256_to_string(x) {
 }
 
 // Provides: caml_bigint_256_test_bit
-// Requires: _1n, BigInt_, caml_js_to_bool
+// Requires: BigInt_, caml_js_to_bool
 function caml_bigint_256_test_bit(b, i) {
-  var is_set = !!(b[0] & (_1n << BigInt_(i)));
+  var is_set = !!(b[0] & (BigInt_(1) << BigInt_(i)));
   return caml_js_to_bool(Number(is_set));
 }
 
