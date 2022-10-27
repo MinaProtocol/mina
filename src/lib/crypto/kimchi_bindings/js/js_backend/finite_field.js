@@ -298,12 +298,12 @@ function caml_pasta_fq_sqrt(x) {
 // Provides: caml_pasta_fp_equal
 // Requires: caml_pasta_fp_sub, BigInt_
 function caml_pasta_fp_equal(x, y) {
-  return Number(caml_pasta_fp_sub(x, y)[0] === BigInt_(0));
+  return Number(x[0] === y[0]);
 }
 // Provides: caml_pasta_fq_equal
 // Requires: caml_pasta_fq_sub, BigInt_
 function caml_pasta_fq_equal(x, y) {
-  return Number(caml_pasta_fq_sub(x, y)[0] === BigInt_(0));
+  return Number(x[0] === y[0]);
 }
 
 // Provides: caml_pasta_fp_random
