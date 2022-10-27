@@ -494,8 +494,10 @@ module Update = struct
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
-      ; Set_or_keep.to_input zkapp_uri ~dummy:"" ~f:(fun zkapp_uri ->
-            Zkapp_account.zkapp_uri_to_input zkapp_uri )
+      ; Set_or_keep.to_input
+          (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
+          ~dummy:(Zkapp_account.hash_zkapp_uri_opt None)
+          ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
       ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy

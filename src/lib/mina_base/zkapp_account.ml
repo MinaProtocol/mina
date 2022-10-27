@@ -285,7 +285,7 @@ module Checked = struct
     to_input'
       { t with
         verification_key = Data_as_hash.hash t.verification_key.data
-      ; zkapp_uri = Data_as_hash.hash t.verification_key.data
+      ; zkapp_uri = Data_as_hash.hash t.zkapp_uri
       }
 
   let digest_vk t =
@@ -304,29 +304,35 @@ end
 
 [%%define_locally Verification_key_wire.(digest_vk, dummy_vk_hash)]
 
-let hash_zkapp_uri_opt (zkapp_uri_opt : string option) :
-    Snark_params.Tick.Field.t =
-  match zkapp_uri_opt with
-  | Some zkapp_uri ->
-      (* We use [length*8 + 1] to pass a final [true] after the end of the
-         string, to ensure that trailing null bytes don't alias in the hash
-         preimage.
-      *)
-      let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
-      String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
-          let c = Char.to_int c in
-          (* Insert the bits into [bits], LSB order. *)
-          for j = 0 to 7 do
-            (* [Int.test_bit c j] *)
-            bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-          done ) ;
-      (* REVIEWER: IS THIS OK? *)
-      Field.project (Array.to_list bits)
-  | None ->
-      (* This zero value cannot be attained by any string, due to the trailing [true]
-         added above
-      *)
-      Field.zero
+(* This preimage cannot be attained by any string, due to the trailing [true]
+   added below.
+*)
+let zkapp_uri_non_preimage =
+  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
+
+let hash_zkapp_uri_opt (zkapp_uri_opt : string option) =
+  let input =
+    match zkapp_uri_opt with
+    | Some zkapp_uri ->
+        (* We use [length*8 + 1] to pass a final [true] after the end of the
+           string, to ensure that trailing null bytes don't alias in the hash
+           preimage.
+        *)
+        let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
+        String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
+            let c = Char.to_int c in
+            (* Insert the bits into [bits], LSB order. *)
+            for j = 0 to 7 do
+              (* [Int.test_bit c j] *)
+              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+            done ) ;
+        Random_oracle_input.Chunked.packeds
+          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
+    | None ->
+        Lazy.force zkapp_uri_non_preimage
+  in
+  Random_oracle.pack_input input
+  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
 
 let hash_zkapp_uri (zkapp_uri : string) = hash_zkapp_uri_opt (Some zkapp_uri)
 
