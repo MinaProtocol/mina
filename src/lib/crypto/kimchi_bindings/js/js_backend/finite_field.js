@@ -56,7 +56,6 @@ function caml_finite_field_power(a, n, p) {
 // Provides: caml_finite_field_inverse
 // Requires: caml_bigint_modulo, BigInt_
 function caml_finite_field_inverse(a, p) {
-  var a_orig = a;
   a = caml_bigint_modulo(a, p);
   if (a === BigInt_(0)) return undefined;
   var b = p;
@@ -76,7 +75,7 @@ function caml_finite_field_inverse(a, p) {
     u = m;
     v = n;
   }
-  if (b !== BigInt_(1)) throw Error("inverting failed (no inverse)");
+  if (b !== BigInt_(1)) return undefined;
   return caml_bigint_modulo(x, p);
 }
 

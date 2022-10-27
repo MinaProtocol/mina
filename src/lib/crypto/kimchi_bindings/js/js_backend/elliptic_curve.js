@@ -77,7 +77,7 @@ function caml_group_projective_add(g, h, p) {
   // H = U2-U1
   var H = U2 - U1;
   // I = (2*H)^2
-  var I = caml_bigint_modulo(BigInt_(4)*H*H, p);
+  var I = caml_bigint_modulo((H*H) << BigInt_(2), p);
   // J = H*I
   var J = caml_bigint_modulo(H*I, p);
   // r = 2*(S2-S1)
