@@ -53,12 +53,12 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo ()
-      =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
-        ~memo
+      create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -67,7 +67,16 @@ let create_zkapp_account =
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that creates a zkApp account"
-      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file for the zkApp account to be created"
@@ -78,8 +87,8 @@ let create_zkapp_account =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo
-      ))
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
 
 let upgrade_zkapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -126,10 +135,12 @@ let upgrade_zkapp =
          ~verification_key ~zkapp_uri ~auth ))
 
 let transfer_funds_one_receiver =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount () =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receiver ~amount () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~keyfile ~fee ~nonce ~memo
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo
         ~receivers:(Deferred.return [ (receiver, amount) ])
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -141,7 +152,16 @@ let transfer_funds_one_receiver =
       ~summary:
         "Generate a zkApp Transaction that makes one transfer to the receiver \
          account"
-      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
        and receiver =
          Param.flag "--receiver"
            ~doc:"PUBLIC_KEY the public key of the receiver"
@@ -152,13 +172,16 @@ let transfer_funds_one_receiver =
          failwithf "Fee must at least be %s"
            (Currency.Fee.to_formatted_string Flags.min_fee)
            () ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receiver ~amount ))
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~memo ~receiver ~amount ))
 
 let transfer_funds =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receivers () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo ~receivers
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -209,7 +232,17 @@ let transfer_funds =
       ~summary:
         "Generate a zkApp transaction that makes multiple transfers from one \
          account"
-      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags in
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
+       in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
@@ -217,7 +250,8 @@ let transfer_funds =
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers ))
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~memo ~receivers ))
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state

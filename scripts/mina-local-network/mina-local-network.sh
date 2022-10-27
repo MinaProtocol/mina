@@ -328,8 +328,8 @@ if ${VALUE_TRANSFERS}; then
 fi
 
 if ${ZKAPP_TRANSACTIONS}; then
-  if [ "${WHALES}" -eq "0" ] || [ "${FISH}" -eq "0" ]; then
-    echo "Send zkApp transactions requires at least one 'Fish' node running and at least one whale account acting as the fee payer account!"
+  if [ "${WHALES}" -lt "2" ] || [ "${FISH}" -eq "0" ]; then
+    echo "Send zkApp transactions requires at least one 'Fish' node running and at least 2 whale accounts acting as the fee payer and sender account!"
     printf "\n"
 
     exit 1
@@ -375,7 +375,10 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir ${LEDGER_FOLDER}/service-keys
   clean-dir ${LEDGER_FOLDER}/zkapp_keys
 
-  generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+  if ${ZKAPP_TRANSACTIONS}; then
+    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+  fi
+
   generate-keypair ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account
   for ((i = 0; i < ${FISH}; i++)); do
     generate-keypair ${LEDGER_FOLDER}/offline_fish_keys/offline_fish_account_${i}
@@ -572,6 +575,7 @@ printf "\n"
 
 if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
   FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
+  SENDER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1
   ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
   ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
 
@@ -606,7 +610,7 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     echo "Set up zkapp account"
     printf "\n"
 
-    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,5d)
+    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --sender-key ${SENDER_KEY_FILE} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
@@ -618,7 +622,8 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
   fi
 
-  nonce=1
+  fee_payer_nonce=1
+  sender_nonce=1
   state=0
 
   while true; do
@@ -629,14 +634,14 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
-      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,3d)
+      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,5d)
       python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let nonce++
+      let fee_payer_nonce++
+      let sender_nonce++
 
-
-      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
+      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
       python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let nonce++
+      let fee_payer_nonce++
       let state++
     fi
   done

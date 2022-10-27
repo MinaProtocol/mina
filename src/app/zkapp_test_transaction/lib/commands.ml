@@ -304,15 +304,17 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   in
   generate_zkapp_txn keypair ledger ~zkapp_kp
 
-let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
-    ~memo =
+let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
+    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind sender_keypair = Util.keypair_of_file sender in
+  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
-    { Transaction_snark.For_tests.Deploy_snapp_spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
+        (sender_keypair, sender_nonce)
     ; fee
-    ; fee_payer = None
+    ; fee_payer = Some (fee_payer_keypair, fee_payer_nonce)
     ; amount
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
@@ -379,19 +381,21 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   zkapp_command
 
-let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
+let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
+    ~memo ~receivers =
   let open Deferred.Let_syntax in
   let%bind receivers = receivers in
   let amount =
     List.fold ~init:Currency.Amount.zero receivers ~f:(fun acc (_, a) ->
         Option.value_exn (Currency.Amount.add acc a) )
   in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind sender_keypair = Util.keypair_of_file sender in
+  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
   let spec =
     { Transaction_snark.For_tests.Multiple_transfers_spec.sender =
-        (keypair, nonce)
+        (sender_keypair, sender_nonce)
     ; fee
-    ; fee_payer = None
+    ; fee_payer = Some (fee_payer_keypair, fee_payer_nonce)
     ; receivers
     ; amount
     ; zkapp_account_keypairs = []
