@@ -1,104 +1,101 @@
 open Base
 
-module Hashless_ledger = struct
-  type t =
-    { base : Ledger.t
-    ; overlay : (Account.Identifier.t, Account.t) Hashtbl.t
-    ; mutable next_available_token : Token_id.t
-    }
-
-  type location = Ours of Account.Identifier.t | Theirs of Ledger.Location.t
-
-  let msg s =
-    s
-    ^ ": somehow we got a location that isn't present in the underlying ledger"
-
-  let get t = function
-    | Ours key ->
-        Hashtbl.find t.overlay key
-    | Theirs loc -> (
-        match Ledger.get t.base loc with
-        | Some a -> (
-            match Hashtbl.find t.overlay (Account.identifier a) with
-            | None ->
-                Some a
-            | s ->
-                s )
-        | None ->
-            failwith (msg "get") )
-
-  let location_of_account t key =
-    match Hashtbl.find t.overlay key with
-    | Some _ ->
-        Some (Ours key)
-    | None ->
-        Option.map
-          ~f:(fun d -> Theirs d)
-          (Ledger.location_of_account t.base key)
-
-  let set t loc acct =
-    if Token_id.(t.next_available_token <= Account.token acct) then
-      t.next_available_token <- Token_id.next (Account.token acct) ;
-    match loc with
-    | Ours key ->
-        Hashtbl.set t.overlay ~key ~data:acct
-    | Theirs loc -> (
-        match Ledger.get t.base loc with
-        | Some a ->
-            Hashtbl.set t.overlay ~key:(Account.identifier a) ~data:acct
-        | None ->
-            failwith (msg "set") )
-
-  let get_or_create_account t key account =
-    match location_of_account t key with
-    | None ->
-        set t (Ours key) account ;
-        Ok (`Added, Ours key)
-    | Some loc ->
-        Ok (`Existed, loc)
-
-  let get_or_create_exn ledger aid =
-    let action, loc =
-      get_or_create_account ledger aid (Account.initialize aid)
-      |> Or_error.ok_exn
-    in
-    (action, Option.value_exn (get ledger loc), loc)
-
-  let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
-
-  let remove_accounts_exn _t =
-    failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"
-
-  (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
-  let merkle_root _t = Ledger_hash.empty_hash
-
-  let create l =
-    { base = l
-    ; overlay = Hashtbl.create (module Account_id)
-    ; next_available_token = Ledger.next_available_token l
-    }
-
-  let with_ledger ~depth ~f =
-    Ledger.with_ledger ~depth ~f:(fun l ->
-        let t = create l in
-        f t)
-
-  let next_available_token { next_available_token; _ } = next_available_token
-
-  let set_next_available_token t tid = t.next_available_token <- tid
-end
-
-include Transaction_logic.Make (Hashless_ledger)
-
-let create = Hashless_ledger.create
+let within_mask l ~f =
+  let mask =
+    Ledger.register_mask l (Ledger.Mask.create ~depth:(Ledger.depth l) ())
+  in
+  let r = f mask in
+  if Result.is_ok r then Ledger.commit mask ;
+  ignore
+    (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask : Ledger.unattached_mask) ;
+  r
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
-  Result.map
-    ~f:(fun applied_txn ->
-      applied_txn.Transaction_applied.Signed_command_applied.common.user_command
-        .status)
-    (apply_user_command l ~constraint_constants ~txn_global_slot uc)
+  within_mask l ~f:(fun l' ->
+      Result.map
+        ~f:(fun applied_txn ->
+          applied_txn.Ledger.Transaction_applied.Signed_command_applied.common
+            .user_command
+            .status)
+        (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc))
 
 let apply_transaction ~constraint_constants ~txn_state_view l txn =
-  Result.map ~f:Transaction_applied.user_command_status
-    (apply_transaction l ~constraint_constants ~txn_state_view txn)
+  within_mask l ~f:(fun l' ->
+      Result.map ~f:Ledger.Transaction_applied.user_command_status
+        (Ledger.apply_transaction l' ~constraint_constants ~txn_state_view txn))
+
+let%test_unit "invalid transactions do not dirty the ledger" =
+  let open Core in
+  let open Mina_numbers in
+  let open Currency in
+  let open Signature_lib in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let ledger = Ledger.create_ephemeral ~depth:4 () in
+  let sender_sk, receiver_sk =
+    Quickcheck.Generator.generate ~size:0
+      ~random:(Splittable_random.State.of_int 100)
+      (Quickcheck.Generator.tuple2 Signature_lib.Private_key.gen
+         Signature_lib.Private_key.gen)
+  in
+  let sender_pk =
+    Public_key.compress (Public_key.of_private_key_exn sender_sk)
+  in
+  let sender_id = Account_id.create sender_pk Token_id.default in
+  let sender_account : Account.t =
+    Or_error.ok_exn
+      (Account.create_timed sender_id (Balance.of_int 20)
+         ~initial_minimum_balance:(Balance.of_int 20)
+         ~cliff_time:(Global_slot.of_int 1) ~cliff_amount:(Amount.of_int 10)
+         ~vesting_period:(Global_slot.of_int 1)
+         ~vesting_increment:(Amount.of_int 1))
+  in
+  let receiver_pk =
+    Public_key.compress (Public_key.of_private_key_exn receiver_sk)
+  in
+  let receiver_id = Account_id.create receiver_pk Token_id.default in
+  let receiver_account : Account.t =
+    Account.create receiver_id (Balance.of_int 20)
+  in
+  let invalid_command =
+    let payment : Payment_payload.t =
+      { source_pk = sender_pk
+      ; receiver_pk
+      ; token_id = Token_id.default
+      ; amount = Amount.of_int 15
+      }
+    in
+    let payload =
+      Signed_command_payload.create ~fee:(Fee.of_int 1)
+        ~fee_token:Token_id.default ~fee_payer_pk:sender_pk
+        ~nonce:(Account_nonce.of_int 0) ~valid_until:None
+        ~memo:Signed_command_memo.dummy
+        ~body:(Signed_command_payload.Body.Payment payment)
+    in
+    Option.value_exn
+      (Signed_command.create_with_signature_checked
+         (Signed_command.sign_payload sender_sk payload)
+         sender_pk payload)
+  in
+  Ledger.create_new_account_exn ledger sender_id sender_account ;
+  Ledger.create_new_account_exn ledger receiver_id receiver_account ;
+  ( match
+      apply_user_command ~constraint_constants
+        ~txn_global_slot:(Global_slot.of_int 1) ledger invalid_command
+    with
+  | Ok _ ->
+      failwith "successfully applied an invalid transaction"
+  | Error err ->
+      if
+        String.equal (Error.to_string_hum err)
+          "The source account requires a minimum balance"
+      then ()
+      else
+        failwithf "transaction failed for an unexpected reason: %s\n"
+          (Error.to_string_hum err) () ) ;
+  let account_after_apply =
+    Option.value_exn
+      (Option.bind
+         (Ledger.location_of_account ledger sender_id)
+         ~f:(Ledger.get ledger))
+  in
+  assert (Account_nonce.equal account_after_apply.nonce (Account_nonce.of_int 0))
