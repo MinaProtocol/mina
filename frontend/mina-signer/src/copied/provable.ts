@@ -29,7 +29,10 @@ declare interface ProvablePure<T> extends Provable<T> {
 }
 
 type ProvableExtension<T, TJson = JSONValue> = {
-  toInput: (x: T) => { fields?: Field[]; packed?: [Field, number][] };
+  toInput: (x: T) => {
+    fields?: Field[];
+    packed?: { field: Field; bits: number }[];
+  };
   toJSON: (x: T) => TJson;
 };
 type ProvableExtended<T, TJson = JSONValue> = Provable<T> &
@@ -228,12 +231,15 @@ function dataAsHash<T, J>({
   };
 }
 
-type HashInput = { fields?: Field[]; packed?: [Field, number][] };
+type HashInput = {
+  fields?: Field[];
+  packed?: { field: Field; bits: number }[];
+};
 const HashInput = {
   get empty() {
     return {};
   },
-  append(input1: HashInput, input2: HashInput) {
+  append(input1: HashInput, input2: HashInput): HashInput {
     if (input2.fields !== undefined) {
       (input1.fields ??= []).push(...input2.fields);
     }
