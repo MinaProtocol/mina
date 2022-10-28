@@ -25,17 +25,18 @@ let
   export-installed = opam-nix.opamListToQuery export.installed;
 
   extra-packages = with implicit-deps; {
-    dune-rpc = dune;
-    dyn = dune;
-    fiber = dune;
-    ocaml-lsp-server = "1.11.6";
+    dune-rpc = "3.5.0";
+    dyn = "3.5.0";
+    fiber = "3.5.0";
+    chrome-trace = "3.5.0";
+    ocaml-lsp-server = "1.14.1";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
-    omd = "1.3.1";
-    ordering = dune;
+    omd = "1.3.2";
+    ordering = "3.5.0";
     pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
-    stdune = dune;
+    stdune = "3.5.0";
     xdg = dune;
   };
 
