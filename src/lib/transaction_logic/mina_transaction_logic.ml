@@ -2264,11 +2264,15 @@ module For_tests = struct
       in
       let gen_amount () =
         Currency.Amount.(
-          gen_incl (of_nanomina_int_exn 1_000_000) (of_centimina_int_exn 10))
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let gen_fee () =
         Currency.Fee.(
-          gen_incl (of_nanomina_int_exn 1_000_000) (of_centimina_int_exn 10))
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in

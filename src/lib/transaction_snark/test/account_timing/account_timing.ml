@@ -83,7 +83,7 @@ let%test_module "account timing check" =
       let balance = Balance.of_mina_int_exn 100_000 in
       let initial_minimum_balance = Balance.of_mina_int_exn 80_000 in
       let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount = Amount.of_centimina_int_exn 50 in
+      let cliff_amount = Amount.of_nanomina_int_exn 500_000_000 in
       let vesting_period = Mina_numbers.Global_slot.of_int 10 in
       let vesting_increment = Amount.of_mina_int_exn 1 in
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
@@ -143,7 +143,7 @@ let%test_module "account timing check" =
       let balance = Balance.of_mina_int_exn 100_000 in
       let initial_minimum_balance = Balance.of_mina_int_exn 10_000 in
       let cliff_time = Mina_numbers.Global_slot.of_int 1_000 in
-      let cliff_amount = Amount.of_centimina_int_exn 90 in
+      let cliff_amount = Amount.of_nanomina_int_exn 900_000_000 in
       let vesting_period = Mina_numbers.Global_slot.of_int 10 in
       let vesting_increment = Amount.of_mina_int_exn 100 in
       let account =
@@ -1138,9 +1138,11 @@ let%test_module "account timing check" =
                  ( { initial_minimum_balance =
                        Currency.Balance.of_nanomina_int_exn min_balance
                    ; cliff_time = Mina_numbers.Global_slot.of_int 1000
-                   ; cliff_amount = Currency.Amount.of_centimina_int_exn 10
+                   ; cliff_amount =
+                       Currency.Amount.of_nanomina_int_exn 100_000_000
                    ; vesting_period = Mina_numbers.Global_slot.of_int 10
-                   ; vesting_increment = Currency.Amount.of_centimina_int_exn 10
+                   ; vesting_increment =
+                       Currency.Amount.of_nanomina_int_exn 100_000_000
                    }
                    : Account_update.Update.Timing_info.value )
              in

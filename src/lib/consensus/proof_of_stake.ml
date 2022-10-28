@@ -3536,7 +3536,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~constraint_constants =
         let previous_consensus_state =
           Protocol_state.consensus_state previous_protocol_state
-in
+        in
         let constants =
           Constants.create ~constraint_constants
             ~protocol_constants:
@@ -4089,7 +4089,8 @@ in
         Option.value_exn
           Amount.(
             genesis_currency
-            + of_nanomina_int_exn (height * to_nanomina_int constraint_constants.coinbase_amount))
+            + of_nanomina_int_exn
+                (height * to_nanomina_int constraint_constants.coinbase_amount))
 
       (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
       let opt_gen opt ~gen =

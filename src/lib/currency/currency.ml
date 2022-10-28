@@ -359,15 +359,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let one = Unsigned.one
 
-    (* The number of nanounits in a centiunit. User for unit transformations. *)
-    let centi_to_nano = 10_000_000
-
     (* The number of nanounits in a unit. User for unit transformations. *)
     let unit_to_nano = 1_000_000_000
 
     let to_nanomina_int = to_int
-
-    let to_centimina_int m = to_int m / centi_to_nano
 
     let to_mina_int m = to_int m / unit_to_nano
 
@@ -410,27 +405,16 @@ module Make_str (A : Wire_types.Concrete) = struct
        and either raise Currency_overflow exception or return None
        depending on the error-handling strategy.
 
-       It is advisable to use nanomina, centimina and mina wherever
-       possible and limit the use of _exn veriants to places where
-       a fixed value is being converted and hence overflow cannot
-       happen. *)
+       It is advisable to use nanomina and mina wherever possible and
+       limit the use of _exn veriants to places where a fixed value is
+       being converted and hence overflow cannot happen. *)
     let of_nanomina_int i = if Int.(i >= 0) then Some (of_int i) else None
-
-    let of_centimina_int i =
-      Option.(of_nanomina_int i >>= Fn.flip scale centi_to_nano)
 
     let of_mina_int i =
       Option.(of_nanomina_int i >>= Fn.flip scale unit_to_nano)
 
     let of_nanomina_int_exn i =
       match of_nanomina_int i with
-      | None ->
-          raise (Currency_overflow i)
-      | Some m ->
-          m
-
-    let of_centimina_int_exn i =
-      match of_centimina_int i with
       | None ->
           raise (Currency_overflow i)
       | Some m ->

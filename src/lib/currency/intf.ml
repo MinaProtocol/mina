@@ -51,25 +51,18 @@ module type Basic = sig
      and either raise Currency_overflow exception or return None
      depending on the error-handling strategy.
 
-     It is advisable to use nanomina, centimina and mina wherever
-     possible and limit the use of _exn veriants to places where
-     a fixed value is being converted and hence overflow cannot
-     happen. *)
+     It is advisable to use nanomina and mina wherever possible and
+     limit the use of _exn veriants to places where a fixed value is
+     being converted and hence overflow cannot happen. *)
   val of_mina_int_exn : int -> t
-
-  val of_centimina_int_exn : int -> t
 
   val of_nanomina_int_exn : int -> t
 
   val of_mina_int : int -> t option
 
-  val of_centimina_int : int -> t option
-
   val of_nanomina_int : int -> t option
 
   val to_mina_int : t -> int
-
-  val to_centimina_int : t -> int
 
   val to_nanomina_int : t -> int
 

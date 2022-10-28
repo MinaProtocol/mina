@@ -146,7 +146,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
-      let fee = Currency.Fee.of_centimina_int_exn 2 in
+      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
       let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
           =
         { sender = (fish1_kp, nonce)
@@ -172,7 +172,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
       (* Lower fee so that zkapp_command_create_accounts gets applied first *)
-      let fee = Currency.Fee.of_centimina_int_exn 1 in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
@@ -226,7 +226,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update all"
       in
-      let fee = Currency.Fee.of_centimina_int_exn 1 in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
       let app_state =
         let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
@@ -352,7 +352,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Non-existent account"
       in
-      let fee = Currency.Fee.of_centimina_int_exn 1 in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
       let spec : Transaction_snark.For_tests.Update_states_spec.t =
         { sender = (new_kp, Account.Nonce.zero)
         ; fee
