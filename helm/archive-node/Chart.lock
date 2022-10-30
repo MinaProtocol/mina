@@ -1,9 +1,9 @@
 dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 10.2.5
+  version: '*'
 - name: common-utilities
   repository: https://coda-charts.storage.googleapis.com
-  version: 0.0.9
-digest: sha256:80b8998adedf79b0fe5252d5601ec0fa9dda31495b015f41c3cce0bdaccf9702
-generated: "2021-01-27T18:03:33.233853887-05:00"
+  version: 0.1.1
+digest: sha256:af63bcc0a73090209c9a0d0cee95fe541e149acd2258670e1d94f7a2603b5f2b
+generated: "2022-10-30T02:49:18.344584565-04:00"
