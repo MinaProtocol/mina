@@ -1,4 +1,4 @@
-0.0.10:
+0.1.0:
 ------
 - - Allow scheduling on GCP spot VMs
 
