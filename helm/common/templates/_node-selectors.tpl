@@ -6,9 +6,16 @@ Node selector: preemptible node affinity
 {{- define "nodeSelector.preemptible" }}
 affinity:
   nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
+    preferredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
         - matchExpressions:
+          - key: "cloud.google.com/gke-spot"
+            {{- if .nodeSelector.preemptible }}
+            operator: In
+            {{- else }}
+            operator: NotIn
+            {{- end }}
+            values: ["true"]
           - key: "cloud.google.com/gke-preemptible"
             {{- if .nodeSelector.preemptible }}
             operator: In

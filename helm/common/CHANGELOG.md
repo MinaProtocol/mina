@@ -1,3 +1,7 @@
+0.0.10:
+------
+- - Allow scheduling on GCP spot VMs
+
 0.0.8:
 ------
 - enable Artifacthub repository hosting *changes* annotations
