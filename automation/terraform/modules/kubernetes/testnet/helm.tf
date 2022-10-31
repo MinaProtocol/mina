@@ -26,7 +26,7 @@ resource "helm_release" "seeds" {
   name       = "${var.testnet_name}-seeds"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version    = "1.0.6"
+  version    = "1.0.10"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -47,7 +47,7 @@ resource "helm_release" "block_producers" {
   name       = "${var.testnet_name}-block-producers"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version    = "1.0.5"
+  version    = "1.0.9"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -65,7 +65,7 @@ resource "helm_release" "plain_nodes" {
   name       = "${var.testnet_name}-plain-node-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/plain-node" : "plain-node"
-  version    = "1.0.1"
+  version    = "1.0.5"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.plain_node_vars[count.index])
@@ -83,7 +83,7 @@ resource "helm_release" "snark_workers" {
   name       = "${var.testnet_name}-snark-set-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version    = "1.0.3"
+  version    = "1.0.7"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_vars[count.index])
@@ -102,7 +102,7 @@ resource "helm_release" "archive_node" {
   name       = "archive-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version    = "1.0.5"
+  version    = "1.0.9"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.archive_vars[count.index])
