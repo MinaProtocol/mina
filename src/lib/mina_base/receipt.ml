@@ -10,8 +10,8 @@ module Signed_command_elt = struct
   type t = Signed_command_payload of Signed_command.Payload.t
 end
 
-module Parties_elt = struct
-  type t = Parties_commitment of Random_oracle.Digest.t
+module Zkapp_command_elt = struct
+  type t = Zkapp_command_commitment of Random_oracle.Digest.t
 end
 
 module Chain_hash = struct
@@ -62,15 +62,17 @@ module Chain_hash = struct
     |> hash ~init:Hash_prefix.receipt_chain_signed_command
     |> of_hash
 
-  (* prepend party index computed by Parties_logic.apply *)
-  let cons_parties_commitment (index : Mina_numbers.Index.t) (e : Parties_elt.t)
-      (t : t) =
+  (* prepend account_update index computed by Zkapp_command_logic.apply *)
+  let cons_zkapp_command_commitment (index : Mina_numbers.Index.t)
+      (e : Zkapp_command_elt.t) (t : t) =
     let open Random_oracle in
-    let x = match e with Parties_commitment s -> Input.Chunked.field s in
+    let x =
+      match e with Zkapp_command_commitment s -> Input.Chunked.field s
+    in
     let index_input = Mina_numbers.Index.to_input index in
     Input.Chunked.(append index_input (append x (field (t :> Field.t))))
     |> pack_input
-    |> hash ~init:Hash_prefix.receipt_chain_parties
+    |> hash ~init:Hash_prefix.receipt_chain_zkapp_command
     |> of_hash
 
   [%%if defined consensus_mechanism]
@@ -80,8 +82,8 @@ module Chain_hash = struct
       type t = Signed_command_payload of Transaction_union_payload.var
     end
 
-    module Parties_elt = struct
-      type t = Parties_commitment of Random_oracle.Checked.Digest.t
+    module Zkapp_command_elt = struct
+      type t = Zkapp_command_commitment of Random_oracle.Checked.Digest.t
     end
 
     let constant (t : t) =
@@ -108,18 +110,18 @@ module Chain_hash = struct
             (Checked.pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed )
 
-    (* prepend party index *)
-    let cons_parties_commitment (index : Mina_numbers.Index.Checked.t)
-        (e : Parties_elt.t) (t : t) =
+    (* prepend account_update index *)
+    let cons_zkapp_command_commitment (index : Mina_numbers.Index.Checked.t)
+        (e : Zkapp_command_elt.t) (t : t) =
       let open Random_oracle in
       let%bind x =
         match e with
-        | Parties_commitment s ->
+        | Zkapp_command_commitment s ->
             Let_syntax.return (Input.Chunked.field s)
       in
       let index_input = Mina_numbers.Index.Checked.to_input index in
       make_checked (fun () ->
-          Checked.hash ~init:Hash_prefix.receipt_chain_parties
+          Checked.hash ~init:Hash_prefix.receipt_chain_zkapp_command
             (Checked.pack_input
                Input.Chunked.(
                  append index_input (append x (field (var_to_hash_packed t)))) )
@@ -150,14 +152,15 @@ module Chain_hash = struct
         in
         assert (equal unchecked checked) )
 
-  let%test_unit "checked-unchecked equivalence (parties)" =
+  let%test_unit "checked-unchecked equivalence (zkapp_command)" =
     let open Quickcheck in
     test ~trials:20 (Generator.tuple2 gen Field.gen)
       ~f:(fun (base, commitment) ->
         let index_int = 17 in
         let unchecked =
           let index = Mina_numbers.Index.of_int index_int in
-          cons_parties_commitment index (Parties_commitment commitment) base
+          cons_zkapp_command_commitment index
+            (Zkapp_command_commitment commitment) base
         in
         let checked =
           let open Snark_params.Tick.Checked.Let_syntax in
@@ -174,8 +177,8 @@ module Chain_hash = struct
             in
             let commitment = Field.Var.constant commitment in
             let%map res =
-              Checked.cons_parties_commitment index
-                (Parties_commitment commitment) (var_of_t base)
+              Checked.cons_zkapp_command_commitment index
+                (Zkapp_command_commitment commitment) (var_of_t base)
             in
             As_prover.read typ res
           in

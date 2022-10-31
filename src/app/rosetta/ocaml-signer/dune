@@ -26,7 +26,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -46,7 +46,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -66,7 +66,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base
@@ -86,7 +86,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
-               ppx_coda
+               ppx_mina
                ppx_deriving.show
                ppx_deriving_yojson
                ppx_base

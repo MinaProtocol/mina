@@ -38,12 +38,12 @@ let%test_module "Sequence events test" =
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
-    module Deploy_party = struct
-      let party_body : Party.Body.t =
-        { Party.Body.dummy with
+    module Deploy_account_update = struct
+      let account_update_body : Account_update.Body.t =
+        { Account_update.Body.dummy with
           public_key = pk_compressed
         ; update =
-            { Party.Update.dummy with
+            { Account_update.Update.dummy with
               verification_key =
                 Set { data = vk; hash = Zkapp_account.digest_vk vk }
             ; permissions =
@@ -63,18 +63,22 @@ let%test_module "Sequence events test" =
             }
         ; use_full_commitment = true
         ; preconditions =
-            { Party.Preconditions.network =
+            { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
+        ; authorization_kind = Signature
         }
 
-      let party : Party.t =
-        { body = party_body; authorization = Signature Signature.dummy }
+      let account_update : Account_update.t =
+        { body = account_update_body
+        ; authorization = Signature Signature.dummy
+        }
     end
 
-    module Initialize_party = struct
-      let party, () = Async.Thread_safe.block_on_async_exn initialize_prover
+    module Initialize_account_update = struct
+      let account_update, () =
+        Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
     module Add_sequence_events = struct
@@ -84,7 +88,7 @@ let%test_module "Sequence events test" =
             Array.init event_length ~f:(fun inner ->
                 Snark_params.Tick.Field.of_int (outer + inner) ) )
 
-      let party, () =
+      let account_update, () =
         Async.Thread_safe.block_on_async_exn
           (add_sequence_events_prover
              ~handler:
@@ -92,16 +96,18 @@ let%test_module "Sequence events test" =
                   sequence_events ) )
     end
 
-    let test_parties ?expected_failure ?state_body ?(fee_payer_nonce = 0)
-        ~ledger parties =
+    let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
+        ~ledger zkapp_command =
       let memo = Signed_command_memo.empty in
-      let transaction_commitment : Parties.Transaction_commitment.t =
-        let other_parties_hash = Parties.Call_forest.hash parties in
-        Parties.Transaction_commitment.create ~other_parties_hash
+      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+        let account_updates_hash =
+          Zkapp_command.Call_forest.hash zkapp_command
+        in
+        Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
-      let fee_payer : Party.Fee_payer.t =
+      let fee_payer : Account_update.Fee_payer.t =
         { body =
-            { Party.Body.Fee_payer.dummy with
+            { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 50)
             ; nonce = Account.Nonce.of_int fee_payer_nonce
@@ -111,14 +117,14 @@ let%test_module "Sequence events test" =
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
-        Parties.Transaction_commitment.create_complete transaction_commitment
-          ~memo_hash
+        Zkapp_command.Transaction_commitment.create_complete
+          transaction_commitment ~memo_hash
           ~fee_payer_hash:
-            (Parties.Call_forest.Digest.Party.create
-               (Party.of_fee_payer fee_payer) )
+            (Zkapp_command.Call_forest.Digest.Account_update.create
+               (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
-          =
+      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+          Zkapp_command.t =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -131,30 +137,30 @@ let%test_module "Sequence events test" =
           | fee_payer ->
               fee_payer
         in
-        let other_parties =
-          Parties.Call_forest.map other_parties ~f:(function
+        let account_updates =
+          Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
-               } as party :
-                Party.t )
+               } as account_update :
+                Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
                 let commitment =
                   if use_full_commitment then full_commitment
                   else transaction_commitment
                 in
-                { party with
+                { account_update with
                   authorization =
                     Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
-            | party ->
-                party )
+            | account_update ->
+                account_update )
         in
-        { fee_payer; other_parties; memo }
+        { fee_payer; account_updates; memo }
       in
-      let parties : Parties.t =
-        sign_all { fee_payer; other_parties = parties; memo }
+      let zkapp_command : Zkapp_command.t =
+        sign_all { fee_payer; account_updates = zkapp_command; memo }
       in
       let account = Account.create account_id Currency.Balance.(of_int 500) in
       let _, loc =
@@ -162,9 +168,9 @@ let%test_module "Sequence events test" =
         |> Or_error.ok_exn
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          check_parties_with_merges_exn ?state_body ?expected_failure ledger
-            [ parties ] ) ;
-      (parties, Ledger.get ledger loc)
+          check_zkapp_command_with_merges_exn ?state_body ?expected_failure
+            ledger [ zkapp_command ] ) ;
+      (zkapp_command, Ledger.get ledger loc)
 
     let create_ledger () = Ledger.create ~depth:ledger_depth ()
 
@@ -175,30 +181,36 @@ let%test_module "Sequence events test" =
       (Pickles_types.Vector.Vector_5.to_list seq_state, last_seq_slot)
 
     let%test_unit "Initialize" =
-      let parties, account =
+      let zkapp_command, account =
         let ledger = create_ledger () in
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
       in
       assert (Option.is_some account) ;
-      let other_parties = Parties.Call_forest.to_list parties.other_parties in
+      let account_updates =
+        Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+      in
       (* we haven't added any sequence events *)
-      List.iter other_parties ~f:(fun party ->
-          assert (List.is_empty party.body.sequence_events) )
+      List.iter account_updates ~f:(fun account_update ->
+          assert (List.is_empty account_update.body.sequence_events) )
 
     let%test_unit "Initialize and add sequence events" =
-      let parties0, account0 =
+      let zkapp_command0, account0 =
         let ledger = create_ledger () in
         []
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
       in
-      let other_parties0 = Parties.Call_forest.to_list parties0.other_parties in
-      List.iter other_parties0 ~f:(fun party ->
-          assert (List.is_empty party.body.sequence_events) ) ;
+      let account_updates0 =
+        Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
+      in
+      List.iter account_updates0 ~f:(fun account_update ->
+          assert (List.is_empty account_update.body.sequence_events) ) ;
       assert (Option.is_some account0) ;
       (* sequence state unmodified *)
       let seq_state_elts0, last_seq_slot0 =
@@ -210,19 +222,24 @@ let%test_module "Sequence events test" =
               Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* last seq slot is 0 *)
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
-      let parties1, account1 =
+      let zkapp_command1, account1 =
         let ledger = create_ledger () in
         []
-        |> Parties.Call_forest.cons_tree Add_sequence_events.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
       in
       assert (Option.is_some account1) ;
-      let other_parties1 = Parties.Call_forest.to_list parties1.other_parties in
-      List.iteri other_parties1 ~f:(fun i party ->
-          if i > 1 then assert (not @@ List.is_empty party.body.sequence_events)
-          else assert (List.is_empty party.body.sequence_events) ) ;
+      let account_updates1 =
+        Zkapp_command.Call_forest.to_list zkapp_command1.account_updates
+      in
+      List.iteri account_updates1 ~f:(fun i account_update ->
+          if i > 1 then
+            assert (not @@ List.is_empty account_update.body.sequence_events)
+          else assert (List.is_empty account_update.body.sequence_events) ) ;
       let seq_state_elts1, last_seq_slot1 =
         seq_state_elts_of_account account1
       in
@@ -252,13 +269,15 @@ let%test_module "Sequence events test" =
       in
       let ledger = create_ledger () in
       let slot1 = Mina_numbers.Global_slot.of_int 1 in
-      let _parties0, account0 =
+      let _zkapp_command0, account0 =
         let state_body = make_state_body slot1 in
         []
-        |> Parties.Call_forest.cons_tree Add_sequence_events.party
-        |> Parties.Call_forest.cons_tree Initialize_party.party
-        |> Parties.Call_forest.cons Deploy_party.party
-        |> test_parties ~state_body ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~state_body ~ledger
       in
       assert (Option.is_some account0) ;
       let seq_state_elts0, last_seq_slot0 =
@@ -282,11 +301,12 @@ let%test_module "Sequence events test" =
       (* seq slot is 1 *)
       assert (Mina_numbers.Global_slot.equal slot1 last_seq_slot0) ;
       let slot2 = Mina_numbers.Global_slot.of_int 2 in
-      let _parties1, account1 =
+      let _zkapp_command1, account1 =
         let state_body = make_state_body slot2 in
         []
-        |> Parties.Call_forest.cons_tree Add_sequence_events.party
-        |> test_parties ~state_body ~fee_payer_nonce:1 ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Add_sequence_events.account_update
+        |> test_zkapp_command ~state_body ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
       let seq_state_elts1, last_seq_slot1 =
@@ -314,11 +334,12 @@ let%test_module "Sequence events test" =
       (* seq slot is 2 *)
       assert (Mina_numbers.Global_slot.equal slot2 last_seq_slot1) ;
       let slot3 = Mina_numbers.Global_slot.of_int 3 in
-      let _parties2, account2 =
+      let _zkapp_command2, account2 =
         let state_body = make_state_body slot3 in
         []
-        |> Parties.Call_forest.cons_tree Add_sequence_events.party
-        |> test_parties ~state_body ~fee_payer_nonce:2 ~ledger
+        |> Zkapp_command.Call_forest.cons_tree
+             Add_sequence_events.account_update
+        |> test_zkapp_command ~state_body ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;
       let seq_state_elts2, last_seq_slot2 =

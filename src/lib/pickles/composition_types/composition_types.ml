@@ -43,6 +43,14 @@ module Wrap = struct
                   from the [Minimal] value.
               *)
               type ('challenge, 'scalar_challenge) t =
+                    ( 'challenge
+                    , 'scalar_challenge )
+                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                    .Deferred_values
+                    .Plonk
+                    .Minimal
+                    .V1
+                    .t =
                 { alpha : 'scalar_challenge
                 ; beta : 'challenge
                 ; gamma : 'challenge
@@ -201,6 +209,15 @@ module Wrap = struct
                , 'bulletproof_challenges
                , 'branch_data )
                t =
+                ( 'plonk
+                , 'scalar_challenge
+                , 'fp
+                , 'bulletproof_challenges
+                , 'branch_data )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Deferred_values
+                .V1
+                .t =
             { plonk : 'plonk
             ; combined_inner_product : 'fp
                   (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
@@ -323,6 +340,12 @@ module Wrap = struct
       module Stable = struct
         module V1 = struct
           type ('g1, 'bulletproof_challenges) t =
+                ( 'g1
+                , 'bulletproof_challenges )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Messages_for_next_wrap_proof
+                .V1
+                .t =
             { challenge_polynomial_commitment : 'g1
             ; old_bulletproof_challenges : 'bulletproof_challenges
             }
@@ -357,6 +380,14 @@ module Wrap = struct
              , 'bp_chals
              , 'index )
              t =
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'bp_chals
+              , 'index )
+              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
           { deferred_values :
               ( 'plonk
               , 'scalar_challenge
@@ -563,6 +594,15 @@ module Wrap = struct
              , 'bp_chals
              , 'index )
              t =
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'messages_for_next_step_proof
+              , 'bp_chals
+              , 'index )
+              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
           { proof_state :
               ( 'plonk
               , 'scalar_challenge

@@ -376,7 +376,7 @@ module T = struct
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d )
+            Mina_tracing.start d )
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -439,8 +439,8 @@ module T = struct
               ; pubsub_v0 = RW
               ; validation_queue_size = 150
               ; peer_exchange = true
-              ; mina_peer_exchange = true
-              ; keypair = Some libp2p_keypair
+              ; peer_protection_ratio = 0.2
+              ; keypair = libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
               ; time_controller
@@ -506,7 +506,7 @@ module T = struct
                  ~log_precomputed_blocks:false ~stop_time:48 () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+          Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
             ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
@@ -514,7 +514,7 @@ module T = struct
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
-                Coda_run.setup_local_server coda ;
+                Mina_run.setup_local_server coda ;
                 coda )
               ()
           in

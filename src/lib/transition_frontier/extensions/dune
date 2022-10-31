@@ -22,6 +22,7 @@
    logger
    mina_state
    staged_ledger
+   mina_wire_types
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version)))

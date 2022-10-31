@@ -20,43 +20,44 @@ end
 
 include T
 
-let protocol_state = create "CodaProtoState"
+let protocol_state = create "MinaProtoState"
 
-let protocol_state_body = create "CodaProtoStateBody"
+let protocol_state_body = create "MinaProtoStateBody"
 
-let account = create "CodaAccount"
+let account = create "MinaAccount"
 
-let side_loaded_vk = create "CodaSideLoadedVk"
+let side_loaded_vk = create "MinaSideLoadedVk"
 
-let zkapp_account = create "CodaZkappAccount"
+let zkapp_account = create "MinaZkappAccount"
 
-let zkapp_payload = create "CodaZkappPayload"
+let zkapp_payload = create "MinaZkappPayload"
 
-let zkapp_body = create "CodaZkappBody"
+let zkapp_body = create "MinaZkappBody"
 
-let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
+let merkle_tree i = create (Printf.sprintf "MinaMklTree%03d" i)
 
-let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
+let coinbase_merkle_tree i = create (Printf.sprintf "MinaCbMklTree%03d" i)
 
-let merge_snark = create "CodaMergeSnark"
+let merge_snark = create "MinaMergeSnark"
 
-let base_snark = create "CodaBaseSnark"
+let base_snark = create "MinaBaseSnark"
 
-let transition_system_snark = create "CodaTransitionSnark"
+let transition_system_snark = create "MinaTransitionSnark"
 
-let signature_testnet = create "CodaSignature"
+let signature_testnet = create "MinaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
 
-let receipt_chain_user_command = create "CodaReceiptUC"
+let receipt_chain_user_command = create "MinaReceiptUC"
 
+(* leaving this one with "Coda", to preserve the existing hashes *)
 let receipt_chain_zkapp = create "CodaReceiptZkapp"
 
-let epoch_seed = create "CodaEpochSeed"
+let epoch_seed = create "MinaEpochSeed"
 
-let vrf_message = create "CodaVrfMessage"
+let vrf_message = create "MinaVrfMessage"
 
-let vrf_output = create "CodaVrfOutput"
+let vrf_output = create "MinaVrfOutput"
 
 let vrf_evaluation = create "MinaVrfEvaluation"
 
@@ -71,29 +72,29 @@ let coinbase_stack = create "CoinbaseStack"
 
 let coinbase = create "Coinbase"
 
-let checkpoint_list = create "CodaCheckpoints"
+let checkpoint_list = create "MinaCheckpoints"
 
-let bowe_gabizon_hash = create "CodaTockBGHash"
+let bowe_gabizon_hash = create "MinaTockBGHash"
 
-let zkapp_precondition = create "CodaZkappPred"
+let zkapp_precondition = create "MinaZkappPred"
 
 (*for Zkapp_precondition.Account.t*)
-let zkapp_precondition_account = create "CodaZkappPredAcct"
+let zkapp_precondition_account = create "MinaZkappPredAcct"
 
-let zkapp_precondition_protocol_state = create "CodaZkappPredPS"
+let zkapp_precondition_protocol_state = create "MinaZkappPredPS"
 
-(*for Party.Account_precondition.t*)
-let party_account_precondition = create "MinaPartyAccountPred"
+(*for Account_update.Account_precondition.t*)
+let account_update_account_precondition = create "MinaAcctUpdAcctPred"
 
-let party = create "MinaParty"
+let account_update = create "MinaAcctUpdate"
 
-let party_cons = create "MinaPartyCons"
+let account_update_cons = create "MinaAcctUpdateCons"
 
-let party_node = create "MinaPartyNode"
+let account_update_node = create "MinaAcctUpdateNode"
 
-let party_stack_frame = create "MinaPartyStckFrm"
+let account_update_stack_frame = create "MinaAcctUpdStckFrm"
 
-let party_stack_frame_cons = create "MinaPartyStckFrmCons"
+let account_update_stack_frame_cons = create "MinaActUpStckFrmCons"
 
 let zkapp_uri = create "MinaZkappUri"
 

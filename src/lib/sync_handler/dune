@@ -3,7 +3,7 @@
  (public_name sync_handler)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane))
+ (preprocess (pps ppx_mina ppx_version ppx_jane))
  (libraries
    ;; opam libraries
    sexplib0
@@ -33,4 +33,5 @@
    truth
    proof_carrying_data
    mina_ledger
+   mina_wire_types
 ))

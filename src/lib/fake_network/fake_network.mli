@@ -76,13 +76,6 @@ type nonrec 'n t =
   }
   constraint 'n = _ num_peers
 
-val setup :
-     context:(module CONTEXT)
-  -> ?trust_system:Trust_system.t
-  -> ?time_controller:Block_time.Controller.t
-  -> (peer_state, 'n num_peers) Vect.t
-  -> 'n num_peers t
-
 module Generator : sig
   open Quickcheck
 

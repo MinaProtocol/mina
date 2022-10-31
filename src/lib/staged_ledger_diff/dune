@@ -24,6 +24,14 @@
    consensus
    logger
    ppx_version.runtime
+   mina_wire_types
+   mina_base.import
+   signature_lib
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
+   mina_numbers
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

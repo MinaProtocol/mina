@@ -669,7 +669,13 @@ let%test_module "Bootstrap_controller tests" =
 
     let logger = Logger.create ()
 
-    let trust_system = Trust_system.null ()
+    let trust_system =
+      let s = Trust_system.null () in
+      don't_wait_for
+        (Pipe_lib.Strict_pipe.Reader.iter
+           (Trust_system.upcall_pipe s)
+           ~f:(const Deferred.unit) ) ;
+      s
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 

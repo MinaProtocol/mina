@@ -36,9 +36,11 @@
 
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
+  inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
-    }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
+    , nix-utils, ... }:
     {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -141,6 +143,7 @@
           };
         in {
           steps = flakeSteps {
+            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
               agents = [ "nix" ];
@@ -160,6 +163,8 @@
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
+
+              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
             })
           ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
@@ -184,6 +189,12 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
+
+        debianPackages = pkgs.callPackage ./nix/debian.nix { };
+
+        # Packages for the development environment that are not needed to build mina-dev.
+        # For instance dependencies for tests.
+        devShellPackages = [ pkgs.rosetta-cli ];
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -261,10 +272,10 @@
         packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
           src = ./src/lib/snarky_js_bindings/snarkyjs;
           preBuild = ''
-            BINDINGS_PATH=./dist/server/node_bindings
+            BINDINGS_PATH=./src/node_bindings
             mkdir -p "$BINDINGS_PATH"
-            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
-            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
             chmod -R 777 "$BINDINGS_PATH"
 
             # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
@@ -275,7 +286,7 @@
             sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
-          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          npmBuild = "npm run build";
           # TODO: add snarky-run
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
@@ -295,38 +306,44 @@
         };
 
         inherit ocamlPackages;
-        packages.mina = ocamlPackages.mina;
-        packages.mina_tests = ocamlPackages.mina_tests;
-        packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
-        packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
+
+        packages = {
+          inherit (ocamlPackages)
+            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+          inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
+        };
+
         packages.mina-docker = pkgs.dockerTools.buildImage {
           name = "mina";
-          contents = [ ocamlPackages.mina.out ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-image-root";
+            paths = [ ocamlPackages.mina.out ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
         };
         packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
           name = "mina-daemon";
-          contents = [
-            pkgs.dumb-init
-            pkgs.coreutils
-            pkgs.bashInteractive
-            pkgs.python3
-            pkgs.libp2p_helper
-            ocamlPackages.mina.out
-            ocamlPackages.mina.mainnet
-            ocamlPackages.mina.genesis
-            ocamlPackages.mina_build_config
-            ocamlPackages.mina_daemon_scripts
-          ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-daemon-image-root";
+            paths = [
+              pkgs.dumb-init
+              pkgs.coreutils
+              pkgs.bashInteractive
+              pkgs.python3
+              pkgs.libp2p_helper
+              ocamlPackages.mina.out
+              ocamlPackages.mina.mainnet
+              ocamlPackages.mina.genesis
+              ocamlPackages.mina_build_config
+              ocamlPackages.mina_daemon_scripts
+            ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
           config = {
             env = [ "MINA_TIME_OFFSET=0" ];
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        # packages.mina_static = ocamlPackages_static.mina;
-        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
-        packages.go-capnproto2 = pkgs.go-capnproto2;
-        packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
         legacyPackages.regular = pkgs;
@@ -334,7 +351,10 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
+        packages.mina-deb = debianPackages.mina;
+
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          buildInputs = oa.buildInputs ++ devShellPackages;
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
@@ -343,15 +363,14 @@
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-with-lsp";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
-            pushd src/app/cli
-            dune build @check
-            popd
           '';
         });
 
@@ -365,6 +384,7 @@
         # However, this is a useful balance between purity and convenience for Rust development.
         devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-rust-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep

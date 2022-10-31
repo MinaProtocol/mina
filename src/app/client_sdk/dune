@@ -44,12 +44,11 @@
   cache_dir.fake
   run_in_thread.fake
   mina_metrics.none
-  bindings_js
-  node_backend
+  js_backend
   mina_transaction)
  (link_deps
   ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
-  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
+  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))

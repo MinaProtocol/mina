@@ -3,6 +3,7 @@
  (public_name mina_base)
  (inline_tests)
  (library_flags -linkall)
+ (flags -w -22)
  (libraries
    ;; opam libraries
    async_kernel
@@ -22,11 +23,13 @@
    base_quickcheck.ppx_quickcheck
    core_kernel.uuid
    ;; local libraries
+   mina_wire_types
    run_in_thread
    kimchi_backend_common
    kimchi_backend.pasta
    mina_base.import
    sgn
+   sgn_type
    pickles_types
    blake2
    pickles
@@ -70,9 +73,9 @@
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_annot ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
+  (pps ppx_annot ppx_snarky ppx_here ppx_mina ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
        ppx_base base_quickcheck.ppx_quickcheck ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
-       ppx_variants_conv
+       ppx_variants_conv ppx_pipebang
  ))
  (instrumentation (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))

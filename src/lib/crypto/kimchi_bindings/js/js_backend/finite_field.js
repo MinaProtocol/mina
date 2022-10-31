@@ -1,4 +1,4 @@
-/* global joo_global_object, Uint8Array_, BigInt_, _0n, _1n, _2n, _32n,
+/* global joo_global_object, Uint8Array_, BigInt_
    caml_bigint_of_bytes, caml_js_to_bool, caml_string_of_jsstring
 */
 
@@ -39,14 +39,14 @@ function caml_bigint_modulo(x, p) {
 
 // modular exponentiation, a^n % p
 // Provides: caml_finite_field_power
-// Requires: caml_bigint_modulo, _0n, _1n
+// Requires: caml_bigint_modulo, BigInt_
 function caml_finite_field_power(a, n, p) {
   a = caml_bigint_modulo(a, p);
   // this assumes that p is prime, so that a^(p-1) % p = 1
-  n = caml_bigint_modulo(n, p - _1n);
-  var x = _1n;
-  for (; n > _0n; n >>= _1n) {
-    if (n & _1n) x = caml_bigint_modulo(x * a, p);
+  n = caml_bigint_modulo(n, p - BigInt_(1));
+  var x = BigInt_(1);
+  for (; n > BigInt_(0); n >>= BigInt_(1)) {
+    if (n & BigInt_(1)) x = caml_bigint_modulo(x * a, p);
     a = caml_bigint_modulo(a * a, p);
   }
   return x;
@@ -54,17 +54,16 @@ function caml_finite_field_power(a, n, p) {
 
 // inverting with EGCD, 1/a in Z_p
 // Provides: caml_finite_field_inverse
-// Requires: caml_bigint_modulo, _0n, _1n
+// Requires: caml_bigint_modulo, BigInt_
 function caml_finite_field_inverse(a, p) {
-  var a_orig = a;
   a = caml_bigint_modulo(a, p);
-  if (a === _0n) throw Error("cannot invert 0");
+  if (a === BigInt_(0)) return undefined;
   var b = p;
-  var x = _0n;
-  var y = _1n;
-  var u = _1n;
-  var v = _0n;
-  while (a !== _0n) {
+  var x = BigInt_(0);
+  var y = BigInt_(1);
+  var u = BigInt_(1);
+  var v = BigInt_(0);
+  while (a !== BigInt_(0)) {
     var q = b / a;
     var r = caml_bigint_modulo(b, a);
     var m = x - u * q;
@@ -76,50 +75,52 @@ function caml_finite_field_inverse(a, p) {
     u = m;
     v = n;
   }
-  if (b !== _1n) throw Error("inverting failed (no inverse)");
-  if (caml_bigint_modulo(x * a_orig, p) !== _1n) throw Error("caml_finite_field_inverse has a bug");
+  if (b !== BigInt_(1)) return undefined;
   return caml_bigint_modulo(x, p);
 }
 
 // Provides: caml_finite_field_sqrt
-// Requires: _32n, _0n, _1n, _2n, caml_finite_field_power, caml_bigint_modulo
-function caml_finite_field_sqrt(n, p, Q, z) {
-  // https://en.wikipedia.org/wiki/Tonelli-Shanks_algorithm#The_algorithm
-  // variable naming is the same as in that link ^
-  // Q is what we call `t` elsewhere - the odd factor in p - 1
-  // z is a known non-square mod p. we pass in the primitive root of unity
-  var M = _32n;
-  var c = caml_finite_field_power(z, Q, p); // z^Q
-  var t = caml_finite_field_power(n, Q, p); // n^Q
-  var R = caml_finite_field_power(n, (Q + _1n) / _2n, p); // n^((Q + 1)/2)
-  while (true) {
-    if (t === _0n) return _0n;
-    if (t === _1n) {
-      if (caml_bigint_modulo(R * R - n, p) !== _0n) throw Error("caml_finite_field_sqrt has a bug");
-      return R;
+// Requires: BigInt_, caml_finite_field_power, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_pasta_p_bigint, caml_pasta_q_bigint
+var caml_finite_field_sqrt = (function () {
+  var precomputed_c = {};
+  return function caml_finite_field_sqrt(n, p, Q, z) {
+    // https://en.wikipedia.org/wiki/Tonelli-Shanks_algorithm#The_algorithm
+    // variable naming is the same as in that link ^
+    // Q is what we call `t` elsewhere - the odd factor in p - 1
+    // z is a known non-square mod p. we pass in the primitive root of unity
+    var M = BigInt_(32);
+    var c =
+      precomputed_c[p.toString()] ||
+      (precomputed_c[p.toString()] = caml_finite_field_power(z, Q, p)); // z^Q
+    // TODO: can we save work by sharing computation between t and R?
+    var t = caml_finite_field_power(n, Q, p); // n^Q
+    var R = caml_finite_field_power(n, (Q + BigInt_(1)) / BigInt_(2), p); // n^((Q + 1)/2)
+    while (true) {
+      if (t === BigInt_(0)) return BigInt_(0);
+      if (t === BigInt_(1)) return R;
+      // use repeated squaring to find the least i, 0 < i < M, such that t^(2^i) = 1
+      var i = BigInt_(0);
+      var s = t;
+      while (s !== BigInt_(1)) {
+        s = caml_bigint_modulo(s * s, p);
+        i = i + BigInt_(1);
+      }
+      if (i === M) return undefined; // no solution
+      var b = caml_finite_field_power(c, (BigInt_(1) << (M - i - BigInt_(1))), p); // c^(2^(M-i-1))
+      M = i;
+      c = caml_bigint_modulo(b * b, p);
+      t = caml_bigint_modulo(t * c, p);
+      R = caml_bigint_modulo(R * b, p);
     }
-    // use repeated squaring to find the least i, 0 < i < M, such that t^(2^i) = 1
-    var i = _0n;
-    var s = t;
-    while (s !== _1n) {
-      s = caml_bigint_modulo(s * s, p);
-      i = i + _1n;
-    }
-    if (i === M) return undefined; // no solution
-    var b = caml_finite_field_power(c, (_1n << (M - i - _1n)), p); // c^(2^(M-i-1))
-    M = i;
-    c = caml_bigint_modulo(b * b, p);
-    t = caml_bigint_modulo(t * c, p);
-    R = caml_bigint_modulo(R * b, p);
   }
-}
+})();
 
 // Provides: caml_finite_field_is_square
-// Requires: caml_finite_field_power, _0n, _1n, _2n
+// Requires: caml_finite_field_power, BigInt_
 function caml_finite_field_is_square(x, p) {
-  if (x === _0n) return 1;
-  var sqrt_1 = caml_finite_field_power(x, (p - _1n) / _2n, p);
-  return Number(sqrt_1 === _1n);
+  if (x === BigInt_(0)) return 1;
+  var sqrt_1 = caml_finite_field_power(x, (p - BigInt_(1)) / BigInt_(2), p);
+  return Number(sqrt_1 === BigInt_(1));
 }
 
 // Provides: caml_random_bytes
@@ -156,13 +157,13 @@ function caml_finite_field_random(p) {
 }
 
 // Provides: caml_finite_field_domain_generator
-// Requires: caml_bigint_modulo, caml_bindings_debug, _1n
+// Requires: caml_bigint_modulo, caml_bindings_debug, BigInt_
 function caml_finite_field_domain_generator(i, p, primitive_root_of_unity) {
   // this takes an integer i and returns the 2^ith root of unity, i.e. a number `w` with
   // w^(2^i) = 1, w^(2^(i-1)) = -1
   // computed by taking the 2^32th root and squaring 32-i times
   if (i > 32 || i < 0) throw Error('log2 size of evaluation domain must be in [0, 32], got ' + i);
-  if (i === 0) return _1n;
+  if (i === 0) return BigInt_(1);
   var generator = primitive_root_of_unity;
   for (var j = 32; j > i; j--) {
     generator = caml_bigint_modulo(generator * generator, p);
@@ -187,11 +188,13 @@ function caml_pasta_fq_add(x, y) {
 // Provides: caml_pasta_fp_negate
 // Requires: caml_pasta_p_bigint
 function caml_pasta_fp_negate(x) {
+  if (!x[0]) return [x[0]];
   return [caml_pasta_p_bigint - x[0]];
 }
 // Provides: caml_pasta_fq_negate
 // Requires: caml_pasta_q_bigint
 function caml_pasta_fq_negate(x) {
+  if (!x[0]) return [x[0]];
   return [caml_pasta_q_bigint - x[0]];
 }
 
@@ -217,16 +220,18 @@ function caml_pasta_fq_mul(x, y) {
   return [caml_bigint_modulo(x[0] * y[0], caml_pasta_q_bigint)];
 }
 
+// Provides: caml_pasta_option
+function caml_pasta_option(x) {
+  if (x === undefined || x[0] === undefined) return 0; // None
+  return [0, x]; // Some(x)
+}
+
 // Provides: caml_pasta_fp_option
-function caml_pasta_fp_option(x) {
-  if (x === undefined) return 0; // None
-  return [0, x]; // Some(x)
-}
+// Requires: caml_pasta_option
+var caml_pasta_fp_option = caml_pasta_option;
 // Provides: caml_pasta_fq_option
-function caml_pasta_fq_option(x) {
-  if (x === undefined) return 0; // None
-  return [0, x]; // Some(x)
-}
+// Requires: caml_pasta_option
+var caml_pasta_fq_option = caml_pasta_option;
 
 // Provides: caml_pasta_fp_inv
 // Requires: caml_finite_field_inverse, caml_pasta_p_bigint, caml_pasta_fp_option
@@ -290,14 +295,14 @@ function caml_pasta_fq_sqrt(x) {
 }
 
 // Provides: caml_pasta_fp_equal
-// Requires: caml_pasta_fp_sub, _0n
+// Requires: caml_pasta_fp_sub, BigInt_
 function caml_pasta_fp_equal(x, y) {
-  return Number(caml_pasta_fp_sub(x, y)[0] === _0n);
+  return Number(x[0] === y[0]);
 }
 // Provides: caml_pasta_fq_equal
-// Requires: caml_pasta_fq_sub, _0n
+// Requires: caml_pasta_fq_sub, BigInt_
 function caml_pasta_fq_equal(x, y) {
-  return Number(caml_pasta_fq_sub(x, y)[0] === _0n);
+  return Number(x[0] === y[0]);
 }
 
 // Provides: caml_pasta_fp_random
@@ -418,12 +423,12 @@ function caml_pasta_fq_domain_generator(i) {
 var caml_bindings_debug = false;
 
 // Provides: _test_finite_field
-// Requires: caml_bindings_debug, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_pasta_fp_is_square, caml_pasta_fq_is_square, caml_finite_field_domain_generator
+// Requires: caml_bindings_debug, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_pasta_fp_is_square, caml_pasta_fq_is_square, caml_finite_field_domain_generator
 var _test_finite_field = caml_bindings_debug && (function test() {
   var console = joo_global_object.console;
   // t is computed correctly from p = 2^32 * t + 1
-  console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
-  console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
+  console.assert(caml_pasta_pm1_odd_factor * (BigInt_(1) << BigInt_(32)) + BigInt_(1) === caml_pasta_p_bigint);
+  console.assert(caml_pasta_qm1_odd_factor * (BigInt_(1) << BigInt_(32)) + BigInt_(1) === caml_pasta_q_bigint);
 
   // the primitive root of unity is computed correctly as 5^t
   var generator = BigInt_(5);
@@ -434,15 +439,15 @@ var _test_finite_field = caml_bindings_debug && (function test() {
 
   // the primitive roots of unity `r` actually satisfy the equations defining them:
   // r^(2^32) = 1, r^(2^31) != 1
-  var should_be_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint);
-  var should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint);
-  console.assert(should_be_1 === _1n);
-  console.assert(should_be_minus_1 + _1n === caml_pasta_p_bigint);
+  var should_be_1 = caml_finite_field_power(caml_twoadic_root_fp, (BigInt_(1) << BigInt_(32)), caml_pasta_p_bigint);
+  var should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fp, (BigInt_(1) << BigInt_(31)), caml_pasta_p_bigint);
+  console.assert(should_be_1 === BigInt_(1));
+  console.assert(should_be_minus_1 + BigInt_(1) === caml_pasta_p_bigint);
 
-  should_be_1 = caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint);
-  should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fq, (_1n << BigInt_(31)), caml_pasta_q_bigint);
-  console.assert(should_be_1 === _1n);
-  console.assert(should_be_minus_1 + _1n === caml_pasta_q_bigint);
+  should_be_1 = caml_finite_field_power(caml_twoadic_root_fq, (BigInt_(1) << BigInt_(32)), caml_pasta_q_bigint);
+  should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fq, (BigInt_(1) << BigInt_(31)), caml_pasta_q_bigint);
+  console.assert(should_be_1 === BigInt_(1));
+  console.assert(should_be_minus_1 + BigInt_(1) === caml_pasta_q_bigint);
 
   // the primitive roots of unity are non-squares
   // -> verifies that the two-adicity is 32, and that they can be used as non-squares in the sqrt algorithm
@@ -453,8 +458,8 @@ var _test_finite_field = caml_bindings_debug && (function test() {
   // generator^(2^i) = 1, generator^(2^(i-1)) = -1
   var i = 10;
   var domain_gen = caml_finite_field_domain_generator(i, caml_pasta_p_bigint, caml_twoadic_root_fp);
-  should_be_1 = caml_finite_field_power(domain_gen, _1n << BigInt_(i), caml_pasta_p_bigint);
-  should_be_minus_1 = caml_finite_field_power(domain_gen, _1n << BigInt_(i-1), caml_pasta_p_bigint);
-  console.assert(should_be_1 === _1n);
-  console.assert(should_be_minus_1 + _1n === caml_pasta_p_bigint);
+  should_be_1 = caml_finite_field_power(domain_gen, BigInt_(1) << BigInt_(i), caml_pasta_p_bigint);
+  should_be_minus_1 = caml_finite_field_power(domain_gen, BigInt_(1) << BigInt_(i-1), caml_pasta_p_bigint);
+  console.assert(should_be_1 === BigInt_(1));
+  console.assert(should_be_minus_1 + BigInt_(1) === caml_pasta_p_bigint);
 })()

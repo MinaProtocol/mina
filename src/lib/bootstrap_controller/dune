@@ -3,7 +3,7 @@
  (public_name bootstrap_controller)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_register_event))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_register_event))
  (libraries
    ;; opam libraries
    sexplib0
@@ -52,4 +52,13 @@
    mina_base.util
    o1trace
    mina_net2
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend
+   sgn_type
+   sgn
+   currency
+   kimchi_backend.pasta
+   mina_wire_types
    ))

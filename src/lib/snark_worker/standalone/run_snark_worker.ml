@@ -30,13 +30,14 @@ let command =
        match%bind Prod.perform_single worker_state ~message spec with
        | Ok (proof, time) ->
            Caml.Format.printf
-             !"Successfully proved in %{sexp: Time.Span.t}.@.Proof \
-               was:@.%{sexp: Transaction_snark.t}@."
+             !"@[<v>Successfully proved in %{sexp: Time.Span.t}.@,\
+               Proof was:@,\
+               %{sexp: Transaction_snark.t}@]@."
              time proof ;
            exit 0
        | Error err ->
            Caml.Format.printf
-             !"Proving failed with error:@.%s"
+             !"Proving failed with error: %s@."
              (Error.to_string_hum err) ;
            exit 1 )
 
