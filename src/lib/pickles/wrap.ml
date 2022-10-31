@@ -551,7 +551,7 @@ let wrap
         end)
     in
     let module V = H1.To_vector (Tick.Curve.Affine) in
-    Vector.trim
+    Vector.trim_front
       (V.f Max_local_max_proof_verifieds.length
          (M.f messages_for_next_wrap_proof) )
       lte
