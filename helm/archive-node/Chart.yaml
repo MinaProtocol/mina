@@ -2,7 +2,7 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 1.0.9
+version: 1.0.10
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
