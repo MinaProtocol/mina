@@ -559,9 +559,6 @@ let () =
       | _ ->
           Js.Opt.empty ) ;
   let from f x = new%js field_constr (As_field.of_field (f x)) in
-  static_method "fromNumber" (from As_field.of_number_exn) ;
-  static_method "fromString" (from As_field.of_string_exn) ;
-  static_method "fromBigInt" (from As_field.of_bigint_exn) ;
   static_method "check" (fun _x -> ())
 
 let () =
