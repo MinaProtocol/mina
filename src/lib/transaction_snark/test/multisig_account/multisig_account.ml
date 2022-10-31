@@ -33,8 +33,8 @@ let%test_module "multisig_account" =
             let open Checked in
             Checked.List.map ~f:(fun (_, pk') -> neq_pk pk pk') xs
             >>= fun bs ->
-            [%with_label_ __LOC__]
-              (Boolean.Assert.all bs >>= fun () -> distinct_public_keys xs)
+            [%with_label_ __LOC__] (fun () ->
+                Boolean.Assert.all bs >>= fun () -> distinct_public_keys xs )
         | [] ->
             Checked.return ()
 
@@ -59,7 +59,7 @@ let%test_module "multisig_account" =
               |> Checked.List.all >>= Boolean.all )
         in
         Checked.List.map witness ~f:verify_sig
-        >>= fun bs -> [%with_label_ __LOC__] (Boolean.Assert.all bs)
+        >>= fun bs -> [%with_label_ __LOC__] (fun () -> Boolean.Assert.all bs)
 
       let check_witness m pubkeys commitment witness =
         if List.length witness <> m then

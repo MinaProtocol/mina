@@ -52,6 +52,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('token, 'fee) t =
+            ('token, 'fee) Mina_wire_types.Mina_base.Fee_excess.Poly.V1.t =
         { fee_token_l : 'token
         ; fee_excess_l : 'fee
         ; fee_token_r : 'token
@@ -121,7 +122,7 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      ( Token_id.Stable.V1.t
+      ( Token_id.Stable.V2.t
       , (Fee.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving compare, equal, hash, sexp, yojson]
@@ -179,16 +180,16 @@ let to_input_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
 
 let assert_equal_checked (t1 : var) (t2 : var) =
   Checked.all_unit
-    [ [%with_label_ "fee_token_l"]
-        (make_checked (fun () ->
-             Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l ) )
-    ; [%with_label_ "fee_excess_l"]
-        (Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l)
-    ; [%with_label_ "fee_token_r"]
-        (make_checked (fun () ->
-             Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r ) )
-    ; [%with_label_ "fee_excess_r"]
-        (Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r)
+    [ [%with_label_ "fee_token_l"] (fun () ->
+          make_checked (fun () ->
+              Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l ) )
+    ; [%with_label_ "fee_excess_l"] (fun () ->
+          Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l )
+    ; [%with_label_ "fee_token_r"] (fun () ->
+          make_checked (fun () ->
+              Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r ) )
+    ; [%with_label_ "fee_excess_r"] (fun () ->
+          Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r )
     ]
 
 [%%endif]
@@ -286,7 +287,7 @@ let%snarkydef_ eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
   in
   let%map () =
     [%with_label_ "Fee excess is eliminated"]
-      Field.(Checked.Assert.equal (Var.constant zero) fee_excess_m)
+      Field.(fun () -> Checked.Assert.equal (Var.constant zero) fee_excess_m)
   in
   ((fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r))
 
@@ -433,19 +434,19 @@ let%snarkydef_ combine_checked
   (* Eliminations. *)
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_l, fee_excess2_l) =
     (* [1l; 1r; 2l; 2r] -> [1l; 2l; 2r] *)
-    [%with_label_ "Eliminate fee_excess1_r"]
-      (eliminate_fee_excess_checked
-         (fee_token1_l, fee_excess1_l)
-         (fee_token1_r, fee_excess1_r)
-         (fee_token2_l, fee_excess2_l) )
+    [%with_label_ "Eliminate fee_excess1_r"] (fun () ->
+        eliminate_fee_excess_checked
+          (fee_token1_l, fee_excess1_l)
+          (fee_token1_r, fee_excess1_r)
+          (fee_token2_l, fee_excess2_l) )
   in
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_r, fee_excess2_r) =
     (* [1l; 2l; 2r] -> [1l; 2r] *)
-    [%with_label_ "Eliminate fee_excess2_l"]
-      (eliminate_fee_excess_checked
-         (fee_token1_l, fee_excess1_l)
-         (fee_token2_l, fee_excess2_l)
-         (fee_token2_r, fee_excess2_r) )
+    [%with_label_ "Eliminate fee_excess2_l"] (fun () ->
+        eliminate_fee_excess_checked
+          (fee_token1_l, fee_excess1_l)
+          (fee_token2_l, fee_excess2_l)
+          (fee_token2_r, fee_excess2_r) )
   in
   let%bind { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     rebalance_checked
@@ -487,19 +488,19 @@ let%snarkydef_ combine_checked
       Fee.Signed.Checked.to_field_var currency_excess
     in
     let%map () =
-      [%with_label_ "Fee excess does not overflow"]
-        (Field.Checked.Assert.equal excess excess_from_currency)
+      [%with_label_ "Fee excess does not overflow"] (fun () ->
+          Field.Checked.Assert.equal excess excess_from_currency )
     in
     currency_excess
   in
   (* Convert to currency. *)
   let%bind fee_excess_l =
-    [%with_label_ "Check for overflow in fee_excess_l"]
-      (convert_to_currency fee_excess_l)
+    [%with_label_ "Check for overflow in fee_excess_l"] (fun () ->
+        convert_to_currency fee_excess_l )
   in
   let%map fee_excess_r =
-    [%with_label_ "Check for overflow in fee_excess_r"]
-      (convert_to_currency fee_excess_r)
+    [%with_label_ "Check for overflow in fee_excess_r"] (fun () ->
+        convert_to_currency fee_excess_r )
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
 
