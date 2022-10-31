@@ -558,7 +558,6 @@ let () =
           with Failure _ -> Js.Opt.empty )
       | _ ->
           Js.Opt.empty ) ;
-  let from f x = new%js field_constr (As_field.of_field (f x)) in
   static_method "check" (fun _x -> ())
 
 let () =
