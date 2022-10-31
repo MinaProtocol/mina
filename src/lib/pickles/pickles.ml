@@ -162,7 +162,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                let (T (_proofs_verified, pi)) = HI.length xs in
                let module V = H2_1.To_vector (Int) in
                let v = V.f pi xs in
-               Vector.extend_exn v max_proofs_verified 0
+               Vector.extend_front_exn v max_proofs_verified 0
            end)
     in
     let module V = H2_1.To_vector (Vec) in
@@ -215,7 +215,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let messages_for_next_wrap_proof =
             { messages_for_next_wrap_proof with
               old_bulletproof_challenges =
-                Vector.extend_exn
+                Vector.extend_front_exn
                   messages_for_next_wrap_proof.old_bulletproof_challenges m
                   dummy_chals
             }
@@ -333,7 +333,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 =
              fun rule ->
               let (T (_, l)) = HT.length rule.prevs in
-              Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
+              Vector.extend_front_exn
+                (V.f l (M.f rule.prevs))
+                Max_proofs_verified.n 0
           end)
       in
       let module V = H4.To_vector (Local_max_proofs_verifieds) in
@@ -1951,7 +1953,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
-                  Vector.extend_exn
+                  Vector.extend_front_exn
                     (V.f l (M.f rule.prevs))
                     Max_proofs_verified.n 0
               end)
@@ -2341,7 +2343,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       O.create pairing_vk
                         Vector.(
-                          map2 (Vector.trim sgs lte) prev_challenges
+                          map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
@@ -2574,6 +2576,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       .prepare
                         next_statement.proof_state.messages_for_next_wrap_proof
                     in
+                    Core_kernel.printf "does this get called?\n%!" ;
                     let%map.Promise next_proof =
                       let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
                       Common.time "wrap proof" (fun () ->
@@ -2586,7 +2589,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
                                   ( Vector.map2
-                                      (Vector.extend_exn
+                                      (Vector.extend_front_exn
                                          prev_statement.proof_state
                                            .messages_for_next_step_proof
                                            .challenge_polynomial_commitments
@@ -2875,7 +2878,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
-                  Vector.extend_exn
+                  Vector.extend_front_exn
                     (V.f l (M.f rule.prevs))
                     Max_proofs_verified.n 0
               end)
@@ -3265,7 +3268,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       O.create pairing_vk
                         Vector.(
-                          map2 (Vector.trim sgs lte) prev_challenges
+                          map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
@@ -3476,7 +3479,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
                                   ( Vector.map2
-                                      (Vector.extend_exn
+                                      (Vector.extend_front_exn
                                          prev_statement.proof_state
                                            .messages_for_next_step_proof
                                            .challenge_polynomial_commitments
