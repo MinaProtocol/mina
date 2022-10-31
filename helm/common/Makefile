@@ -3,11 +3,15 @@ version     	:=      $(shell yq eval '.version' Chart.yaml)
 changes         :=      $(shell yq eval '.annotations."artifacthub.io/changes"' Chart.yaml)
 changelog       ?=      CHANGELOG.md
 
-lint: 
+lint:
 	helm lint . --debug --strict
 
 dry-run:
 	helm install $(name)-dry-run . --dry-run --namespace test
+
+dep-up:
+	helm repo update
+	helm dep update
 
 .SILENT:
 changelog:
