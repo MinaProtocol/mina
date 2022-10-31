@@ -190,7 +190,7 @@ let wrap_main
           Branch_data.Checked.pack
             (module Impl)
             { proofs_verified_mask =
-                Vector.extend_exn actual_proofs_verified_mask Nat.N2.n
+                Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n
                   Boolean.false_
             ; domain_log2
             }
