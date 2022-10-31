@@ -1,21 +1,21 @@
 ### Mina node selector TEMPLATES ###
 
 {{/*
-Node selector: preemptible node affinity
+Node selector: spot node affinity
 */}}
 {{- define "nodeSelector.preemptible" }}
 affinity:
   nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
+    requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: "cloud.google.com/gke-spot"
-          {{- if .nodeSelector.preemptible }}
-          operator: In
-          {{- else }}
-          operator: NotIn
-          {{- end }}
-          values: ["true"]
+        - matchExpressions:
+          - key: "cloud.google.com/gke-spot"
+            {{- if .nodeSelector.preemptible }}
+            operator: In
+            {{- else }}
+            operator: NotIn
+            {{- end }}
+            values: ["true"]
 {{- end }}
 
 {{/*
