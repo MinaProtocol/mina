@@ -12,6 +12,7 @@ dry-run:
 dep-up:
 	helm repo update
 	helm dep update
+	git add charts/ Chart.lock
 
 .SILENT:
 changelog:

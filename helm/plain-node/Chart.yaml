@@ -2,11 +2,11 @@ apiVersion: v2
 name: plain-node
 description: A Helm chart for Mina Protocol's plain nodes
 type: application
-version: 1.0.2
+version: 1.0.5
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - All references to the crypto currency now say Mina
+    - Support spot instances
 dependencies:
   - name: common-utilities
     version: "*"

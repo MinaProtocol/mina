@@ -2,11 +2,11 @@ apiVersion: v2
 name: snark-worker
 description: A Helm chart for Mina Protocol's SNARK worker nodes
 type: application
-version: 1.0.4
+version: 1.0.7
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - All references to the crypto currency now say Mina
+    - Support spot instances
 dependencies:
   - name: common-utilities
     version: "*"
