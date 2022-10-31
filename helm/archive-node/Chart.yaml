@@ -2,14 +2,14 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 1.0.10
+version: 1.0.11
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - Support spot instances
+    - Support spot instances and lock postgres chart to 10.*
 dependencies:
   - name: postgresql
-    version: "*"
+    version: "10.*"
     repository: "https://charts.bitnami.com/bitnami"
     condition: archive.enablePostgresDB
   - name: common-utilities
