@@ -61,6 +61,18 @@ end
 
 module Gen = Gen_make (Signed_command)
 
+let gen_signed =
+  let module G = Signed_command.Gen in
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2
+      Mina_base_import.Signature_keypair.gen
+  in
+  G.payment_with_random_participants ~sign_type:`Real ~keys:(Array.of_list keys)
+    ~max_amount:10000 ~fee_range:1000 ()
+
+let gen = Gen.to_signed_command gen_signed
+
 [%%versioned
 module Stable = struct
   module V2 = struct

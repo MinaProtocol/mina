@@ -20,6 +20,8 @@ module Poly = struct
     end
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type ('public_key, 'token_id, 'amount) t =
         { source_pk : 'public_key
         ; receiver_pk : 'public_key
@@ -42,6 +44,8 @@ module Stable = struct
   end
 
   module V1 = struct
+    [@@@with_all_version_tags]
+
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Token_id.Stable.V1.t

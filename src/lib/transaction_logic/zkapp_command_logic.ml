@@ -181,6 +181,19 @@ module Local_state = struct
            , 'length
            , 'failure_status_tbl )
            t =
+            ( 'stack_frame
+            , 'call_stack
+            , 'token_id
+            , 'signed_amount
+            , 'ledger
+            , 'bool
+            , 'comm
+            , 'length
+            , 'failure_status_tbl )
+            Mina_wire_types.Mina_transaction_logic.Zkapp_command_logic
+            .Local_state
+            .V1
+            .t =
         { stack_frame : 'stack_frame
         ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
@@ -222,7 +235,7 @@ module Local_state = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
-          , Token_id.Stable.V1.t
+          , Token_id.Stable.V2.t
           , ( Currency.Amount.Stable.V1.t
             , Sgn.Stable.V1.t )
             Currency.Signed_poly.Stable.V1.t

@@ -6,7 +6,7 @@ module Failure = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -49,6 +49,7 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -80,7 +81,7 @@ module Failure = struct
 
     let to_display t : Display.t =
       let _, display =
-        List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
+        List.fold_left t ~init:(0, []) ~f:(fun (index, acc) bucket ->
             if List.is_empty bucket then (index + 1, acc)
             else (index + 1, (index, bucket) :: acc) )
       in
@@ -129,7 +130,7 @@ module Failure = struct
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
-      ~invalid_fee_excess:add
+      ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -218,6 +219,8 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Cancelled ->
+        "Cancelled"
 
   let of_string = function
     | "Predicate" ->
@@ -302,6 +305,8 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
+    | "Cancelled" ->
+        Ok Cancelled
     | str -> (
         let res =
           List.find_map
@@ -444,12 +449,17 @@ module Failure = struct
     | Invalid_fee_excess ->
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
+    | Cancelled ->
+        "The account update is cancelled because there's a failure in the \
+         zkApp transaction"
 end
 
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = Applied | Failed of Failure.Collection.Stable.V1.t
+    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+      | Applied
+      | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

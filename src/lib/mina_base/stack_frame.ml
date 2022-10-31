@@ -22,7 +22,7 @@ type ('caller, 'zkapp_command) frame = ('caller, 'zkapp_command) t
 let empty : value =
   { caller = Token_id.default; caller_caller = Token_id.default; calls = [] }
 
-module Digest : sig
+module type Stack_frame_digest_intf = sig
   include Digest_intf.S
 
   val create :
@@ -49,7 +49,15 @@ module Digest : sig
   end
 
   val typ : (Checked.t, t) Typ.t
-end = struct
+end
+
+module Wire_types = Mina_wire_types.Mina_base.Stack_frame.Digest
+
+module Make_sig (A : Wire_types.Types.S) = struct
+  module type S = Stack_frame_digest_intf with type Stable.V1.t = A.V1.t
+end
+
+module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -104,6 +112,8 @@ end = struct
 
   let typ = Field.typ
 end
+
+module Digest = Wire_types.Make (Make_sig) (Make_str)
 
 module Checked = struct
   type nonrec 'zkapp_command t = (Token_id.Checked.t, 'zkapp_command) t

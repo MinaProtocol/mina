@@ -41,6 +41,8 @@ module Compressed = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      [@@@with_all_version_tags]
+
       module T = struct
         type t = ((Field.t[@version_asserted]), bool) Poly.Stable.V1.t
         [@@deriving equal, compare, hash]
@@ -174,6 +176,8 @@ module Uncompressed = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = Field.t * Field.t [@@deriving compare, equal, hash]
 
       let to_latest = Fn.id

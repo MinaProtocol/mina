@@ -22,6 +22,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type ('payload, 'pk, 'signature) t =
               ( 'payload
               , 'pk
@@ -36,6 +38,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     [@@@with_top_version_tag]
+
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_signed_command_vn for that version
+    *)
 
     module V2 = struct
       type t =
@@ -64,6 +75,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t =
         ( Payload.Stable.V1.t
         , Public_key.Stable.V1.t
@@ -73,15 +86,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       (* don't need to coerce old commands to new ones *)
       let to_latest _ = failwith "Not implemented"
-
-      let description = "Signed command"
-
-      let version_byte = Base58_check.Version_bytes.signed_command_legacy
     end
   end]
 
   (* type of signed commands, pre-Berkeley hard fork *)
-  type t_legacy = Stable.V1.t
+  type t_v1 = Stable.V1.t
 
   type _unused = unit
     constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -369,9 +378,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
     `If_this_is_used_it_should_have_a_comment_justifying_it t
 
   (* so we can deserialize Base58Check transaction ids created before Berkeley hard fork *)
-  module Base58_check_legacy = Codable.Make_base58_check (Stable.V1)
+  module V1_all_tagged = struct
+    include Stable.V1.With_all_version_tags
 
-  let of_base58_check_exn_legacy = Base58_check_legacy.of_base58_check
+    let description = "Signed command"
+
+    let version_byte = Base58_check.Version_bytes.signed_command_v1
+  end
+
+  module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged)
+
+  let of_base58_check_exn_v1 = Base58_check_v1.of_base58_check
 
   (* give transaction ids have version tag *)
   include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
@@ -428,6 +445,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Fn.compose
                (Public_key.Compressed.equal public_key)
                Account_id.public_key ) )
+
+  let%test "latest signed command version" =
+    (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+       for latest version, then update this test
+    *)
+    Int.equal Stable.Latest.version 2
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

@@ -55,6 +55,7 @@
    random_oracle
    random_oracle_input
    ppx_version.runtime
+   mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))
