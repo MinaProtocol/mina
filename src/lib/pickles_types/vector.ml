@@ -22,6 +22,18 @@ let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
 
+let iteri (type a n) (t : (a, n) t) ~(f : int -> a -> unit) : unit =
+  let rec go : type n. int -> (a, n) t -> unit =
+   fun acc t ->
+    match t with
+    | [] ->
+        ()
+    | x :: xs ->
+        f acc x ;
+        go (acc + 1) xs
+  in
+  go 0 t
+
 let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit =
  fun t1 t2 ~f ->
   match (t1, t2) with
@@ -421,6 +433,9 @@ let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
 let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
  fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
 
+let trim_front (type a n m) (v : (a, m) t) (p : (n, m) Nat.Lte.t) : (a, n) t =
+  rev (trim (rev v) p)
+
 let extend_front_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
  fun v m dummy ->
   let v = to_array v in
@@ -453,6 +468,10 @@ let rec extend :
       default :: extend [] Z m default
   | x :: xs, S p, S m ->
       x :: extend xs p m default
+
+let extend_front :
+    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+ fun v _p m default -> extend_front_exn v m default
 
 module With_version (N : Nat.Intf) = struct
   module type S = sig
