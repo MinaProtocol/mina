@@ -118,6 +118,8 @@ module Step = struct
 
     type prev_values
 
+    type proofs_verified
+
     (* TODO: As an optimization this can be the local proofs-verified size *)
     type max_proofs_verified
 
@@ -144,13 +146,13 @@ module Step = struct
       | Return_value : return_value -> unit t
       | Auxiliary_value : auxiliary_value -> unit t
       | Unfinalized_proofs :
-          (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+          (Unfinalized.Constant.t, proofs_verified) Vector.t t
       | Messages_for_next_wrap_proof :
           (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
-      type local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
+      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
@@ -159,10 +161,13 @@ module Step = struct
              and type return_value = return_value
              and type auxiliary_value = auxiliary_value
              and type prev_values = prev_values
+             and type proofs_verified = proofs_verified
              and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
     let module R = struct
       type nonrec max_proofs_verified = max_proofs_verified
+
+      type nonrec proofs_verified = proofs_verified
 
       type nonrec statement = statement
 
@@ -193,7 +198,7 @@ module Step = struct
         | Return_value : return_value -> unit t
         | Auxiliary_value : auxiliary_value -> unit t
         | Unfinalized_proofs :
-            (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+            (Unfinalized.Constant.t, proofs_verified) Vector.t t
         | Messages_for_next_wrap_proof :
             (Digest.Constant.t, max_proofs_verified) Vector.t t
     end in

@@ -550,10 +550,11 @@ struct
       prev_proofs := Some prev_proofs' ;
       actual_wrap_domains := Some actual_wrap_domains'
     in
+    let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
       lazy
-        (Vector.extend
-           (Option.value_exn !unfinalized_proofs)
+        (Vector.extend_front
+           (Lazy.force unfinalized_proofs)
            lte Max_proofs_verified.n
            (Unfinalized.Constant.dummy ()) )
     in
@@ -671,7 +672,7 @@ struct
           auxiliary_value := Some res ;
           k ()
       | Req.Unfinalized_proofs ->
-          k (Lazy.force unfinalized_proofs_extended)
+          k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force messages_for_next_wrap_proof_padded)
       | _ -> (
@@ -764,7 +765,7 @@ struct
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
-          Vector.extend
+          Vector.extend_front
             (Vector.map2 prev_evals (Option.value_exn !x_hats)
                ~f:(fun (es, ft_eval1) x_hat ->
                  Plonk_types.All_evals.
