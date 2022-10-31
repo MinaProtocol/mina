@@ -36,15 +36,34 @@
 
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
+  inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
-    }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
+    , nix-utils, ... }:
     {
-      overlay = import ./nix/overlay.nix;
+      overlays = {
+        misc = import ./nix/misc.nix;
+        rust = import ./nix/rust.nix;
+        go = import ./nix/go.nix;
+      };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [
+        modules = let
+          PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
+          wallet = {
+            box_primitive = "xsalsa20poly1305";
+            ciphertext =
+              "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
+            nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
+            pw_primitive = "argon2i";
+            pwdiff = [ 134217728 6 ];
+            pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
+          };
+          wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
+          wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
+        in [
           self.nixosModules.mina
           {
             boot.isContainer = true;
@@ -53,10 +72,46 @@
 
             services.mina = {
               enable = true;
+              config = {
+                "ledger" = {
+                  "name" = "mina-demo";
+                  "accounts" = [{
+                    "pk" = PK;
+                    "balance" = "66000";
+                    "sk" = null;
+                    "delegate" = null;
+                  }];
+                };
+              };
               waitForRpc = false;
               external-ip = "0.0.0.0";
-              extraArgs = [ "--seed" ];
+              generate-genesis-proof = true;
+              seed = true;
+              block-producer-key = "/var/lib/mina/wallets/store/${PK}";
+              extraArgs = [
+                "--demo-mode"
+                "--proof-level"
+                "none"
+                "--run-snark-worker"
+                "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
+                "-insecure-rest-server"
+              ];
             };
+
+            systemd.services.mina = {
+              preStart = ''
+                printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
+              '';
+              environment = {
+                MINA_TIME_OFFSET = "0";
+                MINA_PRIVKEY_PASS = "";
+              };
+            };
+
+            systemd.tmpfiles.rules = [
+              "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
+              "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
+            ];
           }
         ];
       };
@@ -71,13 +126,24 @@
               docker-archive:${self.packages.x86_64-linux.${package}} \
               docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
             '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
           };
+          publishDocs = {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+            '';
+            label = "Publish documentation to Google Storage";
+            depends_on = [ "defaultPackage_x86_64-linux" ];
+            branches = [ "develop" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+          };
         in {
           steps = flakeSteps {
+            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
               agents = [ "nix" ];
@@ -86,19 +152,21 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            publishDocs
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
-          (nixpkgs.lib.composeManyExtensions [
+          (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
-            (import ./nix/overlay.nix)
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
+
+              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
             })
-          ]);
+          ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
         nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
@@ -121,6 +189,12 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
+
+        debianPackages = pkgs.callPackage ./nix/debian.nix { };
+
+        # Packages for the development environment that are not needed to build mina-dev.
+        # For instance dependencies for tests.
+        devShellPackages = [ pkgs.rosetta-cli ];
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -198,10 +272,10 @@
         packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
           src = ./src/lib/snarky_js_bindings/snarkyjs;
           preBuild = ''
-            BINDINGS_PATH=./dist/server/node_bindings
+            BINDINGS_PATH=./src/node_bindings
             mkdir -p "$BINDINGS_PATH"
-            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
-            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
             chmod -R 777 "$BINDINGS_PATH"
 
             # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
@@ -212,7 +286,7 @@
             sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
-          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          npmBuild = "npm run build";
           # TODO: add snarky-run
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
@@ -232,38 +306,44 @@
         };
 
         inherit ocamlPackages;
-        packages.mina = ocamlPackages.mina;
-        packages.mina_tests = ocamlPackages.mina_tests;
-        packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
-        packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
+
+        packages = {
+          inherit (ocamlPackages)
+            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+          inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
+        };
+
         packages.mina-docker = pkgs.dockerTools.buildImage {
           name = "mina";
-          contents = [ ocamlPackages.mina.out ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-image-root";
+            paths = [ ocamlPackages.mina.out ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
         };
         packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
           name = "mina-daemon";
-          contents = [
-            pkgs.dumb-init
-            pkgs.coreutils
-            pkgs.bashInteractive
-            pkgs.python3
-            pkgs.libp2p_helper
-            ocamlPackages.mina.out
-            ocamlPackages.mina.mainnet
-            ocamlPackages.mina.genesis
-            ocamlPackages.mina_build_config
-            ocamlPackages.mina_daemon_scripts
-          ];
+          copyToRoot = pkgs.buildEnv {
+            name = "mina-daemon-image-root";
+            paths = [
+              pkgs.dumb-init
+              pkgs.coreutils
+              pkgs.bashInteractive
+              pkgs.python3
+              pkgs.libp2p_helper
+              ocamlPackages.mina.out
+              ocamlPackages.mina.mainnet
+              ocamlPackages.mina.genesis
+              ocamlPackages.mina_build_config
+              ocamlPackages.mina_daemon_scripts
+            ];
+            pathsToLink = [ "/bin" "/share" "/etc" ];
+          };
           config = {
             env = [ "MINA_TIME_OFFSET=0" ];
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        # packages.mina_static = ocamlPackages_static.mina;
-        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
-        packages.go-capnproto2 = pkgs.go-capnproto2;
-        packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
         legacyPackages.regular = pkgs;
@@ -271,17 +351,26 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
-        devShell = ocamlPackages.mina-dev;
+        packages.mina-deb = debianPackages.mina;
+
+        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-with-lsp";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
-            pushd src/app/cli
-            dune build @check
-            popd
           '';
         });
 
@@ -295,6 +384,7 @@
         # However, this is a useful balance between purity and convenience for Rust development.
         devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-rust-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep

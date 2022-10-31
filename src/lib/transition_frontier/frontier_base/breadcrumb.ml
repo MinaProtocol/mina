@@ -347,7 +347,7 @@ module For_tests = struct
           , Option.value_exn prev_state_hashes.state_body_hash ) )
       in
       let coinbase_receiver = largest_account_public_key in
-      let staged_ledger_diff =
+      let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
@@ -465,7 +465,7 @@ module For_tests = struct
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
   let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
-      ~accounts_with_secret_keys =
+      ~accounts_with_secret_keys () =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ~verifier ~precomputed_values ?trust_system

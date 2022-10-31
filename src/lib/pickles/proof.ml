@@ -45,6 +45,9 @@ module Base = struct
 
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+              ( 'messages_for_next_wrap_proof
+              , 'messages_for_next_step_proof )
+              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
@@ -94,7 +97,8 @@ module Base = struct
   end
 end
 
-type ('s, 'mlmb, _) with_data =
+type ('s, 'mlmb, 'c) with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's

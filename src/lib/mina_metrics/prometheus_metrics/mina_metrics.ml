@@ -94,7 +94,7 @@ module TextFormat_0_0_4 = struct
   let output f =
     MetricFamilyMap.iter (fun metric samples ->
         let { MetricInfo.name; metric_type; help; label_names } = metric in
-        Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
+        Fmt.pf f "@[<v>#HELP %a %a@,#TYPE %a %a@,%a@]" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
           samples )
@@ -274,10 +274,37 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
       ~subsystem
 
+  let snark_work_zkapp_base_time_sec =
+    let help = "time elapsed while doing base proof for a zkapp transaction" in
+    Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
+
   let snark_work_base_time_sec =
-    let help = "time elapsed while doing base proof" in
-    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
-      ~subsystem
+    let help =
+      "time elapsed while doing base proof for a non-zkapp transaction"
+    in
+    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
+
+  let snark_work_zkapp_base_submissions =
+    let help =
+      "Number of base transactions snarks for zkapp transactions submitted"
+    in
+    Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
+
+  let snark_work_base_submissions =
+    let help =
+      "Number of base transactions snarks for non-zkapp transactions submitted"
+    in
+    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_length =
+    let help = "Number of updates in a zkapp transaction" in
+    Counter.v "zkapp_transaction_length" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates =
+    let help =
+      "Number of updates with proof authorization in a zkapp transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 
   (* TODO:
      let transaction_proving_time_ms =
@@ -330,6 +357,29 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let zkapp_transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of zkapp transactions added to the pool since the node start"
+    in
+    Counter.v "zkapp_transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_size : Counter.t =
+    let help = "Size of valid zkapp transaction received (bin_size_t)" in
+    Counter.v "zkapp_transaction_size" ~help ~namespace ~subsystem
+
+  let zkapp_updates : Counter.t =
+    let help =
+      "Number of account updates in a valid zkapp transaction received"
+    in
+    Counter.v "zkapp_updates" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates : Counter.t =
+    let help =
+      "Number of account updates with proof authorization in a zkapp \
+       transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -1256,6 +1306,10 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_zkapp_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_zkapp_txns" ~help ~namespace ~subsystem
 
   let best_tip_coinbase : Gauge.t =
     let help =

@@ -163,6 +163,10 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ('g, 'proofs_verified, 'vk) t =
+            ( 'g
+            , 'proofs_verified
+            , 'vk )
+            Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
         { max_proofs_verified : 'proofs_verified
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option

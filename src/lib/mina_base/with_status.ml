@@ -3,7 +3,8 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type 'a t = { data : 'a; status : Transaction_status.Stable.V2.t }
+    type 'a t = 'a Mina_wire_types.Mina_base.With_status.V2.t =
+      { data : 'a; status : Transaction_status.Stable.V2.t }
     [@@deriving sexp, yojson, equal, compare, fields]
 
     let to_latest data_latest (t : _ t) =

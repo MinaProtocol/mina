@@ -2,13 +2,15 @@
  (name best_tip_prover)
  (public_name best_tip_prover)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare))
  (libraries
    ;; opam libraries
    core
    core_kernel
    async_kernel
    ;; local libraries
+   genesis_constants
+   consensus
    with_hash
    precomputed_values
    proof_carrying_data
@@ -24,4 +26,9 @@
    transition_frontier_base
    merkle_list_prover
    non_empty_list
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
 ))

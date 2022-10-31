@@ -555,7 +555,7 @@ struct
         (Vector.extend
            (Option.value_exn !unfinalized_proofs)
            lte Max_proofs_verified.n
-           (Unfinalized.Constant.dummy ()) )
+           (Lazy.force Unfinalized.Constant.dummy) )
     in
     let module Extract = struct
       module type S = sig
@@ -712,7 +712,8 @@ struct
         List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
-        (Domain.size h) (fun () ->
+        (Domain.size h)
+        (fun () ->
           Impls.Step.generate_witness_conv
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
                     next_statement_hashed ->
@@ -723,11 +724,12 @@ struct
                   pk
               in
               (proof, next_statement_hashed) )
-            [] ~return_typ:input
-            (fun () ->
+            ~input_typ:Impls.Step.Typ.unit ~return_typ:input
+            (fun () () ->
               Impls.Step.handle
                 (fun () -> conv_inv (branch_data.main ~step_domains ()))
                 handler ) )
+        ()
     in
     let prev_evals =
       extract_from_proofs

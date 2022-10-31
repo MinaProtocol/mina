@@ -11,6 +11,7 @@
    core
    async
    ;; local libraries
+   mina_wire_types
    mina_metrics
    mina_net2
    debug_assert
@@ -55,8 +56,16 @@
    genesis_constants
    data_hash_lib
    sgn
+   sgn_type
+   node_error_service
+   pickles.backend
+   pasta_bindings
+   pickles
+   snark_params
+   kimchi_backend
+   kimchi_backend.pasta
  )
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_register_event))
+  (pps ppx_mina ppx_version ppx_jane ppx_register_event))
  (instrumentation (backend bisect_ppx))
  (synopsis "Coda block producer"))

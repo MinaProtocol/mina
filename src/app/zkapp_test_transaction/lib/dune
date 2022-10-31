@@ -48,8 +48,9 @@
    mina_base.import
    mina_transaction_logic
    staged_ledger_diff
+   mina_wire_types
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_coda ppx_version ppx_let ppx_sexp_conv
+ (preprocess (pps ppx_custom_printf ppx_mina ppx_version ppx_let ppx_sexp_conv
                   ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx ppx_inline_test)))

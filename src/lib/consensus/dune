@@ -11,6 +11,7 @@
    core.uuid
    async_kernel
    graphql-async
+   graphql
    sexplib0
    base.caml
    integers
@@ -25,6 +26,7 @@
    async_rpc_kernel
    sexp_diff_kernel
    ;; local libraries
+   mina_wire_types
    mina_base.util
    unsigned_extended
    kimchi_backend.pasta
@@ -75,6 +77,7 @@
    mina_base.import
    ppx_version.runtime
    graphql_basic_scalars
+   signature_lib_unix
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess
@@ -83,7 +86,7 @@
     ppx_assert
     ppx_base
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_custom_printf
     ppx_deriving.std
     ppx_deriving_yojson

@@ -70,13 +70,18 @@
    mina_compile_config
    unsigned_extended
    ppx_version.runtime
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
  )
 
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_assert
-               ppx_coda
+               ppx_mina
                ppx_compare
                ppx_version
                ppx_here

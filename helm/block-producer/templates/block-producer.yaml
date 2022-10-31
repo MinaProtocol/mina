@@ -73,6 +73,19 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
@@ -196,9 +209,7 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
-          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
@@ -244,10 +255,8 @@ spec:
           value: "mina_network_block_data"
         - name: MINA_PRIVKEY_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- end }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         ports:
@@ -272,10 +281,8 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.mina-config
-        {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- end }}
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"

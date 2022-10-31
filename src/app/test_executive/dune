@@ -11,6 +11,7 @@
    base.caml
    async_unix
    ;; local libraries
+   mina_wire_types
    with_hash
    data_hash_lib
    kimchi_backend
@@ -43,8 +44,8 @@
    user_command_input
    participating_state
    sgn
-   parties_builder
+   zkapp_command_builder
    network_pool
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))
+ (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

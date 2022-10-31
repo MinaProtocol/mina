@@ -4,7 +4,7 @@ open Pickles_types
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = N0 | N1 | N2
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id

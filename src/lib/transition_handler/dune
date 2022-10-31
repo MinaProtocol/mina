@@ -32,6 +32,7 @@
    perf_histograms
    mina_metrics
    mina_block
+   mina_transaction
    network_peer
    with_hash
    logger
@@ -45,6 +46,11 @@
    network_pool
    mina_net2
    mina_numbers
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))

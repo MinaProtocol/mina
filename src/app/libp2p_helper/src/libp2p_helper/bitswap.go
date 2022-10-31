@@ -11,8 +11,8 @@ import (
 	"github.com/ipfs/go-bitswap"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	exchange "github.com/ipfs/go-ipfs-exchange-interface"
+	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type bitswapDeleteCmd struct {
@@ -69,25 +69,30 @@ func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *Bitsw
 	}
 }
 
-func announceNewRootBlock(engine *bitswap.Bitswap, statusStorage codanet.BitswapStorage, bs map[BitswapBlockLink][]byte, root BitswapBlockLink) error {
-	err := statusStorage.SetStatus(root, codanet.Partial)
+func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, storage codanet.BitswapStorage, blockMap map[BitswapBlockLink][]byte, root BitswapBlockLink) error {
+	err := storage.SetStatus(ctx, root, codanet.Partial)
 	if err != nil {
 		return err
 	}
-
-	for h, b := range bs {
+	bs := make([]blocks.Block, 0, len(blockMap))
+	for h, b := range blockMap {
 		bitswapLogger.Debugf("Publishing block %s (%d bytes)", codanet.BlockHashToCidSuffix(h), len(b))
 		block, _ := blocks.NewBlockWithCid(b, codanet.BlockHashToCid(h))
-		err = engine.HasBlock(block)
-		if err != nil {
-			return err
-		}
+		bs = append(bs, block)
 	}
-	return statusStorage.SetStatus(root, codanet.Full)
+	err = storage.StoreBlocks(ctx, bs)
+	if err != nil {
+		return err
+	}
+	err = engine.NotifyNewBlocks(ctx, bs...)
+	if err != nil {
+		return err
+	}
+	return storage.SetStatus(ctx, root, codanet.Full)
 }
 
 func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
-	if err := bs.storage.SetStatus(root, codanet.Deleting); err != nil {
+	if err := bs.storage.SetStatus(bs.ctx, root, codanet.Deleting); err != nil {
 		return err
 	}
 	ClearRootDownloadState(bs, root)
@@ -104,14 +109,14 @@ func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
 		return err
 	}
 	for _, block := range allDescendants {
-		if err := bs.storage.ViewBlock(block, viewBlockF); err != nil && err != blockstore.ErrNotFound {
+		if err := bs.storage.ViewBlock(bs.ctx, block, viewBlockF); err != nil && err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(block)}) {
 			return err
 		}
 	}
-	if err := bs.storage.DeleteBlocks(allDescendants); err != nil {
+	if err := bs.storage.DeleteBlocks(bs.ctx, allDescendants); err != nil {
 		return err
 	}
-	return bs.storage.DeleteStatus(root)
+	return bs.storage.DeleteStatus(bs.ctx, root)
 }
 
 func ClearRootDownloadState(bs BitswapState, root root) {
@@ -151,6 +156,9 @@ func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, roots ..
 	}
 }
 
+func (bs *BitswapCtx) Context() context.Context {
+	return bs.ctx
+}
 func (bs *BitswapCtx) CheckInvariants() {
 	// No checking invariants in production
 }
@@ -177,15 +185,24 @@ func (bs *BitswapCtx) RegisterDeadlineTracker(root_ root, downloadTimeout time.D
 	}()
 }
 func (bs *BitswapCtx) GetStatus(key [32]byte) (codanet.RootBlockStatus, error) {
-	return bs.storage.GetStatus(key)
+	return bs.storage.GetStatus(bs.ctx, key)
 }
 func (bs *BitswapCtx) SetStatus(key [32]byte, value codanet.RootBlockStatus) error {
-	return bs.storage.SetStatus(key, value)
+	return bs.storage.SetStatus(bs.ctx, key, value)
 }
-func (bs *BitswapCtx) DeleteStatus(key [32]byte) error    { return bs.storage.DeleteStatus(key) }
-func (bs *BitswapCtx) DeleteBlocks(keys [][32]byte) error { return bs.storage.DeleteBlocks(keys) }
+func (bs *BitswapCtx) DeleteStatus(key [32]byte) error { return bs.storage.DeleteStatus(bs.ctx, key) }
+func (bs *BitswapCtx) DeleteBlocks(keys [][32]byte) error {
+	return bs.storage.DeleteBlocks(bs.ctx, keys)
+}
 func (bs *BitswapCtx) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	return bs.storage.ViewBlock(key, callback)
+	return bs.storage.ViewBlock(bs.ctx, key, callback)
+}
+func (bs *BitswapCtx) StoreDownloadedBlock(block blocks.Block) error {
+	err := bs.storage.StoreBlocks(bs.ctx, []blocks.Block{block})
+	if err != nil {
+		return err
+	}
+	return bs.engine.Server.NotifyNewBlocks(bs.ctx, block)
 }
 
 type BitswapBlockRequester struct {
@@ -208,12 +225,11 @@ func (br *BitswapBlockRequester) RequestBlocks(ids []cid.Cid) error {
 }
 
 // BitswapLoop: Bitswap processing loop
-//  Do not launch more than one instance of it
+//
+//	Do not launch more than one instance of it
 func (bs *BitswapCtx) Loop() {
-	engine := bs.engine
-	storage := bs.storage
 	configuredCheck := func() {
-		if engine == nil || storage == nil {
+		if bs.engine == nil || bs.storage == nil {
 			panic("BitswapLoop: context not configured")
 		}
 	}
@@ -227,7 +243,7 @@ func (bs *BitswapCtx) Loop() {
 		case cmd := <-bs.addCmds:
 			configuredCheck()
 			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
-			err := announceNewRootBlock(engine, storage, blocks, root)
+			err := announceNewRootBlock(bs.ctx, bs.engine, bs.storage, blocks, root)
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 			} else {

@@ -20,12 +20,14 @@
    ppx_deriving_yojson.runtime
    graphql_parser
    ;; local libraries
+   mina_wire_types
    network_pool
    cli_lib
    kimchi_backend.pasta
    mina_base.util
    mina_ledger
    pickles
+   pickles_unix
    mina_incremental
    coda_genesis_ledger
    work_selector
@@ -35,6 +37,7 @@
    trust_system
    with_hash
    data_hash_lib
+   data_hash_lib_unix
    staged_ledger
    genesis_constants
    pipe_lib
@@ -72,6 +75,7 @@
    base58_check
    mina_net2
    snark_params
+   snark_params_unix
    rosetta_lib
    random_oracle
    coda_genesis_proof
@@ -85,6 +89,10 @@
    o1trace
    verifier
    graphql_wrapper
-   staged_ledger_diff)
+   staged_ledger_diff
+   kimchi_backend
+   sgn_type
+   mina_transaction_logic
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

@@ -36,24 +36,41 @@ CREATE TABLE zkapp_state_data_array
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_state_data
 
-   We don't specify the width here, as that may change (and not enforced
-   by Postgresql, in any case)
-
-   Postgresql does not allow enforcing that the array elements are
-   foreign keys
-
-   Any element of the array may be NULL, meaning Ignore, per the
-   NULL convention
+   Any element of the array may be NULL, per the NULL convention
 */
-CREATE TABLE zkapp_states
+CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element0                 int              REFERENCES zkapp_state_data(id)
+, element1                 int		    REFERENCES zkapp_state_data(id)
+, element2                 int		    REFERENCES zkapp_state_data(id)
+, element3                 int		    REFERENCES zkapp_state_data(id)
+, element4                 int		    REFERENCES zkapp_state_data(id)
+, element5                 int		    REFERENCES zkapp_state_data(id)
+, element6                 int		    REFERENCES zkapp_state_data(id)
+, element7                 int		    REFERENCES zkapp_state_data(id)
 );
 
-/* like zkapp_states, but for sequences */
+/* like zkapp_states_nullable, but elements are not NULL */
+CREATE TABLE zkapp_states
+( id                       serial           PRIMARY KEY
+, element0                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element1                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element2                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element3                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element4                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element5                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element6                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element7                 int              NOT NULL REFERENCES zkapp_state_data(id)
+);
+
+/* like zkapp_states, but for sequence states */
 CREATE TABLE zkapp_sequence_states
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element0                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element1                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element2                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element3                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element4                 int              NOT NULL REFERENCES zkapp_state_data(id)
 );
 
 /* the element_ids are non-NULL, and refer to zkapp_state_data_array
@@ -104,7 +121,7 @@ CREATE TABLE zkapp_uris
 /* NULL convention */
 CREATE TABLE zkapp_updates
 ( id                       serial           PRIMARY KEY
-, app_state_id             int              NOT NULL REFERENCES zkapp_states(id)
+, app_state_id             int              NOT NULL REFERENCES zkapp_states_nullable(id)
 , delegate_id              int              REFERENCES public_keys(id)
 , verification_key_id      int              REFERENCES zkapp_verification_keys(id)
 , permissions_id           int              REFERENCES zkapp_permissions(id)
@@ -129,13 +146,13 @@ CREATE TABLE zkapp_nonce_bounds
 CREATE TYPE zkapp_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
-CREATE TABLE zkapp_precondition_accounts
+CREATE TABLE zkapp_account_precondition_values
 ( id                       serial                 PRIMARY KEY
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
 , receipt_chain_hash       text
 , delegate_id              int                    REFERENCES public_keys(id)
-, state_id                 int        NOT NULL    REFERENCES zkapp_states(id)
+, state_id                 int        NOT NULL    REFERENCES zkapp_states_nullable(id)
 , sequence_state_id        int                    REFERENCES zkapp_state_data(id)
 , proved_state             boolean
 , is_new                   boolean
@@ -147,7 +164,7 @@ CREATE TABLE zkapp_precondition_accounts
 CREATE TABLE zkapp_account_precondition
 ( id                       serial                            PRIMARY KEY
 , kind                     zkapp_precondition_type           NOT NULL
-, precondition_account_id  int                               REFERENCES zkapp_precondition_accounts(id)
+, account_precondition_values_id  int                               REFERENCES zkapp_account_precondition_values(id)
 , nonce                    bigint
 );
 
@@ -237,12 +254,14 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
+CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
+
+CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array.
 */
-CREATE TABLE zkapp_other_party_body
+CREATE TABLE zkapp_account_update_body
 ( id                                    serial          PRIMARY KEY
 , account_identifier_id                 int             NOT NULL  REFERENCES account_identifiers(id)
 , update_id                             int             NOT NULL  REFERENCES zkapp_updates(id)
@@ -255,19 +274,20 @@ CREATE TABLE zkapp_other_party_body
 , zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
-, caller                                call_type_type  NOT NULL
+, caller                                call_type  NOT NULL
+, authorization_kind                    authorization_kind_type NOT NULL
 );
 
-CREATE TABLE zkapp_other_party
+CREATE TABLE zkapp_account_update
 ( id                       serial                          PRIMARY KEY
-, body_id                  int                             NOT NULL REFERENCES zkapp_other_party_body(id)
+, body_id                  int                             NOT NULL REFERENCES zkapp_account_update_body(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
 
-/* a list of of failures for a party in a zkApp
-   the index is the index into the `other_parties`
+/* a list of of failures for an account update in a zkApp
+   the index is the index into the `account_updates`
 */
-CREATE TABLE zkapp_party_failures
+CREATE TABLE zkapp_account_update_failures
 ( id       serial    PRIMARY KEY
 , index    int       NOT NULL
 , failures text[]    NOT NULL

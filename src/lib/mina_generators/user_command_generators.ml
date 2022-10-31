@@ -1,7 +1,7 @@
 (* user_command_generators.ml *)
 
 (* generate User_command.t's, that is, either Signed_commands or
-   Parties
+   Zkapp_command
 *)
 
 [%%import "/src/config.mlh"]
@@ -14,21 +14,29 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
+let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
+    ?max_token_updates ?account_state_tbl ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
-     sum to zero), and max_other_parties * 2 keypairs, because all the other parties
+     sum to zero), and max_account_updates * 2 keypairs, because all the other zkapp_command
      might be new and their accounts not in the ledger; or they might all be old and in the ledger
 
-     We'll put the fee payer account and max_other_parties accounts in the
-     ledger, and have max_other_parties keypairs available for new accounts
+     We'll put the fee payer account and max_account_updates accounts in the
+     ledger, and have max_account_updates keypairs available for new accounts
   *)
-  let max_other_parties =
-    Option.value_map max_other_parties
-      ~default:Parties_generators.max_other_parties ~f:Fn.id
+  let max_account_updates =
+    Option.value max_account_updates
+      ~default:Zkapp_command_generators.max_account_updates
   in
-  let num_keypairs = (max_other_parties * 2) + 2 in
+  let max_token_updates =
+    Option.value max_token_updates
+      ~default:Zkapp_command_generators.max_token_updates
+  in
+  let num_keypairs =
+    Option.value num_keypairs
+      ~default:((max_account_updates * 2) + (max_token_updates * 3) + 2)
+  in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty
@@ -36,7 +44,7 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
-  let num_keypairs_in_ledger = max_other_parties + 1 in
+  let num_keypairs_in_ledger = num_keypairs / 2 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
@@ -56,18 +64,18 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_int min_cmd_fee
-      |> Int.( + ) 1_000_000_000_000_000
+      |> Int.( + ) 100_000_000_000_000_000
       |> Currency.Balance.of_int
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "10000000.0" in
+      let max_bal = Currency.Balance.of_formatted_string "2000000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)
       with
       | None ->
-          failwith "parties_with_ledger: overflow for max_balance"
+          failwith "zkapp_command_with_ledger: overflow for max_balance"
       | Some _ ->
           max_bal
     in
@@ -107,11 +115,12 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
       match Ledger.get_or_create_account ledger acct_id acct with
       | Error err ->
           failwithf
-            "parties: error adding account for account id: %s, error: %s@."
+            "zkapp_command: error adding account for account id: %s, error: \
+             %s@."
             (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
             (Error.to_string_hum err) ()
       | Ok (`Existed, _) ->
-          failwithf "parties: account for account id already exists: %s@."
+          failwithf "zkapp_command: account for account id already exists: %s@."
             (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
             ()
       | Ok (`Added, _) ->
@@ -120,19 +129,22 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
-  let%bind parties =
-    Parties_generators.gen_parties_from ~max_other_parties ~fee_payer_keypair
-      ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
+  let%bind zkapp_command =
+    Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
+      ~max_token_updates ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl
+      ?vk ?failure ()
   in
-  let parties =
+  let zkapp_command =
     Option.value_exn
-      (Parties.Valid.to_valid ~ledger ~get:Ledger.get
-         ~location_of_account:Ledger.location_of_account parties )
+      (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
+         ~location_of_account:Ledger.location_of_account zkapp_command )
   in
   (* include generated ledger in result *)
-  return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
+  return
+    (User_command.Zkapp_command zkapp_command, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
+let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
+    ?length ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -141,33 +153,44 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
     | None ->
         Quickcheck.Generator.small_non_negative_int
   in
-  (* Keep track of account states across multiple parties transaction *)
-  let account_state_tbl = Account_id.Table.create () in
-  let merge_ledger source_ledger target_ledger =
-    (* add all accounts in source to target *)
-    Ledger.iteri source_ledger ~f:(fun _ndx acct ->
-        let acct_id = Account_id.create acct.public_key acct.token_id in
-        match Ledger.get_or_create_account target_ledger acct_id acct with
-        | Ok (`Added, _) ->
-            ()
-        | Ok (`Existed, _) ->
-            failwith "Account already existed in target ledger"
-        | Error err ->
-            failwithf "Could not add account to target ledger: %s"
-              (Error.to_string_hum err) () )
+  let max_account_updates =
+    Option.value max_account_updates
+      ~default:Zkapp_command_generators.max_account_updates
   in
-  let init_ledger = Ledger.create ~depth:ledger_depth () in
-  let rec go parties_and_fee_payer_keypairs n =
-    if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
+  let max_token_updates =
+    Option.value max_token_updates
+      ~default:Zkapp_command_generators.max_token_updates
+  in
+  let num_keypairs = length * max_account_updates * 2 in
+  (* Keep track of account states across multiple zkapp_command transaction *)
+  let account_state_tbl = Account_id.Table.create () in
+  let%bind zkapp_command, fee_payer_keypair, keymap, ledger =
+    zkapp_command_with_ledger ~num_keypairs ~max_account_updates
+      ~max_token_updates ~account_state_tbl ?vk ?failure ()
+  in
+  let rec go zkapp_command_and_fee_payer_keypairs n =
+    if n <= 1 then
+      return
+        ( (zkapp_command, fee_payer_keypair, keymap)
+          :: List.rev zkapp_command_and_fee_payer_keypairs
+        , ledger )
     else
-      let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ?max_other_parties ~account_state_tbl ?vk ?failure
-          ()
+      let%bind zkapp_command =
+        Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
+          ~max_token_updates ~fee_payer_keypair ~keymap ~ledger
+          ~account_state_tbl ?vk ?failure ()
       in
-      let parties_and_fee_payer_keypairs' =
-        (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs
+      let valid_zkapp_command =
+        Option.value_exn
+          (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
+             ~location_of_account:Ledger.location_of_account zkapp_command )
       in
-      merge_ledger ledger init_ledger ;
-      go parties_and_fee_payer_keypairs' (n - 1)
+      let zkapp_command_and_fee_payer_keypairs' =
+        ( User_command.Zkapp_command valid_zkapp_command
+        , fee_payer_keypair
+        , keymap )
+        :: zkapp_command_and_fee_payer_keypairs
+      in
+      go zkapp_command_and_fee_payer_keypairs' (n - 1)
   in
   go [] length
