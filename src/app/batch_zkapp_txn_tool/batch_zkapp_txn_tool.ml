@@ -195,8 +195,9 @@ let generate_random_zkapps ~ledger ~vk ~prover
     if n > 0 then
       let%bind parties =
         Mina_generators.Zkapp_command_generators
-        .gen_zkapp_commands_with_limited_keys ~ledger ~keymap ~account_state_tbl
-          ?num_account_updates:parties_size ~vk ~fee_payer_keypair ()
+        .gen_zkapp_commands_with_limited_keys_testnet ~ledger ~keymap
+          ~account_state_tbl ?num_account_updates:parties_size ~vk
+          ~fee_payer_keypair ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)

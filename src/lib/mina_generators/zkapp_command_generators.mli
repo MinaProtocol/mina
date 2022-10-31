@@ -19,6 +19,7 @@ val max_account_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure
+  -> ?ignore_sequence_events_precond:bool
   -> first_use_of_account:bool
   -> Account.t
   -> Account_update.Account_precondition.t Quickcheck.Generator.t
@@ -68,7 +69,7 @@ val gen_list_of_zkapp_command_from :
   -> unit
   -> Zkapp_command.t list Quickcheck.Generator.t
 
-val gen_zkapp_commands_with_limited_keys :
+val gen_zkapp_commands_with_limited_keys_testnet :
      keymap:Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
   -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
   -> ledger:Mina_ledger.Ledger.t
