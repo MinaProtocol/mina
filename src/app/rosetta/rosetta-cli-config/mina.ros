@@ -1,7 +1,7 @@
 create_account(1){
   create_account{
     network = {"network":"debug", "blockchain":"mina"};
-    key = generate_key({"curve_type":"secp256k1"});
+    key = generate_key({"curve_type":"pallas"});
     account = derive({
       "network_identifier": {{network}},
       "public_key": {{key.public_key}}
