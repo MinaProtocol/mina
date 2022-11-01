@@ -144,6 +144,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     };
     let proof_evals = ProofEvaluations {
         w: array_init(|_| vec![Fq::one()]),
+        coefficients: array_init(|_| vec![Fq::one()]),
         z: vec![Fq::one()],
         s: array_init(|_| vec![Fq::one()]),
         lookup: None,

@@ -263,6 +263,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
     };
     let proof_evals = ProofEvaluations {
         w: array_init(|_| vec![Fp::one()]),
+        coefficients: array_init(|_| vec![Fp::one()]),
         z: vec![Fp::one()],
         s: array_init(|_| vec![Fp::one()]),
         lookup: None,
