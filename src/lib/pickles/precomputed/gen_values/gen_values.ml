@@ -3,7 +3,8 @@ open Asttypes
 open Parsetree
 open Longident
 open Core_kernel
-open Kimchi_pasta.Pasta
+open Kimchi_pasta
+open Pasta
 open Pickles_types
 
 let () =
@@ -37,7 +38,7 @@ let vesta =
               Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
                 domain_size i )
-          |> Kimchi_pasta.Pasta.Fp_poly_comm.of_backend_without_degree_bound
+          |> Basic.Fp_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )
 
 let pallas =
@@ -52,7 +53,7 @@ let pallas =
               Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
                 domain_size i )
-          |> Kimchi_pasta.Pasta.Fq_poly_comm.of_backend_without_degree_bound
+          |> Basic.Fq_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )
 
 let mk xss ~f =
