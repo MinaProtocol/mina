@@ -14,7 +14,7 @@ spec:
       - name: import-schema
         image: bitnami/postgresql:13.8.0
         command: ["bash", "-c"]
-        args: ["cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
+        args: ["cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} wget {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
       - name: update-transaction-isolation-level
         image: bitnami/postgresql:13.8.0
         command: ["bash", "-c"]
