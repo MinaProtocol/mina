@@ -7,6 +7,10 @@ open Network_peer
 
 exception No_initial_peers
 
+module Find_ip : sig
+  val find : logger:Logger.t -> Unix.Inet_addr.t Async_kernel.Deferred.t
+end
+
 type Structured_log_events.t +=
   | Gossip_new_state of { state_hash : State_hash.t }
   | Gossip_transaction_pool_diff of

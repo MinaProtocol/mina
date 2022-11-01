@@ -872,7 +872,7 @@ let setup_daemon logger =
           let%bind external_ip =
             match external_ip_opt with
             | None ->
-                Find_ip.find ~logger
+                Mina_networking.Find_ip.find ~logger
             | Some ip ->
                 return @@ Unix.Inet_addr.of_string ip
           in

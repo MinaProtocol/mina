@@ -14,7 +14,7 @@ module type Full = sig
 
   [%%else]
 
-  [%%show consesus_mechanism]
+  [%%show consensus_mechanism]
 
   [%%optcomp.error "invalid value for \"consensus_mechanism\""]
 

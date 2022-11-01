@@ -6,13 +6,9 @@ include Data_hash.Make_full_size (struct
   let description = "Epoch Seed"
 end)
 
-(* Data hash versioned boilerplate below *)
-
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
-
-  [@@@with_all_version_tags]
 
   module V1 = struct
     module T = struct
@@ -30,3 +26,5 @@ module Stable = struct
     include Hashable.Make_binable (T)
   end
 end]
+
+let _f : unit -> (Stable.Latest.t, t) Type_equal.t = fun () -> Type_equal.T
