@@ -44,8 +44,6 @@ module R1CS_constraint_system =
               Field.of_bigint (Bigint256.of_decimal_string x) ))
     end)
 
-module Var = Var
-
 let lagrange : int -> _ Kimchi_types.poly_comm array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->
       Array.map
