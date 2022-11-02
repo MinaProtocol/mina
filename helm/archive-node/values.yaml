@@ -31,7 +31,7 @@ archive:
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.username }}:{{ .Values.postgresql.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"
@@ -53,7 +53,7 @@ postgresql:
     database: "archive"
 
 nodeSelector:
-  preemptible: false
+  preemptible: true
 
 healthcheck:
   enabled: true
