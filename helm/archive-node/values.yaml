@@ -45,11 +45,10 @@ postgresql:
       enabled: false
     initdb:
       user: "mina"
-      password: "boofar"
+      password: "zo3moong7moog4Iep7eNgo3iecaesahH"
   auth:
-    postgresqlPassword: "foobar"
     username: "mina"
-    password: "boofar"
+    password: "zo3moong7moog4Iep7eNgo3iecaesahH"
     database: "archive"
 
 nodeSelector:

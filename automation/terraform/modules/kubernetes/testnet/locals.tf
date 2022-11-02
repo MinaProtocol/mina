@@ -147,7 +147,7 @@ locals {
                     matchExpressions = [
                       {
                         key = "cloud.google.com/gke-spot"
-                        operator = "In"
+                        operator = item["spotAllowed"] ? "In" : "NotIn"
                         values = ["true"]
                       }
                     ]

@@ -339,7 +339,7 @@ variable "archive_configs" {
       persistenceSize         = string
       persistenceStorageClass = string
       persistenceAccessModes  = list(string)
-      preemptibleAllowed     = string
+      spotAllowed     = string
     })
   )
   default = []
