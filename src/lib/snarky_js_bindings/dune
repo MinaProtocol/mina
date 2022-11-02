@@ -3,6 +3,8 @@
   (js_of_ocaml
    (compilation_mode whole_program))))
 
+(data_only_dirs test_module)
+
 (executable
  (name snarky_js_node)
  (modules snarky_js_node)
