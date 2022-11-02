@@ -29,23 +29,7 @@ let sample_block_sexp =
        (registers
         ((ledger
           13910975332034754558398291674843021523138027077932710089396878442879931078992)
-         (pending_coinbase_stack ())
-         (local_state
-          ((stack_frame
-            0x02F99BCFB0AA7F48C1888DA5A67196A2410FB084CD2DB1AF5216C5122AEBC054)
-           (call_stack
-            0x0000000000000000000000000000000000000000000000000000000000000000)
-           (transaction_commitment
-            0x0000000000000000000000000000000000000000000000000000000000000000)
-           (full_transaction_commitment
-            0x0000000000000000000000000000000000000000000000000000000000000000)
-           (token_id
-            0x0000000000000000000000000000000000000000000000000000000000000001)
-           (excess ((magnitude 0) (sgn Pos)))
-           (supply_increase ((magnitude 0) (sgn Pos)))
-           (ledger 0) (success true)
-           (account_update_index 0)
-           (failure_status_tbl ())))))
+         (pending_coinbase_stack ())))
        (timestamp 1655382227041)
        (body_reference
         "\021\140i\206o\231\153\191\212i\0118O&\230\190\177\2176\016h8\238T8{\021\194#\223\158\137")))
@@ -484,30 +468,7 @@ let sample_block_json =
           "genesis_ledger_hash": "jwhzN7vCf9ykq6SmNe1EuGQYTAjLDTA8D4bQm5K57ZHVKSi5rUR",
           "registers": {
             "ledger": "jwhzN7vCf9ykq6SmNe1EuGQYTAjLDTA8D4bQm5K57ZHVKSi5rUR",
-            "pending_coinbase_stack": null,
-            "local_state": {
-              "stack_frame": "0x02F99BCFB0AA7F48C1888DA5A67196A2410FB084CD2DB1AF5216C5122AEBC054",
-              "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
-              "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-              "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-              "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-              "excess": {
-                "magnitude": "0",
-                "sgn": [
-                  "Pos"
-                ]
-              },
-              "supply_increase": {
-                "magnitude": "0",
-                "sgn": [
-                  "Pos"
-                ]
-              },
-              "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
-              "success": true,
-              "account_update_index": "0",
-              "failure_status_tbl": []
-            }
+            "pending_coinbase_stack": null
           },
           "timestamp": "1655382227041",
           "body_reference": "158c69ce6fe799bfd4690b384f26e6beb1d936106838ee54387b15c223df9e89"
