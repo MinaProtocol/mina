@@ -207,10 +207,16 @@ cat dockerfiles/stages/1-build-deps \
     dockerfiles/stages/3-builder \
     dockerfiles/stages/4-production \
     | docker build -t mina-rosetta-ubuntu:v1.3.0 \
+        --build-arg "DUNE_PROFILE=mainnet"
         --build-arg "MINA_BRANCH=release/1.3.0" -
 ```
 
-This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu 20.04 and includes the most recent release of the mina daemon along with mina-archive and mina-rosetta.
+This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu
+20.04 and includes the most recent release of the mina daemon along
+with mina-archive and mina-rosetta. Note the `DUNE_PROFILE` argument,
+which should take a different value depending on which network you
+want to connect to. Complete list of predefined `dune` profiles can be
+found in `src/config` directory in the main repository.
 
 Alternatively, you could use the official image `minaprotocol/mina-rosetta-ubuntu:1.3.0beta1-087f715-stretch` which is built in exactly this way by buildkite CI/CD.
 
@@ -228,13 +234,14 @@ For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 ```
 docker run -it --rm --name rosetta \
     --entrypoint=./docker-devnet-start.sh \
-    -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
     minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
 Note: It will take 20min-1hr for your node to sync
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
+* The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * PostgreSQL runs on port 3086
 * Rosetta runs on port 3087
