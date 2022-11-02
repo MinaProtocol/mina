@@ -882,7 +882,7 @@ module Node = struct
           [ "pg_dump"
           ; "--create"
           ; "--no-owner"
-          ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+          ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
           ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
@@ -912,7 +912,7 @@ module Node = struct
       ~cmd:
         [ "mina-replayer"
         ; "--archive-uri"
-        ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
         ; "--input-file"
         ; dest
         ; "--output-file"
