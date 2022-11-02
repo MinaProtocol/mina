@@ -1,5 +1,4 @@
 open Core_kernel
-module Nat = Nat
 
 module type Nat_intf = Nat.Intf
 
@@ -7,15 +6,11 @@ type z = Nat.z
 
 type 'a s = 'a Nat.s
 
-type 'a nat = 'a Nat.t = Z : z nat | S : 'n nat -> 'n s nat
-
 module T = struct
   type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
 end
 
 include T
-
-let hd (type a n) (t : (a, n s) t) : a = match t with x :: _ -> x
 
 let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
 
@@ -75,18 +70,18 @@ let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
 
 let to_array t = Array.of_list (to_list t)
 
-let rec length : type a n. (a, n) t -> n nat = function
+let rec length : type a n. (a, n) t -> n Nat.t = function
   | [] ->
       Z
   | _ :: xs ->
       S (length xs)
 
-let rec init : type a n. int -> n nat -> f:(int -> a) -> (a, n) t =
+let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
  fun i n ~f -> match n with Z -> [] | S n -> f i :: init (i + 1) n ~f
 
 let init n ~f = init 0 n ~f
 
-let rec fold_map :
+let rec _fold_map :
     type acc a b n.
     (a, n) t -> f:(acc -> a -> acc * b) -> init:acc -> acc * (b, n) t =
  fun t ~f ~init ->
@@ -95,7 +90,7 @@ let rec fold_map :
       (init, [])
   | x :: xs ->
       let acc, y = f init x in
-      let res, ys = fold_map xs ~f ~init:acc in
+      let res, ys = _fold_map xs ~f ~init:acc in
       (res, y :: ys)
 
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
@@ -109,9 +104,6 @@ let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
 
 let unzip ts = (map ts ~f:fst, map ts ~f:snd)
 
-let unzip3 ts =
-  (map ts ~f:Tuple3.get1, map ts ~f:Tuple3.get2, map ts ~f:Tuple3.get3)
-
 type _ e = T : ('a, 'n) t -> 'a e
 
 let rec of_list : type a. a list -> a e = function
@@ -121,12 +113,7 @@ let rec of_list : type a. a list -> a e = function
       let (T xs) = of_list xs in
       T (x :: xs)
 
-let to_sequence : type a n. (a, n) t -> a Sequence.t =
- fun t ->
-  Sequence.unfold ~init:(T t) ~f:(fun (T t) ->
-      match t with [] -> None | x :: xs -> Some (x, T xs) )
-
-let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
+let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
  fun xs n ->
   match (xs, n) with
   | [], Z ->
@@ -136,23 +123,20 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
   | _ ->
       failwith "Vector: Length mismatch"
 
-let of_list_and_length xs n =
-  Option.try_with (fun () -> of_list_and_length_exn xs n)
-
-let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
+let of_array_and_length_exn : type a n. a array -> n Nat.t -> (a, n) t =
  fun xs n ->
   if Array.length xs <> Nat.to_int n then
     failwithf "of_array_and_length_exn: got %d (expected %d)" (Array.length xs)
       (Nat.to_int n) () ;
   init n ~f:(Array.get xs)
 
-let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
+let rec _take_from_list : type a n. a list -> n Nat.t -> (a, n) t =
  fun xs n ->
   match (xs, n) with
   | _, Z ->
       []
   | x :: xs, S n ->
-      x :: take_from_list xs n
+      x :: _take_from_list xs n
   | _ ->
       failwith "take_from_list: Not enough to take"
 
@@ -175,8 +159,6 @@ let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
 
-let reduce (init :: xs) ~f = fold xs ~f ~init
-
 let reduce_exn (type n) (t : (_, n) t) ~f =
   match t with
   | [] ->
@@ -186,17 +168,6 @@ let reduce_exn (type n) (t : (_, n) t) ~f =
 
 module L = struct
   type 'a t = 'a list [@@deriving yojson]
-end
-
-module type Yojson_intf1 = sig
-  type 'a t
-
-  val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
-
-  val of_yojson :
-       (Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or)
-    -> Yojson.Safe.t
-    -> 'a t Ppx_deriving_yojson_runtime.error_or
 end
 
 module Make = struct
@@ -210,7 +181,7 @@ module Make = struct
     val unit : unit t
   end) =
   struct
-    let rec f : type n a. n nat -> a F.t -> (a, n) t F.t =
+    let rec f : type n a. n Nat.t -> a F.t -> (a, n) t F.t =
      fun n tc ->
       match n with
       | Z ->
@@ -230,8 +201,8 @@ module Make = struct
     let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
   end
 
-  module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
-  struct
+  module Yojson (N : Nat_intf) :
+    Sigs.Jsonable.S1 with type 'a t := ('a, N.n) t = struct
     let to_yojson f t = L.to_yojson f (to_list t)
 
     let of_yojson f s =
@@ -388,11 +359,11 @@ let rev (type a n) (xs : (a, n) t) : (a, n) t =
     (fold ~init:[] ~f:(fun acc x -> List.cons x acc) xs)
     (length xs)
 
-let rec last : type a n. (a, n s) t -> a = function
+let rec _last : type a n. (a, n s) t -> a = function
   | [ x ] ->
       x
   | _ :: (_ :: _ as xs) ->
-      last xs
+      _last xs
 
 let rec split :
     type n m n_m a. (a, n_m) t -> (n, m, n_m) Nat.Adds.t -> (a, n) t * (a, m) t
@@ -444,6 +415,32 @@ let rec extend :
       default :: extend [] Z m default
   | x :: xs, S p, S m ->
       x :: extend xs p m default
+
+module type S = sig
+  type 'a t [@@deriving compare, yojson, sexp, hash, equal]
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val of_list_exn : 'a list -> 'a t
+
+  val to_list : 'a t -> 'a list
+end
+
+module type VECTOR = sig
+  type 'a t
+
+  include S with type 'a t := 'a t
+
+  module Stable : sig
+    module V1 : sig
+      include S with type 'a t = 'a t
+
+      include Sigs.Binable.S1 with type 'a t = 'a t
+
+      include Sigs.VERSIONED
+    end
+  end
+end
 
 module With_version (N : Nat.Intf) = struct
   module type S = sig

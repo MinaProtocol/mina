@@ -59,6 +59,7 @@
    mina_metrics
    mina_numbers
    mina_numbers_unix
+   mina_stdlib
    signature_lib
    snarky.backendless
    blake2

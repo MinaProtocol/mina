@@ -46,6 +46,8 @@ module Basic = struct
   module Rounds = Basic.Rounds
   module Bigint256 = Basic.Bigint256
   module Fp = Basic.Fp
+  module Fp_poly_comm = Basic.Fp_poly_comm
+  module Fq_poly_comm = Basic.Fq_poly_comm
 end
 
 module Precomputed = Precomputed

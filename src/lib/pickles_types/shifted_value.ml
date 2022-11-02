@@ -84,7 +84,7 @@ module type S = sig
   val to_field :
     (module Field_intf with type t = 'f) -> shift:'f Shift.t -> 'f t -> 'f
 
-  val equal : ('f -> 'f -> 'bool) -> 'f t -> 'f t -> 'bool
+  val equal : ('f, 'res) Sigs.rel2 -> ('f t, 'res) Sigs.rel2
 end
 
 module Type1 = struct

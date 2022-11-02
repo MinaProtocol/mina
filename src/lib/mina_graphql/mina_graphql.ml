@@ -914,7 +914,6 @@ module Types = struct
           ; timing
           ; permissions
           ; zkapp
-          ; zkapp_uri
           } =
         let open Option.Let_syntax in
         let%bind token_permissions = token_permissions in
@@ -922,8 +921,7 @@ module Types = struct
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind voting_for = voting_for in
-        let%bind permissions = permissions in
-        let%map zkapp_uri = zkapp_uri in
+        let%map permissions = permissions in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
@@ -936,7 +934,6 @@ module Types = struct
         ; timing
         ; permissions
         ; zkapp
-        ; zkapp_uri
         }
 
       let of_full_account ?breadcrumb
@@ -952,7 +949,6 @@ module Types = struct
           ; timing
           ; permissions
           ; zkapp
-          ; zkapp_uri
           } =
         { Account.Poly.public_key
         ; token_id
@@ -971,7 +967,6 @@ module Types = struct
         ; timing
         ; permissions = Some permissions
         ; zkapp
-        ; zkapp_uri = Some zkapp_uri
         }
 
       let of_account_id mina account_id =
@@ -1008,7 +1003,6 @@ module Types = struct
               ; timing = Timing.Untimed
               ; permissions = None
               ; zkapp = None
-              ; zkapp_uri = None
               }
 
       let of_pk mina pk =
@@ -1028,8 +1022,7 @@ module Types = struct
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
-          , Zkapp_account.t option
-          , string option )
+          , Zkapp_account.t option )
           Account.Poly.t
       ; locked : bool option
       ; is_actively_staking : bool
@@ -1389,7 +1382,8 @@ module Types = struct
                     the zkApp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.zkapp_uri )
+                   Option.value_map account.zkapp ~default:None ~f:(fun zkapp ->
+                       Some zkapp.zkapp_uri ) )
              ; field "zkappState"
                  ~typ:
                    ( list @@ non_null
