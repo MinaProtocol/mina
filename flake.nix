@@ -177,13 +177,16 @@
           (map (builtins.match "	path = (.*)")
             (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
 
-        requireSubmodules = lib.warnIf (!builtins.all builtins.pathExists
-          (map (x: ./. + "/${x}") submodules)) ''
+        requireSubmodules = let 
+          ref = r: "[34;1m${r}[31;1m";
+          command = c: "[37;1m${c}[31;1m";
+        in lib.warnIf (!builtins.all (x: x)
+          (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
             Some submodules are missing, you may get errors. Consider one of the following:
-            - run nix/pin.sh and use "mina" flake ref;
-            - use "git+file://$PWD?submodules=1";
-            - use "git+https://github.com/minaprotocol/mina?submodules=1";
-            - use non-flake commands like nix-build and nix-shell.
+            - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
+            - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
           '';
 
         checks = import ./nix/checks.nix inputs pkgs;

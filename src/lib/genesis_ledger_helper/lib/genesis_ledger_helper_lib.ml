@@ -119,10 +119,11 @@ module Accounts = struct
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             } ->
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Zkapp_state.Max_state_size.n
+                Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
                 <> List.length state
               then
                 Or_error.errorf
@@ -137,7 +138,7 @@ module Accounts = struct
             in
             let%map sequence_state =
               if
-                Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
+                Pickles_types.Nat.to_int Pickles_types.Nat.N5.n
                 <> List.length sequence_state
               then
                 Or_error.errorf
@@ -157,6 +158,7 @@ module Accounts = struct
               ; sequence_state
               ; last_sequence_slot
               ; proved_state
+              ; zkapp_uri
               }
       in
       ( { public_key = account.public_key
@@ -177,7 +179,6 @@ module Accounts = struct
               ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
         ; zkapp
         ; permissions
-        ; zkapp_uri = Option.value ~default:"" t.zkapp_uri
         }
         : Mina_base.Account.t )
 
@@ -268,6 +269,7 @@ module Accounts = struct
                ; sequence_state
                ; last_sequence_slot
                ; proved_state
+               ; zkapp_uri
                }
              ->
             let state = Zkapp_state.V.to_list app_state in
@@ -284,6 +286,7 @@ module Accounts = struct
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             } )
       in
       { pk =
@@ -308,7 +311,6 @@ module Accounts = struct
       ; zkapp
       ; permissions
       ; token_symbol = Some account.token_symbol
-      ; zkapp_uri = Some account.zkapp_uri
       }
   end
 
