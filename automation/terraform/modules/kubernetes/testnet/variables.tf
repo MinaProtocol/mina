@@ -329,9 +329,6 @@ variable "archive_configs" {
 
       postgresHost            = string
       postgresPort            = string
-      postgresqlUsername      = string
-      postgresqlPassword      = string
-      postgresDB              = string
       remoteSchemaFile        = string
       remoteSchemaAuxFiles        = list(string)
 
