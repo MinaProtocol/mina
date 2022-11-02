@@ -75,6 +75,7 @@
    snark_params
    pickles
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
 
  (preprocessor_deps ../../../../config.mlh)

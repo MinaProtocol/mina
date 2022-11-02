@@ -60,5 +60,6 @@
    sgn
    currency
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_wire_types
    ))
