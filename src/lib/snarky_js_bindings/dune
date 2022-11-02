@@ -4,6 +4,7 @@
    (compilation_mode whole_program))))
 
 (data_only_dirs test_module)
+(vendored_dirs snarkyjs)
 
 (executable
  (name snarky_js_node)
