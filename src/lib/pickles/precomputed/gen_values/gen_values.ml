@@ -38,8 +38,7 @@ let vesta =
               Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
                 domain_size i )
-          |> Basic.Fp_poly_comm.of_backend_without_degree_bound
-          |> unwrap ) )
+          |> Basic.Fp_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let pallas =
   let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
@@ -53,8 +52,7 @@ let pallas =
               Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
                 domain_size i )
-          |> Basic.Fq_poly_comm.of_backend_without_degree_bound
-          |> unwrap ) )
+          |> Basic.Fq_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
