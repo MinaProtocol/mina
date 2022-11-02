@@ -73,4 +73,4 @@
  (inline_tests)
  (modes native)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx ppx_deriving.show)))

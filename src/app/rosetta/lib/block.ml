@@ -114,7 +114,7 @@ module Internal_command_info = struct
        * canonical user command that created them so we are able consistently
        * produce more balance changing operations in the mempool or a block.
        * *)
-      let plan : 'a Op.t list = 
+      let plan : 'a Op.t list =
         let mk_account_creation_fee related =
           match t.receiver_account_creation_fee_paid with
           | None -> []
@@ -449,15 +449,15 @@ WITH RECURSIVE chain AS (
         ac_payer.creation_fee,
         ac_receiver.creation_fee
         FROM user_commands u
-        INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
-        INNER JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
-        INNER JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
-        INNER JOIN accounts_created ac_payer ON ac_payer.account_identifier_id = ai_payer.id
-        INNER JOIN account_identifiers ai_source on ai_source.id = u.source_id
-        INNER JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
-        INNER JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
-        INNER JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
-        INNER JOIN accounts_created ac_receiver on ac_receiver.account_identifier_id = ai_receiver.id
+        LEFT JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
+        LEFT JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
+        LEFT JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
+        LEFT JOIN accounts_created ac_payer ON ac_payer.account_identifier_id = ai_payer.id
+        LEFT JOIN account_identifiers ai_source on ai_source.id = u.source_id
+        LEFT JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
+        LEFT JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
+        LEFT JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
+        LEFT JOIN accounts_created ac_receiver on ac_receiver.account_identifier_id = ai_receiver.id
         WHERE blocks_user_commands.block_id = ?
       |}
 
@@ -539,6 +539,10 @@ WITH RECURSIVE chain AS (
       User_commands.run (module Conn) block_id
       |> Errors.Lift.sql ~context:"Finding user commands within block"
     in
+    let pp_print_raw_user_command fmt (_i, signed, _extra) =
+      Format.fprintf fmt "%a"  Archive_lib.Processor.User_command.Signed_command.pp signed
+    in
+    let () = Format.printf "raw_user_commands= %a@." (Format.pp_print_list pp_print_raw_user_command) raw_user_commands in
     let%bind raw_internal_commands =
       Internal_commands.run (module Conn) block_id
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
