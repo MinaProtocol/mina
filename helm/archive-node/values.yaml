@@ -47,6 +47,7 @@ postgresql:
       user: "mina"
       password: "boofar"
   auth:
+    postgresqlPassword: "foobar"
     username: "mina"
     password: "boofar"
     database: "archive"
