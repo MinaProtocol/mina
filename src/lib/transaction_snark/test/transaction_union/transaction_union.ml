@@ -157,7 +157,7 @@ let%test_module "Transaction union tests" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
-                ~f:(fun { account; private_key = _ } ->
+                ~f:(fun { account; _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
                     account ) ;
@@ -179,7 +179,7 @@ let%test_module "Transaction union tests" =
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                Signed_command.accounts_accessed
+                Signed_command.accounts_referenced
                   (Signed_command.forget_check t1)
               in
               let sparse_ledger =
@@ -200,7 +200,14 @@ let%test_module "Transaction union tests" =
                 ; target = pending_coinbase_stack_target
                 }
               in
-              let user_command_supply_increase = Currency.Amount.Signed.zero in
+              let user_command_supply_increase =
+                (* receiver account is created, decrease supply by account creation fee *)
+                let magnitude =
+                  U.constraint_constants.account_creation_fee
+                  |> Currency.Amount.of_fee
+                in
+                Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
+              in
               Transaction_snark.check_user_command ~constraint_constants
                 ~sok_message
                 ~source:(Ledger.merkle_root ledger)
@@ -393,7 +400,7 @@ let%test_module "Transaction union tests" =
                           for each command normally, but we know statically
                           that these are payments in this test.
                        *)
-                       Signed_command.accounts_accessed
+                       Signed_command.accounts_referenced
                          (Signed_command.forget_check t) )
                      [ t1; t2 ] )
               in
@@ -1928,16 +1935,16 @@ let%test_module "legacy transactions using zkApp accounts" =
       let expected_failure_sender =
         Option.map expected_failure_sender ~f:(fun f -> [ f ])
       in
-      let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
+      let zkapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
-        ~ledger snapp_pk ;
+        ~ledger zkapp_pk ;
       let txn_fee = Fee.of_int 1000000 in
       let amount = 100 in
       (*send from a zkApp account*)
       let signed_command1 =
         let fee_payer =
           { U.Wallet.private_key = new_kp.private_key
-          ; account = account ledger snapp_pk
+          ; account = account ledger zkapp_pk
           }
         in
         U.Wallet.user_command ~fee_payer ~receiver_pk:spec.receiver amount
@@ -1956,7 +1963,7 @@ let%test_module "legacy transactions using zkApp accounts" =
           ; account = account ledger source_pk
           }
         in
-        U.Wallet.user_command ~fee_payer ~receiver_pk:snapp_pk amount txn_fee
+        U.Wallet.user_command ~fee_payer ~receiver_pk:zkapp_pk amount txn_fee
           sender_nonce memo
       in
       U.test_transaction_union ?expected_failure:expected_failure_receiver

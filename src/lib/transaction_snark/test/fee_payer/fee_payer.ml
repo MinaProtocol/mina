@@ -3,7 +3,7 @@ open Mina_ledger
 open Currency
 open Signature_lib
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 open Mina_transaction
 
@@ -143,21 +143,17 @@ let%test_module "Fee payer tests" =
               let fee = Fee.of_int 1_000_000 in
               let amount = Amount.of_int 10_000_000_000 in
               (*making new_kp the fee-payer for this to fail*)
-              let test_spec : Spec.t =
+              let test_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
                 ; fee_payer = None
-                ; receivers = []
                 ; amount
                 ; zkapp_account_keypairs = [ fst spec.sender ]
                 ; memo
                 ; new_zkapp_account = true
                 ; snapp_update
-                ; current_auth = Permissions.Auth_required.Signature
-                ; call_data = Snark_params.Tick.Field.zero
-                ; events = []
-                ; sequence_events = []
                 ; preconditions = None
+                ; authorization_kind = Signature
                 }
               in
               let zkapp_command =

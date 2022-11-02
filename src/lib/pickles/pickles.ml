@@ -359,15 +359,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let log =
         let weight =
           let sys = Backend.Tick.R1CS_constraint_system.create () in
-          fun (c : Impls.Step.Constraint.t) ->
+          fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
             let prev = sys.next_row in
-            List.iter c ~f:(fun { annotation; basic } ->
-                Backend.Tick.R1CS_constraint_system.add_constraint sys
-                  ?label:annotation basic ) ;
+            Backend.Tick.R1CS_constraint_system.add_constraint sys
+              ?label:annotation basic ;
             let next = sys.next_row in
             next - prev
         in
-        Constraints.log ~weight (Impls.Step.make_checked main)
+        Constraints.log ~weight (fun () -> Impls.Step.make_checked main)
       in
       if profile_constraints then
         Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
@@ -376,20 +375,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
       let log =
         let sys = Backend.Tock.R1CS_constraint_system.create () in
-        let weight (c : Impls.Wrap.Constraint.t) =
+        let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
           let prev = sys.next_row in
-          List.iter c ~f:(fun { annotation; basic } ->
-              Backend.Tock.R1CS_constraint_system.add_constraint sys
-                ?label:annotation basic ) ;
+          Backend.Tock.R1CS_constraint_system.add_constraint sys
+            ?label:annotation basic ;
           let next = sys.next_row in
           next - prev
         in
         let log =
           Constraints.log ~weight
             Impls.Wrap.(
-              make_checked (fun () : unit ->
-                  let x = with_label __LOC__ (fun () -> exists typ) in
-                  main x () ))
+              fun () ->
+                make_checked (fun () : unit ->
+                    let x = with_label __LOC__ (fun () -> exists typ) in
+                    main x () ))
         in
         log
       in
@@ -596,7 +595,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
               let f (T b : _ Branch_data.t) =
                 let (T (typ, _conv, conv_inv)) = etyp in
-                let main () =
+                let main () () =
                   let res = b.main ~step_domains () in
                   Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
                 in
@@ -606,13 +605,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 if return_early_digest_exception then
                   raise
                     (Return_digest
-                       ( constraint_system ~exposing:[] ~return_typ:typ main
+                       ( constraint_system ~input_typ:Typ.unit ~return_typ:typ
+                           main
                        |> R1CS_constraint_system.digest ) ) ;
 
                 let k_p =
                   lazy
                     (let cs =
-                       constraint_system ~exposing:[] ~return_typ:typ main
+                       constraint_system ~input_typ:Typ.unit ~return_typ:typ
+                         main
                      in
                      let cs_hash =
                        Md5.to_hex (R1CS_constraint_system.digest cs)
@@ -649,8 +650,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                         cache k_p k_v
                         (Snarky_backendless.Typ.unit ())
-                        typ
-                        (fun () -> main) )
+                        typ main )
                 in
                 accum_dirty (Lazy.map pk ~f:snd) ;
                 accum_dirty (Lazy.map vk ~f:snd) ;
@@ -681,7 +681,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let disk_key_prover =
           lazy
             (let cs =
-               constraint_system ~exposing:[ typ ]
+               constraint_system ~input_typ:typ
                  ~return_typ:(Snarky_backendless.Typ.unit ())
                  main
              in
@@ -2050,14 +2050,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~wrap_rounds:Tock.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
-            let main () =
+            let main () () =
               let res = inner_step_data.main ~step_domains () in
               Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
             in
             let open Impls.Step in
             let k_p =
               lazy
-                (let cs = constraint_system ~exposing:[] ~return_typ:typ main in
+                (let cs =
+                   constraint_system ~input_typ:Typ.unit ~return_typ:typ main
+                 in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( Type_equal.Id.uid self.id
                  , snark_keys_header
@@ -2086,8 +2088,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
               (Snarky_backendless.Typ.unit ())
-              typ
-              (fun () -> main)
+              typ main
           in
           let step_vks =
             let module V = H4.To_vector (Lazy_keys) in
@@ -2137,7 +2138,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let disk_key_prover =
               lazy
                 (let cs =
-                   constraint_system ~exposing:[ typ ] ~return_typ:Typ.unit main
+                   constraint_system ~input_typ:typ ~return_typ:Typ.unit main
                  in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( self_id
@@ -2603,7 +2604,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                         ; challenges = Vector.to_array chals
                                         } )
                                   |> Wrap_hack.pad_accumulator ) )
-                            [ input ]
+                            ~input_typ:input
                             ~return_typ:(Snarky_backendless.Typ.unit ())
                             (fun x () : unit -> wrap_main (conv x))
                             { messages_for_next_step_proof =
@@ -2975,14 +2976,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~wrap_rounds:Tock.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
-            let main () =
+            let main () () =
               let res = inner_step_data.main ~step_domains () in
               Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
             in
             let open Impls.Step in
             let k_p =
               lazy
-                (let cs = constraint_system ~exposing:[] ~return_typ:typ main in
+                (let cs =
+                   constraint_system ~input_typ:Typ.unit ~return_typ:typ main
+                 in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( Type_equal.Id.uid self.id
                  , snark_keys_header
@@ -3011,8 +3014,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
               (Snarky_backendless.Typ.unit ())
-              typ
-              (fun () -> main)
+              typ main
           in
           let step_vks =
             let module V = H4.To_vector (Lazy_keys) in
@@ -3062,7 +3064,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let disk_key_prover =
               lazy
                 (let cs =
-                   constraint_system ~exposing:[ typ ] ~return_typ:Typ.unit main
+                   constraint_system ~input_typ:typ ~return_typ:Typ.unit main
                  in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( self_id
@@ -3493,7 +3495,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                         ; challenges = Vector.to_array chals
                                         } )
                                   |> Wrap_hack.pad_accumulator ) )
-                            [ input ]
+                            ~input_typ:input
                             ~return_typ:(Snarky_backendless.Typ.unit ())
                             (fun x () : unit -> wrap_main (conv x))
                             { messages_for_next_step_proof =

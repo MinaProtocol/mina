@@ -15,7 +15,7 @@ use o1_utils::hasher::CryptoDigest;
 pub mod fp {
     use super::*;
     use crate::arkworks::CamlFp;
-    use mina_curves::pasta::fp::Fp;
+    use mina_curves::pasta::Fp;
 
     //
     // CamlPastaFpPlonkGateVector
@@ -91,7 +91,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::CamlFq;
-    use mina_curves::pasta::fq::Fq;
+    use mina_curves::pasta::Fq;
 
     //
     // CamlPastaFqPlonkGateVector

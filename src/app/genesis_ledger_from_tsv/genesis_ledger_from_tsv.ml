@@ -184,7 +184,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_cliff_time_months =
     try
       let n = Float.of_string cliff_time_months in
-      n >= 0.0
+      Float.(n >= 0.0)
     with _ -> false
   in
   let valid_cliff_amount = valid_mina_amount cliff_amount in

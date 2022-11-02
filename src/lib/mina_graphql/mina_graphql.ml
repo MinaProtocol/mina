@@ -1147,8 +1147,7 @@ module Types = struct
     let account_vk =
       obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
         ~fields:(fun _ ->
-          [ field "verificationKey"
-              ~doc:"Verification key in Base58Check format"
+          [ field "verificationKey" ~doc:"verification key in Base64 format"
               ~typ:
                 (non_null @@ Pickles_unix.Graphql_scalars.VerificationKey.typ ())
               ~args:Arg.[]
@@ -4284,13 +4283,23 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            List.filter_map (Ledger.to_list ledger) ~f:(fun acc ->
-                let open Option.Let_syntax in
-                let%map () =
-                  Option.some_if (Token_id.equal token_id acc.token_id) ()
-                in
-                Types.AccountObj.Partial_account.of_full_account ~breadcrumb acc
-                |> Types.AccountObj.lift mina acc.public_key )
+            let accounts = Ledger.accounts ledger in
+            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
+                if Token_id.(Account_id.token_id acct_id <> token_id) then
+                  acct_objs
+                else
+                  (* account id in the ledger, lookup should always succeed *)
+                  let loc =
+                    Option.value_exn
+                    @@ Ledger.location_of_account ledger acct_id
+                  in
+                  let account = Option.value_exn @@ Ledger.get ledger loc in
+                  let partial_account =
+                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                      account
+                  in
+                  Types.AccountObj.lift mina account.public_key partial_account
+                  :: acct_objs )
         | None ->
             [] )
 
@@ -4299,7 +4308,7 @@ module Queries = struct
       ~typ:Types.account_id
       ~args:
         Arg.
-          [ arg "token" ~doc:"Token to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owner for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->

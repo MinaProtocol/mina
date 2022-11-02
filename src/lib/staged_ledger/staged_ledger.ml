@@ -565,7 +565,7 @@ module T = struct
           Fee_transfer.receivers t
       | Command t ->
           let t = (t :> User_command.t) in
-          User_command.accounts_accessed t
+          User_command.accounts_referenced t
       | Coinbase c ->
           let ft_receivers =
             Option.map ~f:Coinbase.Fee_transfer.receiver c.fee_transfer
@@ -3248,7 +3248,7 @@ let%test_module "staged ledger tests" =
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
-      let f_pop_and_add =
+      let f_pop_and_add () =
         let open Snark_params.Tick in
         let open Pending_coinbase in
         let proof_emitted =
@@ -3803,7 +3803,7 @@ let%test_module "staged ledger tests" =
             }
           in
           let memo = Signed_command_memo.dummy in
-          let test_spec : Spec.t =
+          let test_spec : Update_states_spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
             ; fee_payer = None

@@ -18,7 +18,7 @@ let check_sig pk msg sigma : Boolean.var Checked.t =
   Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
-let%snarkydef verify_sig pubkeys msg sigma =
+let%snarkydef_ verify_sig pubkeys msg sigma =
   let%bind pubkeys =
     exists
       (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
@@ -204,6 +204,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = Signature
                 }
             ; authorization = Signature Signature.dummy
             }
@@ -226,6 +227,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     }
                 ; use_full_commitment = false
                 ; caller = Call
+                ; authorization_kind = Proof
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
             }

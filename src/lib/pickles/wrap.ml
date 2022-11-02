@@ -604,7 +604,7 @@ let wrap
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
               ~auxiliary:auxiliary_inputs pk ~message:next_accumulator )
-          [ input ]
+          ~input_typ:input
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )

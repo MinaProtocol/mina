@@ -49,55 +49,55 @@ module Constant = struct
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
-  let dummy : unit -> t =
-    Memo.unit (fun () : t ->
-        let one_chal = Challenge.Constant.dummy in
-        let open Ro in
-        let alpha = scalar_chal () in
-        let beta = chal () in
-        let gamma = chal () in
-        let zeta = scalar_chal () in
-        let chals :
-            _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-            =
-          { alpha = Common.Ipa.Wrap.endo_to_field alpha
-          ; beta = Challenge.Constant.to_tock_field beta
-          ; gamma = Challenge.Constant.to_tock_field gamma
-          ; zeta = Common.Ipa.Wrap.endo_to_field zeta
-          ; joint_combiner = None
-          }
-        in
-        let evals =
-          Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
-        in
-        let env =
-          Plonk_checks.scalars_env
-            (module Tock.Field)
-            ~srs_length_log2:Common.Max_degree.wrap_log2
-            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
-            ~field_of_hex:
-              (Core_kernel.Fn.compose Tock.Field.of_bigint
-                 Kimchi_pasta.Pasta.Bigint256.of_hex_string )
-            ~domain:
-              (Plonk_checks.domain
-                 (module Tock.Field)
-                 (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
-                 ~domain_generator:Tock.Field.domain_generator )
-            chals evals
-        in
-        let plonk =
-          Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
-        in
-        { deferred_values =
-            { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
-            ; combined_inner_product = Shifted_value (tock ())
-            ; xi = Scalar_challenge.create one_chal
-            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
-            ; b = Shifted_value (tock ())
-            }
-        ; should_finalize = false
-        ; sponge_digest_before_evaluations = Digest.Constant.dummy
-        } )
+  let dummy : t Lazy.t =
+    lazy
+      (let one_chal = Challenge.Constant.dummy in
+       let open Ro in
+       let alpha = scalar_chal () in
+       let beta = chal () in
+       let gamma = chal () in
+       let zeta = scalar_chal () in
+       let chals :
+           _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+           =
+         { alpha = Common.Ipa.Wrap.endo_to_field alpha
+         ; beta = Challenge.Constant.to_tock_field beta
+         ; gamma = Challenge.Constant.to_tock_field gamma
+         ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+         ; joint_combiner = None
+         }
+       in
+       let evals =
+         Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
+       in
+       let env =
+         Plonk_checks.scalars_env
+           (module Tock.Field)
+           ~srs_length_log2:Common.Max_degree.wrap_log2
+           ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
+           ~field_of_hex:
+             (Core_kernel.Fn.compose Tock.Field.of_bigint
+                Kimchi_pasta.Pasta.Bigint256.of_hex_string )
+           ~domain:
+             (Plonk_checks.domain
+                (module Tock.Field)
+                (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
+                ~domain_generator:Tock.Field.domain_generator )
+           chals evals
+       in
+       let plonk =
+         Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+       in
+       { deferred_values =
+           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
+           ; combined_inner_product = Shifted_value (tock ())
+           ; xi = Scalar_challenge.create one_chal
+           ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
+           ; b = Shifted_value (tock ())
+           }
+       ; should_finalize = false
+       ; sponge_digest_before_evaluations = Digest.Constant.dummy
+       } )
 end
 
 let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
@@ -111,5 +111,5 @@ let dummy () : t =
   let (Typ { var_of_fields; value_to_fields; _ }) =
     typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
   in
-  let xs, aux = value_to_fields (Constant.dummy ()) in
+  let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
   var_of_fields (Array.map ~f:Field.constant xs, aux)

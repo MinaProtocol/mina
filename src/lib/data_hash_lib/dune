@@ -33,6 +33,7 @@
    fields_derivers.json
    test_util
    ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

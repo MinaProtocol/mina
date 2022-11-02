@@ -41,7 +41,6 @@ let%test_module "account timing check" =
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
       let equal_balances_computation =
-        let open Snarky_backendless.Checked in
         let%bind checked_timing =
           make_checked_timing_computation account txn_amount txn_global_slot
         in
@@ -416,7 +415,7 @@ let%test_module "account timing check" =
               in
               let validated_uc = validate_user_command uc in
               let account_ids =
-                Mina_transaction.Transaction.accounts_accessed txn
+                Mina_transaction.Transaction.accounts_referenced txn
               in
               let sparse_ledger_before =
                 Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
@@ -847,7 +846,12 @@ let%test_module "account timing check" =
                 (Transaction_status.Failure.to_string expected_failure)
                 ()
           | Failed failuress ->
-              let failures = List.concat failuress in
+              let failures =
+                List.filter (List.concat failuress) ~f:(fun failure ->
+                    not
+                    @@ Transaction_status.Failure.equal failure
+                         Transaction_status.Failure.Cancelled )
+              in
               if
                 not
                   (List.equal Transaction_status.Failure.equal failures
@@ -902,7 +906,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -912,7 +917,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -971,7 +975,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -981,7 +986,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1050,7 +1054,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1060,7 +1065,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1112,11 +1116,11 @@ let%test_module "account timing check" =
       let sender_keypair = List.nth_exn keypairs 0 in
       let zkapp_keypair = Signature_lib.Keypair.create () in
       let fee = 1_000_000 in
-      let (create_timed_account_spec : Transaction_snark.For_tests.Spec.t) =
+      let (create_timed_account_spec
+            : Transaction_snark.For_tests.Deploy_snapp_spec.t ) =
         { sender = (sender_keypair, Account.Nonce.zero)
         ; fee = Currency.Fee.of_int fee
         ; fee_payer = None
-        ; receivers = []
         ; amount =
             Option.value_exn
               Currency.Amount.(
@@ -1140,11 +1144,8 @@ let%test_module "account timing check" =
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Proof
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       let timed_account_id =
@@ -1260,7 +1261,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1270,7 +1272,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1345,7 +1346,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1355,7 +1357,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1419,7 +1420,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1429,7 +1431,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1494,7 +1495,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1504,7 +1506,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1573,7 +1574,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1583,7 +1585,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1646,7 +1647,8 @@ let%test_module "account timing check" =
           let receiver_key =
             zkapp_keypair.public_key |> Signature_lib.Public_key.compress
           in
-          let (zkapp_command_spec : Transaction_snark.For_tests.Spec.t) =
+          let (zkapp_command_spec
+                : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
@@ -1656,7 +1658,6 @@ let%test_module "account timing check" =
             ; memo
             ; new_zkapp_account = false
             ; snapp_update = Account_update.Update.dummy
-            ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
@@ -1696,11 +1697,11 @@ let%test_module "account timing check" =
       in
       let sender_keypair = List.hd_exn keypairs in
       let zkapp_keypair = Signature_lib.Keypair.create () in
-      let (create_timed_account_spec : Transaction_snark.For_tests.Spec.t) =
+      let (create_timed_account_spec
+            : Transaction_snark.For_tests.Deploy_snapp_spec.t ) =
         { sender = (sender_keypair, Account.Nonce.zero)
         ; fee = Currency.Fee.of_int 1_000_000
         ; fee_payer = None
-        ; receivers = []
         ; amount = Currency.Amount.of_int 50_000_000_000_000
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo =
@@ -1720,11 +1721,8 @@ let%test_module "account timing check" =
                    : Account_update.Update.Timing_info.value )
              in
              { Account_update.Update.dummy with timing } )
-        ; current_auth = Permissions.Auth_required.Proof
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
         ; preconditions = None
+        ; authorization_kind = None_given
         }
       in
       let timing_account_id =
@@ -1776,7 +1774,8 @@ let%test_module "account timing check" =
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
-          let (update_timing_spec : Transaction_snark.For_tests.Spec.t) =
+          let (update_timing_spec
+                : Transaction_snark.For_tests.Update_states_spec.t ) =
             { sender = (sender_keypair, Account.Nonce.zero)
             ; fee = Currency.Fee.of_int 1_000_000
             ; fee_payer = None
@@ -1856,7 +1855,8 @@ let%test_module "account timing check" =
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
-          let (update_timing_spec : Transaction_snark.For_tests.Spec.t) =
+          let (update_timing_spec
+                : Transaction_snark.For_tests.Update_states_spec.t ) =
             { sender = (sender_keypair, Account.Nonce.zero)
             ; fee = Currency.Fee.of_int 1_000_000
             ; fee_payer = None
