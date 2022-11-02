@@ -10,11 +10,7 @@ spec:
       - name: import-schema
         image: gcr.io/o1labs-192920/postgresql-curl:latest
         command: ["bash", "-c"]
-        args: ["cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.auth.password }} psql --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
-      - name: update-transaction-isolation-level
-        image: bitnami/postgresql:13.8.0
-        command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.auth.postgresqlPassword }} psql --username {{ .Values.postgresql.auth.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB }} -c 'ALTER DATABASE {{ .Values.archive.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;'"]
+        args: ["cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.auth.password }} psql --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
       restartPolicy: Never
   backoffLimit: 10
 {{- end }}

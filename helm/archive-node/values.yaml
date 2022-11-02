@@ -30,8 +30,7 @@ archive:
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
-  postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.postgresql.auth.database }}
   ports:
     server: 3086
     postgres: "5432"
@@ -46,8 +45,6 @@ postgresql:
       user: "mina"
       password: "boofar"
   auth:
-    postgresqlUsername: "postgres"
-    postgresqlPassword: "foobar"
     username: "mina"
     password: "boofar"
     database: "archive"
