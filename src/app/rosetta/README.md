@@ -41,7 +41,7 @@ https://www.rosetta-api.org/docs/models/Operation.html
    on the ability to enable and disable staking via GrapQL.
    That feature of the daemon had been deprecated, and has been
    removed. A new test-agent may appear in the future.
-- Update for release/1.3.0 as opposed to purpose-built rosetta branches
+- Update for master as opposed to purpose-built rosetta branches
 
 2022/01/18:
 
@@ -199,7 +199,7 @@ https://www.rosetta-api.org/docs/models/Operation.html
 
 ## How to build your own docker image
 
-Checkout the "release/1.3.0" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "master" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
 ```
 cat dockerfiles/stages/1-build-deps \
@@ -208,7 +208,7 @@ cat dockerfiles/stages/1-build-deps \
     dockerfiles/stages/4-production \
     | docker build -t mina-rosetta-ubuntu:v1.3.0 \
         --build-arg "DUNE_PROFILE=mainnet"
-        --build-arg "MINA_BRANCH=release/1.3.0" -
+        --build-arg "MINA_BRANCH=master" -
 ```
 
 This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu
