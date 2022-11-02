@@ -56,13 +56,47 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     [%%define_locally
-    Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
+    Stable.Latest.
+      ( to_yojson
+      , of_yojson
+      , to_base58_check
+      , of_base58_check_exn
+      , compare
+      , sexp_of_t )]
 
     let of_bytes = Fn.id
 
     let to_bytes = Fn.id
 
     let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
+
+    let of_sha256 : Digestif.SHA256.t -> t =
+      Fn.compose of_bytes Digestif.SHA256.to_raw_string
+
+    let gen : t Quickcheck.Generator.t =
+      let char_generator =
+        Base_quickcheck.Generator.of_list
+          [ '0'
+          ; '1'
+          ; '2'
+          ; '3'
+          ; '4'
+          ; '5'
+          ; '6'
+          ; '7'
+          ; '8'
+          ; '9'
+          ; 'A'
+          ; 'B'
+          ; 'C'
+          ; 'D'
+          ; 'E'
+          ; 'F'
+          ]
+      in
+      String.gen_with_length (length_in_bytes * 2) char_generator
+      |> Quickcheck.Generator.map
+           ~f:(Fn.compose of_sha256 Digestif.SHA256.of_hex)
   end
 
   module Pending_coinbase_aux = struct

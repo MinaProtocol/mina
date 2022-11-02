@@ -123,7 +123,7 @@ module Accounts = struct
             } ->
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Zkapp_state.Max_state_size.n
+                Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
                 <> List.length state
               then
                 Or_error.errorf
@@ -138,7 +138,7 @@ module Accounts = struct
             in
             let%map sequence_state =
               if
-                Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
+                Pickles_types.Nat.to_int Pickles_types.Nat.N5.n
                 <> List.length sequence_state
               then
                 Or_error.errorf

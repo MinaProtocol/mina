@@ -9,6 +9,7 @@
    base.caml
    base
    core
+   sexplib0
    ;; local libraries
    staged_ledger_diff
    staged_ledger
@@ -37,6 +38,6 @@
    mina_wire_types
  )
  (preprocess
-  (pps ppx_mina ppx_version ppx_deriving_yojson))
+  (pps base_quickcheck.ppx_quickcheck ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Filtering operations for external transitions"))
