@@ -26,7 +26,7 @@ archive:
   image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
   # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
   remoteSchemaFile: "create_schema.sql"
-  remoteSchemaAuxFiles: 
+  remoteSchemaAuxFiles:
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
@@ -40,8 +40,17 @@ archive:
   enablePostgresDB: true
 
 postgresql:
-  postgresqlPassword: "foobar"
-  postgresqlUsername: "postgres"
+  primary:
+    name: "archive"
+    initdb:
+      user: "mina"
+      password: "boofar"
+  auth:
+    postgresqlUsername: "postgres"
+    postgresqlPassword: "foobar"
+    username: "mina"
+    password: "boofar"
+    database: "archive"
 
 nodeSelector:
   preemptible: false
