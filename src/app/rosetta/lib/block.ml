@@ -401,8 +401,7 @@ WITH RECURSIVE chain AS (
         ; receiver: string
         ; status: string option
         ; failure_reason: string option
-        ; fee_payer_account_creation_fee_paid: int64 option
-        ; receiver_account_creation_fee_paid: int64 option
+        ; account_creation_fee_paid: int64 option
         }
       [@@deriving hlist]
 
@@ -416,11 +415,8 @@ WITH RECURSIVE chain AS (
 
       let failure_reason t = t.failure_reason
 
-      let fee_payer_account_creation_fee_paid t =
-        t.fee_payer_account_creation_fee_paid
-
-      let receiver_account_creation_fee_paid t =
-        t.receiver_account_creation_fee_paid
+      let account_creation_fee_paid t =
+        t.account_creation_fee_paid
 
       let typ = Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
@@ -429,7 +425,6 @@ WITH RECURSIVE chain AS (
             ; string
             ; option string
             ; option string
-            ; option int64
             ; option int64
             ]
     end
@@ -444,21 +439,30 @@ WITH RECURSIVE chain AS (
         {| SELECT u.id, u.command_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
         pk_payer.value as fee_payer, pk_source.value as source, pk_receiver.value as receiver,
-        blocks_user_commands.status,
-        blocks_user_commands.failure_reason,
-        ac_payer.creation_fee,
-        ac_receiver.creation_fee
+        buc.status,
+        buc.failure_reason,
+        ac.creation_fee
         FROM user_commands u
-        INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
+        INNER JOIN blocks_user_commands buc ON buc.user_command_id = u.id
         INNER JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
         INNER JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
-        INNER JOIN accounts_created ac_payer ON ac_payer.account_identifier_id = ai_payer.id
         INNER JOIN account_identifiers ai_source on ai_source.id = u.source_id
         INNER JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
         INNER JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
         INNER JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
-        INNER JOIN accounts_created ac_receiver on ac_receiver.account_identifier_id = ai_receiver.id
-        WHERE blocks_user_commands.block_id = ?
+        /* Account creation fees are attributed to the first successful command in the
+           block that mentions the account with the following LEFT JOIN */
+        LEFT JOIN accounts_created ac
+            ON buc.block_id = ac.block_id
+                   AND u.receiver_id = ac.account_identifier_id
+                   AND buc.status = 'applied'
+                   AND buc.sequence_no =
+                       (SELECT MIN(buc2.sequence_no)
+                        FROM blocks_user_commands buc2
+                            INNER JOIN user_commands uc2 on buc2.user_command_id = uc2.id
+                                   AND uc2.receiver_id = ac.account_identifier_id
+                                   AND buc2.block_id = buc.block_id)
+        WHERE buc.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -600,35 +604,17 @@ WITH RECURSIVE chain AS (
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
-              match
-                ( User_commands.Extras.fee_payer_account_creation_fee_paid
-                    extras
-                , User_commands.Extras.receiver_account_creation_fee_paid
-                    extras )
-              with
-              | None, None ->
+              match User_commands.Extras.account_creation_fee_paid extras with
+              | None ->
                M.return
                @@ `Applied
                     User_command_info.Account_creation_fees_paid.By_no_one
-              | Some fee_payer, None ->
-                  M.return
-                  @@ `Applied
-                       (User_command_info.Account_creation_fees_paid
-                        .By_fee_payer
-                          (Unsigned.UInt64.of_int64 fee_payer))
-              | None, Some receiver ->
+              | Some receiver ->
                   M.return
                   @@ `Applied
                        (User_command_info.Account_creation_fees_paid
                         .By_receiver
-                          (Unsigned.UInt64.of_int64 receiver))
-              | Some _, Some _ ->
-                  M.fail
-                    (Errors.create
-                       ~context:
-                         "The archive database is storing creation fees paid \
-                          by two different pks. This is impossible."
-                       `Invariant_violation) )
+                          (Unsigned.UInt64.of_int64 receiver)))
             | Some status ->
                 M.return @@ `Failed status
           in
