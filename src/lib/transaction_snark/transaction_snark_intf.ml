@@ -426,8 +426,7 @@ module type Full = sig
              , Currency.Amount.var )
              Account_timing.As_record.t
            , 'j
-           , 'k
-           , 'l )
+           , 'k )
            Account.Poly.t
       -> txn_amount:Currency.Amount.var option
       -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
