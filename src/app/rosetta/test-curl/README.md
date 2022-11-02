@@ -32,3 +32,11 @@ Same `token_id` issue as `con_preprocess.sh`
 failing: TODO
 
 
+
+# rosetta-cli 
+
+Using the `mina.ros` file from this folder, in the local sandbox:
+- the `rosetta-cli` tool successfully creates accounts.
+- some funds need to be added to them manually, to make the `request_funds` step pass.
+- the `transfer` test fails at the `/construction/parse` step.
+  Previous steps seem to be successful (`/construction/derive`, `/construction/preprocess`, `/construction/metadata`, `/construction/payloads`)
