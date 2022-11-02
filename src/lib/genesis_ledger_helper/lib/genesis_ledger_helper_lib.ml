@@ -123,31 +123,34 @@ module Accounts = struct
             } ->
             let%bind app_state =
               if
-                Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
-                <> List.length state
-              then
+                Mina_stdlib.List.Length.Compare.(
+                  state = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n)
+              then Ok (Zkapp_state.V.of_list_exn state)
+              else
                 Or_error.errorf
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t (List.length state)
-              else Ok (Zkapp_state.V.of_list_exn state)
             in
+
             let verification_key =
               Option.map verification_key
                 ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
             let%map sequence_state =
               if
-                Pickles_types.Nat.to_int Pickles_types.Nat.N5.n
-                <> List.length sequence_state
-              then
+                Mina_stdlib.List.Length.Compare.(
+                  sequence_state
+                  = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
+              then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
+              else
                 Or_error.errorf
                   !"Snap account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t
                   (List.length sequence_state)
-              else Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
             in
+
             let last_sequence_slot =
               Mina_numbers.Global_slot.of_int last_sequence_slot
             in

@@ -35,6 +35,7 @@
    mina_block
    mina_base
    mina_ledger
+   mina_stdlib
    mina_transaction_logic
    syncable_ledger
    consensus

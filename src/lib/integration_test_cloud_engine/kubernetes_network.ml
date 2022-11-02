@@ -1071,7 +1071,7 @@ module Workload = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if List.length t.node_info <> List.length pod_ids then
+    if Stdlib.List.compare_lengths t.node_info pod_ids <> 0 then
       failwithf
         "Unexpected number of replicas in kubernetes deployment for workload \
          %s: expected %d, got %d"
@@ -1169,7 +1169,7 @@ let initialize_infra ~logger network =
     result_str |> String.split_lines
     |> List.map ~f:(fun line ->
            let parts = String.split line ~on:':' in
-           assert (List.length parts = 2) ;
+           assert (Mina_stdlib.List.Length.Compare.(parts = 2)) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
     |> List.filter ~f:(fun (pod_name, _) ->
            String.Set.mem all_pods_set pod_name )
