@@ -5,11 +5,11 @@
         "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1656444434,
-        "narHash": "sha256-q3v+AOzwTtfxTngPmqlt2U9OLkW1LW51RKduQ8TSHdA=",
+        "lastModified": 1665561509,
+        "narHash": "sha256-+9KQw0ftpNjezYwbUIcLAvDWekuGSBAs8I2XulcUkT4=",
         "owner": "tweag",
         "repo": "flake-buildkite-pipeline",
-        "rev": "ecd0eeaab42124f4438a9b59caed0c9d2719aa0a",
+        "rev": "c836a5a449973dd04a80f6741863ceb43ec414c9",
         "type": "github"
       },
       "original": {
@@ -112,6 +112,22 @@
       "original": {
         "owner": "hercules-ci",
         "repo": "gitignore.nix",
+        "type": "github"
+      }
+    },
+    "mirage-opam-overlays": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1661959605,
+        "narHash": "sha256-CPTuhYML3F4J58flfp3ZbMNhkRkVFKmBEYBZY5tnQwA=",
+        "owner": "dune-universe",
+        "repo": "mirage-opam-overlays",
+        "rev": "05f1c1823d891ce4d8adab91f5db3ac51d86dc0b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dune-universe",
+        "repo": "mirage-opam-overlays",
         "type": "github"
       }
     },
@@ -246,45 +262,47 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
-      "locked": {
-        "lastModified": 1640418986,
-        "narHash": "sha256-a8GGtxn2iL3WAkY5H+4E0s3Q7XJt6bTOvos9qqxT5OQ=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "5c37ad87222cfc1ec36d6cd1364514a9efc2f7f2",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "opam-nix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
         "flake-utils": "flake-utils_2",
+        "mirage-opam-overlays": "mirage-opam-overlays",
         "nixpkgs": [
           "nixpkgs"
         ],
+        "opam-overlays": "opam-overlays",
         "opam-repository": [
           "opam-repository"
         ],
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1661505722,
-        "narHash": "sha256-nDXkDNhFCSyByOMHUblmcDQxzfaOsFbkGg3a6vaSs0I=",
+        "lastModified": 1666213087,
+        "narHash": "sha256-P9RzZE8gixLEwsHj4RPIByeTf42muIi+AjUM0nTYtSQ=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "7147eb03812beed3019404b86735975d4f165335",
+        "rev": "25922a6da8410f73ffe972bf3e1fb593e028bcbf",
         "type": "github"
       },
       "original": {
         "owner": "tweag",
         "repo": "opam-nix",
+        "type": "github"
+      }
+    },
+    "opam-overlays": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1654162756,
+        "narHash": "sha256-RV68fUK+O3zTx61iiHIoS0LvIk0E4voMp+0SwRg6G6c=",
+        "owner": "dune-universe",
+        "repo": "opam-overlays",
+        "rev": "c8f6ef0fc5272f254df4a971a47de7848cc1c8a4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dune-universe",
+        "repo": "opam-overlays",
         "type": "github"
       }
     },
@@ -306,7 +324,10 @@
     },
     "opam2json": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": [
+          "opam-nix",
+          "nixpkgs"
+        ]
       },
       "locked": {
         "lastModified": 1651529032,

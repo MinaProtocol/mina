@@ -600,16 +600,26 @@ module Types = struct
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
          excess and increase in supply " ~fields:(fun _ ->
-        [ field "sourceLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the source ledger"
+        [ field "sourceFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source first pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              source.ledger )
-        ; field "targetLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the target ledger"
+              source.first_pass_ledger )
+        ; field "targetFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target first pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              target.ledger )
+              target.first_pass_ledger )
+        ; field "sourceSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source second pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
+              source.second_pass_ledger )
+        ; field "targetSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target second pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
+              target.second_pass_ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \

@@ -6177,8 +6177,9 @@
             "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
-              "name": "sourceLedgerHash",
-              "description": "Base58Check-encoded hash of the source ledger",
+              "name": "sourceFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source first pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6193,8 +6194,43 @@
               "deprecationReason": null
             },
             {
-              "name": "targetLedgerHash",
-              "description": "Base58Check-encoded hash of the target ledger",
+              "name": "targetFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target first pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourceSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source second pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target second pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

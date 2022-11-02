@@ -34,7 +34,7 @@ Poly.
   , to_hlist
   , of_hlist )]
 
-let snarked_ledger_hash (t : _ Poly.t) = t.registers.ledger
+let snarked_ledger_hash (t : _ Poly.t) = t.registers.second_pass_ledger
 
 module Value = struct
   [%%versioned
@@ -75,7 +75,12 @@ let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable
     [ Staged_ledger_hash.typ
     ; Frozen_ledger_hash.typ
-    ; Registers.typ [ Frozen_ledger_hash.typ; Typ.unit; Local_state.typ ]
+    ; Registers.typ
+        [ Frozen_ledger_hash.typ
+        ; Frozen_ledger_hash.typ
+        ; Typ.unit
+        ; Local_state.typ
+        ]
     ; Block_time.Checked.typ
     ; Consensus.Body_reference.typ
     ]
@@ -98,9 +103,16 @@ let var_to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger; pending_coinbase_stack = (); local_state } = registers in
+    let { first_pass_ledger
+        ; second_pass_ledger
+        ; pending_coinbase_stack = ()
+        ; local_state
+        } =
+      registers
+    in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.var_to_input ledger
+      [| Frozen_ledger_hash.var_to_input first_pass_ledger
+       ; Frozen_ledger_hash.var_to_input second_pass_ledger
        ; Local_state.Checked.to_input local_state
       |]
   in
@@ -126,9 +138,18 @@ let to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger; pending_coinbase_stack = (); local_state } = registers in
+    let { first_pass_ledger
+        ; second_pass_ledger
+        ; pending_coinbase_stack = ()
+        ; local_state
+        } =
+      registers
+    in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.to_input ledger; Local_state.to_input local_state |]
+      [| Frozen_ledger_hash.to_input first_pass_ledger
+       ; Frozen_ledger_hash.to_input second_pass_ledger
+       ; Local_state.to_input local_state
+      |]
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
@@ -148,7 +169,8 @@ let negative_one
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
   ; registers =
-      { ledger = genesis_ledger_hash
+      { first_pass_ledger = genesis_ledger_hash
+      ; second_pass_ledger = genesis_ledger_hash
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.dummy ()
       }
@@ -165,7 +187,12 @@ type display = (string, string, Local_state.display, string, string) Poly.t
 let display
     ({ staged_ledger_hash
      ; genesis_ledger_hash
-     ; registers = { ledger; pending_coinbase_stack = (); local_state }
+     ; registers =
+         { first_pass_ledger
+         ; second_pass_ledger
+         ; pending_coinbase_stack = ()
+         ; local_state
+         }
      ; timestamp
      ; body_reference
      } :
@@ -177,9 +204,12 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; registers =
-      { ledger =
+      { first_pass_ledger =
           Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check ledger
+          @@ Frozen_ledger_hash.to_base58_check first_pass_ledger
+      ; second_pass_ledger =
+          Visualization.display_prefix_of_string
+          @@ Frozen_ledger_hash.to_base58_check second_pass_ledger
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.display local_state
       }

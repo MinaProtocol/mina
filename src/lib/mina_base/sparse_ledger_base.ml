@@ -32,8 +32,10 @@ end
 
 module Global_state = struct
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
+    ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     }
   [@@deriving sexp, to_yojson]
@@ -63,7 +65,13 @@ module L = struct
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
-   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
+   fun t id ->
+    try
+      let loc = M.find_index_exn !t id in
+      let account = M.get_exn !t loc in
+      if Public_key.Compressed.(equal empty account.public_key) then None
+      else Some loc
+    with _ -> None
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a

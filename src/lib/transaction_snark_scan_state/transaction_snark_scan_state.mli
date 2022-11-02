@@ -20,7 +20,8 @@ module Transaction_with_witness : sig
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     }
   [@@deriving sexp]
 end

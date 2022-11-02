@@ -19,6 +19,8 @@ module Failure = struct
         | Overflow
         | Global_excess_overflow
         | Local_excess_overflow
+        | Local_supply_increase_overflow
+        | Global_supply_increase_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -46,6 +48,10 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Incorrect_verification_key of
+            [ `Expected_verification_key of
+              Side_loaded_verification_key.Stable.V2.t ]
+        | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -77,7 +83,7 @@ module Failure = struct
 
     let to_display t : Display.t =
       let _, display =
-        List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
+        List.fold_left t ~init:(0, []) ~f:(fun (index, acc) bucket ->
             if List.is_empty bucket then (index + 1, acc)
             else (index + 1, (index, bucket) :: acc) )
       in
@@ -103,7 +109,8 @@ module Failure = struct
       ~cannot_pay_creation_fee_in_token:add ~source_insufficient_balance:add
       ~source_minimum_balance_violation:add ~receiver_already_exists:add
       ~token_owner_not_caller:add ~overflow:add ~global_excess_overflow:add
-      ~local_excess_overflow:add ~signed_command_on_zkapp_account:add
+      ~local_excess_overflow:add ~local_supply_increase_overflow:add
+      ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
       ~zkapp_account_not_present:add ~update_not_permitted_balance:add
       ~update_not_permitted_timing_existing_account:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
@@ -125,6 +132,11 @@ module Failure = struct
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
+      ~incorrect_verification_key:(fun acc var ->
+        var.constructor
+          (`Expected_verification_key Side_loaded_verification_key.dummy)
+        :: acc )
+      ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -153,6 +165,10 @@ module Failure = struct
         "Global_excess_overflow"
     | Local_excess_overflow ->
         "Local_excess_overflow"
+    | Local_supply_increase_overflow ->
+        "Local_supply_increase_overflow"
+    | Global_supply_increase_overflow ->
+        "Global_supply_increase_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -207,6 +223,11 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Incorrect_verification_key (`Expected_verification_key expected_key) ->
+        sprintf "Incorrect_verification_key_%s"
+          (Side_loaded_verification_key.to_base64 expected_key)
+    | Cancelled ->
+        "Cancelled"
 
   let of_string = function
     | "Predicate" ->
@@ -233,6 +254,10 @@ module Failure = struct
         Ok Global_excess_overflow
     | "Local_excess_overflow" ->
         Ok Local_excess_overflow
+    | "Local_supply_increase_overflow" ->
+        Ok Local_supply_increase_overflow
+    | "Global_supply_increase_overflow" ->
+        Ok Global_supply_increase_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -285,6 +310,8 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
+    | "Cancelled" ->
+        Ok Cancelled
     | str -> (
         let res =
           List.find_map
@@ -308,6 +335,13 @@ module Failure = struct
               , fun str ->
                   Account_app_state_precondition_unsatisfied (int_of_string str)
               )
+            ; ( "Incorrect_verification_key_"
+              , ""
+              , fun str ->
+                  let vk =
+                    Or_error.ok_exn (Side_loaded_verification_key.of_base64 str)
+                  in
+                  Incorrect_verification_key (`Expected_verification_key vk) )
             ]
         in
         match res with
@@ -350,6 +384,10 @@ module Failure = struct
         "The resulting global fee excess is too large to store"
     | Local_excess_overflow ->
         "The resulting local fee excess is too large to store"
+    | Local_supply_increase_overflow ->
+        "The resulting local supply increase is too large to store"
+    | Global_supply_increase_overflow ->
+        "The resulting global supply increase is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
@@ -421,6 +459,14 @@ module Failure = struct
     | Invalid_fee_excess ->
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
+    | Incorrect_verification_key (`Expected_verification_key vk) ->
+        sprintf
+          "The party's account verification key did not match the verification \
+           key that the party's authorization proof was valid against (%s)"
+          (Side_loaded_verification_key.to_base64 vk)
+    | Cancelled ->
+        "The account update is cancelled because there's a failure in the \
+         zkApp transaction"
 end
 
 [%%versioned

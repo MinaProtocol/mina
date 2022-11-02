@@ -124,7 +124,7 @@ let trivial_zkapp =
 let check_zkapp_command_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
-  (*TODO: merge multiple snapp transactions*)
+  (*TODO: merge multiple zkApp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
@@ -201,7 +201,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure
                       in
                       let p = Or_error.ok_exn p in
                       let target_ledger_root_snark =
-                        (Transaction_snark.statement p).target.ledger
+                        (Transaction_snark.statement p).target
+                          .second_pass_ledger
                       in
                       let target_ledger_root = Ledger.merkle_root ledger in
                       [%test_eq: Ledger_hash.t] target_ledger_root
@@ -433,7 +434,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     | Command (Zkapp_command x) ->
         `Zkapp_command x
   in
-  let source = Ledger.merkle_root ledger in
+  let source_first_pass_ledger = Ledger.merkle_root ledger in
   let pending_coinbase_stack = Pending_coinbase.Stack.empty in
   let txn_unchecked = Transaction.forget txn in
   let state_body, state_body_hash =
@@ -536,7 +537,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                (Error.to_string_hum e) ) ;
         (true, None)
   in
-  let target = Ledger.merkle_root ledger in
+  let target_first_pass_ledger = Ledger.merkle_root ledger in
+  let source_second_pass_ledger, target_second_pass_ledger = failwith "TODO" in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
@@ -546,7 +548,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
-          ~source ~target ~init_stack:pending_coinbase_stack
+          ~source_first_pass_ledger ~target_first_pass_ledger
+          ~source_second_pass_ledger ~target_second_pass_ledger
+          ~init_stack:pending_coinbase_stack
           ~pending_coinbase_stack_state:
             { Transaction_snark.Pending_coinbase_stack_state.source =
                 pending_coinbase_stack

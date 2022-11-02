@@ -10,7 +10,8 @@ module Zkapp_command_segment_witness = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { global_ledger : Sparse_ledger.Stable.V2.t
+        { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
+        ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V1.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
