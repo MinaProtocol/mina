@@ -76,8 +76,8 @@ echo "ran batch zkapps";
               value: /gcloud/keyfile.json
             - name: MINA_LIBP2P_PASS
               value: "blubber"
-            image: gcr.io/o1labs-192920/batch_zkapp_txn_tool:1d63942-berkeley-rampup
-            imagePullPolicy: IfNotPresent
+            image: gcr.io/o1labs-192920/batch_zkapp_txn_tool:0390d62-berkeley-rampup
+            imagePullPolicy: Always
             name: zkapp-burst-cronjob-size20-4
             resources:
               limits:

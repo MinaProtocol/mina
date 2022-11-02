@@ -13,8 +13,8 @@ RUN sudo apt-get -y update && sudo apt-get -y install man
 RUN sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
 RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) unstable" | sudo tee /etc/apt/sources.list.d/mina.list \
   && sudo apt-get update\
-  && sudo apt-get install -y --allow-downgrades mina-berkeley=1.3.2beta2-fix-batch-zkapp-txn-ci-1d63942\
-  && sudo apt-get install -y --allow-downgrades mina-batch-zkapp-test-txns=1.3.2beta2-fix-batch-zkapp-txn-ci-1d63942
+  && sudo apt-get install -y --allow-downgrades mina-berkeley=1.3.2beta2-fix-batch-zkapp-txn-ci-0390d62\
+  && sudo apt-get install -y --allow-downgrades mina-batch-zkapp-test-txns=1.3.2beta2-fix-batch-zkapp-txn-ci-0390d62
 
 USER root
 
