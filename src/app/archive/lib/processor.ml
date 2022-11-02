@@ -1745,7 +1745,7 @@ module User_command = struct
       ; memo : string
       ; hash : string
       }
-    [@@deriving hlist, fields]
+    [@@deriving hlist, fields, show]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist

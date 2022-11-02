@@ -382,6 +382,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   match (oks, errs) with
   | [], errs ->
       (* no Oks *)
+     let () = Format.printf "Only errors @." in
       Error (List.concat errs)
   | [ partial ], _ ->
       (* exactly one Ok *)
