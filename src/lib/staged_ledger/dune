@@ -64,6 +64,7 @@
    pickles.backend
    zkapp_command_builder
    ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

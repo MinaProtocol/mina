@@ -1,14 +1,19 @@
 (library
  (name mina_base_unix)
  (public_name mina_base.unix)
+ (inline_tests)
  (libraries
    ;; opam libraries
    graphql-async
+   graphql
    yojson
-   result
+   ppx_inline_test.config
    core_kernel
+   sexplib0
+   result
    base
    ;; local libraries
+   pasta_bindings
    graphql_basic_scalars
    mina_base
    pickles
@@ -16,6 +21,6 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
  )
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
  (synopsis "Utils that depends on the unix library"))

@@ -36,6 +36,8 @@ module Stable : sig
   end
 
   module V1 : sig
+    [@@@with_all_version_tags]
+
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Token_id.Stable.V1.t
