@@ -201,7 +201,14 @@ https://www.rosetta-api.org/docs/models/Operation.html
 
 Checkout the "release/1.3.0" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production | docker build -t mina-rosetta-ubuntu:v1.3.0 --build-arg "MINA_BRANCH=release/1.3.0" -`
+```
+cat dockerfiles/stages/1-build-deps \
+    dockerfiles/stages/2-opam-deps \
+    dockerfiles/stages/3-builder \
+    dockerfiles/stages/4-production \
+    | docker build -t mina-rosetta-ubuntu:v1.3.0 \
+        --build-arg "MINA_BRANCH=release/1.3.0" -
+```
 
 This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu 20.04 and includes the most recent release of the mina daemon along with mina-archive and mina-rosetta.
 
@@ -219,7 +226,10 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta-ubuntu:v1.3.0
+docker run -it --rm --name rosetta \
+    --entrypoint=./docker-devnet-start.sh \
+    -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
 Note: It will take 20min-1hr for your node to sync
@@ -250,7 +260,13 @@ It might be convenient to set up the database inside a docker container anyway,
 for instance like so:
 
 ```shell
-$ docker run -d --name pg-mina-archive -p 5432:5432 -e POSTGRES_PASSWORD='*******' -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=mina_archive -e POSTGRES_USER=pguser postgres:14.5
+$ docker run -d --name pg-mina-archive \
+    -p 5432:5432 \
+    -e POSTGRES_PASSWORD='*******' \
+    -e POSTGRES_HOST_AUTH_METHOD=trust 
+    -e POSTGRES_DB=mina_archive \
+    -e POSTGRES_USER=pguser \
+    postgres:14.5
 ```
 
 The `POSTGRES_HOST_AUTH_METHOD=trust` instructs the database not to require
@@ -269,7 +285,10 @@ Once this is done, the Rosetta server can be launched with the following
 command:
 
 ```shell
-$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe --port 3087 --graphql-uri http://localhost:3085/graphql --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe \
+    --port 3087 \
+    --graphql-uri http://localhost:3085/graphql \
+    --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
 ```
 
 The `--graphql-uri` parameter gives address at which Rosetta can connect to
@@ -377,7 +396,11 @@ using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccf
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v16
+$ docker run -d --rm \
+    --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 \
+    --name mina-rosetta-test \
+    --entrypoint ./docker-test-start.sh \
+    minaprotocol/mina-rosetta:v16
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -385,7 +408,13 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta-ubuntu:v1.3.0
+$ docker run -d --rm \
+    --publish 3087:3087 \
+    --publish 3086:3086 \
+    --publish 3085:3085 \
+    --name mina-rosetta-demo \
+    --entrypoint ./docker-demo-start.sh \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 
 $ docker logs --follow mina-rosetta-demo
 
