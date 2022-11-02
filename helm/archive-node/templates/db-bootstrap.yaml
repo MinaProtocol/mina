@@ -10,7 +10,7 @@ spec:
       - name: import-schema
         image: gcr.io/o1labs-192920/postgresql-curl:latest
         command: ["bash", "-c"]
-        args: ["cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.auth.password }} psql --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
+        args: ["sleep 60 && cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.auth.password }} psql --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
       restartPolicy: Never
   backoffLimit: 10
 {{- end }}

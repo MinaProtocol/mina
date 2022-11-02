@@ -41,6 +41,8 @@ archive:
 postgresql:
   primary:
     name: "archive"
+    persistence:
+      enabled: false
     initdb:
       user: "mina"
       password: "boofar"

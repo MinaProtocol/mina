@@ -146,8 +146,8 @@ locals {
                   {
                     matchExpressions = [
                       {
-                        key = "cloud.google.com/gke-preemptible"
-                        operator = item["preemptibleAllowed"] ? "In" : "NotIn"
+                        key = "cloud.google.com/gke-spot"
+                        operator = "In"
                         values = ["true"]
                       }
                     ]
