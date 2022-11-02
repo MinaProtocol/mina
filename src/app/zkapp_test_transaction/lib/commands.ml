@@ -325,7 +325,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     }
   in
   let zkapp_command =
-    Transaction_snark.For_tests.deploy_snapp ~change_permissions:false
+    Transaction_snark.For_tests.deploy_snapp ~default_permissions:true
       ~constraint_constants spec
   in
   let%map () = if debug then gen_proof zkapp_command else return () in

@@ -52,4 +52,13 @@
    mina_base.util
    o1trace
    mina_net2
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend
+   sgn_type
+   sgn
+   currency
+   kimchi_backend.pasta
+   mina_wire_types
    ))

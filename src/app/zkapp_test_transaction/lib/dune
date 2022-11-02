@@ -48,6 +48,7 @@
    mina_base.import
    mina_transaction_logic
    staged_ledger_diff
+   mina_wire_types
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

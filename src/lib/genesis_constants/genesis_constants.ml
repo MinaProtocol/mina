@@ -237,6 +237,10 @@ module Protocol = struct
     module Stable = struct
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
+              ( 'length
+              , 'delta
+              , 'genesis_state_timestamp )
+              Mina_wire_types.Genesis_constants.Protocol.Poly.V1.t =
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length

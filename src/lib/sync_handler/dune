@@ -33,4 +33,5 @@
    truth
    proof_carrying_data
    mina_ledger
+   mina_wire_types
 ))

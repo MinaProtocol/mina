@@ -111,9 +111,12 @@ nix develop mina#with-lsp -c $EDITOR .
 if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
-This command will try to `dune build @check` in `src/app/cli`, in order to get
-type information necessary for the LSP to work. This might take a while, but
-will only happen once. After it's done, you will be dropped in your favourite editor.
+This will drop you in your favorite editor within a Nix sanbdbox containing an
+OCaml LSP server.
+
+However, for LSP to work its magic, you will need to have to make type
+informations available. They can for example be obtained by running `dune build
+@check` in `src/app/cli`, which might take a while, or by compiling the project.
 
 Don't forget to exit and re-enter the editor using this command after switching
 branches, or otherwise changing the dependency tree of Mina.
@@ -456,8 +459,8 @@ Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
 
 ```
-trusted-substituters = "https://storage.googleapis.com/mina-nix-cache"
-trusted-public-keys = "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+trusted-substituters = https://storage.googleapis.com/mina-nix-cache https://cache.nixos.org
+trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 ```
 
 And then reload your `nix-daemon` service.
