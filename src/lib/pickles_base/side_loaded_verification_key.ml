@@ -114,7 +114,7 @@ end
 
 (* TODO: remove since it looks very much like the Domains module in the same directory *)
 module Domains = struct
-  [@@@warning "-40"]
+  [@@@warning "-40-42"]
 
   [%%versioned
   module Stable = struct

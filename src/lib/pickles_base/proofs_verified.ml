@@ -61,7 +61,7 @@ module Prefix_mask = struct
     type 'f t = 'f boolean vec2
   end
 
-  let[@warning "-40"] there : proofs_verified -> bool vec2 = function
+  let[@warning "-40-42"] there : proofs_verified -> bool vec2 = function
     | N0 ->
         [ false; false ]
     | N1 ->
@@ -69,7 +69,7 @@ module Prefix_mask = struct
     | N2 ->
         [ true; true ]
 
-  let[@warning "-40"] back : bool vec2 -> proofs_verified = function
+  let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
         N0
     | [ true; false ] ->

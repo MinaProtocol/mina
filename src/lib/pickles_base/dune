@@ -4,12 +4,9 @@
  (public_name pickles_base)
  ; Deactivated warnings
  ;
- ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
- ; module openings may both solve the warning *and* help the reader)
- ;
  ; 44: open-shadow-identifier (the use of Core_kernel makes it ubiquitous)
  (flags
-  (:standard -w +a-42-44 -warn-error +a))
+  (:standard -w +a-44 -warn-error +a))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps h_list.ppx ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
