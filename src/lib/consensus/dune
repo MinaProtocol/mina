@@ -107,4 +107,5 @@
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
- (enabled_if false))
+ (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
+)
