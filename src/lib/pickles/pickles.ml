@@ -304,7 +304,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
-        type a1 a2 a3 a4 s1 s2_inner.
+        type a1 a2 a3 s1 s2_inner.
            (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
         -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
       | [] ->
@@ -369,18 +369,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
 
-      module Statement = struct
-        type t = Field.t
-
-        let to_field_elements x = [| x |]
-
-        module Constant = struct
-          type t = Field.Constant.t [@@deriving bin_io]
-
-          let to_field_elements x = [| x |]
-        end
-      end
-
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
         Impl.(
@@ -409,8 +397,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        module Statement = Statement
-
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
@@ -458,22 +444,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
-        let example_input, example_proof = example
+        let _example_input, _example_proof = example
       end
 
       module No_recursion_return = struct
-        module Statement = struct
-          type t = unit
-
-          let to_field_elements () = [||]
-
-          module Constant = struct
-            type t = unit [@@deriving bin_io]
-
-            let to_field_elements () = [||]
-          end
-        end
-
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
@@ -521,12 +495,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (res, b0) ] ) ) ;
           (res, b0)
 
-        let example_input, example_proof = example
+        let _example_input, _example_proof = example
       end
 
-      module Simple_chain = struct
-        module Statement = Statement
+      [@@@warning "-60"]
 
+      module Simple_chain = struct
         type _ Snarky_backendless.Request.t +=
           | Prev_input : Field.Constant.t Snarky_backendless.Request.t
           | Proof : (Nat.N1.n, Nat.N1.n) Proof.t Snarky_backendless.Request.t
@@ -541,7 +515,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -619,7 +593,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
-        let example_input, example_proof = example
+        let _example_input, _example_proof = example
       end
 
       module Tree_proof = struct
@@ -648,7 +622,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -740,9 +714,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let examples = [ example1; example2 ]
 
-        let example1_input, example_proof = example1
+        let _example1_input, _example_proof = example1
 
-        let example2_input, example2_proof = example2
+        let _example2_input, _example2_proof = example2
       end
 
       let%test_unit "verify" =
@@ -751,8 +725,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                Tree_proof.Proof.verify_promise Tree_proof.examples ) )
 
       module Tree_proof_return = struct
-        module Statement = No_recursion_return.Statement
-
         type _ Snarky_backendless.Request.t +=
           | Is_base_case : bool Snarky_backendless.Request.t
           | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
@@ -781,7 +753,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -880,9 +852,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let examples = [ example1; example2 ]
 
-        let example1_input, example1_proof = example1
+        let _example1_input, _example1_proof = example1
 
-        let example2_input, example2_proof = example2
+        let _example2_input, _example2_proof = example2
       end
 
       let%test_unit "verify" =
@@ -892,19 +864,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           )
 
       module Add_one_return = struct
-        module Statement = struct
-          type t = Field.t
-
-          let to_field_elements x = [| x |]
-
-          module Constant = struct
-            type t = Field.Constant.t [@@deriving bin_io]
-
-            let to_field_elements x = [| x |]
-          end
-        end
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
@@ -953,23 +913,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ ((input, res), b0) ] ) ) ;
           ((input, res), b0)
 
-        let example_input, example_proof = example
+        let _example_input, _example_proof = example
       end
 
       module Auxiliary_return = struct
-        module Statement = struct
-          type t = Field.t
-
-          let to_field_elements x = [| x |]
-
-          module Constant = struct
-            type t = Field.Constant.t [@@deriving bin_io]
-
-            let to_field_elements x = [| x |]
-          end
-        end
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
@@ -1035,7 +983,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ ((input, result), b0) ] ) ) ;
           ((input, result), b0)
 
-        let example_input, example_proof = example
+        let _example_input, _example_proof = example
       end
     end )
 
@@ -1104,7 +1052,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       module M = struct
         module IR = Inductive_rule.T (A) (A_value) (A) (A_value) (A) (A_value)
-        module HIR = H4.T (IR)
 
         let max_local_max_proofs_verifieds ~self (type n)
             (module Max_proofs_verified : Nat.Intf with type n = n) branches
@@ -1142,10 +1089,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let module V = H4.To_vector (Local_max_proofs_verifieds) in
           let padded = V.f branches (M.f choices) |> Vector.transpose in
           (padded, Maxes.m padded)
-
-        module Lazy_ (A : T0) = struct
-          type t = A.t Lazy.t
-        end
 
         module Lazy_keys = struct
           type t =
@@ -1273,7 +1216,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               typ main
           in
           let step_vks =
-            let module V = H4.To_vector (Lazy_keys) in
             lazy
               (Vector.map [ step_keypair ] ~f:(fun (_, vk) ->
                    Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
@@ -1282,7 +1224,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let module SC' = SC in
             let open Impls.Wrap in
             let open Wrap_main_inputs in
-            let open Wrap_main in
             let x =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
             in
@@ -1308,7 +1249,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
-            for i = 0 to 64000 do
+            for _i = 0 to 64000 do
               assert_r1cs x y z
             done
           in
@@ -1349,7 +1290,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let wrap_vk = Lazy.map wrap_vk ~f:fst in
           let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
           let prover =
-            let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
             let f :
                    ( unit * (unit * unit)
                    , unit * (unit * unit)
@@ -1361,12 +1301,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t
                    Promise.t =
              fun (T b as branch_data) (step_pk, step_vk) () ->
-              let (( module
-                    Req )
-                    : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t ) =
+              let (_ : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t) =
                 Requests.Wrap.create ()
               in
-              let (module Requests) = b.requests in
               let _, prev_vars_length = b.proofs_verified in
               let step =
                 let wrap_vk = Lazy.force wrap_vk in
@@ -1395,7 +1332,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 in
                 let%map.Promise proof =
-                  let module Pairing_acc = Tock.Inner_curve.Affine in
                   (* The prover for wrapping a proof *)
                   let wrap (type actual_branching)
                       ~(max_proofs_verified : Max_proofs_verified.n Nat.t)
@@ -1403,11 +1339,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         with type ns = Maxes.ns
                          and type length = Max_proofs_verified.n )
                       ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk
-                      ~step_domains ~wrap_domains ~pairing_plonk_indices pk
+                      ~step_domains:_ ~wrap_domains:_ ~pairing_plonk_indices:_
+                      pk
                       ({ statement = prev_statement
-                       ; prev_evals
+                       ; prev_evals = _
                        ; proof
-                       ; index = which_index
+                       ; index = _which_index
                        } :
                         ( _
                         , _
@@ -1905,13 +1842,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let step, wrap_vk, wrap_disk_key = M.compile
 
       module Proof = struct
-        type statement = A_value.t
-
         module Max_local_max_proofs_verified = Max_proofs_verified
-        module Max_proofs_verified_vec = Nvector (Max_proofs_verified)
         include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
 
-        let id = wrap_disk_key
+        let _id = wrap_disk_key
 
         let verification_key = wrap_vk
 
@@ -1922,7 +1856,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Lazy.force verification_key)
             ts
 
-        let statement (T p : t) =
+        let _statement (T p : t) =
           p.statement.messages_for_next_step_proof.app_state
       end
 
@@ -1938,7 +1872,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Recurse_on_bad_proof = struct
         open Impls.Step
 
-        let dummy_proof =
+        let _dummy_proof =
           Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
 
         type _ Snarky_backendless.Request.t +=
@@ -1952,7 +1886,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
@@ -2085,18 +2019,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     ( module struct
       open Impls.Step
 
-      module Statement = struct
-        type t = Field.t
-
-        let to_field_elements x = [| x |]
-
-        module Constant = struct
-          type t = Field.Constant.t [@@deriving bin_io]
-
-          let to_field_elements x = [| x |]
-        end
-      end
-
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
         Impl.(
@@ -2125,9 +2047,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2178,9 +2098,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2231,9 +2149,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2283,9 +2199,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let example_input, example_proof = example
       end
 
-      module Simple_chain = struct
-        module Statement = Statement
+      [@@@warning "-60"]
 
+      module Simple_chain = struct
         type _ Snarky_backendless.Request.t +=
           | Prev_input : Field.Constant.t Snarky_backendless.Request.t
           | Proof : Side_loaded.Proof.t Snarky_backendless.Request.t
@@ -2310,7 +2226,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
-        let _tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
