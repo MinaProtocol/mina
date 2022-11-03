@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc && cp src/client_sdk.min.js dist/src/client_sdk.bc.js",
     "clean": "rm -rf dist",
+    "minify": "esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
     "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js && esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
     "make-jsoo": "make -C ../.. client_sdk && npm run copy-jsoo",
     "test": "for f in ./tests/*.test.ts; do jest $f || exit 1; done",
