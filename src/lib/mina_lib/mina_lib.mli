@@ -26,6 +26,10 @@ exception Snark_worker_signal_interrupt of Signal.t
 
 exception Offline_shutdown
 
+module Find_ip : sig
+  val find : logger:Logger.t -> Async_unix.Unix.Inet_addr.t Deferred.t
+end
+
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t

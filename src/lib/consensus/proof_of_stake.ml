@@ -673,6 +673,18 @@ module Make_str (A : Wire_types.Concrete) = struct
             `All_seen
         | nel ->
             `Unseen (Public_key.Compressed.Set.of_list nel)
+
+      module For_tests = struct
+        type nonrec snapshot_identifier = snapshot_identifier =
+          | Staking_epoch_snapshot
+          | Next_epoch_snapshot
+
+        (* don't want to expose this bit of imperative code, in general
+           OK for tests
+        *)
+        let set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit =
+          set_snapshot
+      end
     end
 
     module Epoch_ledger = struct

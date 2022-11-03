@@ -40,6 +40,8 @@ exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
 
+module Find_ip = Find_ip
+
 (* A way to run a single snark worker for a daemon in a lazy manner. Forcing
    this lazy value will run the snark worker process. A snark work is
    assigned to a public key. This public key can change throughout the entire time
@@ -2181,3 +2183,253 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let%test_module "Epoch ledger sync tests" =
+  ( module struct
+    let make_mina_network () =
+      let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
+        Broadcast_pipe.create None
+      in
+      let producer_transition_reader, _producer_transition_writer =
+        Strict_pipe.create Synchronous
+      in
+      let logger = Logger.null () in
+      let cwd = Caml.Sys.getcwd () in
+      let trust_system = Trust_system.create cwd in
+      let time_controller =
+        Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+      in
+      let%bind precomputed_values =
+        let runtime_config : Runtime_config.t =
+          { daemon = None
+          ; genesis = None
+          ; proof = None
+          ; ledger = None
+          ; epoch_data = None
+          }
+        in
+        match%map
+          Genesis_ledger_helper.init_from_config_file ~genesis_dir:cwd ~logger
+            ~proof_level:None runtime_config
+        with
+        | Ok (precomputed_values, _) ->
+            precomputed_values
+        | Error err ->
+            failwithf "Could not create precomputed values: %s"
+              (Error.to_string_hum err) ()
+      in
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants =
+        let genesis_constants = Genesis_constants.for_unit_tests in
+        Consensus.Constants.create ~constraint_constants
+          ~protocol_constants:genesis_constants.protocol
+      in
+      let module Context = struct
+        let logger = logger
+
+        let constraint_constants = constraint_constants
+
+        let consensus_constants = consensus_constants
+
+        let precomputed_values = precomputed_values
+      end in
+      let on_remote_push () = Deferred.unit in
+      let block_reader, block_sink =
+        let on_push () = Deferred.unit in
+        Transition_handler.Block_sink.create
+          { logger
+          ; slot_duration_ms =
+              precomputed_values.consensus_constants.slot_duration_ms
+          ; on_push
+          ; log_gossip_heard = false
+          ; time_controller
+          ; consensus_constants
+          ; genesis_constants = precomputed_values.genesis_constants
+          }
+      in
+      let pids = Child_processes.Termination.create_pid_table () in
+      let%bind verifier =
+        Verifier.create ~logger ~proof_level:precomputed_values.proof_level
+          ~constraint_constants:precomputed_values.constraint_constants ~pids
+          ~conf_dir:None
+      in
+      let _transaction_pool, tx_remote_sink, _tx_local_sink =
+        let config =
+          Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
+            ~trust_system
+            ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
+            ~genesis_constants:precomputed_values.genesis_constants
+        in
+        Network_pool.Transaction_pool.create ~config ~constraint_constants
+          ~consensus_constants ~time_controller ~logger
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          ~expiry_ns:
+            (Time_ns.Span.of_hr
+               (Float.of_int
+                  precomputed_values.genesis_constants.transaction_expiry_hr ) )
+          ~on_remote_push ~log_gossip_heard:false
+      in
+
+      let%bind _snark_pool, snark_remote_sink, _snark_local_sink =
+        let config =
+          Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+            ~trust_system ~disk_location:"snark_pool_config"
+        in
+        Network_pool.Snark_pool.load ~config ~constraint_constants
+          ~consensus_constants ~time_controller ~logger
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          ~expiry_ns:
+            (Time_ns.Span.of_hr
+               (Float.of_int
+                  precomputed_values.genesis_constants.transaction_expiry_hr ) )
+          ~on_remote_push ~log_gossip_heard:false
+      in
+      let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
+      let genesis_ledger = lazy (Mina_ledger.Ledger.create ~depth:10 ()) in
+      let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
+      let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
+      let consensus_local_state =
+        Consensus.Data.Local_state.create
+          ~context:(module Context)
+          ~genesis_ledger ~genesis_epoch_data ~epoch_ledger_location:cwd
+          ~genesis_state_hash
+          (Signature_lib.Public_key.Compressed.Set.of_list [])
+      in
+      ignore
+        ( Consensus.Data.Local_state.For_tests.set_snapshot
+            consensus_local_state Staking_epoch_snapshot
+          : _ ) ;
+      let genesis_ledger_hash = Ledger_hash.empty_hash in
+      let is_seed = false in
+      let%bind creatable_gossip_net =
+        let chain_id = "dummy" in
+        let conf_dir = cwd in
+        let seed_peer_list_url = None in
+        let initial_peers = [] in
+        let%map addrs_and_ports =
+          let%map external_ip = Find_ip.find ~logger in
+          let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
+          let client_port = Cli_lib.Flag.Port.default_client in
+          let libp2p_port = Cli_lib.Flag.Port.default_libp2p in
+          ( { external_ip; bind_ip; peer = None; client_port; libp2p_port }
+            : Node_addrs_and_ports.t )
+        in
+        let libp2p_keypair =
+          Mina_net2.Keypair.of_string
+            "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
+          |> Or_error.ok_exn
+        in
+        let pubsub_v1 =
+          (* TODO after introducing Bitswap-based block retrieval,
+             use definition in Mina_cli_entrypoint
+          *)
+          Gossip_net.Libp2p.N
+        in
+        let pubsub_v0 = Cli_lib.Default.pubsub_v0 in
+        let gossip_net_params : Gossip_net.Libp2p.Config.t =
+          { timeout = Time.Span.of_sec 3.
+          ; logger
+          ; conf_dir
+          ; chain_id
+          ; unsafe_no_trust_ip = false
+          ; seed_peer_list_url
+          ; initial_peers
+          ; addrs_and_ports
+          ; metrics_port = None
+          ; trust_system
+          ; flooding = false
+          ; direct_peers = []
+          ; peer_protection_ratio = 0.2
+          ; peer_exchange = false
+          ; min_connections = Cli_lib.Default.min_connections
+          ; max_connections = Cli_lib.Default.max_connections
+          ; validation_queue_size = Cli_lib.Default.validation_queue_size
+          ; isolate = false
+          ; keypair = libp2p_keypair
+          ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
+          ; time_controller
+          ; pubsub_v1
+          ; pubsub_v0
+          }
+        in
+        Mina_networking.Gossip_net.(
+          Any.Creatable ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+      in
+      let log_gossip_heard : Mina_networking.Config.log_gossip_heard =
+        { snark_pool_diff = false
+        ; transaction_pool_diff = false
+        ; new_state = false
+        }
+      in
+      let config : Mina_networking.Config.t =
+        { logger
+        ; trust_system
+        ; time_controller
+        ; consensus_constants
+        ; consensus_local_state
+        ; genesis_ledger_hash
+        ; constraint_constants
+        ; precomputed_values
+        ; creatable_gossip_net
+        ; is_seed
+        ; log_gossip_heard
+        }
+      in
+      let answer_sync_ledger_query query_env =
+        let ledger_hash, _ = Envelope.Incoming.data query_env in
+        let frontier =
+          match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+          | Some tf ->
+              tf
+          | None ->
+              failwith "Could not get transition frontier"
+        in
+        Sync_handler.answer_query ~frontier ledger_hash
+          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+          ~logger ~trust_system
+        |> Deferred.map
+             ~f:
+               (Result.of_option
+                  ~error:
+                    (Error.createf
+                       !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                       Mina_networking.refused_answer_query_string ledger_hash ) )
+      in
+      let unimplemented _ = failwith "RPC unimplemented" in
+      let%bind (mina_networking : Mina_networking.t) =
+        Mina_networking.create config ~sinks ~answer_sync_ledger_query
+          ~get_some_initial_peers:unimplemented
+          ~get_staged_ledger_aux_and_pending_coinbases_at_hash:unimplemented
+          ~get_ancestry:unimplemented ~get_best_tip:unimplemented
+          ~get_node_status:unimplemented
+          ~get_transition_chain_proof:unimplemented
+          ~get_transition_chain:unimplemented
+          ~get_transition_knowledge:unimplemented
+      in
+      (* create transition frontier *)
+      let _valid_transitions, _initialization_finish_signal =
+        let notify_online () = Deferred.unit in
+        let most_recent_valid_block =
+          Broadcast_pipe.create
+            ( Mina_block.genesis ~precomputed_values
+            |> Validation.reset_frontier_dependencies_validation
+            |> Validation.reset_staged_ledger_diff_validation )
+        in
+        Transition_router.run
+          ~context:(module Context)
+          ~trust_system:config.trust_system ~verifier ~network:mina_networking
+          ~is_seed:config.is_seed ~is_demo_mode:false
+          ~time_controller:config.time_controller
+          ~consensus_local_state:config.consensus_local_state
+          ~persistent_root_location:"persistent_root_location"
+          ~persistent_frontier_location:"persistent_frontier_location"
+          ~frontier_broadcast_pipe:
+            (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+          ~catchup_mode:`Normal ~network_transition_reader:block_reader
+          ~producer_transition_reader ~most_recent_valid_block ~notify_online
+      in
+      Deferred.unit
+
+    let (_ : _) = Async.Thread_safe.block_on_async_exn (fun () -> return ())
+  end )

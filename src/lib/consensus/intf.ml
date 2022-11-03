@@ -291,6 +291,8 @@ module type S = sig
   module Data : sig
     module Local_state : sig
       module Snapshot : sig
+        type t
+
         module Ledger_snapshot : sig
           type t =
             | Genesis_epoch_ledger of Mina_ledger.Ledger.t
@@ -339,6 +341,17 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
         -> unit
+
+      module For_tests : sig
+        type snapshot_identifier =
+          | Staking_epoch_snapshot
+          | Next_epoch_snapshot
+
+        (* set epoch ledgers in local state for testing
+           relies on persnickety imperative code that should not be exposed more generally
+        *)
+        val set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit
+      end
     end
 
     module Vrf : sig

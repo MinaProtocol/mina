@@ -14,12 +14,15 @@
    incremental
    core_kernel
    async_kernel
+   cohttp
+   cohttp-async
    base.caml
    base.base_internalhash_types
    uri
    stdio
    result
    bin_prot.shape
+   ppx_inline_test.config
    ;; local libraries
    transition_chain_prover
    best_tip_prover
@@ -103,4 +106,4 @@
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
- (synopsis "Coda gut layer"))
+ (synopsis "Mina gut layer"))
