@@ -546,6 +546,8 @@ module T = struct
     let target_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
+    let connecting_ledger_left = failwith "TODO" in
+    let connecting_ledger_right = failwith "TODO" in
     ( applied_txn
     , { Transaction_snark.Statement.source =
           { first_pass_ledger = source_merkle_root
@@ -559,6 +561,8 @@ module T = struct
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
+      ; connecting_ledger_left
+      ; connecting_ledger_right
       ; fee_excess
       ; supply_increase
       ; sok_digest = ()

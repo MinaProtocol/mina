@@ -538,7 +538,6 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
         (true, None)
   in
   let target_first_pass_ledger = Ledger.merkle_root ledger in
-  let source_second_pass_ledger, target_second_pass_ledger = failwith "TODO" in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
@@ -549,14 +548,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
           ~source_first_pass_ledger ~target_first_pass_ledger
-          ~source_second_pass_ledger ~target_second_pass_ledger
           ~init_stack:pending_coinbase_stack
           ~pending_coinbase_stack_state:
             { Transaction_snark.Pending_coinbase_stack_state.source =
                 pending_coinbase_stack
             ; target = pending_coinbase_stack_target
             }
-          ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+          ~supply_increase
           { transaction = txn; block_data = state_body }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with

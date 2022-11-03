@@ -389,14 +389,16 @@ let%test_module "account timing check" =
         |> Or_error.ok_exn
       in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
-        ~source:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
-        ~target:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
+        ~source_first_pass_ledger:
+          (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
+        ~target_first_pass_ledger:
+          (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
         ~init_stack:Pending_coinbase.Stack.empty
         ~pending_coinbase_stack_state:
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+        ~supply_increase
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         }

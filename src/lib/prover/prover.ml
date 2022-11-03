@@ -77,8 +77,12 @@ module Worker_state = struct
           }
         in
         let chain_state = Blockchain_snark.Blockchain.state chain in
+        let connecting_ledger_left = failwith "TODO" in
+        let connecting_ledger_right = failwith "TODO" in
         ( { source = reg chain_state
           ; target = reg next_state
+          ; connecting_ledger_left
+          ; connecting_ledger_right
           ; supply_increase = Currency.Amount.Signed.zero
           ; fee_excess = Fee_excess.zero
           ; sok_digest = Sok_message.Digest.default

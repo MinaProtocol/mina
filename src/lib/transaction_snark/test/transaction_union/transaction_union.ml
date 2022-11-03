@@ -136,12 +136,13 @@ let%test_module "Transaction union tests" =
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty )
-            ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target_first_pass_ledger:
+              (Sparse_ledger.merkle_root sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~zkapp_account1:None ~zkapp_account2:None ~supply_increase )
+            ~supply_increase )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -174,7 +175,7 @@ let%test_module "Transaction union tests" =
                 Mina_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let target =
+              let target_first_pass_ledger =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
@@ -208,10 +209,10 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
+              Transaction_snark.check_signed_command ~constraint_constants
                 ~sok_message
-                ~source:(Ledger.merkle_root ledger)
-                ~target ~init_stack:pending_coinbase_stack
+                ~source_first_pass_ledger:(Ledger.merkle_root ledger)
+                ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
                 { transaction = t1; block_data = state_body }

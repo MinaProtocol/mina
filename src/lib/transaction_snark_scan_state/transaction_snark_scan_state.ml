@@ -211,6 +211,8 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
   in
   let target_parties_merkle_root = failwith "TODO" in
+  let connecting_ledger_left = failwith "TODO" in
+  let connecting_ledger_right = failwith "TODO" in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -247,6 +249,8 @@ let create_expected_statement ~constraint_constants
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       }
+  ; connecting_ledger_left
+  ; connecting_ledger_right
   ; fee_excess
   ; supply_increase
   ; sok_digest = ()
@@ -282,9 +286,13 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
       in
+      let connecting_ledger_left = failwith "TODO merge rules" in
+      let connecting_ledger_right = failwith "TODO merge rules" in
       let statement : Transaction_snark.Statement.t =
         { source = s.source
         ; target = s'.target
+        ; connecting_ledger_left
+        ; connecting_ledger_right
         ; supply_increase
         ; fee_excess
         ; sok_digest = ()
@@ -586,10 +594,16 @@ struct
         { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
         ; source
         ; target
+        ; connecting_ledger_left = _
+        ; connecting_ledger_right = _
         ; supply_increase = _
         ; sok_digest = ()
         } ->
         let open Or_error.Let_syntax in
+        let _connecting_ledger_left = failwith "TODO check connecting ledger" in
+        let _connecting_ledger_right =
+          failwith "TODO check connecting ledger"
+        in
         let%map () =
           Option.value_map ~default:(Ok ()) registers_begin
             ~f:(fun registers_begin -> check_registers registers_begin source)

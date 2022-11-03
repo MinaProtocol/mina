@@ -204,22 +204,25 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
             coinbase_stack_source
         in
         let tm0 = Core.Unix.gettimeofday () in
+        let target_hash = Sparse_ledger.merkle_root sparse_ledger' in
         let%map proof =
           T.of_non_zkapp_command_transaction
             ~statement:
               { sok_digest = Sok_message.Digest.default
               ; source =
                   { first_pass_ledger = Sparse_ledger.merkle_root sparse_ledger
-                  ; second_pass_ledger = failwith "TODO"
+                  ; second_pass_ledger = target_hash
                   ; pending_coinbase_stack = coinbase_stack_source
                   ; local_state = Mina_state.Local_state.empty ()
                   }
               ; target =
-                  { first_pass_ledger = Sparse_ledger.merkle_root sparse_ledger'
-                  ; second_pass_ledger = failwith "TODO"
+                  { first_pass_ledger = target_hash
+                  ; second_pass_ledger = target_hash
                   ; pending_coinbase_stack = coinbase_stack_target
                   ; local_state = Mina_state.Local_state.empty ()
                   }
+              ; connecting_ledger_left = target_hash
+              ; connecting_ledger_right = target_hash
               ; supply_increase =
                   (let magnitude =
                      Transaction.expected_supply_increase t |> Or_error.ok_exn
@@ -345,14 +348,12 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                 (Sparse_ledger.merkle_root sparse_ledger)
               ~target_first_pass_ledger:
                 (Sparse_ledger.merkle_root sparse_ledger')
-              ~source_second_pass_ledger:(failwith "TODO")
-              ~target_second_pass_ledger:(failwith "TODO")
               ~init_stack:Pending_coinbase.Stack.empty
               ~pending_coinbase_stack_state:
                 { source = Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+              ~supply_increase
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
@@ -395,15 +396,13 @@ let generate_base_snarks_witness sparse_ledger0
                 (Sparse_ledger.merkle_root sparse_ledger)
               ~target_first_pass_ledger:
                 (Sparse_ledger.merkle_root sparse_ledger')
-              ~source_second_pass_ledger:(failwith "TODO")
-              ~target_second_pass_ledger:(failwith "TODO")
               ~init_stack:Pending_coinbase.Stack.empty
               ~pending_coinbase_stack_state:
                 { Transaction_snark.Pending_coinbase_stack_state.source =
                     Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+              ~supply_increase
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
               }

@@ -85,6 +85,8 @@ module Statement : sig
               , 'pending_coinbase
               , 'local_state )
               Registers.Stable.V1.t
+          ; connecting_ledger_left : 'ledger_hash
+          ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
           ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
@@ -101,6 +103,8 @@ module Statement : sig
       -> target_first_pass_ledger:'ledger_hash
       -> source_second_pass_ledger:'ledger_hash
       -> target_second_pass_ledger:'ledger_hash
+      -> connecting_ledger_left:'ledger_hash
+      -> connecting_ledger_right:'ledger_hash
       -> pending_coinbase_stack_state:
            'pending_coinbase Pending_coinbase_stack_state.poly
       -> ( 'ledger_hash
@@ -128,6 +132,8 @@ module Statement : sig
         Poly.t =
     { source : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
     ; target : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
+    ; connecting_ledger_left : 'ledger_hash
+    ; connecting_ledger_right : 'ledger_hash
     ; supply_increase : 'amount
     ; fee_excess : 'fee_excess
     ; sok_digest : 'sok_digest
@@ -252,24 +258,18 @@ val check_transaction :
   -> sok_message:Sok_message.t
   -> source_first_pass_ledger:Frozen_ledger_hash.t
   -> target_first_pass_ledger:Frozen_ledger_hash.t
-  -> source_second_pass_ledger:Frozen_ledger_hash.t
-  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> zkapp_account1:Zkapp_account.t option
-  -> zkapp_account2:Zkapp_account.t option
   -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
-val check_user_command :
+val check_signed_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source_first_pass_ledger:Frozen_ledger_hash.t
   -> target_first_pass_ledger:Frozen_ledger_hash.t
-  -> source_second_pass_ledger:Frozen_ledger_hash.t
-  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> supply_increase:Amount.Signed.t
@@ -283,12 +283,8 @@ val generate_transaction_witness :
   -> sok_message:Sok_message.t
   -> source_first_pass_ledger:Frozen_ledger_hash.t
   -> target_first_pass_ledger:Frozen_ledger_hash.t
-  -> source_second_pass_ledger:Frozen_ledger_hash.t
-  -> target_second_pass_ledger:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> zkapp_account1:Zkapp_account.t option
-  -> zkapp_account2:Zkapp_account.t option
   -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
