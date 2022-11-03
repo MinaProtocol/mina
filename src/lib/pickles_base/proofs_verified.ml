@@ -1,14 +1,18 @@
 open Core_kernel
 
+[@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
-    [@@deriving sexp, sexp, compare, yojson, hash, equal]
+    [@@deriving sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id
   end
 end]
+
+[@@@warning "+4"]
 
 let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 
@@ -44,7 +48,7 @@ let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
       N1
   | S (S Z) ->
       N2
-  | _ ->
+  | S _ ->
       failwithf "Proofs_verified.of_nat: got %d" (Pickles_types.Nat.to_int n) ()
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t

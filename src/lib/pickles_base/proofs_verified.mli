@@ -1,7 +1,7 @@
 module Stable : sig
   module V1 : sig
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
-    [@@deriving sexp, sexp, compare, yojson, hash, equal]
+    [@@deriving sexp, compare, yojson, hash, equal]
 
     include Pickles_types.Sigs.Binable.S with type t := t
 
@@ -10,7 +10,7 @@ module Stable : sig
 end
 
 type t = Stable.V1.t = N0 | N1 | N2
-[@@deriving sexp, sexp, compare, yojson, hash, equal]
+[@@deriving sexp, compare, yojson, hash, equal]
 
 val of_nat : 'n Pickles_types.Nat.t -> t
 
