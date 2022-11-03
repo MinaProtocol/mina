@@ -1,5 +1,7 @@
 open Core_kernel
 
+[@@@warning "-4"]
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -7,6 +9,8 @@ module Stable = struct
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
+
+[@@@warning "+4"]
 
 let finite_exn = function
   | Finite x ->

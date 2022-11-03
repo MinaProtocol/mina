@@ -13,6 +13,7 @@
    base.caml
    ;; local libraries
    mina_net2
+   mina_stdlib
    inline_test_quiet_logs
    logger
    child_processes

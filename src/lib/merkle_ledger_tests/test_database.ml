@@ -425,7 +425,8 @@ let%test_module "test functor on in memory databases" =
                 List.map ~f:snd
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
-              assert (List.length accounts = List.length retrieved_accounts) ;
+              assert (
+                Stdlib.List.compare_lengths accounts retrieved_accounts = 0 ) ;
               assert (List.equal Account.equal accounts retrieved_accounts) )
 
       let%test_unit "removing accounts restores Merkle root" =

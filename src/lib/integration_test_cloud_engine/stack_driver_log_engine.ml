@@ -302,10 +302,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
+    ( match log_entries with
+    | [] ->
+        [%log spam] "No logs were pulled"
+    | log_entries ->
+        [%log spam] "Parsing events from $n logs"
+          ~metadata:[ ("n", `Int (List.length log_entries)) ] ) ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           ( match log_entry |> parse_event_from_log_entry ~logger ~network with
