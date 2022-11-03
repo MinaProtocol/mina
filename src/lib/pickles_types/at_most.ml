@@ -33,7 +33,7 @@ let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
       []
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
-  | _ ->
+  | _ :: _, Z ->
       failwith "At_most: Length mismatch"
 
 module type S = sig
