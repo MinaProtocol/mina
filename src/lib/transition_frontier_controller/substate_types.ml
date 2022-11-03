@@ -8,11 +8,16 @@ open Async_kernel
     with the transition's state.    
 *)
 type 'a processing_context =
-  | In_progress of { interrupt_ivar : unit Ivar.t; timeout : Time.t }
-      (** A deferred action is in progress *)
+  | In_progress of
+      { interrupt_ivar : unit Ivar.t
+      ; timeout : Time.t
+      ; downto_ : Mina_numbers.Length.t
+      ; holder : State_hash.t ref
+            (** Last transition which held this context *)
+      }  (** A deferred action is in progress *)
   | Dependent
-      (** A deferred action is to be handled by a gossiped descedant
-      (so that this transition is part of the descedant's batch) *)
+      (** A deferred action is to be handled by a gossiped descendant
+      (so that this transition is part of the descendant's batch) *)
   | Done of 'a
       (** A deferred action is complete. This constructor is used only as
       a transient marker before making the transition processed right after. *)
@@ -31,7 +36,7 @@ type 'a processing_context =
      *)
 type 'a status =
   | Waiting_for_parent of (unit -> 'a status)
-  (*** Waiting for parent to be processed before starting the processing.
+      (** Waiting for parent to be processed before starting the processing.
      This state might be skipped when sequential processing is unnecessary. *)
   | Processing of 'a processing_context
       (** Processing of the state is in progress. *)

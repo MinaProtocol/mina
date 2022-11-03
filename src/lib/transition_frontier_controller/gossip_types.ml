@@ -8,7 +8,7 @@ open Core_kernel
   is supported until next hardfork).
   *)
 type transition_gossip_t =
-  | Not_a_gossip
+  | No_validation_callback
   | Gossiped_header of Mina_net2.Validation_callback.t
   | Gossiped_block of Mina_net2.Validation_callback.t
   | Gossiped_both of
@@ -43,7 +43,7 @@ let state_hash_of_received_header =
     [transition_gossip_t] object *)
 let drop_gossip_data validation_result gossip_data =
   match gossip_data with
-  | Not_a_gossip ->
+  | No_validation_callback ->
       ()
   | Gossiped_header vc ->
       Mina_net2.Validation_callback.fire_if_not_already_fired vc
@@ -58,7 +58,7 @@ let drop_gossip_data validation_result gossip_data =
         validation_result
 
 let create_gossip_data ?gossip_type vc_opt =
-  Option.value ~default:Not_a_gossip
+  Option.value ~default:No_validation_callback
   @@ let%bind.Option gt = gossip_type in
      let%map.Option vc = vc_opt in
      match gt with `Header -> Gossiped_header vc | `Block -> Gossiped_block vc
@@ -76,9 +76,9 @@ let update_gossip_data ~logger ~state_hash ~vc ~gossip_type old =
       Gossiped_both { block_vc = vc; header_vc }
   | `Header, Gossiped_block block_vc ->
       Gossiped_both { block_vc; header_vc = vc }
-  | `Block, Not_a_gossip ->
+  | `Block, No_validation_callback ->
       Gossiped_block vc
-  | `Header, Not_a_gossip ->
+  | `Header, No_validation_callback ->
       Gossiped_header vc
   | `Header, Gossiped_header _ ->
       log_duplicate () ; old

@@ -47,8 +47,6 @@ module type CONTEXT = sig
   (** Callback to write built breadcrumbs so that they can be added to frontier *)
   val write_breadcrumb : Frontier_base.Breadcrumb.t -> unit
 
-  val timeout_controller : Timeout_controller.t
-
   val outdated_root_cache :
     (State_hash.t, unit) Transition_handler.Core_extended_cache.Lru.t
 
@@ -131,6 +129,8 @@ module type CONTEXT = sig
        (module Interruptible.F)
     -> (Ledger_proof.t * Sok_message.t) list
     -> unit Or_error.t Or_error.t Interruptible.t
+
+  val processed_dsu : Processed_skipping.Dsu.t
 end
 
 let state_functions =
@@ -163,3 +163,7 @@ let accept_gossip ~context:(module Context : CONTEXT) ~valid_cb consensus_state
       Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Accept
   | Error _ ->
       Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Reject
+
+let interrupt_after_timeout ~timeout interrupt_ivar =
+  Async_kernel.upon (Async.at timeout)
+    (Async_kernel.Ivar.fill_if_empty interrupt_ivar)

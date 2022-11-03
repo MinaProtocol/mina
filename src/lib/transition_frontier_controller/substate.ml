@@ -20,7 +20,7 @@ let view (type state_t)
     and
     2. Have same state level as [top_state]
 
-    Returned list of states is in the child-first order.
+    Returned list of states is in the parent-first order.
 *)
 let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     top_state =
@@ -34,43 +34,20 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     if equal_state_levels top_state state then None
     else view ~state_functions ~f:predicate state
   in
-  let rec loop state =
+  let rec loop state res =
     let parent_hash = (transition_meta state).parent_state_hash in
     Option.value_map ~default:[]
       ~f:(fun parent_state ->
         if equal_state_levels parent_state state then
           let `Take to_take, `Continue to_continue = full_predicate state in
-          let take_f = if to_take then List.cons state else Fn.id in
-          take_f @@ if to_continue then loop parent_state else []
+          let res' = if to_take then state :: res else res in
+          if to_continue then loop parent_state res' else []
         else
           (* Parent is of different state => it's of higher state => we don't need to go deeper *)
           [] )
       (State_hash.Table.find transition_states parent_hash)
   in
-  loop top_state
-
-(** [collect_dependent_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
-  while collected states are:
-  
-    1. In [Waiting_for_parent], [Failed] or [Processing Dependent] substate
-    and
-    2. Have same state level as [top_state]
-
-    States with [Processed] status are skipped through.
-    Returned list of states is in the child-first order.
-*)
-let collect_dependent_ancestry ~state_functions ~transition_states top_state =
-  let viewer s =
-    match s.status with
-    | Processing (In_progress _) ->
-        (`Take false, `Continue false)
-    | Waiting_for_parent _ | Failed _ | Processing _ ->
-        (`Take true, `Continue true)
-    | Processed _ ->
-        (`Take false, `Continue true)
-  in
-  collect_states ~predicate:{ viewer } ~state_functions ~transition_states
-    top_state
+  loop top_state []
 
 (** Modify status of common substate to [Processed].
     
@@ -112,15 +89,12 @@ let mark_processed_modifier ~is_recursive_call subst =
   | Processed _ ->
       Result.Error "already processed"
 
-(** Function determines whether to continue mark processed recursive
-    call.
-    
-    It takes transition and returns true iff:
+(** Function takes transition and returns true when one of conditions hold:
 
       * Transition's parent is not in the catchup state (which means it's in frontier)
       * Transition's parent has a higher state level
     *)
-let is_to_continue_mark_processed_recursion (type state_t)
+let is_parent_of_higher_state (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
     ~transition_states state =
   let parent_hash = (F.transition_meta state).parent_state_hash in
@@ -246,8 +220,7 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
              ~transition_states ) ;
       if
         is_recursive_call
-        || is_to_continue_mark_processed_recursion ~state_functions
-             ~transition_states state
+        || is_parent_of_higher_state ~state_functions ~transition_states state
       then
         let children =
           List.append (State_hash.Set.to_list children.processed)
@@ -310,22 +283,19 @@ let update_children_on_promotion (type state_t) ~state_functions
   State_hash.Table.change transition_states parent_hash
     ~f:(Option.bind ~f:update_children)
 
-(** [view_processing] functions takes state and returns [`Done] if the processing is finished,
-    [`In_progress timeout] is the processing continues and [None] if the processing is dependent
-      or status is different from [Processing].  *)
-let view_processing ~state_functions =
-  Fn.compose Option.join
+(** [is_processing_done] functions takes state and returns true iff
+    the status of the state is [Substate.Processing (Substate.Done _)]. *)
+let is_processing_done ~state_functions =
+  Fn.compose (Option.value ~default:false)
   @@ view ~state_functions
        ~f:
          { viewer =
              (fun subst ->
                match subst.status with
                | Processing (Done _) ->
-                   Some `Done
-               | Processing (In_progress { timeout; _ }) ->
-                   Some (`In_progress timeout)
+                   true
                | _ ->
-                   None )
+                   false )
          }
 
 module For_tests = struct
@@ -336,7 +306,7 @@ module For_tests = struct
     and
     2. Have same state level as [top_state]
 
-    Returned list of states is in the child-first order.
+    Returned list of states is in the parent-first order.
 *)
   let collect_failed_ancestry ~state_functions ~transition_states top_state =
     let viewer s =
@@ -344,6 +314,29 @@ module For_tests = struct
       | Failed _ ->
           (`Take true, `Continue true)
       | _ ->
+          (`Take false, `Continue true)
+    in
+    collect_states ~predicate:{ viewer } ~state_functions ~transition_states
+      top_state
+
+  (** [collect_dependent_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
+  while collected states are:
+  
+    1. In [Waiting_for_parent], [Failed] or [Processing Dependent] substate
+    and
+    2. Have same state level as [top_state]
+
+    States with [Processed] status are skipped through.
+    Returned list of states is in the parent-first order.
+*)
+  let collect_dependent_ancestry ~state_functions ~transition_states top_state =
+    let viewer s =
+      match s.status with
+      | Processing (In_progress _) ->
+          (`Take false, `Continue false)
+      | Waiting_for_parent _ | Failed _ | Processing _ ->
+          (`Take true, `Continue true)
+      | Processed _ ->
           (`Take false, `Continue true)
     in
     collect_states ~predicate:{ viewer } ~state_functions ~transition_states

@@ -26,5 +26,5 @@ val start_processing :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)
   -> transition_states:Transition_state.t State_hash.Table.t
-  -> Mina_block.Validation.initial_valid_with_block
+  -> State_hash.t
   -> unit

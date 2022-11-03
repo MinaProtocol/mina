@@ -16,6 +16,13 @@ val verify_header_is_relevant :
   -> Mina_block.Header.with_hash
   -> [ `Irrelevant | `Preserve_gossip_data | `Relevant ]
 
+val preserve_body :
+     body:Mina_block.Body.t
+  -> Transition_state.t
+  -> Transition_state.t
+     * [> `Nop
+       | `Mark_downloading_body_processed of unit Async_kernel.Ivar.t option ]
+
 (** [preserve_relevant_gossip] takes data of a recently received gossip related to a
     transition already present in the catchup state. It preserves useful data of gossip
     in the catchup state.
@@ -27,14 +34,12 @@ val preserve_relevant_gossip :
      ?body:Mina_block.Body.t
   -> ?vc:Mina_net2.Validation_callback.t
   -> context:(module Context.CONTEXT)
-  -> state_hash:State_hash.t
-  -> ?gossip_type:[ `Block | `Header ]
-  -> ?gossip_header:Mina_block.initial_valid_header
+  -> gossip_type:[ `Block | `Header ]
+  -> gossip_header:Mina_block.initial_valid_header
   -> Transition_state.t
   -> Transition_state.t
      * [ `Nop
        | `Mark_verifying_blockchain_proof_processed of
          Mina_block.initial_valid_header
-       | `Promote_and_interrupt of unit Async.Ivar.t
-       | `Start_processing_verifying_complete_works of
-         Mina_block.initial_valid_block ]
+       | `Mark_downloading_body_processed of unit Async_kernel.Ivar.t option
+       | `Start_processing_verifying_complete_works of State_hash.t ]
