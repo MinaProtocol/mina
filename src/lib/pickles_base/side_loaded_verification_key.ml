@@ -114,6 +114,8 @@ end
 
 (* TODO: remove since it looks very much like the Domains module in the same directory *)
 module Domains = struct
+  [@@@warning "-40"]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -155,11 +157,28 @@ module Poly = struct
 end
 
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
-  let [ v1; v2; g1; g2; g3; g4; g5; g6 ] =
-    Plonk_verification_key_evals.to_hlist k
+  let Plonk_verification_key_evals.
+        { sigma_comm
+        ; coefficients_comm
+        ; generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        } =
+    k
   in
   List.map
-    (Vector.to_list v1 @ Vector.to_list v2 @ [ g1; g2; g3; g4; g5; g6 ])
+    ( Vector.to_list sigma_comm
+    @ Vector.to_list coefficients_comm
+    @ [ generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ] )
     ~f:g
   |> Array.concat
 
@@ -169,7 +188,7 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) t =
 let to_input (type a) ~(field_of_int : int -> a) :
     (a * a, _, _) Poly.t -> a Random_oracle_input.Chunked.t =
   let open Random_oracle_input.Chunked in
-  fun { max_proofs_verified; wrap_index; wrap_vk = _ } :
+  fun Poly.{ max_proofs_verified; wrap_index; wrap_vk = _ } :
       _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
       [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
