@@ -164,8 +164,7 @@ module Stable = struct
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
           (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
-      Staged_ledger_hash.Aux_hash.of_bytes
-        (state_hash |> Digestif.SHA256.to_raw_string)
+      Staged_ledger_hash.Aux_hash.of_sha256 state_hash
   end
 end]
 

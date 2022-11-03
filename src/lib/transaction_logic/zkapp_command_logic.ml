@@ -181,6 +181,19 @@ module Local_state = struct
            , 'length
            , 'failure_status_tbl )
            t =
+            ( 'stack_frame
+            , 'call_stack
+            , 'token_id
+            , 'signed_amount
+            , 'ledger
+            , 'bool
+            , 'comm
+            , 'length
+            , 'failure_status_tbl )
+            Mina_wire_types.Mina_transaction_logic.Zkapp_command_logic
+            .Local_state
+            .V1
+            .t =
         { stack_frame : 'stack_frame
         ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
@@ -907,7 +920,6 @@ module Make (Inputs : Inputs_intf) = struct
           (* Check that account_update has a valid caller. *)
           assert_ ~pos:__POS__ Bool.(is_normal_call ||| is_delegate_call) )
     in
-
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
        Pop from the call stack to get another forest, which is guaranteed to be non-empty.

@@ -33,4 +33,6 @@ module type S = sig
   val digest_string : ?off:int -> ?len:int -> String.t -> t
 
   val digest_bigstring : ?off:int -> ?len:int -> Bigstring.t -> t
+
+  val gen : t Quickcheck.Generator.t
 end

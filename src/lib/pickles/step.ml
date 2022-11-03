@@ -555,7 +555,7 @@ struct
         (Vector.extend
            (Option.value_exn !unfinalized_proofs)
            lte Max_proofs_verified.n
-           (Unfinalized.Constant.dummy ()) )
+           (Lazy.force Unfinalized.Constant.dummy) )
     in
     let module Extract = struct
       module type S = sig

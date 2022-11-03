@@ -11,6 +11,7 @@
    core.uuid
    async_kernel
    graphql-async
+   graphql
    sexplib0
    base.caml
    integers
@@ -58,6 +59,7 @@
    mina_metrics
    mina_numbers
    mina_numbers_unix
+   mina_stdlib
    signature_lib
    snarky.backendless
    blake2

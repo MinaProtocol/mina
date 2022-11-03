@@ -10,18 +10,19 @@
    ppx_jane
    ppx_deriving.std
    h_list.ppx))
+ (modules_without_implementation sigs poly_types)
  (instrumentation
   (backend bisect_ppx))
  (libraries
    ;; opam libraries
-   ppx_inline_test.config
-   sexplib0
-   result
-   core_kernel
-   base.caml
-   bin_prot.shape
-   ;; local libraries
-   snarky.backendless
-   tuple_lib
-   ppx_version.runtime
-))
+  ppx_inline_test.config
+  sexplib0
+  result
+  core_kernel
+  base.caml
+  bin_prot.shape
+  ;; local libraries
+  snarky.backendless
+  tuple_lib
+  ppx_version.runtime
+  ))
