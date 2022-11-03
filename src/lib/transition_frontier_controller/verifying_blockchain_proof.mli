@@ -25,7 +25,7 @@ val promote_to :
    context is not discarded but passed to the next ancestor that is in 
    [Verifying_blockchain_proof] and isn't [Processed].
 *)
-val mark_processed :
+val make_processed :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)
   -> transition_states:Transition_state.t State_hash.Table.t

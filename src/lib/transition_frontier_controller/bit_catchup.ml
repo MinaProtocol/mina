@@ -22,16 +22,15 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
            ~context ~transition_states ~header ~substate ~gossip_data ~body_opt
            ~aux
   | Verifying_blockchain_proof
-      { header = _; substate; gossip_data; body_opt; aux } ->
+      { header = _; substate; gossip_data; body_opt; aux; baton = _ } ->
       Option.some
       @@ Downloading_body.promote_to ~mark_processed_and_promote ~context
            ~transition_states ~substate ~gossip_data ~body_opt ~aux
-  | Downloading_body
-      { header; substate; block_vc; next_failed_ancestor = _; aux } ->
+  | Downloading_body { header; substate; block_vc; baton = _; aux } ->
       Option.some
       @@ Verifying_complete_works.promote_to ~mark_processed_and_promote
            ~context ~transition_states ~header ~substate ~block_vc ~aux
-  | Verifying_complete_works { block; substate; block_vc; aux } ->
+  | Verifying_complete_works { block; substate; block_vc; aux; baton = _ } ->
       Option.some
       @@ Building_breadcrumb.promote_to ~mark_processed_and_promote ~context
            ~transition_states ~block ~substate ~block_vc ~aux
@@ -79,16 +78,9 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
   in
   Substate.update_children_on_promotion ~state_functions ~transition_states
     ~parent_hash ~state_hash state_opt ;
-  let check_processing =
-    Option.iter ~f:(function
-      | `Done ->
-          mark_processed_and_promote [ state_hash ]
-      | `In_progress timeout ->
-          Timeout_controller.register ~state_functions ~transition_states
-            ~state_hash ~timeout Context.timeout_controller )
-  in
-  Option.iter state_opt
-    ~f:(Fn.compose check_processing @@ Substate.view_processing ~state_functions)
+  Option.iter state_opt ~f:(fun state ->
+      if Substate.is_processing_done ~state_functions state then
+        mark_processed_and_promote [ state_hash ] )
 
 (** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
 transitions processed. Then it promotes all of the transitions that can be promoted
@@ -109,6 +101,20 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
     Substate.mark_processed ~logger:Context.logger ~state_functions
       ~transition_states state_hashes
   in
+  let open State_hash.Set in
+  let processed = of_list state_hashes in
+  let promoted = of_list higher_state_promotees in
+  iter (diff processed promoted) ~f:(fun key ->
+      Option.iter (State_hash.Table.find transition_states key) ~f:(fun st ->
+          let data = Transition_state.State_functions.transition_meta st in
+          let open Processed_skipping.Dsu in
+          add_exn ~key ~data Context.processed_dsu ;
+          union ~a:key ~b:data.parent_state_hash Context.processed_dsu ;
+          let children = Transition_state.children st in
+          iter children.processed ~f:(fun b ->
+              union ~a:key ~b Context.processed_dsu ) ) ) ;
+  iter (diff processed promoted) ~f:(fun key ->
+      Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
   List.iter
     ~f:(promote_to_higher_state ~context:(module Context) ~transition_states)
     higher_state_promotees
@@ -130,6 +136,14 @@ let handle_produced_transition ~logger ~state breadcrumb =
       [%log warn]
         "Produced breadcrumb $state_hash is already in bit-catchup state"
         ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]
+
+let shutdown_substate = function
+  | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
+    ->
+      Ivar.fill_if_empty interrupt_ivar () ;
+      ({ r with status = Failed (Error.of_string "shutdown") }, ())
+  | s ->
+      (s, ())
 
 let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~collected_transitions
@@ -165,8 +179,6 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     let write_breadcrumb b =
       Queue.enqueue breadcrumb_queue b ;
       Strict_pipe.Writer.write breadcrumb_notification_writer ()
-
-    let timeout_controller = Timeout_controller.create ()
 
     let check_body_in_storage = Block_storage.read_body block_storage
 
@@ -211,6 +223,8 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
 
     let verify_transaction_proofs (module I : Interruptible.F) =
       Fn.compose I.lift @@ Verifier.verify_transaction_snarks verifier
+
+    let processed_dsu = Processed_skipping.Dsu.create ()
   end in
   let transition_states = State_hash.Table.create () in
   let state =
@@ -239,8 +253,11 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
          let open Strict_pipe.Writer in
-         Timeout_controller.cancel_all ~state_functions ~transition_states
-           Context.timeout_controller ;
+         State_hash.Table.map_inplace transition_states ~f:(fun st ->
+             Option.value_map ~default:st ~f:fst
+               (Transition_state.State_functions.modify_substate
+                  ~f:{ modifier = shutdown_substate }
+                  st ) ) ;
          kill breadcrumb_notification_writer ) ;
   Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
       let breadcrumbs = Queue.to_list breadcrumb_queue in

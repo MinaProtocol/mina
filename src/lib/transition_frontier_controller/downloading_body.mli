@@ -12,3 +12,10 @@ val promote_to :
   -> body_opt:Mina_block.Body.t option
   -> aux:Transition_state.aux_data
   -> Transition_state.t
+
+val pass_the_baton :
+     transition_states:Transition_state.t State_hash.Table.t
+  -> context:(module Context.CONTEXT)
+  -> mark_processed_and_promote:(State_body_hash.t list -> unit)
+  -> Transition_state.t
+  -> Transition_state.t

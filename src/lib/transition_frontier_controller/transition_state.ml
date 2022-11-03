@@ -39,19 +39,21 @@ type t =
       ; aux : aux_data
       ; gossip_data : Gossip_types.transition_gossip_t
       ; body_opt : Mina_block.Body.t option
+      ; baton : bool
       }  (** Transition goes through verification of its blockchain proof. *)
   | Downloading_body of
       { header : Mina_block.initial_valid_header
       ; substate : Mina_block.Body.t Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
-      ; next_failed_ancestor : State_hash.t option
+      ; baton : bool
       }  (** Transition's body download is in progress. *)
   | Verifying_complete_works of
       { block : Mina_block.initial_valid_block
       ; substate : unit Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
+      ; baton : bool
       }  (** Transition goes through verification of transaction snarks. *)
   | Building_breadcrumb of
       { block : Mina_block.initial_valid_block
