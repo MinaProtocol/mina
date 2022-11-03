@@ -13,7 +13,7 @@ open Core_kernel
 *)
 type catchup_state =
   { transition_states : Transition_state.t State_hash.Table.t
-  (** Map from a state_hash to state of the transition corresponding to it  *)
+        (** Map from a state_hash to state of the transition corresponding to it  *)
   ; orphans : State_hash.t list State_hash.Table.t
         (** Map from transition's state hash to list of its children for transitions
     that are not in the transition states *)
@@ -46,8 +46,6 @@ module type CONTEXT = sig
 
   (** Callback to write built breadcrumbs so that they can be added to frontier *)
   val write_breadcrumb : Frontier_base.Breadcrumb.t -> unit
-
-  val timeout_controller : Timeout_controller.t
 
   (** Check is the body of a transition is present in the block storage, *)
   val check_body_in_storage :
@@ -128,6 +126,8 @@ module type CONTEXT = sig
        (module Interruptible.F)
     -> (Ledger_proof.t * Sok_message.t) list
     -> bool Or_error.t Interruptible.t
+
+  val processed_dsu : Processed_skipping.Dsu.t
 end
 
 let state_functions =
@@ -160,3 +160,7 @@ let accept_gossip ~context:(module Context : CONTEXT) ~valid_cb consensus_state
       Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Accept
   | Error _ ->
       Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Reject
+
+let interrupt_after_timeout ~timeout interrupt_ivar =
+  Async_kernel.upon (Async.at timeout)
+    (Async_kernel.Ivar.fill_if_empty interrupt_ivar)

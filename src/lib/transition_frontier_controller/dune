@@ -12,6 +12,7 @@
    core_kernel
    core
    sexplib0
+   base.base_internalhash_types
    ;; local libraries
    block_storage
    unix_timestamp
@@ -49,4 +50,5 @@
    mina_base.import
    mina_numbers
    ledger_proof
+   dsu
 ))

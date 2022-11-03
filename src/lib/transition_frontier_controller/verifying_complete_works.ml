@@ -2,63 +2,31 @@ open Mina_base
 open Core_kernel
 open Context
 
-(** Update transition's state for a transition in
-    [Transiiton_state.Verifying_complete_works] state with [Substate.Processing] status.
+module F = struct
+  type proceessing_result = unit
 
-    Pre-condition: new status is either [Substate.Failed] or [Substate.Processing].
-*)
-let update_status_from_processing ~timeout_controller ~transition_states
-    ~state_hash status =
-  let f = function
-    | Transition_state.Verifying_complete_works
-        ({ substate = { status = Processing ctx; _ }; block_vc; _ } as r) ->
-        Timeout_controller.cancel_in_progress_ctx ~transition_states
-          ~state_functions ~timeout_controller ~state_hash ctx ;
-        let block_vc =
-          match status with
-          | Substate.Failed _ ->
-              Option.iter block_vc
-                ~f:
-                  (Fn.flip
-                     Mina_net2.Validation_callback.fire_if_not_already_fired
-                     `Ignore ) ;
-              None
-          | _ ->
-              block_vc
-        in
-        Transition_state.Verifying_complete_works
-          { r with substate = { r.substate with status }; block_vc }
+  let ignore_gossip = function
+    | Transition_state.Verifying_complete_works ({ block_vc = Some vc; _ } as r)
+      ->
+        Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
+        Transition_state.Verifying_complete_works { r with block_vc = None }
     | st ->
         st
-  in
-  State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
 
-(** [upon_f] is a callback to be executed upon completion of
-  transaction snark verification for a transition (or a failure).
-*)
-let upon_f ~timeout_controller ~block ~mark_processed_and_promote
-    ~transition_states ~ancestors_to_process res =
-  let state_hash = state_hash_of_block_with_validation block in
-  match res with
-  | Result.Error () ->
-      update_status_from_processing ~timeout_controller ~transition_states
-        ~state_hash
-        (Failed (Error.of_string "interrupted"))
-  | Result.Ok (Result.Ok false) ->
-      (* We mark invalid only the first header because it is the only one for which
-         we can be sure it's invalid *)
-      Transition_state.mark_invalid ~transition_states
-        ~error:(Error.of_string "wrong blockchain proof")
-        state_hash
-  | Result.Ok (Result.Ok true) ->
-      let processed = List.rev (state_hash :: ancestors_to_process) in
-      List.iter processed ~f:(fun state_hash ->
-          update_status_from_processing ~timeout_controller ~transition_states
-            ~state_hash (Processing (Done ())) ) ;
-      mark_processed_and_promote processed
-  | Result.Ok (Result.Error e) ->
-      update_status_from_processing ~timeout_controller ~transition_states
-        ~state_hash (Failed e)
+  let to_data = function
+    | Transition_state.Verifying_complete_works { substate; baton; _ } ->
+        Some Verifying_generic.{ substate; baton }
+    | _ ->
+        None
+
+  let update Verifying_generic.{ substate; baton } = function
+    | Transition_state.Verifying_complete_works r ->
+        Transition_state.Verifying_complete_works { r with substate; baton }
+    | st ->
+        st
+end
+
+include Verifying_generic.Make (F)
 
 (** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
 let get_body = function
@@ -74,6 +42,71 @@ let get_state_hash = function
   | _ ->
       failwith "unexpected collected ancestor for Verifying_complete_works"
 
+(** [upon_f] is a callback to be executed upon completion of
+  transaction snark verification for a transition (or a failure).
+*)
+let rec upon_f ~context ~mark_processed_and_promote ~transition_states
+    ~state_hashes ~holder res =
+  let (module Context : CONTEXT) = context in
+  let top_state_hash = !holder in
+  match res with
+  | Result.Error () ->
+      (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
+      let for_restart_opt =
+        update_to_failed ~dsu:Context.processed_dsu ~transition_states
+          ~state_hash:top_state_hash
+          (Error.of_string "interrupted")
+      in
+      Option.iter for_restart_opt
+        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+  | Result.Ok (Result.Ok false) ->
+      (* We mark invalid only the first header because it is the only one for which
+         we can be sure it's invalid *)
+      Transition_state.mark_invalid ~transition_states
+        ~error:(Error.of_string "wrong blockchain proof")
+        top_state_hash
+  | Result.Ok (Result.Ok true) ->
+      List.iter state_hashes ~f:(fun state_hash ->
+          let for_restart_opt =
+            update_to_processing_done ~transition_states ~state_hash
+              ~dsu:Context.processed_dsu
+              ~reuse_ctx:State_hash.(state_hash <> top_state_hash)
+              ()
+          in
+          Option.iter for_restart_opt ~f:(fun for_restart ->
+              start ~context ~mark_processed_and_promote ~transition_states
+                for_restart ;
+              mark_processed_and_promote [ state_hash ] ) )
+  | Result.Ok (Result.Error e) ->
+      let for_restart_opt =
+        update_to_failed ~dsu:Context.processed_dsu ~transition_states
+          ~state_hash:top_state_hash e
+      in
+      Option.iter for_restart_opt
+        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+
+and start ~context ~mark_processed_and_promote ~transition_states states =
+  Option.value ~default:()
+  @@ let%map.Option top_state = List.last states in
+     let ctx =
+       launch_in_progress ~context ~mark_processed_and_promote
+         ~transition_states states
+     in
+     match top_state with
+     | Transition_state.Verifying_complete_works ({ block; substate; _ } as r)
+       ->
+         let key =
+           State_hash.With_state_hashes.state_hash
+             (Mina_block.Validation.block_with_hash block)
+         in
+         State_hash.Table.set transition_states ~key
+           ~data:
+             (Transition_state.Verifying_complete_works
+                { r with substate = { substate with status = Processing ctx } }
+             )
+     | _ ->
+         ()
+
 (** Launch transaction snark (complete work) verification
     and return the processing context for the deferred action launched.
     
@@ -81,27 +114,14 @@ let get_state_hash = function
     ancestors that are neither in [Substate.Processed] status nor has an
     verification action already launched for it and its ancestors.
     *)
-let launch_in_progress ~mark_processed_and_promote
-    ~context:(module Context : CONTEXT) ~transition_states block_with_validation
-    =
-  let block = Mina_block.Validation.block block_with_validation in
-  let parent_hash =
-    Mina_block.header block |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
+and launch_in_progress ~mark_processed_and_promote
+    ~context:(module Context : CONTEXT) ~transition_states states =
+  let bottom_state = List.hd_exn states in
+  let downto_ =
+    (Transition_state.State_functions.transition_meta bottom_state)
+      .blockchain_length
   in
-  let states =
-    Option.value ~default:[]
-    @@ match%bind.Option
-         State_hash.Table.find transition_states parent_hash
-       with
-       | Transition_state.Verifying_complete_works _ as parent ->
-           Some
-             (Substate.collect_dependent_ancestry ~transition_states
-                ~state_functions parent )
-       | _ ->
-           None
-  in
-  let bodies = Mina_block.body block :: List.map ~f:get_body states in
+  let bodies = List.map ~f:get_body states in
   let works =
     List.concat_map bodies
       ~f:
@@ -111,24 +131,27 @@ let launch_in_progress ~mark_processed_and_promote
            let msg = Sok_message.create ~fee ~prover in
            One_or_two.to_list (One_or_two.map proofs ~f:(fun p -> (p, msg))) )
   in
+  let state_hashes = List.map ~f:get_state_hash states in
   let module I = Interruptible.Make () in
   let action = Context.verify_transaction_proofs (module I) works in
+  let holder = ref (List.last_exn state_hashes) in
   Async_kernel.Deferred.upon (I.force action)
-    (upon_f ~timeout_controller:Context.timeout_controller
-       ~block:block_with_validation ~mark_processed_and_promote
-       ~transition_states
-       ~ancestors_to_process:(List.map ~f:get_state_hash states) ) ;
+    (upon_f
+       ~context:(module Context)
+       ~mark_processed_and_promote ~transition_states ~state_hashes ~holder ) ;
+  let timeout =
+    Time.add (Time.now ()) Context.transaction_snark_verification_timeout
+  in
+  interrupt_after_timeout ~timeout I.interrupt_ivar ;
   Substate.In_progress
-    { interrupt_ivar = I.interrupt_ivar
-    ; timeout =
-        Time.add (Time.now ()) Context.transaction_snark_verification_timeout
-    }
+    { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
 
 (** Promote a transition that is in [Downloading_body] state with
     [Processed] status to [Verifying_complete_works] state.
 *)
 let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
     ~substate ~block_vc ~aux =
+  let (module Context : CONTEXT) = context in
   let body =
     match substate.Substate.status with
     | Processed b ->
@@ -137,35 +160,47 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
         failwith "promote_downloading_body: expected processed"
   in
   let block = Mina_block.Validation.with_body header body in
-  let ctx =
-    if aux.Transition_state.received_via_gossip then
-      launch_in_progress ~mark_processed_and_promote ~context ~transition_states
-        block
-    else Substate.Dependent
+  let pre_st =
+    Transition_state.Verifying_complete_works
+      { block
+      ; substate = { substate with status = Processing Dependent }
+      ; block_vc
+      ; aux
+      ; baton = false
+      }
   in
-  Transition_state.Verifying_complete_works
-    { block
-    ; substate = { substate with status = Processing ctx }
-    ; block_vc
-    ; aux
-    }
+  if aux.Transition_state.received_via_gossip then
+    let for_start =
+      collect_dependent_and_pass_the_baton ~transition_states
+        ~dsu:Context.processed_dsu pre_st
+    in
+    let ctx =
+      launch_in_progress ~context ~mark_processed_and_promote ~transition_states
+        for_start
+    in
+    Transition_state.Verifying_complete_works
+      { block
+      ; substate = { substate with status = Processing ctx }
+      ; block_vc
+      ; aux
+      ; baton = false
+      }
+  else pre_st
 
 (** [start_processing block] starts verification of complete works for
-    a transition corresponding to the [block].
+       a transition corresponding to the [block].
 
-    This function is called when a gossip is received for a transition
-    that is in [Transition_state.Verifying_complete_works] state.
+       This function is called when a gossip is received for a transition
+       that is in [Transition_state.Verifying_complete_works] state.
 
-    Pre-condition: transition corresponding to [block] has
-    [Substate.Processing Dependent] status.
-*)
+       Pre-condition: transition corresponding to [block] has
+       [Substate.Processing Dependent] status.
+   *)
 let start_processing ~context ~mark_processed_and_promote ~transition_states
-    block =
+    state_hash =
   let (module Context : CONTEXT) = context in
-  let state_hash = state_hash_of_block_with_validation block in
-  let ctx =
-    launch_in_progress ~mark_processed_and_promote ~context ~transition_states
-      block
+  let for_start =
+    collect_dependent_and_pass_the_baton_by_hash ~transition_states
+      ~dsu:Context.processed_dsu state_hash
   in
-  update_status_from_processing ~timeout_controller:Context.timeout_controller
-    ~transition_states ~state_hash (Substate.Processing ctx)
+  start ~context ~mark_processed_and_promote ~transition_states for_start

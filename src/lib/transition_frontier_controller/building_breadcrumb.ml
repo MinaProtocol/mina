@@ -44,13 +44,13 @@ let validate_frontier_dependencies ~transition_states
   
   Pre-condition: new [status] is either [Failed] or [Processing].
 *)
-let update_status_from_processing ~timeout_controller ~transition_states
-    ~state_hash status =
+let update_status_for_unprocessed ~transition_states ~state_hash status =
   let f = function
     | Transition_state.Building_breadcrumb
-        ({ substate = { status = Processing ctx; _ }; block_vc; _ } as r) ->
-        Timeout_controller.cancel_in_progress_ctx ~transition_states
-          ~state_functions ~timeout_controller ~state_hash ctx ;
+        ( { substate = { status = Processing (In_progress _); _ }; block_vc; _ }
+        as r )
+    | Transition_state.Building_breadcrumb
+        ({ substate = { status = Failed _; _ }; block_vc; _ } as r) ->
         let block_vc =
           match status with
           | Substate.Failed _ ->
@@ -73,28 +73,25 @@ let update_status_from_processing ~timeout_controller ~transition_states
 (** [upon_f] is a callback to be executed upon completion of building
   a breadcrumb (or a failure).
 *)
-let upon_f ~state_hash ~timeout_controller ~mark_processed_and_promote
-    ~transition_states res =
+let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
   let mark_invalid ~tag e =
     Transition_state.mark_invalid ~transition_states ~error:(Error.tag ~tag e)
       state_hash
   in
-  match res with
+  function
   | Result.Error () ->
-      update_status_from_processing ~timeout_controller ~transition_states
-        ~state_hash
+      update_status_for_unprocessed ~transition_states ~state_hash
         (Failed (Error.of_string "interrupted"))
   | Result.Ok (Result.Ok breadcrumb) ->
-      update_status_from_processing ~timeout_controller ~transition_states
-        ~state_hash (Processing (Done breadcrumb)) ;
+      update_status_for_unprocessed ~transition_states ~state_hash
+        (Processing (Done breadcrumb)) ;
       mark_processed_and_promote [ state_hash ]
   | Result.Ok (Result.Error (`Invalid_staged_ledger_diff e)) ->
       mark_invalid ~tag:"invalid staged ledger diff" e
   | Result.Ok (Result.Error (`Invalid_staged_ledger_hash e)) ->
       mark_invalid ~tag:"invalid staged ledger hash" e
   | Result.Ok (Result.Error (`Fatal_error e)) ->
-      update_status_from_processing ~timeout_controller ~transition_states
-        ~state_hash
+      update_status_for_unprocessed ~transition_states ~state_hash
       @@ Failed (Error.of_exn e)
 
 (** [building_breadcrumb_status ~parent block] decides upon status of [block]
@@ -110,19 +107,24 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       validate_frontier_dependencies ~transition_states ~context block
     in
     let state_hash = state_hash_of_block_with_validation transition in
+    let downto_ =
+      Mina_block.blockchain_length (Mina_block.Validation.block block)
+    in
     let (module Context : CONTEXT) = context in
-    let open Context in
     let module I = Interruptible.Make () in
     let action =
       Context.build_breadcrumb ~received_at ~sender ~parent ~transition
         (module I)
     in
+    let timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout in
     Async_kernel.Deferred.upon (I.force action)
-      (upon_f ~transition_states ~state_hash ~mark_processed_and_promote
-         ~timeout_controller ) ;
+      (upon_f ~transition_states ~state_hash ~mark_processed_and_promote) ;
+    interrupt_after_timeout ~timeout I.interrupt_ivar ;
     Substate.In_progress
       { interrupt_ivar = I.interrupt_ivar
-      ; timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout
+      ; timeout
+      ; downto_
+      ; holder = ref state_hash
       }
   in
   match impl with

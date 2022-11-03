@@ -17,7 +17,7 @@ let infinity_rank = Int.max_value lsr 1
     For more information on design and usage of the DSU, see:
     https://www.notion.so/minaprotocol/Bit-catchup-algorithm-8a3fa7a2630c46d98505b25ebb20c8e7#e364c78e09c74c03835bc7ed8634dc47
 *)
-module Dsu (Key : Hashtbl.Key) (D : Data) = struct
+module Make (Key : Hashtbl.Key) (D : Data) = struct
   type element_t = { data : D.t option; parent : int; rank : int }
 
   module KeyMap = Hashtbl.Make (Key)
