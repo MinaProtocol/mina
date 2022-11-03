@@ -40,8 +40,6 @@ exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
 
-module Find_ip = Find_ip
-
 (* A way to run a single snark worker for a daemon in a lazy manner. Forcing
    this lazy value will run the snark worker process. A snark work is
    assigned to a public key. This public key can change throughout the entire time
@@ -2186,53 +2184,26 @@ let verifier { processes = { verifier; _ }; _ } = verifier
 
 let%test_module "Epoch ledger sync tests" =
   ( module struct
-    let make_mina_network () =
+    module type CONTEXT = sig
+      include CONTEXT
+
+      val trust_system : Trust_system.t
+    end
+
+    let make_mina_network ~context:(module Context : CONTEXT) ~libp2p_keypair
+        ~staking_ledger ~next_epoch_ledger =
+      let open Context in
       let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
         Broadcast_pipe.create None
       in
       let producer_transition_reader, _producer_transition_writer =
         Strict_pipe.create Synchronous
       in
-      let logger = Logger.null () in
       let cwd = Caml.Sys.getcwd () in
-      let trust_system = Trust_system.create cwd in
+      let precomputed_values = Context.precomputed_values in
       let time_controller =
         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
       in
-      let%bind precomputed_values =
-        let runtime_config : Runtime_config.t =
-          { daemon = None
-          ; genesis = None
-          ; proof = None
-          ; ledger = None
-          ; epoch_data = None
-          }
-        in
-        match%map
-          Genesis_ledger_helper.init_from_config_file ~genesis_dir:cwd ~logger
-            ~proof_level:None runtime_config
-        with
-        | Ok (precomputed_values, _) ->
-            precomputed_values
-        | Error err ->
-            failwithf "Could not create precomputed values: %s"
-              (Error.to_string_hum err) ()
-      in
-      let constraint_constants = precomputed_values.constraint_constants in
-      let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
-        Consensus.Constants.create ~constraint_constants
-          ~protocol_constants:genesis_constants.protocol
-      in
-      let module Context = struct
-        let logger = logger
-
-        let constraint_constants = constraint_constants
-
-        let consensus_constants = consensus_constants
-
-        let precomputed_values = precomputed_values
-      end in
       let on_remote_push () = Deferred.unit in
       let block_reader, block_sink =
         let on_push () = Deferred.unit in
@@ -2269,7 +2240,6 @@ let%test_module "Epoch ledger sync tests" =
                   precomputed_values.genesis_constants.transaction_expiry_hr ) )
           ~on_remote_push ~log_gossip_heard:false
       in
-
       let%bind _snark_pool, snark_remote_sink, _snark_local_sink =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -2301,23 +2271,21 @@ let%test_module "Epoch ledger sync tests" =
           : _ ) ;
       let genesis_ledger_hash = Ledger_hash.empty_hash in
       let is_seed = false in
-      let%bind creatable_gossip_net =
-        let chain_id = "dummy" in
+      let libp2p_keypair =
+        Mina_net2.Keypair.of_string libp2p_keypair |> Or_error.ok_exn
+      in
+      let creatable_gossip_net =
+        let chain_id = "dummy_chain_id" in
         let conf_dir = cwd in
         let seed_peer_list_url = None in
         let initial_peers = [] in
-        let%map addrs_and_ports =
-          let%map external_ip = Find_ip.find ~logger in
+        let addrs_and_ports =
+          let external_ip = Unix.Inet_addr.of_string "127.0.0.1" in
           let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
           let client_port = Cli_lib.Flag.Port.default_client in
           let libp2p_port = Cli_lib.Flag.Port.default_libp2p in
           ( { external_ip; bind_ip; peer = None; client_port; libp2p_port }
             : Node_addrs_and_ports.t )
-        in
-        let libp2p_keypair =
-          Mina_net2.Keypair.of_string
-            "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
-          |> Or_error.ok_exn
         in
         let pubsub_v1 =
           (* TODO after introducing Bitswap-based block retrieval,
@@ -2396,16 +2364,22 @@ let%test_module "Epoch ledger sync tests" =
                        !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                        Mina_networking.refused_answer_query_string ledger_hash ) )
       in
-      let unimplemented _ = failwith "RPC unimplemented" in
+      let unimplemented name _ = failwithf "RPC %s unimplemented" name () in
+      let rpc_error name _ =
+        return @@ Or_error.error_string (sprintf "Bogus error for RPC %s" name)
+      in
       let%bind (mina_networking : Mina_networking.t) =
         Mina_networking.create config ~sinks ~answer_sync_ledger_query
-          ~get_some_initial_peers:unimplemented
-          ~get_staged_ledger_aux_and_pending_coinbases_at_hash:unimplemented
-          ~get_ancestry:unimplemented ~get_best_tip:unimplemented
-          ~get_node_status:unimplemented
-          ~get_transition_chain_proof:unimplemented
-          ~get_transition_chain:unimplemented
-          ~get_transition_knowledge:unimplemented
+          ~get_some_initial_peers:(unimplemented "get_some_initial_peers")
+          ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+            (unimplemented "get_staged_ledger_aux_and_pending_coinbases_at_hash")
+          ~get_ancestry:(unimplemented "get_ancestry")
+          ~get_best_tip:(unimplemented "get_best_tip")
+          ~get_node_status:(rpc_error "get_node_status")
+          ~get_transition_chain_proof:
+            (unimplemented "get_transition_chain_proof")
+          ~get_transition_chain:(unimplemented "get_transition_chain")
+          ~get_transition_knowledge:(unimplemented "get_transition_knowledge")
       in
       (* create transition frontier *)
       let _valid_transitions, _initialization_finish_signal =
@@ -2429,7 +2403,105 @@ let%test_module "Epoch ledger sync tests" =
           ~catchup_mode:`Normal ~network_transition_reader:block_reader
           ~producer_transition_reader ~most_recent_valid_block ~notify_online
       in
-      Deferred.unit
+      let staking_epoch_snapshot =
+        Consensus.Data.Local_state.For_tests.snapshot_of_ledger staking_ledger
+      in
+      let next_epoch_snapshot =
+        Consensus.Data.Local_state.For_tests.snapshot_of_ledger
+          next_epoch_ledger
+      in
+      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
+        Staking_epoch_snapshot staking_epoch_snapshot ;
+      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
+        Next_epoch_snapshot next_epoch_snapshot ;
+      let network_peer =
+        let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
+        let libp2p_port = Cli_lib.Flag.Port.default_libp2p in
+        Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
+      in
+      return (mina_networking, network_peer)
 
-    let (_ : _) = Async.Thread_safe.block_on_async_exn (fun () -> return ())
+    let%test_unit "Sync from empty ledger" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Protocol_version.(
+            set_current @@ create_exn ~major:2 ~minor:0 ~patch:0) ;
+          let logger = Logger.null () in
+          let cwd = Caml.Sys.getcwd () in
+          let%bind precomputed_values =
+            let runtime_config : Runtime_config.t =
+              { daemon = None
+              ; genesis = None
+              ; proof = None
+              ; ledger = None
+              ; epoch_data = None
+              }
+            in
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~genesis_dir:cwd
+                ~logger ~proof_level:None runtime_config
+            with
+            | Ok (precomputed_values, _) ->
+                precomputed_values
+            | Error err ->
+                failwithf "Could not create precomputed values: %s"
+                  (Error.to_string_hum err) ()
+          in
+          let constraint_constants = precomputed_values.constraint_constants in
+          let consensus_constants =
+            let genesis_constants = Genesis_constants.for_unit_tests in
+            Consensus.Constants.create ~constraint_constants
+              ~protocol_constants:genesis_constants.protocol
+          in
+          let cwd = Caml.Sys.getcwd () in
+          let trust_system = Trust_system.create cwd in
+          let module Context = struct
+            let logger = logger
+
+            let constraint_constants = constraint_constants
+
+            let consensus_constants = consensus_constants
+
+            let precomputed_values = precomputed_values
+
+            let trust_system = trust_system
+          end in
+          let staking_ledger =
+            let db_ledger =
+              Mina_ledger.Ledger.Db.create
+                ~depth:precomputed_values.constraint_constants.ledger_depth ()
+            in
+            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
+              db_ledger
+          in
+          let next_epoch_ledger =
+            let db_ledger =
+              Mina_ledger.Ledger.Db.create
+                ~depth:precomputed_values.constraint_constants.ledger_depth ()
+            in
+            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
+              db_ledger
+          in
+          let%bind mina_network, network_peer =
+            make_mina_network
+              ~context:(module Context)
+              ~libp2p_keypair:
+                "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
+              ~staking_ledger ~next_epoch_ledger
+          in
+          let db_ledger : Mina_ledger.Ledger.Db.t =
+            Mina_ledger.Ledger.Db.create
+              ~depth:precomputed_values.constraint_constants.ledger_depth ()
+          in
+          let sync_ledger =
+            Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
+          in
+          let query_reader =
+            Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+          in
+          let response_writer =
+            Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+          in
+          Mina_networking.glue_sync_ledger mina_network
+            ~preferred:[ network_peer ] query_reader response_writer ;
+          Deferred.unit )
   end )

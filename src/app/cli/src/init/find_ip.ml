@@ -4,9 +4,7 @@ open Cohttp_async
 
 type ip_service = { uri : string; body_handler : string -> string }
 
-(* TODO: Make these requests over HTTPS: https://github.com/MinaProtocol/mina/issues/4019
-   that issue is closed, but still would be good to use HTTPS here
-*)
+(* TODO: Make these requests over https: https://github.com/CodaProtocol/coda/issues/4019*)
 let services =
   [ { uri = "http://api.ipify.org"; body_handler = Fn.id }
   ; { uri = "http://bot.whatismyipaddress.com"; body_handler = Fn.id }

@@ -1498,8 +1498,7 @@ let broadcast_snark_pool_diff t diff =
          } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
 
-(* TODO: Don't copy and paste *)
-let find_map' xs ~f =
+let find_map xs ~f =
   let open Async in
   let ds = List.map xs ~f in
   let filter ~f =
@@ -1556,7 +1555,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
            "None of randomly-chosen peers can handle the request" )
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
-      find_map' current_peers ~f:(fun peer ->
+      find_map current_peers ~f:(fun peer ->
           let%bind response_or_error =
             query_peer t peer.Peer.peer_id rpc input
           in

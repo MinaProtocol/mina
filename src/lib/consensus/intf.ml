@@ -351,6 +351,9 @@ module type S = sig
            relies on persnickety imperative code that should not be exposed more generally
         *)
         val set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit
+
+        (* snapshot with empty delegatee table *)
+        val snapshot_of_ledger : Snapshot.Ledger_snapshot.t -> Snapshot.t
       end
     end
 

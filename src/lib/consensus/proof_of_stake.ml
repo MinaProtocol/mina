@@ -684,6 +684,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         *)
         let set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit =
           set_snapshot
+
+        (* if all we're testing is the ledger sync, empty delegatee table sufficient *)
+        let snapshot_of_ledger (ledger : Snapshot.Ledger_snapshot.t) :
+            Snapshot.t =
+          { ledger; delegatee_table = Public_key.Compressed.Table.create () }
       end
     end
 
