@@ -47,13 +47,13 @@ struct
 
   let of_sponge { Sponge.state; params; sponge_state } =
     match sponge_state with
-    | Squeezed n ->
+    | Sponge.Squeezed n ->
         { sponge_state = Squeezed n
         ; state = Array.copy state
         ; needs_final_permute_if_empty = true
         ; params
         }
-    | Absorbed n -> (
+    | Sponge.Absorbed n -> (
         let abs i =
           { sponge_state = Absorbing { next_index = i; xs = [] }
           ; state = Array.copy state

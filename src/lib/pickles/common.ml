@@ -28,7 +28,7 @@ let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
   in
-  { Domains.h = Pow_2_roots_of_unity h }
+  { Domains.h = Domain.Pow_2_roots_of_unity h }
 
 let actual_wrap_domain_size ~log_2_domain_size =
   let d =
@@ -97,39 +97,41 @@ end
 
 module Lookup_parameters = struct
   let tick_zero : _ Composition_types.Zero_values.t =
-    { value =
-        { challenge = Challenge.Constant.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-        }
-    ; var =
-        { challenge = Impls.Step.Field.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value
-              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
-        }
-    }
+    Composition_types.Zero_values.
+      { value =
+          { challenge = Challenge.Constant.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+          }
+      ; var =
+          { challenge = Impls.Step.Field.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value
+                (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+          }
+      }
 
   let tock_zero : _ Composition_types.Zero_values.t =
-    { value =
-        { challenge = Challenge.Constant.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-        }
-    ; var =
-        { challenge = Impls.Wrap.Field.zero
-        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
-        }
-    }
+    Composition_types.Zero_values.
+      { value =
+          { challenge = Challenge.Constant.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+          }
+      ; var =
+          { challenge = Impls.Wrap.Field.zero
+          ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+          }
+      }
 
   let _tick ~lookup:_ : _ Composition_types.Wrap.Lookup_parameters.t =
-    { use = No; zero = tick_zero }
+    Composition_types.Wrap.Lookup_parameters.{ use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
-  | Finite (x, y) ->
+  | Kimchi_types.Finite (x, y) ->
       (x, y)
-  | Infinity ->
+  | Kimchi_types.Infinity ->
       invalid_arg "finite_exn"
 
 let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
