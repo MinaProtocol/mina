@@ -45,7 +45,8 @@
   run_in_thread.fake
   mina_metrics.none
   js_backend
-  mina_transaction)
+  mina_transaction
+  pasta_bindings.backend.none)
  (link_deps
   ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
   ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
