@@ -123,12 +123,69 @@ pub use {
 */
 
 pub mod to_move {
+    use ark_ff::PrimeField;
+    use kimchi::circuits::constraints::ConstraintSystem;
+    use kimchi::circuits::gate::{CircuitGate, GateType};
+    use kimchi::circuits::wires::GateWires;
+    use mina_curves::pasta::Fp;
+    use serde::Serialize;
+    use serde_with::serde_as;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
 
+    /*
+    #[serde_as]
+    #[derive(Serialize)]
+    struct Gates<F>
+    where
+        F: PrimeField,
+    {
+        pub typ: GateType,
+        pub wires: GateWires,
+        #[serde_as(as = "Vec<o1_utils::serialization::SerdeAs>")]
+        pub coeffs: Vec<F>,
+    }
+
+    impl<F> From<&CircuitGate<F>> for Gates<F>
+    where
+        F: PrimeField,
+    {
+        fn from(gate: &CircuitGate<F>) -> Self {
+            Self {
+                typ: gate.typ,
+                wires: gate.wires,
+                coeffs: gate.coeffs.clone(),
+            }
+        }
+    }
+    */
+
+    #[derive(Serialize)]
+    struct Circuit<F>
+    where
+        F: PrimeField,
+    {
+        public_input_size: usize,
+        #[serde(bound = "CircuitGate<F>: Serialize")]
+        gates: Vec<CircuitGate<F>>,
+    }
+
+    impl<F> From<&ConstraintSystem<F>> for Circuit<F>
+    where
+        F: PrimeField,
+    {
+        fn from(cs: &ConstraintSystem<F>) -> Self {
+            Circuit {
+                public_input_size: cs.public,
+                gates: cs.gates.clone(),
+            }
+        }
+    }
+
     #[wasm_bindgen]
     pub fn prover_to_json(prover_index: &WasmPastaFpPlonkIndex) -> String {
-        serde_json::to_string(&prover_index.0.cs).expect("couldn't serialize constraints")
+        let circuit: Circuit<Fp> = (&prover_index.0.cs).into();
+        serde_json::to_string(&circuit).expect("couldn't serialize constraints")
     }
 }
