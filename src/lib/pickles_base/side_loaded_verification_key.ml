@@ -129,6 +129,7 @@ module Max_branches_vec = struct
     ()
 end
 
+(* TODO: remove since it looks very much like the Domains module in the same directory *)
 module Domains = struct
   [%%versioned
   module Stable = struct
