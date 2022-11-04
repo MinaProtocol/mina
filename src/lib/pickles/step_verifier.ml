@@ -184,7 +184,7 @@ struct
           Array.map2_exn gammas prechallenges ~f:term_and_challenge
           |> Array.unzip
         in
-        (Array.reduce_exn terms ~f:Inner_curve.( + ), challenges) )
+        (Array.reduce_exn terms ~f:(fun x y -> Inner_curve.(x + y)), challenges) )
 
   let group_map =
     let f =
