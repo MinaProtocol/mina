@@ -187,7 +187,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
       }
   else pre_st
 
-(** [start_processing block] starts verification of complete works for
+(** [make_independent block] starts verification of complete works for
        a transition corresponding to the [block].
 
        This function is called when a gossip is received for a transition
@@ -196,7 +196,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
        Pre-condition: transition corresponding to [block] has
        [Substate.Processing Dependent] status.
    *)
-let start_processing ~context ~mark_processed_and_promote ~transition_states
+let make_independent ~context ~mark_processed_and_promote ~transition_states
     state_hash =
   let (module Context : CONTEXT) = context in
   let for_start =

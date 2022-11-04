@@ -13,9 +13,12 @@ val promote_to :
   -> aux:Transition_state.aux_data
   -> Transition_state.t
 
+(** Set [baton] of the next ancestor in [Transition_state.Downloading_body]
+    and [Substate.Processing (Substate.In_progress _)] status to [true]
+    and restart all the failed ancestors before the next ancestors. *)
 val pass_the_baton :
      transition_states:Transition_state.t State_hash.Table.t
   -> context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_body_hash.t list -> unit)
-  -> Transition_state.t
-  -> Transition_state.t
+  -> State_hash.t
+  -> unit
