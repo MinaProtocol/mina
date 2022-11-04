@@ -116,7 +116,7 @@ module Sql = struct
   (* TODO: either address will have to include a token id, or we pass the
      token id separately, make it optional and use the default token if omitted
   *)
-  let run (module Conn : Caqti_async.CONNECTION) block_query address =
+  let run (module Conn : Caqti_async.CONNECTION) account block_query address =
     let open Deferred.Result.Let_syntax in
     let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
     let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
@@ -206,11 +206,12 @@ module Sql = struct
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the
-             genesis ledger, so compute its balance at the start block
-             TODO: this is probably wrong now, because we have timing
-             info for all accounts, in every block *)
-          let balance_at_genesis : int64 = failwith "TODO: LOOK UP BALANCE"
-              (* WAS : timing_info.initial_balance - timing_info.initial_minimum_balance) *)
+             genesis ledger, so use the balance obtained from GraphQL. *)
+           let balance_at_genesis : int64 =
+             Get_balance.(Option.value
+               ~default:account.balance.total
+               account.balance.liquid)
+           |> Unsigned.UInt64.to_int64
           in
           let incremental_balance_since_genesis : UInt64.t =
             compute_incremental_balance timing_info
@@ -243,24 +244,24 @@ module Sql = struct
                   + incremental_balance_between_slots)
               |> UInt64.to_int64, UInt64.of_int64 nonce )
       in
-      let%bind total_balance =
+      let total_balance =
         match (last_relevant_command_info_opt, timing_info_opt) with
         | None, None ->
           (* We've never heard of this account, at least as of the
              block_identifier provided. TODO: This means they
              requested a block from before account creation. Should it
              error instead? Need to clarify with Coinbase team. *)
-          Deferred.Result.return 0L
+           0L
         | Some (_, last_relevant_command_balance, _), _ ->
           (* This account was involved in a command and we don't care
              about its vesting, so just use the last known balance from
              the command *)
-          Deferred.Result.return last_relevant_command_balance
+          last_relevant_command_balance
         | None, Some _ ->
           (* This account hasn't seen any transactions but was in the
-             genesis ledger, so use its genesis balance *)
-          failwith "LOOKUP BALANCE, NONCE IN ACCOUNTS_ACCESSED; timing_info isn't just genesis ledger any longer"
-          (* WAS:    Deferred.Result.return timing_info.initial_balance *)
+             genesis ledger, so use the balance obtained from GraphQL. *)
+           Get_balance.(account.balance.total)
+           |> Unsigned.UInt64.to_int64
       in
       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
       Deferred.Result.return (requested_block_identifier, balance_info, nonce)
@@ -300,8 +301,13 @@ module Balance = struct
               graphql_uri )
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
+            let open Deferred.Result.Let_syntax in
             let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run (module Conn) block_query address )
+            let%bind account_data = Graphql.query
+                  Get_balance.(make @@ makeVariables ~public_key:(`String address) ())
+                  graphql_uri
+            in
+            Sql.run (module Conn) (Option.value_exn account_data.account) block_query address )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let dummy_block_identifier =
