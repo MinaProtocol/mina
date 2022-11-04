@@ -199,7 +199,7 @@ let step_main :
         -> (pvars, br) Length.t
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
      fun ds ld ->
-      match (ds, ld) with
+      match[@warning "-4"] (ds, ld) with
       | [], Z ->
           []
       | d :: ds, S ld ->
@@ -223,10 +223,10 @@ let step_main :
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
-      match (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
+      match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
       | [], [], [], Z, Z, Z, [] ->
           []
-      | ( d :: ds
+      | ( _d :: ds
         , n1 :: ns1
         , n2 :: ns2
         , S ld

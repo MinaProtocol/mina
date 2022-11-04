@@ -83,7 +83,7 @@ struct
       * (int, prevs_length) Vector.t )
       Promise.t =
     let _ = auxiliary_typ in
-    (* TODO: remove from function signature?*)
+    (* unused *)
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -563,7 +563,7 @@ struct
           , witnesses'
           , prev_proofs'
           , actual_wrap_domains' ) =
-        let rec go :
+        let[@warning "-4"] rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
             -> ( values
@@ -705,11 +705,11 @@ struct
         match (xs, maxes, l) with
         | [], [], Z ->
             []
-        | _ :: _, [], Z ->
+        | _x :: _xs, [], Z ->
             assert false
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
-        | [], _ :: ms, S n ->
+        | [], _m :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =

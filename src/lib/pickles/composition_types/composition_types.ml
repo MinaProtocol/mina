@@ -216,17 +216,19 @@ module Wrap = struct
             let[@warning "-45"] refine_opt feature_flags t =
               let flags = of_feature_flags feature_flags in
               map2 flags t ~f:(fun flag v ->
+                  let open Plonk_types.Opt in
                   match (flag, v) with
-                  | Plonk_types.Opt.Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
+                  | Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
                       Plonk_types.Opt.Some v
-                  | Plonk_types.Opt.Flag.Yes, _ ->
+                  | Flag.Yes, (Some _ | None) ->
                       assert false
-                  | Plonk_types.Opt.Flag.Maybe, _ ->
+                  | Flag.Maybe, v ->
                       v
-                  | Plonk_types.Opt.Flag.No, _ ->
+                  | Flag.No, (None | Some _ | Maybe _) ->
                       Plonk_types.Opt.None )
 
-            let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
+            let spec (* (type f) *) _
+                (* ((module Impl) : f impl) *) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =
@@ -241,7 +243,7 @@ module Wrap = struct
                 match flag with
                 | Plonk_types.Opt.Flag.No ->
                     Spec.T.Constant (None, (fun _ _ -> (* TODO *) ()), opt_spec)
-                | _ ->
+                | Plonk_types.Opt.Flag.(Yes | Maybe) ->
                     opt_spec
               in
               let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =

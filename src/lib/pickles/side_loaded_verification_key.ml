@@ -115,6 +115,7 @@ module Domain = struct
 
   let log2_size (Pow_2_roots_of_unity x) = x
 end
+[@@warning "-4"]
 
 module Domains = struct
   include V.Domains

@@ -109,7 +109,7 @@ struct
     with_label __LOC__ (fun () ->
         let constant_part, non_constant_part =
           List.partition_map (Array.to_list ts) ~f:(fun (t, g) ->
-              match t with
+              match[@warning "-4"] t with
               | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                   First
                     ( if Field.Constant.(equal zero) c then None
@@ -339,7 +339,7 @@ struct
 
   let lagrange_commitment ~domain srs i =
     let d = Int.pow 2 (Domain.log2_size domain) in
-    match
+    match[@warning "-4"]
       (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
     with
     | [| Finite g |] ->
@@ -415,7 +415,7 @@ struct
         List.partition_map
           (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
           ~f:(fun (i, t) ->
-            match t with
+            match[@warning "-4"] t with
             | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                 First
                   ( if Field.Constant.(equal zero) c then None
