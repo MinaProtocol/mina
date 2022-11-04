@@ -130,10 +130,13 @@ module Sql = struct
           account_identifier_id
         |> Errors.Lift.sql ~context:"Finding timing info"
       in
-      (* First find the block referenced by the block identifier. Then find the latest block no later than it that has a
-       * user or internal command relevant to the address we're checking and pull the balance from it. For non-vesting
-       * accounts that balance will still be the balance at the block identifier. For vesting accounts we'll also compute
-       * how much extra balance has accumulated in between the blocks. *)
+      (* First find the block referenced by the block identifier. Then
+         find the latest block no later than it that has a user or
+         internal command relevant to the address we're checking and
+         pull the balance from it. For non-vesting accounts that
+         balance will still be the balance at the block
+         identifier. For vesting accounts we'll also compute how much
+         extra balance has accumulated in between the blocks. *)
       let%bind ( requested_block_height
                , requested_block_global_slot_since_genesis
                , requested_block_hash ) =
@@ -191,19 +194,21 @@ module Sql = struct
       let%bind (liquid_balance, nonce) =
         match (last_relevant_command_info_opt, timing_info_opt) with
         | None, None ->
-          (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* This means they requested a block from before account creation;
-           * this is ambiguous in the spec but Coinbase confirmed we can return 0.
-           * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
+          (* We've never heard of this account, at least as of the
+             block_identifier provided This means they requested a
+             block from before account creation; this is ambiguous in
+             the spec but Coinbase confirmed we can return 0.
+             https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return (0L, UInt64.zero)
         | Some (_, last_relevant_command_balance, nonce), None ->
-          (* This account has no special vesting, so just use its last known
-           * balance from the command.*)
+          (* This account has no special vesting, so just use its last
+             known balance from the command.*)
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
         | None, Some timing_info ->
-          (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block
-             TODO: this is probably wrong now, because we have timing info for all accounts, in every block
-          *)
+          (* This account hasn't seen any transactions but was in the
+             genesis ledger, so compute its balance at the start block
+             TODO: this is probably wrong now, because we have timing
+             info for all accounts, in every block *)
           let balance_at_genesis : int64 = failwith "TODO: LOOK UP BALANCE"
               (* WAS : timing_info.initial_balance - timing_info.initial_minimum_balance) *)
           in
@@ -220,9 +225,11 @@ module Sql = struct
               ( last_relevant_command_global_slot_since_genesis
               , last_relevant_command_balance, nonce )
           , Some timing_info ) ->
-          (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
-           * to compute the change in its balance between the most recent command and the start block (if it has vesting
-           * it may have changed). *)
+          (* This block was in the genesis ledger and has been
+             involved in at least one user or internal command. We need *
+             to compute the change in its balance between the most recent
+             command and the start block (if it has vesting * it may have
+             changed). *)
           let incremental_balance_between_slots =
             compute_incremental_balance timing_info
               ~start_slot:
@@ -239,15 +246,19 @@ module Sql = struct
       let%bind total_balance =
         match (last_relevant_command_info_opt, timing_info_opt) with
         | None, None ->
-          (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
+          (* We've never heard of this account, at least as of the
+             block_identifier provided. TODO: This means they
+             requested a block from before account creation. Should it
+             error instead? Need to clarify with Coinbase team. *)
           Deferred.Result.return 0L
         | Some (_, last_relevant_command_balance, _), _ ->
-          (* This account was involved in a command and we don't care about its vesting, so just use the last known
-           * balance from the command *)
+          (* This account was involved in a command and we don't care
+             about its vesting, so just use the last known balance from
+             the command *)
           Deferred.Result.return last_relevant_command_balance
         | None, Some _ ->
-          (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
+          (* This account hasn't seen any transactions but was in the
+             genesis ledger, so use its genesis balance *)
           failwith "LOOKUP BALANCE, NONCE IN ACCOUNTS_ACCESSED; timing_info isn't just genesis ledger any longer"
           (* WAS:    Deferred.Result.return timing_info.initial_balance *)
       in
