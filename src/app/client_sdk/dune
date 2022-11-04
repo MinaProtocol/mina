@@ -51,7 +51,8 @@
   run_in_thread.fake
   mina_metrics.none
   js_backend
-  mina_transaction)
+  mina_transaction
+  pasta_bindings.backend.none)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
