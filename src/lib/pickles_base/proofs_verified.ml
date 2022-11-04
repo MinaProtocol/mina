@@ -1,14 +1,18 @@
 open Core_kernel
 
+[@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
-    [@@deriving sexp, sexp, compare, yojson, hash, equal]
+    [@@deriving sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id
   end
 end]
+
+[@@@warning "+4"]
 
 let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 
@@ -37,6 +41,7 @@ let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 type proofs_verified = t
 
 let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
+  let open Pickles_types.Nat in
   match n with
   | Z ->
       N0
@@ -44,8 +49,8 @@ let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
       N1
   | S (S Z) ->
       N2
-  | _ ->
-      failwithf "Proofs_verified.of_nat: got %d" (Pickles_types.Nat.to_int n) ()
+  | S _ ->
+      failwithf "Proofs_verified.of_nat: got %d" (to_int n) ()
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 
@@ -56,7 +61,7 @@ module Prefix_mask = struct
     type 'f t = 'f boolean vec2
   end
 
-  let there : proofs_verified -> bool vec2 = function
+  let[@warning "-40-42"] there : proofs_verified -> bool vec2 = function
     | N0 ->
         [ false; false ]
     | N1 ->
@@ -64,7 +69,7 @@ module Prefix_mask = struct
     | N2 ->
         [ true; true ]
 
-  let back : bool vec2 -> proofs_verified = function
+  let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
         N0
     | [ true; false ] ->
@@ -72,9 +77,7 @@ module Prefix_mask = struct
     | [ true; true ] ->
         N2
     | [ false; true ] ->
-        failwith "Invalid mask"
-
-  let create = there
+        invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
@@ -108,7 +111,7 @@ module One_hot = struct
     | _ ->
         failwith "Invalid mask"
 
-  let to_input ~zero ~one (type f) (t : t) =
+  let to_input ~zero ~one (t : t) =
     let one_hot =
       match t with
       | N0 ->
