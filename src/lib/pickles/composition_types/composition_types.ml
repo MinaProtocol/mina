@@ -512,7 +512,7 @@ module Wrap = struct
 
     open Snarky_backendless.H_list
 
-    let to_hlist
+    let[@warning "-45"] to_hlist
         { app_state
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
@@ -524,7 +524,7 @@ module Wrap = struct
       ; old_bulletproof_challenges
       ]
 
-    let of_hlist
+    let[@warning "-45"] of_hlist
         ([ app_state
          ; dlog_plonk_index
          ; challenge_polynomial_commitments
@@ -672,7 +672,7 @@ module Wrap = struct
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
-      let spec impl lookup =
+      let[@warning "-45"] spec impl lookup =
         Spec.T.Struct
           [ Vector (B Field, Nat.N9.n)
           ; Vector (B Challenge, Nat.N2.n)
@@ -684,7 +684,7 @@ module Wrap = struct
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
-      let to_data
+      let[@warning "-45"] to_data
           ({ proof_state =
                { deferred_values =
                    { xi
@@ -749,7 +749,7 @@ module Wrap = struct
           ]
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
-      let of_data
+      let[@warning "-45"] of_data
           Hlist.HlistId.
             [ fp
             ; challenge
@@ -988,7 +988,7 @@ module Step = struct
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ]
 
-        let to_data
+        let[@warning "-45"] to_data
             ({ deferred_values =
                  { xi
                  ; bulletproof_challenges
@@ -1041,7 +1041,7 @@ module Step = struct
               ~f:Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ]
 
-        let of_data
+        let[@warning "-45"] of_data
             Hlist.HlistId.
               [ Vector.
                   [ combined_inner_product
@@ -1141,7 +1141,7 @@ module Step = struct
             Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
         ; messages_for_next_step_proof
         }
-    end
+    end [@@warning "-45"]
 
     let typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -1180,7 +1180,7 @@ module Step = struct
       }
     [@@deriving sexp, compare, yojson]
 
-    let to_data
+    let[@warning "-45"] to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
         } ~option_map =
@@ -1191,7 +1191,7 @@ module Step = struct
       ; messages_for_next_wrap_proof
       ]
 
-    let of_data
+    let[@warning "-45"] of_data
         Hlist.HlistId.
           [ unfinalized_proofs
           ; messages_for_next_step_proof
