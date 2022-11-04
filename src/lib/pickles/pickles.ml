@@ -397,7 +397,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -448,7 +448,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module No_recursion_return = struct
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -622,7 +622,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let _tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -753,7 +753,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let _tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -1159,7 +1159,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'm )
               Step_branch_data.t
           end in
-          let proofs_verifieds = Vector.[ 2 ] in
+          let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
@@ -1167,7 +1167,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
               rule ~wrap_domains ~proofs_verifieds
           in
-          let step_domains = Vector.[ inner_step_data.domains ] in
+          let step_domains = Vector.singleton inner_step_data.domains in
           let step_keypair =
             let etyp =
               Impls.Step.input ~feature_flags
@@ -1886,7 +1886,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let _tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
@@ -2394,9 +2394,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2447,9 +2445,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2500,9 +2496,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        module Statement = Statement
-
-        let tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2583,7 +2577,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:maybe_features ~typ:Field.typ
 
-        let _tag, _, p, Provers.[ step ] =
+        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit

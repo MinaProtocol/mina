@@ -73,9 +73,10 @@ module Wrap = struct
             type 'scalar_challenge t = { joint_combiner : 'scalar_challenge }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            let to_struct l = Hlist.HlistId.[ l.joint_combiner ]
+            let[@warning "-45"] to_struct l = Hlist.HlistId.[ l.joint_combiner ]
 
-            let of_struct Hlist.HlistId.[ joint_combiner ] = { joint_combiner }
+            let[@warning "-45"] of_struct Hlist.HlistId.[ joint_combiner ] =
+              { joint_combiner }
 
             let map ~f { joint_combiner } =
               { joint_combiner = f joint_combiner }
@@ -150,7 +151,7 @@ module Wrap = struct
               ; runtime_tables
               ]
 
-            let to_data
+            let[@warning "-45"] to_data
                 { range_check0
                 ; range_check1
                 ; foreign_field_add
@@ -171,7 +172,7 @@ module Wrap = struct
                 ; runtime_tables
                 ]
 
-            let of_data
+            let[@warning "-45"] of_data
                 Hlist.HlistId.
                   [ range_check0
                   ; range_check1
@@ -212,7 +213,7 @@ module Wrap = struct
                   | None ->
                       Plonk_types.Opt.None )
 
-            let refine_opt feature_flags t =
+            let[@warning "-45"] refine_opt feature_flags t =
               let flags = of_feature_flags feature_flags in
               map2 flags t ~f:(fun flag v ->
                   match (flag, v) with
@@ -734,7 +735,7 @@ module Wrap = struct
 
     open Snarky_backendless.H_list
 
-    let to_hlist
+    let[@warning "-45"] to_hlist
         { app_state
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
@@ -746,7 +747,7 @@ module Wrap = struct
       ; old_bulletproof_challenges
       ]
 
-    let of_hlist
+    let[@warning "-45"] of_hlist
         ([ app_state
          ; dlog_plonk_index
          ; challenge_polynomial_commitments
@@ -939,7 +940,7 @@ module Wrap = struct
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
-      let to_data
+      let[@warning "-45"] to_data
           ({ proof_state =
                { deferred_values =
                    { xi
@@ -1013,7 +1014,7 @@ module Wrap = struct
           ]
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
-      let of_data
+      let[@warning "-45"] of_data
           Hlist.HlistId.
             [ fp
             ; challenge
@@ -1308,7 +1309,7 @@ module Step = struct
               .spec impl lookup.zero feature_flags
             ]
 
-        let to_data
+        let[@warning "-45"] to_data
             ({ deferred_values =
                  { xi
                  ; bulletproof_challenges
@@ -1369,7 +1370,7 @@ module Step = struct
           ; optional_column_scalars
           ]
 
-        let of_data
+        let[@warning "-45"] of_data
             Hlist.HlistId.
               [ Vector.
                   [ combined_inner_product
@@ -1483,7 +1484,7 @@ module Step = struct
             Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
         ; messages_for_next_step_proof
         }
-    end
+    end [@@warning "-45"]
 
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -1522,7 +1523,7 @@ module Step = struct
       }
     [@@deriving sexp, compare, yojson]
 
-    let to_data
+    let[@warning "-45"] to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
         } ~option_map ~to_opt =
@@ -1533,7 +1534,7 @@ module Step = struct
       ; messages_for_next_wrap_proof
       ]
 
-    let of_data
+    let[@warning "-45"] of_data
         Hlist.HlistId.
           [ unfinalized_proofs
           ; messages_for_next_step_proof

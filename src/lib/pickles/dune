@@ -17,7 +17,7 @@
  ;
  ; 44: open-shadow-identifier (operation overloading is common in the codebase)
  (flags
-  (:standard -w +a-4-40..42-44-70-45
+  (:standard -w +a-4-40..42-44-70
              -warn-error +a-70)
    -open Core_kernel)
  (instrumentation
