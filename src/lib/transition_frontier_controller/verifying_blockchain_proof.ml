@@ -145,11 +145,12 @@ let promote_to ~context ~mark_processed_and_promote ~header ~transition_states
     |> With_hash.data |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
-  let for_start =
-    collect_dependent_and_pass_the_baton_by_hash ~transition_states
-      ~dsu:Context.processed_dsu parent_hash
-  in
-  start ~context ~mark_processed_and_promote ~transition_states for_start ;
+  ( if aux.Transition_state.received_via_gossip then
+    let for_start =
+      collect_dependent_and_pass_the_baton_by_hash ~transition_states
+        ~dsu:Context.processed_dsu parent_hash
+    in
+    start ~context ~mark_processed_and_promote ~transition_states for_start ) ;
   Transition_state.Verifying_blockchain_proof
     { header = Gossip.pre_initial_valid_of_received_header header
     ; gossip_data
@@ -177,7 +178,7 @@ let make_processed ~context ~mark_processed_and_promote ~transition_states
   Option.value ~default:()
   @@ let%map.Option for_restart =
        update_to_processing_done ~transition_states ~state_hash
-         ~dsu:Context.processed_dsu ~reuse_ctx:true ~force_baton:true header
+         ~dsu:Context.processed_dsu ~reuse_ctx:true header
      in
      start ~context ~mark_processed_and_promote ~transition_states for_restart ;
      mark_processed_and_promote [ state_hash ]

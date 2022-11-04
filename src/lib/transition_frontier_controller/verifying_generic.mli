@@ -56,16 +56,14 @@ module Make : functor
       there is an unprocessed ancestor covered by this active progress, action won't
       be interrupted and it will be assigned to the first unprocessed ancestor.
 
-      If [baton] is set to [true] in the transition being updated or if [force_baton]
-      is [true], then baton will be passed to the next transition with
-      [Substate.Processing (Substate.In_progress _)] and transitions in between will
-      get restarted.  *)
+      If [baton] is set to [true] in the transition being updated the baton will be
+      passed to the next transition with [Substate.Processing (Substate.In_progress _)]
+      and transitions in between will get restarted.  *)
   val update_to_processing_done :
        transition_states:Transition_state.t State_hash.Table.t
     -> state_hash:State_hash.t
     -> dsu:Processed_skipping.Dsu.t
     -> ?reuse_ctx:bool
-    -> ?force_baton:bool
     -> F.proceessing_result
     -> Transition_state.t list option
 
