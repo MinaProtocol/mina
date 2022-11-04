@@ -28,20 +28,15 @@ let mark_done ~transition_states state_hash =
   | _ ->
       None
 
+(** Save new transition state and process the hint.
+
+    When state is [Transition_state.Downloading_body], pass the baton
+    to ancestor (and restart failed) if [baton] is [true]. 
+*)
 let handle_preserve_hint ~mark_processed_and_promote ~transition_states ~context
     (st, hint) =
-  let st =
-    match (st, hint) with
-    | Transition_state.Downloading_body _, `Mark_downloading_body_processed _ ->
-        Downloading_body.pass_the_baton ~transition_states ~context
-          ~mark_processed_and_promote st
-    | _ ->
-        st
-  in
-  let state_hash =
-    (Transition_state.State_functions.transition_meta st).state_hash
-  in
-  State_hash.Table.set transition_states ~key:state_hash ~data:st ;
+  let meta = Transition_state.State_functions.transition_meta st in
+  State_hash.Table.set transition_states ~key:meta.state_hash ~data:st ;
   match hint with
   | `Nop ->
       ()
@@ -49,11 +44,17 @@ let handle_preserve_hint ~mark_processed_and_promote ~transition_states ~context
       Verifying_blockchain_proof.make_processed ~context
         ~mark_processed_and_promote ~transition_states iv_header
   | `Start_processing_verifying_complete_works state_hash ->
-      Verifying_complete_works.start_processing ~context
+      Verifying_complete_works.make_independent ~context
         ~mark_processed_and_promote ~transition_states state_hash
   | `Mark_downloading_body_processed ivar_opt ->
+      ( match st with
+      | Downloading_body { baton = true; _ } ->
+          Downloading_body.pass_the_baton ~transition_states ~context
+            ~mark_processed_and_promote meta.parent_state_hash
+      | _ ->
+          () ) ;
       Option.iter ivar_opt ~f:(Fn.flip Ivar.fill_if_empty ()) ;
-      mark_processed_and_promote [ state_hash ]
+      mark_processed_and_promote [ meta.state_hash ]
 
 let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in

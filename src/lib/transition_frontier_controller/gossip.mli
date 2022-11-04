@@ -16,6 +16,17 @@ val verify_header_is_relevant :
   -> Mina_block.Header.with_hash
   -> [ `Irrelevant | `Preserve_gossip_data | `Relevant ]
 
+(** Preserve body in the transition's state.
+    
+    Function is called when a gossip with a body is received or
+    when a transition is retrieved through ancestry retrieval with a body
+    (i.e. via using old RPCs).
+
+    In case of [Transition_state.Downloading_body] state in [Substate.Failed] or
+    [Substate.Processing (Substate.In_progress _)] statuses, status is changed
+    to [Substate.Processing (Substate.Done _)] and [`Mark_downloading_body_processed]
+    hint is returned. Returned hint is [`Nop] otherwise.
+*)
 val preserve_body :
      body:Mina_block.Body.t
   -> Transition_state.t
