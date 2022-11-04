@@ -2455,7 +2455,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           Kimchi_bindings.Protocol.SRS.Fp
                           .batch_accumulator_generate urs 1 chals
                         in
-                        let sg_new =
+                        let[@warning "-4"] sg_new =
                           match sg_new with
                           | [| Kimchi_types.Finite x |] ->
                               x
@@ -2489,7 +2489,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 N1
                             | S (S Z) ->
                                 N2
-                            | _ ->
+                            | S _ ->
                                 assert false )
                         ; domain_log2 =
                             Composition_types.Branch_data.Domain_log2.of_int_exn
@@ -3364,7 +3364,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 N1
                             | S (S Z) ->
                                 N2
-                            | _ ->
+                            | S _ ->
                                 assert false )
                         ; domain_log2 =
                             Composition_types.Branch_data.Domain_log2.of_int_exn

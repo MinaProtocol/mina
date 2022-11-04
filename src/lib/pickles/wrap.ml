@@ -80,6 +80,8 @@ module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 
 let%test_unit "scalars consistency" =
   let module E = struct
+    [@@@warning "-4"]
+
     type t =
       | Add of t * t
       | Mul of t * t
@@ -277,7 +279,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                   N1
               | S (S Z) ->
                   N2
-              | _ ->
+              | S _ ->
                   assert false )
           ; domain_log2 =
               Branch_data.Domain_log2.of_int_exn
