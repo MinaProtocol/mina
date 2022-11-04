@@ -587,13 +587,14 @@ struct
                             None
                         | `Add_with_correction (_, (_, corr)) ->
                             Some corr ) )
-                      ~f:Ops.add_fast )
+                      ~f:(Ops.add_fast ?check_finite:None) )
               in
               with_label __LOC__ (fun () ->
                   let init =
                     List.fold
                       (List.filter_map ~f:Fn.id constant_part)
-                      ~init:correction ~f:Ops.add_fast
+                      ~init:correction
+                      ~f:(Ops.add_fast ?check_finite:None)
                   in
                   List.fold terms ~init ~f:(fun acc term ->
                       match term with
@@ -660,8 +661,10 @@ struct
         in
         let ft_comm =
           with_label __LOC__ (fun () ->
-              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
-                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+              Common.ft_comm
+                ~add:(Ops.add_fast ?check_finite:None)
+                ~scale:scale_fast ~negate:Inner_curve.negate
+                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
                 ~verification_key:m ~plonk ~alpha ~t_comm )
         in
         let bulletproof_challenges =
