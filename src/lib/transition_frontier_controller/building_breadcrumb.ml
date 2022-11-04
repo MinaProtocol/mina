@@ -39,7 +39,7 @@ let validate_frontier_dependencies ~transition_states
       |> Frontier_base.Breadcrumb.block_with_hash )
     ~is_block_in_frontier
 
-(** [update_status_from_processing ~state_hash status] updates status of a transition
+(** [update_status_for_unprocessed ~state_hash status] updates status of a transition
   corresponding to [state_hash] that is in [Building_breadcrumb] state.
   
   Pre-condition: new [status] is either [Failed] or [Processing].

@@ -13,7 +13,7 @@ val promote_to :
   -> aux:Transition_state.aux_data
   -> Transition_state.t
 
-(** [start_processing block] starts verification of complete works for
+(** [make_independent block] starts verification of complete works for
     a transition corresponding to the [block].
 
     This function is called when a gossip is received for a transition
@@ -22,7 +22,7 @@ val promote_to :
     Pre-condition: transition corresponding to [block] has
     [Substate.Processing Dependent] status.
 *)
-val start_processing :
+val make_independent :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)
   -> transition_states:Transition_state.t State_hash.Table.t

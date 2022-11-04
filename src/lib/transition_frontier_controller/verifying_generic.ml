@@ -2,19 +2,33 @@ open Mina_base
 open Core_kernel
 open Context
 
+(** Summary of the state relevant to verifying generic functions  *)
 type 'a data = { substate : 'a Substate_types.t; baton : bool }
 
 module Make (F : sig
+  (** Result of processing *)
   type proceessing_result
 
+  (** Resolve all gossips held in the state to [`Ignore] *)
   val ignore_gossip : Transition_state.t -> Transition_state.t
 
+  (** Extract data from the state *)
   val to_data : Transition_state.t -> proceessing_result data option
 
+  (** Update state witht the given data *)
   val update :
     proceessing_result data -> Transition_state.t -> Transition_state.t
 end) =
 struct
+  (** Collect transitions that are either in [Substate.Processing Substate.Dependent]
+      or in [Substate.Failed] statuses and set [baton] to [true] for the next
+      ancestor in [Substate.Processing (Substate.In_progress _)] status.
+      
+      Traversal starts with a transition represented by its state and the state is also
+      included into result (or has [baton] set to [true]) if it satisfies the conditions.
+        
+      Function does nothing and returns [[]] if [F.to_data] returns [Nothing] on provided state.
+      *)
   let collect_dependent_and_pass_the_baton ~transition_states ~dsu top_state =
     let ts =
       Processed_skipping.collect_to_in_progress ~state_functions
@@ -38,6 +52,17 @@ struct
     | _ ->
         []
 
+  (** Try to reuse processing context to handle some of 
+      ancestors due for restart.
+      
+      Function takes a list of ancestors due to restart (in parent-first order)
+      and returns a prefix of it with transitions that can't be covered
+      by the processing context provided.
+
+      If some transitions can be handled with given context, top transition
+      will be assigned to this context and
+      [Substate.Processing (Substate.In_progress ctx)] status.
+      *)
   let try_to_reuse ~transition_states ts ctx =
     match ctx with
     | Substate.In_progress { downto_; timeout = _; interrupt_ivar; holder } ->
@@ -65,6 +90,15 @@ struct
     | _ ->
         ts
 
+  (** Collect transitions that are either in [Substate.Processing Substate.Dependent]
+      or in [Substate.Failed] statuses and set [baton] to [true] for the next
+      ancestor in [Substate.Processing (Substate.In_progress _)] status.
+      
+      Traversal starts with a transition represented by its state hash and the state is also
+      included into result (or has [baton] set to [true]) if it satisfies the conditions.
+        
+      Function does nothing and returns [[]] if [F.to_data] returns [Nothing] on provided state.
+      *)
   let collect_dependent_and_pass_the_baton_by_hash ~dsu ~transition_states
       state_hash =
     Option.value ~default:[]
@@ -72,6 +106,14 @@ struct
        let%map.Option _ = F.to_data p in
        collect_dependent_and_pass_the_baton ~dsu ~transition_states p
 
+  (* TODO Formal proof why we pass context to next unprocessed and if it
+     isn't possible, then context is useless *)
+
+  (** Pass processing context to the next unprocessed state.
+      If the next unprocessed state is in [Substate.Processing (Substate.In_progress )]
+      status or if it's below context's [downto_] field, context is canceled
+      and no transition gets updated.
+  *)
   let pass_ctx_to_next_unprocessed ~transition_states ~dsu parent_hash ctx_opt =
     Option.iter ~f:Fn.id
     @@ let%bind.Option ctx = ctx_opt in
@@ -100,6 +142,16 @@ struct
        | _ ->
            ()
 
+  (** Update status to [Substate.Processing (Substate.Done _)]. 
+      
+      If [reuse_ctx] is [true], if there is an [Substate.In_progress] context and
+      there is an unprocessed ancestor covered by this active progress, action won't
+      be interrupted and it will be assigned to the first unprocessed ancestor.
+
+      If [baton] is set to [true] in the transition being updated or if [force_baton]
+      is [true], then baton will be passed to the next transition with
+      [Substate.Processing (Substate.In_progress _)] and transitions in between will
+      get restarted.  *)
   let update_to_processing_done ~transition_states ~state_hash ~dsu
       ?(reuse_ctx = false) ?(force_baton = false) res =
     let%bind.Option st = State_hash.Table.find transition_states state_hash in
@@ -127,12 +179,16 @@ struct
         ~f:(try_to_reuse ~transition_states deps)
         ~default:deps ctx_opt
     else (
-      (* TODO Formal proof why we pass context to next unprocessed and if it
-         isn't possible, then context is useless *)
       pass_ctx_to_next_unprocessed ~transition_states ~dsu
         meta.parent_state_hash ctx_opt ;
       [] )
 
+  (** Update status to [Substate.Failed].
+
+      If [baton] is set to [true] in the transition being updated the baton
+      will be passed to the next transition with
+      [Substate.Processing (Substate.In_progress _)] and transitions in between will
+      get restarted.  *)
   let update_to_failed ~transition_states ~state_hash ~dsu error =
     let%bind.Option st = State_hash.Table.find transition_states state_hash in
     let%bind.Option { substate; baton } = F.to_data st in
