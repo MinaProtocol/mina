@@ -2127,7 +2127,7 @@ var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
 // Provides: prover_to_json
 // Requires: plonk_wasm
 var prover_to_json = function (prover_index) {
-    return plonk_wasm.prover_to_json(index);
+    return plonk_wasm.prover_to_json(prover_index);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_batch_verify

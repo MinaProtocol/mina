@@ -221,6 +221,18 @@ module Keypair = Impl.Keypair
 module Verification_key = Impl.Verification_key
 module Typ = Impl.Typ
 
+(* helper functions *)
+
+external prover_to_json :
+  Kimchi_bindings.Protocol.Index.Fp.t -> Js.js_string Js.t = "prover_to_json"
+
+let keypair_to_json (keypair : Keypair.t) : Js.js_string Js.t =
+  let wrapper_prover_index : Backend.Keypair.t = Keypair.pk keypair in
+  let prover_index : Kimchi_bindings.Protocol.Index.Fp.t =
+    wrapper_prover_index.index
+  in
+  prover_to_json prover_index
+
 let singleton_array (type a) (x : a) : a Js.js_array Js.t =
   let arr = new%js Js.array_empty in
   arr##push x |> ignore ;
@@ -3203,6 +3215,8 @@ module Ledger = struct
     |> Array.map ~f:to_js_field_unchecked
     |> Js.array
 
+  (* global *)
+
   let () =
     let static name thing = Js.Unsafe.set ledger_class (Js.string name) thing in
     let static_method name f =
@@ -3215,6 +3229,8 @@ module Ledger = struct
     static_method "customTokenIdChecked" custom_token_id_checked ;
     static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
+
+    static_method "keypairToJson" keypair_to_json ;
 
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
@@ -3352,6 +3368,8 @@ module Ledger = struct
     method_ "addAccount" add_account ;
     method_ "applyJsonTransaction" apply_json_transaction
 end
+
+(* export stuff *)
 
 let export () =
   Js.export "Field" field_class ;
