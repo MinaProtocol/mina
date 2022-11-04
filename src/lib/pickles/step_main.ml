@@ -192,7 +192,7 @@ let step_main :
     else Types_map.uses_lookup d
   in
   let lookup_usage =
-    let rec go :
+    let[@warning "-4"] rec go :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
@@ -221,7 +221,7 @@ let step_main :
         -> (ns2, br) Length.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 ->
-      match (ds, ns1, ns2, ld, ln1, ln2) with
+      match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2) with
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->

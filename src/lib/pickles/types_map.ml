@@ -293,7 +293,7 @@ let add_side_loaded ~name permanent =
   tag
 
 let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
-  (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
+  assert (match kind with Side_loaded -> true | Compiled -> false) ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
         assert false

@@ -24,6 +24,7 @@ module Step = struct
             sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
               header.kind.identifier n header.identifying_hash
     end
+    [@@warning "-4"]
   end
 
   let storable =
@@ -139,6 +140,7 @@ module Wrap = struct
             sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
+    [@@warning "-4"]
 
     module Proving = struct
       type t =

@@ -551,7 +551,7 @@ struct
             List.partition_map
               Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
               ~f:(fun (i, t) ->
-                match t with
+                match[@warning "-4"] t with
                 | `Field (Constant c, _) ->
                     First
                       ( if Field.Constant.(equal zero) c then None
@@ -635,13 +635,14 @@ struct
         *)
         let sponge =
           match sponge with
-          | { state; sponge_state; params; needs_final_permute_if_empty = _ }
-            -> (
-              match sponge_state with
-              | Squeezed n ->
-                  S.make ~state ~sponge_state:(Squeezed n) ~params
-              | _ ->
-                  assert false )
+          | { state
+            ; sponge_state = Squeezed n
+            ; params
+            ; needs_final_permute_if_empty = _
+            } ->
+              S.make ~state ~sponge_state:(Squeezed n) ~params
+          | { sponge_state = Absorbing _; _ } ->
+              assert false
         in
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in

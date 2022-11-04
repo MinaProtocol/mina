@@ -109,7 +109,7 @@ struct
     with_label __LOC__ (fun () ->
         let constant_part, non_constant_part =
           List.partition_map (Array.to_list ts) ~f:(fun (t, g) ->
-              match t with
+              match[@warning "-4"] t with
               | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                   First
                     ( if Field.Constant.(equal zero) c then None
@@ -416,7 +416,7 @@ struct
         List.partition_map
           (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
           ~f:(fun (i, t) ->
-            match t with
+            match[@warning "-4"] t with
             | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                 First
                   ( if Field.Constant.(equal zero) c then None

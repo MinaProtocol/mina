@@ -92,7 +92,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     let get_eval =
       match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
     in
-    match (col : Scalars.Column.t) with
+    match[@warning "-4"] (col : Scalars.Column.t) with
     | Witness i ->
         get_eval witness.(i)
     | Index Poseidon ->
