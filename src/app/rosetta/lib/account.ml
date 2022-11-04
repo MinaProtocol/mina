@@ -38,7 +38,7 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 int64)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -60,7 +60,7 @@ module Sql = struct
 
               )
 
-              SELECT DISTINCT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+              SELECT DISTINCT full_chain.height,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -80,16 +80,16 @@ module Sql = struct
               WHERE pks.value = $1
               AND full_chain.height <= $2
 
-              ORDER BY (full_chain.height) DESC
+              ORDER BY full_chain.height DESC
               LIMIT 1
 |sql}
 
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 int64)
         {sql|
-                SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+                SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
 
                 FROM blocks b
                 INNER JOIN accounts_accessed ac ON ac.block_id = b.id
@@ -200,7 +200,7 @@ module Sql = struct
              the spec but Coinbase confirmed we can return 0.
              https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return (0L, UInt64.zero)
-        | Some (_, last_relevant_command_balance, nonce), None ->
+        | Some (_, _, last_relevant_command_balance, nonce), None ->
           (* This account has no special vesting, so just use its last
              known balance from the command.*)
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
@@ -223,7 +223,7 @@ module Sql = struct
                   + incremental_balance_since_genesis)
               |> UInt64.to_int64, UInt64.zero)
         | ( Some
-              ( last_relevant_command_global_slot_since_genesis
+              (_, last_relevant_command_global_slot_since_genesis
               , last_relevant_command_balance, nonce )
           , Some timing_info ) ->
           (* This block was in the genesis ledger and has been
@@ -252,7 +252,7 @@ module Sql = struct
              requested a block from before account creation. Should it
              error instead? Need to clarify with Coinbase team. *)
            0L
-        | Some (_, last_relevant_command_balance, _), _ ->
+        | Some (_, _, last_relevant_command_balance, _), _ ->
           (* This account was involved in a command and we don't care
              about its vesting, so just use the last known balance from
              the command *)
