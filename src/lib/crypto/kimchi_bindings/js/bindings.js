@@ -5,7 +5,7 @@
 
 // Provides: caml_bytes_of_uint8array
 // Requires: caml_create_bytes, caml_bytes_unsafe_set
-var caml_bytes_of_uint8array = function(uint8array) {
+var caml_bytes_of_uint8array = function (uint8array) {
     var length = uint8array.length;
     var ocaml_bytes = caml_create_bytes(length);
     for (var i = 0; i < length; i++) {
@@ -17,7 +17,7 @@ var caml_bytes_of_uint8array = function(uint8array) {
 
 // Provides: caml_bytes_to_uint8array
 // Requires: caml_ml_bytes_length, caml_bytes_unsafe_get
-var caml_bytes_to_uint8array = function(ocaml_bytes) {
+var caml_bytes_to_uint8array = function (ocaml_bytes) {
     var length = caml_ml_bytes_length(ocaml_bytes);
     var bytes = new joo_global_object.Uint8Array(length);
     for (var i = 0; i < length; i++) {
@@ -61,25 +61,25 @@ var caml_bigint_256_print = plonk_wasm.caml_bigint_256_print
 
 // Provides: caml_bigint_256_to_string
 // Requires: plonk_wasm, caml_string_of_jsstring
-var caml_bigint_256_to_string = function(x) {
+var caml_bigint_256_to_string = function (x) {
     return caml_string_of_jsstring(plonk_wasm.caml_bigint_256_to_string(x));
 };
 
 // Provides: caml_bigint_256_test_bit
 // Requires: plonk_wasm, caml_js_to_bool
-var caml_bigint_256_test_bit = function(x, i) {
+var caml_bigint_256_test_bit = function (x, i) {
     return caml_js_to_bool(plonk_wasm.caml_bigint_256_test_bit(x, i));
 };
 
 // Provides: caml_bigint_256_to_bytes
 // Requires: plonk_wasm, caml_bytes_of_uint8array
-var caml_bigint_256_to_bytes = function(x) {
+var caml_bigint_256_to_bytes = function (x) {
     return caml_bytes_of_uint8array(plonk_wasm.caml_bigint_256_to_bytes(x));
 };
 
 // Provides: caml_bigint_256_of_bytes
 // Requires: plonk_wasm, caml_bytes_to_uint8array
-var caml_bigint_256_of_bytes = function(ocaml_bytes) {
+var caml_bigint_256_of_bytes = function (ocaml_bytes) {
     return plonk_wasm.caml_bigint_256_of_bytes(caml_bytes_to_uint8array(ocaml_bytes));
 };
 
@@ -92,14 +92,14 @@ var caml_bigint_256_deep_copy = plonk_wasm.caml_bigint_256_deep_copy
 
 
 // Provides: caml_pasta_fp_copy
-var caml_pasta_fp_copy = function(x, y) {
+var caml_pasta_fp_copy = function (x, y) {
     for (var i = 0, l = x.length; i < l; i++) {
         x[i] = y[i];
     }
 };
 
 // Provides: caml_option_of_maybe_undefined
-var caml_option_of_maybe_undefined = function(x) {
+var caml_option_of_maybe_undefined = function (x) {
     if (x === undefined) {
         return 0; // None
     } else {
@@ -108,7 +108,7 @@ var caml_option_of_maybe_undefined = function(x) {
 };
 
 // Provides: caml_option_to_maybe_undefined
-var caml_option_to_maybe_undefined = function(x) {
+var caml_option_to_maybe_undefined = function (x) {
     if (x === 0) { // None
         return undefined;
     } else {
@@ -146,7 +146,7 @@ var caml_pasta_fp_div = plonk_wasm.caml_pasta_fp_div
 
 // Provides: caml_pasta_fp_inv
 // Requires: plonk_wasm, caml_option_of_maybe_undefined
-var caml_pasta_fp_inv = function(x) {
+var caml_pasta_fp_inv = function (x) {
     return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fp_inv(x));
 };
 
@@ -156,13 +156,13 @@ var caml_pasta_fp_square = plonk_wasm.caml_pasta_fp_square
 
 // Provides: caml_pasta_fp_is_square
 // Requires: plonk_wasm, caml_js_to_bool
-var caml_pasta_fp_is_square = function(x) {
+var caml_pasta_fp_is_square = function (x) {
     return caml_js_to_bool(plonk_wasm.caml_pasta_fp_is_square(x));
 };
 
 // Provides: caml_pasta_fp_sqrt
 // Requires: plonk_wasm, caml_option_of_maybe_undefined
-var caml_pasta_fp_sqrt = function(x) {
+var caml_pasta_fp_sqrt = function (x) {
     return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fp_sqrt(x));
 };
 
@@ -172,7 +172,7 @@ var caml_pasta_fp_of_int = plonk_wasm.caml_pasta_fp_of_int
 
 // Provides: caml_pasta_fp_to_string
 // Requires: plonk_wasm, caml_string_of_jsstring
-var caml_pasta_fp_to_string = function(x) {
+var caml_pasta_fp_to_string = function (x) {
     return caml_string_of_jsstring(plonk_wasm.caml_pasta_fp_to_string(x));
 };
 
@@ -188,25 +188,25 @@ var caml_pasta_fp_print = plonk_wasm.caml_pasta_fp_print
 
 // Provides: caml_pasta_fp_mut_add
 // Requires: caml_pasta_fp_copy, caml_pasta_fp_add
-var caml_pasta_fp_mut_add = function(x, y) {
+var caml_pasta_fp_mut_add = function (x, y) {
     caml_pasta_fp_copy(x, caml_pasta_fp_add(x, y));
 };
 
 // Provides: caml_pasta_fp_mut_sub
 // Requires: caml_pasta_fp_copy, caml_pasta_fp_sub
-var caml_pasta_fp_mut_sub = function(x, y) {
+var caml_pasta_fp_mut_sub = function (x, y) {
     caml_pasta_fp_copy(x, caml_pasta_fp_sub(x, y));
 };
 
 // Provides: caml_pasta_fp_mut_mul
 // Requires: caml_pasta_fp_copy, caml_pasta_fp_mul
-var caml_pasta_fp_mut_mul = function(x, y) {
+var caml_pasta_fp_mut_mul = function (x, y) {
     caml_pasta_fp_copy(x, caml_pasta_fp_mul(x, y));
 };
 
 // Provides: caml_pasta_fp_mut_square
 // Requires: caml_pasta_fp_copy, caml_pasta_fp_square
-var caml_pasta_fp_mut_square = function(x) {
+var caml_pasta_fp_mut_square = function (x) {
     caml_pasta_fp_copy(x, caml_pasta_fp_square(x));
 };
 
@@ -244,14 +244,14 @@ var caml_pasta_fp_domain_generator = plonk_wasm.caml_pasta_fp_domain_generator
 
 // Provides: caml_pasta_fp_to_bytes
 // Requires: plonk_wasm, caml_bytes_of_uint8array
-var caml_pasta_fp_to_bytes = function(x) {
+var caml_pasta_fp_to_bytes = function (x) {
     var res = plonk_wasm.caml_pasta_fp_to_bytes(x);
     return caml_bytes_of_uint8array(plonk_wasm.caml_pasta_fp_to_bytes(x));
 };
 
 // Provides: caml_pasta_fp_of_bytes
 // Requires: plonk_wasm, caml_bytes_to_uint8array
-var caml_pasta_fp_of_bytes = function(ocaml_bytes) {
+var caml_pasta_fp_of_bytes = function (ocaml_bytes) {
     return plonk_wasm.caml_pasta_fp_of_bytes(caml_bytes_to_uint8array(ocaml_bytes));
 };
 
@@ -264,7 +264,7 @@ var caml_pasta_fp_deep_copy = plonk_wasm.caml_pasta_fp_deep_copy
 
 
 // Provides: caml_pasta_fq_copy
-var caml_pasta_fq_copy = function(x, y) {
+var caml_pasta_fq_copy = function (x, y) {
     for (var i = 0, l = x.length; i < l; i++) {
         x[i] = y[i];
     }
@@ -300,7 +300,7 @@ var caml_pasta_fq_div = plonk_wasm.caml_pasta_fq_div
 
 // Provides: caml_pasta_fq_inv
 // Requires: plonk_wasm, caml_option_of_maybe_undefined
-var caml_pasta_fq_inv = function(x) {
+var caml_pasta_fq_inv = function (x) {
     return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fq_inv(x));
 };
 
@@ -310,13 +310,13 @@ var caml_pasta_fq_square = plonk_wasm.caml_pasta_fq_square
 
 // Provides: caml_pasta_fq_is_square
 // Requires: plonk_wasm, caml_js_to_bool
-var caml_pasta_fq_is_square = function(x) {
+var caml_pasta_fq_is_square = function (x) {
     return caml_js_to_bool(plonk_wasm.caml_pasta_fq_is_square(x));
 };
 
 // Provides: caml_pasta_fq_sqrt
 // Requires: plonk_wasm, caml_option_of_maybe_undefined
-var caml_pasta_fq_sqrt = function(x) {
+var caml_pasta_fq_sqrt = function (x) {
     return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fq_sqrt(x));
 };
 
@@ -326,7 +326,7 @@ var caml_pasta_fq_of_int = plonk_wasm.caml_pasta_fq_of_int
 
 // Provides: caml_pasta_fq_to_string
 // Requires: plonk_wasm, caml_string_of_jsstring
-var caml_pasta_fq_to_string = function(x) {
+var caml_pasta_fq_to_string = function (x) {
     return caml_string_of_jsstring(plonk_wasm.caml_pasta_fq_to_string(x));
 };
 
@@ -342,25 +342,25 @@ var caml_pasta_fq_print = plonk_wasm.caml_pasta_fq_print
 
 // Provides: caml_pasta_fq_mut_add
 // Requires: caml_pasta_fq_copy, caml_pasta_fq_add
-var caml_pasta_fq_mut_add = function(x, y) {
+var caml_pasta_fq_mut_add = function (x, y) {
     caml_pasta_fq_copy(x, caml_pasta_fq_add(x, y));
 };
 
 // Provides: caml_pasta_fq_mut_sub
 // Requires: caml_pasta_fq_copy, caml_pasta_fq_sub
-var caml_pasta_fq_mut_sub = function(x, y) {
+var caml_pasta_fq_mut_sub = function (x, y) {
     caml_pasta_fq_copy(x, caml_pasta_fq_sub(x, y));
 };
 
 // Provides: caml_pasta_fq_mut_mul
 // Requires: caml_pasta_fq_copy, caml_pasta_fq_mul
-var caml_pasta_fq_mut_mul = function(x, y) {
+var caml_pasta_fq_mut_mul = function (x, y) {
     caml_pasta_fq_copy(x, caml_pasta_fq_mul(x, y));
 };
 
 // Provides: caml_pasta_fq_mut_square
 // Requires: caml_pasta_fq_copy, caml_pasta_fq_square
-var caml_pasta_fq_mut_square = function(x) {
+var caml_pasta_fq_mut_square = function (x) {
     caml_pasta_fq_copy(x, caml_pasta_fq_square(x));
 };
 
@@ -398,14 +398,14 @@ var caml_pasta_fq_domain_generator = plonk_wasm.caml_pasta_fq_domain_generator
 
 // Provides: caml_pasta_fq_to_bytes
 // Requires: plonk_wasm, caml_bytes_of_uint8array
-var caml_pasta_fq_to_bytes = function(x) {
+var caml_pasta_fq_to_bytes = function (x) {
     var res = plonk_wasm.caml_pasta_fq_to_bytes(x);
     return caml_bytes_of_uint8array(plonk_wasm.caml_pasta_fq_to_bytes(x));
 };
 
 // Provides: caml_pasta_fq_of_bytes
 // Requires: plonk_wasm, caml_bytes_to_uint8array
-var caml_pasta_fq_of_bytes = function(ocaml_bytes) {
+var caml_pasta_fq_of_bytes = function (ocaml_bytes) {
     return plonk_wasm.caml_pasta_fq_of_bytes(caml_bytes_to_uint8array(ocaml_bytes));
 };
 
@@ -483,7 +483,7 @@ var js_class_vector_of_rust_vector = function (v, klass) {
 
 
 // Provides: caml_fp_vector_create
-var caml_fp_vector_create = function() {
+var caml_fp_vector_create = function () {
     return [0]; // OCaml tag for arrays, so that we can use the same utility fns on both
 };
 
@@ -499,7 +499,7 @@ var caml_fp_vector_emplace_back = function (v, x) {
 
 // Provides: caml_fp_vector_get
 var caml_fp_vector_get = function (v, i) {
-    return new joo_global_object.Uint8Array(v[i+1]);
+    return new joo_global_object.Uint8Array(v[i + 1]);
 }
 
 // Provides: caml_fp_vector_to_rust
@@ -520,7 +520,7 @@ var caml_fp_vector_of_rust = function (v) {
 
 
 // Provides: caml_fq_vector_create
-var caml_fq_vector_create = function() {
+var caml_fq_vector_create = function () {
     return [0]; // OCaml tag for arrays, so that we can use the same utility fns on both
 };
 
@@ -536,7 +536,7 @@ var caml_fq_vector_emplace_back = function (v, x) {
 
 // Provides: caml_fq_vector_get
 var caml_fq_vector_get = function (v, i) {
-    return new joo_global_object.Uint8Array(v[i+1]);
+    return new joo_global_object.Uint8Array(v[i + 1]);
 }
 
 // Provides: caml_fq_vector_to_rust
@@ -586,7 +586,7 @@ var free_on_finalize = function (x) {
 
 
 // Provides: rust_affine_to_caml_affine
-var rust_affine_to_caml_affine = function(pt) {
+var rust_affine_to_caml_affine = function (pt) {
     var infinity = pt.infinity;
     if (infinity) {
         pt.free();
@@ -600,7 +600,7 @@ var rust_affine_to_caml_affine = function(pt) {
 };
 
 // Provides: rust_affine_of_caml_affine
-var rust_affine_of_caml_affine = function(pt, klass) {
+var rust_affine_of_caml_affine = function (pt, klass) {
     var res = new klass();
     if (pt === 0) {
         res.infinity = true;
@@ -620,7 +620,7 @@ var rust_affine_of_caml_affine = function(pt, klass) {
 
 // Provides: caml_pallas_one
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_one = function() {
+var caml_pallas_one = function () {
     var res = plonk_wasm.caml_pallas_one();
     free_on_finalize(res);
     return res;
@@ -628,7 +628,7 @@ var caml_pallas_one = function() {
 
 // Provides: caml_pallas_add
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_add = function(x, y) {
+var caml_pallas_add = function (x, y) {
     var res = plonk_wasm.caml_pallas_add(x, y);
     free_on_finalize(res);
     return res;
@@ -636,7 +636,7 @@ var caml_pallas_add = function(x, y) {
 
 // Provides: caml_pallas_sub
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_sub = function(x, y) {
+var caml_pallas_sub = function (x, y) {
     var res = plonk_wasm.caml_pallas_sub(x, y);
     free_on_finalize(res);
     return res;
@@ -644,7 +644,7 @@ var caml_pallas_sub = function(x, y) {
 
 // Provides: caml_pallas_negate
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_negate = function(x) {
+var caml_pallas_negate = function (x) {
     var res = plonk_wasm.caml_pallas_negate(x);
     free_on_finalize(res);
     return res;
@@ -652,7 +652,7 @@ var caml_pallas_negate = function(x) {
 
 // Provides: caml_pallas_double
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_double = function(x) {
+var caml_pallas_double = function (x) {
     var res = plonk_wasm.caml_pallas_double(x);
     free_on_finalize(res);
     return res;
@@ -660,7 +660,7 @@ var caml_pallas_double = function(x) {
 
 // Provides: caml_pallas_scale
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_scale = function(x, y) {
+var caml_pallas_scale = function (x, y) {
     var res = plonk_wasm.caml_pallas_scale(x, y);
     free_on_finalize(res);
     return res;
@@ -668,7 +668,7 @@ var caml_pallas_scale = function(x, y) {
 
 // Provides: caml_pallas_random
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_random = function() {
+var caml_pallas_random = function () {
     var res = plonk_wasm.caml_pallas_random();
     free_on_finalize(res);
     return res;
@@ -676,7 +676,7 @@ var caml_pallas_random = function() {
 
 // Provides: caml_pallas_rng
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_rng = function(i) {
+var caml_pallas_rng = function (i) {
     var res = plonk_wasm.caml_pallas_rng(i);
     free_on_finalize(res);
     return res;
@@ -684,14 +684,14 @@ var caml_pallas_rng = function(i) {
 
 // Provides: caml_pallas_to_affine
 // Requires: plonk_wasm, rust_affine_to_caml_affine
-var caml_pallas_to_affine = function(pt) {
+var caml_pallas_to_affine = function (pt) {
     var res = plonk_wasm.caml_pallas_to_affine(pt);
     return rust_affine_to_caml_affine(res);
 };
 
 // Provides: caml_pallas_of_affine
 // Requires: plonk_wasm, rust_affine_of_caml_affine, free_on_finalize
-var caml_pallas_of_affine = function(pt) {
+var caml_pallas_of_affine = function (pt) {
     var res = plonk_wasm.caml_pallas_of_affine(rust_affine_of_caml_affine(pt, plonk_wasm.caml_pallas_affine_one));
     free_on_finalize(res);
     return res;
@@ -699,7 +699,7 @@ var caml_pallas_of_affine = function(pt) {
 
 // Provides: caml_pallas_of_affine_coordinates
 // Requires: plonk_wasm, free_on_finalize
-var caml_pallas_of_affine_coordinates = function(x, y) {
+var caml_pallas_of_affine_coordinates = function (x, y) {
     var res = plonk_wasm.caml_pallas_of_affine_coordinates(x, y);
     free_on_finalize(res);
     return res;
@@ -715,7 +715,7 @@ var caml_pallas_endo_scalar = plonk_wasm.caml_pallas_endo_scalar;
 
 // Provides: caml_pallas_affine_deep_copy
 // Requires: plonk_wasm, rust_affine_of_caml_affine, rust_affine_to_caml_affine
-var caml_pallas_affine_deep_copy = function(pt) {
+var caml_pallas_affine_deep_copy = function (pt) {
     return rust_affine_to_caml_affine(plonk_wasm.caml_pallas_affine_deep_copy(rust_affine_of_caml_affine(pt, plonk_wasm.caml_pallas_affine_one)));
 };
 
@@ -725,7 +725,7 @@ var caml_pallas_affine_deep_copy = function(pt) {
 
 // Provides: caml_vesta_one
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_one = function() {
+var caml_vesta_one = function () {
     var res = plonk_wasm.caml_vesta_one();
     free_on_finalize(res);
     return res;
@@ -733,7 +733,7 @@ var caml_vesta_one = function() {
 
 // Provides: caml_vesta_add
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_add = function(x, y) {
+var caml_vesta_add = function (x, y) {
     var res = plonk_wasm.caml_vesta_add(x, y);
     free_on_finalize(res);
     return res;
@@ -741,7 +741,7 @@ var caml_vesta_add = function(x, y) {
 
 // Provides: caml_vesta_sub
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_sub = function(x, y) {
+var caml_vesta_sub = function (x, y) {
     var res = plonk_wasm.caml_vesta_sub(x, y);
     free_on_finalize(res);
     return res;
@@ -749,7 +749,7 @@ var caml_vesta_sub = function(x, y) {
 
 // Provides: caml_vesta_negate
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_negate = function(x) {
+var caml_vesta_negate = function (x) {
     var res = plonk_wasm.caml_vesta_negate(x);
     free_on_finalize(res);
     return res;
@@ -757,7 +757,7 @@ var caml_vesta_negate = function(x) {
 
 // Provides: caml_vesta_double
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_double = function(x) {
+var caml_vesta_double = function (x) {
     var res = plonk_wasm.caml_vesta_double(x);
     free_on_finalize(res);
     return res;
@@ -765,7 +765,7 @@ var caml_vesta_double = function(x) {
 
 // Provides: caml_vesta_scale
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_scale = function(x, y) {
+var caml_vesta_scale = function (x, y) {
     var res = plonk_wasm.caml_vesta_scale(x, y);
     free_on_finalize(res);
     return res;
@@ -773,7 +773,7 @@ var caml_vesta_scale = function(x, y) {
 
 // Provides: caml_vesta_random
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_random = function() {
+var caml_vesta_random = function () {
     var res = plonk_wasm.caml_vesta_random();
     free_on_finalize(res);
     return res;
@@ -781,7 +781,7 @@ var caml_vesta_random = function() {
 
 // Provides: caml_vesta_rng
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_rng = function(i) {
+var caml_vesta_rng = function (i) {
     var res = plonk_wasm.caml_vesta_rng(i);
     free_on_finalize(res);
     return res;
@@ -789,14 +789,14 @@ var caml_vesta_rng = function(i) {
 
 // Provides: caml_vesta_to_affine
 // Requires: plonk_wasm, rust_affine_to_caml_affine
-var caml_vesta_to_affine = function(pt) {
+var caml_vesta_to_affine = function (pt) {
     var res = plonk_wasm.caml_vesta_to_affine(pt);
     return rust_affine_to_caml_affine(res);
 };
 
 // Provides: caml_vesta_of_affine
 // Requires: plonk_wasm, rust_affine_of_caml_affine, free_on_finalize
-var caml_vesta_of_affine = function(pt) {
+var caml_vesta_of_affine = function (pt) {
     var res = plonk_wasm.caml_vesta_of_affine(rust_affine_of_caml_affine(pt, plonk_wasm.caml_vesta_affine_one));
     free_on_finalize(res);
     return res;
@@ -804,7 +804,7 @@ var caml_vesta_of_affine = function(pt) {
 
 // Provides: caml_vesta_of_affine_coordinates
 // Requires: plonk_wasm, free_on_finalize
-var caml_vesta_of_affine_coordinates = function(x, y) {
+var caml_vesta_of_affine_coordinates = function (x, y) {
     var res = plonk_wasm.caml_vesta_of_affine_coordinates(x, y);
     free_on_finalize(res);
     return res;
@@ -820,7 +820,7 @@ var caml_vesta_endo_scalar = plonk_wasm.caml_vesta_endo_scalar;
 
 // Provides: caml_vesta_affine_deep_copy
 // Requires: plonk_wasm, rust_affine_of_caml_affine, rust_affine_to_caml_affine
-var caml_vesta_affine_deep_copy = function(pt) {
+var caml_vesta_affine_deep_copy = function (pt) {
     return rust_affine_to_caml_affine(plonk_wasm.caml_vesta_affine_deep_copy(rust_affine_of_caml_affine(pt, plonk_wasm.caml_vesta_affine_one)));
 };
 
@@ -829,14 +829,14 @@ var caml_vesta_affine_deep_copy = function(pt) {
 
 // Provides: caml_array_of_rust_vector
 // Requires: js_class_vector_of_rust_vector
-var caml_array_of_rust_vector = function(v, klass, convert, should_free) {
+var caml_array_of_rust_vector = function (v, klass, convert, should_free) {
     v = js_class_vector_of_rust_vector(v, klass);
     var len = v.length;
-    var res = new Array(len+1);
+    var res = new Array(len + 1);
     res[0] = 0; // OCaml tag before array contents
-    for (var i=0; i < len; i++) {
+    for (var i = 0; i < len; i++) {
         var rust_val = v[i];
-        res[i+1] = convert(rust_val);
+        res[i + 1] = convert(rust_val);
         if (should_free) { rust_val.free(); }
     }
     return res;
@@ -844,9 +844,9 @@ var caml_array_of_rust_vector = function(v, klass, convert, should_free) {
 
 // Provides: caml_array_to_rust_vector
 // Requires: js_class_vector_to_rust_vector, free_finalization_registry
-var caml_array_to_rust_vector = function(v, convert, mk_new) {
+var caml_array_to_rust_vector = function (v, convert, mk_new) {
     v = v.slice(1); // Copy, dropping OCaml tag
-    for (var i=0, l=v.length; i < l; i++) {
+    for (var i = 0, l = v.length; i < l; i++) {
         var class_val = convert(v[i], mk_new);
         v[i] = class_val;
         // Don't free when GC runs; rust will free on its end.
@@ -861,7 +861,7 @@ var caml_array_to_rust_vector = function(v, convert, mk_new) {
 
 // Provides: caml_poly_comm_of_rust_poly_comm
 // Requires: rust_affine_to_caml_affine, caml_array_of_rust_vector
-var caml_poly_comm_of_rust_poly_comm = function(poly_comm, klass, should_free) {
+var caml_poly_comm_of_rust_poly_comm = function (poly_comm, klass, should_free) {
     var rust_shifted = poly_comm.shifted;
     var rust_unshifted = poly_comm.unshifted;
     var caml_shifted;
@@ -876,7 +876,7 @@ var caml_poly_comm_of_rust_poly_comm = function(poly_comm, klass, should_free) {
 
 // Provides: caml_poly_comm_to_rust_poly_comm
 // Requires: rust_affine_of_caml_affine, caml_array_to_rust_vector
-var caml_poly_comm_to_rust_poly_comm = function(poly_comm, poly_comm_class, mk_affine) {
+var caml_poly_comm_to_rust_poly_comm = function (poly_comm, poly_comm_class, mk_affine) {
     var caml_unshifted = poly_comm[1];
     var caml_shifted = poly_comm[2];
     var rust_shifted = undefined;
@@ -893,13 +893,13 @@ var caml_poly_comm_to_rust_poly_comm = function(poly_comm, poly_comm_class, mk_a
 
 // Provides: caml_vesta_poly_comm_of_rust
 // Requires: plonk_wasm, caml_poly_comm_of_rust_poly_comm
-var caml_vesta_poly_comm_of_rust = function(x) {
+var caml_vesta_poly_comm_of_rust = function (x) {
     return caml_poly_comm_of_rust_poly_comm(x, plonk_wasm.WasmGVesta, false);
 }
 
 // Provides: caml_vesta_poly_comm_to_rust
 // Requires: plonk_wasm, caml_poly_comm_to_rust_poly_comm
-var caml_vesta_poly_comm_to_rust = function(x) {
+var caml_vesta_poly_comm_to_rust = function (x) {
     return caml_poly_comm_to_rust_poly_comm(x, plonk_wasm.WasmFpPolyComm, plonk_wasm.caml_vesta_affine_one);
 }
 
@@ -909,13 +909,13 @@ var caml_vesta_poly_comm_to_rust = function(x) {
 
 // Provides: caml_pallas_poly_comm_of_rust
 // Requires: plonk_wasm, caml_poly_comm_of_rust_poly_comm
-var caml_pallas_poly_comm_of_rust = function(x) {
+var caml_pallas_poly_comm_of_rust = function (x) {
     return caml_poly_comm_of_rust_poly_comm(x, plonk_wasm.WasmGPallas, false);
 }
 
 // Provides: caml_pallas_poly_comm_to_rust
 // Requires: plonk_wasm, caml_poly_comm_to_rust_poly_comm
-var caml_pallas_poly_comm_to_rust = function(x) {
+var caml_pallas_poly_comm_to_rust = function (x) {
     return caml_poly_comm_to_rust_poly_comm(x, plonk_wasm.WasmFqPolyComm, plonk_wasm.caml_pallas_affine_one);
 }
 
@@ -925,13 +925,13 @@ var caml_pallas_poly_comm_to_rust = function(x) {
 
 // Provides: caml_fp_srs_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_fp_srs_create = function(i) {
+var caml_fp_srs_create = function (i) {
     return free_on_finalize(plonk_wasm.caml_fp_srs_create(i));
 };
 
 // Provides: caml_fp_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
-var caml_fp_srs_write = function(append, t, path) {
+var caml_fp_srs_write = function (append, t, path) {
     if (append === 0) {
         append = undefined;
     } else {
@@ -1007,19 +1007,19 @@ var caml_fp_srs_h = function (t) {
 
 // Provides: caml_fq_srs_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_fq_srs_create = function(i) {
+var caml_fq_srs_create = function (i) {
     return free_on_finalize(plonk_wasm.caml_fq_srs_create(i));
 };
 
 // Provides: caml_fq_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
-var caml_fq_srs_write = function(append, t, path) {
+var caml_fq_srs_write = function (append, t, path) {
     if (append === 0) {
         append = undefined;
     } else {
         append = append[1];
     }
-    return plonk_wasm.caml_fq_srs_write(append, t,  caml_jsstring_of_string(path));
+    return plonk_wasm.caml_fq_srs_write(append, t, caml_jsstring_of_string(path));
 };
 
 // Provides: caml_fq_srs_read
@@ -1088,7 +1088,7 @@ var caml_fq_srs_h = function (t) {
 
 
 // Provides: caml_plonk_wire_of_rust
-var caml_plonk_wire_of_rust = function(wire) {
+var caml_plonk_wire_of_rust = function (wire) {
     var res = [0, wire.row, wire.col];
     wire.free();
     return res;
@@ -1096,42 +1096,42 @@ var caml_plonk_wire_of_rust = function(wire) {
 
 // Provides: caml_plonk_wire_to_rust
 // Requires: plonk_wasm
-var caml_plonk_wire_to_rust = function(wire) {
+var caml_plonk_wire_to_rust = function (wire) {
     return plonk_wasm.Wire.create(wire[1], wire[2]);
 };
 
 // Provides: caml_plonk_wires_of_rust
 // Requires: caml_plonk_wire_of_rust
-var caml_plonk_wires_of_rust = function(wires) {
+var caml_plonk_wires_of_rust = function (wires) {
     var res = [0,
-      caml_plonk_wire_of_rust(wires[0]),
-      caml_plonk_wire_of_rust(wires[1]),
-      caml_plonk_wire_of_rust(wires[2]),
-      caml_plonk_wire_of_rust(wires[3]),
-      caml_plonk_wire_of_rust(wires[4]),
-      caml_plonk_wire_of_rust(wires[5]),
-      caml_plonk_wire_of_rust(wires[6])];
+        caml_plonk_wire_of_rust(wires[0]),
+        caml_plonk_wire_of_rust(wires[1]),
+        caml_plonk_wire_of_rust(wires[2]),
+        caml_plonk_wire_of_rust(wires[3]),
+        caml_plonk_wire_of_rust(wires[4]),
+        caml_plonk_wire_of_rust(wires[5]),
+        caml_plonk_wire_of_rust(wires[6])];
     wires.free();
     return res;
 };
 
 // Provides: caml_plonk_wires_to_rust
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
-var caml_plonk_wires_to_rust = function(wires) {
+var caml_plonk_wires_to_rust = function (wires) {
     return new plonk_wasm.WasmGateWires(
-      caml_plonk_wire_to_rust(wires[1]),
-      caml_plonk_wire_to_rust(wires[2]),
-      caml_plonk_wire_to_rust(wires[3]),
-      caml_plonk_wire_to_rust(wires[4]),
-      caml_plonk_wire_to_rust(wires[5]),
-      caml_plonk_wire_to_rust(wires[6]),
-      caml_plonk_wire_to_rust(wires[7])
+        caml_plonk_wire_to_rust(wires[1]),
+        caml_plonk_wire_to_rust(wires[2]),
+        caml_plonk_wire_to_rust(wires[3]),
+        caml_plonk_wire_to_rust(wires[4]),
+        caml_plonk_wire_to_rust(wires[5]),
+        caml_plonk_wire_to_rust(wires[6]),
+        caml_plonk_wire_to_rust(wires[7])
     );
 };
 
 // Provides: caml_plonk_gate_of_rust
 // Requires: caml_plonk_wires_of_rust, caml_u8array_vector_of_rust_flat_vector
-var caml_plonk_gate_of_rust = function(gate) {
+var caml_plonk_gate_of_rust = function (gate) {
     // TODO: Hardcoding 32 here is a little brittle
     var res = [0, gate.typ, caml_plonk_wires_of_rust(gate.wires), caml_u8array_vector_of_rust_flat_vector(gate.c, 32)];
     gate.free();
@@ -1140,21 +1140,21 @@ var caml_plonk_gate_of_rust = function(gate) {
 
 // Provides: caml_fp_plonk_gate_to_rust
 // Requires: plonk_wasm, caml_plonk_wires_to_rust, caml_u8array_vector_to_rust_flat_vector
-var caml_fp_plonk_gate_to_rust = function(gate) {
+var caml_fp_plonk_gate_to_rust = function (gate) {
     return new plonk_wasm.WasmFpGate(
-      gate[1],
-      caml_plonk_wires_to_rust(gate[2]),
-      caml_u8array_vector_to_rust_flat_vector(gate[3]));
+        gate[1],
+        caml_plonk_wires_to_rust(gate[2]),
+        caml_u8array_vector_to_rust_flat_vector(gate[3]));
 };
 
 // Provides: caml_fq_plonk_gate_to_rust
 // Requires: plonk_wasm, caml_plonk_wires_to_rust, caml_u8array_vector_to_rust_flat_vector
-var caml_fq_plonk_gate_to_rust = function(gate) {
+var caml_fq_plonk_gate_to_rust = function (gate) {
     // TODO: Hardcoding 32 here is a little brittle
     return new plonk_wasm.WasmFqGate(
-      gate[1],
-      caml_plonk_wires_to_rust(gate[2]),
-      caml_u8array_vector_to_rust_flat_vector(gate[3]))
+        gate[1],
+        caml_plonk_wires_to_rust(gate[2]),
+        caml_u8array_vector_to_rust_flat_vector(gate[3]))
 };
 
 
@@ -1163,31 +1163,31 @@ var caml_fq_plonk_gate_to_rust = function(gate) {
 
 // Provides: caml_pasta_fp_plonk_gate_vector_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_pasta_fp_plonk_gate_vector_create = function() {
+var caml_pasta_fp_plonk_gate_vector_create = function () {
     return free_on_finalize(plonk_wasm.caml_pasta_fp_plonk_gate_vector_create());
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_add
 // Requires: plonk_wasm, caml_fp_plonk_gate_to_rust
-var caml_pasta_fp_plonk_gate_vector_add = function(v, x) {
+var caml_pasta_fp_plonk_gate_vector_add = function (v, x) {
     return plonk_wasm.caml_pasta_fp_plonk_gate_vector_add(v, caml_fp_plonk_gate_to_rust(x));
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_get
 // Requires: plonk_wasm, caml_plonk_gate_of_rust
-var caml_pasta_fp_plonk_gate_vector_get = function(v, i) {
+var caml_pasta_fp_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(v, i));
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_wrap
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
-var caml_pasta_fp_plonk_gate_vector_wrap = function(v, x, y) {
+var caml_pasta_fp_plonk_gate_vector_wrap = function (v, x, y) {
     return plonk_wasm.caml_pasta_fp_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_digest
 // Requires: plonk_wasm, caml_bytes_of_uint8array
-var caml_pasta_fp_plonk_gate_vector_digest = function(gate_vector) {
+var caml_pasta_fp_plonk_gate_vector_digest = function (gate_vector) {
     var uint8array = plonk_wasm.caml_pasta_fp_plonk_gate_vector_digest(gate_vector);
     return caml_bytes_of_uint8array(uint8array);
 }
@@ -1198,31 +1198,31 @@ var caml_pasta_fp_plonk_gate_vector_digest = function(gate_vector) {
 
 // Provides: caml_pasta_fq_plonk_gate_vector_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_pasta_fq_plonk_gate_vector_create = function() {
+var caml_pasta_fq_plonk_gate_vector_create = function () {
     return free_on_finalize(plonk_wasm.caml_pasta_fq_plonk_gate_vector_create());
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_add
 // Requires: plonk_wasm, caml_fq_plonk_gate_to_rust
-var caml_pasta_fq_plonk_gate_vector_add = function(v, x) {
+var caml_pasta_fq_plonk_gate_vector_add = function (v, x) {
     return plonk_wasm.caml_pasta_fq_plonk_gate_vector_add(v, caml_fq_plonk_gate_to_rust(x));
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_get
 // Requires: plonk_wasm, caml_plonk_gate_of_rust
-var caml_pasta_fq_plonk_gate_vector_get = function(v, i) {
+var caml_pasta_fq_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(v, i));
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_wrap
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
-var caml_pasta_fq_plonk_gate_vector_wrap = function(v, x, y) {
+var caml_pasta_fq_plonk_gate_vector_wrap = function (v, x, y) {
     return plonk_wasm.caml_pasta_fq_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_digest
 // Requires: plonk_wasm, caml_bytes_of_uint8array
-var caml_pasta_fq_plonk_gate_vector_digest = function(gate_vector) {
+var caml_pasta_fq_plonk_gate_vector_digest = function (gate_vector) {
     var uint8array = plonk_wasm.caml_pasta_fq_plonk_gate_vector_digest(gate_vector);
     return caml_bytes_of_uint8array(uint8array);
 }
@@ -1232,7 +1232,7 @@ var caml_pasta_fq_plonk_gate_vector_digest = function(gate_vector) {
 
 // Provides: caml_pasta_fp_plonk_index_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_pasta_fp_plonk_index_create = function(gates, public_inputs, prev_challenges, urs) {
+var caml_pasta_fp_plonk_index_create = function (gates, public_inputs, prev_challenges, urs) {
     var t = plonk_wasm.caml_pasta_fp_plonk_index_create(gates, public_inputs, prev_challenges, urs);
     return free_on_finalize(t);
 };
@@ -1270,7 +1270,7 @@ var caml_pasta_fp_plonk_index_read = function (offset, urs, path) {
 
 // Provides: caml_pasta_fp_plonk_index_write
 // Requires: plonk_wasm, caml_jsstring_of_string
-var caml_pasta_fp_plonk_index_write = function(append, t, path) {
+var caml_pasta_fp_plonk_index_write = function (append, t, path) {
     if (append === 0) {
         append = undefined;
     } else {
@@ -1285,7 +1285,7 @@ var caml_pasta_fp_plonk_index_write = function(append, t, path) {
 
 // Provides: caml_pasta_fq_plonk_index_create
 // Requires: plonk_wasm, free_on_finalize
-var caml_pasta_fq_plonk_index_create = function(gates, public_inputs, prev_challenges, urs) {
+var caml_pasta_fq_plonk_index_create = function (gates, public_inputs, prev_challenges, urs) {
     return free_on_finalize(plonk_wasm.caml_pasta_fq_plonk_index_create(gates, public_inputs, prev_challenges, urs));
 }
 
@@ -1322,7 +1322,7 @@ var caml_pasta_fq_plonk_index_read = function (offset, urs, path) {
 
 // Provides: caml_pasta_fq_plonk_index_write
 // Requires: plonk_wasm, caml_jsstring_of_string
-var caml_pasta_fq_plonk_index_write = function(append, t, path) {
+var caml_pasta_fq_plonk_index_write = function (append, t, path) {
     if (append === 0) {
         append = undefined;
     } else {
@@ -1336,7 +1336,7 @@ var caml_pasta_fq_plonk_index_write = function(append, t, path) {
 
 
 // Provides: caml_plonk_domain_of_rust
-var caml_plonk_domain_of_rust = function(x) {
+var caml_plonk_domain_of_rust = function (x) {
     var log_size_of_group = x.log_size_of_group;
     var group_gen = x.group_gen;
     x.free();
@@ -1345,15 +1345,15 @@ var caml_plonk_domain_of_rust = function(x) {
 
 // Provides: caml_plonk_domain_to_rust
 // Requires: free_on_finalize
-var caml_plonk_domain_to_rust = function(x, klass) {
+var caml_plonk_domain_to_rust = function (x, klass) {
     // TODO: Check if this gets finalized
     return new klass(x[1], x[2]);
 };
 
 // Provides: caml_plonk_verification_evals_of_rust
 // Requires: caml_poly_comm_of_rust_poly_comm, js_class_vector_of_rust_vector, plonk_wasm
-var caml_plonk_verification_evals_of_rust = function(x, affine_klass) {
-    var convert = function(poly_comm) {
+var caml_plonk_verification_evals_of_rust = function (x, affine_klass) {
+    var convert = function (poly_comm) {
         return caml_poly_comm_of_rust_poly_comm(poly_comm, affine_klass, false);
     };
 
@@ -1368,7 +1368,7 @@ var caml_plonk_verification_evals_of_rust = function(x, affine_klass) {
 
     // should be inverse of the above ^
     // TODO: make work for both Wasm..PolyComm types
-    var convertArray = function(comms) {
+    var convertArray = function (comms) {
         comms = js_class_vector_of_rust_vector(comms, plonk_wasm.WasmFqPolyComm);
         // comms = js_class_vector_of_rust_vector(comms, plonk_wasm.WasmFpPolyComm);
         return [0].concat(comms.map(convert));
@@ -1384,32 +1384,32 @@ var caml_plonk_verification_evals_of_rust = function(x, affine_klass) {
     var endomul_scalar_comm = convert(x.endomul_scalar_comm);
 
     x.free();
-    return [ 0
-      , sigma_comm
-      , coefficients_comm
-      , generic_comm
-      , psm_comm
-      , complete_add_comm
-      , mul_comm
-      , emul_comm
-      , endomul_scalar_comm
-      , 0 ];
+    return [0
+        , sigma_comm
+        , coefficients_comm
+        , generic_comm
+        , psm_comm
+        , complete_add_comm
+        , mul_comm
+        , emul_comm
+        , endomul_scalar_comm
+        , 0];
 };
 
 // Provides: caml_plonk_verification_evals_to_rust
 // Requires: caml_poly_comm_to_rust_poly_comm, js_class_vector_to_rust_vector
-var caml_plonk_verification_evals_to_rust = function(x, klass, poly_comm_class, mk_affine) {
-    var convert = function(poly_comm) {
+var caml_plonk_verification_evals_to_rust = function (x, klass, poly_comm_class, mk_affine) {
+    var convert = function (poly_comm) {
         return caml_poly_comm_to_rust_poly_comm(poly_comm, poly_comm_class, mk_affine);
     };
 
-    var convertArray = function(comms) {
-      var n = comms.length;
-      var res = new Array(n-1);
-      for (var i = 1; i < n; i++) {
-          res[i-1] = convert(comms[i]);
-      }
-      return js_class_vector_to_rust_vector(res);
+    var convertArray = function (comms) {
+        var n = comms.length;
+        var res = new Array(n - 1);
+        for (var i = 1; i < n; i++) {
+            res[i - 1] = convert(comms[i]);
+        }
+        return js_class_vector_to_rust_vector(res);
     };
 
     var sigma_comm = convertArray(x[1]);
@@ -1423,25 +1423,25 @@ var caml_plonk_verification_evals_to_rust = function(x, klass, poly_comm_class, 
     // TODO: Chacha
 
     return new klass(
-      sigma_comm,
-      coefficients_comm,
-      generic_comm,
-      psm_comm,
-      complete_add_comm,
-      mul_comm,
-      emul_comm,
-      endomul_scalar_comm);
+        sigma_comm,
+        coefficients_comm,
+        generic_comm,
+        psm_comm,
+        complete_add_comm,
+        mul_comm,
+        emul_comm,
+        endomul_scalar_comm);
 };
 
 // Provides: caml_plonk_verification_shifts_of_rust
-var caml_plonk_verification_shifts_of_rust = function(x) {
-    var res = [0, x.s0, x.s1, x.s2, x.s3, x.s4, x.s5, x.s6]; 
+var caml_plonk_verification_shifts_of_rust = function (x) {
+    var res = [0, x.s0, x.s1, x.s2, x.s3, x.s4, x.s5, x.s6];
     x.free();
     return res;
 };
 
 // Provides: caml_plonk_verification_shifts_to_rust
-var caml_plonk_verification_shifts_to_rust = function(x, klass) {
+var caml_plonk_verification_shifts_to_rust = function (x, klass) {
     return new klass(x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
 };
 
@@ -1516,18 +1516,18 @@ function linearization_of_rust(linearization, affine_class) {
     var F = affine_class === plonk_wasm.WasmGVesta ? 'Fq' : 'Fp';
     var WasmPolishToken = plonk_wasm['Wasm' + F + 'PolishToken'];
     var WasmIndexTerm = plonk_wasm['Wasm' + F + 'IndexTerm'];
-    
+
     var constant_term = js_class_vector_of_rust_vector(linearization.constant_term, WasmPolishToken);
     constant_term = constant_term.map(polish_token_of_rust)
     constant_term = [0].concat(constant_term);
-    
+
     var index_terms = Array.from(linearization.index_terms)
         .map(function (ptr) {
             var wasmIndexTerm = wrap(ptr, WasmIndexTerm);
             return index_term_of_rust(wasmIndexTerm, WasmPolishToken);
         });
     index_terms = [0].concat(index_terms);
-    
+
     linearization.free();
     return [0, constant_term, index_terms];
 }
@@ -1537,7 +1537,7 @@ var None = 0;
 
 // Provides: caml_plonk_verifier_index_of_rust
 // Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize, None
-var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
+var caml_plonk_verifier_index_of_rust = function (x, affine_class) {
     var domain = caml_plonk_domain_of_rust(x.domain);
     var max_poly_size = x.max_poly_size;
     var max_quot_size = x.max_quot_size;
@@ -1554,7 +1554,7 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
 };
 // Provides: caml_plonk_verifier_index_to_rust
 // Requires: caml_plonk_domain_to_rust, caml_plonk_verification_evals_to_rust, caml_plonk_verification_shifts_to_rust, free_finalization_registry
-var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
+var caml_plonk_verifier_index_to_rust = function (x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
     var domain = caml_plonk_domain_to_rust(x[1], domain_class);
     var max_poly_size = x[2];
     var max_quot_size = x[3];
@@ -1572,19 +1572,19 @@ var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verific
 
 // Provides: caml_pasta_fp_plonk_verifier_index_of_rust
 // Requires: plonk_wasm, caml_plonk_verifier_index_of_rust
-var caml_pasta_fp_plonk_verifier_index_of_rust = function(x) {
+var caml_pasta_fp_plonk_verifier_index_of_rust = function (x) {
     return caml_plonk_verifier_index_of_rust(x, plonk_wasm.WasmGVesta);
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_to_rust
 // Requires: plonk_wasm, caml_plonk_verifier_index_to_rust
-var caml_pasta_fp_plonk_verifier_index_to_rust = function(x) {
+var caml_pasta_fp_plonk_verifier_index_to_rust = function (x) {
     return caml_plonk_verifier_index_to_rust(x, plonk_wasm.WasmFpPlonkVerifierIndex, plonk_wasm.WasmFpDomain, plonk_wasm.WasmFpPlonkVerificationEvals, plonk_wasm.WasmFpPolyComm, plonk_wasm.caml_vesta_affine_one, plonk_wasm.WasmFpShifts);
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_create
 // Requires: plonk_wasm, caml_pasta_fp_plonk_verifier_index_of_rust
-var caml_pasta_fp_plonk_verifier_index_create = function(x) {
+var caml_pasta_fp_plonk_verifier_index_create = function (x) {
     var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
     var vk_caml = caml_pasta_fp_plonk_verifier_index_of_rust(vk);
     return vk_caml;
@@ -1614,13 +1614,13 @@ var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
 
 // Provides: caml_pasta_fp_plonk_verifier_index_shifts
 // Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust
-var caml_pasta_fp_plonk_verifier_index_shifts = function(log2_size) {
+var caml_pasta_fp_plonk_verifier_index_shifts = function (log2_size) {
     return caml_plonk_verification_shifts_of_rust(plonk_wasm.caml_pasta_fp_plonk_verifier_index_shifts(log2_size));
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_dummy
 // Requires: plonk_wasm, caml_pasta_fp_plonk_verifier_index_of_rust
-var caml_pasta_fp_plonk_verifier_index_dummy = function() {
+var caml_pasta_fp_plonk_verifier_index_dummy = function () {
     var res = plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy();
     return caml_pasta_fp_plonk_verifier_index_of_rust(res);
     // return caml_pasta_fp_plonk_verifier_index_of_rust(plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy());
@@ -1628,7 +1628,7 @@ var caml_pasta_fp_plonk_verifier_index_dummy = function() {
 
 // Provides: caml_pasta_fp_plonk_verifier_index_deep_copy
 // Requires: plonk_wasm, caml_pasta_fp_plonk_verifier_index_of_rust, caml_pasta_fp_plonk_verifier_index_to_rust
-var caml_pasta_fp_plonk_verifier_index_deep_copy = function(x) {
+var caml_pasta_fp_plonk_verifier_index_deep_copy = function (x) {
     return caml_pasta_fp_plonk_verifier_index_of_rust(plonk_wasm.caml_pasta_fp_plonk_verifier_index_deep_copy(caml_pasta_fp_plonk_verifier_index_to_rust(x)));
 };
 
@@ -1638,19 +1638,19 @@ var caml_pasta_fp_plonk_verifier_index_deep_copy = function(x) {
 
 // Provides: caml_pasta_fq_plonk_verifier_index_of_rust
 // Requires: plonk_wasm, caml_plonk_verifier_index_of_rust
-var caml_pasta_fq_plonk_verifier_index_of_rust = function(x) {
+var caml_pasta_fq_plonk_verifier_index_of_rust = function (x) {
     return caml_plonk_verifier_index_of_rust(x, plonk_wasm.WasmGPallas);
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_to_rust
 // Requires: plonk_wasm, caml_plonk_verifier_index_to_rust
-var caml_pasta_fq_plonk_verifier_index_to_rust = function(x) {
+var caml_pasta_fq_plonk_verifier_index_to_rust = function (x) {
     return caml_plonk_verifier_index_to_rust(x, plonk_wasm.WasmFqPlonkVerifierIndex, plonk_wasm.WasmFqDomain, plonk_wasm.WasmFqPlonkVerificationEvals, plonk_wasm.WasmFqPolyComm, plonk_wasm.caml_pallas_affine_one, plonk_wasm.WasmFqShifts);
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_create
 // Requires: plonk_wasm, caml_pasta_fq_plonk_verifier_index_of_rust
-var caml_pasta_fq_plonk_verifier_index_create = function(x) {
+var caml_pasta_fq_plonk_verifier_index_create = function (x) {
     return caml_pasta_fq_plonk_verifier_index_of_rust(plonk_wasm.caml_pasta_fq_plonk_verifier_index_create(x));
 };
 
@@ -1678,19 +1678,19 @@ var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
 
 // Provides: caml_pasta_fq_plonk_verifier_index_shifts
 // Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust
-var caml_pasta_fq_plonk_verifier_index_shifts = function(log2_size) {
+var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
     return caml_plonk_verification_shifts_of_rust(plonk_wasm.caml_pasta_fq_plonk_verifier_index_shifts(log2_size));
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_dummy
 // Requires: plonk_wasm, caml_pasta_fq_plonk_verifier_index_of_rust
-var caml_pasta_fq_plonk_verifier_index_dummy = function() {
+var caml_pasta_fq_plonk_verifier_index_dummy = function () {
     return caml_pasta_fq_plonk_verifier_index_of_rust(plonk_wasm.caml_pasta_fq_plonk_verifier_index_dummy());
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_deep_copy
 // Requires: plonk_wasm, caml_pasta_fq_plonk_verifier_index_of_rust, caml_pasta_fq_plonk_verifier_index_to_rust
-var caml_pasta_fq_plonk_verifier_index_deep_copy = function(x) {
+var caml_pasta_fq_plonk_verifier_index_deep_copy = function (x) {
     return caml_pasta_fq_plonk_verifier_index_of_rust(plonk_wasm.caml_pasta_fq_plonk_verifier_index_deep_copy(caml_pasta_fq_plonk_verifier_index_to_rust(x)));
 };
 
@@ -1702,17 +1702,17 @@ var PERMUTS_MINUS_1 = 6;
 
 // Provides: caml_pasta_fp_proof_evaluations_to_rust
 // Requires: plonk_wasm, caml_fp_vector_to_rust, PERMUTS_MINUS_1, COLUMNS
-var caml_pasta_fp_proof_evaluations_to_rust = function(x) {
+var caml_pasta_fp_proof_evaluations_to_rust = function (x) {
     var w = new plonk_wasm.WasmVecVecFp(COLUMNS);
     for (var i = 0; i < COLUMNS; ++i) {
-      w.push(caml_fp_vector_to_rust(x[1][i + 1]));
+        w.push(caml_fp_vector_to_rust(x[1][i + 1]));
     }
 
     var z = caml_fp_vector_to_rust(x[2]);
 
     var s = new plonk_wasm.WasmVecVecFp(PERMUTS_MINUS_1);
     for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fp_vector_to_rust(x[3][i + 1]));
+        s.push(caml_fp_vector_to_rust(x[3][i + 1]));
     }
 
     var generic_selector = caml_fp_vector_to_rust(x[4]);
@@ -1723,8 +1723,8 @@ var caml_pasta_fp_proof_evaluations_to_rust = function(x) {
 
 // Provides: caml_pasta_fp_proof_evaluations_of_rust
 // Requires: plonk_wasm, caml_fp_vector_of_rust, COLUMNS, PERMUTS_MINUS_1
-var caml_pasta_fp_proof_evaluations_of_rust = function(x) {
-    var convertArray = function(v, n) {
+var caml_pasta_fp_proof_evaluations_of_rust = function (x) {
+    var convertArray = function (v, n) {
         var res = [0];
         for (var i = 0; i < n; ++i) {
             res.push(caml_fp_vector_of_rust(v.get(i)));
@@ -1744,8 +1744,8 @@ var caml_pasta_fp_proof_evaluations_of_rust = function(x) {
 
 // Provides: caml_pasta_fp_opening_proof_to_rust
 // Requires: plonk_wasm, caml_array_to_rust_vector, rust_affine_of_caml_affine
-var caml_pasta_fp_opening_proof_to_rust = function(x) {
-    var convert_affines = function(affines) {
+var caml_pasta_fp_opening_proof_to_rust = function (x) {
+    var convert_affines = function (affines) {
         return caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_vesta_affine_one);
     }
     var lr = x[1];
@@ -1768,8 +1768,8 @@ var caml_pasta_fp_opening_proof_to_rust = function(x) {
 
 // Provides: caml_pasta_fp_opening_proof_of_rust
 // Requires: plonk_wasm, caml_array_of_rust_vector, rust_affine_to_caml_affine
-var caml_pasta_fp_opening_proof_of_rust = function(x) {
-    var convert_affines = function(affines) {
+var caml_pasta_fp_opening_proof_of_rust = function (x) {
+    var convert_affines = function (affines) {
         return caml_array_of_rust_vector(affines, plonk_wasm.WasmGVesta, rust_affine_to_caml_affine, false);
     }
     var l = convert_affines(x.lr_0);
@@ -1795,8 +1795,8 @@ var caml_pasta_fp_opening_proof_of_rust = function(x) {
 
 // Provides: caml_pasta_fp_commitments_to_rust
 // Requires: plonk_wasm, caml_vesta_poly_comm_to_rust, js_class_vector_to_rust_vector
-var caml_pasta_fp_commitments_to_rust = function(x) {
-    var convertArray = function(v) {
+var caml_pasta_fp_commitments_to_rust = function (x) {
+    var convertArray = function (v) {
         var n = v.length - 1;
         var res = new Array(n);
         for (var i = 0; i < n; ++i) {
@@ -1814,8 +1814,8 @@ var caml_pasta_fp_commitments_to_rust = function(x) {
 
 // Provides: caml_pasta_fp_commitments_of_rust
 // Requires: caml_vesta_poly_comm_of_rust, js_class_vector_of_rust_vector, plonk_wasm
-var caml_pasta_fp_commitments_of_rust = function(x) {
-    var convertArray = function(v) {
+var caml_pasta_fp_commitments_of_rust = function (x) {
+    var convertArray = function (v) {
         var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFpPolyComm);
         var res = [0];
         for (var i = 0; i < a.length; ++i) {
@@ -1834,7 +1834,7 @@ var caml_pasta_fp_commitments_of_rust = function(x) {
 
 // Provides: caml_pasta_fp_proof_to_rust
 // Requires: plonk_wasm, caml_pasta_fp_commitments_to_rust, caml_pasta_fp_opening_proof_to_rust, caml_pasta_fp_proof_evaluations_to_rust, caml_fp_vector_to_rust, caml_vesta_poly_comm_to_rust, js_class_vector_to_rust_vector
-var caml_pasta_fp_proof_to_rust = function(x) {
+var caml_pasta_fp_proof_to_rust = function (x) {
     var commitments = caml_pasta_fp_commitments_to_rust(x[1]);
     var proof = caml_pasta_fp_opening_proof_to_rust(x[2]);
     var evals0 = caml_pasta_fp_proof_evaluations_to_rust(x[3][1]);
@@ -1844,10 +1844,10 @@ var caml_pasta_fp_proof_to_rust = function(x) {
     var prev_challenges = x[6];
     var chals_len = prev_challenges.length;
     var prev_challenges_scalars = new plonk_wasm.WasmVecVecFp(chals_len - 1);
-    var prev_challenges_comms = new Array(chals_len-1);
+    var prev_challenges_comms = new Array(chals_len - 1);
     for (var i = 1; i < chals_len; i++) {
         prev_challenges_scalars.push(caml_fp_vector_to_rust(prev_challenges[i][1]));
-        prev_challenges_comms[i-1] = caml_vesta_poly_comm_to_rust(prev_challenges[i][2]);
+        prev_challenges_comms[i - 1] = caml_vesta_poly_comm_to_rust(prev_challenges[i][2]);
     }
     prev_challenges_comms = js_class_vector_to_rust_vector(prev_challenges_comms);
     return new plonk_wasm.WasmFpProverProof(commitments, proof, evals0, evals1, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
@@ -1855,7 +1855,7 @@ var caml_pasta_fp_proof_to_rust = function(x) {
 
 // Provides: caml_pasta_fp_proof_of_rust
 // Requires: plonk_wasm, caml_pasta_fp_commitments_of_rust, caml_pasta_fp_opening_proof_of_rust, caml_pasta_fp_proof_evaluations_of_rust, caml_fp_vector_of_rust, js_class_vector_of_rust_vector, caml_vesta_poly_comm_of_rust
-var caml_pasta_fp_proof_of_rust = function(x) {
+var caml_pasta_fp_proof_of_rust = function (x) {
     var messages = caml_pasta_fp_commitments_of_rust(x.commitments);
     var proof = caml_pasta_fp_opening_proof_of_rust(x.proof);
     var evals0 = caml_pasta_fp_proof_evaluations_of_rust(x.evals0);
@@ -1870,7 +1870,7 @@ var caml_pasta_fp_proof_of_rust = function(x) {
     for (var i = 1; i < chals_len; i++) {
         var res = new Array(3);
         res[0] = 0;
-        res[1] = caml_fp_vector_of_rust(prev_challenges_scalars.get(i-1));
+        res[1] = caml_fp_vector_of_rust(prev_challenges_scalars.get(i - 1));
         // TODO Check this. Could be off by 1
         res[2] = caml_vesta_poly_comm_of_rust(prev_challenges_comms[i]);
         prev_challenges[i] = res;
@@ -1880,10 +1880,10 @@ var caml_pasta_fp_proof_of_rust = function(x) {
 
 // Provides: caml_pasta_fp_plonk_proof_create
 // Requires: plonk_wasm, caml_fp_vector_to_rust, caml_array_to_rust_vector, rust_affine_of_caml_affine, caml_pasta_fp_proof_of_rust
-var caml_pasta_fp_plonk_proof_create = function(index, witness_cols, prev_challenges, prev_sgs) {
-    var w = new plonk_wasm.WasmVecVecFp(witness_cols.length-1);
+var caml_pasta_fp_plonk_proof_create = function (index, witness_cols, prev_challenges, prev_sgs) {
+    var w = new plonk_wasm.WasmVecVecFp(witness_cols.length - 1);
     for (var i = 1; i < witness_cols.length; i++) {
-      w.push(caml_fp_vector_to_rust(witness_cols[i]));
+        w.push(caml_fp_vector_to_rust(witness_cols[i]));
     }
     witness_cols = w;
     prev_challenges = caml_fp_vector_to_rust(prev_challenges);
@@ -1895,7 +1895,7 @@ var caml_pasta_fp_plonk_proof_create = function(index, witness_cols, prev_challe
 
 // Provides: caml_pasta_fp_plonk_proof_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_vesta_poly_comm_to_rust, caml_pasta_fp_plonk_verifier_index_to_rust, caml_pasta_fp_proof_to_rust
-var caml_pasta_fp_plonk_proof_verify = function(index, proof) {
+var caml_pasta_fp_plonk_proof_verify = function (index, proof) {
     index = caml_pasta_fp_plonk_verifier_index_to_rust(index);
     proof = caml_pasta_fp_proof_to_rust(proof);
     return plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
@@ -1903,7 +1903,7 @@ var caml_pasta_fp_plonk_proof_verify = function(index, proof) {
 
 // Provides: caml_pasta_fp_plonk_proof_batch_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_vesta_poly_comm_to_rust, caml_pasta_fp_plonk_verifier_index_to_rust, caml_pasta_fp_proof_to_rust
-var caml_pasta_fp_plonk_proof_batch_verify = function(indexes, proofs) {
+var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
     indexes = caml_array_to_rust_vector(indexes, caml_pasta_fp_plonk_verifier_index_to_rust);
     proofs = caml_array_to_rust_vector(proofs, caml_pasta_fp_proof_to_rust);
     return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
@@ -1911,13 +1911,13 @@ var caml_pasta_fp_plonk_proof_batch_verify = function(indexes, proofs) {
 
 // Provides: caml_pasta_fp_plonk_proof_dummy
 // Requires: plonk_wasm, caml_pasta_fp_proof_of_rust
-var caml_pasta_fp_plonk_proof_dummy = function() {
+var caml_pasta_fp_plonk_proof_dummy = function () {
     return caml_pasta_fp_proof_of_rust(plonk_wasm.caml_pasta_fp_plonk_proof_dummy());
 };
 
 // Provides: caml_pasta_fp_plonk_proof_deep_copy
 // Requires: plonk_wasm, caml_pasta_fp_proof_to_rust, caml_pasta_fp_proof_of_rust
-var caml_pasta_fp_plonk_proof_deep_copy = function(proof) {
+var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
     return caml_pasta_fp_proof_of_rust(plonk_wasm.caml_pasta_fp_plonk_proof_deep_copy(caml_pasta_fp_proof_to_rust(proof)));
 };
 
@@ -1927,17 +1927,17 @@ var caml_pasta_fp_plonk_proof_deep_copy = function(proof) {
 
 // Provides: caml_pasta_fq_proof_evaluations_to_rust
 // Requires: plonk_wasm, caml_fq_vector_to_rust, PERMUTS_MINUS_1, COLUMNS
-var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
+var caml_pasta_fq_proof_evaluations_to_rust = function (x) {
     var w = new plonk_wasm.WasmVecVecFq(COLUMNS);
     for (var i = 0; i < COLUMNS; ++i) {
-      w.push(caml_fq_vector_to_rust(x[1][i + 1]));
+        w.push(caml_fq_vector_to_rust(x[1][i + 1]));
     }
 
     var z = caml_fq_vector_to_rust(x[2]);
 
     var s = new plonk_wasm.WasmVecVecFq(PERMUTS_MINUS_1);
     for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fq_vector_to_rust(x[3][i + 1]));
+        s.push(caml_fq_vector_to_rust(x[3][i + 1]));
     }
 
     var generic_selector = caml_fq_vector_to_rust(x[4]);
@@ -1948,8 +1948,8 @@ var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
 
 // Provides: caml_pasta_fq_proof_evaluations_of_rust
 // Requires: plonk_wasm, caml_fq_vector_of_rust, COLUMNS, PERMUTS_MINUS_1
-var caml_pasta_fq_proof_evaluations_of_rust = function(x) {
-    var convertArray = function(v, n) {
+var caml_pasta_fq_proof_evaluations_of_rust = function (x) {
+    var convertArray = function (v, n) {
         var res = [0];
         for (var i = 0; i < n; ++i) {
             res.push(caml_fq_vector_of_rust(v.get(i)));
@@ -1969,8 +1969,8 @@ var caml_pasta_fq_proof_evaluations_of_rust = function(x) {
 
 // Provides: caml_pasta_fq_opening_proof_to_rust
 // Requires: plonk_wasm, caml_array_to_rust_vector, rust_affine_of_caml_affine
-var caml_pasta_fq_opening_proof_to_rust = function(x) {
-    var convert_affines = function(affines) {
+var caml_pasta_fq_opening_proof_to_rust = function (x) {
+    var convert_affines = function (affines) {
         return caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
     }
     var lr = x[1];
@@ -1993,8 +1993,8 @@ var caml_pasta_fq_opening_proof_to_rust = function(x) {
 
 // Provides: caml_pasta_fq_opening_proof_of_rust
 // Requires: plonk_wasm, caml_array_of_rust_vector, rust_affine_to_caml_affine
-var caml_pasta_fq_opening_proof_of_rust = function(x) {
-    var convert_affines = function(affines) {
+var caml_pasta_fq_opening_proof_of_rust = function (x) {
+    var convert_affines = function (affines) {
         return caml_array_of_rust_vector(affines, plonk_wasm.WasmGPallas, rust_affine_to_caml_affine, false);
     }
     var l = convert_affines(x.lr_0);
@@ -2020,14 +2020,14 @@ var caml_pasta_fq_opening_proof_of_rust = function(x) {
 
 // Provides: caml_pasta_fq_commitments_to_rust
 // Requires: plonk_wasm, caml_pallas_poly_comm_to_rust, js_class_vector_to_rust_vector
-var caml_pasta_fq_commitments_to_rust = function(x) {
-    var convertArray = function(v) {
-      var n = v.length - 1;
-      var res = new Array(n);
-      for (var i = 0; i < n; ++i) {
-        res[i] = caml_pallas_poly_comm_to_rust(v[i + 1]);
-      }
-      return js_class_vector_to_rust_vector(res);
+var caml_pasta_fq_commitments_to_rust = function (x) {
+    var convertArray = function (v) {
+        var n = v.length - 1;
+        var res = new Array(n);
+        for (var i = 0; i < n; ++i) {
+            res[i] = caml_pallas_poly_comm_to_rust(v[i + 1]);
+        }
+        return js_class_vector_to_rust_vector(res);
     };
 
     var w_comm = convertArray(x[1]);
@@ -2038,15 +2038,15 @@ var caml_pasta_fq_commitments_to_rust = function(x) {
 
 // Provides: caml_pasta_fq_commitments_of_rust
 // Requires: caml_pallas_poly_comm_of_rust, js_class_vector_of_rust_vector, plonk_wasm
-var caml_pasta_fq_commitments_of_rust = function(x) {
-    var convertArray = function(v) {
-      var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFqPolyComm);
-      var res = [0];
-      for (var i = 0; i < a.length; ++i) {
-        // TODO Check this. Could be off by 1
-        res.push(caml_pallas_poly_comm_of_rust(a[i]))
-      }
-      return res;
+var caml_pasta_fq_commitments_of_rust = function (x) {
+    var convertArray = function (v) {
+        var a = js_class_vector_of_rust_vector(v, plonk_wasm.WasmFqPolyComm);
+        var res = [0];
+        for (var i = 0; i < a.length; ++i) {
+            // TODO Check this. Could be off by 1
+            res.push(caml_pallas_poly_comm_of_rust(a[i]))
+        }
+        return res;
     };
 
     var w_comm = convertArray(x.w_comm);
@@ -2058,7 +2058,7 @@ var caml_pasta_fq_commitments_of_rust = function(x) {
 
 // Provides: caml_pasta_fq_proof_to_rust
 // Requires: plonk_wasm, caml_pasta_fq_commitments_to_rust, caml_pasta_fq_opening_proof_to_rust, caml_pasta_fq_proof_evaluations_to_rust, caml_fq_vector_to_rust, caml_pallas_poly_comm_to_rust, js_class_vector_to_rust_vector
-var caml_pasta_fq_proof_to_rust = function(x) {
+var caml_pasta_fq_proof_to_rust = function (x) {
     var messages = caml_pasta_fq_commitments_to_rust(x[1]);
     var proof = caml_pasta_fq_opening_proof_to_rust(x[2]);
     var evals0 = caml_pasta_fq_proof_evaluations_to_rust(x[3][1]);
@@ -2068,10 +2068,10 @@ var caml_pasta_fq_proof_to_rust = function(x) {
     var prev_challenges = x[6];
     var chals_len = prev_challenges.length;
     var prev_challenges_scalars = new plonk_wasm.WasmVecVecFq(chals_len - 1);
-    var prev_challenges_comms = new Array(chals_len-1);
+    var prev_challenges_comms = new Array(chals_len - 1);
     for (var i = 1; i < chals_len; i++) {
         prev_challenges_scalars.push(caml_fq_vector_to_rust(prev_challenges[i][1]));
-        prev_challenges_comms[i-1] = caml_pallas_poly_comm_to_rust(prev_challenges[i][2]);
+        prev_challenges_comms[i - 1] = caml_pallas_poly_comm_to_rust(prev_challenges[i][2]);
     }
     prev_challenges_comms = js_class_vector_to_rust_vector(prev_challenges_comms);
     return new plonk_wasm.WasmFqProverProof(messages, proof, evals0, evals1, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
@@ -2079,7 +2079,7 @@ var caml_pasta_fq_proof_to_rust = function(x) {
 
 // Provides: caml_pasta_fq_proof_of_rust
 // Requires: plonk_wasm, caml_pasta_fq_commitments_of_rust, caml_pasta_fq_opening_proof_of_rust, caml_pasta_fq_proof_evaluations_of_rust, caml_fq_vector_of_rust, js_class_vector_of_rust_vector, caml_pallas_poly_comm_of_rust
-var caml_pasta_fq_proof_of_rust = function(x) {
+var caml_pasta_fq_proof_of_rust = function (x) {
     var messages = caml_pasta_fq_commitments_of_rust(x.commitments);
     var proof = caml_pasta_fq_opening_proof_of_rust(x.proof);
     var evals0 = caml_pasta_fq_proof_evaluations_of_rust(x.evals0);
@@ -2094,7 +2094,7 @@ var caml_pasta_fq_proof_of_rust = function(x) {
     for (var i = 1; i < chals_len; i++) {
         var res = new Array(3);
         res[0] = 0;
-        res[1] = caml_fq_vector_of_rust(prev_challenges_scalars.get(i-1));
+        res[1] = caml_fq_vector_of_rust(prev_challenges_scalars.get(i - 1));
         res[2] = caml_pallas_poly_comm_of_rust(prev_challenges_comms[i]);
         prev_challenges[i] = res;
     }
@@ -2103,10 +2103,10 @@ var caml_pasta_fq_proof_of_rust = function(x) {
 
 // Provides: caml_pasta_fq_plonk_proof_create
 // Requires: plonk_wasm, caml_fq_vector_to_rust, caml_array_to_rust_vector, rust_affine_of_caml_affine, caml_pasta_fq_proof_of_rust
-var caml_pasta_fq_plonk_proof_create = function(index, witness_cols, prev_challenges, prev_sgs) {
-    var w = new plonk_wasm.WasmVecVecFq(witness_cols.length-1);
+var caml_pasta_fq_plonk_proof_create = function (index, witness_cols, prev_challenges, prev_sgs) {
+    var w = new plonk_wasm.WasmVecVecFq(witness_cols.length - 1);
     for (var i = 1; i < witness_cols.length; i++) {
-      w.push(caml_fq_vector_to_rust(witness_cols[i]));
+        w.push(caml_fq_vector_to_rust(witness_cols[i]));
     }
     witness_cols = w;
     prev_challenges = caml_fq_vector_to_rust(prev_challenges);
@@ -2118,15 +2118,21 @@ var caml_pasta_fq_plonk_proof_create = function(index, witness_cols, prev_challe
 
 // Provides: caml_pasta_fq_plonk_proof_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_pallas_poly_comm_to_rust, caml_pasta_fq_plonk_verifier_index_to_rust, caml_pasta_fq_proof_to_rust
-var caml_pasta_fq_plonk_proof_verify = function(index, proof) {
+var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
     index = caml_pasta_fq_plonk_verifier_index_to_rust(index);
     proof = caml_pasta_fq_proof_to_rust(proof);
     return plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
 };
 
+// Provides: prover_to_json
+// Requires: plonk_wasm
+var prover_to_json = function (prover_index) {
+    return plonk_wasm.prover_to_json(index);
+};
+
 // Provides: caml_pasta_fq_plonk_proof_batch_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_pallas_poly_comm_to_rust, caml_pasta_fq_plonk_verifier_index_to_rust, caml_pasta_fq_proof_to_rust
-var caml_pasta_fq_plonk_proof_batch_verify = function(indexes, proofs) {
+var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
     indexes = caml_array_to_rust_vector(indexes, caml_pasta_fq_plonk_verifier_index_to_rust);
     proofs = caml_array_to_rust_vector(proofs, caml_pasta_fq_proof_to_rust);
     return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
@@ -2134,13 +2140,13 @@ var caml_pasta_fq_plonk_proof_batch_verify = function(indexes, proofs) {
 
 // Provides: caml_pasta_fq_plonk_proof_dummy
 // Requires: plonk_wasm, caml_pasta_fq_proof_of_rust
-var caml_pasta_fq_plonk_proof_dummy = function() {
+var caml_pasta_fq_plonk_proof_dummy = function () {
     return caml_pasta_fq_proof_of_rust(plonk_wasm.caml_pasta_fq_plonk_proof_dummy());
 };
 
 // Provides: caml_pasta_fq_plonk_proof_deep_copy
 // Requires: plonk_wasm, caml_pasta_fq_proof_to_rust, caml_pasta_fq_proof_of_rust
-var caml_pasta_fq_plonk_proof_deep_copy = function(proof) {
+var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
     return caml_pasta_fq_proof_of_rust(plonk_wasm.caml_pasta_fq_plonk_proof_deep_copy(caml_pasta_fq_proof_to_rust(proof)));
 };
 
@@ -2150,7 +2156,7 @@ var caml_pasta_fq_plonk_proof_deep_copy = function(proof) {
 
 // Provides: caml_random_oracles_of_rust
 // Requires: caml_u8array_vector_of_rust_flat_vector, caml_option_of_maybe_undefined
-var caml_random_oracles_of_rust = function(x) {
+var caml_random_oracles_of_rust = function (x) {
     var joint_combiner_chal = x.joint_combiner_chal;
     var joint_combiner = x.joint_combiner;
     var joint_combiner_ocaml = undefined;
@@ -2158,22 +2164,22 @@ var caml_random_oracles_of_rust = function(x) {
         joint_combiner_ocaml = [0, [0, joint_combiner_chal], joint_combiner];
     }
     return [0,
-      caml_option_of_maybe_undefined(joint_combiner_ocaml),
-      x.beta,
-      x.gamma,
-      [0, x.alpha_chal],
-      x.alpha,
-      x.zeta,
-      x.v,
-      x.u,
-      [0, x.zeta_chal],
-      [0, x.v_chal],
-      [0, x.u_chal]];
+        caml_option_of_maybe_undefined(joint_combiner_ocaml),
+        x.beta,
+        x.gamma,
+        [0, x.alpha_chal],
+        x.alpha,
+        x.zeta,
+        x.v,
+        x.u,
+        [0, x.zeta_chal],
+        [0, x.v_chal],
+        [0, x.u_chal]];
 };
 
 // Provides: caml_random_oracles_to_rust
 // Requires: caml_u8array_vector_to_rust_flat_vector, caml_option_to_maybe_undefined
-var caml_random_oracles_to_rust = function(x, roKlass) {
+var caml_random_oracles_to_rust = function (x, roKlass) {
     // var caml_vector = [0, x[1], x[2], x[3][1], x[4], x[5], x[6], x[7], x[8][1], x[9][1], x[10][1]];
     var joint_combiner_ocaml = caml_option_to_maybe_undefined(x[1]);
     var joint_combiner_chal = undefined;
@@ -2183,29 +2189,29 @@ var caml_random_oracles_to_rust = function(x, roKlass) {
         joint_combiner = joint_combiner_ocaml[2];
     }
     return new roKlass(
-      joint_combiner_chal,
-      joint_combiner,
-      x[2],
-      x[3],
-      x[4][1],
-      x[5],
-      x[6],
-      x[7],
-      x[8],
-      x[9][1],
-      x[10][1],
-      x[11][1]);
+        joint_combiner_chal,
+        joint_combiner,
+        x[2],
+        x[3],
+        x[4][1],
+        x[5],
+        x[6],
+        x[7],
+        x[8],
+        x[9][1],
+        x[10][1],
+        x[11][1]);
 };
 
 // Provides: caml_oracles_of_rust
 // Requires: caml_u8array_vector_of_rust_flat_vector, caml_random_oracles_of_rust
-var caml_oracles_of_rust = function(x) {
+var caml_oracles_of_rust = function (x) {
     return [0, caml_random_oracles_of_rust(x.o), [0, x.p_eval0, x.p_eval1], caml_u8array_vector_of_rust_flat_vector(x.opening_prechallenges, 32 /* TODO: Don't hardcode */), x.digest_before_evaluations];
 };
 
 // Provides: caml_oracles_to_rust
 // Requires: caml_u8array_vector_to_rust_flat_vector, caml_random_oracles_to_rust
-var caml_oracles_to_rust = function(x, klass, roKlass) {
+var caml_oracles_to_rust = function (x, klass, roKlass) {
     return new klass(
         caml_random_oracles_to_rust(x[1], roKlass),
         x[2][1],
@@ -2221,7 +2227,7 @@ var caml_oracles_to_rust = function(x, klass, roKlass) {
 
 // Provides: fp_oracles_create
 // Requires: plonk_wasm, caml_oracles_of_rust, caml_array_to_rust_vector, caml_vesta_poly_comm_to_rust, caml_pasta_fp_plonk_verifier_index_to_rust, caml_pasta_fp_proof_to_rust
-var fp_oracles_create = function(lgr_comm, verifier_index, proof) {
+var fp_oracles_create = function (lgr_comm, verifier_index, proof) {
     return caml_oracles_of_rust(plonk_wasm.fp_oracles_create(
         caml_array_to_rust_vector(lgr_comm, caml_vesta_poly_comm_to_rust),
         caml_pasta_fp_plonk_verifier_index_to_rust(verifier_index),
@@ -2231,15 +2237,15 @@ var fp_oracles_create = function(lgr_comm, verifier_index, proof) {
 
 // Provides: fp_oracles_dummy
 // Requires: plonk_wasm, caml_oracles_of_rust
-var fp_oracles_dummy = function() {
+var fp_oracles_dummy = function () {
     return caml_oracles_of_rust(plonk_wasm.fp_oracles_dummy());
 };
 
 // Provides: fp_oracles_deep_copy
 // Requires: plonk_wasm, caml_oracles_of_rust, caml_oracles_to_rust
-var fp_oracles_deep_copy = function(x) {
+var fp_oracles_deep_copy = function (x) {
     return caml_oracles_of_rust(plonk_wasm.fp_oracles_deep_copy(
-      caml_oracles_to_rust(x, plonk_wasm.WasmFpOracles, plonk_wasm.WasmFpRandomOracles)));
+        caml_oracles_to_rust(x, plonk_wasm.WasmFpOracles, plonk_wasm.WasmFpRandomOracles)));
 };
 
 
@@ -2248,7 +2254,7 @@ var fp_oracles_deep_copy = function(x) {
 
 // Provides: fq_oracles_create
 // Requires: plonk_wasm, caml_oracles_of_rust, caml_array_to_rust_vector, caml_pallas_poly_comm_to_rust, caml_pasta_fq_plonk_verifier_index_to_rust, caml_pasta_fq_proof_to_rust
-var fq_oracles_create = function(lgr_comm, verifier_index, proof) {
+var fq_oracles_create = function (lgr_comm, verifier_index, proof) {
     return caml_oracles_of_rust(plonk_wasm.fq_oracles_create(
         caml_array_to_rust_vector(lgr_comm, caml_pallas_poly_comm_to_rust),
         caml_pasta_fq_plonk_verifier_index_to_rust(verifier_index),
@@ -2258,16 +2264,16 @@ var fq_oracles_create = function(lgr_comm, verifier_index, proof) {
 
 // Provides: fq_oracles_dummy
 // Requires: plonk_wasm, caml_oracles_of_rust
-var fq_oracles_dummy = function() {
+var fq_oracles_dummy = function () {
     return caml_oracles_of_rust(plonk_wasm.fq_oracles_dummy());
 };
 
 // Provides: fq_oracles_deep_copy
 // Requires: plonk_wasm, caml_oracles_of_rust, caml_oracles_to_rust
-var fq_oracles_deep_copy = function(x) {
+var fq_oracles_deep_copy = function (x) {
     return caml_oracles_of_rust(
-      plonk_wasm.fq_oracles_deep_copy(
-        caml_oracles_to_rust(x, plonk_wasm.WasmFqOracles, plonk_wasm.WasmFqRandomOracles)));
+        plonk_wasm.fq_oracles_deep_copy(
+            caml_oracles_to_rust(x, plonk_wasm.WasmFqOracles, plonk_wasm.WasmFqRandomOracles)));
 };
 
 

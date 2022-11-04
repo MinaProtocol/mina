@@ -121,3 +121,14 @@ pub use {
     oracle::sponge::caml::CamlScalarChallenge,
 };
 */
+
+pub mod to_move {
+    use wasm_bindgen::prelude::wasm_bindgen;
+
+    use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
+
+    #[wasm_bindgen]
+    pub fn prover_to_json(prover_index: &WasmPastaFpPlonkIndex) -> String {
+        serde_json::to_string(&prover_index.0.cs).expect("couldn't serialize constraints")
+    }
+}
