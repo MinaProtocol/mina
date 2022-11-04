@@ -319,7 +319,7 @@
             cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
             chmod 0666 src/plonk_wasm{.js,_bg.wasm}
           '';
-          npmBuild = "npm run build";
+          npmBuild = "npm run minify && npm run build";
           doCheck = true;
           checkPhase = "npm test";
         };
