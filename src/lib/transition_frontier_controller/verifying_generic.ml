@@ -148,15 +148,13 @@ struct
       there is an unprocessed ancestor covered by this active progress, action won't
       be interrupted and it will be assigned to the first unprocessed ancestor.
 
-      If [baton] is set to [true] in the transition being updated or if [force_baton]
-      is [true], then baton will be passed to the next transition with
-      [Substate.Processing (Substate.In_progress _)] and transitions in between will
-      get restarted.  *)
+      If [baton] is set to [true] in the transition being updated, the baton will
+      be passed to the next transition with [Substate.Processing (Substate.In_progress _)]
+      and transitions in between will get restarted.  *)
   let update_to_processing_done ~transition_states ~state_hash ~dsu
-      ?(reuse_ctx = false) ?(force_baton = false) res =
+      ?(reuse_ctx = false) res =
     let%bind.Option st = State_hash.Table.find transition_states state_hash in
-    let%bind.Option { substate; baton = prev_baton } = F.to_data st in
-    let baton = force_baton || prev_baton in
+    let%bind.Option { substate; baton } = F.to_data st in
     let meta = Transition_state.State_functions.transition_meta st in
     let%map.Option ctx_opt =
       match substate.status with
