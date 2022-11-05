@@ -36,7 +36,11 @@ end
 module R1CS_constraint_system =
   Plonk_constraint_system.Make
     (Field)
-    (Kimchi_bindings.Protocol.Gates.Vector.Fq)
+    (struct
+      include Kimchi_bindings.Protocol.Gates.Vector.Fq
+
+      let get_asm _ _ = failwith "cannot call get_asm on this curve"
+    end)
     (struct
       let params =
         Sponge.Params.(

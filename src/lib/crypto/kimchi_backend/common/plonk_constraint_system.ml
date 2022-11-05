@@ -19,6 +19,8 @@ module type Gate_vector_intf = sig
   val get : t -> int -> field Kimchi_types.circuit_gate
 
   val digest : int -> t -> bytes
+
+  val get_asm : int -> t -> string
 end
 
 (** A row indexing in a constraint system. *)
@@ -591,6 +593,11 @@ struct
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+
+  let get_asm (sys : t) : string =
+    let gates = finalize_and_get_gates sys in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    Gates.get_asm public_input_size gates
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =

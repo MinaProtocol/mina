@@ -35,7 +35,11 @@ end
 module R1CS_constraint_system =
   Plonk_constraint_system.Make
     (Field)
-    (Kimchi_bindings.Protocol.Gates.Vector.Fp)
+    (struct
+      include Kimchi_bindings.Protocol.Gates.Vector.Fp
+
+      let get_asm = Kimchi_bindings.Utils.gate_to_asm
+    end)
     (struct
       let params =
         Sponge.Params.(
