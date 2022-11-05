@@ -136,6 +136,14 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
   if (not killed) && not t.finished then (
     match result with
     | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
+        Format.eprintf "ERROR 1@." ;
+        ( match e with
+        | Ok _ ->
+            failwith "WHAT?"
+        | Error (`Exit_non_zero n) ->
+            Format.eprintf "NONZERO %d@." n
+        | Error (`Signal signal) ->
+            Format.eprintf "SIGNAL %s@." (Core.Signal.to_string signal) ) ;
         [%log' fatal t.logger]
           !"libp2p_helper process died unexpectedly: $exit_status"
           ~metadata:
@@ -143,6 +151,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
         t.finished <- true ;
         raise Libp2p_helper_died_unexpectedly
     | Error err ->
+        Format.eprintf "ERROR 2@." ;
         [%log' fatal t.logger]
           !"Child processes library could not track libp2p_helper process: $err"
           ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;

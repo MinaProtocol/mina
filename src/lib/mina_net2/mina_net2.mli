@@ -75,6 +75,8 @@ module Multiaddr : sig
 
   val to_peer : t -> Network_peer.Peer.t option
 
+  val of_peer : Network_peer.Peer.t -> t
+
   (** can a multiaddr plausibly be used as a Peer.t?
       a syntactic check only; a return value of
        true does not guarantee that the multiaddress can

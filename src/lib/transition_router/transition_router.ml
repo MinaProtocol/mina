@@ -565,6 +565,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
+      Format.eprintf "INITIALIZING ROUTER@." ;
       let%map () =
         initialize
           ~context:(module Context)
@@ -577,6 +578,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
+      Format.eprintf "DONE INITIALIZING ROUTER@." ;
       let valid_transition_reader1, valid_transition_reader2 =
         Strict_pipe.Reader.Fork.two valid_transition_reader
       in

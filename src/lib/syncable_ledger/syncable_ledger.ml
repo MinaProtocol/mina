@@ -240,6 +240,7 @@ end = struct
     let answer_query :
         t -> query Envelope.Incoming.t -> answer option Deferred.t =
      fun { mt; f; logger; trust_system } query_envelope ->
+      Format.eprintf "ANSWERING@." ;
       let open Trust_system in
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
@@ -536,9 +537,10 @@ end = struct
            * (Hash.t, Account.t) Answer.t Envelope.Incoming.t
         -> unit Deferred.t =
      fun (root_hash, query, env) ->
+      Format.eprintf "HANDLING ANSWER@." ;
       (* NOTE: think about synchronization here. This is deferred now, so
-          the t and the underlying ledger can change while processing is
-          happening. *)
+         the t and the underlying ledger can change while processing is
+         happening. *)
       let already_done =
         match Ivar.peek t.validity_listener with Some `Ok -> true | _ -> false
       in
@@ -664,6 +666,8 @@ end = struct
           all_done t ) ;
         Deferred.unit
     in
+    let len = Linear_pipe.length t.answers in
+    Format.eprintf "LENGTH: %d@." len ;
     Linear_pipe.iter t.answers ~f:handle_answer
 
   let new_goal t h ~data ~equal =
@@ -724,7 +728,9 @@ end = struct
             `Ok t.tree )
 
   let fetch t rh ~data ~equal =
+    Format.eprintf "FETCHING@." ;
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
+    Format.eprintf "SET GOAL@." ;
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =

@@ -108,7 +108,7 @@ let get_mina_binary () =
    *not* be used to kill a process that was started during this run of the
    daemon.
 *)
-let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
+let _maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     =
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
@@ -203,10 +203,10 @@ let start_custom :
                conf_dir )
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
-  let%bind () =
-    Deferred.map ~f:Or_error.return
-    @@ maybe_kill_and_unlock name lock_path logger
-  in
+  (* let%bind () =
+     Deferred.map ~f:Or_error.return
+     @@ maybe_kill_and_unlock name lock_path logger
+     in *)
   [%log debug] "Starting custom child process $name with args $args"
     ~metadata:
       [ ("name", `String name)
