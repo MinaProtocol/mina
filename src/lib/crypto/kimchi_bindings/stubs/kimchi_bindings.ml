@@ -452,3 +452,8 @@ module Protocol = struct
     end
   end
 end
+
+module Utils = struct
+  external gate_to_asm : int -> Protocol.Gates.Vector.Fp.t -> string
+    = "gate_to_asm"
+end

@@ -23,6 +23,9 @@ pub mod urs_utils; // TODO: move this logic to proof-systems
 pub mod field_vector;
 pub mod gate_vector;
 
+/// ASM
+pub mod asm;
+
 /// Curves
 pub mod projective;
 
