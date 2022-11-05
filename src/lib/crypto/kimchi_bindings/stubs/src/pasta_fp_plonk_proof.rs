@@ -11,7 +11,9 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
+use kimchi::proof::{
+    PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
+};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
@@ -261,15 +263,21 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         delta: g,
         sg: g,
     };
-    let proof_evals = ProofEvaluations {
-        w: array_init(|_| vec![Fp::one()]),
-        z: vec![Fp::one()],
-        s: array_init(|_| vec![Fp::one()]),
-        lookup: None,
-        generic_selector: vec![Fp::one()],
-        poseidon_selector: vec![Fp::one()],
+    let evals = {
+        let one_vec = vec![Fp::one()];
+        let single = PointEvaluations {
+            zeta: one_vec.clone(),
+            zeta_omega: one_vec,
+        };
+        ProofEvaluations {
+            w: array_init(|_| single.clone()),
+            z: single.clone(),
+            s: array_init(|_| single.clone()),
+            lookup: None,
+            generic_selector: single.clone(),
+            poseidon_selector: single.clone(),
+        }
     };
-    let evals = [proof_evals.clone(), proof_evals];
 
     let dlogproof = ProverProof {
         commitments: ProverCommitments {

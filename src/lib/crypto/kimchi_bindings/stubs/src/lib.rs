@@ -61,7 +61,10 @@ pub use {
         scalars::caml::CamlRandomOracles,
         wires::caml::CamlWire,
     },
-    kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
+    kimchi::proof::{
+        caml::{CamlLookupEvaluations, CamlProofEvaluations},
+        PointEvaluations,
+    },
     kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
     oracle::sponge::caml::CamlScalarChallenge,
 };
