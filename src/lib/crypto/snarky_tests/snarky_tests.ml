@@ -66,8 +66,8 @@ let get_hash_of_circuit () =
   in
   let digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
   let expected = "5357346d161dcccaa547c7999b8148db" in
-  Format.printf "expected: %s\n" expected ;
-  Format.printf "obtained: %s\n" digest ;
+  Format.printf "expected:\n%s\n\n" expected ;
+  Format.printf "obtained:\n%s\n" digest ;
   assert (String.(digest = expected))
 
 let generate_witness () =
