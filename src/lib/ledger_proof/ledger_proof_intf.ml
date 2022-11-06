@@ -16,19 +16,19 @@ module type S = sig
   end]
 
   val create :
-       statement:Transaction_snark.Statement.t
+       statement:Mina_state.Snarked_ledger_state.t
     -> sok_digest:Sok_message.Digest.t
     -> proof:Proof.t
     -> t
 
   val statement_target :
-       Transaction_snark.Statement.t
+       Mina_state.Snarked_ledger_state.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
        , Mina_state.Local_state.t )
        Mina_state.Registers.t
 
-  val statement : t -> Transaction_snark.Statement.t
+  val statement : t -> Mina_state.Snarked_ledger_state.t
 
   val sok_digest : t -> Sok_message.Digest.t
 

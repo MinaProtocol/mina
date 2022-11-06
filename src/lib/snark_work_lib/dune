@@ -12,6 +12,7 @@
    core
    ;; local libraries
    transaction_snark
+   mina_state
    signature_lib
    one_or_two
    currency
