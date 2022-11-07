@@ -64,8 +64,8 @@ type ( 'a_var
 
 val create :
      index:int
-  -> self:('var, 'value, 'max_proofs_verified, 'branches) Pickles__.Tag.t
-  -> wrap_domains:Pickles__.Import.Domains.t
+  -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+  -> wrap_domains:Import.Domains.t
   -> step_uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
@@ -77,7 +77,7 @@ val create :
        , 'a_value
        , 'ret_var
        , 'ret_value )
-       Pickles__.Inductive_rule.public_input
+       Inductive_rule.public_input
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
