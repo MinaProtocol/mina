@@ -39,17 +39,20 @@ end
 
 module Wrap = struct
   module Challenges_vector = struct
+    module Vector = Pickles_types.Vector
+    module Wrap_bp_vec = Import.Types.Wrap_bp_vec
+    open Import
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
       module V2 = struct
         type t =
-          Limb_vector.Constant.Hex64.Stable.V1.t
-          Pickles_types.Vector.Vector_2.Stable.V1.t
-          Import.Scalar_challenge.Stable.V2.t
-          Import.Bulletproof_challenge.Stable.V1.t
-          Import.Types.Wrap_bp_vec.Stable.V1.t
+          Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+          Scalar_challenge.Stable.V2.t
+          Bulletproof_challenge.Stable.V1.t
+          Wrap_bp_vec.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
 
         let to_latest = Core_kernel.Fn.id
