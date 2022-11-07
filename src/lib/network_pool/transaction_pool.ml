@@ -1462,9 +1462,7 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns =
-      Time_ns.Span.of_hr
-        (Float.of_int precomputed_values.genesis_constants.transaction_expiry_hr)
+    let expiry_ns = Time_ns.Span.of_hr (Float.of_int 2)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
