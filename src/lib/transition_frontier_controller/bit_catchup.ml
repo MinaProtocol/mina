@@ -34,7 +34,7 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
       Option.some
       @@ Building_breadcrumb.promote_to ~mark_processed_and_promote ~context
            ~transition_states ~block ~substate ~block_vc ~aux
-  | Building_breadcrumb { block = _; substate; block_vc; aux } ->
+  | Building_breadcrumb { block = _; substate; block_vc; aux; ancestors = _ } ->
       Option.some
       @@ Waiting_to_be_added_to_frontier.promote_to ~context ~substate ~block_vc
            ~aux
