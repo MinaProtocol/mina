@@ -32,11 +32,11 @@ module Inner_curve : sig
     module Impl = Impls.Wrap.Impl
 
     module Params : sig
-      val a : Kimchi_pasta__Basic.Fq.t
+      val a : Kimchi_pasta.Pasta.Fq.t
 
-      val b : Kimchi_pasta__Basic.Fq.t
+      val b : Kimchi_pasta.Pasta.Fq.t
 
-      val one : Kimchi_pasta__Basic.Fq.t * Kimchi_pasta__Basic.Fq.t
+      val one : Kimchi_pasta.Pasta.Fq.t * Kimchi_pasta.Pasta.Fq.t
 
       val group_size_in_bits : int
     end
@@ -242,26 +242,26 @@ module Inner_curve : sig
     -> t
 
   val ( + ) :
-       Impls.Wrap.field Snarky_backendless__.Cvar.t
-       * Impls.Wrap.field Snarky_backendless__.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless__.Cvar.t
-       * Impls.Wrap.field Snarky_backendless__.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless__.Cvar.t
-       * Impls.Wrap.field Snarky_backendless__.Cvar.t
+       Impls.Wrap.field Snarky_backendless.Cvar.t
+       * Impls.Wrap.field Snarky_backendless.Cvar.t
+    -> Impls.Wrap.field Snarky_backendless.Cvar.t
+       * Impls.Wrap.field Snarky_backendless.Cvar.t
+    -> Impls.Wrap.field Snarky_backendless.Cvar.t
+       * Impls.Wrap.field Snarky_backendless.Cvar.t
 
   val double :
-       Impls.Wrap.field Snarky_backendless__.Cvar.t
-       * Impls.Wrap.field Snarky_backendless__.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless__.Cvar.t
-       * Impls.Wrap.field Snarky_backendless__.Cvar.t
+       Impls.Wrap.field Snarky_backendless.Cvar.t
+       * Impls.Wrap.field Snarky_backendless.Cvar.t
+    -> Impls.Wrap.field Snarky_backendless.Cvar.t
+       * Impls.Wrap.field Snarky_backendless.Cvar.t
 
   val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
 
   val to_field_elements : 'a * 'a -> 'a list
 
   val assert_equal :
-       Pickles__Impls.Wrap.Field.t * Pickles__Impls.Wrap.Field.t
-    -> Pickles__Impls.Wrap.Field.t * Pickles__Impls.Wrap.Field.t
+       Impls.Wrap.Field.t * Impls.Wrap.Field.t
+    -> Impls.Wrap.Field.t * Impls.Wrap.Field.t
     -> unit
 
   val scale_inv : t -> Inputs.Impl.Boolean.var list -> t
