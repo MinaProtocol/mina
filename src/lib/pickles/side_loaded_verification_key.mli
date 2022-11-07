@@ -54,7 +54,7 @@ module Checked : sig
 
   val to_input :
        t
-    -> Pasta_bindings.Fp.t Snarky_backendless__Cvar.t
+    -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t
        Random_oracle_input.Chunked.t
 end
 
@@ -76,7 +76,7 @@ module Stable : sig
 
     val to_base58_check : t -> string
 
-    val of_base58_check : string -> t Base__Or_error.t
+    val of_base58_check : string -> t Base.Or_error.t
 
     val of_base58_check_exn : string -> t
 
@@ -102,7 +102,7 @@ include Pickles_types.Sigs.Comparable.S with type t := t
 
 val to_base58_check : t -> string
 
-val of_base58_check : string -> t Base__Or_error.t
+val of_base58_check : string -> t Base.Or_error.t
 
 val of_base58_check_exn : string -> t
 
