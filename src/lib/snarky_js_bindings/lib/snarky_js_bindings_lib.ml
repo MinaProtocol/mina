@@ -529,35 +529,36 @@ let () =
       this##toString ) ;
   static_method "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : field_class Js.t Js.Opt.t ->
-      let return x =
-        Js.Opt.return (new%js field_constr (As_field.of_field x))
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : field_class Js.t ->
+      let return x = Some (new%js field_constr (As_field.of_field x)) in
+      let result : field_class Js.t option =
+        match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+        | "number" ->
+            let value = Js.float_of_number (Obj.magic value) in
+            if Caml.Float.is_integer value then
+              return (Field.of_int (Float.to_int value))
+            else None
+        | "boolean" ->
+            let value = Js.to_bool (Obj.magic value) in
+            return (if value then Field.one else Field.zero)
+        | "string" -> (
+            let value : Js.js_string Js.t = Obj.magic value in
+            let s = Js.to_string value in
+            try
+              return
+                (Field.constant
+                   ( if
+                     String.length s > 1
+                     && Char.equal s.[0] '0'
+                     && Char.equal (Char.lowercase s.[1]) 'x'
+                   then
+                     Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+                   else Field.Constant.of_string s ) )
+            with Failure _ -> None )
+        | _ ->
+            None
       in
-      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
-      | "number" ->
-          let value = Js.float_of_number (Obj.magic value) in
-          if Caml.Float.is_integer value then
-            return (Field.of_int (Float.to_int value))
-          else Js.Opt.empty
-      | "boolean" ->
-          let value = Js.to_bool (Obj.magic value) in
-          return (if value then Field.one else Field.zero)
-      | "string" -> (
-          let value : Js.js_string Js.t = Obj.magic value in
-          let s = Js.to_string value in
-          try
-            return
-              (Field.constant
-                 ( if
-                   String.length s > 1
-                   && Char.equal s.[0] '0'
-                   && Char.equal (Char.lowercase s.[1]) 'x'
-                 then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
-                 else Field.Constant.of_string s ) )
-          with Failure _ -> Js.Opt.empty )
-      | _ ->
-          Js.Opt.empty ) ;
+      Option.value_exn ~message:"Field.fromJSON failed" result ) ;
   let from f x = new%js field_constr (As_field.of_field (f x)) in
   static_method "fromNumber" (from As_field.of_number_exn) ;
   static_method "fromString" (from As_field.of_string_exn) ;
@@ -681,14 +682,12 @@ let () =
       Js.Unsafe.coerce this##toBoolean ) ;
   static_method "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : bool_class Js.t Js.Opt.t ->
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : bool_class Js.t ->
       match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
       | "boolean" ->
-          Js.Opt.return
-            (new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value)))
-      | _ ->
-          Js.Opt.empty )
+          new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value))
+      | s ->
+          failwith ("Bool.fromJSON: expected boolean, got " ^ s) )
 
 type coords = < x : As_field.t Js.prop ; y : As_field.t Js.prop > Js.t
 
