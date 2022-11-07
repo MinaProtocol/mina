@@ -9,7 +9,6 @@ module Pallas_based_plonk = struct
 
   module Verification_key = Pallas_based_plonk.Verification_key
   module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
-  module Var = Pallas_based_plonk.Var
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
   module Rounds = Pallas_based_plonk.Rounds
   module Keypair = Pallas_based_plonk.Keypair
@@ -27,7 +26,6 @@ module Vesta_based_plonk = struct
 
   module Verification_key = Vesta_based_plonk.Verification_key
   module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system
-  module Var = Vesta_based_plonk.Var
   module Rounds_vector = Vesta_based_plonk.Rounds_vector
   module Rounds = Vesta_based_plonk.Rounds
   module Keypair = Vesta_based_plonk.Keypair

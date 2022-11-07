@@ -7,7 +7,6 @@ module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
 module Constants = Constants
 module Plonk_dlog_proof = Plonk_dlog_proof
 module Plonk_dlog_oracles = Plonk_dlog_oracles
-module Var = Var
 module Scalar_challenge = Scalar_challenge
 module Endoscale_round = Endoscale_round
 module Scale_round = Scale_round

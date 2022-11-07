@@ -52,6 +52,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('token, 'fee) t =
+            ('token, 'fee) Mina_wire_types.Mina_base.Fee_excess.Poly.V1.t =
         { fee_token_l : 'token
         ; fee_excess_l : 'fee
         ; fee_token_r : 'token
@@ -121,7 +122,7 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      ( Token_id.Stable.V1.t
+      ( Token_id.Stable.V2.t
       , (Fee.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving compare, equal, hash, sexp, yojson]

@@ -152,6 +152,8 @@ module type UInt32_A = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
@@ -170,6 +172,8 @@ module type UInt64_A = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]

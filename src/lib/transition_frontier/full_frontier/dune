@@ -46,6 +46,11 @@
    protocol_version
    signature_lib
    verifier
-   )
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))

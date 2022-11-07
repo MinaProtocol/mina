@@ -9,7 +9,8 @@
    pasta_bindings
    js_of_ocaml
    bindings_js
-   node_backend)
+   node_backend
+   pasta_bindings.backend.none)
  (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm_bg.wasm)
  (instrumentation (backend bisect_ppx))
  (forbidden_libraries core async)

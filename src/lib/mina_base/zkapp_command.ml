@@ -946,6 +946,15 @@ module T = struct
   module Stable = struct
     [@@@with_top_version_tag]
 
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_zkapp_command_vn for that version
+    *)
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -2045,4 +2054,10 @@ let%test_module "Test" =
     let%test_unit "full circuit" =
       Run_in_thread.block_on_async_exn
       @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
+
+    let%test "latest zkApp version" =
+      (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+         for latest version, then update this test
+      *)
+      Stable.Latest.version = 1
   end )

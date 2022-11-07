@@ -59,15 +59,15 @@ $ chmod -R 0700 keys
 Don't forget to set key files' permissions to `0700` or else the
 client will refuse to import them.
 
-Additionally, the block producer's key should be copied to the `wallet`
+Additionally, the block producer's key should be copied to the `wallets`
 directory in the node's config dir. This directory doesn't exist yet
 probably, so one can create it by hand or try launching the node to
 set up the config directory. The filename should be identical to the
 block producer's public key.
 
 ```shell
-$ mkdir -p .mina-config/wallet/store
-$ cp keys/block-producer.key .mina-config/wallet/store/<public-key>
+$ mkdir -p .mina-config/wallets/store
+$ cp keys/block-producer.key .mina-config/wallets/store/$(cat keys/block-producer.key.pub)
 ```
 
 Of course we are free to produce more keys for regular users of the
@@ -135,8 +135,8 @@ $ mina daemon \
     --config-directory ./.mina-config \
     --config-file genesis-ledger.json \
     --proof-level none \
-    --block-producer-pubkey "<public key of the block producer>" \
-    --run-snark-worker "<public key of the snarker>" \
+    --block-producer-pubkey "$(cat keys/block-producer.key.pub)" \
+    --run-snark-worker "$(cat keys/snark-producer.key.pub)" \
     --seed
 ```
 

@@ -495,8 +495,8 @@ module Update = struct
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
-          (Set_or_keep.map ~f:Account.hash_zkapp_uri zkapp_uri)
-          ~dummy:(Account.hash_zkapp_uri_opt None)
+          (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
+          ~dummy:(Zkapp_account.hash_zkapp_uri_opt None)
           ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
@@ -535,8 +535,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
-             ~non_preimage:(Account.hash_zkapp_uri_opt None)
+          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -845,7 +845,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -899,7 +899,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -910,7 +910,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Token_id.Stable.V1.t
+          ; caller : Token_id.Stable.V2.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -954,7 +954,7 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
           ; update : Update.Stable.V1.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -980,7 +980,7 @@ module Body = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
-        ; token_id : Token_id.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
         ; update : Update.Stable.V1.t
         ; balance_change :
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
@@ -990,7 +990,7 @@ module Body = struct
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
-        ; caller : Token_id.Stable.V1.t
+        ; caller : Token_id.Stable.V2.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]

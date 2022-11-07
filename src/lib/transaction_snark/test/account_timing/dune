@@ -43,6 +43,7 @@
    genesis_ledger
    snarky.backendless
    mina_transaction_logic
+   mina_wire_types
    )
   (library_flags -linkall)
   (inline_tests)

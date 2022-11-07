@@ -2,7 +2,15 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module Proof : S2
+    module Proof : sig
+      type ('a, 'b) t
+
+      module Proofs_verified_2 : sig
+        module V2 : sig
+          type nonrec t = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) t
+        end
+      end
+    end
 
     module Side_loaded : sig
       module Verification_key : sig
@@ -111,6 +119,12 @@ module Concrete_ : sig
           -> ('s, 'mlmb, _) with_data
 
     type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
+
+    module Proofs_verified_2 : sig
+      module V2 : sig
+        type nonrec t = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) t
+      end
+    end
   end
 
   module Side_loaded : sig
