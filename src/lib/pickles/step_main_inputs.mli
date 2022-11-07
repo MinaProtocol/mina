@@ -29,8 +29,7 @@ module Sponge : sig
   (** Extension of [S.absorb]*)
   val absorb :
        t
-    -> [< `Bits of Pickles__Impls.Step.Boolean.var list
-       | `Field of Permutation.Field.t ]
+    -> [< `Bits of Impls.Step.Boolean.var list | `Field of Permutation.Field.t ]
     -> unit
 end
 
@@ -39,11 +38,11 @@ module Inner_curve : sig
     module Impl = Impl.Impl
 
     module Params : sig
-      val a : Kimchi_pasta__Basic.Fp.t
+      val a : Kimchi_pasta.Basic.Fp.t
 
-      val b : Kimchi_pasta__Basic.Fp.t
+      val b : Kimchi_pasta.Basic.Fp.t
 
-      val one : Kimchi_pasta__Basic.Fp.t * Kimchi_pasta__Basic.Fp.t
+      val one : Kimchi_pasta.Basic.Fp.t * Kimchi_pasta.Basic.Fp.t
 
       val group_size_in_bits : int
     end
@@ -241,18 +240,18 @@ module Inner_curve : sig
     -> Inputs.F.t * Inputs.F.t
 
   val ( + ) :
-       Impls.Step.field Snarky_backendless__.Cvar.t
-       * Impls.Step.field Snarky_backendless__.Cvar.t
-    -> Impls.Step.field Snarky_backendless__.Cvar.t
-       * Impls.Step.field Snarky_backendless__.Cvar.t
-    -> Impls.Step.field Snarky_backendless__.Cvar.t
-       * Impls.Step.field Snarky_backendless__.Cvar.t
+       Impls.Step.field Snarky_backendless.Cvar.t
+       * Impls.Step.field Snarky_backendless.Cvar.t
+    -> Impls.Step.field Snarky_backendless.Cvar.t
+       * Impls.Step.field Snarky_backendless.Cvar.t
+    -> Impls.Step.field Snarky_backendless.Cvar.t
+       * Impls.Step.field Snarky_backendless.Cvar.t
 
   val double :
-       Impls.Step.field Snarky_backendless__.Cvar.t
-       * Impls.Step.field Snarky_backendless__.Cvar.t
-    -> Impls.Step.field Snarky_backendless__.Cvar.t
-       * Impls.Step.field Snarky_backendless__.Cvar.t
+       Impls.Step.field Snarky_backendless.Cvar.t
+       * Impls.Step.field Snarky_backendless.Cvar.t
+    -> Impls.Step.field Snarky_backendless.Cvar.t
+       * Impls.Step.field Snarky_backendless.Cvar.t
 
   val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
 
