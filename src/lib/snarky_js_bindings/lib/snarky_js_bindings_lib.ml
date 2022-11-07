@@ -3247,6 +3247,8 @@ module Ledger = struct
         val epochSeed = Char.to_int epoch_seed
 
         val stateHash = Char.to_int state_hash
+
+        val publicKey = Char.to_int non_zero_curve_point_compressed
       end
     in
     static "encoding"
