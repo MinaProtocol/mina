@@ -24,6 +24,7 @@
    coda_genesis_proof
    signature_lib
    mina_numbers
+   mina_stdlib
    with_hash
    currency
    pickles.backend

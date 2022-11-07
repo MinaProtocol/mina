@@ -7,7 +7,6 @@ module Pallas_based_plonk : sig
 
   module Verification_key = Pallas_based_plonk.Verification_key
   module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
-  module Var = Kimchi_backend_common.Var
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
   module Rounds = Pallas_based_plonk.Rounds
   module Keypair = Pallas_based_plonk.Keypair
@@ -25,7 +24,6 @@ module Vesta_based_plonk : sig
 
   module Verification_key = Vesta_based_plonk.Verification_key
   module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system
-  module Var = Kimchi_backend_common.Var
   module Rounds_vector = Vesta_based_plonk.Rounds_vector
   module Rounds = Vesta_based_plonk.Rounds
   module Keypair = Vesta_based_plonk.Keypair
@@ -48,6 +46,8 @@ module Basic : sig
   module Rounds = Basic.Rounds
   module Bigint256 = Basic.Bigint256
   module Fp = Basic.Fp
+  module Fp_poly_comm = Basic.Fp_poly_comm
+  module Fq_poly_comm = Basic.Fq_poly_comm
 end
 
 module Precomputed : sig
