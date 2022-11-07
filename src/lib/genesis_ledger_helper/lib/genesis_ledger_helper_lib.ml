@@ -580,9 +580,6 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
-  ; transaction_expiry_hr =
-      Option.value ~default:default.transaction_expiry_hr
-        (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
   ; zkapp_proof_update_cost =
       Option.value ~default:default.zkapp_proof_update_cost
         (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
@@ -627,8 +624,6 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
-          ; transaction_expiry_hr =
-              Some precomputed_values.genesis_constants.transaction_expiry_hr
           ; zkapp_proof_update_cost =
               Some precomputed_values.genesis_constants.zkapp_proof_update_cost
           ; zkapp_signed_single_update_cost =
