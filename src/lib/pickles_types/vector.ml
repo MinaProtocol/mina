@@ -120,7 +120,7 @@ let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
       []
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
-  | _ ->
+  | [], S _ | _ :: _, Z ->
       failwith "Vector: Length mismatch"
 
 let of_array_and_length_exn : type a n. a array -> n Nat.t -> (a, n) t =
@@ -137,7 +137,7 @@ let rec _take_from_list : type a n. a list -> n Nat.t -> (a, n) t =
       []
   | x :: xs, S n ->
       x :: _take_from_list xs n
-  | _ ->
+  | [], S _ ->
       failwith "take_from_list: Not enough to take"
 
 let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
@@ -646,56 +646,6 @@ module Vector_16 = struct
       type 'a t = ('a, Nat.N16.n) vec
 
       include Make.Binable (Nat.N16)
-
-      include (T : module type of T with type 'a t := 'a t)
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_17 = struct
-  module T = With_length (Nat.N17)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N17.n) vec
-
-      include Make.Binable (Nat.N17)
-
-      include (T : module type of T with type 'a t := 'a t)
-    end
-  end]
-
-  include T
-
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
-module Vector_18 = struct
-  module T = With_length (Nat.N18)
-
-  [%%versioned_binable
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, Nat.N18.n) vec
-
-      include Make.Binable (Nat.N18)
 
       include (T : module type of T with type 'a t := 'a t)
     end

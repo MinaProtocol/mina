@@ -19,6 +19,8 @@ module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
 module Opt = struct
+  [@@@warning "-4"]
+
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]
 
@@ -461,6 +463,8 @@ module All_evals = struct
         ~value_of_hlist:of_hlist
   end
 
+  [@@@warning "-4"]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -507,6 +511,8 @@ module All_evals = struct
 end
 
 module Openings = struct
+  [@@@warning "-4"] (* Deals with the 2 sexp-deriving types below *)
+
   module Bulletproof = struct
     [%%versioned
     module Stable = struct
