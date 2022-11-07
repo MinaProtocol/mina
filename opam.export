@@ -1,5 +1,7 @@
 opam-version: "2.0"
+compiler: ["ocaml-base-compiler.4.14.0"]
 roots: [
+  "alcotest.1.1.0"
   "angstrom.0.15.0"
   "async_ssl.v0.14.0"
   "bignum.v0.14.0"
@@ -38,6 +40,7 @@ roots: [
   "yojson.1.7.0"
 ]
 installed: [
+  "alcotest.1.1.0"
   "angstrom.0.15.0"
   "asetmap.0.8.1"
   "astring.0.8.5"
@@ -240,6 +243,7 @@ installed: [
   "uri-sexp.4.2.0"
   "utop.2.9.1"
   "uucp.13.0.0"
+  "uuidm.0.9.7"
   "uuseg.13.0.0"
   "uutf.1.0.2"
   "variantslib.v0.14.0"
@@ -249,12 +253,92 @@ installed: [
   "zed.3.1.0"
 ]
 pinned: [
+  "async_kernel.v0.14.0"
+  "capnp.3.4.0"
   "check_opam_switch.~dev"
   "graphql_ppx.1.2.2"
-  "capnp.3.4.0"
   "rpc_parallel.v0.14.0"
-  "async_kernel.v0.14.0"
 ]
+package "async_kernel" {
+  opam-version: "2.0"
+  version: "v0.14.0"
+  synopsis: "Monadic concurrency library"
+  description: """\
+Part of Jane Street's Core library
+  The Core suite of libraries is an industrial strength alternative to
+  OCaml's standard library that was developed by Jane Street, the
+  largest industrial user of OCaml."""
+  maintainer: "opensource@janestreet.com"
+  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
+  license: "MIT"
+  homepage: "https://github.com/janestreet/async_kernel"
+  doc:
+    "https://ocaml.janestreet.com/ocaml-core/latest/doc/async_kernel/index.html"
+  bug-reports: "https://github.com/janestreet/async_kernel/issues"
+  depends: [
+    "ocaml" {>= "4.08.0"}
+    "core_kernel" {>= "v0.13" & < "v0.15"}
+    "ppx_jane" {>= "v0.13" & < "v0.15"}
+    "dune" {>= "2.0.0"}
+  ]
+  build: ["dune" "build" "-p" name "-j" jobs]
+  dev-repo: "git+https://github.com/janestreet/async_kernel.git"
+  url {
+    src:
+      "https://github.com/MinaProtocol/async_kernel/archive/bf02e69c129b6ffec97cc5b7a5d85125802968bb.tar.gz"
+    checksum:
+      "sha256=ae824169495106fa9099aa53c0367e58651de426f70653897b3e1168c9a7edb6"
+  }
+}
+package "capnp" {
+  opam-version: "2.0"
+  version: "3.4.0"
+  synopsis:
+    "OCaml code generation plugin for the Cap'n Proto serialization framework"
+  description: """\
+Cap'n Proto is a multi-language code generation framework designed for
+  high performance through the use of lazy parsing and arena allocation.
+  This package provides a plugin for the Cap'n Proto compiler which enables
+  OCaml code generation, as well as corresponding runtime library support."""
+  maintainer: "Paul Pelzl <pelzlpj@gmail.com>"
+  authors: "Paul Pelzl <pelzlpj@gmail.com>"
+  license: "BSD-2-Clause"
+  homepage: "https://github.com/capnproto/capnp-ocaml"
+  bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
+  depends: [
+    "ocaml" {>= "4.03.0"}
+    "dune" {>= "1.0"}
+    "result"
+    "base" {>= "v0.11"}
+    "stdio"
+    "base_quickcheck" {with-test}
+    "ocplib-endian" {>= "0.7"}
+    "res"
+    "stdint" {>= "0.5.1"}
+    "ounit" {with-test}
+    "conf-capnproto" {with-test}
+  ]
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+    [
+      "dune"
+      "build"
+      "-p"
+      name
+      "-j"
+      jobs
+      "@runtest"
+      "@src/benchmark/benchmarks"
+    ] {with-test}
+  ]
+  dev-repo: "git+https://github.com/capnproto/capnp-ocaml.git"
+  url {
+    src:
+      "https://github.com/o1-labs/capnp-ocaml/archive/6f4913503cc971ab34df9bf9d4c65778fe05eb8f.tar.gz"
+    checksum:
+      "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
+  }
+}
 package "check_opam_switch" {
   opam-version: "2.0"
   version: "~dev"
@@ -285,8 +369,10 @@ package "check_opam_switch" {
     ]
   ]
   url {
-    src: "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
-    checksum: "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
+    src:
+      "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
+    checksum:
+      "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
   }
 }
 package "graphql_ppx" {
@@ -315,111 +401,42 @@ package "graphql_ppx" {
   ]
   dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
   url {
-    src: "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
-         checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
-  }
-}
-
-package "capnp" {
-  opam-version: "2.0"
-  version: "3.4.0"
-  maintainer: "Paul Pelzl <pelzlpj@gmail.com>"
-  authors: "Paul Pelzl <pelzlpj@gmail.com>"
-  homepage: "https://github.com/capnproto/capnp-ocaml"
-  bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
-  license: "BSD-2-Clause"
-  depends: [
-    "ocaml" {>= "4.03.0"}
-    "dune" {>= "1.0"}
-    "result"
-    "base" {>= "v0.11"}
-    "stdio"
-    "base_quickcheck" {with-test}
-    "ocplib-endian" {>= "0.7"}
-    "res"
-    "stdint" {>= "0.5.1"}
-    "ounit" {with-test}
-    "conf-capnproto" {with-test}
-  ]
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-    ["dune" "build" "-p" name "-j" jobs "@runtest" "@src/benchmark/benchmarks"] {with-test}
-  ]
-  dev-repo: "git+https://github.com/capnproto/capnp-ocaml.git"
-  synopsis:
-    "OCaml code generation plugin for the Cap'n Proto serialization framework"
-  description: """
-  Cap'n Proto is a multi-language code generation framework designed for
-  high performance through the use of lazy parsing and arena allocation.
-  This package provides a plugin for the Cap'n Proto compiler which enables
-  OCaml code generation, as well as corresponding runtime library support."""
-  url {
-    src: "https://github.com/o1-labs/capnp-ocaml/archive/6f4913503cc971ab34df9bf9d4c65778fe05eb8f.tar.gz"
-    checksum: "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
+    src:
+      "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
+    checksum:
+      "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
   }
 }
 package "rpc_parallel" {
   opam-version: "2.0"
   version: "v0.14.0"
-  maintainer: "opensource@janestreet.com"
-  authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
-  homepage: "https://github.com/janestreet/rpc_parallel"
-  bug-reports: "https://github.com/janestreet/rpc_parallel/issues"
-  dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
-  doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/rpc_parallel/index.html"
-  license: "MIT"
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-  ]
-  depends: [
-    "ocaml"       {>= "4.08.0"}
-    "async"       {>= "v0.13" & < "v0.15"}
-    "core"        {>= "v0.13" & < "v0.15"}
-    "core_kernel" {>= "v0.13" & < "v0.15"}
-    "ppx_jane"    {>= "v0.13" & < "v0.15"}
-    "sexplib"     {>= "v0.13" & < "v0.15"}
-    "dune"        {>= "2.0.0"}
-  ]
   synopsis: "Type-safe parallel library built on top of Async_rpc"
-  description: "
-  Rpc_parallel offers an API to define various workers and protocols,
+  description: """\
+Rpc_parallel offers an API to define various workers and protocols,
   spawn workers as separate processes, and communicate with them using
-  Async Rpc.
-
-  "
-  url {
-    src: "https://github.com/MinaProtocol/rpc_parallel/archive/39d6eec98705d5cc1f3ed8479ef19b1a1e0ee70e.tar.gz"
-    checksum: "sha256=2b6c758433c5fd12b4971380147be96f0ce5d239932fc7f6df1d84f306bcbd2a"
-  }
-}
-package "async_kernel" {
-  opam-version: "2.0"
-  version: "v0.14.0"
+  Async Rpc."""
   maintainer: "opensource@janestreet.com"
-  authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
-  homepage: "https://github.com/janestreet/async_kernel"
-  bug-reports: "https://github.com/janestreet/async_kernel/issues"
-  dev-repo: "git+https://github.com/janestreet/async_kernel.git"
-  doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/async_kernel/index.html"
+  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
   license: "MIT"
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-  ]
+  homepage: "https://github.com/janestreet/rpc_parallel"
+  doc:
+    "https://ocaml.janestreet.com/ocaml-core/latest/doc/rpc_parallel/index.html"
+  bug-reports: "https://github.com/janestreet/rpc_parallel/issues"
   depends: [
-    "ocaml"       {>= "4.08.0"}
+    "ocaml" {>= "4.08.0"}
+    "async" {>= "v0.13" & < "v0.15"}
+    "core" {>= "v0.13" & < "v0.15"}
     "core_kernel" {>= "v0.13" & < "v0.15"}
-    "ppx_jane"    {>= "v0.13" & < "v0.15"}
-    "dune"        {>= "2.0.0"}
+    "ppx_jane" {>= "v0.13" & < "v0.15"}
+    "sexplib" {>= "v0.13" & < "v0.15"}
+    "dune" {>= "2.0.0"}
   ]
-  synopsis: "Monadic concurrency library"
-  description: "
-  Part of Jane Street's Core library
-  The Core suite of libraries is an industrial strength alternative to
-  OCaml's standard library that was developed by Jane Street, the
-  largest industrial user of OCaml.
-  "
+  build: ["dune" "build" "-p" name "-j" jobs]
+  dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
   url {
-    src: "https://github.com/MinaProtocol/async_kernel/archive/bf02e69c129b6ffec97cc5b7a5d85125802968bb.tar.gz"
-    checksum: "sha256=ae824169495106fa9099aa53c0367e58651de426f70653897b3e1168c9a7edb6"
+    src:
+      "https://github.com/MinaProtocol/rpc_parallel/archive/39d6eec98705d5cc1f3ed8479ef19b1a1e0ee70e.tar.gz"
+    checksum:
+      "sha256=2b6c758433c5fd12b4971380147be96f0ce5d239932fc7f6df1d84f306bcbd2a"
   }
 }
