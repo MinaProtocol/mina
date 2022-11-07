@@ -52,7 +52,9 @@ module SimpleCircuit = struct
     let cs : Impl.R1CS_constraint_system.t =
       Impl.constraint_system ~input_typ ~return_typ main
     in
-    let asm = Impl.R1CS_constraint_system.get_asm cs in
+    let asm =
+      Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.get_asm cs
+    in
     compare_with asm "simple.asm"
 end
 
