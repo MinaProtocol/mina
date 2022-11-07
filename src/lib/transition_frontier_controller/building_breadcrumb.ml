@@ -143,44 +143,129 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       Substate.Failed
         (Error.createf "failed to validate frontier dependencies: %s" err_str)
 
+let get_parent ~transition_states ~context meta =
+  let (module Context : CONTEXT) = context in
+  let parent_hash = meta.Substate.parent_state_hash in
+  match State_hash.Table.find transition_states parent_hash with
+  | Some
+      (Transition_state.Building_breadcrumb
+        { substate = { status = Processed parent; _ }; _ } )
+  | Some
+      (Transition_state.Waiting_to_be_added_to_frontier
+        { breadcrumb = parent; _ } ) ->
+      Ok parent
+  | Some (Transition_state.Building_breadcrumb { ancestors; _ }) ->
+      Error ancestors
+  | Some st ->
+      [%log' warn Context.logger]
+        "Parent $parent_hash of transition $state_hash in Building_breadcrumb \
+         status hash unexpected state $state"
+        ~metadata:
+          [ ("parent_hash", State_hash.to_yojson parent_hash)
+          ; ("state_hash", State_hash.to_yojson meta.state_hash)
+          ; ("state", `String (Transition_state.name st))
+          ] ;
+      (* It's only possible to be invalid and then this function shouldn't
+         have been called *)
+      Error Length_map.empty
+  | None -> (
+      match Transition_frontier.find Context.frontier parent_hash with
+      | None ->
+          [%log' warn Context.logger]
+            "Parent $parent_hash of transition $state_hash in \
+             Building_breadcrumb status is neither in frontier nor in catchup \
+             state"
+            ~metadata:
+              [ ("parent_hash", State_hash.to_yojson parent_hash)
+              ; ("state_hash", State_hash.to_yojson meta.state_hash)
+              ] ;
+          Error Length_map.empty
+      | Some p ->
+          Ok p )
+
+(** Filter unprocessed takes a map from blockchain length to state hash
+    and returns a map with processed or higher state transitions removed. *)
+let filter_unprocessed ~transition_states ancestors =
+  let is_processed state_hash =
+    match State_hash.Table.find transition_states state_hash with
+    | Some
+        (Transition_state.Building_breadcrumb
+          { substate = { status = Processed _; _ }; _ } ) ->
+        `Left
+    | Some (Transition_state.Building_breadcrumb _) ->
+        `Right
+    | _ ->
+        `Left
+  in
+  let segment_of ~key:_ ~data = is_processed data in
+  let last_processed_opt =
+    Length_map.binary_search_segmented ancestors ~segment_of `Last_on_left
+  in
+  Option.value_map ~default:ancestors
+    ~f:(fun (k, _) ->
+      let _, _, unprocessed = Length_map.split ancestors k in
+      unprocessed )
+    last_processed_opt
+
+let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
+    ancestor_hash =
+  match State_hash.Table.find transition_states ancestor_hash with
+  | Some
+      ( Transition_state.Building_breadcrumb
+          ({ substate = { status = Failed _; _ }; _ } as r) as st ) -> (
+      let ancestor_meta = Transition_state.State_functions.transition_meta st in
+      match get_parent ~transition_states ~context ancestor_meta with
+      | Ok parent ->
+          State_hash.Table.set transition_states ~key:ancestor_hash
+            ~data:
+              (Building_breadcrumb
+                 { r with substate = { r.substate with status = build parent } }
+              )
+      | _ ->
+          let (module Context : CONTEXT) = context in
+          [%log' error Context.logger]
+            "Failed ancestor $ancestor_hash of transition $state_hash in \
+             Building_breadcrumb can't be restarted"
+            ~metadata:
+              [ ("ancestor_hash", State_hash.to_yojson ancestor_hash)
+              ; ("state_hash", State_hash.to_yojson state_hash)
+              ] )
+  | _ ->
+      ()
+
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.
 *)
 let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
     ~substate ~block_vc ~aux =
-  let parent_hash =
-    Mina_block.Validation.block block
-    |> Mina_block.header |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
+  let meta =
+    Substate.transition_meta_of_header_with_hash
+      (With_hash.map ~f:Mina_block.header
+         (Mina_block.Validation.block_with_hash block) )
   in
   let build parent =
     building_breadcrumb_status ~context ~mark_processed_and_promote
       ~transition_states ~received_at:aux.Transition_state.received_at
       ~sender:aux.sender ~parent block
   in
-  let rec mk_status () =
-    match State_hash.Table.find transition_states parent_hash with
-    | Some
-        (Transition_state.Building_breadcrumb
-          { substate = { status = Processed parent; _ }; _ } )
-    | Some
-        (Transition_state.Waiting_to_be_added_to_frontier
-          { breadcrumb = parent; _ } ) ->
-        build parent
-    | Some _ ->
-        Substate.Waiting_for_parent mk_status
-    | None -> (
-        let (module Context : CONTEXT) = context in
-        match Transition_frontier.find Context.frontier parent_hash with
-        | Some parent ->
-            build parent
-        | None ->
-            (* parent is neither in transition states nor in frontier,
-               this case should not happen *)
-            failwith
-              "Building breadcrumb: parent is neither in catchup state nor in \
-               the frontier" )
+  let mk_status () =
+    (Option.value_map ~f:build
+       ~default:(Substate.Failed (Error.of_string "parent not present")) )
+      (Result.ok @@ get_parent ~transition_states ~context meta)
   in
-  let status = mk_status () in
+  let status, ancestors =
+    match get_parent ~transition_states ~context meta with
+    | Ok p ->
+        (build p, Length_map.empty)
+    | Error ancestors ->
+        ( Waiting_for_parent mk_status
+        , Length_map.add_exn
+            ~key:(Mina_numbers.Length.pred meta.blockchain_length)
+            ~data:meta.parent_state_hash ancestors )
+  in
+  let ancestors = filter_unprocessed ~transition_states ancestors in
+  Option.iter (Length_map.min_elt ancestors) ~f:(fun (_, ancestor_hash) ->
+      restart_failed_ancestor ~build ~context ~transition_states
+        ~state_hash:meta.state_hash ancestor_hash ) ;
   Transition_state.Building_breadcrumb
-    { block; block_vc; substate = { substate with status }; aux }
+    { block; block_vc; substate = { substate with status }; aux; ancestors }
