@@ -499,18 +499,22 @@ module Deriving = struct
           versioned_current :: generate_contained_type_version_decls type_decl
 
   let get_type_decl_representative type_decls =
-    let type_decl1 = List.hd_exn type_decls in
-    let type_decl2 = List.hd_exn (List.rev type_decls) in
-    ( if not (Int.equal (List.length type_decls) 1) then
-      let loc =
-        { loc_start = type_decl1.ptype_loc.loc_start
-        ; loc_end = type_decl2.ptype_loc.loc_end
-        ; loc_ghost = true
-        }
-      in
-      Location.raise_errorf ~loc
-        "Versioned type must be just one type \"t\", not a sequence of types" ) ;
-    type_decl1
+    match type_decls with
+    | [ type_decl1 ] ->
+        type_decl1
+    | type_decl1 :: type_decls ->
+        let type_decl2 = List.hd_exn (List.rev type_decls) in
+        let loc =
+          { loc_start = type_decl1.ptype_loc.loc_start
+          ; loc_end = type_decl2.ptype_loc.loc_end
+          ; loc_ghost = true
+          }
+        in
+        Location.raise_errorf ~loc
+          "Versioned type must be just one type \"t\", not a sequence of types"
+    | [] ->
+        assert false
+  (* assumed to not be possible *)
 
   let generate_let_bindings_for_type_decl_str ~loc ~path (_rec_flag, type_decls)
       rpc binable =

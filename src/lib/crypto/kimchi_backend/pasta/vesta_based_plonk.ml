@@ -5,18 +5,16 @@ module Field = Fp
 module Curve = Vesta
 
 module Bigint = struct
-  module R = struct
-    include Field.Bigint
+  include Field.Bigint
 
-    let of_data _ = failwith __LOC__
+  let of_data _ = failwith __LOC__
 
-    let to_field = Field.of_bigint
+  let to_field = Field.of_bigint
 
-    let of_field = Field.to_bigint
-  end
+  let of_field = Field.to_bigint
 end
 
-let field_size : Bigint.R.t = Field.size
+let field_size : Bigint.t = Field.size
 
 module Verification_key = struct
   type t =
@@ -34,8 +32,6 @@ end
 
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Vesta_constraint_system
-
-module Var = Var
 
 let lagrange : int -> _ Kimchi_types.poly_comm array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->

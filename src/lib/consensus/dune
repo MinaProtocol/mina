@@ -60,6 +60,7 @@
    mina_metrics
    mina_numbers
    mina_numbers_unix
+   mina_stdlib
    signature_lib
    snarky.backendless
    blake2
@@ -107,4 +108,6 @@
  (libraries core_kernel signature_lib mina_state mina_block consensus prover blockchain_snark logger.file_system)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane)))
+ (preprocess (pps ppx_version ppx_jane))
+ (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
+)

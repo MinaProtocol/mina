@@ -131,6 +131,7 @@ type nonrec gate_type =
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd
+  | Xor16
 
 type nonrec 'f circuit_gate =
   { typ : gate_type

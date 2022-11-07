@@ -41,7 +41,7 @@ where
 {
     fn from(val: LookupSelectors<PolyComm<G>>) -> Self {
         let LookupSelectors {
-            chacha: _,
+            xor: _,
             chacha_final: _,
             lookup_gate,
             range_check_gate: _,
@@ -60,7 +60,7 @@ where
     fn from(val: CamlLookupSelectors<CamlPolyComm>) -> Self {
         let CamlLookupSelectors { lookup_gate } = val;
         LookupSelectors {
-            chacha: None,
+            xor: None,
             chacha_final: None,
             lookup_gate: lookup_gate.map(From::from),
             range_check_gate: None,
