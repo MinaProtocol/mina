@@ -41,10 +41,10 @@ module Make
          , 'ret_value )
          Inductive_rule.public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
-    -> Kimchi_pasta__Vesta_based_plonk.Keypair.t
+    -> Kimchi_pasta.Vesta_based_plonk.Keypair.t
     -> Impls.Wrap.Verification_key.t
     -> ( ( 'value
-         , ( Pickles__.Unfinalized.Constant.t
+         , ( Unfinalized.Constant.t
            , Max_proofs_verified.n )
            Pickles_types.Vector.t
          , (Backend.Tock.Curve.Affine.t, 'prevs_length) Pickles_types.Vector.t
