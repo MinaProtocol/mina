@@ -95,7 +95,7 @@ module Wrap : sig
        'a t
     -> ( Backend.Tock.Inner_curve.Affine.t
        , ( ( Backend.Tock.Field.t
-           , Kimchi_pasta__Basic.Rounds.Wrap.n )
+           , Kimchi_pasta.Basic.Rounds.Wrap.n )
            Pickles_types.Vector.t
          , 'a )
          Pickles_types.Vector.t )
