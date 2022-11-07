@@ -37,16 +37,16 @@ val wrap :
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
-  -> Kimchi_pasta__Pallas_based_plonk.Keypair.t
+  -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
          , ( Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-             Pickles_types__Hlist0.Id.t
+             Pickles_types.Hlist0.Id.t
            , Impls.Step.Other_field.Constant.t
              Pickles_types.Shifted_value.Type2.t
-             Pickles_types__Hlist0.Id.t )
+             Pickles_types.Hlist0.Id.t )
            Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t
@@ -60,8 +60,8 @@ val wrap :
          Import.Types.Step.Proof_state.Per_proof.In_circuit.t
        , 'max_proofs_verified )
        Pickles_types.Vector.t
-     , ( Kimchi_pasta__Basic.Fp.Stable.Latest.t
-         * Kimchi_pasta__Basic.Fp.Stable.Latest.t
+     , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
+         * Kimchi_pasta.Basic.Fp.Stable.Latest.t
        , 'actual_proofs_verified )
        Pickles_types.Vector.t
      , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -83,8 +83,8 @@ val wrap :
   -> ( 'max_proofs_verified
        Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
      , ( 'b
-       , ( Kimchi_pasta__Basic.Fp.Stable.Latest.t
-           * Kimchi_pasta__Basic.Fp.Stable.Latest.t
+       , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
+           * Kimchi_pasta.Basic.Fp.Stable.Latest.t
          , 'actual_proofs_verified )
          Pickles_types.Vector.t
        , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -98,7 +98,7 @@ val wrap :
      Promise.t
 
 val combined_inner_product :
-     env:Backend.Tick.Field.t Plonk_checks__.Scalars.Env.t
+     env:Backend.Tick.Field.t Plonk_checks.Scalars.Env.t
   -> domain:< shifts : Backend.Tick.Field.t array ; .. >
   -> ft_eval1:Backend.Tick.Field.t
   -> actual_proofs_verified:
@@ -122,8 +122,7 @@ val combined_inner_product :
 
 val challenge_polynomial :
      Backend.Tick.Field.t array
-  -> (Backend.Tick.Field.t -> Backend.Tick.Field.t)
-     Core_kernel__.Import.Staged.t
+  -> (Backend.Tick.Field.t -> Backend.Tick.Field.t) Core_kernel.Staged.t
 
 module Type1 :
     module type of
