@@ -22,13 +22,13 @@ val ones_vector :
 (** *)
 val seal :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless__.Cvar.t
-  -> 'f Snarky_backendless__.Cvar.t
+  -> 'f Snarky_backendless.Cvar.t
+  -> 'f Snarky_backendless.Cvar.t
 
 (** *)
 val lowest_128_bits :
      constrain_low_bits:bool
-  -> assert_128_bits:('f Snarky_backendless__.Cvar.t -> unit)
+  -> assert_128_bits:('f Snarky_backendless.Cvar.t -> unit)
   -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless__.Cvar.t
-  -> 'f Snarky_backendless__.Cvar.t
+  -> 'f Snarky_backendless.Cvar.t
+  -> 'f Snarky_backendless.Cvar.t
