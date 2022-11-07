@@ -2,7 +2,7 @@ module Padded_length = Pickles_types.Nat.N2
 
 val pad_accumulator :
      (Backend.Tock.Proof.Challenge_polynomial.t, 'a) Pickles_types.Vector.t
-  -> ( Kimchi_pasta__Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+  -> ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
      , Backend.Tock.Field.t )
      Backend.Tock.Proof.Challenge_polynomial.t_
      list
@@ -11,7 +11,7 @@ val hash_messages_for_next_wrap_proof :
      'n Pickles_types.Nat.t
   -> ( Backend.Tick.Curve.Affine.t
      , ( ( Backend.Tock.Field.t
-         , Pickles_types__Nat.z Backend.Tock.Rounds.plus_n )
+         , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
        , 'n )
        Pickles_types.Vector.t )
@@ -22,7 +22,7 @@ val pad_proof : ('mlmb, 'a) Proof.t -> Proof.Proofs_verified_max.t
 
 val pad_challenges :
      ( ( Backend.Tock.Field.t
-       , Pickles_types__Nat.z Backend.Tock.Rounds.plus_n )
+       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
        Pickles_types.Vector.t
      , 'a )
      Pickles_types.Vector.t
@@ -39,10 +39,10 @@ module Checked : sig
          Pickles_types.Vector.t
        , 'a )
        Pickles_types.Vector.t
-    -> ( ( Pickles__.Impls.Wrap.Field.t
-         , Pickles_types__Nat.z Backend.Tock.Rounds.plus_n )
+    -> ( ( Impls.Wrap.Field.t
+         , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
-       , Pickles_types__Nat.z Padded_length.plus_n )
+       , Pickles_types.Nat.z Padded_length.plus_n )
        Pickles_types.Vector.t
 
   val pad_commitments :
@@ -61,7 +61,7 @@ module Checked : sig
        'a Pickles_types.Nat.t
     -> ( Backend.Tick.Curve.Affine.t
        , ( ( Backend.Tock.Field.t
-           , Pickles_types__Nat.z Backend.Tock.Rounds.plus_n )
+           , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
            Pickles_types.Vector.t
          , 'a )
          Pickles_types.Vector.t )
