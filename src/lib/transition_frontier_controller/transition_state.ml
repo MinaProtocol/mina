@@ -60,6 +60,7 @@ type t =
       ; substate : Frontier_base.Breadcrumb.t Substate_types.t
       ; aux : aux_data
       ; block_vc : Mina_net2.Validation_callback.t option
+      ; ancestors : State_hash.t Length_map.t
       }  (** Transition's breadcrumb is being built. *)
   | Waiting_to_be_added_to_frontier of
       { breadcrumb : Frontier_base.Breadcrumb.t
@@ -70,6 +71,22 @@ type t =
   | Invalid of
       { transition_meta : Substate_types.transition_meta; error : Error.t }
       (** Transition is invalid. *)
+
+let name = function
+  | Received _ ->
+      "received"
+  | Verifying_blockchain_proof _ ->
+      "verifying blockchain proof"
+  | Downloading_body _ ->
+      "downloading body"
+  | Verifying_complete_works _ ->
+      "verifying complete works"
+  | Building_breadcrumb _ ->
+      "building breadcrumb"
+  | Waiting_to_be_added_to_frontier _ ->
+      "waiting to be added to frontier"
+  | Invalid _ ->
+      "invalid"
 
 (** Instantiation of [Substate.State_functions] for transition state type [t].  *)
 module State_functions : Substate.State_functions with type state_t = t = struct

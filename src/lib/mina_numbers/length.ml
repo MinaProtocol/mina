@@ -18,3 +18,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+let pred t =
+    if t = zero then zero else
+  of_int @@
+      to_int t - 1

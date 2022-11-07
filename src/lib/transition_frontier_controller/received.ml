@@ -292,28 +292,29 @@ and restart_failed_ancestor ~state ~mark_processed_and_promote ~context
     Substate.Processing
       (In_progress { timeout; interrupt_ivar; downto_; holder = ref state_hash })
   in
-  Option.iter (State_hash.Table.find transition_states top_state_hash)
-    ~f:(fun st ->
-      if is_received st then
-        let unprocessed_opt =
-          Processed_skipping.next_unprocessed ~state_functions
-            ~transition_states ~dsu:Context.processed_dsu st
-        in
-        match unprocessed_opt with
-        | Some
-            (Received
-              ( { header
-                ; substate = { status = Failed _; _ }
-                ; aux = { sender; _ }
-                ; _
-                } as r ) ) ->
-            let status = handle_unprocessed ~sender header in
-            State_hash.Table.set
-              ~key:(Gossip.state_hash_of_received_header header)
-              transition_states
-              ~data:(Received { r with substate = { r.substate with status } })
-        | _ ->
-            () )
+  let f st =
+    if is_received st then
+      let unprocessed_opt =
+        Processed_skipping.next_unprocessed ~state_functions ~transition_states
+          ~dsu:Context.processed_dsu st
+      in
+      match unprocessed_opt with
+      | Some
+          (Received
+            ( { header
+              ; substate = { status = Failed _; _ }
+              ; aux = { sender; _ }
+              ; _
+              } as r ) ) ->
+          let status = handle_unprocessed ~sender header in
+          State_hash.Table.set
+            ~key:(Gossip.state_hash_of_received_header header)
+            transition_states
+            ~data:(Received { r with substate = { r.substate with status } })
+      | _ ->
+          ()
+  in
+  Option.iter (State_hash.Table.find transition_states top_state_hash) ~f
 
 (** [add_received] adds a gossip to the state.
 
