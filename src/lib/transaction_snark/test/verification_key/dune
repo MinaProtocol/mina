@@ -13,6 +13,7 @@
    mina_base.import
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    transaction_snark
    snark_params
