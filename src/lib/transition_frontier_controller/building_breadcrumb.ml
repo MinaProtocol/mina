@@ -102,15 +102,18 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
 *)
 let building_breadcrumb_status ~context ~mark_processed_and_promote
     ~transition_states ~received_at ~sender ~parent block =
+  let (module Context : CONTEXT) = context in
+  let state_hash =
+    State_hash.With_state_hashes.state_hash
+      (Mina_block.Validation.block_with_hash block)
+  in
   let impl =
     let%map.Result transition =
       validate_frontier_dependencies ~transition_states ~context block
     in
-    let state_hash = state_hash_of_block_with_validation transition in
     let downto_ =
       Mina_block.blockchain_length (Mina_block.Validation.block block)
     in
-    let (module Context : CONTEXT) = context in
     let module I = Interruptible.Make () in
     let action =
       Context.build_breadcrumb ~received_at ~sender ~parent ~transition
@@ -134,8 +137,14 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       let err_str =
         match err with
         | `Already_in_frontier ->
+            Context.record_event
+            @@ `Invalid_frontier_dependencies
+                 (`Already_in_frontier, state_hash, sender) ;
             "already in frontier"
         | `Not_selected_over_frontier_root ->
+            Context.record_event
+            @@ `Invalid_frontier_dependencies
+                 (`Not_selected_over_frontier_root, state_hash, sender) ;
             "not selected over frontier root"
         | `Parent_missing_from_frontier ->
             "parent missing from frontier"
