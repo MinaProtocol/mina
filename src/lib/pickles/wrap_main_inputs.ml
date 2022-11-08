@@ -3,8 +3,6 @@ open Backend
 module Me = Tock
 module Other = Tick
 module Impl = Impls.Wrap
-open Pickles_types
-open Import
 
 let _high_entropy_bits = 128
 
