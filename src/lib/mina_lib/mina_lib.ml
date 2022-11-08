@@ -2337,7 +2337,10 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         Mina_networking.Gossip_net.(
-          Any.Creatable ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+          Any.Creatable
+            ( (module Libp2p)
+            , Libp2p.create ~allow_multiple_instances:true ~pids
+                gossip_net_params ))
       in
       let log_gossip_heard : Mina_networking.Config.log_gossip_heard =
         { snark_pool_diff = false

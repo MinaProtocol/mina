@@ -124,17 +124,22 @@ end
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
+  * The optional [allow_multiple_instances] defaults to `false`. A `true` value
+  * allows spawning multiple subprocesses, which can be useful for tests.
+  *
   * The new [net] isn't connected to any network until [configure] is called.
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
 val create :
-     all_peers_seen_metric:bool
+     ?allow_multiple_instances:bool
+  -> all_peers_seen_metric:bool
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
   -> conf_dir:string
   -> on_peer_connected:(Peer.Id.t -> unit)
   -> on_peer_disconnected:(Peer.Id.t -> unit)
+  -> unit
   -> t Deferred.Or_error.t
 
 (** State for the connection gateway. It will disallow connections from IPs
