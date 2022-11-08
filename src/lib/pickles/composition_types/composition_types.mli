@@ -52,10 +52,8 @@ module Wrap : sig
                 ; zeta : 'scalar_challenge
                 ; joint_combiner : 'scalar_challenge option
                 }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-              include
-                Pickles_types.Sigs.Binable.S2 with type ('a, 'b) t := ('a, 'b) t
+              [@@deriving
+                sexp, compare, yojson, hlist, hash, bin_shape, bin_io, equal]
 
               include Pickles_types.Sigs.VERSIONED
 
