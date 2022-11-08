@@ -22,8 +22,6 @@ module Lookup_pattern = struct
 end
 
 module Column = struct
-  open Core_kernel
-
   module T = struct
     type t =
       | Witness of int

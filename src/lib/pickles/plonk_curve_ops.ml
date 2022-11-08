@@ -1,5 +1,3 @@
-open Core_kernel
-
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let seal i = Tuple_lib.Double.map ~f:(Util.seal i)

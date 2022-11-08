@@ -1,4 +1,3 @@
-open Core_kernel
 module Sponge_lib = Sponge
 
 module Snarkable = struct

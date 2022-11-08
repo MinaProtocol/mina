@@ -1,6 +1,7 @@
 (library
  (name pickles_unix)
  (public_name pickles.unix)
+ (flags -open Core_kernel)
  (inline_tests)
  (libraries
    ;; opam libraries

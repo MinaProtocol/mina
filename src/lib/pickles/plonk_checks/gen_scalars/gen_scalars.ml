@@ -1,5 +1,3 @@
-open Core_kernel
-
 let output_file = Out_channel.create Sys.argv.(1)
 
 let output_string str = Out_channel.output_string output_file str
@@ -32,7 +30,7 @@ module Lookup_pattern = struct
 end
 
 module Column = struct
-  open Core_kernel
+  
 
   module T = struct
     type t =

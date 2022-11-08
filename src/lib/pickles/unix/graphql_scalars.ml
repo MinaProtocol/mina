@@ -37,7 +37,7 @@ let%test_module "Roundtrip tests" =
         module VerificationKey_gen = struct
           include Pickles.Side_loaded.Verification_key
 
-          let gen = Core_kernel.Quickcheck.Generator.return dummy
+          let gen = Quickcheck.Generator.return dummy
         end
 
         include Make_test (VerificationKey) (VerificationKey_gen)
@@ -49,8 +49,8 @@ let%test_module "Roundtrip tests" =
           include Pickles.Backend.Tick.Field
 
           let gen =
-            Core_kernel.Int.quickcheck_generator
-            |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+            Int.quickcheck_generator
+            |> Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
         end
 
         include Make_test (VerificationKeyHash) (VerificationKeyHash_gen)

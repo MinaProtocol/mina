@@ -1,4 +1,3 @@
-open Core_kernel
 open Import
 module Nat = Pickles_types.Nat
 module Shifted_value = Pickles_types.Shifted_value

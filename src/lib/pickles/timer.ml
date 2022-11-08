@@ -1,5 +1,3 @@
-open Core_kernel
-
 let l = ref ""
 
 let r = ref (Time.now ())

@@ -1,7 +1,9 @@
 (library
  (name composition_types)
  (public_name pickles.composition_types)
- (flags -warn-error -27)
+ (flags
+  -warn-error -27
+  -open Core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries

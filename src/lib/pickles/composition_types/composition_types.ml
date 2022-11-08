@@ -5,7 +5,6 @@ module Digest = Digest
 module Spec = Spec
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Opt = Plonk_types.Opt
-open Core_kernel
 
 type 'f impl = 'f Spec.impl
 

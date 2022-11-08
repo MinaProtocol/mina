@@ -1,5 +1,4 @@
 module D = Composition_types.Digest
-open Core_kernel
 
 module Rounds = struct
   let rounds_full = 55
@@ -70,7 +69,7 @@ module type S = sig
 
   val digest :
        field Sponge.Params.t
-    -> Inputs.Field.t Core_kernel.Array.t
+    -> Inputs.Field.t array
     -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
 end
 

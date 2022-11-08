@@ -1,5 +1,5 @@
 (* q > p *)
-open Core_kernel
+
 module SC = Scalar_challenge
 open Import
 open Util

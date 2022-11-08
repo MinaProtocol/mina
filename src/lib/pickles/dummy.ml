@@ -2,7 +2,7 @@ let evals =
   let open Pickles_types.Plonk_types in
   let e =
     Evals.map Evaluation_lengths.constants ~f:(fun n ->
-        let a () = Core_kernel.Array.create ~len:n (Ro.tock ()) in
+        let a () = Array.create ~len:n (Ro.tock ()) in
         (a (), a ()) )
   in
   let ex =
@@ -15,7 +15,7 @@ let evals =
 let evals_combined =
   Pickles_types.Plonk_types.All_evals.map evals
     ~f1:(fun x -> x)
-    ~f2:(Core_kernel.Array.reduce_exn ~f:Backend.Tock.Field.( + ))
+    ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
 
 module Ipa = struct
   module Wrap = struct

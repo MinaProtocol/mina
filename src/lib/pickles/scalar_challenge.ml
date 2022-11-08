@@ -1,4 +1,3 @@
-open Core_kernel
 open Import
 module SC = Scalar_challenge
 

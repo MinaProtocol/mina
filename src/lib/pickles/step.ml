@@ -1,5 +1,4 @@
 module SC = Scalar_challenge
-open Core_kernel
 open Async_kernel
 module Proof = Proof
 open Pickles_types

@@ -1,7 +1,6 @@
 module type S = sig
   module Scalar_challenge = Scalar_challenge
   module Endo = Endo
-  open Core_kernel
   open Async_kernel
   open Pickles_types
   open Hlist

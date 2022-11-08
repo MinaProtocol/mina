@@ -1,5 +1,3 @@
-open Core_kernel
-
 (* We maintain a global hash table which stores for each inductive proof system some
    data.
 *)

@@ -1,6 +1,5 @@
 module Limbs = Pickles_types.Nat.N4
 module Vector = Pickles_types.Vector
-module Fn = Core_kernel.Fn
 
 module Constant = struct
   include Limb_vector.Constant.Make (Limbs)
@@ -20,8 +19,8 @@ module Constant = struct
 
   (* Force the typechecker to verify that these types are equal. *)
   let () =
-    let _f : unit -> (t, Stable.Latest.t) Core_kernel.Type_equal.t =
-     fun () -> Core_kernel.Type_equal.T
+    let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
     in
     ()
 
@@ -58,7 +57,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Constant = struct
     include Constant
 
-    let to_bits x = Core_kernel.List.take (to_bits x) Field.size_in_bits
+    let to_bits x = List.take (to_bits x) Field.size_in_bits
   end
 
   let typ =

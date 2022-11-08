@@ -38,8 +38,7 @@ struct
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ())
-        (T (Snarky_backendless.Typ.unit (), Core_kernel.Fn.id, Core_kernel.Fn.id)
-        )
+        (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
         main
     in
     Timer.clock __LOC__ ; t

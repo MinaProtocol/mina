@@ -1,5 +1,3 @@
-open Core_kernel
-
 let rec absorb :
     type a g1 g1_opt f scalar.
        absorb_field:(f -> unit)

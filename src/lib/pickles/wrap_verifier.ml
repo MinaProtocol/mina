@@ -8,10 +8,10 @@ module G = struct
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial ~one ~add ~mul chals =
     let ( + ) = add and ( * ) = mul in
-    Core_kernel.stage (fun pt ->
+    stage (fun pt ->
         let k = Array.length chals in
         let pow_two_pows =
-          let res = Core_kernel.Array.init k ~f:(fun _ -> pt) in
+          let res = Array.init k ~f:(fun _ -> pt) in
           for i = 1 to k - 1 do
             let y = res.(i - 1) in
             res.(i) <- y * y
@@ -30,7 +30,7 @@ module G = struct
   let num_possible_domains = Pickles_types.Nat.S Wrap_hack.Padded_length.n
 
   let all_possible_domains =
-    Core_kernel.Memo.unit (fun () ->
+    Memo.unit (fun () ->
         Pickles_types.Vector.init num_possible_domains
           ~f:(fun proofs_verified -> (Common.wrap_domains ~proofs_verified).h) )
 end
@@ -81,14 +81,13 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core_kernel.printf
+            printf
               !"%s: %{sexp:Backend.Tock.Field.t}, %{sexp:Backend.Tock.Field.t}\n\
                 %!"
               lab (read_var x) (read_var y))
 
   let print_w lab gs =
     if Import.debug then
-      let open Core_kernel in
       Array.iteri gs ~f:(fun i (fin, g) ->
           as_prover
             As_prover.(fun () -> printf "fin=%b %!" (read Boolean.typ fin)) ;
@@ -101,8 +100,7 @@ struct
           fun () ->
             Printf.printf "in-snark %s:" lab ;
             Field.Constant.print
-              (Field.Constant.project
-                 (Core_kernel.List.map ~f:(read Boolean.typ) x) ) ;
+              (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
             Printf.printf "\n%!")
 
   let print_bool lab x =
@@ -116,8 +114,7 @@ struct
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Wrap_inner_curve)
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
-  let product m f =
-    Core_kernel.List.reduce_exn (Core_kernel.List.init m ~f) ~f:Field.( * )
+  let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
   let absorb sponge ty t =
     Util.absorb
@@ -155,7 +152,7 @@ struct
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
     let prechallenges =
-      Core_kernel.Array.map gammas ~f:(fun gammas_i ->
+      Array.map gammas ~f:(fun gammas_i ->
           absorb (PC :: PC) gammas_i ;
           squeeze_scalar sponge )
     in
@@ -165,14 +162,13 @@ struct
       ( Ops.add_fast left_term right_term
       , Import.Bulletproof_challenge.unpack pre )
     in
-    let open Core_kernel in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
     in
     (Array.reduce_exn terms ~f:Ops.add_fast, challenges)
 
   let equal_g g1 g2 =
-    Core_kernel.List.map2_exn ~f:Field.equal
+    List.map2_exn ~f:Field.equal
       (Inner_curve.to_field_elements g1)
       (Inner_curve.to_field_elements g2)
     |> Boolean.all
@@ -268,9 +264,8 @@ struct
               ( Inner_curve.constant g
               , Inner_curve.constant (negate (pow2pow g actual_shift)) )
           | xs ->
-              Core_kernel.failwithf
-                "expected commitment to have length 1. got %d" (Array.length xs)
-                ()
+              failwithf "expected commitment to have length 1. got %d"
+                (Array.length xs) ()
         in
         match domains with
         | [] ->
@@ -295,8 +290,7 @@ struct
                    ~f:(Tuple_lib.Double.map ~f:(Util.seal (module Impl))) )
 
   let h_precomp =
-    Core_kernel.Lazy.map ~f:Inner_curve.Scaling_precomputation.create
-      Generators.h
+    Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
 
   let group_map =
     let f =
@@ -319,7 +313,7 @@ struct
               (x * x * x)
               + (constant Inner_curve.Params.a * x)
               + constant Inner_curve.Params.b) )
-        |> Core_kernel.unstage )
+        |> unstage )
     in
     fun x -> Lazy.force f x
 
@@ -469,7 +463,6 @@ struct
       (choice : n One_hot_vector.t) : Boolean.var array =
     let open Pickles_types in
     let max =
-      let open Core_kernel in
       Option.value_exn
         (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
     in
@@ -533,7 +526,6 @@ struct
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
-              let open Core_kernel in
               Array.iter
                 (Pickles_base.Side_loaded_verification_key
                  .index_to_field_elements
@@ -546,15 +538,14 @@ struct
         let open Plonk_types.Messages in
         let without = Type.Without_degree_bound in
         let absorb_g gs =
-          absorb sponge without
-            (Core_kernel.Array.map gs ~f:(fun g -> (Boolean.true_, g)))
+          absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
         absorb sponge Field (Boolean.true_, index_digest) ;
-        Vector.iter ~f:(Core_kernel.Array.iter ~f:(absorb sponge PC)) sg_old ;
+        Vector.iter ~f:(Array.iter ~f:(absorb sponge PC)) sg_old ;
         let x_hat =
           let domain = (which_branch, step_domains) in
           let public_input =
-            Core_kernel.Array.concat_map public_input ~f:(function
+            Array.concat_map public_input ~f:(function
               | `Field (x, b) ->
                   [| `Field (x, Field.size_in_bits)
                    ; `Field ((b :> Field.t), 1)
@@ -563,9 +554,8 @@ struct
                   [| `Field (x, n) |] )
           in
           let constant_part, non_constant_part =
-            Core_kernel.List.partition_map
-              Core_kernel.Array.(
-                to_list (mapi public_input ~f:(fun i t -> (i, t))))
+            List.partition_map
+              Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
               ~f:(fun (i, t) ->
                 match t with
                 | `Field (Constant c, _) ->
@@ -584,7 +574,7 @@ struct
           in
           with_label __LOC__ (fun () ->
               let terms =
-                Core_kernel.List.map non_constant_part ~f:(fun (i, x) ->
+                List.map non_constant_part ~f:(fun (i, x) ->
                     match x with
                     | b, 1 ->
                         assert_ (Constraint.boolean (b :> Field.t)) ;
@@ -597,7 +587,6 @@ struct
               in
               let correction =
                 with_label __LOC__ (fun () ->
-                    let open Core_kernel in
                     List.reduce_exn
                       (List.filter_map terms ~f:(function
                         | `Cond_add _ ->
@@ -607,7 +596,6 @@ struct
                       ~f:Ops.add_fast )
               in
               with_label __LOC__ (fun () ->
-                  let open Core_kernel in
                   let init =
                     List.fold
                       (List.filter_map ~f:Fn.id constant_part)
@@ -708,9 +696,7 @@ struct
                 :: Vector.append w_comm
                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                      (snd Plonk_types.(Columns.add Permuts_minus_1.n))
-              |> Vector.map
-                   ~f:(Core_kernel.Array.map ~f:(fun g -> (Boolean.true_, g)))
-              )
+              |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
               (snd
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
           in
@@ -721,9 +707,7 @@ struct
             ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
-                  ~f:
-                    (Core_kernel.Array.map ~f:(fun (keep, x) ->
-                         (keep, `Finite x) ) )
+                  ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
               , [] )
         in
         let joint_combiner =
@@ -746,7 +730,7 @@ struct
       (e : Field.t array Pickles_types.Plonk_types.Evals.t) :
       (Boolean.var * Field.t) array Pickles_types.Plonk_types.Evals.t =
     Pickles_types.Plonk_types.Evals.map2 lengths e ~f:(fun lengths e ->
-        Core_kernel.Array.zip_exn (mask lengths choice) e )
+        Array.zip_exn (mask lengths choice) e )
 
   let compute_challenges ~scalar chals =
     Pickles_types.Vector.map chals ~f:(fun prechallenge ->
@@ -766,7 +750,7 @@ struct
     with_label __LOC__ (fun () ->
         match List.rev (Array.to_list e) with
         | e :: es ->
-            Core_kernel.List.fold ~init:e es ~f:(fun acc y ->
+            List.fold ~init:e es ~f:(fun acc y ->
                 let acc' =
                   exists Field.typ ~compute:(fun () ->
                       As_prover.read_var Field.(y + (pt_to_n * acc)) )
@@ -821,7 +805,7 @@ struct
   end
 
   let field_array_if b ~then_ ~else_ =
-    Core_kernel.Array.map2_exn then_ else_ ~f:(fun x1 x2 ->
+    Array.map2_exn then_ else_ ~f:(fun x1 x2 ->
         Field.if_ b ~then_:x1 ~else_:x2 )
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
@@ -855,7 +839,7 @@ struct
     let sg_evals1, sg_evals2 =
       let sg_olds =
         Vector.map old_bulletproof_challenges ~f:(fun chals ->
-            Core_kernel.unstage (challenge_polynomial (Vector.to_array chals)) )
+            unstage (challenge_polynomial (Vector.to_array chals)) )
       in
       let sg_evals pt = Vector.map sg_olds ~f:(fun f -> f pt) in
       (sg_evals plonk.zeta, sg_evals zetaw)
@@ -877,7 +861,7 @@ struct
       in
       Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
         ~f:(fun () (x1, x2) ->
-          let absorb = Core_kernel.Array.iter ~f:(Sponge.absorb sponge) in
+          let absorb = Array.iter ~f:(Sponge.absorb sponge) in
           absorb x1 ; absorb x2 )
         ~finish:(fun () -> Array.copy sponge.state)
     in
@@ -936,15 +920,13 @@ struct
                 (e : (Field.t array, _) Plonk_types.Evals.In_circuit.t) =
               let a =
                 Plonk_types.Evals.In_circuit.to_list e
-                |> Core_kernel.List.map ~f:(function
+                |> List.map ~f:(function
                      | None ->
                          [||]
                      | Some a ->
-                         Core_kernel.Array.map a ~f:(fun x ->
-                             Plonk_types.Opt.Some x )
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
                      | Maybe (b, a) ->
-                         Core_kernel.Array.map a ~f:(fun x ->
-                             Plonk_types.Opt.Maybe (b, x) ) )
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
               in
               let sg_evals =
                 Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
@@ -988,7 +970,7 @@ struct
     let b_correct =
       with_label __LOC__ (fun () ->
           let challenge_poly =
-            Core_kernel.unstage
+            unstage
               (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
           let b_actual =

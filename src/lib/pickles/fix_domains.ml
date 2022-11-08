@@ -1,4 +1,3 @@
-open Core_kernel
 open Import
 
 let zk_rows = 3

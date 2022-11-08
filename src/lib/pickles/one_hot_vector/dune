@@ -1,6 +1,8 @@
 (library
  (name one_hot_vector)
  (public_name pickles.one_hot_vector)
+ (flags 
+   -open Core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries

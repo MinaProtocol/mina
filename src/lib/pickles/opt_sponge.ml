@@ -1,5 +1,3 @@
-open Core_kernel
-
 (* This module implements snarky functions for a sponge that can *conditionally* absorb input,
    while branching minimally. Specifically, if absorbing N field elements, this sponge can absorb
    a variable subset of N field elements, while performing N + 1 invocations of the sponge's

@@ -7,4 +7,4 @@ let params =
     map pasta_p_kimchi ~f:(fun s ->
         Backend.Tick.Field.of_bits
           (List.init Backend.Tick.Field.size_in_bits
-             (testbit (Bigint.of_string s)) ) ))
+             ~f:(testbit (Bigint.of_string s)) ) ))

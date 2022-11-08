@@ -3,7 +3,6 @@ open Pickles_types
 open Hlist
 open Tuple_lib
 open Common
-open Core_kernel
 open Async_kernel
 open Import
 open Types

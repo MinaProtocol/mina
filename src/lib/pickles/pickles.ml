@@ -25,7 +25,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   open Tuple_lib
   module Scalar_challenge = Scalar_challenge
   module SC = Scalar_challenge
-  open Core_kernel
   open Async_kernel
   open Import
   open Pickles_types

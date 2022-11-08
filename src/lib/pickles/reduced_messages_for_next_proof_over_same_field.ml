@@ -55,7 +55,7 @@ module Wrap = struct
           Wrap_bp_vec.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
 
-        let to_latest = Core_kernel.Fn.id
+        let to_latest = Fn.id
       end
     end]
 
@@ -66,8 +66,8 @@ module Wrap = struct
     [@@deriving sexp, compare, yojson, hash, equal]
 
     let () =
-      let _f : unit -> (t, Stable.Latest.t) Core_kernel.Type_equal.t =
-       fun () -> Core_kernel.Type_equal.T
+      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+       fun () -> Type_equal.T
       in
       ()
 

@@ -1,6 +1,3 @@
-module Array = Core_kernel.Array
-module Int = Core_kernel.Int
-
 module type Field = sig
   include Sponge.Intf.Field
 

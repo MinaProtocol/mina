@@ -1,4 +1,3 @@
-module Array = Core_kernel.Array
 module Nat = Pickles_types.Nat
 module Vector = Pickles_types.Vector
 

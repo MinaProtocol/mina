@@ -1,5 +1,4 @@
 module S = Sponge
-open Core_kernel
 open Pickles_types
 open Common
 open Poly_types

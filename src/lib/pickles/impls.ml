@@ -1,5 +1,4 @@
 open Pickles_types
-open Core_kernel
 open Import
 open Backend
 module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)

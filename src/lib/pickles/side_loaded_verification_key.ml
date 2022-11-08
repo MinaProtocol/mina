@@ -23,7 +23,6 @@
         a 'transaction' or a 'merge'.
 *)
 
-open Core_kernel
 open Pickles_types
 module V = Pickles_base.Side_loaded_verification_key
 

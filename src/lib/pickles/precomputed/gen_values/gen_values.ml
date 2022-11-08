@@ -2,7 +2,6 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
-open Core_kernel
 open Kimchi_pasta
 open Pasta
 open Pickles_types

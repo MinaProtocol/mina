@@ -1,4 +1,3 @@
-open Core_kernel
 module Impl = Impls.Step
 
 let high_entropy_bits = 128

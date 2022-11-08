@@ -1,4 +1,3 @@
-open Core_kernel
 open Pickles_types
 open Hlist
 open Common
