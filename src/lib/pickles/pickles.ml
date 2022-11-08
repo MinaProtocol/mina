@@ -1154,6 +1154,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let () = Tick.Keypair.set_urs_info []
 
+      let () = Backtrace.elide := false
+
       (*
     let%test_unit "test deserialization and verification for side-loaded keys" =
       Side_loaded.srs_precomputation () ;
