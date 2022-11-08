@@ -22,9 +22,7 @@ module Step : sig
 
     val generate :
          prev_challenges:int
-      -> ( Kimchi_pasta.Vesta_based_plonk.Field.t
-         , Kimchi_bindings.Protocol.Gates.Vector.Fp.t )
-         Kimchi_backend_common.Plonk_constraint_system.t
+      -> Kimchi_pasta_constraint_system.Vesta_constraint_system.t
       -> t
   end
 
@@ -133,9 +131,7 @@ module Wrap : sig
 
     val generate :
          prev_challenges:int
-      -> ( Kimchi_pasta.Pallas_based_plonk.Field.t
-         , Kimchi_bindings.Protocol.Gates.Vector.Fq.t )
-         Kimchi_backend_common.Plonk_constraint_system.t
+      -> Kimchi_pasta_constraint_system.Pallas_constraint_system.t
       -> t
   end
 
