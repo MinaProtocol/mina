@@ -1,9 +1,7 @@
 open Core_kernel
 open Common
 open Backend
-open Pickles_types
 module Impl = Impls.Step
-open Import
 
 let _high_entropy_bits = 128
 
@@ -118,7 +116,6 @@ module Inner_curve = struct
     module Impl = Impl
 
     module Params = struct
-      open Impl.Field.Constant
       include C.Params
 
       let one = C.to_affine_exn C.one
