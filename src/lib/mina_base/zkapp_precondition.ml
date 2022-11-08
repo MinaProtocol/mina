@@ -535,12 +535,15 @@ module Account = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
+    let sequence_state =
+      with_checked ~checked:field ~name:"SequenceState" field
+    in
     Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
-      ~sequence_state:!.(Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver sequence_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
     |> finish "AccountPrecondition" ~t_toplevel_annots
