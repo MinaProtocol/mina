@@ -137,23 +137,30 @@ module Js_layout = struct
 
   let option x obj ~(js_type : option_type) : _ Input.t =
     let inner = !(x#js_layout) in
-    let js_type, (range_min, range_max) =
+    let layout =
       match js_type with
       | Flagged_option ->
-          ("flaggedOption", ("0", "0"))
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "flaggedOption")
+            ; ("inner", inner)
+            ]
       | Closed_interval (min, max) ->
-          ("closedInterval", (min, max))
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "closedInterval")
+            ; ("rangeMin", `String min)
+            ; ("rangeMax", `String max)
+            ; ("inner", inner)
+            ]
       | Or_undefined ->
-          ("orUndefined", ("0", "0"))
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "orUndefined")
+            ; ("inner", inner)
+            ]
     in
-    obj#js_layout :=
-      `Assoc
-        [ ("type", `String "option")
-        ; ("optionType", `String js_type)
-        ; ("rangeMin", `String range_min)
-        ; ("rangeMax", `String range_max)
-        ; ("inner", inner)
-        ] ;
+    obj#js_layout := layout ;
     obj
 
   let wrapped x obj =
