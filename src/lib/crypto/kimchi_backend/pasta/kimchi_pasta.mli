@@ -18,8 +18,8 @@ module Pallas_based_plonk : sig
 end
 
 module Vesta_based_plonk : sig
-  module Field = Basic.Fp
-  module Curve = Basic.Vesta
+  module Field = Vesta_based_plonk.Field
+  module Curve = Vesta_based_plonk.Curve
   module Bigint = Vesta_based_plonk.Bigint
 
   val field_size : Pasta_bindings.BigInt256.t

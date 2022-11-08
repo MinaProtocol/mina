@@ -7,7 +7,7 @@ module Plonk_constraint_system : sig
   module Make = Plonk_constraint_system.Make
   module Plonk_constraint = Plonk_constraint_system.Plonk_constraint
 
-  type ('f, 'rust_gates) t
+  type ('f, 'rust_gates) t = ('f, 'rust_gates) Plonk_constraint_system.t
 
   val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
 
