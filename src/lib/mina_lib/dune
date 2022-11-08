@@ -103,6 +103,7 @@
    snark_params
    kimchi_backend.pasta
    mina_wire_types
+   inline_test_quiet_logs
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))

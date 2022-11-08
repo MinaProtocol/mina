@@ -8,6 +8,7 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
+open Inline_test_quiet_logs
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -2190,14 +2191,10 @@ let%test_module "Epoch ledger sync tests" =
       val trust_system : Trust_system.t
     end
 
-    let (_ : _) = Format.eprintf "POINT 1@."
-
-    [@@@warning "-32-26-27"]
-
     let snark_remote_sink_ref = ref None
 
     let make_mina_network ~context:(module Context : CONTEXT) ~instance
-        ~libp2p_keypair ~initial_peers ~staking_ledger ~next_epoch_ledger =
+        ~libp2p_keypair_str ~initial_peers =
       let open Context in
       let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
         Broadcast_pipe.create None
@@ -2286,14 +2283,12 @@ let%test_module "Epoch ledger sync tests" =
           ~genesis_state_hash
           (Signature_lib.Public_key.Compressed.Set.of_list [])
       in
-      ignore
-        ( Consensus.Data.Local_state.For_tests.set_snapshot
-            consensus_local_state Staking_epoch_snapshot
-          : _ ) ;
-      let genesis_ledger_hash = Ledger_hash.empty_hash in
+      let genesis_ledger_hash =
+        Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
+      in
       let is_seed = instance = 0 in
       let libp2p_keypair =
-        Mina_net2.Keypair.of_string libp2p_keypair |> Or_error.ok_exn
+        Mina_net2.Keypair.of_string libp2p_keypair_str |> Or_error.ok_exn
       in
       let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance in
       let creatable_gossip_net =
@@ -2364,18 +2359,12 @@ let%test_module "Epoch ledger sync tests" =
         ; log_gossip_heard
         }
       in
+      let get_best_tip _ = return None in
       let answer_sync_ledger_query query_env =
-        Format.eprintf "A 1@." ;
         let ledger_hash, _ = Envelope.Incoming.data query_env in
-        Format.eprintf "A 2@." ;
-        let frontier =
-          match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
-          | Some tf ->
-              tf
-          | None ->
-              failwith "Could not get transition frontier"
+        let%bind.Deferred.Or_error frontier =
+          Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
         in
-        Format.eprintf "A 3@." ;
         Sync_handler.answer_query ~frontier ledger_hash
           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
           ~logger ~trust_system
@@ -2394,20 +2383,19 @@ let%test_module "Epoch ledger sync tests" =
       in
       let%bind (mina_networking : Mina_networking.t) =
         Mina_networking.create config ~sinks ~answer_sync_ledger_query
+          ~get_best_tip
           ~get_some_initial_peers:(unimplemented "get_some_initial_peers")
           ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
             (unimplemented "get_staged_ledger_aux_and_pending_coinbases_at_hash")
           ~get_ancestry:(unimplemented "get_ancestry")
-          ~get_best_tip:(unimplemented "get_best_tip")
           ~get_node_status:(rpc_error "get_node_status")
           ~get_transition_chain_proof:
             (unimplemented "get_transition_chain_proof")
           ~get_transition_chain:(unimplemented "get_transition_chain")
           ~get_transition_knowledge:(unimplemented "get_transition_knowledge")
       in
-      Format.eprintf "PT 1@." ;
       (* create transition frontier *)
-      let _valid_transitions, initialization_finish_signal =
+      let _valid_transitions, _initialization_finish_signal =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block =
           Broadcast_pipe.create
@@ -2430,38 +2418,18 @@ let%test_module "Epoch ledger sync tests" =
           ~catchup_mode:`Normal ~network_transition_reader:block_reader
           ~producer_transition_reader ~most_recent_valid_block ~notify_online
       in
-      (* wait until transition frontier ready *)
-      (*       let%bind () = Ivar.read initialization_finish_signal in *)
-      Format.eprintf "PT 2@." ;
-      let staking_epoch_snapshot =
-        Consensus.Data.Local_state.For_tests.snapshot_of_ledger staking_ledger
-      in
-      let next_epoch_snapshot =
-        Consensus.Data.Local_state.For_tests.snapshot_of_ledger
-          next_epoch_ledger
-      in
-      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
-        Staking_epoch_snapshot staking_epoch_snapshot ;
-      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
-        Next_epoch_snapshot next_epoch_snapshot ;
       let network_peer =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
-      Format.eprintf "PT 3@." ;
-      return (mina_networking, network_peer)
+      return (mina_networking, network_peer, consensus_local_state)
 
-    let (_ : _) = Format.eprintf "POINT 2@."
-
-    let%test_unit "Sync from empty ledger" =
-      Format.eprintf "PTU 0@." ;
+    let%test "Sync from empty ledger" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Format.eprintf "PTU 0.5@." ;
           Protocol_version.(
             set_current @@ create_exn ~major:2 ~minor:0 ~patch:0) ;
           let logger = Logger.create () in
           let cwd = Caml.Sys.getcwd () in
-          Format.eprintf "PTU 1@." ;
           let%bind precomputed_values =
             let runtime_config : Runtime_config.t =
               { daemon = None
@@ -2508,19 +2476,23 @@ let%test_module "Epoch ledger sync tests" =
             Mina_ledger.Ledger.Db.create
               ~depth:precomputed_values.constraint_constants.ledger_depth ()
           in
-          let empty_ledger =
-            let db_ledger = make_empty_ledger () in
-            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
-              db_ledger
-          in
           let staking_ledger =
             let db_ledger = make_empty_ledger () in
             let accounts =
               Quickcheck.(
                 random_value @@ Generator.list_with_length 10 Account.gen)
             in
-            List.iteri accounts ~f:(fun ndx acct ->
-                Ledger.Db.set_at_index_exn db_ledger ndx acct ) ;
+            List.iter accounts ~f:(fun acct ->
+                let acct_id =
+                  Account_id.create acct.public_key Token_id.default
+                in
+                match
+                  Ledger.Db.get_or_create_account db_ledger acct_id acct
+                with
+                | Ok _ ->
+                    ()
+                | Error _ ->
+                    failwith "Could not add account" ) ;
             Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
               db_ledger
           in
@@ -2533,24 +2505,32 @@ let%test_module "Epoch ledger sync tests" =
             Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
               db_ledger
           in
-          Format.eprintf "PTU 2@." ;
-          let%bind _mina_network1, network_peer1 =
+          let%bind _mina_network1, network_peer1, consensus_local_state1 =
             make_mina_network
               ~context:(module Context1)
               ~instance:0
-              ~libp2p_keypair:
+              ~libp2p_keypair_str:
                 "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
-              ~initial_peers:[] ~staking_ledger ~next_epoch_ledger
+              ~initial_peers:[]
           in
-          let%bind mina_network2, _network_peer2 =
-            Format.eprintf "MULTIADDR: %s@."
-              Mina_net2.Multiaddr.(to_string @@ of_peer network_peer1) ;
+          let staking_epoch_snapshot =
+            Consensus.Data.Local_state.For_tests.snapshot_of_ledger
+              staking_ledger
+          in
+          let next_epoch_snapshot =
+            Consensus.Data.Local_state.For_tests.snapshot_of_ledger
+              next_epoch_ledger
+          in
+          Consensus.Data.Local_state.For_tests.set_snapshot
+            consensus_local_state1 Staking_epoch_snapshot staking_epoch_snapshot ;
+          Consensus.Data.Local_state.For_tests.set_snapshot
+            consensus_local_state1 Next_epoch_snapshot next_epoch_snapshot ;
+          let%bind mina_network2, _network_peer2, _consensus_local_state2 =
             make_mina_network ~instance:1
               ~context:(module Context2)
-              ~libp2p_keypair:
+              ~libp2p_keypair_str:
                 "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
               ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
-              ~staking_ledger:empty_ledger ~next_epoch_ledger:empty_ledger
           in
           let db_ledger : Mina_ledger.Ledger.Db.t = make_empty_ledger () in
           let sync_ledger =
@@ -2562,25 +2542,15 @@ let%test_module "Epoch ledger sync tests" =
           let response_writer =
             Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
           in
-          Format.eprintf "PTU 3@." ;
           Mina_networking.glue_sync_ledger mina_network2
             ~preferred:[ network_peer1 ] query_reader response_writer ;
-          Format.eprintf "PTU 4@." ;
-          if false then ()
-          else
-            Deferred.don't_wait_for
-              ( match%map
-                  Mina_ledger.Sync_ledger.Db.fetch sync_ledger
-                    staking_ledger_root ~data:() ~equal:(fun () () ->
-                      Format.eprintf "EQUAL@." ; true )
-                with
-              | `Ok ledger ->
-                  Format.eprintf "SYNCED LEDGER@." ;
-                  let ledger_root = Ledger.Db.merkle_root ledger in
-                  assert (Ledger_hash.equal ledger_root staking_ledger_root)
-              | `Target_changed _ ->
-                  Format.eprintf "FAILED TO SYNC LEDGER@." ;
-                  failwith "Target changed when syncing epoch ledger" ) ;
-          let%bind () = Async.after (Time.Span.of_min 2.0) in
-          Deferred.unit )
+          match%map
+            Mina_ledger.Sync_ledger.Db.fetch sync_ledger staking_ledger_root
+              ~data:() ~equal:(fun () () -> true)
+          with
+          | `Ok ledger ->
+              let ledger_root = Ledger.Db.merkle_root ledger in
+              Ledger_hash.equal ledger_root staking_ledger_root
+          | `Target_changed _ ->
+              false )
   end )

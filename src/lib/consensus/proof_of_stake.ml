@@ -679,11 +679,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           | Staking_epoch_snapshot
           | Next_epoch_snapshot
 
-        (* don't want to expose this bit of imperative code, in general
-           OK for tests
-        *)
-        let set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit =
-          set_snapshot
+        let set_snapshot = set_snapshot
 
         (* if all we're testing is the ledger sync, empty delegatee table sufficient *)
         let snapshot_of_ledger (ledger : Snapshot.Ledger_snapshot.t) :
