@@ -11,10 +11,11 @@ let () =
   Pallas_based_plonk.Keypair.set_urs_info []
 
 let time lab f =
-  printf "%s: %!" lab ;
+  Printf.printf "%s: %!" lab ;
   let start = Time.now () in
   let x = f () in
-  printf "%s\n%!" (Time.Span.to_string_hum (Time.diff (Time.now ()) start)) ;
+  Printf.printf "%s\n%!"
+    (Time.Span.to_string_hum (Time.diff (Time.now ()) start)) ;
   x
 
 let unwrap = function
@@ -92,7 +93,12 @@ let structure =
     end]
 
 let () =
-  let target = Sys.argv.(1) in
-  let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
-  Pprintast.top_phrase fmt (Ptop_def structure) ;
-  exit 0
+  if Array.length Sys.argv > 1 then (
+    let target = Sys.argv.(1) in
+    let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
+    Pprintast.top_phrase fmt (Ptop_def structure) ;
+    exit 0 )
+  else (
+    Format.eprintf
+      "gen_values expects one argument for its target, none given.@." ;
+    exit 1 )

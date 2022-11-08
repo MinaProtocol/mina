@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (flags -open Core_kernel)
  (libraries
    ;; opam libraries
    stdio
