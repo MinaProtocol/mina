@@ -40,3 +40,8 @@ Using the `mina.ros` file from this folder, in the local sandbox:
 - some funds need to be added to them manually, to make the `request_funds` step pass.
 - the `transfer` test fails at the `/construction/parse` step.
   Previous steps seem to be successful (`/construction/derive`, `/construction/preprocess`, `/construction/metadata`, `/construction/payloads`)
+  
+  This step fails with an `Invalid signature` error which is raised when the rosetta server verifies the signed transaction created by rosetta-cli.
+  One possible explanation is that the default value for the `validUntil` field (present in the signed payload) seems different on the two sides.
+  - https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L195
+  - https://github.com/MinaProtocol/mina/blob/develop/src/lib/mina_base/signed_command_payload.ml#L310
