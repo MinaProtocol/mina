@@ -1,6 +1,5 @@
 open Mina_base
 open Core_kernel
-open Async
 open Context
 include Gossip_types
 
@@ -13,39 +12,27 @@ include Gossip_types
 *)
 let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
     ~transition_states header_with_hash =
-  let open Transition_handler.Validator in
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_result =
     let%bind.Result () =
       Option.value_map (Hashtbl.find transition_states hash) ~default:(Ok ())
         ~f:(fun st -> Error (`In_process st))
     in
-    verify_header_is_relevant
+    Transition_handler.Validator.verify_header_is_relevant
       ~context:(module Context)
       ~frontier:Context.frontier header_with_hash
   in
-  let open Context in
-  let record_irrelevant error =
-    don't_wait_for
-    @@ record_transition_is_irrelevant ~logger ~trust_system ~sender ~error
-         header_with_hash
-  in
-  (* This action is deferred because it may potentially trigger change of ban status
-     of a peer which requires writing to a synchonous pipe. *)
-  (* Although it's not evident from types, banning may be triiggered only for irrelevant
-     case, hence it's safe to do don't_wait_for *)
+  Context.record_event
+    (`Verified_header_relevance (relevance_result, header_with_hash, sender)) ;
   match relevance_result with
   | Ok () ->
-      don't_wait_for
-        (record_transition_is_relevant ~logger ~trust_system ~sender
-           ~time_controller header_with_hash ) ;
       `Relevant
-  | Error (`In_process (Transition_state.Invalid _) as error) ->
-      record_irrelevant error ; `Irrelevant
-  | Error (`In_process _ as error) ->
-      record_irrelevant error ; `Preserve_gossip_data
-  | Error error ->
-      record_irrelevant error ; `Irrelevant
+  | Error (`In_process (Transition_state.Invalid _)) ->
+      `Irrelevant
+  | Error (`In_process _) ->
+      `Preserve_gossip_data
+  | _ ->
+      `Irrelevant
 
 (** Preserve body in the transition's state.
     

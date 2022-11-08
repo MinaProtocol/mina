@@ -119,24 +119,6 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
     ~f:(promote_to_higher_state ~context:(module Context) ~transition_states)
     higher_state_promotees
 
-(** [handle_produced_transition] adds locally produced block to the catchup state *)
-let handle_produced_transition ~logger ~state breadcrumb =
-  let hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
-  let data =
-    Transition_state.Waiting_to_be_added_to_frontier
-      { breadcrumb
-      ; source = `Internal
-      ; children = Substate.empty_children_sets
-      }
-  in
-  match Hashtbl.add state.transition_states ~key:hash ~data with
-  | `Ok ->
-      ()
-  | `Duplicate ->
-      [%log warn]
-        "Produced breadcrumb $state_hash is already in bit-catchup state"
-        ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]
-
 let shutdown_substate = function
   | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
     ->
@@ -176,8 +158,8 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       Pipe_lib.Strict_pipe.Writer.write verified_transition_writer
         (`Transition t, `Source s, `Valid_cb None)
 
-    let write_breadcrumb b =
-      Queue.enqueue breadcrumb_queue b ;
+    let write_breadcrumb source b =
+      Queue.enqueue breadcrumb_queue (source, b) ;
       Strict_pipe.Writer.write breadcrumb_notification_writer ()
 
     let check_body_in_storage = Block_storage.read_body block_storage
@@ -225,6 +207,34 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       Fn.compose I.lift @@ Verifier.verify_transaction_snarks verifier
 
     let processed_dsu = Processed_skipping.Dsu.create ()
+
+    let record_event = function
+      | `Invalid_frontier_dependencies (e, state_hash, sender) ->
+          Transition_handler.Processor.handle_frontier_validation_error
+            ~trust_system ~logger ~sender ~state_hash e
+      | `Verified_header_relevance (relevance_result, header_with_hash, sender)
+        -> (
+          let open Transition_handler.Validator in
+          let record_irrelevant error =
+            don't_wait_for
+            @@ record_transition_is_irrelevant ~logger ~trust_system ~sender
+                 ~error header_with_hash
+          in
+          (* Although it's not evident from types, banning may be triiggered only for irrelevant
+             case, hence it's safe to do don't_wait_for *)
+          match relevance_result with
+          | Ok () ->
+              (* This action is deferred because it may potentially trigger change of ban status
+                 of a peer which requires writing to a synchonous pipe. *)
+              don't_wait_for
+                (record_transition_is_relevant ~logger ~trust_system ~sender
+                   ~time_controller header_with_hash )
+          | Error (`In_process (Transition_state.Invalid _) as error) ->
+              record_irrelevant error
+          | Error (`In_process _ as error) ->
+              record_irrelevant error
+          | Error error ->
+              record_irrelevant error )
   end in
   let transition_states = State_hash.Table.create () in
   let state =
@@ -244,7 +254,9 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
          ~state ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback producer_transition_reader
-       ~f:(handle_produced_transition ~logger ~state) ;
+       ~f:
+         (Waiting_to_be_added_to_frontier.handle_produced_transition ~context
+            ~transition_states ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback network_transition_reader
        ~f:
@@ -260,17 +272,44 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
                   st ) ) ;
          kill breadcrumb_notification_writer ) ;
   Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
-      let breadcrumbs = Queue.to_list breadcrumb_queue in
+      let f (_, b) =
+        let parent_hash = Frontier_base.Breadcrumb.parent_hash b in
+        match Transition_frontier.find frontier parent_hash with
+        | Some _ ->
+            true
+        | _ ->
+            [%log warn]
+              "When trying to add breadcrumb $state_hash, its parent had been \
+               removed from transition frontier: $parent_hash"
+              ~metadata:
+                [ ("parent_hash", State_hash.to_yojson parent_hash)
+                ; ( "state_hash"
+                  , Frontier_base.Breadcrumb.state_hash b
+                    |> State_hash.to_yojson )
+                ] ;
+            false
+      in
+      let breadcrumbs = Queue.to_list breadcrumb_queue |> List.filter ~f in
       Queue.clear breadcrumb_queue ;
       let%map.Deferred () =
-        Transition_frontier.add_breadcrumbs_exn Context.frontier breadcrumbs
+        Transition_frontier.add_breadcrumbs_exn Context.frontier
+          (List.map ~f:snd breadcrumbs)
       in
-      let f =
+      let promote_do =
         promote_to_higher_state_impl ~context ~transition_states
           ~mark_processed_and_promote
       in
-      let promote =
-        State_hash.Table.change transition_states ~f:(Option.bind ~f)
+      let promote (source, b) =
+        ( match source with
+        | `Internal ->
+            ()
+        | _ ->
+            Transition_handler.Processor.record_block_inclusion_time
+              (Frontier_base.Breadcrumb.validated_transition b)
+              ~time_controller ~consensus_constants:Context_.consensus_constants
+        ) ;
+        State_hash.Table.change transition_states
+          ~f:(Option.bind ~f:promote_do)
+          (Frontier_base.Breadcrumb.state_hash b)
       in
-      List.iter breadcrumbs
-        ~f:(Fn.compose promote Frontier_base.Breadcrumb.state_hash) )
+      List.iter breadcrumbs ~f:promote )

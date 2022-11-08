@@ -23,6 +23,22 @@ type catchup_state =
   *)
   }
 
+type source_t = [ `Catchup | `Gossip | `Internal ]
+
+type event_t =
+  [ `Verified_header_relevance of
+    ( unit
+    , [ `Disconnected
+      | `In_frontier of State_hash.t
+      | `In_process of Transition_state.t ] )
+    Result.t
+    * Mina_block.Header.with_hash
+    * Network_peer.Envelope.Sender.t
+  | `Invalid_frontier_dependencies of
+    [ `Already_in_frontier | `Not_selected_over_frontier_root ]
+    * State_hash.t
+    * Network_peer.Envelope.Sender.t ]
+
 module type CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
 
@@ -40,12 +56,10 @@ module type CONTEXT = sig
 
   (** Callback to write verified transitions after they're added to the frontier. *)
   val write_verified_transition :
-       [ `Transition of Mina_block.Validated.t ]
-       * [ `Source of [ `Catchup | `Gossip | `Internal ] ]
-    -> unit
+    [ `Transition of Mina_block.Validated.t ] * [ `Source of source_t ] -> unit
 
   (** Callback to write built breadcrumbs so that they can be added to frontier *)
-  val write_breadcrumb : Frontier_base.Breadcrumb.t -> unit
+  val write_breadcrumb : source_t -> Frontier_base.Breadcrumb.t -> unit
 
   (** Check is the body of a transition is present in the block storage, *)
   val check_body_in_storage :
@@ -128,6 +142,8 @@ module type CONTEXT = sig
     -> bool Or_error.t Interruptible.t
 
   val processed_dsu : Processed_skipping.Dsu.t
+
+  val record_event : event_t -> unit
 end
 
 let state_functions =

@@ -41,6 +41,21 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
   |> Cached.sequence_deferred
   >>= Fn.compose transform_result Cached.sequence_result
 
+let record_block_inclusion_time ~time_controller ~consensus_constants block =
+  let transition_time =
+    block |> Mina_block.Validated.header |> Mina_block.Header.protocol_state
+    |> Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.consensus_time
+  in
+  let time_elapsed =
+    Block_time.diff
+      (Block_time.now time_controller)
+      (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
+         transition_time )
+  in
+  Mina_metrics.Block_latency.Inclusion_time.update
+    (Block_time.Span.to_time_span time_elapsed)
+
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
@@ -78,30 +93,34 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   | `Internal ->
       ()
   | _ ->
-      let transition_time =
-        transition |> Mina_block.Validated.header
-        |> Mina_block.Header.protocol_state |> Protocol_state.consensus_state
-        |> Consensus.Data.Consensus_state.consensus_time
-      in
-      let time_elapsed =
-        Block_time.diff
-          (Block_time.now time_controller)
-          (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
-             transition_time )
-      in
-      Mina_metrics.Block_latency.Inclusion_time.update
-        (Block_time.Span.to_time_span time_elapsed) ) ;
+      record_block_inclusion_time transition ~time_controller
+        ~consensus_constants ) ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source, `Valid_cb valid_cb) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(Mina_block.Validated.state_hash transition)
 
+let handle_frontier_validation_error ~trust_system ~logger ~sender ~state_hash =
+  let metadata = [ ("state_hash", State_hash.to_yojson state_hash) ] in
+  function
+  | `Not_selected_over_frontier_root ->
+      don't_wait_for
+      @@ Trust_system.record_envelope_sender trust_system logger sender
+           ( Trust_system.Actions.Gossiped_invalid_transition
+           , Some
+               ( "The transition with hash $state_hash was not selected over \
+                  the transition frontier root"
+               , metadata ) )
+  | `Already_in_frontier ->
+      [%log warn] ~metadata
+        "Refusing to process the transition with hash $state_hash because is \
+         is already in the transition frontier"
+
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~frontier ~catchup_scheduler ~processed_transition_writer
     ~time_controller ~block_or_header ~valid_cb =
   let open Context in
-  let parent_hash, transition_hash, transition_receipt_time, sender, validation
-      =
+  let parent_hash, state_hash, transition_receipt_time, sender, validation =
     match block_or_header with
     | `Block cached_env ->
         let env = Cached.peek cached_env in
@@ -121,7 +140,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         , Envelope.Incoming.sender env
         , v )
   in
-  let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let root_block =
     Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
   in
@@ -165,29 +183,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         with
         | Ok t ->
             return (Ok t)
-        | Error `Not_selected_over_frontier_root ->
-            let%map () =
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Gossiped_invalid_transition
-                , Some
-                    ( "The transition with hash $state_hash was not selected \
-                       over the transition frontier root"
-                    , metadata ) )
-            in
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
-            Error ()
-        | Error `Already_in_frontier ->
-            [%log warn] ~metadata
-              "Refusing to process the transition with hash $state_hash \
-               because is is already in the transition frontier" ;
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
-            return (Error ())
         | Error `Parent_missing_from_frontier -> (
             match validation with
             | ( _
@@ -208,6 +203,15 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                   ~cached_transition:cached_initially_validated_transition
                   ~valid_cb ;
                 return (Error ()) )
+        | Error (`Not_selected_over_frontier_root as e)
+        | Error (`Already_in_frontier as e) ->
+            handle_frontier_validation_error ~trust_system ~logger ~sender
+              ~state_hash e ;
+            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
+            return (Error ())
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_breadcrumb =
@@ -226,7 +230,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             | Error (`Invalid_staged_ledger_diff error) ->
                 [%log error]
                   ~metadata:
-                    (metadata @ [ ("error", Error_json.error_to_yojson error) ])
+                    [ ("error", Error_json.error_to_yojson error)
+                    ; ("state_hash", State_hash.to_yojson state_hash)
+                    ]
                   "Error while building breadcrumb in the transition handler \
                    processor: $error" ;
                 Deferred.return (Error ())
