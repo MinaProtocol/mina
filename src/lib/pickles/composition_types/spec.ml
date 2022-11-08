@@ -94,7 +94,7 @@ let rec pack :
       Array.append hd (pack ~zero ~one p (Struct specs) tl)
   | Array (spec, _) ->
       Array.concat_map t ~f:(pack ~zero ~one p spec)
-  | Opt { inner; flag; dummy1 = _; dummy2 } -> (
+  | Opt { inner; flag = _; dummy1 = _; dummy2; bool = _ } -> (
       match t with
       | None ->
           Array.append [| zero |] (pack ~zero ~one p inner dummy2)
@@ -116,7 +116,7 @@ let rec typ :
     -> (var, value, f) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
   fun t spec ->
-    match spec with
+    match[@warning "-45"] spec with
     | B spec ->
         t.typ spec
     | Scalar chal ->
@@ -145,10 +145,6 @@ let rec typ :
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
           ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
 
-type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
-
-type generic_spec = { spec : 'env. 'env exists }
-
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
@@ -167,7 +163,7 @@ let rec etyp :
     (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
   let open Snarky_backendless.Typ in
   fun e spec ->
-    match spec with
+    match[@warning "-45"] spec with
     | B spec ->
         e.etyp spec
     | Scalar chal ->

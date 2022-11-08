@@ -7,6 +7,8 @@ module Spec = Spec
 module Opt = Plonk_types.Opt
 open Core_kernel
 
+[@@@warning "-45"]
+
 type 'f impl = 'f Spec.impl
 
 let index_to_field_elements =
@@ -75,9 +77,11 @@ module Wrap = struct
               }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            let to_struct l = Hlist.HlistId.[ l.joint_combiner; l.lookup_gate ]
+            let[@warning "-45"] to_struct l =
+              Hlist.HlistId.[ l.joint_combiner; l.lookup_gate ]
 
-            let of_struct Hlist.HlistId.[ joint_combiner; lookup_gate ] =
+            let[@warning "-45"] of_struct
+                Hlist.HlistId.[ joint_combiner; lookup_gate ] =
               { joint_combiner; lookup_gate }
 
             let typ (type f fp) scalar_challenge
@@ -273,7 +277,7 @@ module Wrap = struct
           ; xi
           ; bulletproof_challenges
           ; branch_data
-          } ~f ~scalar =
+          } ~f:_ ~scalar =
         { xi = scalar xi
         ; combined_inner_product
         ; b
@@ -398,7 +402,7 @@ module Wrap = struct
     module Minimal = struct
       type ( 'challenge
            , 'scalar_challenge
-           , 'scalar_challenge_opt
+           , _
            , 'fp
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -1100,7 +1104,6 @@ module Step = struct
       end
 
       let typ impl fq ~assert_16_bits ~zero ~uses_lookup =
-        let open Deferred_values.Plonk.In_circuit.Lookup in
         let lookup_config =
           { Wrap.Lookup_parameters.use = uses_lookup; zero }
         in
@@ -1144,8 +1147,8 @@ module Step = struct
     end [@@warning "-45"]
 
     let typ (type n f)
-        ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) zero ~assert_16_bits
+        ( (module _ : Snarky_backendless.Snark_intf.Run with type field = f) as
+        impl ) zero ~assert_16_bits
         (proofs_verified : (Pickles_types.Plonk_types.Opt.Flag.t, n) Vector.t)
         fq :
         ( ((_, _) Vector.t, _) t
