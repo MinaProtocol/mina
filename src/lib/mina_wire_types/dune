@@ -13,6 +13,7 @@
     kimchi_types
     kimchi_bindings
     kimchi_backend.pasta
+    kimchi_backend.pasta.basic
     blake2
     )
   (preprocessor_deps ../../config.mlh)

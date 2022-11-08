@@ -35,6 +35,7 @@
    o1trace
    mina_base.import
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    with_hash
    snarky.backendless)
  (instrumentation (backend bisect_ppx))

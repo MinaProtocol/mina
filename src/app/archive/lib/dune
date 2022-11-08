@@ -30,6 +30,7 @@
    sgn
    mina_base.util
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    random_oracle
    pipe_lib
