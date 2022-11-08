@@ -484,7 +484,7 @@ module Wrap = struct
           ; xi
           ; bulletproof_challenges
           ; branch_data
-          } ~f ~scalar =
+          } ~f:_ ~scalar =
         { xi = scalar xi
         ; combined_inner_product
         ; b
