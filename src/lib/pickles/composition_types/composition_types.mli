@@ -257,19 +257,6 @@ module Wrap : sig
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           w :=
-        ( 'plonk
-        , 'scalar_challenge
-        , 'fp
-        , 'bulletproof_challenges
-        , 'branch_data )
-        t
-
       val map_challenges :
            ('a, 'b, 'fp, 'c, 'd) t
         -> f:'e
@@ -476,7 +463,8 @@ module Wrap : sig
     module Minimal : sig
       type ( 'challenge
            , 'scalar_challenge
-           , 'scalar_challenge_opt
+           , _
+           (* TODO: fix this unused polymorphic parameter *)
            , 'fp
            , 'messages_for_next_wrap_proof
            , 'digest
