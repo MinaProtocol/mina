@@ -80,6 +80,8 @@ let proof t = t.proof
 
 let statement t = { t.statement with sok_digest = () }
 
+let statement_with_sok t = t.statement
+
 let sok_digest t = t.statement.sok_digest
 
 let to_yojson = Stable.Latest.to_yojson

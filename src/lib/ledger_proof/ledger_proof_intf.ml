@@ -30,6 +30,15 @@ module type S = sig
 
   val statement : t -> Mina_state.Snarked_ledger_state.t
 
+  val statement_with_sok : t -> Mina_state.Snarked_ledger_state.With_sok.t
+
+  val statement_with_sok_target :
+       Mina_state.Snarked_ledger_state.With_sok.t
+    -> ( Frozen_ledger_hash.t
+       , Pending_coinbase.Stack_versioned.t
+       , Mina_state.Local_state.t )
+       Mina_state.Registers.t
+
   val sok_digest : t -> Sok_message.Digest.t
 
   val underlying_proof : t -> Proof.t

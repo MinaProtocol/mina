@@ -26,6 +26,8 @@ val proof : t -> Mina_base.Proof.t
 
 val statement : t -> Statement.t
 
+val statement_with_sok : t -> Statement.With_sok.t
+
 val sok_digest : t -> Sok_message.Digest.t
 
 open Pickles_types

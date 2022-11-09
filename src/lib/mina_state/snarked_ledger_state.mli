@@ -148,6 +148,17 @@ module Stable : sig
   end
 end]
 
+type var =
+  ( Frozen_ledger_hash.var
+  , Currency.Amount.Signed.var
+  , Pending_coinbase.Stack.var
+  , Fee_excess.var
+  , unit
+  , Local_state.Checked.t )
+  Poly.t
+
+val typ : (var, t) Tick.Typ.t
+
 module With_sok : sig
   [%%versioned:
   module Stable : sig
@@ -163,6 +174,13 @@ module With_sok : sig
       [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
+
+  type display =
+    (string, string, string, int, string, Local_state.display) Poly.t
+
+  val display : Stable.Latest.t -> display
+
+  val genesis : genesis_ledger_hash:Frozen_ledger_hash.t -> t
 
   type var =
     ( Frozen_ledger_hash.var

@@ -381,13 +381,18 @@ module For_tests = struct
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.registers
       in
-      let next_registers =
+      let previous_ledger_proof_stmt =
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.ledger_proof_statement
+      in
+      let next_registers, ledger_proof_statement =
         Option.value_map ledger_proof_opt
           ~f:(fun (proof, _) ->
-            { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
-              pending_coinbase_stack = ()
-            } )
-          ~default:previous_registers
+            ( { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
+                pending_coinbase_stack = ()
+              }
+            , Ledger_proof.statement_with_sok proof ) )
+          ~default:(previous_registers, previous_ledger_proof_stmt)
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -399,6 +404,7 @@ module For_tests = struct
           ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
           ~genesis_ledger_hash
           ~body_reference:(Body.compute_reference body)
+          ~ledger_proof_statement
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state

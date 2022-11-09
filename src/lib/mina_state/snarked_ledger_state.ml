@@ -192,6 +192,19 @@ module T = struct
     end
   end]
 
+  type var =
+    ( Frozen_ledger_hash.var
+    , Currency.Amount.Signed.var
+    , Pending_coinbase.Stack.var
+    , Fee_excess.var
+    , unit
+    , Local_state.Checked.t )
+    Poly.t
+
+  let typ : (var, t) Tick.Typ.t =
+    Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
+      Pending_coinbase.Stack.typ Fee_excess.typ Tick.Typ.unit Local_state.typ
+
   module With_sok = struct
     [%%versioned
     module Stable = struct
@@ -209,6 +222,28 @@ module T = struct
         let to_latest = Fn.id
       end
     end]
+
+    type display =
+      (string, string, string, int, string, Local_state.display) Poly.t
+
+    let display _ = failwith "TODO"
+
+    let genesis ~genesis_ledger_hash : t =
+      let registers =
+        { Registers.first_pass_ledger = genesis_ledger_hash
+        ; second_pass_ledger = genesis_ledger_hash
+        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+        ; local_state = Local_state.dummy ()
+        }
+      in
+      { source = registers
+      ; target = registers
+      ; connecting_ledger_left = Frozen_ledger_hash.empty_hash
+      ; connecting_ledger_right = Frozen_ledger_hash.empty_hash
+      ; supply_increase = Currency.Amount.Signed.zero
+      ; fee_excess = Fee_excess.empty
+      ; sok_digest = Sok_message.Digest.default
+      }
 
     type var =
       ( Frozen_ledger_hash.var
