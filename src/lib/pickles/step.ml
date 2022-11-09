@@ -648,10 +648,12 @@ struct
             :: pad [] ms n
       in
       lazy
-        (pad
-           (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
-                s.proof_state.messages_for_next_wrap_proof ) )
-           Maxes.maxes Maxes.length )
+        (Vector.rev
+           (pad
+              (Vector.map
+                 (Vector.rev (Option.value_exn !statements_with_hashes))
+                 ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
+              Maxes.maxes Maxes.length ) )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
