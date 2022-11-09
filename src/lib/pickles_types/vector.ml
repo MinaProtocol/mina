@@ -44,7 +44,7 @@ let rec hhead_off :
       let hds, tls = hhead_off xss in
       (x :: hds, xs :: tls)
 
-let rec mapn :
+let[@tail_mod_cons] rec mapn :
     type xs y n.
     (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
@@ -54,14 +54,13 @@ let rec mapn :
   | (_ :: _) :: _ ->
       let hds, tls = hhead_off xss in
       let y = f hds in
-      let ys = mapn tls ~f in
-      y :: ys
+      y :: mapn tls ~f
   | [] ->
       failwith "mapn: Empty args"
 
 let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
-let rec to_list : type a n. (a, n) t -> a list =
+let[@tail_mod_cons] rec to_list : type a n. (a, n) t -> a list =
  fun t -> match t with [] -> [] | x :: xs -> x :: to_list xs
 
 let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
@@ -74,7 +73,8 @@ let rec length : type a n. (a, n) t -> n Nat.t = function
   | _ :: xs ->
       S (length xs)
 
-let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
+let[@tail_mod_cons] rec init :
+    type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
  fun i n ~f -> match n with Z -> [] | S n -> f i :: init (i + 1) n ~f
 
 let init n ~f = init 0 n ~f
