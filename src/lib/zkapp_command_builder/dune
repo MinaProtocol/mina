@@ -12,6 +12,7 @@
    currency
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    pickles.backend
    pickles_types
