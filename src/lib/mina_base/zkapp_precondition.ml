@@ -155,19 +155,6 @@ module Numeric = struct
         ; to_input
         ; to_input_checked = Checked.to_input
         }
-
-    let time =
-      Block_time.
-        { equal
-        ; compare
-        ; lte_checked = run Checked.( <= )
-        ; eq_checked = run Checked.( = )
-        ; zero
-        ; max_value
-        ; typ = Checked.typ
-        ; to_input
-        ; to_input_checked = Checked.to_input
-        }
   end
 
   open Tc
@@ -187,13 +174,6 @@ module Numeric = struct
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
 
-    let block_time_inner obj =
-      let ( ^^ ) = Fn.compose in
-      iso_string ~name:"BlockTime" ~js_type:UInt64
-        ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
-        ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
-        obj
-
     let nonce obj = deriver "Nonce" uint32 obj
 
     let balance obj = deriver "Balance" balance obj
@@ -205,8 +185,6 @@ module Numeric = struct
     let global_slot obj = deriver "GlobalSlot" uint32 obj
 
     let token_id obj = deriver "TokenId" Token_id.deriver obj
-
-    let block_time obj = deriver "BlockTime" block_time_inner obj
   end
 
   let%test_module "Numeric" =
@@ -453,8 +431,6 @@ module Leaf_typs = struct
   open Numeric.Tc
 
   let length = Numeric.typ length
-
-  let time = Numeric.typ time
 
   let amount = Numeric.typ amount
 
@@ -919,7 +895,6 @@ module Protocol_state = struct
     module Stable = struct
       module V1 = struct
         type ( 'snarked_ledger_hash
-             , 'time
              , 'length
              , 'vrf_output
              , 'global_slot
@@ -927,7 +902,6 @@ module Protocol_state = struct
              , 'epoch_data )
              t =
               ( 'snarked_ledger_hash
-              , 'time
               , 'length
               , 'vrf_output
               , 'global_slot
@@ -940,7 +914,6 @@ module Protocol_state = struct
                We should include staged ledger hash again! It only changes once per
                block. *)
             snarked_ledger_hash : 'snarked_ledger_hash
-          ; timestamp : 'time
           ; blockchain_length : 'length
                 (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
                    with global_slot_since_hard_fork.
@@ -969,7 +942,6 @@ module Protocol_state = struct
     module V1 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
-        , Block_time.Stable.V1.t Numeric.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
         , unit (* TODO *)
         , Global_slot.Stable.V1.t Numeric.Stable.V1.t
@@ -990,7 +962,6 @@ module Protocol_state = struct
     let last_vrf_output = ( !. ) ~skip_data:() skip in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
-      ~timestamp:!.Numeric.Derivers.block_time
       ~blockchain_length:!.Numeric.Derivers.length
       ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output
       ~total_currency:!.Numeric.Derivers.amount
@@ -1004,7 +975,6 @@ module Protocol_state = struct
     let open Quickcheck.Let_syntax in
     (* TODO: pass in ledger hash, next available token *)
     let snarked_ledger_hash = Zkapp_basic.Or_ignore.Ignore in
-    let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
       Genesis_constants.for_unit_tests.protocol.slots_per_sub_window
@@ -1031,7 +1001,6 @@ module Protocol_state = struct
     let%bind staking_epoch_data = Epoch_data.gen in
     let%map next_epoch_data = Epoch_data.gen in
     { Poly.snarked_ledger_hash
-    ; timestamp
     ; blockchain_length
     ; min_window_density
     ; last_vrf_output
@@ -1044,7 +1013,6 @@ module Protocol_state = struct
 
   let to_input
       ({ snarked_ledger_hash
-       ; timestamp
        ; blockchain_length
        ; min_window_density
        ; last_vrf_output
@@ -1060,7 +1028,6 @@ module Protocol_state = struct
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
       [ Hash.(to_input Tc.field snarked_ledger_hash)
-      ; Numeric.(to_input Tc.time timestamp)
       ; length blockchain_length
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
@@ -1081,7 +1048,6 @@ module Protocol_state = struct
       module V1 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , Block_time.Stable.V1.t
           , Length.Stable.V1.t
           , unit (* TODO *)
           , Global_slot.Stable.V1.t
@@ -1104,7 +1070,6 @@ module Protocol_state = struct
     module Checked = struct
       type t =
         ( Frozen_ledger_hash.var
-        , Block_time.Checked.t
         , Length.Checked.t
         , unit (* TODO *)
         , Global_slot.Checked.t
@@ -1142,7 +1107,6 @@ module Protocol_state = struct
       in
       let last_vrf_output = ( !. ) ~skip_data:() skip in
       Poly.Fields.make_creator obj ~snarked_ledger_hash:!.field
-        ~timestamp:!.Numeric.Derivers.block_time_inner
         ~blockchain_length:!.uint32 ~min_window_density:!.uint32
         ~last_vrf_output ~total_currency:!.amount
         ~global_slot_since_hard_fork:!.uint32
@@ -1155,7 +1119,6 @@ module Protocol_state = struct
   module Checked = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
-      , Block_time.Checked.t Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
       , Global_slot.Checked.t Numeric.Checked.t
@@ -1165,7 +1128,6 @@ module Protocol_state = struct
 
     let to_input
         ({ snarked_ledger_hash
-         ; timestamp
          ; blockchain_length
          ; min_window_density
          ; last_vrf_output
@@ -1181,7 +1143,6 @@ module Protocol_state = struct
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
         [ Hash.(to_input_checked Tc.frozen_ledger_hash snarked_ledger_hash)
-        ; Numeric.(Checked.to_input Tc.time timestamp)
         ; length blockchain_length
         ; length min_window_density
         ; Numeric.(Checked.to_input Tc.amount total_currency)
@@ -1199,7 +1160,6 @@ module Protocol_state = struct
     let check
         (* Bind all the fields explicity so we make sure they are all used. *)
           ({ snarked_ledger_hash
-           ; timestamp
            ; blockchain_length
            ; min_window_density
            ; last_vrf_output
@@ -1232,7 +1192,6 @@ module Protocol_state = struct
       Boolean.all
         ( [ Hash.(check_checked Tc.ledger_hash)
               snarked_ledger_hash s.snarked_ledger_hash
-          ; Numeric.(Checked.check Tc.time) timestamp s.timestamp
           ; Numeric.(Checked.check Tc.length)
               blockchain_length s.blockchain_length
           ; Numeric.(Checked.check Tc.length)
@@ -1253,7 +1212,6 @@ module Protocol_state = struct
     let state_hash = Hash.(typ Tc.state_hash) in
     let epoch_seed = Hash.(typ Tc.epoch_seed) in
     let length = Numeric.(typ Tc.length) in
-    let time = Numeric.(typ Tc.time) in
     let amount = Numeric.(typ Tc.amount) in
     let global_slot = Numeric.(typ Tc.global_slot) in
     let epoch_data =
@@ -1272,7 +1230,6 @@ module Protocol_state = struct
     in
     Typ.of_hlistable
       [ frozen_ledger_hash
-      ; time
       ; length
       ; length
       ; Typ.unit
@@ -1295,20 +1252,6 @@ module Protocol_state = struct
 
   let accept : t =
     { snarked_ledger_hash = Ignore
-    ; timestamp = Ignore
-    ; blockchain_length = Ignore
-    ; min_window_density = Ignore
-    ; last_vrf_output = ()
-    ; total_currency = Ignore
-    ; global_slot_since_hard_fork = Ignore
-    ; global_slot_since_genesis = Ignore
-    ; staking_epoch_data = epoch_data
-    ; next_epoch_data = epoch_data
-    }
-
-  let valid_until time : t =
-    { snarked_ledger_hash = Ignore
-    ; timestamp = Check time
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()
@@ -1328,7 +1271,6 @@ module Protocol_state = struct
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
         ({ snarked_ledger_hash
-         ; timestamp
          ; blockchain_length
          ; min_window_density
          ; last_vrf_output
@@ -1375,9 +1317,6 @@ module Protocol_state = struct
     let%bind () =
       Hash.(check ~label:"snarked_ledger_hash" Tc.ledger_hash)
         snarked_ledger_hash s.snarked_ledger_hash
-    in
-    let%bind () =
-      Numeric.(check ~label:"timestamp" Tc.time) timestamp s.timestamp
     in
     let%bind () =
       Numeric.(check ~label:"blockchain_length" Tc.length)
