@@ -19,6 +19,7 @@
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
