@@ -888,6 +888,8 @@ struct
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let open Vector in
     let actual_width_mask = branch_data.proofs_verified_mask in
+    (* TODO: Get this at the root *)
+    let actual_width_mask = Vector.rev actual_width_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let scalar =
