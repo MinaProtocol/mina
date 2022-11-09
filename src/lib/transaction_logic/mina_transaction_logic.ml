@@ -2506,7 +2506,6 @@ module For_tests = struct
       }
     in
     { snarked_ledger_hash = h
-    ; timestamp = Block_time.zero
     ; blockchain_length = len
     ; min_window_density = len
     ; last_vrf_output = ()

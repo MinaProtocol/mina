@@ -370,18 +370,6 @@ let gen_protocol_state_precondition
   let%bind snarked_ledger_hash =
     Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
-  let%bind timestamp =
-    let%bind epsilon1 =
-      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
-    in
-    let%bind epsilon2 =
-      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
-    in
-    { lower = Block_time.sub psv.timestamp epsilon1
-    ; upper = Block_time.add psv.timestamp epsilon2
-    }
-    |> return |> Zkapp_basic.Or_ignore.gen
-  in
   let%bind blockchain_length =
     let open Mina_numbers in
     let%bind epsilon1 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
@@ -456,7 +444,6 @@ let gen_protocol_state_precondition
   in
   let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
   { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
-  ; timestamp
   ; blockchain_length
   ; min_window_density
   ; last_vrf_output = ()
@@ -472,7 +459,6 @@ let gen_invalid_protocol_state_precondition
     Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let module Tamperable = struct
     type t =
-      | Timestamp
       | Blockchain_length
       | Min_window_density
       | Total_currency
@@ -485,8 +471,7 @@ let gen_invalid_protocol_state_precondition
   let%bind lower = Bool.quickcheck_generator in
   match%bind
     Quickcheck.Generator.of_list
-      ( [ Timestamp
-        ; Blockchain_length
+      ( [ Blockchain_length
         ; Min_window_density
         ; Total_currency
         ; Global_slot_since_hard_fork
@@ -494,23 +479,6 @@ let gen_invalid_protocol_state_precondition
         ]
         : Tamperable.t list )
   with
-  | Timestamp ->
-      let%map timestamp =
-        let%map epsilon =
-          Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
-        in
-        if lower || Block_time.(psv.timestamp > add zero epsilon) then
-          { lower = Block_time.zero
-          ; upper = Block_time.sub psv.timestamp epsilon
-          }
-        else
-          { lower = Block_time.add psv.timestamp epsilon
-          ; upper = Block_time.max_value
-          }
-      in
-      { protocol_state_precondition with
-        timestamp = Zkapp_basic.Or_ignore.Check timestamp
-      }
   | Blockchain_length ->
       let open Mina_numbers in
       let%map blockchain_length =

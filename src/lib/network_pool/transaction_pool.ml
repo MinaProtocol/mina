@@ -1736,8 +1736,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
-        ~receiver_idx ~fee ~nonce ~amount () =
+    let mk_transfer_zkapp_command ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
+        ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -1756,13 +1756,6 @@ let%test_module _ =
             Some (fee_payer_kp, fee_payer_nonce)
       in
       let fee = Currency.Fee.of_nanomina_int_exn fee in
-      let protocol_state_precondition =
-        match valid_period with
-        | None ->
-            Zkapp_precondition.Protocol_state.accept
-        | Some time ->
-            Zkapp_precondition.Protocol_state.valid_until time
-      in
       let test_spec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
         { sender
         ; fee_payer
@@ -1779,7 +1772,7 @@ let%test_module _ =
         ; preconditions =
             Some
               { Account_update.Preconditions.network =
-                  protocol_state_precondition
+                  Zkapp_precondition.Protocol_state.accept
               ; account =
                   Account_update.Account_precondition.Nonce
                     ( if Option.is_none fee_payer then
@@ -2130,9 +2123,7 @@ let%test_module _ =
           let%bind test = setup_test () in
           mk_zkapp_command_cmds test.txn_pool
           >>= mk_now_invalid_test test
-                ~mk_command:
-                  (mk_transfer_zkapp_command ?valid_period:None
-                     ?fee_payer_idx:None ) )
+                ~mk_command:(mk_transfer_zkapp_command ?fee_payer_idx:None) )
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
