@@ -16,6 +16,7 @@
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    kimchi_backend.common
    kimchi_backend
    cache_dir

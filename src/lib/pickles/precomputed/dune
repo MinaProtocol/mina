@@ -8,6 +8,7 @@
    pickles_types
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
  (ppx_runtime_libraries base)
  (preprocess

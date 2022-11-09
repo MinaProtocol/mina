@@ -371,10 +371,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let weight =
           let sys = Backend.Tick.R1CS_constraint_system.create () in
           fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
-            let prev = sys.next_row in
+            let prev =
+              Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row
+                sys
+            in
             Backend.Tick.R1CS_constraint_system.add_constraint sys
               ?label:annotation basic ;
-            let next = sys.next_row in
+            let next =
+              Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row
+                sys
+            in
             next - prev
         in
         Constraints.log ~weight (fun () -> Impls.Step.make_checked main)
@@ -387,10 +393,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let log =
         let sys = Backend.Tock.R1CS_constraint_system.create () in
         let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
-          let prev = sys.next_row in
+          let prev =
+            Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
+          in
           Backend.Tock.R1CS_constraint_system.add_constraint sys
             ?label:annotation basic ;
-          let next = sys.next_row in
+          let next =
+            Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
+          in
           next - prev
         in
         let log =

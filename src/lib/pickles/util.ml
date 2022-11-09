@@ -87,7 +87,7 @@ let seal (type f)
   let open Impl in
   match Field.to_constant_and_terms x with
   | None, [ (x, i) ] when Field.Constant.(equal x one) ->
-      Snarky_backendless.Cvar.Var (Impl.Var.index i)
+      Snarky_backendless.Cvar.Var i
   | Some c, [] ->
       Field.constant c
   | _ ->

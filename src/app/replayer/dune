@@ -45,6 +45,7 @@
    logger
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    kimchi_backend.common
    block_time
    data_hash_lib
