@@ -194,6 +194,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
         local_max_proofs_verifieds
         H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
     let dummy_chals = Dummy.Ipa.Wrap.challenges in
+    let rev_magic :
+        type ms.
+           (* This type is wrong actually, the "ms" type-level list should be
+              reversed but there's no way to do that. *)
+           ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
+        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
+     fun xs -> Obj.magic (List.rev (Obj.magic xs))
+    in
     let rec go :
         type len ms ns.
            ms H1.T(Nat).t
@@ -222,7 +230,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           messages_for_next_wrap_proof :: go maxes messages_for_next_wrap_proofs
     in
-    go M.maxes messages_for_next_wrap_proofs
+    rev_magic
+      (go
+         (Obj.magic (List.rev (Obj.magic M.maxes)))
+         (rev_magic messages_for_next_wrap_proofs) )
 
   module Verification_key = struct
     include Verification_key
