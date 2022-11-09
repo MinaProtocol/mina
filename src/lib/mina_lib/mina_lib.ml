@@ -2191,7 +2191,19 @@ let%test_module "Epoch ledger sync tests" =
       val trust_system : Trust_system.t
     end
 
+    let () =
+      Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
+
+    let logger = Logger.create ()
+
+    let cwd = Caml.Sys.getcwd ()
+
+    (* instantiate just once *)
     let snark_remote_sink_ref = ref None
+
+    let make_empty_ledger (module Context : CONTEXT) =
+      Mina_ledger.Ledger.Db.create
+        ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 
     let make_mina_network ~context:(module Context : CONTEXT) ~instance
         ~libp2p_keypair_str ~initial_peers =
@@ -2202,7 +2214,6 @@ let%test_module "Epoch ledger sync tests" =
       let producer_transition_reader, _producer_transition_writer =
         Strict_pipe.create Synchronous
       in
-      let cwd = Caml.Sys.getcwd () in
       let precomputed_values = Context.precomputed_values in
       let time_controller =
         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -2275,11 +2286,12 @@ let%test_module "Epoch ledger sync tests" =
       in
       let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
       let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
+      let dir_uuid = Uuid_unix.create () |> Uuid.to_string in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           ~context:(module Context)
           ~genesis_ledger ~genesis_epoch_data
-          ~epoch_ledger_location:(sprintf "%s_%d" cwd instance)
+          ~epoch_ledger_location:(sprintf "%s_%s" cwd dir_uuid)
           ~genesis_state_hash
           (Signature_lib.Public_key.Compressed.Set.of_list [])
       in
@@ -2427,133 +2439,154 @@ let%test_module "Epoch ledger sync tests" =
       in
       return (mina_networking, network_peer, consensus_local_state)
 
-    let%test "Sync from empty ledger" =
+    let make_context () : (module CONTEXT) Deferred.t =
+      let%map precomputed_values =
+        let runtime_config : Runtime_config.t =
+          { daemon = None
+          ; genesis = None
+          ; proof = None
+          ; ledger = None
+          ; epoch_data = None
+          }
+        in
+        match%map
+          Genesis_ledger_helper.init_from_config_file ~genesis_dir:cwd ~logger
+            ~proof_level:None runtime_config
+        with
+        | Ok (precomputed_values, _) ->
+            precomputed_values
+        | Error err ->
+            failwithf "Could not create precomputed values: %s"
+              (Error.to_string_hum err) ()
+      in
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants =
+        let genesis_constants = Genesis_constants.for_unit_tests in
+        Consensus.Constants.create ~constraint_constants
+          ~protocol_constants:genesis_constants.protocol
+      in
+      let trust_system = Trust_system.create (sprintf "%s_1" cwd) in
+      let module Context = struct
+        let logger = logger
+
+        let constraint_constants = constraint_constants
+
+        let consensus_constants = consensus_constants
+
+        let precomputed_values = precomputed_values
+
+        let trust_system = trust_system
+      end in
+      (module Context : CONTEXT)
+
+    let run_test (module Context : CONTEXT) ~staking_epoch_ledger
+        ~next_epoch_ledger =
+      let module Context2 = struct
+        include Context
+
+        let trust_system = Trust_system.create (sprintf "%s_2" cwd)
+      end in
+      let staking_ledger_root =
+        Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+          staking_epoch_ledger
+      in
+      let next_epoch_ledger_root =
+        Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+          next_epoch_ledger
+      in
+      let%bind _mina_network1, network_peer1, consensus_local_state1 =
+        make_mina_network
+          ~context:(module Context)
+          ~instance:0
+          ~libp2p_keypair_str:
+            "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
+          ~initial_peers:[]
+      in
+      let staking_epoch_snapshot =
+        Consensus.Data.Local_state.For_tests.snapshot_of_ledger
+          staking_epoch_ledger
+      in
+      let next_epoch_snapshot =
+        Consensus.Data.Local_state.For_tests.snapshot_of_ledger
+          next_epoch_ledger
+      in
+      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
+        Staking_epoch_snapshot staking_epoch_snapshot ;
+      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
+        Next_epoch_snapshot next_epoch_snapshot ;
+      let%bind mina_network2, _network_peer2, _consensus_local_state2 =
+        make_mina_network ~instance:1
+          ~context:(module Context2)
+          ~libp2p_keypair_str:
+            "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
+          ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
+      in
+      let make_sync_ledger () =
+        let db_ledger = make_empty_ledger (module Context) in
+        let sync_ledger =
+          Mina_ledger.Sync_ledger.Db.create ~logger
+            ~trust_system:Context.trust_system db_ledger
+        in
+        let query_reader =
+          Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+        in
+        let response_writer =
+          Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+        in
+        Mina_networking.glue_sync_ledger mina_network2
+          ~preferred:[ network_peer1 ] query_reader response_writer ;
+        sync_ledger
+      in
+      let sync_ledger1 = make_sync_ledger () in
+      let%bind () =
+        match%map
+          Mina_ledger.Sync_ledger.Db.fetch sync_ledger1 staking_ledger_root
+            ~data:() ~equal:(fun () () -> true)
+        with
+        | `Ok ledger ->
+            let ledger_root = Ledger.Db.merkle_root ledger in
+            assert (Ledger_hash.equal ledger_root staking_ledger_root)
+        | `Target_changed _ ->
+            failwith "Target changed when getting staking ledger"
+      in
+      let sync_ledger2 = make_sync_ledger () in
+      match%map
+        Mina_ledger.Sync_ledger.Db.fetch sync_ledger2 next_epoch_ledger_root
+          ~data:() ~equal:(fun () () -> true)
+      with
+      | `Ok ledger ->
+          let ledger_root = Ledger.Db.merkle_root ledger in
+          assert (Ledger_hash.equal ledger_root next_epoch_ledger_root)
+      | `Target_changed _ ->
+          failwith "Target changed when getting next epoch ledger"
+
+    let make_db_ledger (module Context : CONTEXT) (accounts : Account.t list) =
+      let db_ledger = make_empty_ledger (module Context) in
+      List.iter accounts ~f:(fun acct ->
+          let acct_id = Account_id.create acct.public_key Token_id.default in
+          match Ledger.Db.get_or_create_account db_ledger acct_id acct with
+          | Ok _ ->
+              ()
+          | Error _ ->
+              failwith "Could not add account" ) ;
+      Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db db_ledger
+
+    let%test_unit "Sync staking, next epoch ledgers" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Protocol_version.(
-            set_current @@ create_exn ~major:2 ~minor:0 ~patch:0) ;
-          let logger = Logger.create () in
-          let cwd = Caml.Sys.getcwd () in
-          let%bind precomputed_values =
-            let runtime_config : Runtime_config.t =
-              { daemon = None
-              ; genesis = None
-              ; proof = None
-              ; ledger = None
-              ; epoch_data = None
-              }
-            in
-            match%map
-              Genesis_ledger_helper.init_from_config_file ~genesis_dir:cwd
-                ~logger ~proof_level:None runtime_config
-            with
-            | Ok (precomputed_values, _) ->
-                precomputed_values
-            | Error err ->
-                failwithf "Could not create precomputed values: %s"
-                  (Error.to_string_hum err) ()
-          in
-          let constraint_constants = precomputed_values.constraint_constants in
-          let consensus_constants =
-            let genesis_constants = Genesis_constants.for_unit_tests in
-            Consensus.Constants.create ~constraint_constants
-              ~protocol_constants:genesis_constants.protocol
-          in
-          let trust_system = Trust_system.create (sprintf "%s_1" cwd) in
-          let module Context1 = struct
-            let logger = logger
-
-            let constraint_constants = constraint_constants
-
-            let consensus_constants = consensus_constants
-
-            let precomputed_values = precomputed_values
-
-            let trust_system = trust_system
-          end in
-          let module Context2 = struct
-            include Context1
-
-            let trust_system = Trust_system.create (sprintf "%s_2" cwd)
-          end in
-          let make_empty_ledger () =
-            Mina_ledger.Ledger.Db.create
-              ~depth:precomputed_values.constraint_constants.ledger_depth ()
-          in
-          let staking_ledger =
-            let db_ledger = make_empty_ledger () in
+          let%bind (module Context) = make_context () in
+          let staking_epoch_ledger =
             let accounts =
               Quickcheck.(
                 random_value @@ Generator.list_with_length 10 Account.gen)
             in
-            List.iter accounts ~f:(fun acct ->
-                let acct_id =
-                  Account_id.create acct.public_key Token_id.default
-                in
-                match
-                  Ledger.Db.get_or_create_account db_ledger acct_id acct
-                with
-                | Ok _ ->
-                    ()
-                | Error _ ->
-                    failwith "Could not add account" ) ;
-            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
-              db_ledger
-          in
-          let staking_ledger_root =
-            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-              staking_ledger
+            make_db_ledger (module Context) accounts
           in
           let next_epoch_ledger =
-            let db_ledger = make_empty_ledger () in
-            Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db
-              db_ledger
+            let accounts =
+              Quickcheck.(
+                random_value @@ Generator.list_with_length 20 Account.gen)
+            in
+            make_db_ledger (module Context) accounts
           in
-          let%bind _mina_network1, network_peer1, consensus_local_state1 =
-            make_mina_network
-              ~context:(module Context1)
-              ~instance:0
-              ~libp2p_keypair_str:
-                "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
-              ~initial_peers:[]
-          in
-          let staking_epoch_snapshot =
-            Consensus.Data.Local_state.For_tests.snapshot_of_ledger
-              staking_ledger
-          in
-          let next_epoch_snapshot =
-            Consensus.Data.Local_state.For_tests.snapshot_of_ledger
-              next_epoch_ledger
-          in
-          Consensus.Data.Local_state.For_tests.set_snapshot
-            consensus_local_state1 Staking_epoch_snapshot staking_epoch_snapshot ;
-          Consensus.Data.Local_state.For_tests.set_snapshot
-            consensus_local_state1 Next_epoch_snapshot next_epoch_snapshot ;
-          let%bind mina_network2, _network_peer2, _consensus_local_state2 =
-            make_mina_network ~instance:1
-              ~context:(module Context2)
-              ~libp2p_keypair_str:
-                "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
-              ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
-          in
-          let db_ledger : Mina_ledger.Ledger.Db.t = make_empty_ledger () in
-          let sync_ledger =
-            Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
-          in
-          let query_reader =
-            Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
-          in
-          let response_writer =
-            Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
-          in
-          Mina_networking.glue_sync_ledger mina_network2
-            ~preferred:[ network_peer1 ] query_reader response_writer ;
-          match%map
-            Mina_ledger.Sync_ledger.Db.fetch sync_ledger staking_ledger_root
-              ~data:() ~equal:(fun () () -> true)
-          with
-          | `Ok ledger ->
-              let ledger_root = Ledger.Db.merkle_root ledger in
-              Ledger_hash.equal ledger_root staking_ledger_root
-          | `Target_changed _ ->
-              false )
+          run_test (module Context) ~staking_epoch_ledger ~next_epoch_ledger )
   end )

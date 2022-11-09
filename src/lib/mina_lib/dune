@@ -10,9 +10,11 @@
    sexplib0
    archive_lib
    core
+   core.uuid
    async
    incremental
    core_kernel
+   core_kernel.uuid
    async_kernel
    cohttp
    cohttp-async
