@@ -65,18 +65,18 @@ module Prefix_mask = struct
     | N0 ->
         [ false; false ]
     | N1 ->
-        [ true; false ]
+        [ false; true ]
     | N2 ->
         [ true; true ]
 
   let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
         N0
-    | [ true; false ] ->
+    | [ false; true ] ->
         N1
     | [ true; true ] ->
         N2
-    | [ false; true ] ->
+    | [ true; false ] ->
         invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
   let typ (type f)

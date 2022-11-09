@@ -67,8 +67,7 @@ let verify_one
           hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
-              (Vector.trim_front
-                 (Vector.rev branch_data.proofs_verified_mask)
+              (Vector.trim_front branch_data.proofs_verified_mask
                  (Nat.lte_exn
                     (Vector.length prev_challenge_polynomial_commitments)
                     Nat.N2.n ) )

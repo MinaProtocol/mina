@@ -509,8 +509,8 @@ struct
     let T = Max_proofs_verified.eq in
     let sg_old =
       with_label __LOC__ (fun () ->
-          Vector.map2 (Vector.rev actual_proofs_verified_mask) sg_old
-            ~f:(fun keep sg -> [| (keep, sg) |]) )
+          Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
+              [| (keep, sg) |] ) )
     in
     with_label __LOC__ (fun () ->
         let sample () = Opt.challenge sponge in
