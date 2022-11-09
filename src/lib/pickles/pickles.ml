@@ -2598,7 +2598,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       .prepare
                         next_statement.proof_state.messages_for_next_wrap_proof
                     in
-                    Core_kernel.printf "does this get called?\n%!" ;
                     let%map.Promise next_proof =
                       let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
                       Common.time "wrap proof" (fun () ->

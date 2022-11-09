@@ -289,12 +289,10 @@ module Make (Inputs : Intf.Inputs_intf) :
           go ()
       | Ok (Some (work, public_key)) -> (
           [%log info]
-            "SNARK work ($work) $work_ids received from $address. Starting \
-             proof generation"
+            "SNARK work $work_ids received from $address. Starting proof \
+             generation"
             ~metadata:
               [ ("address", `String (Host_and_port.to_string daemon_address))
-              ; ( "work"
-                , `String (Sexp.to_string_mach (Work.Spec.sexp_of_t work)) )
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
                     (One_or_two.map (Work.Spec.instances work)
