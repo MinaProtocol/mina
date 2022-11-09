@@ -1206,6 +1206,8 @@ let poseidon =
         val accountUpdateCons = Js.string (account_update_cons :> string)
 
         val accountUpdateNode = Js.string (account_update_node :> string)
+
+        val zkappMemo = Js.string (zkapp_memo :> string)
       end
   end
 
@@ -3004,6 +3006,11 @@ module Ledger = struct
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
+  let memo_hash_base58 (memo_base58 : Js.js_string Js.t) : field_class Js.t =
+    memo_base58 |> Js.to_string
+    |> Mina_base.Signed_command_memo.of_base58_check_exn
+    |> Mina_base.Signed_command_memo.hash |> to_js_field_unchecked
+
   (* low-level building blocks for encoding *)
   let binary_string_to_base58_check bin_string (version_byte : int) :
       Js.js_string Js.t =
@@ -3232,6 +3239,7 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
+    static_method "memoHashBase58" memo_hash_base58 ;
 
     static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
@@ -3249,6 +3257,8 @@ module Ledger = struct
         val stateHash = Char.to_int state_hash
 
         val publicKey = Char.to_int non_zero_curve_point_compressed
+
+        val userCommandMemo = Char.to_int user_command_memo
       end
     in
     static "encoding"
