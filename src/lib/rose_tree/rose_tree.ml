@@ -35,10 +35,10 @@ let rec of_list_exn ?(subtrees = []) = function
 
 let of_non_empty_list ?(subtrees = []) =
   Fn.compose
-    (Non_empty_list.fold
+    (Mina_stdlib.Nonempty_list.fold
        ~init:(fun x -> T (x, subtrees))
        ~f:(fun acc x -> T (x, [ acc ])) )
-    Non_empty_list.rev
+    Mina_stdlib.Nonempty_list.rev
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal (equal ~f) children1 children2
