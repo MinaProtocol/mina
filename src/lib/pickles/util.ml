@@ -39,7 +39,7 @@ let rec absorb :
       let t1, t2 = t in
       absorb ty1 t1 ; absorb ty2 t2
 
-(* [ones_vector (module I) ~first_zero n] returns a vector of booleans of
+(** [ones_vector (module I) ~first_zero n] returns a vector of booleans of
    length n which is all ones until position [first_zero], at which it is zero,
    and zero thereafter. *)
 let ones_vector :
