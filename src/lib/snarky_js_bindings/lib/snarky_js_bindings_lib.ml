@@ -2791,7 +2791,7 @@ module Ledger = struct
   module Account_update = Mina_base.Account_update
   module Zkapp_command = Mina_base.Zkapp_command
 
-  let account_update_of_json =
+  let account_update_of_json, account_update_to_json =
     let deriver =
       Account_update.Graphql_repr.deriver
       @@ Fields_derivers_zkapps.Derivers.o ()
@@ -2802,13 +2802,17 @@ module Ledger = struct
         (account_update |> Js.to_string |> Yojson.Safe.from_string)
       |> Account_update.of_graphql_repr
     in
-    account_update_of_json
-
-  (* TODO hash two zkapp_command together in the correct way *)
+    let account_update_to_json (account_update : Account_update.t) :
+        Js.js_string Js.t =
+      Fields_derivers_zkapps.to_json deriver
+        (Account_update.to_graphql_repr account_update ~call_depth:0)
+      |> Yojson.Safe.to_string |> Js.string
+    in
+    (account_update_of_json, account_update_to_json)
 
   let hash_account_update (p : Js.js_string Js.t) =
-    Account_update.digest (p |> account_update_of_json)
-    |> Field.constant |> to_js_field
+    p |> account_update_of_json |> Account_update.digest |> Field.constant
+    |> to_js_field
 
   let forest_digest_of_field : Field.Constant.t -> Zkapp_command.Digest.Forest.t
       =
@@ -2864,17 +2868,20 @@ module Ledger = struct
       Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let commitment = Zkapp_command.commitment tx in
+    let fee_payer = Account_update.of_fee_payer tx.fee_payer in
+    let fee_payer_hash = Zkapp_command.Digest.Account_update.create fee_payer in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
-        ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
-             (Account_update.of_fee_payer tx.fee_payer) )
+        ~fee_payer_hash
     in
     object%js
       val commitment = to_js_field_unchecked commitment
 
       val fullCommitment = to_js_field_unchecked full_commitment
+
+      (* for testing *)
+      val feePayerHash = to_js_field_unchecked (fee_payer_hash :> Impl.field)
     end
 
   let zkapp_public_input (tx_json : Js.js_string Js.t)
