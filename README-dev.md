@@ -185,10 +185,11 @@ We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code
 
 Our OCaml dependencies live in the [`ocaml.export`](./ocaml.export) file. This file should not be modified manually as it is machine generated.
 
-To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`):
+To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). Here we assume that the version of the OCaml compiler currently used in the codebase is 4.14.0.
 
 ```console
 $ opam switch create mina_fresh 4.14.0
+$ opam switch import opam.export
 ```
 
 After that, install your dependency. You might have to specify versions of current dependencies to avoid having to upgrade  dependencies. For example:
