@@ -121,7 +121,6 @@ let%test_module "transaction_status" =
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~logger ~frontier_broadcast_pipe
-          ~expiry_ns:(Time_ns.Span.of_hr (Float.of_int 2))
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for

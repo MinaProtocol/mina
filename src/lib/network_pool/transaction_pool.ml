@@ -717,11 +717,11 @@ struct
       Deferred.unit
 
     let create ~constraint_constants ~consensus_constants ~time_controller
-        ~expiry_ns ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller ~expiry_ns
+              ~time_controller
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -1462,8 +1462,6 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns = Time_ns.Span.of_hr (Float.of_int 2)
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -1685,7 +1683,7 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test ?expiry () =
+    let setup_test () =
       let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
@@ -1696,10 +1694,9 @@ let%test_module _ =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
           ~genesis_constants:Genesis_constants.compiled
       in
-      let expiry_ns = match expiry with None -> expiry_ns | Some t -> t in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~expiry_ns ~frontier_broadcast_pipe:frontier_pipe_r
+          ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       let txn_pool = Test.resource_pool pool_ in
@@ -2268,124 +2265,6 @@ let%test_module _ =
           let%bind _ = reorg t [] [] in
           assert_pool_txs t (List.drop few_now 1) ;
           Deferred.unit )
-
-    let%test_unit "Expired transactions that are already in the pool are \
-                   removed from the pool when best tip changes (zkapps)" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let eight_block_time =
-            Int64.(
-              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-              * 8L)
-            |> Int64.to_int |> Option.value_exn |> Time_ns.Span.of_int_ms
-          in
-          (* Since expiration for zkapp and transaction_pool uses the same constant, so I use the duration_of_the_test which is 8_slot + 1 sec as the expiration, so that the transaction won't be expired before the test is over. *)
-          let expiry = Time_ns.Span.(eight_block_time + of_sec 1.) in
-          let eight_block =
-            Block_time.Span.of_time_span
-            @@ Time_ns.Span.to_span_float_round_nearest eight_block_time
-          in
-          let%bind t = setup_test ~expiry () in
-          assert_pool_txs t [] ;
-          let curr_time =
-            Block_time.sub (Block_time.of_time (Time.now ())) eight_block
-          in
-          let n_block_times n =
-            Int64.(
-              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-              * n)
-            |> Block_time.Span.of_ms
-          in
-          let three_slot = n_block_times 3L in
-          let seven_slot = n_block_times 7L in
-          let curr_time_plus_three = Block_time.add curr_time three_slot in
-          let curr_time_plus_seven = Block_time.add curr_time seven_slot in
-          let few_now =
-            List.take independent_cmds (List.length independent_cmds / 2)
-          in
-          let expires_later1 =
-            mk_transfer_zkapp_command
-              ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
-              ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
-              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
-          in
-          let expires_later2 =
-            mk_transfer_zkapp_command
-              ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
-              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:2 ()
-          in
-          let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
-          let%bind () = add_commands' t valid_commands in
-          assert_pool_txs t valid_commands ;
-          (* new commands from best tip diff should be removed from the pool *)
-          (* update the nonce to be consistent with the commands in the block *)
-          modify_ledger !(t.best_tip_ref) ~idx:0 ~balance:1_000_000_000_000_000
-            ~nonce:2 ;
-          modify_ledger !(t.best_tip_ref) ~idx:1 ~balance:1_000_000_000_000_000
-            ~nonce:2 ;
-          let%bind () = reorg t (List.take few_now 2 @ [ expires_later1 ]) [] in
-          assert_pool_txs t (expires_later2 :: List.drop few_now 2) ;
-          (* Add new commands, remove old commands some of which are now expired *)
-          let expired_zkapp =
-            mk_transfer_zkapp_command
-              ~valid_period:{ lower = curr_time; upper = curr_time }
-              ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:3
-              ~receiver_idx:5 ~amount:1_000_000_000 ()
-          in
-          let unexpired_zkapp =
-            mk_transfer_zkapp_command
-              ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:4
-              ~receiver_idx:9 ~amount:1_000_000_000 ()
-          in
-          let valid_forever = List.nth_exn few_now 0 in
-          let removed_commands =
-            [ valid_forever; expires_later1; expired_zkapp; unexpired_zkapp ]
-          in
-          let n_block_times n =
-            Int64.(
-              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-              * n)
-            |> Block_time.Span.of_ms
-          in
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 3L))
-          in
-          modify_ledger !(t.best_tip_ref) ~idx:0 ~balance:1_000_000_000_000_000
-            ~nonce:1 ;
-          modify_ledger !(t.best_tip_ref) ~idx:1 ~balance:1_000_000_000_000_000
-            ~nonce:1 ;
-          let%bind () = reorg t [ valid_forever ] removed_commands in
-          (* expired_command should not be in the pool because they are expired
-             and (List.nth few_now 0) because it was committed in a block
-          *)
-          assert_pool_txs t
-            ( expires_later1 :: expires_later2 :: unexpired_zkapp
-            :: List.drop few_now 2 ) ;
-          (* after 5 block times there should be no expired transactions *)
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 5L))
-          in
-          let%bind () = reorg t [] [] in
-          assert_pool_txs t (List.drop few_now 2) ;
-          Deferred.unit )
-
-    let%test_unit "Aged-based expiry (zkapps)" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let expiry = Time_ns.Span.of_sec 1. in
-          let%bind t = setup_test ~expiry () in
-          assert_pool_txs t [] ;
-          let account_update_transfer =
-            mk_transfer_zkapp_command ~fee_payer_idx:(0, 0) ~sender_idx:1
-              ~receiver_idx:9 ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:0
-              ()
-          in
-          let valid_commands = [ account_update_transfer ] in
-          let%bind () = add_commands' t valid_commands in
-          assert_pool_txs t valid_commands ;
-          let%bind () = after (Time.Span.of_sec 2.) in
-          let%bind () = reorg t [] [] in
-          assert_pool_txs t [] ; Deferred.unit )
 
     let%test_unit "Now-invalid transactions are removed from the pool when the \
                    transition frontier is recreated (user cmds)" =
