@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type Field_intf = sig
   type t
 

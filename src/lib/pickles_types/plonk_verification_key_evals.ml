@@ -1,4 +1,3 @@
-open Core_kernel
 module H_list = Snarky_backendless.H_list
 
 [%%versioned

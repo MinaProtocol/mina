@@ -191,8 +191,6 @@ module Not = struct
   type 'a t = 'a -> Empty.t
 end
 
-open Core_kernel
-
 let rec compare :
     type n m. n t -> m t -> [ `Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t ]
     =

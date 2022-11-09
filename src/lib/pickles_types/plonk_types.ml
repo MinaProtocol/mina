@@ -1,5 +1,3 @@
-open Core_kernel
-
 let padded_array_typ ~length ~dummy elt =
   Snarky_backendless.Typ.array ~length elt
   |> Snarky_backendless.Typ.transport
@@ -700,8 +698,6 @@ module Proof = struct
 end
 
 module Shifts = struct
-  open Core_kernel
-
   [%%versioned
   module Stable = struct
     module V2 = struct

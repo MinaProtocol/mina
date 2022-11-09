@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type Nat_intf = Nat.Intf
 
 type z = Nat.z

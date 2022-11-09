@@ -1,4 +1,3 @@
-open Core_kernel
 open Poly_types
 module Id = Hlist0.Id
 module HlistId = Hlist0.HlistId

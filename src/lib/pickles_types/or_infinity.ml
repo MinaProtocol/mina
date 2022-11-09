@@ -1,5 +1,3 @@
-open Core_kernel
-
 [@@@warning "-4"]
 
 [%%versioned
