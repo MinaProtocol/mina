@@ -517,7 +517,7 @@ let wrap
               Tock.Field.of_int domain_index )
         in
         k
-          (Vector.extend_exn wrap_domain_indices max_proofs_verified
+          (Vector.extend_front_exn wrap_domain_indices max_proofs_verified
              Tock.Field.one )
     | _ ->
         Snarky_backendless.Request.unhandled
