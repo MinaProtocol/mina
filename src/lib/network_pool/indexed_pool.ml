@@ -55,10 +55,6 @@ type t =
   ; transactions_with_expiration :
       Transaction_hash.User_command_with_valid_signature.Set.t Global_slot.Map.t
         (*Only transactions that have an expiry*)
-  ; entry_times : Time_ns.t Transaction_hash.Map.t
-        (** The entry time for each transaction *)
-  ; all_by_entry_time : Transaction_hash.t Time_ns.Map.t
-        (** All transactions in the pool indexed by their entry time *)
   ; size : int
   ; config : Config.t
   }
@@ -286,8 +282,6 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_hash = Transaction_hash.Map.empty
-  ; entry_times = Transaction_hash.Map.empty
-  ; all_by_entry_time = Time_ns.Map.empty
   ; transactions_with_expiration = Global_slot.Map.empty
   ; size = 0
   ; config = { constraint_constants; consensus_constants; time_controller }
@@ -383,29 +377,6 @@ let remove_applicable_exn :
     applicable_by_fee = Map_set.remove_exn t.applicable_by_fee fee_per_wu cmd
   }
 
-(* Remove a command from entry_times and all_by_entry_time *)
-let remove_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
-  let entry_time = Map.find t.entry_times cmd_hash in
-  match entry_time with
-  | Some entry_time ->
-      { t with
-        entry_times = Map.remove t.entry_times cmd_hash
-      ; all_by_entry_time = Map.remove t.all_by_entry_time entry_time
-      }
-  | None ->
-      failwithf "Entry time not found for command hash %s"
-        (Transaction_hash.to_base58_check cmd_hash)
-        ()
-
-(* Reset entry_times and all_by_entry_time for a command *)
-let reset_entry_times (cmd_hash : Transaction_hash.t) (t : t) : t =
-  let entry_time = Time_ns.now () in
-  { t with
-    entry_times = Map.update t.entry_times cmd_hash ~f:(fun _ -> entry_time)
-  ; all_by_entry_time =
-      Map.update t.all_by_entry_time entry_time ~f:(fun _ -> cmd_hash)
-  }
-
 (* Remove a command from the all_by_fee and all_by_hash fields, and decrement
    size. This may break an invariant. *)
 let remove_all_by_fee_and_hash_and_expiration_exn :
@@ -423,7 +394,6 @@ let remove_all_by_fee_and_hash_and_expiration_exn :
       remove_from_expiration_exn t.transactions_with_expiration cmd
   ; size = t.size - 1
   }
-  |> remove_entry_times cmd_hash
 
 module Sender_local_state = struct
   type t0 =
@@ -548,7 +518,6 @@ module Update = struct
             add_to_expiration acc.transactions_with_expiration cmd
         ; size = acc.size + 1
         }
-        |> reset_entry_times cmd_hash
     | Remove_all_by_fee_and_hash_and_expiration cmds ->
         F_sequence.foldl
           (fun acc cmd -> remove_all_by_fee_and_hash_and_expiration_exn acc cmd)
@@ -1218,7 +1187,6 @@ let add_from_backtrack :
   let%map () = check_expiry t.config unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee_per_wu = User_command.fee_per_wu unchecked in
-  let entry_time = Time_ns.now () in
   let cmd_hash = Transaction_hash.User_command_with_valid_signature.hash cmd in
   let consumed =
     Option.value_exn (currency_consumed ~constraint_constants cmd)
@@ -1242,9 +1210,6 @@ let add_from_backtrack :
             t.applicable_by_fee fee_per_wu cmd
       ; transactions_with_expiration =
           add_to_expiration t.transactions_with_expiration cmd
-      ; entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
-      ; all_by_entry_time =
-          Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
       ; size = t.size + 1
       ; config = t.config
       }
@@ -1286,9 +1251,6 @@ let add_from_backtrack :
               )
       ; transactions_with_expiration =
           add_to_expiration t.transactions_with_expiration cmd
-      ; entry_times = Map.add_exn t.entry_times ~key:cmd_hash ~data:entry_time
-      ; all_by_entry_time =
-          Map.add_exn t.all_by_entry_time ~key:entry_time ~data:cmd_hash
       ; size = t.size + 1
       ; config = t.config
       }
