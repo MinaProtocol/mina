@@ -27,12 +27,6 @@ module Config = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.t
     ; time_controller : Block_time.Controller.t
-    ; expiry_ns : Time_ns.Span.t
-          (* Discard transactions after the expiry duration has elapsed,
-             and do not accept transactions that cannot become includable
-             before the expiry duration has elapsed.
-             Default value as in Bitcoin ('mempoolexpiry').
-             TODO: Make this configurable *)
     }
   [@@deriving sexp_of, equal, compare]
 end
@@ -287,8 +281,7 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller ~expiry_ns
-    : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   { applicable_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee_rate.Map.empty
@@ -297,8 +290,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller ~expiry_ns
   ; all_by_entry_time = Time_ns.Map.empty
   ; transactions_with_expiration = Global_slot.Map.empty
   ; size = 0
-  ; config =
-      { constraint_constants; consensus_constants; time_controller; expiry_ns }
+  ; config = { constraint_constants; consensus_constants; time_controller }
   }
 
 let size : t -> int = fun t -> t.size
@@ -898,40 +890,6 @@ let revalidate :
               in
               (t''', Sequence.append dropped_acc to_drop) )
 
-let expired_by_predicate (t : t) :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
-  let time_now = Time_ns.now () in
-  let expiry_time = Time_ns.(sub time_now t.config.expiry_ns) in
-  Map.to_sequence t.all_by_hash
-  |> Sequence.filter_map ~f:(fun (cmd_hash, cmd) ->
-         Transaction_hash.User_command_with_valid_signature.data cmd
-         |> function
-         | User_command.Zkapp_command (ps : Zkapp_command.Valid.t) ->
-             Some (cmd_hash, ps.zkapp_command)
-         | User_command.Signed_command _ ->
-             None )
-  |> Sequence.filter ~f:(fun (_, ps) ->
-         ps.account_updates
-         |> Zkapp_command.Call_forest.exists ~f:(fun account_update ->
-                let predicate =
-                  Account_update.protocol_state_precondition account_update
-                in
-                match predicate.timestamp with
-                | Check { upper; _ } ->
-                    Block_time.(upper < of_time_ns expiry_time)
-                | _ ->
-                    false ) )
-  |> Sequence.map ~f:fst
-  |> Sequence.map ~f:(Map.find_exn t.all_by_hash)
-
-let expired_by_age (t : t) :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
-  let time_now = Time_ns.now () in
-  let expiry_time = Time_ns.(sub time_now t.config.expiry_ns) in
-  let expired, _, _ = Map.split t.all_by_entry_time expiry_time in
-  Map.to_sequence expired
-  |> Sequence.map ~f:(fun (_, cmd_hash) -> Map.find_exn t.all_by_hash cmd_hash)
-
 let expired_by_global_slot (t : t) :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t =
   let global_slot_since_genesis = global_slot_since_genesis t.config in
@@ -943,8 +901,7 @@ let expired_by_global_slot (t : t) :
 
 let expired (t : t) :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t =
-  [ expired_by_predicate t; expired_by_age t; expired_by_global_slot t ]
-  |> Sequence.of_list |> Sequence.concat
+  [ expired_by_global_slot t ] |> Sequence.of_list |> Sequence.concat
 
 let remove_expired t :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
@@ -997,31 +954,6 @@ let get_highest_fee :
 *)
 
 module Add_from_gossip_exn (M : Writer_result.S) = struct
-  let check_timestamp_predicate (expiry_ns : Time_ns.Span.t)
-      (user_command : User_command.t) : bool =
-    let expiry = Block_time.Span.of_time_ns_span expiry_ns in
-    let current_time = Block_time.of_time_ns @@ Time_ns.now () in
-    let expiry_time = Block_time.sub current_time expiry in
-    match user_command with
-    | User_command.Signed_command _ ->
-        true
-    | User_command.Zkapp_command ps ->
-        ps.account_updates
-        |> Zkapp_command.Call_forest.exists ~f:(fun account_update ->
-               let predicate =
-                 Account_update.protocol_state_precondition account_update
-               in
-               match predicate.timestamp with
-               | Check { lower; upper } ->
-                   (*Timestamp bounds are compared against slot start time of
-                     the most recent block and that could be any number of slots
-                     old. So give the transaction more time to be included*)
-                   Block_time.(upper <= expiry_time)
-                   || Block_time.(lower >= add current_time expiry)
-               | _ ->
-                   false )
-        |> not
-
   let rec add_from_gossip_exn :
          config:Config.t
       -> Transaction_hash.User_command_with_valid_signature.t
@@ -1033,8 +965,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          , Update.single
          , Command_error.t )
          M.t =
-   fun ~config:({ constraint_constants; expiry_ns; _ } as config) cmd
-       current_nonce balance by_sender ->
+   fun ~config:({ constraint_constants; _ } as config) cmd current_nonce balance
+       by_sender ->
     let open Command_error in
     let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let open M.Let_syntax in
@@ -1048,15 +980,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
       M.of_result
         Result.Let_syntax.(
           (* C5 *)
-          let%bind () =
-            if check_timestamp_predicate expiry_ns unchecked then Ok ()
-            else
-              Error
-                (Expired
-                   ( `Timestamp_predicate (Time_ns.Span.to_string_hum expiry_ns)
-                   , `Global_slot_since_genesis
-                       (global_slot_since_genesis config) ) )
-          in
           let%bind () = check_expiry config unchecked in
           let%bind consumed =
             currency_consumed' ~constraint_constants unchecked
@@ -1397,11 +1320,8 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns = Time_ns.Span.of_hr (Float.of_int 2)
-
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller
-        ~expiry_ns
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -1437,29 +1357,6 @@ let%test_module _ =
                 [%test_eq: t] ~equal pool pool''
             | _ ->
                 failwith "should've succeeded" )
-
-    let%test_unit "age-based expiry" =
-      Quickcheck.test ~trials:1
-        (Mina_generators.User_command_generators.zkapp_command_with_ledger ())
-        ~f:(fun (cmd, _, _, _) ->
-          let cmd =
-            Transaction_hash.User_command_with_valid_signature.create cmd
-          in
-          let pool =
-            { empty with
-              config = { empty.config with expiry_ns = Time_ns.Span.of_sec 5.0 }
-            }
-          in
-          add_from_gossip_exn pool cmd Account_nonce.zero
-            (Currency.Amount.of_mina_int_exn 3_000_000)
-          |> function
-          | Ok (_, pool', dropped) ->
-              assert (Sequence.is_empty dropped) ;
-              Unix.sleep 15 ;
-              let dropped, _ = remove_expired pool' in
-              assert (not @@ Sequence.is_empty dropped)
-          | Error e ->
-              failwithf !"Error: %{sexp: Command_error.t}" e () )
 
     let%test_unit "sequential adds (all valid)" =
       let gen :
