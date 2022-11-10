@@ -14,7 +14,7 @@ open Backend
 
 let challenge_polynomial =
   let open Backend.Tick.Field in
-  Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
+  Wrap_verifier.challenge_polynomial ~add ~mul ~one
 
 module Type1 =
   Plonk_checks.Make

@@ -644,7 +644,7 @@ struct
 
   let challenge_polynomial =
     let open Field in
-    Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
+    Wrap_verifier.challenge_polynomial ~add ~mul ~one
 
   module Pseudo = Pseudo.Make (Impl)
 

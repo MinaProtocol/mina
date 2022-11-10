@@ -15,10 +15,10 @@ module G = struct
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial ~one ~add ~mul chals =
     let ( + ) = add and ( * ) = mul in
-    Core_kernel.stage (fun pt ->
+    stage (fun pt ->
         let k = Array.length chals in
         let pow_two_pows =
-          let res = Core_kernel.Array.init k ~f:(fun _ -> pt) in
+          let res = Array.init k ~f:(fun _ -> pt) in
           for i = 1 to k - 1 do
             let y = res.(i - 1) in
             res.(i) <- y * y
@@ -34,18 +34,18 @@ module G = struct
         in
         prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
-  let num_possible_domains = Pickles_types.Nat.S Wrap_hack.Padded_length.n
+  let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
 
   let all_possible_domains =
-    Core_kernel.Memo.unit (fun () ->
-        Pickles_types.Vector.init num_possible_domains
-          ~f:(fun proofs_verified -> (Common.wrap_domains ~proofs_verified).h) )
+    Memo.unit (fun () ->
+        Vector.init num_possible_domains ~f:(fun proofs_verified ->
+            (Common.wrap_domains ~proofs_verified).h ) )
 end
 
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
-                 and type Impl.Bigint.t = Backend.Tock.Bigint.R.t
+                 and type Impl.Bigint.t = Backend.Tock.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
@@ -483,7 +483,7 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
-    if lookup_verification_enabled then failwith "TODO" else () ;
+    if G.lookup_verification_enabled then failwith "TODO" else () ;
     with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
     with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
     with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
@@ -1004,3 +1004,5 @@ struct
 end
 
 include Make (Wrap_main_inputs)
+
+let challenge_polynomial = G.challenge_polynomial

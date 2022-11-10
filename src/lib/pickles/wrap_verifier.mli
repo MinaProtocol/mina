@@ -1,12 +1,10 @@
 (** Generic (polymorphic instance of [challenge_polynomial]) *)
-module G : sig
-  val challenge_polynomial :
-       one:'a
-    -> add:('a -> 'b -> 'b)
-    -> mul:('b -> 'b -> 'b)
-    -> 'b array
-    -> ('b -> 'b) Core_kernel.Staged.t
-end
+val challenge_polynomial :
+     one:'a
+  -> add:('a -> 'b -> 'b)
+  -> mul:('b -> 'b -> 'b)
+  -> 'b array
+  -> ('b -> 'b) Core_kernel.Staged.t
 
 type 'a index' = 'a Pickles_types.Plonk_verification_key_evals.t
 
@@ -46,13 +44,12 @@ end
 val all_possible_domains :
   ( unit
   , ( Pickles_base.Domain.Stable.V1.t
-    , Pickles_types.Nat.z Wrap_hack.Padded_length.plus_n Pickles_types.Nat.s )
+    , Wrap_hack.Padded_length.n Pickles_types.Nat.s )
     Pickles_types.Vector.t )
   Core_kernel.Memo.fn
 
 val num_possible_domains :
-  Pickles_types.Nat.z Wrap_hack.Padded_length.plus_n Pickles_types.Nat.s
-  Pickles_types.Nat.t
+  Wrap_hack.Padded_length.n Pickles_types.Nat.s Pickles_types.Nat.t
 
 val assert_n_bits :
   n:int -> Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t -> unit
