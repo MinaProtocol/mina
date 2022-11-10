@@ -34,7 +34,7 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
-  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline/derivation-cache";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
 
