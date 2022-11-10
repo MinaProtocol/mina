@@ -16,21 +16,14 @@ let challenge_polynomial =
   let open Backend.Tick.Field in
   Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
 
-module Plonk_checks = struct
-  include Plonk_checks
+module Type1 =
+  Plonk_checks.Make
+    (Shifted_value.Type1)
+    (struct
+      let constant_term = Plonk_checks.Scalars.Tick.constant_term
 
-  module Type1 =
-    Plonk_checks.Make
-      (Shifted_value.Type1)
-      (struct
-        let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-        let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
-      end)
-
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
-end
+      let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+    end)
 
 let vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
@@ -53,7 +46,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    Plonk_checks.Type1.ft_eval0
+    Type1.ft_eval0
       (module Tick.Field)
       plonk ~env ~domain
       (Plonk_types.Evals.to_in_circuit combined_evals)
@@ -242,7 +235,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       ~domain:tick_domain tick_plonk_minimal tick_combined_evals
   in
   let plonk =
-    Plonk_checks.Type1.derive_plonk
+    Type1.derive_plonk
       (module Tick.Field)
       ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =

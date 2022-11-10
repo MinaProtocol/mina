@@ -2536,7 +2536,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
@@ -3425,7 +3425,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
