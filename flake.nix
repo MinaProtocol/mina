@@ -159,7 +159,7 @@
             derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
-              agents = [ "nix" ];
+              agents = [ "nix" { "hostname" = "builder-2"; } ];
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
           } self ++ [
