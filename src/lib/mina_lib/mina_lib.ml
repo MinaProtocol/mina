@@ -8,7 +8,8 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
-open Inline_test_quiet_logs
+
+(* open Inline_test_quiet_logs *)
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
