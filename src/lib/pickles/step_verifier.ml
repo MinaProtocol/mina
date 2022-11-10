@@ -771,7 +771,10 @@ struct
     let mod_max_degree =
       let k = Nat.to_int Backend.Tick.Rounds.n in
       fun d ->
-        let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
+        let d =
+          Number.of_bits
+            (Field.unpack ~length:Side_loaded_verification_key.max_log2_degree d)
+        in
         Number.mod_pow_2 d (`Two_to_the k)
 
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
