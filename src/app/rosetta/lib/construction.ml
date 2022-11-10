@@ -825,19 +825,17 @@ module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
       type t =
-        { nonce: int64
-        ; source: string
-        ; receiver: string
-        ; amount: int64
-        ; fee: int64
+        { nonce : int64
+        ; source : string
+        ; receiver : string
+        ; amount : string
+        ; fee : string
         }
       [@@deriving hlist]
 
       let typ =
         let open Mina_caqti.Type_spec in
-        let spec =
-          Caqti_type.[int64; string; string; int64; int64]
-        in
+        let spec = Caqti_type.[ int64; string; string; string; string ] in
         let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
         let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -862,12 +860,12 @@ module Submit = struct
           { nonce = (UInt32.to_int64 nonce)
           ; source
           ; receiver
-          ; amount = (UInt64.to_int64 amount)
-          ; fee = (UInt64.to_int64 fee) }
+          ; amount = UInt64.to_string amount
+          ; fee = UInt64.to_string fee
+          }
         |> Deferred.Result.map ~f:Option.is_some
     end
   end
-
 
   module Env = struct
     module T (M : Monad_fail.S) = struct
