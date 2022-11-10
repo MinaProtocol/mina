@@ -54,7 +54,9 @@ Pipeline.build
           label = "libp2p bitswap QuickCheck",
           key = "libp2p-bs-qc",
           target = Size.Large,
-          docker = None Docker.Type
+          docker = None Docker.Type,
+          timeout_in_minutes = 45
+
         }
     ]
   }
