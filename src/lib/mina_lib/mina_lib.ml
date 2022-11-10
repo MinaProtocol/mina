@@ -2191,6 +2191,8 @@ let%test_module "Epoch ledger sync tests" =
       val trust_system : Trust_system.t
     end
 
+    type exn += No_sync_answer
+
     let () =
       Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
 
@@ -2198,6 +2200,10 @@ let%test_module "Epoch ledger sync tests" =
 
     (* instantiate just once *)
     let snark_remote_sink_ref = ref None
+
+    let make_empty_ledger (module Context : CONTEXT) =
+      Mina_ledger.Ledger.create
+        ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 
     let make_empty_db_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.Db.create
@@ -2380,6 +2386,7 @@ let%test_module "Epoch ledger sync tests" =
         }
       in
       let get_best_tip _ = return None in
+      let no_answer_ivar = Ivar.create () in
       let answer_sync_ledger_query query_env =
         let ledger_hash, _ = Envelope.Incoming.data query_env in
         let%bind.Deferred.Or_error frontier =
@@ -2388,13 +2395,13 @@ let%test_module "Epoch ledger sync tests" =
         Sync_handler.answer_query ~frontier ledger_hash
           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
           ~logger ~trust_system
-        |> Deferred.map
-             ~f:
-               (Result.of_option
-                  ~error:
-                    (Error.createf
-                       !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                       Mina_networking.refused_answer_query_string ledger_hash ) )
+        |> Deferred.map ~f:(function
+             | Some answer ->
+                 Ok answer
+             | None ->
+                 (* should happen only when trying to sync to genesis ledger *)
+                 Ivar.fill_if_empty no_answer_ivar () ;
+                 Error (Error.of_string "No answer to sync query") )
       in
       let unimplemented name _ = failwithf "RPC %s unimplemented" name () in
       let rpc_error name _ =
@@ -2441,7 +2448,8 @@ let%test_module "Epoch ledger sync tests" =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
-      return (mina_networking, network_peer, consensus_local_state)
+      return
+        (mina_networking, network_peer, consensus_local_state, no_answer_ivar)
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
@@ -2499,7 +2507,10 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
           next_epoch_ledger
       in
-      let%bind _mina_network1, network_peer1, consensus_local_state1 =
+      let%bind ( _mina_network1
+               , network_peer1
+               , consensus_local_state1
+               , no_answer_ivar1 ) =
         make_mina_network
           ~context:(module Context)
           ~instance:0
@@ -2515,11 +2526,15 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Data.Local_state.For_tests.snapshot_of_ledger
           next_epoch_ledger
       in
+      (* store snapshots in local state *)
       Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
         Staking_epoch_snapshot staking_epoch_snapshot ;
       Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
         Next_epoch_snapshot next_epoch_snapshot ;
-      let%bind mina_network2, _network_peer2, _consensus_local_state2 =
+      let%bind ( mina_network2
+               , _network_peer2
+               , _consensus_local_state2
+               , _no_answer_ivar2 ) =
         make_mina_network ~instance:1
           ~context:(module Context2)
           ~libp2p_keypair_str:
@@ -2549,6 +2564,10 @@ let%test_module "Epoch ledger sync tests" =
           ~preferred:[ network_peer1 ] query_reader response_writer ;
         sync_ledger
       in
+      (* should only happen when syncing to a genesis ledger *)
+      don't_wait_for
+        (let%map () = Ivar.read no_answer_ivar1 in
+         raise No_sync_answer ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
       let%bind () =
@@ -2573,6 +2592,19 @@ let%test_module "Epoch ledger sync tests" =
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root)
       | `Target_changed _ ->
           failwith "Target changed when getting next epoch ledger"
+
+    let make_genesis_ledger (module Context : CONTEXT)
+        (accounts : Account.t list) =
+      let ledger = make_empty_ledger (module Context) in
+      List.iter accounts ~f:(fun acct ->
+          let acct_id = Account_id.create acct.public_key Token_id.default in
+          match Ledger.get_or_create_account ledger acct_id acct with
+          | Ok _ ->
+              ()
+          | Error _ ->
+              failwith "Could not add account" ) ;
+      Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
+        ledger
 
     let make_db_ledger (module Context : CONTEXT) (accounts : Account.t list) =
       let db_ledger = make_empty_db_ledger (module Context) in
@@ -2610,13 +2642,47 @@ let%test_module "Epoch ledger sync tests" =
           let next_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 20)
           in
-          (* possible bug, if the starting ledger is disjoint from
-             the ledger to sync to, see issue #12170
-             here, we make sure the starting ledger is contained
+          (* we make sure the starting ledger is contained
              in the target ledgers
+             possible bug: if the starting ledger is disjoint from
+             the ledger to sync to, see issue #12170
           *)
           let starting_accounts = List.take test_accounts 8 in
           run_test
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts )
+
+    (* A `fetch` to sync a genesis ledger will just loop, because `get_ledger_by_hash`
+       returns None for genesis ledgers
+
+       In the consensus code, we don't call `fetch` if the requested hash is the
+       genesis ledger hash, so such looping should not occur
+
+       In the tests here, we check whether `answer_sync_query` returns None, reflecting
+       the None returned by `get_ledger_by_hash`, and fill an ivar; if we detect
+       that has been filled, we raise an exception, No_sync_answer
+
+       That exception should be raised only in the following test
+    *)
+    let%test_unit "Sync genesis ledgers to empty ledgers, should fail" =
+      let f () =
+        Monitor.try_with (fun () ->
+            let%bind (module Context) = make_context () in
+            let staking_epoch_ledger =
+              make_genesis_ledger (module Context) (List.take test_accounts 10)
+            in
+            let next_epoch_ledger = staking_epoch_ledger in
+            run_test
+              (module Context)
+              ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
+      in
+      match Async.Thread_safe.block_on_async_exn f with
+      | Ok () ->
+          failwith "Ledgers synced to a genesis ledger, unexpectedly"
+      | Error exn -> (
+          match Monitor.extract_exn exn with
+          | No_sync_answer ->
+              ()
+          | exn' ->
+              failwithf "Unexpected exception: %s" (Exn.to_string exn') () )
   end )
