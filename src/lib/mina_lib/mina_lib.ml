@@ -8,8 +8,7 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
-
-(* open Inline_test_quiet_logs *)
+open Inline_test_quiet_logs
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -2204,11 +2203,12 @@ let%test_module "Epoch ledger sync tests" =
       Mina_ledger.Ledger.Db.create
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 
-    let dir_prefix = "sync_test"
+    let dir_prefix = "sync_test_data"
 
     let make_dirname s =
+      let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
-      sprintf "%s_%s_%s" dir_prefix s uuid
+      dir_prefix ^/ sprintf "%s_%s" s uuid
 
     let make_mina_network ~context:(module Context : CONTEXT) ~instance
         ~libp2p_keypair_str ~initial_peers =
@@ -2454,7 +2454,8 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         match%map
-          Genesis_ledger_helper.init_from_config_file ~genesis_dir:dir_prefix
+          Genesis_ledger_helper.init_from_config_file
+            ~genesis_dir:(make_dirname "genesis_dir")
             ~logger ~proof_level:None runtime_config
         with
         | Ok (precomputed_values, _) ->
@@ -2611,6 +2612,8 @@ let%test_module "Epoch ledger sync tests" =
           in
           (* possible bug, if the starting ledger is disjoint from
              the ledger to sync to, see issue #12170
+             here, we make sure the starting ledger is contained
+             in the target ledgers
           *)
           let starting_accounts = List.take test_accounts 8 in
           run_test
