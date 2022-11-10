@@ -26,7 +26,7 @@ module Lagrange_precomputations = struct
 
   let max_public_input_size = 150
 
-  open Basic
+  open Kimchi_pasta_basic
 
   let vesta =
     let f s = Fq.of_bigint (Bigint256.of_hex_string s) in

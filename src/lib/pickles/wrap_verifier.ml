@@ -483,12 +483,12 @@ struct
       ; zeta = zeta_1
       } =
     if lookup_verification_enabled then failwith "TODO" else () ;
-    chal beta_0 beta_1 ;
-    chal gamma_0 gamma_1 ;
-    scalar_chal alpha_0 alpha_1 ;
-    scalar_chal zeta_0 zeta_1
+    with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
+    with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
+    with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
+    with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
-  let assert_eq_marlin
+  let assert_eq_plonk
       (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
@@ -705,7 +705,7 @@ struct
         let joint_combiner =
           if lookup_verification_enabled then failwith "TODO" else None
         in
-        assert_eq_marlin
+        assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
