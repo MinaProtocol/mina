@@ -685,13 +685,14 @@ struct
             Vector.append sg_old
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
                 :: [| m.psm_comm |]
-                ::Vector.append w_comm
-                   (Vector.append (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                      (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-                   (snd
-                      Plonk_types.(Columns.add
-                         (fst (Columns.add Permuts_minus_1.n)) ) )
+                :: Vector.append w_comm
+                     (Vector.append
+                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                     (snd
+                        Plonk_types.(
+                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
               |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
               (snd
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )

@@ -603,13 +603,13 @@ struct
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
               :: [| m.psm_comm |]
               :: Vector.append w_comm
-                   (Vector.append (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                   (Vector.append
+                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
                       (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
-                      Plonk_types.(Columns.add
-                         (fst (Columns.add Permuts_minus_1.n)) ) )
-              )
+                      Plonk_types.(
+                        Columns.add (fst (Columns.add Permuts_minus_1.n))) ) )
               (snd
                  (Wrap_hack.Padded_length.add
                     num_commitments_without_degree_bound ) )
