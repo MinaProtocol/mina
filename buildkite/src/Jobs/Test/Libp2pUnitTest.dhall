@@ -55,7 +55,7 @@ Pipeline.build
           key = "libp2p-bs-qc",
           target = Size.Large,
           docker = None Docker.Type,
-          timeout_in_minutes = 45
+          timeout_in_minutes = Some 45
 
         }
     ]
