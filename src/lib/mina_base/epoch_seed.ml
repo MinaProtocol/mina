@@ -27,4 +27,4 @@ module Stable = struct
   end
 end]
 
-let _f : unit -> (Stable.Latest.t, t) Type_equal.t = fun () -> Type_equal.T
+let _f () : (Stable.Latest.t, t) Type_equal.t = Type_equal.T

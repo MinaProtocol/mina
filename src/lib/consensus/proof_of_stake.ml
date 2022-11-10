@@ -137,8 +137,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_seed = struct
       include Mina_base.Epoch_seed
 
-      type _unused = unit constraint t = Stable.Latest.t
-
       let initial : t = of_hash Outside_hash_image.t
 
       let update (seed : t) vrf_result =
