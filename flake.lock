@@ -5,11 +5,11 @@
         "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1668081503,
-        "narHash": "sha256-+nDk2aRxQWbM/KXdgIqlmIC9JB3WPP2b/8YQjPWvr6A=",
+        "lastModified": 1668090250,
+        "narHash": "sha256-OTwRdrmE0xfKzEnX+ht5jM4Qn+s2QDZ6tGJddV8XRqg=",
         "owner": "tweag",
         "repo": "flake-buildkite-pipeline",
-        "rev": "69f40c7714fe8ba2e42a4279a8629100544a7c52",
+        "rev": "d5a7e431112fc9cc90b654a0bf9ebab80edbe9fa",
         "type": "github"
       },
       "original": {
