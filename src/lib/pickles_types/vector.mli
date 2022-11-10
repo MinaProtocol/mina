@@ -141,6 +141,8 @@ val reduce_exn : ('a, 'n) t -> f:('a -> 'a -> 'a) -> 'a
 
 val iter : ('a, 'n) t -> f:('a -> unit) -> unit
 
+val iteri : ('a, 'n) t -> f:(int -> 'a -> unit) -> unit
+
 val iter2 : ('a, 'n) t -> ('b, 'n) t -> f:('a -> 'b -> unit) -> unit
 
 val for_all : ('a, 'n) t -> f:('a -> bool) -> bool
@@ -158,11 +160,18 @@ val unsingleton : ('a, Nat.z Nat.s) t -> 'a
 
 val trim : 'a 'n 'm. ('a, 'm) vec -> ('n, 'm) Nat.Lte.t -> ('a, 'n) vec
 
+val trim_front : 'a 'n 'm. ('a, 'm) vec -> ('n, 'm) Nat.Lte.t -> ('a, 'n) vec
+
 val of_array_and_length_exn : 'a 'n. 'a array -> 'n Nat.t -> ('a, 'n) t
 
 val extend :
   'a 'n 'm. ('a, 'n) vec -> ('n, 'm) Nat.Lte.t -> 'm Nat.t -> 'a -> ('a, 'm) vec
 
 val extend_exn : 'a 'n 'm. ('a, 'n) vec -> 'm Nat.t -> 'a -> ('a, 'm) vec
+
+val extend_front :
+  'a 'n 'm. ('a, 'n) vec -> ('n, 'm) Nat.Lte.t -> 'm Nat.t -> 'a -> ('a, 'm) vec
+
+val extend_front_exn : 'a 'n 'm. ('a, 'n) vec -> 'm Nat.t -> 'a -> ('a, 'm) vec
 
 val transpose : 'a 'n 'm. (('a, 'n) vec, 'm) vec -> (('a, 'm) vec, 'n) vec
