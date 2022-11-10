@@ -11661,7 +11661,7 @@
             {
               "name": "provedState",
               "description":
-                "Boolean indicating whether all 8 fields on zkAppState where last set by a proof-authorized account update",
+                "Boolean indicating whether all 8 fields on zkAppState were last set by a proof-authorized account update",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,

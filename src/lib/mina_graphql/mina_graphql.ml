@@ -1398,8 +1398,8 @@ module Types = struct
                           zkapp_account.app_state |> Zkapp_state.V.to_list ) )
              ; field "provedState" ~typ:bool
                  ~doc:
-                   "Boolean indicating whether all 8 fields on zkAppState \
-                    where last set by a proof-authorized account update"
+                   "Boolean indicating whether all 8 fields on zkAppState were \
+                    last set by a proof-authorized account update"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.zkapp
