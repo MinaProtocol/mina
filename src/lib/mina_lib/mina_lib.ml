@@ -2315,7 +2315,7 @@ let%test_module "Epoch ledger sync tests" =
       let libp2p_keypair =
         Mina_net2.Keypair.of_string libp2p_keypair_str |> Or_error.ok_exn
       in
-      let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance in
+      let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance - 1 in
       let creatable_gossip_net =
         let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
@@ -2323,7 +2323,7 @@ let%test_module "Epoch ledger sync tests" =
         let addrs_and_ports =
           let external_ip = Unix.Inet_addr.localhost in
           let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
-          let client_port = Cli_lib.Flag.Port.default_client - instance in
+          let client_port = Cli_lib.Flag.Port.default_client - instance - 5 in
           ( { external_ip; bind_ip; peer = None; client_port; libp2p_port }
             : Node_addrs_and_ports.t )
         in
@@ -2572,7 +2572,7 @@ let%test_module "Epoch ledger sync tests" =
          raise No_sync_answer ) ;
       (* set timeout *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min 5.0) in
+        (let%map () = after (Time.Span.of_min 3.0) in
          raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
