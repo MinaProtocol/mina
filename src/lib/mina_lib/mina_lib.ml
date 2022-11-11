@@ -2572,7 +2572,7 @@ let%test_module "Epoch ledger sync tests" =
          raise No_sync_answer ) ;
       (* set timeout *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min 3.0) in
+        (let%map () = after (Time.Span.of_min 5.0) in
          raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
