@@ -1908,6 +1908,14 @@ module Base = struct
                statement.target.second_pass_ledger ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
+            (Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
+               statement.connecting_ledger_left ) ) ;
+      with_label __LOC__ (fun () ->
+          run_checked
+            (Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
+               statement.connecting_ledger_left ) ) ;
+      with_label __LOC__ (fun () ->
+          run_checked
             (Amount.Signed.Checked.assert_equal statement.supply_increase
                global.supply_increase ) ) ;
       with_label __LOC__ (fun () ->
@@ -2954,6 +2962,12 @@ module Base = struct
       ; [%with_label_ "equal parties roots"]
           (Frozen_ledger_hash.assert_equal parties_root_after
              statement.target.second_pass_ledger )
+      ; [%with_label_ "valid connecting ledger left"]
+          (Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
+             statement.connecting_ledger_left )
+      ; [%with_label_ "valid connecting ledger right"]
+          (Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
+             statement.connecting_ledger_right )
       ; [%with_label_ "equal supply_increases"]
           (Currency.Amount.Signed.Checked.assert_equal supply_increase
              statement.supply_increase )
@@ -3635,8 +3649,6 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           ; init_stack = pending_coinbase_init_stack
           }
         in
-        let connecting_ledger_left = failwith "todo" in
-        let connecting_ledger_right = failwith "todo" in
         let fee_excess =
           (* capture only the difference in the fee excess *)
           let fee_excess =
@@ -3689,6 +3701,9 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             then Frozen_ledger_hash.empty_hash
             else Sparse_ledger.merkle_root source_local.ledger
           in
+          let target_first_pass_ledger_root =
+            Sparse_ledger.merkle_root target_global.first_pass_ledger
+          in
           { source =
               { first_pass_ledger =
                   Sparse_ledger.merkle_root source_global.first_pass_ledger
@@ -3704,8 +3719,7 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   }
               }
           ; target =
-              { first_pass_ledger =
-                  Sparse_ledger.merkle_root target_global.first_pass_ledger
+              { first_pass_ledger = target_first_pass_ledger_root
               ; second_pass_ledger =
                   Sparse_ledger.merkle_root target_global.second_pass_ledger
               ; pending_coinbase_stack = pending_coinbase_stack_state.target
@@ -3717,8 +3731,8 @@ let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   ; ledger = Sparse_ledger.merkle_root target_local.ledger
                   }
               }
-          ; connecting_ledger_left
-          ; connecting_ledger_right
+          ; connecting_ledger_left = target_first_pass_ledger_root
+          ; connecting_ledger_right = target_first_pass_ledger_root
           ; supply_increase
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default

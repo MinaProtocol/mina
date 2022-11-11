@@ -66,8 +66,11 @@ let%test_module "Transaction union tests" =
                 (User_command.Signed_command
                    (Signed_command.forget_check user_command) )
             in
-            Transaction_snark.Statement.Poly.with_empty_local_state ~source
-              ~target ~sok_digest
+            Transaction_snark.Statement.Poly.with_empty_local_state
+              ~source_first_pass_ledger:source ~target_first_pass_ledger:target
+              ~source_second_pass_ledger:target
+              ~target_second_pass_ledger:target ~connecting_ledger_left:target
+              ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
               ~pending_coinbase_stack_state
