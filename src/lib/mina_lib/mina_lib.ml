@@ -2193,6 +2193,8 @@ let%test_module "Epoch ledger sync tests" =
 
     type exn += No_sync_answer
 
+    type exn += Sync_timeout
+
     let () =
       Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
 
@@ -2568,6 +2570,10 @@ let%test_module "Epoch ledger sync tests" =
       don't_wait_for
         (let%map () = Ivar.read no_answer_ivar1 in
          raise No_sync_answer ) ;
+      (* set timeout *)
+      don't_wait_for
+        (let%map () = after (Time.Span.of_min 3.0) in
+         raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
       let%bind () =
