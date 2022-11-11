@@ -133,6 +133,20 @@ type ( 'ledger_hash
   }
 [@@deriving compare, equal, hash, sexp, yojson]
 
+module Statement_ledgers : sig
+  type 'a t =
+    { first_pass_ledger_source : 'a
+    ; first_pass_ledger_target : 'a
+    ; second_pass_ledger_source : 'a
+    ; second_pass_ledger_target : 'a
+    ; connecting_ledger_left : 'a
+    ; connecting_ledger_right : 'a
+    }
+  [@@deriving compare, equal, hash, sexp, yojson]
+
+  val of_statement : ('a, _, _, _, _, _) Poly.t -> 'a t
+end
+
 [%%versioned:
 module Stable : sig
   module V2 : sig
@@ -210,6 +224,11 @@ module With_sok : sig
 end
 
 val gen : t Quickcheck.Generator.t
+
+val validate_ledgers_at_merge_checked :
+     Frozen_ledger_hash.var Statement_ledgers.t
+  -> Frozen_ledger_hash.var Statement_ledgers.t
+  -> unit Tick.Checked.t
 
 val merge : t -> t -> t Or_error.t
 

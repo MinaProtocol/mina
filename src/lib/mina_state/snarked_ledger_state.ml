@@ -341,50 +341,184 @@ module T = struct
   let option lab =
     Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
+  module type Ledger_hash_intf = sig
+    type t
+
+    type bool
+
+    type error
+
+    val empty_error : error
+
+    val if_ : bool -> then_:t -> else_:t -> t
+
+    val equal : t -> t -> bool
+
+    val assert_equal : assertion_str:string -> t -> t -> error -> error
+  end
+
+  module Ledger_hash_checked :
+    Ledger_hash_intf
+      with type t = Frozen_ledger_hash.var
+       and type error = unit Tick.Checked.t = struct
+    type t = Frozen_ledger_hash.var
+
+    type bool = Tick.Boolean.var
+
+    type error = unit Tick.Checked.t
+
+    let empty_error = Tick.Checked.return ()
+
+    let if_ b ~then_ ~else_ =
+      Tick.Run.run_checked (Frozen_ledger_hash.if_ b ~then_ ~else_)
+
+    let equal t t' = Tick.Run.run_checked (Frozen_ledger_hash.equal_var t t')
+
+    let assert_equal ~assertion_str:_ t t' acc =
+      Tick.(
+        let open Checked.Let_syntax in
+        let%bind () = acc in
+        let%bind b = Frozen_ledger_hash.equal_var t t' in
+        Boolean.Assert.is_true b)
+  end
+
+  module Ledger_hash_unchecked :
+    Ledger_hash_intf with type t = Frozen_ledger_hash.t and type error = unit =
+  struct
+    type t = Frozen_ledger_hash.t
+
+    type bool = Bool.t
+
+    type error = unit
+
+    let empty_error = ()
+
+    let if_ b ~then_ ~else_ = if b then then_ else else_
+
+    let equal = Frozen_ledger_hash.equal
+
+    let assert_equal ~assertion_str t t' () =
+      if Frozen_ledger_hash.equal t t' then () else failwith assertion_str
+  end
+
+  module Statement_ledgers = struct
+    type 'a t =
+      { first_pass_ledger_source : 'a
+      ; first_pass_ledger_target : 'a
+      ; second_pass_ledger_source : 'a
+      ; second_pass_ledger_target : 'a
+      ; connecting_ledger_left : 'a
+      ; connecting_ledger_right : 'a
+      }
+    [@@deriving compare, equal, hash, sexp, yojson]
+
+    let of_statement (s : _ Poly.t) : _ t =
+      { first_pass_ledger_source = s.source.first_pass_ledger
+      ; first_pass_ledger_target = s.target.first_pass_ledger
+      ; second_pass_ledger_source = s.source.second_pass_ledger
+      ; second_pass_ledger_target = s.target.second_pass_ledger
+      ; connecting_ledger_left = s.connecting_ledger_left
+      ; connecting_ledger_right = s.connecting_ledger_right
+      }
+  end
+
+  let validate_ledgers_at_merge (type a error)
+      (module L : Ledger_hash_intf with type t = a and type error = error)
+      (s1 : a Statement_ledgers.t) (s2 : a Statement_ledgers.t) =
+    (*Check ledgers are valid based on the rules descibed in https://github.com/MinaProtocol/mina/discussions/12000*)
+    let is_same_block_at_shared_boundary =
+      (*First statement ends and the second statement starts in the same block. It could be within a single scan state tree or across two scan state trees*)
+      L.equal s1.connecting_ledger_right s2.connecting_ledger_left
+    in
+    (*Rule 1*)
+    let l1 =
+      L.if_ is_same_block_at_shared_boundary
+        ~then_:(*first pass ledger continues*) s2.first_pass_ledger_source
+        ~else_:
+          (*s1's first pass ledger stops at the end of a block's transactions, check that it is equal to the start of the block's second pass ledger*)
+          s1.connecting_ledger_right
+    in
+    let res =
+      L.assert_equal
+        ~assertion_str:
+          "First pass ledger continues or first pass ledger connects to the \
+           same block's start of the second pass ledger"
+        s1.first_pass_ledger_target l1 L.empty_error
+    in
+    (*Rule 2*)
+    (*s1's second pass ledger ends at say, block B1. s2 is in the next block, say B2*)
+    let l2 =
+      L.if_ is_same_block_at_shared_boundary
+        ~then_:(*second pass ledger continues*) s1.second_pass_ledger_target
+        ~else_:
+          (*s2's second pass ledger starts where B2's first pass ledger ends*)
+          s2.connecting_ledger_left
+    in
+    let res =
+      L.assert_equal
+        ~assertion_str:
+          "Second pass ledger continues or second pass ledger of the statement \
+           on the right connects to the same block's end of first pass ledger"
+        s2.second_pass_ledger_source l2 res
+    in
+    (*Rule 3*)
+    let l3 =
+      L.if_ is_same_block_at_shared_boundary
+        ~then_:(*no-op*) s1.second_pass_ledger_target
+        ~else_:
+          (*s2's first pass ledger starts where B1's second pass ledger ends*)
+          s2.first_pass_ledger_source
+    in
+    L.assert_equal s1.second_pass_ledger_target l3
+      ~assertion_str:
+        "First pass ledger of the statement on the right does not connect to \
+         the second pass ledger of the statement on the left"
+      res
+
+  let validate_ledgers_at_merge_checked
+      (s1 : Frozen_ledger_hash.var Statement_ledgers.t)
+      (s2 : Frozen_ledger_hash.var Statement_ledgers.t) =
+    validate_ledgers_at_merge (module Ledger_hash_checked) s1 s2
+
+  let validate_ledgers_at_merge_unchecked
+      (s1 : Frozen_ledger_hash.t Statement_ledgers.t)
+      (s2 : Frozen_ledger_hash.t Statement_ledgers.t) =
+    validate_ledgers_at_merge (module Ledger_hash_unchecked) s1 s2
+
   let merge (s1 : _ Poly.t) (s2 : _ Poly.t) =
     let open Or_error.Let_syntax in
-    let registers_check_equal (t1 : _ Registers.t) (t2 : _ Registers.t) =
-      let check' k f =
-        let x1 = Field.get f t1 and x2 = Field.get f t2 in
-        k x1 x2
-      in
-      let module S = struct
-        module type S = sig
-          type t [@@deriving eq, sexp_of]
-        end
-      end in
-      let check (type t) (module T : S.S with type t = t) f =
-        let open T in
-        check'
-          (fun x1 x2 ->
-            if equal x1 x2 then return ()
-            else
-              Or_error.errorf
-                !"%s is inconsistent between transitions (%{sexp: t} vs \
-                  %{sexp: t})"
-                (Field.name f) x1 x2 )
-          f
-      in
-      let module PC = struct
-        type t = Pending_coinbase.Stack.t [@@deriving sexp_of]
-
-        let equal t1 t2 =
-          Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
-      end in
-      Registers.Fields.to_list
-        ~first_pass_ledger:(check (module Ledger_hash))
-        ~second_pass_ledger:(check (module Ledger_hash))
-        ~pending_coinbase_stack:(check (module PC))
-        ~local_state:(check (module Local_state))
-      |> Or_error.combine_errors_unit
+    let or_error_of_bool ~error b =
+      if b then return ()
+      else
+        Error
+          (Error.createf "Error merging statements left: %s right %s: %s"
+             (Yojson.Safe.to_string (to_yojson s1))
+             (Yojson.Safe.to_string (to_yojson s2))
+             error )
     in
-    let connecting_ledger_left = failwith "TODO merge rule" in
-    let connecting_ledger_right = failwith "TODO merge rule" in
+    (*check ledgers are connected*)
+    let s1_ledger = Statement_ledgers.of_statement s1 in
+    let s2_ledger = Statement_ledgers.of_statement s2 in
+    let () = validate_ledgers_at_merge_unchecked s1_ledger s2_ledger in
+    (*Check pending coinbase stack is connected*)
+    let%bind () =
+      or_error_of_bool ~error:"Pending coinbase stacks are not connected"
+        (Pending_coinbase.Stack.connected
+           ~first:s1.target.pending_coinbase_stack
+           ~second:s2.source.pending_coinbase_stack () )
+    in
+    (*Check local states are equal*)
+    let%bind () =
+      or_error_of_bool ~error:"Local states are not connected"
+        (Local_state.equal s1.target.local_state s2.source.local_state)
+    in
+    let connecting_ledger_left = s1.connecting_ledger_left in
+    let connecting_ledger_right = s2.connecting_ledger_right in
     let%map fee_excess = Fee_excess.combine s1.fee_excess s2.fee_excess
     and supply_increase =
       Currency.Amount.Signed.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
-    and () = registers_check_equal s1.target s2.source in
+    in
     ( { source = s1.source
       ; target = s2.target
       ; connecting_ledger_left

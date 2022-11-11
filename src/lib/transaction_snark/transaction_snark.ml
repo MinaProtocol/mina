@@ -3064,6 +3064,11 @@ module Merge = struct
           Local_state.Checked.assert_equal s.target.local_state
             s2.target.local_state )
     in
+    let%bind () =
+      Statement.validate_ledgers_at_merge_checked
+        (Statement.Statement_ledgers.of_statement s1)
+        (Statement.Statement_ledgers.of_statement s2)
+    in
     let%map () =
       Checked.all_unit
         [ [%with_label_ "equal fee excesses"]
@@ -3074,21 +3079,21 @@ module Merge = struct
         ; [%with_label_ "equal source fee payment ledger hashes"]
             (Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                s1.source.first_pass_ledger )
-        ; [%with_label_ "equal target, source fee payment ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s1.target.first_pass_ledger
-               s2.source.first_pass_ledger )
         ; [%with_label_ "equal target fee payment ledger hashes"]
             (Frozen_ledger_hash.assert_equal s2.target.first_pass_ledger
                s.target.first_pass_ledger )
         ; [%with_label_ "equal source parties ledger hashes"]
             (Frozen_ledger_hash.assert_equal s.source.second_pass_ledger
                s1.source.second_pass_ledger )
-        ; [%with_label_ "equal target, source parties ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s1.target.second_pass_ledger
-               s2.source.second_pass_ledger )
         ; [%with_label_ "equal target parties ledger hashes"]
             (Frozen_ledger_hash.assert_equal s2.target.second_pass_ledger
                s.target.second_pass_ledger )
+        ; [%with_label_ "equal connecting ledger left"]
+            (Frozen_ledger_hash.assert_equal s1.connecting_ledger_left
+               s.connecting_ledger_left )
+        ; [%with_label_ "equal connecting ledger right"]
+            (Frozen_ledger_hash.assert_equal s2.connecting_ledger_right
+               s.connecting_ledger_right )
         ]
     in
     (s1, s2)
