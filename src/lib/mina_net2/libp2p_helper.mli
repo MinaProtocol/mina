@@ -4,14 +4,19 @@ exception Libp2p_helper_died_unexpectedly
 
 type t
 
+(** [allow_multiple_instances] defaults to `false`; set it
+    to `true` for tests that require multiple libp2p helpers
+*)
 val spawn :
-     logger:Logger.t
+     ?allow_multiple_instances:bool
+  -> logger:Logger.t
   -> pids:Child_processes.Termination.t
   -> conf_dir:string
   -> handle_push_message:
        (   t
         -> Libp2p_ipc.Reader.DaemonInterface.PushMessage.unnamed_union_t
         -> unit Deferred.t )
+  -> unit
   -> t Deferred.Or_error.t
 
 val shutdown : t -> unit Deferred.t

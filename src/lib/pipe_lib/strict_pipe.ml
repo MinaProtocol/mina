@@ -56,8 +56,10 @@ module Reader0 = struct
   let pipe_name t = t.name
 
   let assert_not_read reader =
-    if reader.has_reader then
-      raise (Multiple_reads_attempted (value_or_empty reader.name))
+    if reader.has_reader then (
+      Format.eprintf "STACK: %s@."
+        Core.Caml.Printexc.(get_callstack 30 |> raw_backtrace_to_string) ;
+      raise (Multiple_reads_attempted (value_or_empty reader.name)) )
 
   let wrap_reader ?name reader =
     { reader; has_reader = false; downstreams = []; name }

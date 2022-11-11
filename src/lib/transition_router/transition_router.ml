@@ -428,21 +428,19 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
                 [%log info] "Local state already in sync" ;
                 Deferred.unit
             | Some sync_jobs -> (
+                (* we have a frontier, stuff it in the pipe
+                   it's needed for Answer_sync_query
+                *)
+                let%bind () =
+                  Broadcast_pipe.Writer.write frontier_w (Some frontier)
+                in
                 [%log info] "Local state is out of sync; " ;
                 match%map
                   Consensus.Hooks.sync_local_state
                     ~local_state:consensus_local_state
+                    ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
                     ~context:(module Context)
-                    ~trust_system
-                    ~random_peers:(Mina_networking.random_peers network)
-                    ~query_peer:
-                      { Consensus.Hooks.Rpcs.query =
-                          (fun peer rpc query ->
-                            Mina_networking.(
-                              query_peer network peer.peer_id
-                                (Rpcs.Consensus_rpc rpc) query) )
-                      }
-                    sync_jobs
+                    ~trust_system sync_jobs
                 with
                 | Error e ->
                     Error.tag e ~tag:"Local state sync failed" |> Error.raise

@@ -136,6 +136,14 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
   if (not killed) && not t.finished then (
     match result with
     | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
+        Format.eprintf "ERROR 1@." ;
+        ( match e with
+        | Ok _ ->
+            failwith "WHAT?"
+        | Error (`Exit_non_zero n) ->
+            Format.eprintf "NONZERO %d@." n
+        | Error (`Signal signal) ->
+            Format.eprintf "SIGNAL %s@." (Core.Signal.to_string signal) ) ;
         [%log' fatal t.logger]
           !"libp2p_helper process died unexpectedly: $exit_status"
           ~metadata:
@@ -143,6 +151,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
         t.finished <- true ;
         raise Libp2p_helper_died_unexpectedly
     | Error err ->
+        Format.eprintf "ERROR 2@." ;
         [%log' fatal t.logger]
           !"Child processes library could not track libp2p_helper process: $err"
           ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -212,18 +221,21 @@ let handle_incoming_message t msg ~handle_push_message =
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
       Deferred.unit
 
-let spawn ~logger ~pids ~conf_dir ~handle_push_message =
+let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
+    ~handle_push_message () =
   let termination_handler = ref (fun ~killed:_ _result -> Deferred.unit) in
   match%map
     O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
-        Child_processes.start_custom ~logger ~name:"libp2p_helper"
+        Child_processes.start_custom ~allow_multiple_instances ~logger
+          ~name:"libp2p_helper"
           ~git_root_relative_path:
             "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
           ~stdout:`Chunks ~stderr:`Lines
           ~termination:
             (`Handler
               (fun ~killed _process result ->
-                !termination_handler ~killed result ) ) )
+                !termination_handler ~killed result ) )
+          () )
   with
   | Error e ->
       Or_error.tag (Error e)
@@ -341,7 +353,8 @@ let test_with_libp2p_helper ?(logger = Logger.null ())
   Thread_safe.block_on_async_exn (fun () ->
       let%bind conf_dir = Async.Unix.mkdtemp "libp2p_helper_test" in
       let%bind helper =
-        spawn ~logger ~pids ~conf_dir ~handle_push_message >>| Or_error.ok_exn
+        spawn ~logger ~pids ~conf_dir ~handle_push_message ()
+        >>| Or_error.ok_exn
       in
       Monitor.protect
         (fun () -> f conf_dir helper)

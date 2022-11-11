@@ -14,7 +14,7 @@ let net_configs n =
         Mina_net2.create
           ~pids:(Child_processes.Termination.create_pid_table ())
           ~logger:(Logger.create ()) ~conf_dir:tmpd ~all_peers_seen_metric:false
-          ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+          ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
       in
       let net = Or_error.ok_exn net in
       let ips =
