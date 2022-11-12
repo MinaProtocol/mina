@@ -22,7 +22,7 @@ use groupmap::GroupMap;
 use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -851,8 +851,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -876,8 +876,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
