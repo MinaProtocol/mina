@@ -253,6 +253,22 @@ let%snarkydef_ step ~(logger : Logger.t)
         ; no_coinbases_popped
         ]
     in
+    let current_ledger_statement =
+      (Protocol_state.blockchain_state new_state).ledger_proof_statement
+    in
+    let%bind () =
+      let previous_ledger_statement =
+        (Protocol_state.blockchain_state previous_state).ledger_proof_statement
+      in
+      let ledger_statement_valid =
+        Snarked_ledger_state.(
+          valid_ledgers_at_merge_checked
+            (Statement_ledgers.of_statement previous_ledger_statement)
+            (Statement_ledgers.of_statement current_ledger_statement))
+      in
+      with_label __LOC__
+        (Boolean.Assert.any [ nothing_changed; ledger_statement_valid ])
+    in
     let%bind correct_coinbase_status =
       let new_root =
         transition |> Snark_transition.blockchain_state

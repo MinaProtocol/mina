@@ -3078,8 +3078,8 @@ module Merge = struct
           Local_state.Checked.assert_equal s.target.local_state
             s2.target.local_state )
     in
-    let%bind () =
-      Statement.validate_ledgers_at_merge_checked
+    let valid_ledger =
+      Statement.valid_ledgers_at_merge_checked
         (Statement.Statement_ledgers.of_statement s1)
         (Statement.Statement_ledgers.of_statement s2)
     in
@@ -3108,6 +3108,8 @@ module Merge = struct
         ; [%with_label_ "equal connecting ledger right"]
             (Frozen_ledger_hash.assert_equal s2.connecting_ledger_right
                s.connecting_ledger_right )
+        ; [%with_label_ "Ledger transitions are correct"]
+            (Boolean.Assert.is_true valid_ledger)
         ]
     in
     (s1, s2)

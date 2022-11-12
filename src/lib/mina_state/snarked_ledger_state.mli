@@ -225,10 +225,10 @@ end
 
 val gen : t Quickcheck.Generator.t
 
-val validate_ledgers_at_merge_checked :
+val valid_ledgers_at_merge_checked :
      Frozen_ledger_hash.var Statement_ledgers.t
   -> Frozen_ledger_hash.var Statement_ledgers.t
-  -> unit Tick.Checked.t
+  -> Tick.Boolean.var
 
 val merge : t -> t -> t Or_error.t
 

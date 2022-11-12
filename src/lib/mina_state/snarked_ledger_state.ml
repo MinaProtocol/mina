@@ -348,57 +348,61 @@ module T = struct
 
     type error
 
-    val empty_error : error
-
     val if_ : bool -> then_:t -> else_:t -> t
+
+    val all : bool list -> bool
 
     val equal : t -> t -> bool
 
-    val assert_equal : assertion_str:string -> t -> t -> error -> error
+    val accumulate_failures : (bool * string) list -> error
   end
 
   module Ledger_hash_checked :
     Ledger_hash_intf
       with type t = Frozen_ledger_hash.var
-       and type error = unit Tick.Checked.t = struct
+       and type error = unit Tick.Checked.t
+       and type bool = Tick.Boolean.var = struct
     type t = Frozen_ledger_hash.var
 
     type bool = Tick.Boolean.var
 
     type error = unit Tick.Checked.t
 
-    let empty_error = Tick.Checked.return ()
-
     let if_ b ~then_ ~else_ =
       Tick.Run.run_checked (Frozen_ledger_hash.if_ b ~then_ ~else_)
 
+    let all bs = Tick.(Run.run_checked (Boolean.all bs))
+
     let equal t t' = Tick.Run.run_checked (Frozen_ledger_hash.equal_var t t')
 
-    let assert_equal ~assertion_str:_ t t' acc =
-      Tick.(
-        let open Checked.Let_syntax in
-        let%bind () = acc in
-        let%bind b = Frozen_ledger_hash.equal_var t t' in
-        Boolean.Assert.is_true b)
+    let accumulate_failures _bs = Tick.Checked.return ()
   end
 
   module Ledger_hash_unchecked :
-    Ledger_hash_intf with type t = Frozen_ledger_hash.t and type error = unit =
-  struct
+    Ledger_hash_intf
+      with type t = Frozen_ledger_hash.t
+       and type error = unit Or_error.t = struct
     type t = Frozen_ledger_hash.t
 
     type bool = Bool.t
 
-    type error = unit
-
-    let empty_error = ()
+    type error = unit Or_error.t
 
     let if_ b ~then_ ~else_ = if b then then_ else else_
 
+    let all = List.fold ~init:true ~f:( && )
+
     let equal = Frozen_ledger_hash.equal
 
-    let assert_equal ~assertion_str t t' () =
-      if Frozen_ledger_hash.equal t t' then () else failwith assertion_str
+    let accumulate_failures bs =
+      let constraints_failed =
+        List.filter_map bs ~f:(fun (b, str) -> if b then Some str else None)
+      in
+      if List.is_empty constraints_failed then Ok ()
+      else
+        Error
+          (Error.createf "Constraints failed: %s"
+             (String.concat ~sep:"," constraints_failed) )
   end
 
   module Statement_ledgers = struct
@@ -422,9 +426,12 @@ module T = struct
       }
   end
 
-  let validate_ledgers_at_merge (type a error)
-      (module L : Ledger_hash_intf with type t = a and type error = error)
-      (s1 : a Statement_ledgers.t) (s2 : a Statement_ledgers.t) =
+  let validate_ledgers_at_merge (type a error bool)
+      (module L : Ledger_hash_intf
+        with type t = a
+         and type error = error
+         and type bool = bool ) (s1 : a Statement_ledgers.t)
+      (s2 : a Statement_ledgers.t) =
     (*Check ledgers are valid based on the rules descibed in https://github.com/MinaProtocol/mina/discussions/12000*)
     let is_same_block_at_shared_boundary =
       (*First statement ends and the second statement starts in the same block. It could be within a single scan state tree or across two scan state trees*)
@@ -438,13 +445,11 @@ module T = struct
           (*s1's first pass ledger stops at the end of a block's transactions, check that it is equal to the start of the block's second pass ledger*)
           s1.connecting_ledger_right
     in
-    let res =
-      L.assert_equal
-        ~assertion_str:
-          "First pass ledger continues or first pass ledger connects to the \
-           same block's start of the second pass ledger"
-        s1.first_pass_ledger_target l1 L.empty_error
+    let rule1 =
+      "First pass ledger continues or first pass ledger connects to the same \
+       block's start of the second pass ledger"
     in
+    let res1 = L.equal s1.first_pass_ledger_target l1 in
     (*Rule 2*)
     (*s1's second pass ledger ends at say, block B1. s2 is in the next block, say B2*)
     let l2 =
@@ -454,13 +459,11 @@ module T = struct
           (*s2's second pass ledger starts where B2's first pass ledger ends*)
           s2.connecting_ledger_left
     in
-    let res =
-      L.assert_equal
-        ~assertion_str:
-          "Second pass ledger continues or second pass ledger of the statement \
-           on the right connects to the same block's end of first pass ledger"
-        s2.second_pass_ledger_source l2 res
+    let rule2 =
+      "Second pass ledger continues or second pass ledger of the statement on \
+       the right connects to the same block's end of first pass ledger"
     in
+    let res2 = L.equal s2.second_pass_ledger_source l2 in
     (*Rule 3*)
     let l3 =
       L.if_ is_same_block_at_shared_boundary
@@ -469,18 +472,23 @@ module T = struct
           (*s2's first pass ledger starts where B1's second pass ledger ends*)
           s2.first_pass_ledger_source
     in
-    L.assert_equal s1.second_pass_ledger_target l3
-      ~assertion_str:
-        "First pass ledger of the statement on the right does not connect to \
-         the second pass ledger of the statement on the left"
-      res
+    let rule3 =
+      "First pass ledger of the statement on the right does not connect to the \
+       second pass ledger of the statement on the left"
+    in
+    let res3 = L.equal s1.second_pass_ledger_target l3 in
+    let failures =
+      L.accumulate_failures [ (res1, rule1); (res2, rule2); (res3, rule3) ]
+    in
+    let res = L.all [ res1; res2; res3 ] in
+    (res, failures)
 
-  let validate_ledgers_at_merge_checked
+  let valid_ledgers_at_merge_checked
       (s1 : Frozen_ledger_hash.var Statement_ledgers.t)
       (s2 : Frozen_ledger_hash.var Statement_ledgers.t) =
-    validate_ledgers_at_merge (module Ledger_hash_checked) s1 s2
+    validate_ledgers_at_merge (module Ledger_hash_checked) s1 s2 |> fst
 
-  let validate_ledgers_at_merge_unchecked
+  let valid_ledgers_at_merge_unchecked
       (s1 : Frozen_ledger_hash.t Statement_ledgers.t)
       (s2 : Frozen_ledger_hash.t Statement_ledgers.t) =
     validate_ledgers_at_merge (module Ledger_hash_unchecked) s1 s2
@@ -499,7 +507,7 @@ module T = struct
     (*check ledgers are connected*)
     let s1_ledger = Statement_ledgers.of_statement s1 in
     let s2_ledger = Statement_ledgers.of_statement s2 in
-    let () = validate_ledgers_at_merge_unchecked s1_ledger s2_ledger in
+    let%bind () = valid_ledgers_at_merge_unchecked s1_ledger s2_ledger |> snd in
     (*Check pending coinbase stack is connected*)
     let%bind () =
       or_error_of_bool ~error:"Pending coinbase stacks are not connected"
