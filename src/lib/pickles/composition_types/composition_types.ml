@@ -65,7 +65,6 @@ module Wrap = struct
         end
 
         open Pickles_types
-        module Generic_coeffs_vec = Vector.With_length (Nat.N3)
 
         module In_circuit = struct
           module Lookup = struct
@@ -90,7 +89,7 @@ module Wrap = struct
           end
 
           (** All scalar values deferred by a verifier circuit.
-              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], [perm], and [generic]
+              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
               are all scalars which will have been used to scale selector polynomials during the
               computation of the linearized polynomial commitment.
 
@@ -115,8 +114,6 @@ module Wrap = struct
                   (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
-            ; generic : 'fp Generic_coeffs_vec.t
-                  (** scalars used on the coefficient column commitments. *)
             ; lookup : 'lookup_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
@@ -141,7 +138,6 @@ module Wrap = struct
             ; endomul = f t.endomul
             ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
-            ; generic = Vector.map ~f t.generic
             ; lookup =
                 Opt.map t.lookup ~f:(fun (l : _ Lookup.t) ->
                     { l with lookup_gate = f l.lookup_gate } )
@@ -164,7 +160,6 @@ module Wrap = struct
               ; fp
               ; fp
               ; fp
-              ; Vector.typ fp Nat.N3.n
               ; Plonk_types.Opt.typ Impl.Boolean.typ lookup
                   ~dummy:
                     { joint_combiner = dummy_scalar_challenge
@@ -674,7 +669,7 @@ module Wrap = struct
       let spec impl lookup =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N12.n)
+          [ Vector (B Field, Nat.N9.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -704,7 +699,6 @@ module Wrap = struct
                        ; endomul
                        ; endomul_scalar
                        ; perm
-                       ; generic
                        ; lookup
                        }
                    }
@@ -718,9 +712,16 @@ module Wrap = struct
             _ t ) ~option_map =
         let open Vector in
         let fp =
-          combined_inner_product :: b :: zeta_to_srs_length
-          :: zeta_to_domain_size :: vbmul :: complete_add :: endomul
-          :: endomul_scalar :: perm :: generic
+          [ combined_inner_product
+          ; b
+          ; zeta_to_srs_length
+          ; zeta_to_domain_size
+          ; vbmul
+          ; complete_add
+          ; endomul
+          ; endomul_scalar
+          ; perm
+          ]
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -754,13 +755,16 @@ module Wrap = struct
             ; lookup
             ] ~option_map : _ t =
         let open Vector in
-        let (combined_inner_product
-            :: b
-               :: zeta_to_srs_length
-                  :: zeta_to_domain_size
-                     :: vbmul
-                        :: complete_add
-                           :: endomul :: endomul_scalar :: perm :: generic ) =
+        let [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; vbmul
+            ; complete_add
+            ; endomul
+            ; endomul_scalar
+            ; perm
+            ] =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -791,7 +795,6 @@ module Wrap = struct
                     ; endomul
                     ; endomul_scalar
                     ; perm
-                    ; generic
                     ; lookup =
                         option_map lookup
                           ~f:
@@ -972,7 +975,7 @@ module Step = struct
         let spec impl bp_log2 lookup =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N12.n)
+            [ Vector (B Field, Nat.N9.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -999,7 +1002,6 @@ module Step = struct
                      ; endomul
                      ; endomul_scalar
                      ; perm
-                     ; generic
                      ; lookup
                      }
                  }
@@ -1009,9 +1011,16 @@ module Step = struct
               _ t ) ~option_map =
           let open Vector in
           let fq =
-            combined_inner_product :: b :: zeta_to_srs_length
-            :: zeta_to_domain_size :: vbmul :: complete_add :: endomul
-            :: endomul_scalar :: perm :: generic
+            [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; vbmul
+            ; complete_add
+            ; endomul
+            ; endomul_scalar
+            ; perm
+            ]
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -1030,14 +1039,17 @@ module Step = struct
 
         let of_data
             Hlist.HlistId.
-              [ Vector.(
-                  combined_inner_product
-                  :: b
-                     :: zeta_to_srs_length
-                        :: zeta_to_domain_size
-                           :: vbmul
-                              :: complete_add
-                                 :: endomul :: endomul_scalar :: perm :: generic)
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; vbmul
+                  ; complete_add
+                  ; endomul
+                  ; endomul_scalar
+                  ; perm
+                  ]
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -1062,7 +1074,6 @@ module Step = struct
                   ; endomul
                   ; endomul_scalar
                   ; perm
-                  ; generic
                   ; lookup =
                       option_map lookup
                         ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct

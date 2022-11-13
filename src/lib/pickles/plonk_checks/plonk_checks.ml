@@ -393,10 +393,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
       in
-      let generic =
-        let open Vector in
-        [ F.one; F.one; F.one ]
-      in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
         { alpha
@@ -412,7 +408,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; endomul_scalar =
             Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
-        ; generic
         ; lookup =
             ( match joint_combiner with
             | None ->
@@ -458,11 +453,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let open Impl in
     let open In_circuit in
     with_label __LOC__ (fun () ->
-        ( Vector.to_list
-            (with_label __LOC__ (fun () ->
-                 Vector.map2 plonk.generic actual.generic
-                   ~f:(Shifted_value.equal Field.equal) ) )
-        @ with_label __LOC__ (fun () ->
+        ( with_label __LOC__ (fun () ->
               List.map
                 ~f:(fun f ->
                   Shifted_value.equal Field.equal (f plonk) (f actual) )
