@@ -183,15 +183,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
-name = "cairo"
-version = "0.1.0"
-dependencies = [
- "ark-ff",
- "hex",
- "o1-utils",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,11 +206,11 @@ dependencies = [
  "groupmap",
  "itertools",
  "mina-curves",
+ "mina-poseidon",
  "o1-utils",
  "ocaml",
  "ocaml-gen",
  "once_cell",
- "oracle",
  "rand",
  "rand_core",
  "rayon",
@@ -498,13 +489,13 @@ dependencies = [
  "ark-poly",
  "ark-serialize",
  "blake2",
- "cairo",
  "commitment_dlog",
  "disjoint-set",
  "groupmap",
  "hex",
  "itertools",
  "mina-curves",
+ "mina-poseidon",
  "num-bigint",
  "num-derive",
  "num-traits",
@@ -512,7 +503,6 @@ dependencies = [
  "ocaml",
  "ocaml-gen",
  "once_cell",
- "oracle",
  "rand",
  "rand_core",
  "rayon",
@@ -522,6 +512,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "thiserror",
+ "turshi",
 ]
 
 [[package]]
@@ -566,6 +557,24 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
+]
+
+[[package]]
+name = "mina-poseidon"
+version = "0.1.0"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "mina-curves",
+ "o1-utils",
+ "ocaml",
+ "ocaml-gen",
+ "once_cell",
+ "rand",
+ "rayon",
+ "serde",
+ "serde_with",
 ]
 
 [[package]]
@@ -753,24 +762,6 @@ name = "once_cell"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
-
-[[package]]
-name = "oracle"
-version = "0.1.0"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "mina-curves",
- "o1-utils",
- "ocaml",
- "ocaml-gen",
- "once_cell",
- "rand",
- "rayon",
- "serde",
- "serde_with",
-]
 
 [[package]]
 name = "paste"
@@ -1114,6 +1105,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "turshi"
+version = "0.1.0"
+dependencies = [
+ "ark-ff",
+ "hex",
+ "o1-utils",
+]
+
+[[package]]
 name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1163,12 +1163,12 @@ dependencies = [
  "kimchi",
  "libc",
  "mina-curves",
+ "mina-poseidon",
  "num-bigint",
  "o1-utils",
  "ocaml",
  "ocaml-gen",
  "once_cell",
- "oracle",
  "paste",
  "rand",
  "rayon",
