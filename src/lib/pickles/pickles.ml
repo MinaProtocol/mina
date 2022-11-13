@@ -428,6 +428,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              (Cache.Step.Key.Verification.t, branches) Vector.t
              * Cache.Wrap.Key.Verification.t
         -> ?return_early_digest_exception:bool
+        -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
         -> branches:(module Nat.Intf with type n = branches)
         -> max_proofs_verified:
              (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -459,8 +460,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
            * _
            * _ =
      fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-         ~branches:(module Branches) ~max_proofs_verified ~name
-         ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+         ?override_wrap_domain ~branches:(module Branches) ~max_proofs_verified
+         ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
       let snark_keys_header kind constraint_system_hash =
         { Snark_keys_header.header_version = Snark_keys_header.header_version
         ; kind
@@ -495,21 +496,26 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
       Timer.clock __LOC__ ;
       let wrap_domains =
-        let module M =
-          Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
-            (Auxiliary_var)
-            (Auxiliary_value)
-        in
-        let rec f :
-            type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
-          function
-          | [] ->
-              []
-          | x :: xs ->
-              x :: f xs
-        in
-        M.f full_signature prev_varss_n prev_varss_length ~self
-          ~choices:(f choices) ~max_proofs_verified
+        match override_wrap_domain with
+        | None ->
+            let module M =
+              Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+                (Auxiliary_var)
+                (Auxiliary_value)
+            in
+            let rec f :
+                type a b c d.
+                (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t = function
+              | [] ->
+                  []
+              | x :: xs ->
+                  x :: f xs
+            in
+            M.f full_signature prev_varss_n prev_varss_length ~self
+              ~choices:(f choices) ~max_proofs_verified
+        | Some override ->
+            Common.wrap_domains
+              ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
       in
       Timer.clock __LOC__ ;
       let module Branch_data = struct
@@ -960,6 +966,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
       -> ?return_early_digest_exception:bool
+      -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> public_input:
            ( var
            , value
@@ -1006,8 +1013,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       and the underlying Make(_).compile function which builds the circuits.
    *)
    fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-       ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-       ~constraint_constants ~choices () ->
+       ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+       ~max_proofs_verified ~name ~constraint_constants ~choices () ->
     let self =
       match self with
       | None ->
@@ -1075,9 +1082,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           r :: conv_irs rs
     in
     let provers, wrap_vk, wrap_disk_key, cache_handle =
-      M.compile ~return_early_digest_exception ~self ~cache ?disk_keys ~branches
-        ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-        ~constraint_constants
+      M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
+        ?override_wrap_domain ~branches ~max_proofs_verified ~name ~public_input
+        ~auxiliary_typ ~constraint_constants
         ~choices:(fun ~self -> conv_irs (choices ~self))
         ()
     in
@@ -1139,11 +1146,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end in
     (self, cache_handle, (module P), provers)
 
-  let compile ?self ?cache ?disk_keys ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+  let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?disk_keys ~public_input ~auxiliary_typ
-        ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ()
+      compile_promise ?self ?cache ?disk_keys ?override_wrap_domain
+        ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+        ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 a4 s1 s2_inner.
