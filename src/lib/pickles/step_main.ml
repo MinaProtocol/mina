@@ -417,10 +417,37 @@ let step_main :
                   , S pi
                   , actual_wrap_domain :: actual_wrap_domains ) ->
                     let d =
+                      (* Use the domain of the proof if it is side-loaded, or
+                         fail with an error if the proof's domain differs from
+                         the hard-coded one otherwise.
+                      *)
                       match d.wrap_domain with
-                      | `Known _ ->
+                      | `Known wrap_domain ->
+                          as_prover (fun () ->
+                              let actual_wrap_domain =
+                                As_prover.Ref.get actual_wrap_domain
+                                |> Pickles_base.Proofs_verified.to_int
+                              in
+                              let actual_wrap_domain =
+                                Common.wrap_domains
+                                  ~proofs_verified:actual_wrap_domain
+                              in
+                              match (wrap_domain, actual_wrap_domain.h) with
+                              | ( Pow_2_roots_of_unity expected
+                                , Pow_2_roots_of_unity actual )
+                                when expected <> actual ->
+                                  failwithf
+                                    "This circuit was compiled for proofs \
+                                     using the wrap domain of size %d, but a \
+                                     proof was given with size %d. You should \
+                                     pass the ~override_wrap_domain argument \
+                                     to set the correct domain size."
+                                    expected actual ()
+                              | Pow_2_roots_of_unity _, Pow_2_roots_of_unity _
+                                ->
+                                  () ) ;
                           d
-                      | `Side_loaded foo ->
+                      | `Side_loaded _ ->
                           let actual_wrap_domain =
                             exists
                               (Pickles_base.Proofs_verified.One_hot.typ
