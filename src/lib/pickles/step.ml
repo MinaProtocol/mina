@@ -677,6 +677,19 @@ struct
           k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force messages_for_next_wrap_proof_padded)
+      | Req.Wrap_domain_indices ->
+          let all_possible_domains = Wrap_verifier.all_possible_domains () in
+          let wrap_domain_indices =
+            Vector.map (Option.value_exn !actual_wrap_domains)
+              ~f:(fun domain_size ->
+                let domain_index =
+                  Vector.foldi ~init:0 all_possible_domains
+                    ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                      if Int.equal domain domain_size then j else acc )
+                in
+                Pickles_base.Proofs_verified.of_int domain_index )
+          in
+          k wrap_domain_indices
       | _ -> (
           match handler with
           | Some f ->
