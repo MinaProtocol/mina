@@ -91,31 +91,26 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
-  let ww = Vector.to_array e.w in
-  let w0 = Array.map ww ~f:fst in
-  let w1 = Array.map ww ~f:snd in
+  let witness = Vector.to_array e.w in
+  let coefficients = Vector.to_array e.coefficients in
   let var (col, row) =
-    let get_eval, w =
-      match (row : Scalars.curr_or_next) with
-      | Curr ->
-          (fst, w0)
-      | Next ->
-          (snd, w1)
+    let get_eval =
+      match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
     in
     match (col : Scalars.Column.t) with
     | Witness i ->
-        w.(i)
+        get_eval witness.(i)
     | Index Poseidon ->
         get_eval e.poseidon_selector
+    | Index Generic ->
+        get_eval e.generic_selector
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
             %! should have been linearized away"
           i ()
     | Coefficient i ->
-        failwithf
-          !"Coefficient index %d\n%! should have been linearized away"
-          i ()
+        get_eval coefficients.(i)
     | LookupTable ->
         get_eval (Opt.value_exn e.lookup).table
     | LookupSorted i ->
