@@ -380,7 +380,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in
-      let e0 field = fst (field e) in
       let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
@@ -396,8 +395,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       in
       let generic =
         let open Vector in
-        let (l1 :: r1 :: o1 :: _) = w0 in
-        [ e0 generic_selector; l1; r1; o1 ]
+        [ F.one; F.one; F.one; F.one ]
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
