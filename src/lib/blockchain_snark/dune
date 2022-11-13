@@ -26,6 +26,7 @@
    mina_transaction_logic
    mina_state
    pickles_types
+   pickles_base
    pickles
    genesis_constants
    currency
