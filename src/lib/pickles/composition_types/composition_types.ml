@@ -90,7 +90,7 @@ module Wrap = struct
           end
 
           (** All scalar values deferred by a verifier circuit.
-              The values in [poseidon_selector], [vbmul], [complete_add], [endomul], [endomul_scalar], [perm], and [generic]
+              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], [perm], and [generic]
               are all scalars which will have been used to scale selector polynomials during the
               computation of the linearized polynomial commitment.
 
@@ -107,8 +107,6 @@ module Wrap = struct
                   *)
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; poseidon_selector : 'fp
-                  (** scalar used on the poseidon selector *)
             ; vbmul : 'fp  (** scalar used on the vbmul selector *)
             ; complete_add : 'fp
                   (** scalar used on the complete_add selector *)
@@ -136,8 +134,7 @@ module Wrap = struct
 
           let map_fields t ~f =
             { t with
-              poseidon_selector = f t.poseidon_selector
-            ; zeta_to_srs_length = f t.zeta_to_srs_length
+              zeta_to_srs_length = f t.zeta_to_srs_length
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; vbmul = f t.vbmul
             ; complete_add = f t.complete_add
@@ -160,7 +157,6 @@ module Wrap = struct
               ; challenge
               ; challenge
               ; Scalar_challenge.typ scalar_challenge
-              ; fp
               ; fp
               ; fp
               ; fp
@@ -678,7 +674,7 @@ module Wrap = struct
       let spec impl lookup =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N19.n)
+          [ Vector (B Field, Nat.N18.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -703,7 +699,6 @@ module Wrap = struct
                        ; zeta
                        ; zeta_to_srs_length
                        ; zeta_to_domain_size
-                       ; poseidon_selector
                        ; vbmul
                        ; complete_add
                        ; endomul
@@ -724,8 +719,8 @@ module Wrap = struct
         let open Vector in
         let fp =
           combined_inner_product :: b :: zeta_to_srs_length
-          :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
-          :: endomul :: endomul_scalar :: perm :: generic
+          :: zeta_to_domain_size :: vbmul :: complete_add :: endomul
+          :: endomul_scalar :: perm :: generic
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -763,11 +758,9 @@ module Wrap = struct
             :: b
                :: zeta_to_srs_length
                   :: zeta_to_domain_size
-                     :: poseidon_selector
-                        :: vbmul
-                           :: complete_add
-                              :: endomul :: endomul_scalar :: perm :: generic )
-            =
+                     :: vbmul
+                        :: complete_add
+                           :: endomul :: endomul_scalar :: perm :: generic ) =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -793,7 +786,6 @@ module Wrap = struct
                     ; zeta
                     ; zeta_to_srs_length
                     ; zeta_to_domain_size
-                    ; poseidon_selector
                     ; vbmul
                     ; complete_add
                     ; endomul
@@ -980,7 +972,7 @@ module Step = struct
         let spec impl bp_log2 lookup =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N19.n)
+            [ Vector (B Field, Nat.N18.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -1002,7 +994,6 @@ module Step = struct
                      ; zeta
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
-                     ; poseidon_selector
                      ; vbmul
                      ; complete_add
                      ; endomul
@@ -1019,8 +1010,8 @@ module Step = struct
           let open Vector in
           let fq =
             combined_inner_product :: b :: zeta_to_srs_length
-            :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
-            :: endomul :: endomul_scalar :: perm :: generic
+            :: zeta_to_domain_size :: vbmul :: complete_add :: endomul
+            :: endomul_scalar :: perm :: generic
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -1044,11 +1035,9 @@ module Step = struct
                   :: b
                      :: zeta_to_srs_length
                         :: zeta_to_domain_size
-                           :: poseidon_selector
-                              :: vbmul
-                                 :: complete_add
-                                    :: endomul
-                                       :: endomul_scalar :: perm :: generic)
+                           :: vbmul
+                              :: complete_add
+                                 :: endomul :: endomul_scalar :: perm :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -1068,7 +1057,6 @@ module Step = struct
                   ; zeta
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; poseidon_selector
                   ; vbmul
                   ; complete_add
                   ; endomul
