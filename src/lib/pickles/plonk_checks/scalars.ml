@@ -4,7 +4,13 @@ type curr_or_next = Curr | Next [@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
+    type t =
+      | Generic
+      | Poseidon
+      | VarBaseMul
+      | EndoMul
+      | CompleteAdd
+      | EndoMulScalar
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -957,72 +963,92 @@ module Tick : S = struct
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+              * field
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 0, Curr)))
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 1
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 1, Curr)))
+            ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 2
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 2, Curr)))
+            ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 3
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (cell (var (Witness 0, Curr)) * cell (var (Witness 1, Curr))) )
+        )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 4
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr)) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 5
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 3, Curr))) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 6
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 4, Curr))) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 7
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 5, Curr))) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 8
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * ( alpha_pow 1
+                * (cell (var (Witness 3, Curr)) * cell (var (Witness 4, Curr)))
+                ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 9
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * alpha_pow 1) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
@@ -1940,72 +1966,92 @@ module Tock : S = struct
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+              * field
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 0, Curr)))
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 1
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 1, Curr)))
+            ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 2
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 2, Curr)))
+            ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 3
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (cell (var (Witness 0, Curr)) * cell (var (Witness 1, Curr))) )
+        )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 4
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr)) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 5
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 3, Curr))) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 6
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 4, Curr))) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 7
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 5, Curr))) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 8
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * ( alpha_pow 1
+                * (cell (var (Witness 3, Curr)) * cell (var (Witness 4, Curr)))
+                ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 9
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * alpha_pow 1) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
@@ -3064,72 +3110,92 @@ module Tick_with_lookup : S = struct
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+              * field
+                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 0, Curr)))
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 1
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 1, Curr)))
+            ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 2
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 2, Curr)))
+            ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 3
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (cell (var (Witness 0, Curr)) * cell (var (Witness 1, Curr))) )
+        )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 4
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr)) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 5
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 3, Curr))) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 6
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 4, Curr))) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 7
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 5, Curr))) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 8
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * ( alpha_pow 1
+                * (cell (var (Witness 3, Curr)) * cell (var (Witness 4, Curr)))
+                ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+              * ( alpha_pow 9
+                * field
+                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                )
+            + (cell (var (Index Generic, Curr)) * alpha_pow 1) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))
@@ -4188,72 +4254,92 @@ module Tock_with_lookup : S = struct
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+              * field
+                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 0, Curr)))
             ) )
       ; ( Coefficient 1
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 1
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 1, Curr)))
+            ) )
       ; ( Coefficient 2
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 2
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * cell (var (Witness 2, Curr)))
+            ) )
       ; ( Coefficient 3
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 3
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (cell (var (Witness 0, Curr)) * cell (var (Witness 1, Curr))) )
+        )
       ; ( Coefficient 4
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 4
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr)) ) )
       ; ( Coefficient 5
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 5
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 3, Curr))) ) )
       ; ( Coefficient 6
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 6
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 4, Curr))) ) )
       ; ( Coefficient 7
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 7
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * (alpha_pow 1 * cell (var (Witness 5, Curr))) ) )
       ; ( Coefficient 8
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 8
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + cell (var (Index Generic, Curr))
+              * ( alpha_pow 1
+                * (cell (var (Witness 3, Curr)) * cell (var (Witness 4, Curr)))
+                ) ) )
       ; ( Coefficient 9
         , lazy
             ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+              * ( alpha_pow 9
+                * field
+                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                )
+            + (cell (var (Index Generic, Curr)) * alpha_pow 1) ) )
       ; ( Coefficient 10
         , lazy
             ( cell (var (Index Poseidon, Curr))

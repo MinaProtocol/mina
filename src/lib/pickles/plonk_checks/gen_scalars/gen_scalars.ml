@@ -14,7 +14,13 @@ type curr_or_next = Curr | Next
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
+    type t =
+      | Generic
+      | Poseidon
+      | VarBaseMul
+      | EndoMul
+      | CompleteAdd
+      | EndoMulScalar
     [@@deriving hash, eq, compare, sexp]
   end
 
