@@ -65,7 +65,7 @@ module Wrap = struct
         end
 
         open Pickles_types
-        module Generic_coeffs_vec = Vector.With_length (Nat.N9)
+        module Generic_coeffs_vec = Vector.With_length (Nat.N7)
 
         module In_circuit = struct
           module Lookup = struct
@@ -164,7 +164,7 @@ module Wrap = struct
               ; fp
               ; fp
               ; fp
-              ; Vector.typ fp Nat.N9.n
+              ; Vector.typ fp Nat.N7.n
               ; Plonk_types.Opt.typ Impl.Boolean.typ lookup
                   ~dummy:
                     { joint_combiner = dummy_scalar_challenge
@@ -674,7 +674,7 @@ module Wrap = struct
       let spec impl lookup =
         let open Spec in
         Struct
-          [ Vector (B Field, Nat.N18.n)
+          [ Vector (B Field, Nat.N16.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -972,7 +972,7 @@ module Step = struct
         let spec impl bp_log2 lookup =
           let open Spec in
           Struct
-            [ Vector (B Field, Nat.N18.n)
+            [ Vector (B Field, Nat.N16.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)

@@ -397,9 +397,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       let generic =
         let open Vector in
         let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = w0 in
-        let m1 = l1 * r1 in
-        let m2 = l2 * r2 in
-        [ e0 generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
+        [ e0 generic_selector; l1; r1; o1; l2; r2; o2 ]
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
