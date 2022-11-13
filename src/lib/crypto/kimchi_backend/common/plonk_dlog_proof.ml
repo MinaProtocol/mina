@@ -235,6 +235,10 @@ module Make (Inputs : Inputs_intf) = struct
     let evals =
       let open Pickles_types.Plonk_types.Evals in
       { w = Vector.zip (tuple15_to_vec e1.w) (tuple15_to_vec e2.w)
+      ; coefficients =
+          Vector.zip
+            (tuple15_to_vec e1.coefficients)
+            (tuple15_to_vec e2.coefficients)
       ; s = Vector.zip (tuple6_to_vec e1.s) (tuple6_to_vec e2.s)
       ; z = (e1.z, e2.z)
       ; generic_selector = (e1.generic_selector, e2.generic_selector)
@@ -280,6 +284,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
+      ; coefficients
       ; z
       ; s
       ; generic_selector
@@ -287,6 +292,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
+    ; coefficients = tuple15_of_vec coefficients
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector

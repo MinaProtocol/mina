@@ -671,7 +671,7 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N26.n in
+          let num_commitments_without_degree_bound = Nat.N41.n in
           let without_degree_bound =
             (* sg_old
                x_hat
@@ -686,8 +686,13 @@ struct
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
                 :: [| m.psm_comm |]
                 :: Vector.append w_comm
-                     (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                     (snd (Columns.add Permuts_minus_1.n))
+                     (Vector.append
+                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                     (snd
+                        Plonk_types.(
+                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
               |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
               (snd
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
