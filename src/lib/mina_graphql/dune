@@ -24,6 +24,7 @@
    network_pool
    cli_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base.util
    mina_ledger
    pickles
@@ -89,6 +90,10 @@
    o1trace
    verifier
    graphql_wrapper
-   staged_ledger_diff)
+   staged_ledger_diff
+   kimchi_backend
+   sgn_type
+   mina_transaction_logic
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

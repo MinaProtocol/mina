@@ -39,6 +39,7 @@
    o1trace
    with_hash
    ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

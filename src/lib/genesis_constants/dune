@@ -24,6 +24,7 @@
    pickles.backend
    snark_keys_header
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    test_util
    ppx_version.runtime
  )

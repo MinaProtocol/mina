@@ -19,6 +19,7 @@
    ;;local libraries
    pickles
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle
    coda_runtime_config
    transaction_witness
@@ -48,6 +49,7 @@
    mina_base.import
    mina_transaction_logic
    staged_ledger_diff
+   mina_wire_types
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

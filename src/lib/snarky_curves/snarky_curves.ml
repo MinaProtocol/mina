@@ -164,7 +164,8 @@ module Make_weierstrass_checked
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    Typ { unchecked with check = assert_on_curve }
+    Typ
+      { unchecked with check = (fun x -> make_checked_ast (assert_on_curve x)) }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
@@ -184,7 +185,7 @@ module Make_weierstrass_checked
 
   open Let_syntax
 
-  let%snarkydef add' ~div (ax, ay) (bx, by) =
+  let%snarkydef_ add' ~div (ax, ay) (bx, by) =
     let open F in
     let%bind lambda = div (by - ay) (bx - ax) in
     let%bind cx =
@@ -274,7 +275,7 @@ module Make_weierstrass_checked
       (module M : S)
   end
 
-  let%snarkydef double (ax, ay) =
+  let%snarkydef_ double (ax, ay) =
     let open F in
     let%bind x_squared = square ax in
     let%bind lambda =
@@ -323,7 +324,7 @@ module Make_weierstrass_checked
     in
     (choose x1 x2, choose y1 y2)
 
-  let%snarkydef scale (type shifted)
+  let%snarkydef_ scale (type shifted)
       (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       shifted Checked.t =
@@ -335,10 +336,10 @@ module Make_weierstrass_checked
           return acc
       | b :: bs ->
           let%bind acc' =
-            with_label (sprintf "acc_%d" i)
-              (let%bind add_pt = Shifted.add acc pt in
-               let don't_add_pt = acc in
-               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
+            with_label (sprintf "acc_%d" i) (fun () ->
+                let%bind add_pt = Shifted.add acc pt in
+                let don't_add_pt = acc in
+                Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
           and pt' = double pt in
           go (i + 1) bs acc' pt'
     in

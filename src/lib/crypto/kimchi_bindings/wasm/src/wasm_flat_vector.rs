@@ -1,3 +1,10 @@
+//! The flat vector is a vector of fixed-size elements that we want to expose directly to js-of-ocaml
+//! (so that we can access a `Vec<Field>` cheaply,
+//! by just passing a pointer to a continuous memory region instead of copying.
+//! The wasmvector is a normal heap-allocated vector,
+//! where we leave it on the rust heap and just keep a pointer around.
+//! We use flat for fields, normal for gates etc.
+
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 
 use std::convert::From;

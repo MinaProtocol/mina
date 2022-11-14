@@ -21,6 +21,7 @@
    pickles
    data_hash_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_numbers
    mina_compile_config
    zkapp_command_builder

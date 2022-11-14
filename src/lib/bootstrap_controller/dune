@@ -35,6 +35,7 @@
    mina_block
    mina_base
    mina_ledger
+   mina_stdlib
    mina_transaction_logic
    syncable_ledger
    consensus
@@ -52,4 +53,14 @@
    mina_base.util
    o1trace
    mina_net2
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend
+   sgn_type
+   sgn
+   currency
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
    ))

@@ -1,8 +1,10 @@
-open Kimchi
+open Kimchi_types
+open Pasta_bindings
+open Kimchi_bindings
 open Js_of_ocaml
-module Bigint_256 = Foundations.BigInt256
-module Pasta_fp = Foundations.Fp
-module Pasta_fq = Foundations.Fq
+module Bigint_256 = BigInt256
+module Pasta_fp = Fp
+module Pasta_fq = Fq
 module Pasta_fp_vector = FieldVectors.Fp
 module Pasta_fq_vector = FieldVectors.Fq
 module Pasta_pallas = Pallas
@@ -434,9 +436,9 @@ let _ =
 
 let eq_affine ~field_equal x y =
   match (x, y) with
-  | Foundations.Infinity, Foundations.Infinity ->
+  | Infinity, Infinity ->
       true
-  | Foundations.Finite (x1, y1), Foundations.Finite (x2, y2) ->
+  | Finite (x1, y1), Finite (x2, y2) ->
       field_equal x1 x2 && field_equal y1 y2
   | _ ->
       false
@@ -477,9 +479,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Foundations.Infinity ->
-               of_affine Foundations.Infinity
-           | Foundations.Finite (x, y) ->
+           | Infinity ->
+               of_affine Infinity
+           | Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -555,9 +557,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Foundations.Infinity ->
-               of_affine Foundations.Infinity
-           | Foundations.Finite (x, y) ->
+           | Infinity ->
+               of_affine Infinity
+           | Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -593,12 +595,11 @@ let _ =
          let infinity_copied = deep_copy affine_infinity in
          assert (eq affine_infinity infinity_copied) ;
          assert (eq affine_infinity Infinity) ;
-         let infinity_copied_ = deep_copy Foundations.Infinity in
+         let infinity_copied_ = deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
     end )
 
-let eq_poly_comm ~field_equal (x : _ Protocol.poly_comm)
-    (y : _ Protocol.poly_comm) =
+let eq_poly_comm ~field_equal (x : _ poly_comm) (y : _ poly_comm) =
   Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
   && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
 
@@ -607,9 +608,7 @@ module Backend = Kimchi_backend.Pasta.Pallas_based_plonk
 let () = Backend.Keypair.set_urs_info []
 
 module Impl =
-  Snarky_backendless.Snark.Run.Make
-    (Kimchi_backend.Pasta.Pallas_based_plonk)
-    (Unit)
+  Snarky_backendless.Snark.Run.Make (Kimchi_backend.Pasta.Pallas_based_plonk)
 
 let _ =
   Js.export "snarky_test"
@@ -633,24 +632,26 @@ let _ =
            let _ = go 1000 x in
            ()
          in
-         let input = Data_spec.[ Typ.field ] in
-         let _pk =
+         let (pk : Backend.Keypair.t) =
            time "generate_keypair" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create )
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
+               |> Backend.Keypair.create ~prev_challenges:0 )
          in
-         let pk =
+         let (_ : Backend.Keypair.t) =
            time "generate_keypair2" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create )
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
+               |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let pi =
+         let (pi : Backend.Proof.t) =
            time "generate witness conv" (fun () ->
-               Impl.generate_witness_conv input main
-                 ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+               Impl.generate_witness_conv ~input_typ:Typ.field
+                 ~return_typ:Typ.unit main
+                 ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } () ->
                    time "create proof" (fun () ->
                        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
                          ~primary:public_inputs ) )
-                 () x )
+                 x )
          in
          let vk = Backend.Keypair.vk pk in
          let vec = Backend.Field.Vector.create () in
@@ -744,7 +745,7 @@ let _ =
          assert (eq_affine h_second h_second_again)
     end )
 
-let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ Protocol.circuit_gate =
+let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ circuit_gate =
   { typ
   ; wires =
       ( { row = r1; col = c1 }
@@ -764,8 +765,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
+         let eq { typ = kind1; wires = wires1; coeffs = c1 }
+             { typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fp.equal c1 c2 with _ -> false
          in
@@ -851,8 +852,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
+         let eq { typ = kind1; wires = wires1; coeffs = c1 }
+             { typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fq.equal c1 c2 with _ -> false
          in
@@ -944,8 +945,8 @@ let _ =
            vec
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = create gate_vector 0 urs in
-         let index2 = create gate_vector 2 urs in
+         let index0 = create gate_vector 0 0 urs in
+         let index2 = create gate_vector 2 0 urs in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -1016,8 +1017,8 @@ let _ =
            vec
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = create gate_vector 0 urs in
-         let index2 = create gate_vector 2 urs in
+         let index0 = create gate_vector 0 0 urs in
+         let index2 = create gate_vector 2 0 urs in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -1033,7 +1034,7 @@ let _ =
 let eq_verification_shifts ~field_equal l r = Array.for_all2 field_equal l r
 
 let verification_evals_to_list
-    { Protocol.VerifierIndex.sigma_comm : 'PolyComm array
+    { VerifierIndex.sigma_comm : 'PolyComm array
     ; coefficients_comm : 'PolyComm array
     ; generic_comm : 'PolyComm
     ; psm_comm : 'PolyComm
@@ -1050,23 +1051,25 @@ let verification_evals_to_list
      |> Array.to_list )
 
 let eq_verifier_index ~field_equal ~other_field_equal
-    { Protocol.VerifierIndex.domain =
-        { log_size_of_group = i1_1; group_gen = f1 }
+    { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
     ; max_quot_size = i1_3
     ; srs = _
     ; evals = evals1
     ; shifts = shifts1
     ; lookup_index = _
+    ; public = public1
+    ; prev_challenges = prev_challenges1
     }
-    { Protocol.VerifierIndex.domain =
-        { log_size_of_group = i2_1; group_gen = f2 }
+    { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
     ; max_quot_size = i2_3
     ; srs = _
     ; evals = evals2
     ; shifts = shifts2
     ; lookup_index = _
+    ; public = public2
+    ; prev_challenges = prev_challenges2
     } =
   i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
   && List.for_all2
@@ -1074,6 +1077,8 @@ let eq_verifier_index ~field_equal ~other_field_equal
        (verification_evals_to_list evals1)
        (verification_evals_to_list evals2)
   && eq_verification_shifts ~field_equal shifts1 shifts2
+  && public1 = public2
+  && prev_challenges1 = prev_challenges2
 
 let _ =
   let open Pasta_fp_verifier_index in
@@ -1109,8 +1114,8 @@ let _ =
              ~other_field_equal:Pasta_fq.equal
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = Pasta_fp_index.create gate_vector 0 urs in
-         let index2 = Pasta_fp_index.create gate_vector 2 urs in
+         let index0 = Pasta_fp_index.create gate_vector 0 0 urs in
+         let index2 = Pasta_fp_index.create gate_vector 2 0 urs in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
@@ -1159,8 +1164,8 @@ let _ =
              ~other_field_equal:Pasta_fp.equal
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = Pasta_fq_index.create gate_vector 0 urs in
-         let index2 = Pasta_fq_index.create gate_vector 2 urs in
+         let index0 = Pasta_fq_index.create gate_vector 0 0 urs in
+         let index2 = Pasta_fq_index.create gate_vector 2 0 urs in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;

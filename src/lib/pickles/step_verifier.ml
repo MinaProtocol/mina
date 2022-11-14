@@ -14,7 +14,7 @@ let lookup_verification_enabled = false
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
+                 and type Impl.Bigint.t = Backend.Tick.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
@@ -548,6 +548,11 @@ struct
                          Common.wrap_domains ~proofs_verified )
                        [ 0; 1; 2 ] )
                     ~public_input )
+        in
+        let x_hat =
+          with_label "x_hat blinding" (fun () ->
+              Ops.add_fast x_hat
+                (Inner_curve.constant (Lazy.force Generators.h)) )
         in
         absorb sponge PC x_hat ;
         let w_comm = messages.w_comm in

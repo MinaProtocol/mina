@@ -23,6 +23,7 @@
    mina_compile_config
    mina_generators
    sgn
+   sgn_type
    transition_frontier_base
    staged_ledger
    child_processes
@@ -73,8 +74,10 @@
    kimchi_backend
    kimchi_backend_common
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    genesis_ledger
    staged_ledger_diff
+   mina_wire_types
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

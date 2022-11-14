@@ -11,7 +11,12 @@ module Poly : sig
 
   module Stable : sig
     module V2 : sig
-      type nonrec ('pk, 'amount) t
+      type ('pk, 'amount) t
+      [@@deriving bin_io, equal, sexp, hash, yojson, version]
+    end
+
+    module V1 : sig
+      type ('pk, 'token_id, 'amount) t
       [@@deriving bin_io, equal, sexp, hash, yojson, version]
     end
 
@@ -28,6 +33,19 @@ module Stable : sig
       , Currency.Amount.Stable.V1.t )
       Poly.Stable.V2.t
     [@@deriving compare, equal, sexp, hash, compare, yojson]
+  end
+
+  module V1 : sig
+    [@@@with_all_version_tags]
+
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Token_id.Stable.V1.t
+      , Currency.Amount.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving compare, equal, sexp, hash, compare, yojson]
+
+    val to_latest : t -> Latest.t
   end
 end]
 

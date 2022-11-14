@@ -19,6 +19,7 @@
    base.base_internalhash_types
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    mina_base.import
    mina_ledger
@@ -63,6 +64,7 @@
    pickles.backend
    zkapp_command_builder
    ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

@@ -12,10 +12,10 @@ module Zkapp_command_segment_witness = struct
       type t =
         { global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
-            ( ( Token_id.Stable.V1.t
+            ( ( Token_id.Stable.V2.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
-            , ( ( ( Token_id.Stable.V1.t
+            , ( ( ( Token_id.Stable.V2.t
                   , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
@@ -23,7 +23,7 @@ module Zkapp_command_segment_witness = struct
               , Call_stack_digest.Stable.V1.t )
               With_stack_hash.Stable.V1.t
               list
-            , Token_id.Stable.V1.t
+            , Token_id.Stable.V2.t
             , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
             , Sparse_ledger.Stable.V2.t
             , bool

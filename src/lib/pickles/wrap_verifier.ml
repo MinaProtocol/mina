@@ -45,7 +45,7 @@ let all_possible_domains =
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
+                 and type Impl.Bigint.t = Tock.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
 struct
   open Inputs
@@ -607,6 +607,11 @@ struct
                                g x ~num_bits ) ) ) )
           |> Inner_curve.negate
         in
+        let x_hat =
+          with_label "x_hat blinding" (fun () ->
+              Ops.add_fast x_hat
+                (Inner_curve.constant (Lazy.force Generators.h)) )
+        in
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
@@ -745,18 +750,17 @@ struct
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
                 assert_
-                  [ { annotation = None
-                    ; basic =
-                        T
-                          (Basic
-                             { l = (one, y)
-                             ; r = (one, pt_n_acc)
-                             ; o = (negate one, acc')
-                             ; m = zero
-                             ; c = zero
-                             } )
-                    }
-                  ] ;
+                  { annotation = None
+                  ; basic =
+                      T
+                        (Basic
+                           { l = (one, y)
+                           ; r = (one, pt_n_acc)
+                           ; o = (negate one, acc')
+                           ; m = zero
+                           ; c = zero
+                           } )
+                  } ;
                 acc' )
         | [] ->
             failwith "empty list" )

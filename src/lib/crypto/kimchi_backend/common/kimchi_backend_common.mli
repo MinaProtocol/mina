@@ -2,12 +2,22 @@ module Bigint = Bigint
 module Field = Field
 module Curve = Curve
 module Poly_comm = Poly_comm
-module Plonk_constraint_system = Plonk_constraint_system
+
+module Plonk_constraint_system : sig
+  module Make = Plonk_constraint_system.Make
+  module Plonk_constraint = Plonk_constraint_system.Plonk_constraint
+
+  type ('f, 'rust_gates) t
+
+  val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
+
+  val get_rows_len : ('a, 'b) t -> int
+end
+
 module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
 module Constants = Constants
 module Plonk_dlog_proof = Plonk_dlog_proof
 module Plonk_dlog_oracles = Plonk_dlog_oracles
-module Var = Var
 
 module Scalar_challenge : sig
   module Stable = Scalar_challenge.Stable
