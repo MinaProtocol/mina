@@ -282,9 +282,8 @@ module Zkapp_account_update_info = struct
             } )
   end
 
-  let dummies = [
-    {
-      authorization_kind = "OK"
+  let dummies =
+    [ { authorization_kind = "OK"
       ; account = `Pk "Eve"
       ; balance_change = "-1000000"
       ; increment_nonce = false
@@ -292,10 +291,9 @@ module Zkapp_account_update_info = struct
       ; call_depth = Unsigned.UInt64.of_int 10
       ; use_full_commitment = true
       ; status = `Success
-      ; token = `Token_id Amount_of.Token_id.default 
-    };
-    {
-      authorization_kind = "NOK"
+      ; token = `Token_id Amount_of.Token_id.default
+      }
+    ; { authorization_kind = "NOK"
       ; account = `Pk "Alice"
       ; balance_change = "20000000"
       ; increment_nonce = true
@@ -303,9 +301,9 @@ module Zkapp_account_update_info = struct
       ; call_depth = Unsigned.UInt64.of_int 20
       ; use_full_commitment = false
       ; status = `Failed
-      ; token = `Token_id Amount_of.Token_id.default 
-    }
-  ]
+      ; token = `Token_id Amount_of.Token_id.default
+      }
+    ]
 end
 
 module Zkapp_command_info = struct
@@ -330,9 +328,8 @@ module Zkapp_command_info = struct
        * canonical user command that created them so we are able consistently
        * produce more balance changing operations in the mempool or a block.
        * *)
-      Op_build.build
-        ~a_eq:[%equal: [ `Zkapp_fee_payer_dec ]]
-        ~plan:[] ~f:(fun ~related_operations ~operation_identifier op ->
+      Op_build.build ~a_eq:[%equal: [ `Zkapp_fee_payer_dec ]] ~plan:[]
+        ~f:(fun ~related_operations ~operation_identifier op ->
           let status =
             match t.failure_reasons with
             | [] ->
@@ -357,13 +354,11 @@ module Zkapp_command_info = struct
                          t.fee )
                 ; coin_change = None
                 ; metadata = None
-                }
-           )
+                } )
   end
 
   let dummies =
-    [ { 
-        fee_payer = `Pk "Eve"
+    [ { fee_payer = `Pk "Eve"
       ; fee = Unsigned.UInt64.of_int 20_000_000_000
       ; token = `Token_id Amount_of.Token_id.default
       ; sequence_no = 1
@@ -373,17 +368,16 @@ module Zkapp_command_info = struct
       ; nonce = Unsigned.UInt32.of_int 3
       ; memo = Some "Hey"
       }
-    ; { 
-      fee_payer = `Pk "Alice"
-    ; fee = Unsigned.UInt64.of_int 10_000_000_000
-    ; token = `Token_id Amount_of.Token_id.default
-    ; sequence_no = 2
-    ; hash = "COMMAND_2"
-    ; failure_reasons = ["Failure1"]
-    ; valid_until = Some (Unsigned.UInt32.of_int 20_000)
-    ; nonce = Unsigned.UInt32.of_int 2
-    ; memo = None
-    }
+    ; { fee_payer = `Pk "Alice"
+      ; fee = Unsigned.UInt64.of_int 10_000_000_000
+      ; token = `Token_id Amount_of.Token_id.default
+      ; sequence_no = 2
+      ; hash = "COMMAND_2"
+      ; failure_reasons = [ "Failure1" ]
+      ; valid_until = Some (Unsigned.UInt32.of_int 20_000)
+      ; nonce = Unsigned.UInt32.of_int 2
+      ; memo = None
+      }
     ]
 end
 
@@ -651,32 +645,55 @@ WITH RECURSIVE chain AS (
 
   module Zkapp_commands = struct
     module Extras = struct
-      (* TODO: A few of these actually aren't used; should we leave in for future or remove? *)
       type t =
-        { account_pk : string
-        ; status : string option
-        ; failure_reason : string option
-        ; account_creation_fee_paid : int64 option
+        { memo : string
+        ; hash : string
+        ; fee_payer : string
+        ; fee : string
+        ; valid_until : int64 option
+        ; nonce : int64
+        ; sequence_no : int
+        ; status : string
+        ; failure_reasons : string array
         }
       [@@deriving hlist]
 
-      let account_pk t = `Pk t.account_pk
+      let memo t = t.memo
 
-      let status t = t.status
+      let hash t = t.hash
 
-      let failure_reason t = t.failure_reason
-
-      let account_creation_fee_paid t = t.account_creation_fee_paid
+      let fee_payer t = `Pk t.fee_payer
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; option string; option string; option int64 ]
+          Caqti_type.
+            [ string
+            ; string
+            ; string
+            ; string
+            ; option int64
+            ; int64
+            ; int
+            ; string
+            ; Mina_caqti.array_string_typ
+            ]
     end
 
-    let typ =
-      Caqti_type.(tup3 int Archive_lib.Processor.Zkapp_updates.typ Extras.typ)
+    let typ = Caqti_type.(tup2 int Extras.typ)
 
-    let query = Caqti_request.collect Caqti_type.int typ {| 
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {| 
+  SELECT zc.id, zc.memo, zc.hash,
+    pk_fee_payer.value as fee_payer, zfpb.fee, zfpb.valid_until, zfpb.nonce,
+    bzc.sequence_no, bzc.status, zauf.failures
+FROM blocks_zkapp_commands bzc
+ INNER JOIN zkapp_commands zc on zc.id = bzc.zkapp_command_id
+ INNER JOIN zkapp_fee_payer_body zfpb on zc.zkapp_fee_payer_body_id = zfpb.id
+ INNER JOIN account_identifiers ai_fee_payer on ai_fee_payer.id = zfpb.account_identifier_id
+ INNER JOIN public_keys pk_fee_payer on ai_fee_payer.public_key_id = pk_fee_payer.id
+ LEFT JOIN zkapp_account_update_failures zauf on zauf.id = ANY(bzc.failure_reasons_ids)
+WHERE bzc.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -816,8 +833,8 @@ WITH RECURSIVE chain AS (
           ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
           } )
     in
-    let%map zkapp_commands = M.return Zkapp_command_info.dummies (*TODO: *) in
-    let%map zkapps_account_updates = M.return Zkapp_account_update_info.dummies (*TODO: *) in
+    let zkapp_commands = (*TODO: *) Zkapp_command_info.dummies in
+    let zkapps_account_updates = (*TODO: *) Zkapp_account_update_info.dummies in
     { Block_info.block_identifier =
         { Block_identifier.index = raw_block.height
         ; hash = raw_block.state_hash
