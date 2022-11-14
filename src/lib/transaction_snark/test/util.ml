@@ -347,7 +347,7 @@ module Wallet = struct
       { private_key
       ; account =
           Account.create account_id
-            (Balance.of_int ((50 + Random.int 100) * 1_000_000_000))
+            (Balance.of_mina_int_exn (50 + Random.int 100))
       }
     in
     Array.init n ~f:(fun _ -> random_wallet ())
@@ -358,7 +358,10 @@ module Wallet = struct
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
+        ~body:
+          (Payment
+             { source_pk; receiver_pk; amount = Amount.of_nanomina_int_exn amt }
+          )
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -417,7 +420,7 @@ let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
 let check_balance pk balance ledger =
   let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
   let acc = Ledger.get ledger loc |> Option.value_exn in
-  [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
+  [%test_eq: Balance.t] acc.balance (Balance.of_nanomina_int_exn balance)
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
