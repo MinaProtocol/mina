@@ -16,6 +16,7 @@
    base.base_internalhash_types
    ppx_inline_test.config
    ;; local libraries
+   mina_wire_types
    bignum_bigint
    pickles
    codable
@@ -30,7 +31,8 @@
    random_oracle_input
    bitstring_lib
    test_util
-   snarky_integer
+   kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

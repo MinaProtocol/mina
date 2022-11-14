@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -115,17 +116,17 @@ module Network_config = struct
     let bp_keypairs, extra_keypairs =
       List.split_n
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1 )
         num_block_producers
     in
-    if List.length bp_keypairs < num_block_producers then
+    if Mina_stdlib.List.Length.Compare.(bp_keypairs < num_block_producers) then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    assert (List.length bp_keypairs >= num_block_producers) ;
-    if List.length bp_keypairs < num_block_producers then
-      failwith
-        "not enough sample keypairs for specified number of extra keypairs" ;
-    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+
+    assert (
+      Stdlib.List.compare_lengths extra_keypairs extra_genesis_accounts >= 0 ) ;
     let extra_keypairs_cut =
       List.take extra_keypairs (List.length extra_genesis_accounts)
     in
@@ -151,7 +152,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -174,15 +175,35 @@ module Network_config = struct
                   ; vesting_increment = t.vesting_increment
                   }
           in
+          (* an account may be used for snapp transactions, so add
+             permissions
+          *)
+          let (permissions : Runtime_config.Accounts.Single.Permissions.t option)
+              =
+            Some
+              { edit_state = None
+              ; send = None
+              ; receive = None
+              ; set_delegate = None
+              ; set_permissions = None
+              ; set_verification_key = None
+              ; set_zkapp_uri = None
+              ; edit_sequence_state = None
+              ; set_token_symbol = None
+              ; increment_nonce = None
+              ; set_voting_for = None
+              }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = None
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
+          ; permissions
           } )
     in
     (* DAEMON CONFIG *)
@@ -192,7 +213,17 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; transaction_expiry_hr = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_sequence_event_elements = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -234,11 +265,16 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
+    let mina_archive_schema = "create_schema.sql" in
     let mina_archive_base_url =
       "https://raw.githubusercontent.com/MinaProtocol/mina/"
       ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
-    let mina_archive_schema = mina_archive_base_url ^ "create_schema.sql" in
+    let mina_archive_schema_aux_files =
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
+      ]
+    in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
       let keypair =
@@ -276,6 +312,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
@@ -410,7 +447,7 @@ module Network_manager = struct
           accum + (max_nodes * 3) )
       (*
         the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  
+          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
           then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
     in
     let nodes_available = max_nodes - num_kube_nodes in

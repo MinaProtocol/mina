@@ -37,6 +37,19 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       {{- end }}
       containers:
       - name: mina
@@ -77,9 +90,7 @@ spec:
           {{- if $.Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
-          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
@@ -111,10 +122,8 @@ spec:
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
-        {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- end }}
         ports:
         - name: client-port
           protocol: TCP
@@ -133,10 +142,8 @@ spec:
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- end }}
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"

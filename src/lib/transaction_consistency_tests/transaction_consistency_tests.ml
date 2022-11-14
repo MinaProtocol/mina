@@ -73,7 +73,7 @@ let%test_module "transaction logic consistency" =
 
     (* Helpers for applying transactions *)
 
-    module Sparse_txn_logic = Transaction_logic.Make (Sparse_ledger.L)
+    module Sparse_txn_logic = Mina_transaction_logic.Make (Sparse_ledger.L)
 
     let sparse_ledger ledger t =
       Or_error.try_with ~backtrace:true (fun () ->
@@ -109,7 +109,7 @@ let%test_module "transaction logic consistency" =
               (Sparse_ledger.next_available_token source)
             ~next_available_token_after:
               (Sparse_ledger.next_available_token target)
-            ~snapp_account1:None ~snapp_account2:None
+            ~zkapp_account1:None ~zkapp_account2:None
             { transaction; block_data }
             (unstage (Sparse_ledger.handler source)) )
 
@@ -364,8 +364,10 @@ let%test_module "transaction logic consistency" =
             let error = Error.of_exn ~backtrace:`Get exn in
             passed := false ;
             Format.printf
-              "The following transaction was inconsistently \
-               applied:@.%s@.%s@.%s@."
+              "@[<v>The following transaction was inconsistently applied:@,\
+               %s@,\
+               %s@,\
+               %s@]@."
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
@@ -590,8 +592,10 @@ let%test_module "transaction logic consistency" =
             let error = Error.of_exn ~backtrace:`Get exn in
             passed := false ;
             Format.printf
-              "The following transaction was inconsistently \
-               applied:@.%s@.%s@.%s@."
+              "@[<v>The following transaction was inconsistently applied:@,\
+               %s@,\
+               %s@,\
+               %s@]@."
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))

@@ -7,7 +7,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee
+            fee @ppxCustom(module: "Scalars.UInt64")
           }
         }
       }
@@ -18,7 +18,7 @@ module Get_options_metadata =
 
       account(publicKey: $sender, token: $token_id) {
         balance {
-          blockHeight
+          blockHeight @ppxCustom(module: "Scalars.UInt32")
           stateHash
         }
         nonce
@@ -40,7 +40,7 @@ module Send_payment =
                   {from: $from, to:$to_, token:$token, amount:$amount,
                   fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
   }}
   |}]
@@ -57,7 +57,7 @@ mutation ($sender: PublicKey!,
   sendDelegation(signature: {rawSignature: $signature}, input:
     {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
     delegation {
-      hash
+      hash @ppxCustom(module: "Scalars.String_json")
     }
   }
 }
@@ -77,12 +77,12 @@ module Public_key = Signature_lib.Public_key
 module Signed_command_payload = Mina_base.Signed_command_payload
 module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_base.Transaction_hash
+module Transaction_hash = Mina_transaction.Transaction_hash
 
 module Options = struct
   type t =
     { sender : Public_key.Compressed.t
-    ; token_id : Unsigned.UInt64.t
+    ; token_id : string
     ; receiver : Public_key.Compressed.t
     ; valid_until : Unsigned_extended.UInt32.t option
     ; memo : string option
@@ -101,7 +101,7 @@ module Options = struct
 
   let to_json t =
     { Raw.sender = Public_key.Compressed.to_base58_check t.sender
-    ; token_id = Unsigned.UInt64.to_string t.token_id
+    ; token_id = t.token_id
     ; receiver = Public_key.Compressed.to_base58_check t.receiver
     ; valid_until =
         Option.map ~f:Unsigned_extended.UInt32.to_string t.valid_until
@@ -129,7 +129,7 @@ module Options = struct
              |> Result.map_error ~f:(error "receiver")
            in
            { sender
-           ; token_id = Unsigned.UInt64.of_string r.token_id
+           ; token_id = r.token_id
            ; receiver
            ; valid_until =
                Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until
@@ -142,7 +142,7 @@ module Metadata_data = struct
   type t =
     { sender : string
     ; nonce : Unsigned_extended.UInt32.t
-    ; token_id : Unsigned_extended.UInt64.t
+    ; token_id : string
     ; receiver : string
     ; account_creation_fee : Unsigned_extended.UInt64.t option [@default None]
     ; valid_until : Unsigned_extended.UInt32.t option [@default None]
@@ -203,7 +203,7 @@ module Derive = struct
           Some
             (User_command_info.account_id
                (`Pk (Public_key.Compressed.to_base58_check pk_compressed))
-               (Option.value ~default:Amount_of.Token_id.default token_id))
+               (`Token_id (Option.value ~default:Amount_of.Token_id.default token_id)))
       ; metadata = None
       }
   end
@@ -217,7 +217,7 @@ module Metadata = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql :
-               ?token_id:Unsigned.UInt64.t
+               ?token_id:string
             -> address:Public_key.Compressed.t
             -> receiver:Public_key.Compressed.t
             -> unit
@@ -324,11 +324,7 @@ module Metadata = struct
         | Some account ->
             M.return account
       in
-      let nonce =
-        Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
-          account.nonce
-        |> Option.value ~default:Unsigned.UInt32.zero
+      let nonce = Option.value ~default:Unsigned.UInt32.zero account.nonce
       in
       (* suggested fee *)
       (* Take the median of all the fees in blocks and add a bit extra using
@@ -453,7 +449,8 @@ module Preprocess = struct
           Some
             (Options.to_json
                { Options.sender
-               ; token_id = partial_user_command.User_command_info.Partial.token
+               ; token_id = (match  partial_user_command.User_command_info.Partial.token
+                             with `Token_id s -> s)
                ; receiver
                ; valid_until = Option.bind ~f:(fun m -> m.valid_until) metadata
                ; memo = Option.bind ~f:(fun m -> m.memo) metadata
@@ -523,7 +520,7 @@ module Payloads = struct
           partial_user_command
         |> env.lift
       in
-      let random_oracle_input = Signed_command.to_input user_command_payload in
+      let random_oracle_input = Signed_command.to_input_legacy user_command_payload in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
         ; command = partial_user_command
@@ -544,7 +541,7 @@ module Payloads = struct
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }
@@ -651,12 +648,10 @@ module Parse = struct
               Signed_command_payload.Body.Payment
                 { source_pk
                 ; receiver_pk
-                ; token_id = Mina_base.Token_id.of_uint64 payment.token
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
             let fee_payer_pk = source_pk in
-            let fee_token = Mina_base.Token_id.default in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =
@@ -675,7 +670,7 @@ module Parse = struct
                  | Ok m -> return m)
             in
             let payload =
-              Signed_command_payload.create ~fee ~fee_token ~fee_payer_pk ~nonce
+              Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
             (* choose signature verification based on network *)
@@ -839,7 +834,7 @@ module Submit = struct
       [@@deriving hlist]
 
       let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
+        let open Mina_caqti.Type_spec in
         let spec =
           Caqti_type.[int64; string; string; int64; int64]
         in
@@ -923,7 +918,7 @@ module Submit = struct
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
                 Send_payment.(make @@ makeVariables ~from:(`String payment.from)
-                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~to_:(`String payment.to_) ~token:(`String payment.token)
                    ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                    ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
@@ -1004,11 +999,9 @@ module Submit = struct
         match
           ( signed_transaction.payment
           , signed_transaction.stake_delegation
-          , signed_transaction.create_token
-          , signed_transaction.create_token_account
-          , signed_transaction.mint_tokens )
+)
         with
-        | Some payment, None, None, None, None ->
+        | Some payment, None->
             (
             match%bind
             env.gql_payment ~payment ~signature:signed_transaction.signature
@@ -1042,7 +1035,7 @@ module Submit = struct
                    M.fail (Errors.create `Transaction_submit_duplicate)
                  | false ->
                    M.fail e ) )
-        | None, Some delegation, None, None, None ->
+        | None, Some delegation->
             let%map res =
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()

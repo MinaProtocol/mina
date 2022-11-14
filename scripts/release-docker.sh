@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -87,6 +87,9 @@ mina-toolchain)
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
   ;;
+mina-zkapp-test-transaction)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
+  ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
@@ -107,7 +110,12 @@ if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
-TAG="minaprotocol/$SERVICE:$VERSION"
+MINAPROTOCOL="minaprotocol"
+TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
+
+# friendly, predictable tag
+GITHASH=$(git rev-parse --short=7 HEAD)
+HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -119,7 +127,9 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
+  docker tag "${TAG}" "${HASHTAG}"
   docker push "$1"
+  docker push "${HASHTAG}"
 }
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then

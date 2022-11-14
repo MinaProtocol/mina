@@ -31,22 +31,19 @@ let new_delegate =
     "B62qkfHpLpELqpMK6ZvUTJ5wRqKDRF3UHyJ4Kv3FU79Sgs4qpBnx5RR"
 
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
-  let fee = Currency.Fee.of_int fee in
-  let fee_token = Token_id.default in
+  let fee = Currency.Fee.of_nanomina_int_exn fee in
   let nonce = Account.Nonce.of_int nonce in
   let valid_until = Mina_numbers.Global_slot.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
   Signed_command_payload.Common.Poly.
-    { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
+    { fee; fee_payer_pk; nonce; valid_until; memo }
 
 let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
     ~valid_until memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
-  let amount = Currency.Amount.of_int amount in
-  let token_id = Token_id.default in
+  let amount = Currency.Amount.of_nanomina_int_exn amount in
   let body =
-    Signed_command_payload.Body.Payment
-      { source_pk; receiver_pk; token_id; amount }
+    Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount }
   in
   Signed_command_payload.Poly.{ common; body }
 

@@ -4,10 +4,6 @@ type 'a s = Z | S of 'a
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 
-module T = struct
-  type nonrec 'a t = 'a t
-end
-
 type 'a nat = 'a t
 
 type e = T : 'n nat -> e
@@ -30,12 +26,6 @@ module type Intf = sig
   type n
 
   val n : n t
-end
-
-type 'n m = (module Intf with type n = 'n)
-
-module Is_succ = struct
-  type 'n t = Has_pred : 'm t -> 'm s t
 end
 
 module Adds = struct
@@ -172,6 +162,24 @@ module N27 = S (N26)
 module N28 = S (N27)
 module N29 = S (N28)
 module N30 = S (N29)
+module N31 = S (N30)
+module N32 = S (N31)
+module N33 = S (N32)
+module N34 = S (N33)
+module N35 = S (N34)
+module N36 = S (N35)
+module N37 = S (N36)
+module N38 = S (N37)
+module N39 = S (N38)
+module N40 = S (N39)
+module N41 = S (N40)
+module N42 = S (N41)
+module N43 = S (N42)
+module N44 = S (N43)
+module N45 = S (N44)
+module N46 = S (N45)
+module N47 = S (N46)
+module N48 = S (N47)
 
 module Empty = struct
   type t = T of t
@@ -243,3 +251,5 @@ let eq_exn : type n m. n nat -> m nat -> (n, m) Type_equal.t =
       t
   | `Not_equal _ ->
       failwithf "eq_exn: %d vs %d" (to_int n) (to_int m) ()
+
+module type I = Add.Intf_transparent

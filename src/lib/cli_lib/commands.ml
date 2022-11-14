@@ -64,9 +64,9 @@ let validate_keypair =
         Mina_base.Signed_command.sign_payload keypair.Keypair.private_key
           dummy_payload
       in
-      let message = Mina_base.Signed_command.to_input dummy_payload in
+      let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
       let verified =
-        Schnorr.verify signature
+        Schnorr.Legacy.verify signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in
@@ -120,8 +120,9 @@ let validate_transaction =
                 | Error err ->
                     incr num_fails ;
                     Format.eprintf
-                      "Failed to validate transaction:@.%s@.Failed with \
-                       error:%s@."
+                      "@[<v>Failed to validate transaction:@,\
+                       %s@,\
+                       Failed with error:%s@]@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
                          (Error_json.error_to_yojson err) ) )
@@ -130,7 +131,7 @@ let validate_transaction =
     | Ok () ->
         ()
     | Error err ->
-        Format.eprintf "Error:@.%s@.@."
+        Format.eprintf "@[<v>Error:@,%s@,@]@."
           (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
         Format.printf "Invalid transaction.@." ;
         Core_kernel.exit 1 ) ;
@@ -154,7 +155,7 @@ module Vrf = struct
         "Generate a vrf evaluation witness. This may be used to calculate \
          whether a given private key will win a given slot (by checking \
          threshold_met = true in the JSON output), or to generate a witness \
-         that a 3rd party can use to verify a vrf evaluation."
+         that a 3rd account_update can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
@@ -217,8 +218,9 @@ module Vrf = struct
                     vrf_threshold =
                       Some
                         { delegated_stake =
-                            Currency.Balance.of_int delegated_stake
-                        ; total_stake = Currency.Amount.of_int total_stake
+                            Currency.Balance.of_nanomina_int_exn delegated_stake
+                        ; total_stake =
+                            Currency.Amount.of_nanomina_int_exn total_stake
                         }
                   }
               | _ ->
@@ -290,7 +292,7 @@ module Vrf = struct
                 | Ok x ->
                     x
                 | Error err ->
-                    Format.eprintf "Error:@.%s@.@."
+                    Format.eprintf "@[<v>Error:@,%s@,@]@."
                       (Yojson.Safe.pretty_to_string
                          (Error_json.error_to_yojson err) ) ;
                     `Repeat () )
@@ -344,7 +346,7 @@ module Vrf = struct
             | Ok x ->
                 x
             | Error err ->
-                Format.eprintf "Error:@.%s@.@."
+                Format.eprintf "@[<v>Error:@,%s@,@]@."
                   (Yojson.Safe.pretty_to_string
                      (Error_json.error_to_yojson err) ) ;
                 `Repeat () )

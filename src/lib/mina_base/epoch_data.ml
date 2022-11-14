@@ -11,6 +11,12 @@ module Poly = struct
            , 'lock_checkpoint
            , 'length )
            t =
+            ( 'epoch_ledger
+            , 'epoch_seed
+            , 'start_checkpoint
+            , 'lock_checkpoint
+            , 'length )
+            Mina_wire_types.Mina_base.Epoch_data.Poly.V1.t =
         { ledger : 'epoch_ledger
         ; seed : 'epoch_seed
         ; start_checkpoint : 'start_checkpoint
@@ -19,7 +25,7 @@ module Poly = struct
         ; lock_checkpoint : 'lock_checkpoint
         ; epoch_length : 'length
         }
-      [@@deriving hlist, sexp, equal, compare, hash, yojson, fields]
+      [@@deriving annot, hlist, sexp, equal, compare, hash, yojson, fields]
     end
   end]
 end

@@ -55,9 +55,9 @@ let valid_mina_amount amount =
       false
 
 let amount_geq_min_balance ~amount ~initial_min_balance =
-  let amount = Currency.Amount.of_formatted_string amount in
+  let amount = Currency.Amount.of_mina_string_exn amount in
   let initial_min_balance =
-    Currency.Amount.of_formatted_string initial_min_balance
+    Currency.Amount.of_mina_string_exn initial_min_balance
   in
   Currency.Amount.( >= ) amount initial_min_balance
 
@@ -98,11 +98,11 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
   [%log info] "Processing record for $wallet_pk"
     ~metadata:[ ("wallet_pk", `String wallet_pk) ] ;
   let pk = Some wallet_pk in
-  let balance = Currency.Balance.of_formatted_string amount in
+  let balance = Currency.Balance.of_mina_string_exn amount in
   let initial_minimum_balance =
     (* if omitted in the TSV, use balance *)
     if String.is_empty initial_min_balance then balance
-    else Currency.Balance.of_formatted_string initial_min_balance
+    else Currency.Balance.of_mina_string_exn initial_min_balance
   in
   let cliff_time =
     let num_slots_float =
@@ -111,7 +111,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     (* if there's a fractional slot, wait until next slot by rounding up *)
     Global_slot.of_int (Float.iround_up_exn num_slots_float)
   in
-  let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
+  let cliff_amount = Currency.Amount.of_mina_string_exn cliff_amount in
   let vesting_period =
     match Int.of_string unlock_frequency with
     | 0 ->
@@ -122,7 +122,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
         failwithf "Expected unlock frequency to be 0 or 1, got %s"
           unlock_frequency ()
   in
-  let vesting_increment = Currency.Amount.of_formatted_string unlock_amount in
+  let vesting_increment = Currency.Amount.of_mina_string_exn unlock_amount in
   let no_vesting =
     Currency.Amount.equal cliff_amount Currency.Amount.zero
     && Currency.Amount.equal vesting_increment Currency.Amount.zero
@@ -184,7 +184,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_cliff_time_months =
     try
       let n = Float.of_string cliff_time_months in
-      n >= 0.0
+      Float.(n >= 0.0)
     with _ -> false
   in
   let valid_cliff_amount = valid_mina_amount cliff_amount in
@@ -203,11 +203,11 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     *)
     let initial_minimum_balance =
       if String.is_empty initial_min_balance then
-        Currency.Balance.of_formatted_string amount
-      else Currency.Balance.of_formatted_string initial_min_balance
+        Currency.Balance.of_mina_string_exn amount
+      else Currency.Balance.of_mina_string_exn initial_min_balance
     in
-    let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
-    let unlock_amount = Currency.Amount.of_formatted_string unlock_amount in
+    let cliff_amount = Currency.Amount.of_mina_string_exn cliff_amount in
+    let unlock_amount = Currency.Amount.of_mina_string_exn unlock_amount in
     if
       Currency.Amount.equal cliff_amount Currency.Amount.zero
       && Currency.Amount.equal unlock_amount Currency.Amount.zero

@@ -1,13 +1,15 @@
 {
   "name": "mina-signer",
   "description": "Node API for signing transactions on various networks for Mina Protocol",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "scripts": {
-    "build": "tsc && cp src/client_sdk.bc.js dist/src",
+    "build": "tsc && cp src/client_sdk.min.js dist/src/client_sdk.bc.js",
     "clean": "rm -rf dist",
-    "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js",
-    "test": "jest",
-    "prepublishOnly": "yarn make-jsoo && yarn build && yarn test"
+    "minify": "esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
+    "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js && esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
+    "make-jsoo": "make -C ../.. client_sdk && npm run copy-jsoo",
+    "test": "for f in ./tests/*.test.ts; do jest $f || exit 1; done",
+    "prepublishOnly": "npm run make-jsoo && npm run build && npm run test"
   },
   "keywords": [
     "mina",
@@ -30,12 +32,14 @@
     "@babel/preset-typescript": "^7.16.0",
     "@types/jest": "^27.0.3",
     "babel-jest": "^27.3.1",
+    "esbuild": "^0.14.39",
     "ts-jest": "^27.0.7",
     "ts-node": "^10.4.0",
     "typescript": "^4.5.2",
     "jest": "^27.3.1"
   },
   "dependencies": {
-    "@types/node": "^13.7.0"
+    "@types/node": "^13.7.0",
+    "env": "^0.0.2"
   }
 }

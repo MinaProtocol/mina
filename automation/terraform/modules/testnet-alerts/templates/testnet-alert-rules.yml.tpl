@@ -249,7 +249,7 @@ groups:
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: warning
+      severity: critical
     annotations:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."

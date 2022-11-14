@@ -12,8 +12,18 @@
    ;; local libraries
    currency
    signature_lib
+   mina_ledger
    mina_state
    mina_base
-   )
+   mina_numbers
+   mina_transaction
+   mina_transaction_logic
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   sgn
+   with_hash
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_mina)))

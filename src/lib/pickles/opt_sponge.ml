@@ -26,7 +26,7 @@ type 'f t =
   }
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) =
 struct
   open P

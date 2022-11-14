@@ -9,6 +9,7 @@
    sexplib0
    bin_prot.shape
    ;; local libraries
+   ppx_version.runtime
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare)))

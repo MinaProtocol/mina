@@ -336,7 +336,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                     { hash
                     ; sender
                     ; received_at =
-                        Time.to_string (Block_time.to_time received_at)
+                        Time.to_string (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
                     } )
@@ -345,7 +345,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                       { hash
                       ; sender
                       ; received_at =
-                          Time.to_string (Block_time.to_time received_at)
+                          Time.to_string (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
                       } )
