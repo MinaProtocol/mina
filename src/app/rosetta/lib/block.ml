@@ -718,7 +718,8 @@ module Specific = struct
                      (Int.to_string info.secondary_sequence_no)
                      info.hash}
             ; operations
-            ; metadata= None }
+            ; metadata= None
+            ; related_transactions= [] }
             :: acc )
         |> M.map ~f:List.rev
       in
@@ -747,7 +748,8 @@ module Specific = struct
                           else
                             Some (`Assoc [("memo", `String memo)])
                         with
-                        | _ -> None) } )
+                        | _ -> None)
+                      ;related_transactions= []} )
             ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end
