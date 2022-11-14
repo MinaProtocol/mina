@@ -596,15 +596,20 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N26.n in
+          let num_commitments_without_degree_bound = Nat.N41.n in
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
               :: [| m.psm_comm |]
               :: Vector.append w_comm
-                   (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                   (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (Vector.append
+                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                      (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (snd
+                      Plonk_types.(
+                        Columns.add (fst (Columns.add Permuts_minus_1.n))) ) )
               (snd
                  (Wrap_hack.Padded_length.add
                     num_commitments_without_degree_bound ) )

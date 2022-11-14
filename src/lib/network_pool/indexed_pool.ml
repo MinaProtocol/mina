@@ -6,7 +6,7 @@ open Mina_numbers
 open Signature_lib
 
 (* Fee increase required to replace a transaction. *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 1
+let replace_fee : Currency.Fee.t = Currency.Fee.of_nanomina_int_exn 1
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
@@ -770,7 +770,7 @@ let revalidate :
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
             ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
             ; ( "account_balance"
-              , `String (Currency.Amount.to_formatted_string current_balance) )
+              , `String (Currency.Amount.to_mina_string current_balance) )
             ] ;
         let first_cmd = F_sequence.head_exn queue in
         let first_nonce =
@@ -1292,11 +1292,11 @@ let%test_module _ =
           let pool = empty in
           let add_res =
             add_from_gossip_exn pool cmd Account_nonce.zero
-              (Currency.Amount.of_int 500)
+              (Currency.Amount.of_nanomina_int_exn 500)
           in
           if
             Option.value_exn (currency_consumed ~constraint_constants cmd)
-            |> Currency.Amount.to_int > 500
+            |> Currency.Amount.to_nanomina_int > 500
           then
             match add_res with
             | Error (Insufficient_funds _) ->
@@ -1463,7 +1463,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
+        let init_balance = Currency.Amount.of_mina_int_exn 100_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -1481,7 +1481,8 @@ let%test_module _ =
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
-              Currency.Amount.(gen_incl zero (min (of_int 10) cmd_currency))
+              Currency.Amount.(
+                gen_incl zero (min (of_nanomina_int_exn 10) cmd_currency))
             in
             let amount =
               Option.value_exn Currency.Amount.(cmd_currency - fee)
@@ -1517,15 +1518,14 @@ let%test_module _ =
           Mina_generators.User_command_generators.payment ~sign_type:`Fake
             ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
-            ~max_amount:(Currency.Amount.to_int init_balance)
+            ~max_amount:(Currency.Amount.to_nanomina_int init_balance)
             ~fee_range:0 ()
         in
         let replace_cmd =
           modify_payment replace_cmd_skeleton ~sender ~body:Fn.id
             ~common:(fun c ->
               { c with
-                fee =
-                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+                fee = Currency.Fee.of_mina_int_exn (10 + (5 * (size + 1)))
               } )
         in
         (init_nonce, init_balance, setup_cmds, replace_cmd)
@@ -1634,7 +1634,7 @@ let%test_module _ =
       in
       let insert_cmd pool cmd =
         add_from_gossip_exn pool cmd Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
+          (Currency.Amount.of_mina_int_exn 5)
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
@@ -1675,7 +1675,7 @@ let%test_module _ =
       let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
       let insert_cmd pool cmd =
         add_from_gossip_exn pool cmd Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
+          (Currency.Amount.of_mina_int_exn 5)
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
@@ -1727,7 +1727,9 @@ let%test_module _ =
           let account_id =
             Account_id.create (Public_key.compress public_key) Token_id.default
           in
-          let balance = Balance.of_int @@ Amount.to_int amount in
+          let balance =
+            Balance.of_nanomina_int_exn @@ Amount.to_nanomina_int amount
+          in
           let _tag, account, location =
             Or_error.ok_exn (get_or_create ledger account_id)
           in
@@ -1871,7 +1873,7 @@ let%test_module _ =
       let open Currency in
       (* let open Mina_transaction_logic.For_tests in *)
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
@@ -1906,7 +1908,7 @@ let%test_module _ =
                    handled properly" =
       let open Currency in
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
@@ -1945,7 +1947,7 @@ let%test_module _ =
                    not trigger a crash" =
       let open Currency in
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen

@@ -34,7 +34,9 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
     let%bind (predicate_account : Zkapp_precondition.Account.t) =
       let%bind balance =
         let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
-        let balance_change = Currency.Amount.of_int balance_change_int in
+        let balance_change =
+          Currency.Amount.of_nanomina_int_exn balance_change_int
+        in
         let lower =
           match Currency.Balance.sub_amount balance balance_change with
           | None ->
@@ -273,16 +275,15 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
   let small_balance_change =
     (*make small transfers to allow generating large number of zkapp_command without an overflow*)
     let open Currency in
-    if
-      Balance.(effective_balance < of_formatted_string "1.0") && not new_account
+    if Balance.(effective_balance < of_mina_string_exn "1.0") && not new_account
     then failwith "account has low balance"
-    else Balance.of_formatted_string "0.000001"
+    else Balance.of_mina_string_exn "0.000001"
   in
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "50.0")
-        (Currency.Amount.of_formatted_string "100.0")
+        (Currency.Amount.of_mina_string_exn "50.0")
+        (Currency.Amount.of_mina_string_exn "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)
@@ -394,10 +395,10 @@ let gen_protocol_state_precondition
   let%bind total_currency =
     let open Currency in
     let%bind epsilon1 =
-      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+      Amount.gen_incl Amount.zero (Amount.of_mina_int_exn 1)
     in
     let%bind epsilon2 =
-      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+      Amount.gen_incl Amount.zero (Amount.of_mina_int_exn 1)
     in
     { lower =
         Amount.sub psv.total_currency epsilon1
@@ -518,7 +519,7 @@ let gen_invalid_protocol_state_precondition
       let open Currency in
       let%map total_currency =
         let%map epsilon =
-          Amount.(gen_incl (of_int 1_000) (of_int 1_000_000_000))
+          Amount.(gen_incl (of_nanomina_int_exn 1_000) (of_mina_int_exn 1))
         in
         if lower || Amount.(psv.total_currency > epsilon) then
           { lower = Amount.zero
@@ -722,7 +723,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
                 Account_id.create available_pk Token_id.default
           in
           let account_with_pk =
-            Account.create account_id (Currency.Balance.of_int 0)
+            Account.create account_id Currency.Balance.zero
           in
           let account =
             if zkapp_account then

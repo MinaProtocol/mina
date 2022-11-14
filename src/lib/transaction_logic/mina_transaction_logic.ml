@@ -180,13 +180,13 @@ module Transaction_applied = struct
     let account_creation_fees =
       let account_creation_fee_int =
         Genesis_constants.Constraint_constants.compiled.account_creation_fee
-        |> Currency.Fee.to_int
+        |> Currency.Fee.to_nanomina_int
       in
       let num_accounts_created = List.length @@ new_accounts t in
       (* int type is OK, no danger of overflow *)
       Currency.Amount.(
         Signed.of_unsigned
-        @@ of_int (account_creation_fee_int * num_accounts_created))
+        @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
     in
     let txn : Transaction.t =
       match t.varying with
@@ -2263,10 +2263,16 @@ module For_tests = struct
         fst init_ledger.(i)
       in
       let gen_amount () =
-        Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Amount.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let gen_fee () =
-        Currency.Fee.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Fee.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in

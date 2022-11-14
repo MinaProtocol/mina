@@ -29,13 +29,13 @@ let compaction_interval_ms = Some compaction_interval
 [%%endif]
 
 let minimum_user_command_fee =
-  Currency.Fee.of_formatted_string minimum_user_command_fee_string
+  Currency.Fee.of_mina_string_exn minimum_user_command_fee_string
 
 let default_transaction_fee =
-  Currency.Fee.of_formatted_string default_transaction_fee_string
+  Currency.Fee.of_mina_string_exn default_transaction_fee_string
 
 let default_snark_worker_fee =
-  Currency.Fee.of_formatted_string default_snark_worker_fee_string
+  Currency.Fee.of_mina_string_exn default_snark_worker_fee_string
 
 [%%inject "block_window_duration_ms", block_window_duration]
 

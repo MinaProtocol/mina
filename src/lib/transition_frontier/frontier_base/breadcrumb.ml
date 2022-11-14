@@ -277,7 +277,7 @@ module For_tests = struct
           (Option.value_exn (Mina_ledger.Ledger.get ledger account_location))
             .nonce
         in
-        let send_amount = Currency.Amount.of_int 1000000001 in
+        let send_amount = Currency.Amount.of_nanomina_int_exn 1_000_000_001 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
@@ -324,7 +324,7 @@ module For_tests = struct
         let prover = Public_key.compress public_key in
         Some
           Transaction_snark_work.Checked.
-            { fee = Fee.of_int 1
+            { fee = Fee.of_nanomina_int_exn 1
             ; proofs =
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement

@@ -541,7 +541,7 @@ module Payloads = struct
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }

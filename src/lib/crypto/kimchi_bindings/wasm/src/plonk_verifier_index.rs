@@ -642,8 +642,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -666,8 +666,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );
