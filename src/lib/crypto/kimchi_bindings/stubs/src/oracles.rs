@@ -4,7 +4,7 @@ use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
 use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},

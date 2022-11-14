@@ -7,9 +7,9 @@ open Zkapp_test_transaction_lib.Commands
 module Flags = struct
   open Command
 
-  let default_fee = Currency.Fee.of_formatted_string "1"
+  let default_fee = Currency.Fee.of_mina_string_exn "1"
 
-  let min_fee = Currency.Fee.of_formatted_string "0.003"
+  let min_fee = Currency.Fee.of_mina_string_exn "0.003"
 
   let memo =
     Param.flag "--memo" ~doc:"STRING Memo accompanying the transaction"
@@ -21,8 +21,8 @@ module Flags = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string default_fee)
-           (Currency.Fee.to_formatted_string min_fee) )
+           (Currency.Fee.to_mina_string default_fee)
+           (Currency.Fee.to_mina_string min_fee) )
       (Param.optional txn_fee)
 
   let amount =
@@ -86,7 +86,7 @@ let create_zkapp_account =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
 
@@ -129,7 +129,7 @@ let upgrade_zkapp =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~verification_key ~zkapp_uri ~auth ))
@@ -198,7 +198,7 @@ let transfer_funds =
           printf !"Amount:%!" ;
           match%map Reader.read_line (Lazy.force Reader.stdin) with
           | `Ok amt ->
-              let amount = Currency.Amount.of_formatted_string amt in
+              let amount = Currency.Amount.of_mina_string_exn amt in
               (pk, amount)
           | `Eof ->
               failwith "Invalid amount" )
@@ -246,7 +246,7 @@ let transfer_funds =
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
-           (Currency.Fee.to_formatted_string Flags.min_fee)
+           (Currency.Fee.to_mina_string Flags.min_fee)
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
@@ -283,7 +283,7 @@ let update_state =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ))
 
@@ -323,7 +323,7 @@ let update_zkapp_uri =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~zkapp_uri ~auth ))
 
@@ -389,7 +389,7 @@ let update_sequence_state =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~sequence_state ))
 
@@ -429,7 +429,7 @@ let update_token_symbol =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~token_symbol ~auth ))
 
@@ -514,7 +514,7 @@ let update_permissions =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~permissions
          ~current_auth:(Util.auth_of_string current_auth) ))

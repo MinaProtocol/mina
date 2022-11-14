@@ -34,7 +34,7 @@ commitment_dlog = { path = "../../proof-systems/poly-commitment", features = ["o
 groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
-oracle = { path = "../../proof-systems/oracle" }
+mina-poseidon = { path = "../../proof-systems/poseidon" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
 
 # ocaml-specific

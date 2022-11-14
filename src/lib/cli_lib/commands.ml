@@ -218,8 +218,9 @@ module Vrf = struct
                     vrf_threshold =
                       Some
                         { delegated_stake =
-                            Currency.Balance.of_int delegated_stake
-                        ; total_stake = Currency.Amount.of_int total_stake
+                            Currency.Balance.of_nanomina_int_exn delegated_stake
+                        ; total_stake =
+                            Currency.Amount.of_nanomina_int_exn total_stake
                         }
                   }
               | _ ->
