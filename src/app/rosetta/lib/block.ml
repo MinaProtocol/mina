@@ -664,6 +664,8 @@ WITH RECURSIVE chain AS (
 
       let fee_payer t = `Pk t.fee_payer
 
+      let fee t = t.fee
+
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
@@ -695,6 +697,43 @@ FROM blocks_zkapp_commands bzc
  LEFT JOIN zkapp_account_update_failures zauf on zauf.id = ANY(bzc.failure_reasons_ids)
 WHERE bzc.block_id = ?
       |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.collect_list query id
+  end
+
+  module Zkapp_account_update = struct
+    module Extras = struct
+      type t = { account : string; status : string } [@@deriving hlist]
+
+      let account t = `Pk t.account
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ string; string ]
+    end
+
+    let typ =
+      Caqti_type.(
+        tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
+
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {|
+SELECT zaub.account_identifier_id, zaub.id,
+    zaub.balance_change, zaub.increment_nonce, zaub.events_id,
+    zaub.sequence_events_id, zaub.call_data_id, zaub.call_depth,
+    zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
+    zaub.use_full_commitment, zaub.caller, zau.authorization_kind,
+    pk.value as account, bzc.status
+FROM zkapp_commands zc
+ INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
+ INNER JOIN zkapp_account_update zau on zau.id = ANY(zc.zkapp_account_updates_ids)
+ INNER JOIN zkapp_account_update_body zaub on zaub.update_id = zau.id
+ INNER JOIN account_identifiers ai on ai.id = zaub.account_identifier_id
+ INNER JOIN public_keys pk on ai.public_key_id = pk.id
+WHERE zc.id = ?
+    |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
@@ -754,6 +793,21 @@ WHERE bzc.block_id = ?
       Internal_commands.run (module Conn) block_id
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
+    let%bind raw_zkapp_commands =
+      Zkapp_commands.run (module Conn) block_id
+      |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
+    in
+    let%bind raw_zkapp_account_update =
+      List.fold_left raw_zkapp_commands ~init:(M.return [])
+        ~f:(fun acc (cmd_id, _) ->
+          let%bind acc = acc in
+          let%bind account_updates =
+            Zkapp_account_update.run (module Conn) cmd_id
+            |> Errors.Lift.sql
+                 ~context:"Finding zkapp account updates within block"
+          in
+          M.return (acc @ account_updates) )
+    in
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
           let%map kind =
@@ -785,7 +839,7 @@ WHERE bzc.block_id = ?
           ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
           ; hash= ic.hash } )
     in
-    let%map user_commands =
+    let%bind user_commands =
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
@@ -833,8 +887,50 @@ WHERE bzc.block_id = ?
           ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
           } )
     in
-    let zkapp_commands = (*TODO: *) Zkapp_command_info.dummies in
-    let zkapps_account_updates = (*TODO: *) Zkapp_account_update_info.dummies in
+    let%bind zkapp_commands =
+      M.List.map raw_zkapp_commands ~f:(fun (_, cmd) ->
+          (* TODO: check if this holds *)
+          let token = Mina_base.Token_id.(to_string default) in
+          M.return
+            { Zkapp_command_info.fee =
+                Unsigned.UInt64.of_string @@ Zkapp_commands.Extras.fee cmd
+            ; fee_payer = Zkapp_commands.Extras.fee_payer cmd
+            ; valid_until =
+                Option.map ~f:Unsigned.UInt32.of_int64 cmd.valid_until
+            ; nonce = Unsigned.UInt32.of_int64 cmd.nonce
+            ; token = `Token_id token
+            ; sequence_no = cmd.sequence_no
+            ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
+            ; hash = cmd.hash
+            ; failure_reasons = Array.to_list cmd.failure_reasons
+            } )
+    in
+    let%map zkapps_account_updates =
+      M.List.map raw_zkapp_account_update ~f:(fun (upd, extras) ->
+          (* TODO: check if this holds *)
+          let token = Mina_base.Token_id.(to_string default) in
+          let status =
+            match extras.Zkapp_account_update.Extras.status with
+            | "applied" ->
+                `Success
+            | _ ->
+                `Failed
+          in
+          M.return
+            { Zkapp_account_update_info.authorization_kind =
+                upd
+                  .Archive_lib.Processor.Zkapp_account_update_body
+                   .authorization_kind
+            ; account = Zkapp_account_update.Extras.account extras
+            ; balance_change = upd.balance_change
+            ; increment_nonce = upd.increment_nonce
+            ; caller = upd.caller
+            ; call_depth = Unsigned.UInt64.of_int upd.call_depth
+            ; use_full_commitment = upd.use_full_commitment
+            ; status
+            ; token = `Token_id token
+            } )
+    in
     { Block_info.block_identifier =
         { Block_identifier.index = raw_block.height
         ; hash = raw_block.state_hash
