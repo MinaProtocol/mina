@@ -2201,7 +2201,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let timeout_min = 10.0
+    let test_timeout_min = 3.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2336,7 +2336,7 @@ let%test_module "Epoch ledger sync tests" =
         in
         let pubsub_v0 = Cli_lib.Default.pubsub_v0 in
         let gossip_net_params : Gossip_net.Libp2p.Config.t =
-          { timeout = Time.Span.of_sec 3.
+          { timeout = Time.Span.of_sec 10.
           ; logger
           ; conf_dir
           ; chain_id
@@ -2596,7 +2596,7 @@ let%test_module "Epoch ledger sync tests" =
          raise No_sync_answer ) ;
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min timeout_min) in
+        (let%map () = after (Time.Span.of_min test_timeout_min) in
          if not !test_finished then raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
