@@ -273,6 +273,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   type var = (Non_snark.var, Pending_coinbase.Hash.var) t_
 
   include Hashable.Make (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
 
   let ledger_hash ({ non_snark; _ } : t) = Non_snark.ledger_hash non_snark
 

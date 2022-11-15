@@ -12,7 +12,7 @@ open Core_kernel
     adds it to frontier (if it's valid).
 *)
 type catchup_state =
-  { transition_states : Transition_state.t State_hash.Table.t
+  { transition_states : Transition_states.t
         (** Map from a state_hash to state of the transition corresponding to it  *)
   ; orphans : State_hash.t list State_hash.Table.t
         (** Map from transition's state hash to list of its children for transitions
@@ -33,11 +33,18 @@ type event_t =
       | `In_process of Transition_state.t ] )
     Result.t
     * Mina_block.Header.with_hash
-    * Network_peer.Envelope.Sender.t
+    * Network_peer.Peer.t
   | `Invalid_frontier_dependencies of
     [ `Already_in_frontier | `Not_selected_over_frontier_root ]
     * State_hash.t
-    * Network_peer.Envelope.Sender.t ]
+    * Network_peer.Peer.t list
+  | `Pre_validate_header_invalid of
+    Network_peer.Peer.t
+    * Mina_block.Header.t
+    * [ `Invalid_delta_block_chain_proof
+      | `Invalid_genesis_protocol_state
+      | `Invalid_protocol_version
+      | `Mismatched_protocol_version ] ]
 
 module type CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
@@ -46,13 +53,7 @@ module type CONTEXT = sig
 
   val frontier : Transition_frontier.t
 
-  val verifier : Verifier.t
-
   val time_controller : Block_time.Controller.t
-
-  val trust_system : Trust_system.t
-
-  val network : Mina_networking.t
 
   (** Callback to write verified transitions after they're added to the frontier. *)
   val write_verified_transition :
@@ -79,44 +80,50 @@ module type CONTEXT = sig
 
   (** Download body for the given header  *)
   val download_body :
-       header:Mina_block.Validation.initial_valid_with_header
+       header:Mina_block.Header.with_hash
+    -> preferred_peers:Network_peer.Peer.t list
     -> (module Interruptible.F)
     -> Mina_block.Body.t Or_error.t Interruptible.t
 
   (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
        received_at:Time.t
-    -> sender:Network_peer.Envelope.Sender.t
     -> parent:Frontier_base.Breadcrumb.t
     -> transition:Mina_block.Validation.almost_valid_with_block
     -> (module Interruptible.F)
     -> ( Frontier_base.Breadcrumb.t
-       , [> `Invalid_staged_ledger_diff of Error.t
-         | `Invalid_staged_ledger_hash of Error.t
-         | `Fatal_error of exn ] )
+       , [> `Invalid of Error.t * [ `Proof | `Signature_or_proof | `Other ]
+         | `Verifier_error of Error.t ] )
        Result.t
        Interruptible.t
 
-  (** Retrieve ancestors of target hash. Function returns a list of elements,
+  (** Retrieve some ancestors of target hash. Function returns a list of elements,
       each either header or block. List is sorted in parent-first order.
+
+      Parent of the first element of the returned list is either in frontier
+      or in transition states.
 
       Resulting list forms a chain of consequent headers/blocks with the last element
       corresponding to the target hash.
 
-      Element [`Meta] is expected only if corresponding transition is already in transition states
-      or frontier.
-        *)
+      This function attempts to retrieve header for target and some of its ancestors.
+      It returns error if it wasn't able to retrieve any new information.
+      It returns as soon as header of target is know. It won't try to retrieve all ancestors,
+      however it will use batching to get as much information as possible in a fixed amount
+      of RPC invocations. *)
   val retrieve_chain :
        some_ancestors:State_hash.t list
-    -> target:State_hash.t
-    -> parent_cache:State_hash.t State_hash.Table.t
-    -> sender:Network_peer.Envelope.Sender.t
+    -> target_hash:State_hash.t
+    -> target_length:Mina_numbers.Length.t
+    -> preferred_peers:Network_peer.Peer.t list
     -> lookup_transition:(State_hash.t -> [ `Present | `Not_present | `Invalid ])
-    -> (module Interruptible.F)
-    -> ( [ `Header of Mina_block.Header.t
-         | `Block of Mina_block.t
+    -> (* A function returning [`Present] if transition is either in frontier or in transition
+          states, [`Invalid] if transition state is [Invalid] and [`Not_present] otherwise *)
+       (module Interruptible.F)
+    -> ( [ `Header of Mina_block.Header.with_hash
+         | `Block of Mina_block.with_hash
          | `Meta of Substate.transition_meta ]
-       * Network_peer.Envelope.Sender.t )
+       * Network_peer.Peer.t )
        list
        Or_error.t
        Interruptible.t

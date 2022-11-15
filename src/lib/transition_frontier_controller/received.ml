@@ -8,7 +8,7 @@ open Context
   returns in-progress context if the transition was in progress of receiving ancestry.
 *)
 let mark_done ~transition_states state_hash =
-  let%bind.Option st = State_hash.Table.find transition_states state_hash in
+  let%bind.Option st = Transition_states.find transition_states state_hash in
   let%bind.Option st' =
     match st with
     | Transition_state.Received
@@ -20,7 +20,7 @@ let mark_done ~transition_states state_hash =
     | _ ->
         None
   in
-  State_hash.Table.set transition_states ~key:state_hash ~data:st' ;
+  Transition_states.update transition_states st' ;
   match st with
   | Transition_state.Received
       { substate = { status = Processing (In_progress ctx); _ }; _ } ->
@@ -35,8 +35,7 @@ let mark_done ~transition_states state_hash =
 *)
 let handle_preserve_hint ~mark_processed_and_promote ~transition_states ~context
     (st, hint) =
-  let meta = Transition_state.State_functions.transition_meta st in
-  State_hash.Table.set transition_states ~key:meta.state_hash ~data:st ;
+  Transition_states.update transition_states st ;
   match hint with
   | `Nop ->
       ()
@@ -47,6 +46,7 @@ let handle_preserve_hint ~mark_processed_and_promote ~transition_states ~context
       Verifying_complete_works.make_independent ~context
         ~mark_processed_and_promote ~transition_states state_hash
   | `Mark_downloading_body_processed ivar_opt ->
+      let meta = Transition_state.State_functions.transition_meta st in
       ( match st with
       | Downloading_body { baton = true; _ } ->
           Downloading_body.pass_the_baton ~transition_states ~context
@@ -68,7 +68,7 @@ let pre_validate_header ~context:(module Context : CONTEXT) hh =
 
 (** Check transition's status in catchup state and frontier *)
 let lookup_transition ~transition_states ~frontier state_hash =
-  match State_hash.Table.find transition_states state_hash with
+  match Transition_states.find transition_states state_hash with
   | Some (Transition_state.Invalid _) ->
       `Invalid
   | Some _ ->
@@ -85,10 +85,10 @@ let lookup_transition ~transition_states ~frontier state_hash =
 *)
 let insert_invalid_state_impl ~transition_states ~transition_meta ~children_list
     error =
-  Hashtbl.add_exn transition_states ~key:transition_meta.Substate.state_hash
-    ~data:(Transition_state.Invalid { transition_meta; error }) ;
-  List.iter children_list
-    ~f:(Transition_state.mark_invalid ~transition_states ~error)
+  Transition_states.add_new transition_states
+    (Transition_state.Invalid { transition_meta; error }) ;
+  List.iter children_list ~f:(fun state_hash ->
+      Transition_states.mark_invalid ~state_hash transition_states ~error )
 
 (** Insert invalid transition to transition states and remove
     corresponding record from orphans.
@@ -109,34 +109,55 @@ let set_processing_to_failed error = function
       ( { substate = { status = Processing (In_progress _); _ }; gossip_data; _ }
       as r ) ->
       Gossip.drop_gossip_data `Ignore gossip_data ;
-      Transition_state.Received
-        { r with
-          substate = { r.substate with status = Failed error }
-        ; gossip_data = Gossip.No_validation_callback
-        }
+      Some
+        (Transition_state.Received
+           { r with
+             substate = { r.substate with status = Failed error }
+           ; gossip_data = Gossip.No_validation_callback
+           } )
   | st ->
-      st
-
-let compute_header_hashes =
-  With_hash.of_data
-    ~hash_data:
-      (Fn.compose Mina_state.Protocol_state.hashes
-         Mina_block.Header.protocol_state )
+      Some st
 
 let split_retrieve_chain_element = function
-  | `Block b ->
-      let h = Mina_block.header b in
-      let hh = compute_header_hashes h in
+  | `Block bh ->
+      let hh = With_hash.map ~f:Mina_block.header bh in
       ( Substate.transition_meta_of_header_with_hash hh
       , Some hh
-      , Some (Mina_block.body b) )
-  | `Header h ->
-      let hh = compute_header_hashes h in
+      , Some (Mina_block.body @@ With_hash.data bh) )
+  | `Header hh ->
       (Substate.transition_meta_of_header_with_hash hh, Some hh, None)
   | `Meta m ->
       (m, None, None)
 
 let is_received = function Transition_state.Received _ -> true | _ -> false
+
+let rec pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
+    ?body hh =
+  match pre_validate_header ~context hh with
+  | Ok vh ->
+      add_received ~context ~mark_processed_and_promote ~sender ~state ?body
+        (Gossip.Pre_initial_valid vh) ;
+      Ok ()
+  | Error e ->
+      let header = With_hash.data hh in
+      let (module Context : CONTEXT) = context in
+      Context.record_event (`Pre_validate_header_invalid (sender, header, e)) ;
+      let e' =
+        Error.of_string
+        @@
+        match e with
+        | `Invalid_genesis_protocol_state ->
+            "invalid genesis state"
+        | `Invalid_delta_block_chain_proof ->
+            "invalid delta transition chain proof"
+        | `Mismatched_protocol_version ->
+            "protocol version mismatch"
+        | `Invalid_protocol_version ->
+            "invalid protocol version"
+      in
+      let transition_meta = Substate.transition_meta_of_header_with_hash hh in
+      insert_invalid_state ~state ~transition_meta e' ;
+      Error e'
 
 (** Handle an ancestor returned by [retrieve_chain] function.
   
@@ -147,49 +168,40 @@ let is_received = function Transition_state.Received _ -> true | _ -> false
     from.
 
     Returns error iff the ancestor is invalid. *)
-let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
+and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
     ~sender el =
   let (module Context : CONTEXT) = context in
+  let extend_aux aux =
+    { aux with
+      Transition_state.received =
+        { received_at = Time.now (); gossip = false; sender }
+        :: aux.Transition_state.received
+    }
+  in
   let transition_meta, hh_opt, body = split_retrieve_chain_element el in
   let state_hash = transition_meta.state_hash in
-  match (State_hash.Table.find state.transition_states state_hash, hh_opt) with
+  match (Transition_states.find state.transition_states state_hash, hh_opt) with
   | Some (Transition_state.Invalid _), _ ->
       Error (Error.of_string "parent is invalid")
   | Some st, _ ->
-      let f body =
-        handle_preserve_hint ~mark_processed_and_promote
-          ~transition_states:state.transition_states ~context
-          (Gossip.preserve_body ~body st)
+      let st' = Transition_state.modify_aux_data ~f:extend_aux st in
+      let hint =
+        Option.value_map
+          ~f:(fun body -> Gossip.preserve_body ~body st')
+          ~default:(st', `Nop)
+          body
       in
-      Option.iter ~f body ; Ok ()
-  | None, Some hh -> (
-      match pre_validate_header ~context hh with
-      | Ok vh ->
-          add_received ~context ~mark_processed_and_promote ~sender ~state ?body
-            (Gossip.Pre_initial_valid vh) ;
-          Ok ()
-      | Error e ->
-          (* TODO every time this code is called we probably want to update some metrics
-             (see Initial_validator) *)
-          let e' =
-            Error.of_string
-            @@
-            match e with
-            | `Invalid_genesis_protocol_state ->
-                "invalid genesis state"
-            | `Invalid_delta_block_chain_proof ->
-                "invalid delta transition chain proof"
-            | `Mismatched_protocol_version ->
-                "protocol version mismatch"
-            | `Invalid_protocol_version ->
-                "invalid protocol version"
-          in
-          insert_invalid_state ~state ~transition_meta e' ;
-          Error e' )
+      handle_preserve_hint ~mark_processed_and_promote
+        ~transition_states:state.transition_states ~context hint ;
+      Ok ()
+  | None, Some hh ->
+      pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
+        ?body hh
   | None, None ->
-      [%log' warn Context.logger]
-        "Unexpected `Meta entry returned by retrieve_chain for $state_hash"
-        ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+      ignore
+        ( State_hash.Table.add state.parents ~key:state_hash
+            ~data:transition_meta.parent_state_hash
+          : [ `Duplicate | `Ok ] ) ;
       Ok ()
 
 (** Launch retrieval of ancestry for a received header.
@@ -197,22 +209,35 @@ let rec handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
 Pre-condition: header's parent is neither present in transition states nor in transition frontier.
 *)
 and launch_ancestry_retrieval ~context ~mark_processed_and_promote
-    ~retrieve_immediately ~cancel_child_contexts ~timeout ~sender ~state
-    header_with_hash =
+    ~retrieve_immediately ~cancel_child_contexts ~timeout ~preferred_peers
+    ~state header_with_hash =
   let (module Context : CONTEXT) = context in
   let parent_hash =
     With_hash.data header_with_hash
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
+  let parent_length =
+    Mina_block.Header.blockchain_length (With_hash.data header_with_hash)
+    |> Mina_numbers.Length.pred
+  in
   let lookup_transition =
     lookup_transition ~transition_states:state.transition_states
       ~frontier:Context.frontier
   in
+  let some_ancestors =
+    let rec impl lst h =
+      Option.value_map (State_hash.Table.find state.parents h) ~default:lst
+        ~f:(fun p -> impl (p :: lst) p)
+    in
+    impl []
+  in
   let module I = Interruptible.Make () in
   let retrieve_do () =
-    Context.retrieve_chain ~some_ancestors:[] ~target:parent_hash ~sender
-      ~parent_cache:state.parents ~lookup_transition
+    Context.retrieve_chain
+      ~some_ancestors:(some_ancestors parent_hash)
+      ~target_length:parent_length ~target_hash:parent_hash ~preferred_peers
+      ~lookup_transition
       (module I)
   in
   let ancestry =
@@ -248,30 +273,35 @@ and upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
       let error = Error.of_string "parent is invalid" in
       let transition_meta, _, _ = split_retrieve_chain_element el in
       ( match
-          State_hash.Table.find state.transition_states
+          Transition_states.find state.transition_states
             transition_meta.state_hash
         with
       | Some (Transition_state.Invalid _) ->
           ()
       | Some _ ->
-          Transition_state.mark_invalid
-            ~transition_states:state.transition_states ~error
-            transition_meta.state_hash
+          Transition_states.mark_invalid state.transition_states ~error
+            ~state_hash:transition_meta.state_hash
       | None ->
           insert_invalid_state ~state ~transition_meta error ) ;
       res
   in
   let on_error e =
     cancel_child_contexts () ;
-    State_hash.Table.change state.transition_states top_state_hash
-      ~f:(Option.map ~f:(set_processing_to_failed e))
+    Transition_states.update' state.transition_states top_state_hash
+      ~f:(set_processing_to_failed e)
   in
   function
   | Result.Error () ->
       on_error (Error.of_string "interrupted")
   | Ok (Result.Ok lst) ->
       cancel_child_contexts () ;
-      ignore (List.fold lst ~init:(Ok ()) ~f : unit Or_error.t)
+      ignore (List.fold lst ~init:(Ok ()) ~f : unit Or_error.t) ;
+      (* This will trigger only is the top state hash remained in Processing state
+         after handling all of the fetched ancestors *)
+      Transition_states.update' state.transition_states top_state_hash
+        ~f:
+          ( set_processing_to_failed
+          @@ Error.of_string "failed to retrieve ancestors" )
   | Ok (Error e) ->
       on_error e
 
@@ -279,13 +309,13 @@ and restart_failed_ancestor ~state ~mark_processed_and_promote ~context
     top_state_hash =
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
-  let handle_unprocessed ~sender header =
+  let handle_unprocessed ~preferred_peers header =
     let timeout = Time.add (Time.now ()) Context.ancestry_download_timeout in
     let hh = Gossip.header_with_hash_of_received_header header in
     let interrupt_ivar =
       launch_ancestry_retrieval ~mark_processed_and_promote ~context
-        ~cancel_child_contexts:Fn.id ~retrieve_immediately:true ~sender ~timeout
-        ~state hh
+        ~cancel_child_contexts:Fn.id ~retrieve_immediately:true ~preferred_peers
+        ~timeout ~state hh
     in
     let state_hash = State_hash.With_state_hashes.state_hash hh in
     let downto_ = Mina_numbers.Length.zero in
@@ -303,18 +333,21 @@ and restart_failed_ancestor ~state ~mark_processed_and_promote ~context
           (Received
             ( { header
               ; substate = { status = Failed _; _ }
-              ; aux = { sender; _ }
+              ; aux = { received; _ }
               ; _
               } as r ) ) ->
-          let status = handle_unprocessed ~sender header in
-          State_hash.Table.set
-            ~key:(Gossip.state_hash_of_received_header header)
-            transition_states
-            ~data:(Received { r with substate = { r.substate with status } })
+          let status =
+            handle_unprocessed
+              ~preferred_peers:
+                (List.map received ~f:(fun { sender; _ } -> sender))
+              header
+          in
+          Transition_states.update transition_states
+            (Received { r with substate = { r.substate with status } })
       | _ ->
           ()
   in
-  Option.iter (State_hash.Table.find transition_states top_state_hash) ~f
+  Option.iter (Transition_states.find transition_states top_state_hash) ~f
 
 (** [add_received] adds a gossip to the state.
 
@@ -343,6 +376,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
     Option.value ~default:[] @@ Hashtbl.find state.orphans state_hash
   in
   Hashtbl.remove state.orphans state_hash ;
+  Hashtbl.remove state.parents state_hash ;
   let received_at = Time.now () in
   (* [invariant] children.processed = children.waiting_for_parent = empty *)
   let children =
@@ -355,20 +389,19 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
   let child_contexts =
     List.filter_map children_list ~f:(mark_done ~transition_states)
   in
+  let gossip = Option.is_some gossip_type in
   let add_to_state status =
-    Hashtbl.add_exn transition_states ~key:state_hash
-      ~data:
-        (Received
-           { body_opt
-           ; header = received_header
-           ; gossip_data = Gossip.create_gossip_data ?gossip_type vc
-           ; substate = { children; status }
-           ; aux =
-               { received_via_gossip = Option.is_some gossip_type
-               ; sender
-               ; received_at
-               }
-           } )
+    Transition_states.add_new transition_states
+      (Received
+         { body_opt
+         ; header = received_header
+         ; gossip_data = Gossip.create_gossip_data ?gossip_type vc
+         ; substate = { children; status }
+         ; aux =
+             { received_via_gossip = gossip
+             ; received = [ { gossip; sender; received_at } ]
+             }
+         } )
   in
   let cancel_child_contexts () =
     List.iter child_contexts ~f:(fun (_, interrupt_ivar) ->
@@ -407,7 +440,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
         launch_ancestry_retrieval ~mark_processed_and_promote ~context
           ~cancel_child_contexts
           ~retrieve_immediately:(List.is_empty child_contexts)
-          ~sender ~timeout ~state header_with_hash
+          ~preferred_peers:[ sender ] ~timeout ~state header_with_hash
       in
       add_to_state
       @@ Processing
@@ -451,15 +484,14 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
           (handle_preserve_hint ~mark_processed_and_promote
              ~transition_states:state.transition_states ~context )
           (Gossip.preserve_relevant_gossip ?body ?vc ~context ~gossip_type
-             ~gossip_header )
+             ~gossip_header ~sender )
       in
-      Option.iter ~f (State_hash.Table.find state.transition_states state_hash)
+      Option.iter ~f (Transition_states.find state.transition_states state_hash)
 
 (** [handle_collected_transition] adds a transition that was collected during bootstrap
     to the catchup state. *)
 let handle_collected_transition ~context:(module Context : CONTEXT)
     ~mark_processed_and_promote ~state (b_or_h_env, vc) =
-  let sender = Network_peer.Envelope.Incoming.sender b_or_h_env in
   let header_with_validation, body, gossip_type =
     match Network_peer.Envelope.Incoming.data b_or_h_env with
     | Bootstrap_controller.Transition_cache.Block block ->
@@ -469,32 +501,61 @@ let handle_collected_transition ~context:(module Context : CONTEXT)
     | Bootstrap_controller.Transition_cache.Header header ->
         (header, None, `Header)
   in
-  (* TODO: is it safe to add this as a gossip? Transition was received
-     through gossip, but was potentially sent not within its slot
-     as boostrap controller is not able to verify this part.orphans
-     Hence maybe it's worth leaving it as non-gossip, a dependent transition. *)
-  handle_gossip
-    ~context:(module Context)
-    ~mark_processed_and_promote ~state ~sender ?vc ?body ~gossip_type
-    header_with_validation
+  match Network_peer.Envelope.Incoming.sender b_or_h_env with
+  | Local ->
+      [%log' warn Context.logger]
+        "handle_collected_transition: called for a transition with local sender"
+        ~metadata:
+          [ ( "state_hash"
+            , State_hash.to_yojson
+                (state_hash_of_header_with_validation header_with_validation) )
+          ]
+  | Remote sender ->
+      (* TODO: is it safe to add this as a gossip? Transition was received
+         through gossip, but was potentially sent not within its slot
+         as boostrap controller is not able to verify this part.orphans
+         Hence maybe it's worth leaving it as non-gossip, a dependent transition. *)
+      handle_gossip
+        ~context:(module Context)
+        ~mark_processed_and_promote ~state ~sender ?vc ?body ~gossip_type
+        header_with_validation
 
 (** [handle_network_transition] adds a transition that was received through gossip
     to the catchup state. *)
 let handle_network_transition ~context:(module Context : CONTEXT)
     ~mark_processed_and_promote ~state (b_or_h, `Valid_cb vc) =
-  let sender, header_with_validation, body, gossip_type =
-    match b_or_h with
-    | `Block b_env ->
-        let block = Network_peer.Envelope.Incoming.data b_env in
-        ( Network_peer.Envelope.Incoming.sender b_env
-        , Mina_block.Validation.to_header block
-        , Some (Mina_block.body @@ Mina_block.Validation.block block)
-        , `Block )
-    | `Header h_env ->
-        let header = Network_peer.Envelope.Incoming.data h_env in
-        (Network_peer.Envelope.Incoming.sender h_env, header, None, `Header)
-  in
-  handle_gossip
-    ~context:(module Context)
-    ~mark_processed_and_promote ~state ~sender ?body ?vc ~gossip_type
-    header_with_validation
+  Option.value ~default:()
+  @@ let%map.Option sender, header_with_validation, body, gossip_type =
+       let log_local_header hh =
+         [%log' warn Context.logger]
+           "handle_network_transition: called for a transition with local \
+            sender"
+           ~metadata:
+             [ ( "state_hash"
+               , State_hash.to_yojson
+                   (State_hash.With_state_hashes.state_hash hh) )
+             ]
+       in
+       let open Network_peer.Envelope.Incoming in
+       match b_or_h with
+       | `Block { sender = Remote sender; data = block; _ } ->
+           Some
+             ( sender
+             , Mina_block.Validation.to_header block
+             , Some (Mina_block.body @@ Mina_block.Validation.block block)
+             , `Block )
+       | `Block { data = block; _ } ->
+           log_local_header
+             ( Mina_block.Validation.block_with_hash block
+             |> With_hash.map ~f:Mina_block.header ) ;
+           None
+       | `Header { sender = Remote sender; data = header; _ } ->
+           Some (sender, header, None, `Header)
+       | `Header { data = header; _ } ->
+           log_local_header (Mina_block.Validation.header_with_hash header) ;
+           None
+     in
+     handle_gossip
+       ~context:(module Context)
+       ~mark_processed_and_promote ~state ~sender ?body ?vc ~gossip_type
+       header_with_validation

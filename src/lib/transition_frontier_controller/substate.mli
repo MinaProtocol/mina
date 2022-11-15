@@ -27,7 +27,7 @@ val view :
 val collect_states :
      predicate:([ `Take of bool ] * [ `Continue of bool ]) viewer
   -> state_functions:(module State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t State_hash.Table.t
+  -> transition_states:'state_t transition_states
   -> 'state_t
   -> 'state_t list
 
@@ -43,7 +43,7 @@ val collect_states :
 val mark_processed :
      logger:Logger.t
   -> state_functions:(module State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t State_hash.Table.t
+  -> transition_states:'state_t transition_states
   -> State_hash.t list
   -> State_hash.t list
 
@@ -59,7 +59,7 @@ val mark_processed :
 *)
 val update_children_on_promotion :
      state_functions:(module State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t State_hash.Table.t
+  -> transition_states:'state_t transition_states
   -> parent_hash:State_hash.t
   -> state_hash:State_hash.t
   -> 'state_t option
@@ -84,7 +84,7 @@ module For_tests : sig
 *)
   val collect_failed_ancestry :
        state_functions:(module State_functions with type state_t = 'state_t)
-    -> transition_states:'state_t State_hash.Table.t
+    -> transition_states:'state_t transition_states
     -> 'state_t
     -> 'state_t list
 
@@ -100,7 +100,7 @@ module For_tests : sig
 *)
   val collect_dependent_ancestry :
        state_functions:(module State_functions with type state_t = 'state_t)
-    -> transition_states:'state_t State_hash.Table.t
+    -> transition_states:'state_t transition_states
     -> 'state_t
     -> 'state_t list
 end

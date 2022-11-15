@@ -88,6 +88,48 @@ module Make () = struct
   module Result = struct
     type nonrec ('a, 'b) t = ('a, 'b) Result.t t
 
+    let find_map ?(how = `Sequential) (lst : 'a list) ~(f : 'a -> ('r, 'e) t) :
+        ('r, 'e list) t =
+      let res = Ivar.create () in
+      let queue = Queue.of_list lst in
+      let worker_loop _ =
+        let rec loop errors =
+          match Queue.dequeue queue with
+          | None ->
+              return errors
+          | Some elt -> (
+              match%bind.Deferred
+                Deferred.choose
+                  [ Deferred.choice (f elt) (fun x -> `Action x)
+                  ; Deferred.choice (Ivar.read interrupt_ivar) (fun () ->
+                        `Interrupt )
+                  ; Deferred.choice (Ivar.read res) (fun _ -> `Done)
+                  ]
+              with
+              | `Action (Result.Ok (Result.Ok r)) ->
+                  Ivar.fill_if_empty res r ; return errors
+              | `Action (Result.Ok (Result.Error e)) ->
+                  loop (e :: errors)
+              | `Action (Result.Error ()) | `Interrupt ->
+                  Deferred.Result.fail ()
+              | `Done ->
+                  return errors )
+        in
+        loop []
+      in
+      let jobs =
+        match how with
+        | `Sequential ->
+            1
+        | `Parallel ->
+            List.length lst
+        | `Max_concurrent_jobs jobs ->
+            min jobs (List.length lst)
+      in
+      let workers = List.init jobs ~f:worker_loop in
+      let%map.Deferred.Result errors = map ~f:List.concat (all workers) in
+      Option.value_map (Ivar.peek res) ~f:Result.return ~default:(Error errors)
+
     include Monad.Make2 (struct
       type nonrec ('a, 'b) t = ('a, 'b) t
 

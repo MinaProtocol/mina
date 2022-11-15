@@ -1,17 +1,18 @@
 open Mina_base
 open Core_kernel
 
+type received_info =
+  { gossip : bool  (** Was it a gossip or a response to an RPC request *)
+  ; received_at : Time.t
+  ; sender : Network_peer.Peer.t
+  }
+
 (** Auxiliary data of a transition.
     
     It's used across many transition states to store details
     of how the transition was received.
 *)
-type aux_data =
-  { received_via_gossip : bool
-        (* TODO consider storing all senders and received_at times *)
-  ; received_at : Time.t
-  ; sender : Network_peer.Envelope.Sender.t
-  }
+type aux_data = { received_via_gossip : bool; received : received_info list }
 
 (** Transition state type.
     
@@ -87,12 +88,8 @@ val children : t -> Substate_types.children_sets
     For [Invalid] and [Waiting_to_be_added_to_frontier], [false] is returned. *)
 val is_failed : t -> bool
 
-(** Mark transition and all its descedandants invalid. *)
-val mark_invalid :
-     transition_states:State_functions.state_t State_hash.Table.t
-  -> error:Error.t
-  -> State_hash.t
-  -> unit
-
 (** Modify auxiliary data stored in the transition state. *)
 val modify_aux_data : f:(aux_data -> aux_data) -> t -> t
+
+(** Auxiliary data stored in the transition state. *)
+val aux_data : t -> aux_data option

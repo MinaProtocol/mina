@@ -6,7 +6,7 @@ open Mina_base
 val promote_to :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)
-  -> transition_states:Transition_state.t State_hash.Table.t
+  -> transition_states:Transition_states.t
   -> substate:Mina_block.Validation.initial_valid_with_header Substate.t
   -> gossip_data:Gossip.transition_gossip_t
   -> body_opt:Mina_block.Body.t option
@@ -17,7 +17,7 @@ val promote_to :
     and [Substate.Processing (Substate.In_progress _)] status to [true]
     and restart all the failed ancestors before the next ancestors. *)
 val pass_the_baton :
-     transition_states:Transition_state.t State_hash.Table.t
+     transition_states:Transition_states.t
   -> context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_body_hash.t list -> unit)
   -> State_hash.t
