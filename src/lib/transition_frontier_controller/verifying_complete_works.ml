@@ -62,9 +62,9 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
   | Result.Ok (Result.Ok false) ->
       (* We mark invalid only the first header because it is the only one for which
          we can be sure it's invalid *)
-      Transition_state.mark_invalid ~transition_states
+      Transition_states.mark_invalid transition_states
         ~error:(Error.of_string "wrong blockchain proof")
-        top_state_hash
+        ~state_hash:top_state_hash
   | Result.Ok (Result.Ok true) ->
       List.iter state_hashes ~f:(fun state_hash ->
           let for_restart_opt =
@@ -93,17 +93,10 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
          ~transition_states states
      in
      match top_state with
-     | Transition_state.Verifying_complete_works ({ block; substate; _ } as r)
-       ->
-         let key =
-           State_hash.With_state_hashes.state_hash
-             (Mina_block.Validation.block_with_hash block)
-         in
-         State_hash.Table.set transition_states ~key
-           ~data:
-             (Transition_state.Verifying_complete_works
-                { r with substate = { substate with status = Processing ctx } }
-             )
+     | Transition_state.Verifying_complete_works ({ substate; _ } as r) ->
+         Transition_states.update transition_states
+           (Transition_state.Verifying_complete_works
+              { r with substate = { substate with status = Processing ctx } } )
      | _ ->
          ()
 

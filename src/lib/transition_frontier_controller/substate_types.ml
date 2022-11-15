@@ -129,3 +129,54 @@ let transition_meta_of_header_with_hash hh =
       @@ Mina_block.Header.protocol_state h
   ; blockchain_length = Mina_block.Header.blockchain_length h
   }
+
+type ('state_t, 'v) ext_modifier =
+  { ext_modifier : 'a. 'state_t -> 'a t -> 'a t * 'v }
+
+module type Transition_states_intf = sig
+  (** Transition states: a map from state hash to state. *)
+  type t
+
+  type state_t
+
+  (** Add a new state to transition states.
+      
+      Raises exception when the state already exists. *)
+  val add_new : t -> state_t -> unit
+
+  (** Mark transition and all its descedandants invalid. *)
+  val mark_invalid : t -> error:Error.t -> state_hash:State_hash.t -> unit
+
+  (** Find state in transition states *)
+  val find : t -> State_hash.t -> state_t option
+
+  (** Modify substate of a transition state.
+      Returns [Some a] if the modification was performed
+      (with [a] the auxiliary output of the modification function) and
+      [None] if state isn't present or has no substate.  *)
+  val modify_substate :
+    t -> f:(state_t, 'a) ext_modifier -> State_hash.t -> 'a option
+
+  (** Modify substate of a transition state
+      if it's present.  *)
+  val modify_substate_ : t -> f:unit modifier -> State_hash.t -> unit
+
+  (** Remove transition state from the map  *)
+  val remove : t -> State_hash.t -> unit
+
+  (** Update transition state in the map  *)
+  val update : t -> state_t -> unit
+
+  val update' : t -> f:(state_t -> state_t option) -> State_hash.t -> unit
+
+  (** Shutdown actions that are in progress *)
+  val shutdown_in_progress : t -> unit
+end
+
+type ('state_t, 't) transition_states_intf =
+  (module Transition_states_intf with type t = 't and type state_t = 'state_t)
+
+type 'state_t transition_states =
+  | Transition_states :
+      ('state_t, 't) transition_states_intf * 't
+      -> 'state_t transition_states

@@ -69,9 +69,9 @@ let rec upon_f ~holder ~context ~mark_processed_and_promote ~transition_states
   | Result.Ok (Result.Error `Invalid_proof) ->
       (* We mark invalid only the top header because it is the only one for which
          we can be sure it's invalid. *)
-      Transition_state.mark_invalid ~transition_states
-        ~error:(Error.of_string "wrong blockchain proof")
-        top_state_hash
+      Transition_states.mark_invalid transition_states
+        ~error:(Error.of_string "invalid blockchain proof")
+        ~state_hash:top_state_hash
   | Result.Ok (Result.Error (`Verifier_error e)) ->
       (* Top state hash will be set to Failed only if it was Processing before this point *)
       let for_restart_opt =
@@ -116,14 +116,10 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
          ~transition_states ~top_state_hash headers
      in
      match top_state with
-     | Transition_state.Verifying_blockchain_proof ({ header; substate; _ } as r)
-       ->
-         State_hash.Table.set transition_states
-           ~key:(state_hash_of_header_with_validation header)
-           ~data:
-             (Transition_state.Verifying_blockchain_proof
-                { r with substate = { substate with status = Processing ctx } }
-             )
+     | Transition_state.Verifying_blockchain_proof ({ substate; _ } as r) ->
+         Transition_states.update transition_states
+           (Transition_state.Verifying_blockchain_proof
+              { r with substate = { substate with status = Processing ctx } } )
      | _ ->
          ()
 

@@ -12,7 +12,7 @@ open Core_kernel
     adds it to frontier (if it's valid).
 *)
 type catchup_state =
-  { transition_states : Transition_state.t State_hash.Table.t
+  { transition_states : Transition_states.t
         (** Map from a state_hash to state of the transition corresponding to it  *)
   ; orphans : State_hash.t list State_hash.Table.t
         (** Map from transition's state hash to list of its children for transitions
@@ -37,7 +37,14 @@ type event_t =
   | `Invalid_frontier_dependencies of
     [ `Already_in_frontier | `Not_selected_over_frontier_root ]
     * State_hash.t
-    * Network_peer.Envelope.Sender.t ]
+    * Network_peer.Envelope.Sender.t
+  | `Pre_validate_header_invalid of
+    Network_peer.Envelope.Sender.t
+    * Mina_block.Header.t
+    * [ `Invalid_delta_block_chain_proof
+      | `Invalid_genesis_protocol_state
+      | `Invalid_protocol_version
+      | `Mismatched_protocol_version ] ]
 
 module type CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
@@ -45,8 +52,6 @@ module type CONTEXT = sig
   val genesis_state_hash : State_hash.t
 
   val frontier : Transition_frontier.t
-
-  val verifier : Verifier.t
 
   val time_controller : Block_time.Controller.t
 
@@ -86,14 +91,13 @@ module type CONTEXT = sig
   (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
        received_at:Time.t
-    -> sender:Network_peer.Envelope.Sender.t
     -> parent:Frontier_base.Breadcrumb.t
     -> transition:Mina_block.Validation.almost_valid_with_block
     -> (module Interruptible.F)
     -> ( Frontier_base.Breadcrumb.t
-       , [> `Invalid_staged_ledger_diff of Error.t
-         | `Invalid_staged_ledger_hash of Error.t
-         | `Fatal_error of exn ] )
+       , [> `Invalid of Error.t
+         | `Verifier_error of Error.t
+          ] )
        Result.t
        Interruptible.t
 

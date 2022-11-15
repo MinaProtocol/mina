@@ -12,7 +12,7 @@ include module type of Gossip_types
 val verify_header_is_relevant :
      context:(module Context.CONTEXT)
   -> sender:Network_peer.Envelope.Sender.t
-  -> transition_states:Transition_state.t State_hash.Table.t
+  -> transition_states:Transition_states.t
   -> Mina_block.Header.with_hash
   -> [ `Irrelevant | `Preserve_gossip_data | `Relevant ]
 

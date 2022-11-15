@@ -29,7 +29,7 @@ let validate_frontier_dependencies ~transition_states
     in
     Option.is_some (Transition_frontier.find Context.frontier state_hash)
     || Option.value_map ~default:false ~f
-         (State_hash.Table.find transition_states state_hash)
+         (Transition_states.find transition_states state_hash)
   in
   Mina_block.Validation.validate_frontier_dependencies
     ~to_header:Mina_block.header
@@ -63,20 +63,21 @@ let update_status_for_unprocessed ~transition_states ~state_hash status =
           | _ ->
               block_vc
         in
-        Transition_state.Building_breadcrumb
-          { r with substate = { r.substate with status }; block_vc }
+        Some
+          (Transition_state.Building_breadcrumb
+             { r with substate = { r.substate with status }; block_vc } )
     | st ->
-        st
+        Some st
   in
-  State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
+  Transition_states.update' transition_states state_hash ~f
 
 (** [upon_f] is a callback to be executed upon completion of building
   a breadcrumb (or a failure).
 *)
 let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
   let mark_invalid ~tag e =
-    Transition_state.mark_invalid ~transition_states ~error:(Error.tag ~tag e)
-      state_hash
+    Transition_states.mark_invalid transition_states ~error:(Error.tag ~tag e)
+      ~state_hash
   in
   function
   | Result.Error () ->
@@ -155,7 +156,7 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
 let get_parent ~transition_states ~context meta =
   let (module Context : CONTEXT) = context in
   let parent_hash = meta.Substate.parent_state_hash in
-  match State_hash.Table.find transition_states parent_hash with
+  match Transition_states.find transition_states parent_hash with
   | Some
       (Transition_state.Building_breadcrumb
         { substate = { status = Processed parent; _ }; _ } )
@@ -196,7 +197,7 @@ let get_parent ~transition_states ~context meta =
     and returns a map with processed or higher state transitions removed. *)
 let filter_unprocessed ~transition_states ancestors =
   let is_processed state_hash =
-    match State_hash.Table.find transition_states state_hash with
+    match Transition_states.find transition_states state_hash with
     | Some
         (Transition_state.Building_breadcrumb
           { substate = { status = Processed _; _ }; _ } ) ->
@@ -218,18 +219,17 @@ let filter_unprocessed ~transition_states ancestors =
 
 let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
     ancestor_hash =
-  match State_hash.Table.find transition_states ancestor_hash with
+  match Transition_states.find transition_states ancestor_hash with
   | Some
       ( Transition_state.Building_breadcrumb
           ({ substate = { status = Failed _; _ }; _ } as r) as st ) -> (
       let ancestor_meta = Transition_state.State_functions.transition_meta st in
       match get_parent ~transition_states ~context ancestor_meta with
       | Ok parent ->
-          State_hash.Table.set transition_states ~key:ancestor_hash
-            ~data:
-              (Building_breadcrumb
-                 { r with substate = { r.substate with status = build parent } }
-              )
+          Transition_states.update transition_states
+            (Building_breadcrumb
+               { r with substate = { r.substate with status = build parent } }
+            )
       | _ ->
           let (module Context : CONTEXT) = context in
           [%log' error Context.logger]

@@ -241,9 +241,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             | Ok breadcrumb ->
                 Deferred.return (Ok breadcrumb) )
       in
-      Mina_metrics.(
-        Counter.inc_one
-          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
+      (* Mina_metrics.(
+         Counter.inc_one
+           Transition_frontier_controller.breadcrumbs_built_by_processor) ; *)
       Deferred.map ~f:Result.return
         (add_and_finalize ~logger ~frontier ~catchup_scheduler
            ~processed_transition_writer ~only_if_present:false ~time_controller
@@ -306,9 +306,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 Gauge.inc_one
                   Transition_frontier_controller.transitions_being_processed) ;
               `Local_breadcrumb (Cached.pure breadcrumb) )
-        ; Reader.map catchup_breadcrumbs_reader
-            ~f:(fun (cb, catchup_breadcrumbs_callback) ->
-              `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
+        ; Reader.map catchup_breadcrumbs_reader ~f:(fun el ->
+              `Catchup_breadcrumbs el )
         ; Reader.map primary_transition_reader ~f:(fun vt ->
               `Partially_valid_transition vt )
         ]

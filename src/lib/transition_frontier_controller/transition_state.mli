@@ -10,7 +10,7 @@ type aux_data =
   { received_via_gossip : bool
         (* TODO consider storing all senders and received_at times *)
   ; received_at : Time.t
-  ; sender : Network_peer.Envelope.Sender.t
+  ; sender : Network_peer.Peer.t
   }
 
 (** Transition state type.
@@ -87,12 +87,8 @@ val children : t -> Substate_types.children_sets
     For [Invalid] and [Waiting_to_be_added_to_frontier], [false] is returned. *)
 val is_failed : t -> bool
 
-(** Mark transition and all its descedandants invalid. *)
-val mark_invalid :
-     transition_states:State_functions.state_t State_hash.Table.t
-  -> error:Error.t
-  -> State_hash.t
-  -> unit
-
 (** Modify auxiliary data stored in the transition state. *)
 val modify_aux_data : f:(aux_data -> aux_data) -> t -> t
+
+(** Auxiliary data stored in the transition state. *)
+val aux_data : t -> aux_data option

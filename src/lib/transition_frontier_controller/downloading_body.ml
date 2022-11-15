@@ -1,4 +1,3 @@
-open Mina_base
 open Core_kernel
 open Context
 
@@ -45,7 +44,7 @@ let rec update_status_for_unprocessed ~context ~transition_states
             ; baton = false
             }
         in
-        State_hash.Table.set transition_states ~key:state_hash ~data:st ;
+        Transition_states.update transition_states st ;
         match (status, r.baton) with
         | Failed _, true ->
             restart_failed ~transition_states ~context
@@ -56,7 +55,7 @@ let rec update_status_for_unprocessed ~context ~transition_states
         ()
   in
   Option.value_map ~f
-    (State_hash.Table.find transition_states state_hash)
+    (Transition_states.find transition_states state_hash)
     ~default:()
 
 (** [upon_f] is a callback to be executed upon completion of downloading
@@ -117,16 +116,13 @@ and restart_failed ~transition_states ~mark_processed_and_promote ~context =
   function
   | Transition_state.Downloading_body
       ({ header; substate = { status = Failed _; _ } as s; _ } as r) ->
-      let state_hash = state_hash_of_header_with_validation header in
       let ctx =
         make_download_body_ctx ~body_opt:None ~header ~transition_states
           ~mark_processed_and_promote ~context
       in
-      let data =
-        Transition_state.Downloading_body
-          { r with substate = { s with status = Processing ctx } }
-      in
-      State_hash.Table.set transition_states ~key:state_hash ~data
+      Transition_states.update transition_states
+        (Transition_state.Downloading_body
+           { r with substate = { s with status = Processing ctx } } )
       (* We don't need to update parent's childen sets because
          Failed -> Processing status change doesn't require that *)
   | _ ->
@@ -142,19 +138,17 @@ and pass_the_baton ~transition_states ~context ~mark_processed_and_promote
     restart_failed ~transition_states ~mark_processed_and_promote ~context
   in
   let (module Context : CONTEXT) = context in
-  match State_hash.Table.find transition_states state_hash with
+  match Transition_states.find transition_states state_hash with
   | Some (Transition_state.Downloading_body _ as st) -> (
       let collected =
         Processed_skipping.collect_to_in_progress ~state_functions
           ~transition_states ~dsu:Context.processed_dsu st
       in
       match collected with
-      | Downloading_body
-          ({ header; substate = { status = Processing _; _ }; _ } as r)
+      | Downloading_body ({ substate = { status = Processing _; _ }; _ } as r)
         :: rest ->
-          State_hash.Table.set transition_states
-            ~key:(state_hash_of_header_with_validation header)
-            ~data:(Downloading_body { r with baton = true }) ;
+          Transition_states.update transition_states
+            (Downloading_body { r with baton = true }) ;
           List.iter ~f:restart_f rest
       | _ ->
           List.iter ~f:restart_f collected )

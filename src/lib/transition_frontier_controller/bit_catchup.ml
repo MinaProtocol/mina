@@ -13,7 +13,7 @@ open Context
     on the course.
     *)
 let promote_to_higher_state_impl ~mark_processed_and_promote ~context
-    ~transition_states state =
+    ~(transition_states : Transition_states.t) state =
   match state with
   | Transition_state.Received { header; substate; gossip_data; body_opt; aux }
     ->
@@ -48,6 +48,40 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
   | Invalid _ as e ->
       Some e
 
+let pre_validate_header_invalid_action ~header = function
+  | `Invalid_delta_block_chain_proof ->
+      ( Trust_system.Actions.Gossiped_invalid_transition
+      , Some ("invalid delta transition chain witness", []) )
+  | `Invalid_genesis_protocol_state ->
+      ( Trust_system.Actions.Gossiped_invalid_transition
+      , Some ("invalid genesis protocol state", []) )
+  | `Invalid_protocol_version ->
+      ( Trust_system.Actions.Sent_invalid_protocol_version
+      , Some
+          ( "Invalid current or proposed protocol version in catchup block"
+          , [ ( "current_protocol_version"
+              , `String
+                  ( Mina_block.Header.current_protocol_version header
+                  |> Protocol_version.to_string ) )
+            ; ( "proposed_protocol_version"
+              , `String
+                  ( Mina_block.Header.proposed_protocol_version_opt header
+                  |> Option.value_map ~default:"<None>"
+                       ~f:Protocol_version.to_string ) )
+            ] ) )
+  | `Mismatched_protocol_version ->
+      ( Trust_system.Actions.Sent_mismatched_protocol_version
+      , Some
+          ( "Current protocol version in catchup block does not match daemon \
+             protocol version"
+          , [ ( "block_current_protocol_version"
+              , `String
+                  ( Mina_block.Header.current_protocol_version header
+                  |> Protocol_version.to_string ) )
+            ; ( "daemon_current_protocol_version"
+              , `String Protocol_version.(get_current () |> to_string) )
+            ] ) )
+
 (** [promote_to_higher_state] takes state hash of a transition with [Processed] status
     and updates it.
     
@@ -66,12 +100,18 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
   let mark_processed_and_promote =
     mark_processed_and_promote ~context ~transition_states
   in
-  let old_state = State_hash.Table.find_exn transition_states state_hash in
+  let old_state =
+    Option.value_exn @@ Transition_states.find transition_states state_hash
+  in
   let state_opt =
     promote_to_higher_state_impl ~context ~transition_states
       ~mark_processed_and_promote old_state
   in
-  State_hash.Table.change transition_states state_hash ~f:(const state_opt) ;
+  ( match state_opt with
+  | None ->
+      Transition_states.remove transition_states state_hash
+  | Some state ->
+      Transition_states.update transition_states state ) ;
   let parent_hash =
     (Transition_state.State_functions.transition_meta old_state)
       .parent_state_hash
@@ -105,7 +145,7 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
   let processed = of_list state_hashes in
   let promoted = of_list higher_state_promotees in
   iter (diff processed promoted) ~f:(fun key ->
-      Option.iter (State_hash.Table.find transition_states key) ~f:(fun st ->
+      Option.iter (Transition_states.find transition_states key) ~f:(fun st ->
           let data = Transition_state.State_functions.transition_meta st in
           let open Processed_skipping.Dsu in
           add_exn ~key ~data Context.processed_dsu ;
@@ -119,27 +159,10 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
     ~f:(promote_to_higher_state ~context:(module Context) ~transition_states)
     higher_state_promotees
 
-let shutdown_substate = function
-  | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
-    ->
-      Ivar.fill_if_empty interrupt_ivar () ;
-      ({ r with status = Failed (Error.of_string "shutdown") }, ())
-  | s ->
-      (s, ())
-
-let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-    ~frontier ~network_transition_reader ~producer_transition_reader
-    ~clear_reader ~verified_transition_writer =
-  let open Pipe_lib in
-  (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)
-  let breadcrumb_notification_reader, breadcrumb_notification_writer =
-    Strict_pipe.create ~name:"frontier-notifier"
-      (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
-  in
-  let breadcrumb_queue = Queue.create () in
-  (* TODO is "block-db" the right path ? *)
-  let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
+let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
+    ~verified_transition_writer ~block_storage ~breadcrumb_queue
+    ~breadcrumb_notification_writer
+    ~context:(module Context_ : Transition_handler.Validator.CONTEXT) =
   let module Context = struct
     include Context_
 
@@ -160,7 +183,7 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
 
     let write_breadcrumb source b =
       Queue.enqueue breadcrumb_queue (source, b) ;
-      Strict_pipe.Writer.write breadcrumb_notification_writer ()
+      Pipe_lib.Strict_pipe.Writer.write breadcrumb_notification_writer ()
 
     let check_body_in_storage = Block_storage.read_body block_storage
 
@@ -181,13 +204,26 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
     let download_body ~header:_ (module I : Interruptible.F) =
       I.lift @@ Deferred.never ()
 
-    let build_breadcrumb ~received_at ~sender ~parent ~transition
+    let build_breadcrumb ~received_at ~parent ~transition
         (module I : Interruptible.F) =
+      let f = function
+        | `Invalid_body_reference -> Error.of_string "invalid body reference"
+       | `Invalid_staged_ledger_diff lst -> 
+          String.concat ~sep:" and " @@
+          List.map ~f:(function
+
+          )
+         [ `Incorrect_target_snarked_ledger_hash
+         | `Incorrect_target_staged_ledger_hash ]
+         list
+       | `Staged_ledger_application_failed of
+         Staged_ledger.Staged_ledger_error.t ]
+    in
       I.lift
-        (Frontier_base.Breadcrumb.build ~skip_staged_ledger_verification:`Proofs
-           ~logger ~precomputed_values ~verifier ~trust_system ~parent
-           ~transition ~sender:(Some sender)
-           ~transition_receipt_time:(Some received_at) () )
+        (Frontier_base.Breadcrumb.build_no_reporting
+           ~skip_staged_ledger_verification:`Proofs ~logger ~precomputed_values
+           ~verifier ~parent ~transition
+           ~transition_receipt_time:(Some received_at) () |> Deferred.Result.map_error ~f)
 
     let retrieve_chain ~some_ancestors:_ ~target:_ ~parent_cache:_ ~sender:_
         ~lookup_transition:_ (module I : Interruptible.F) =
@@ -212,38 +248,74 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       | `Invalid_frontier_dependencies (e, state_hash, sender) ->
           Transition_handler.Processor.handle_frontier_validation_error
             ~trust_system ~logger ~sender ~state_hash e
-      | `Verified_header_relevance (relevance_result, header_with_hash, sender)
-        -> (
-          let open Transition_handler.Validator in
-          let record_irrelevant error =
-            don't_wait_for
-            @@ record_transition_is_irrelevant ~logger ~trust_system ~sender
-                 ~error header_with_hash
-          in
-          (* Although it's not evident from types, banning may be triiggered only for irrelevant
-             case, hence it's safe to do don't_wait_for *)
-          match relevance_result with
-          | Ok () ->
-              (* This action is deferred because it may potentially trigger change of ban status
-                 of a peer which requires writing to a synchonous pipe. *)
-              don't_wait_for
-                (record_transition_is_relevant ~logger ~trust_system ~sender
-                   ~time_controller header_with_hash )
-          | Error (`In_process (Transition_state.Invalid _) as error) ->
-              record_irrelevant error
-          | Error (`In_process _ as error) ->
-              record_irrelevant error
-          | Error error ->
-              record_irrelevant error )
+      | `Verified_header_relevance (Ok (), header_with_hash, sender) ->
+          (* This action is deferred because it may potentially trigger change of
+             ban status of a peer which requires writing to a synchonous pipe. *)
+          don't_wait_for
+          @@ Transition_handler.Validator.record_transition_is_relevant ~logger
+               ~trust_system ~sender ~time_controller header_with_hash
+      | `Verified_header_relevance (Error error, header_with_hash, sender) ->
+          (* This action is deferred because it may potentially trigger change of
+             ban status of a peer which requires writing to a synchonous pipe. *)
+          don't_wait_for
+          @@ Transition_handler.Validator.record_transition_is_irrelevant
+               ~logger ~trust_system ~sender ~error header_with_hash
+      | `Pre_validate_header_invalid (sender, header, e) ->
+          let action = pre_validate_header_invalid_action ~header e in
+          don't_wait_for
+          @@ Trust_system.record_envelope_sender trust_system logger sender
+               action
   end in
-  let transition_states = State_hash.Table.create () in
+  (module Context : CONTEXT)
+
+module Transition_states_callbacks (Context : CONTEXT) = struct
+  open Context
+
+  (* TODO add logging *)
+  let on_invalid ~error ~aux _meta =
+    don't_wait_for
+    @@ Trust_system.record_envelope_sender trust_system logger
+         aux.Transition_state.sender
+         ( Trust_system.Actions.Gossiped_invalid_transition
+         , Some (Error.to_string_hum error, []) )
+
+  let on_add_new _ =
+    Mina_metrics.Gauge.inc_one
+      Mina_metrics.Transition_frontier_controller.transitions_being_processed
+
+  let on_remove _ =
+    Mina_metrics.Gauge.dec_one
+      Mina_metrics.Transition_frontier_controller.transitions_being_processed
+end
+
+let run ~context ~trust_system ~verifier ~network ~time_controller
+    ~collected_transitions ~frontier ~network_transition_reader
+    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
+  let open Pipe_lib in
+  (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)
+  let breadcrumb_notification_reader, breadcrumb_notification_writer =
+    Strict_pipe.create ~name:"frontier-notifier"
+      (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
+  in
+  let breadcrumb_queue = Queue.create () in
+  let (module Context_ : Transition_handler.Validator.CONTEXT) = context in
+  (* TODO is "block-db" the right path ? *)
+  let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
+  let context =
+    make_context ~context ~frontier ~time_controller ~verifier ~trust_system
+      ~network ~verified_transition_writer ~block_storage ~breadcrumb_queue
+      ~breadcrumb_notification_writer
+  in
+  let (module Context : CONTEXT) = context in
+  let transition_states =
+    Transition_states.create_inmem (module Transition_states_callbacks (Context))
+  in
   let state =
     { transition_states
     ; orphans = State_hash.Table.create ()
     ; parents = State_hash.Table.create ()
     }
   in
-  let context = (module Context : CONTEXT) in
   let mark_processed_and_promote =
     mark_processed_and_promote ~context ~transition_states
   in
@@ -265,11 +337,7 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
          let open Strict_pipe.Writer in
-         State_hash.Table.map_inplace transition_states ~f:(fun st ->
-             Option.value_map ~default:st ~f:fst
-               (Transition_state.State_functions.modify_substate
-                  ~f:{ modifier = shutdown_substate }
-                  st ) ) ;
+         Transition_states.shutdown_in_progress transition_states ;
          kill breadcrumb_notification_writer ) ;
   Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
       let f (_, b) =
@@ -291,6 +359,27 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
       in
       let breadcrumbs = Queue.to_list breadcrumb_queue |> List.filter ~f in
       Queue.clear breadcrumb_queue ;
+      List.iter breadcrumbs ~f:(fun (source, b) ->
+          match source with
+          | `Gossip ->
+              Mina_metrics.Counter.inc_one
+                Mina_metrics.Transition_frontier_controller
+                .breadcrumbs_built_by_processor
+          | `Internal ->
+              let transition_time =
+                Transition_frontier.Breadcrumb.validated_transition b
+                |> Mina_block.Validated.header
+                |> Mina_block.Header.protocol_state
+                |> Mina_state.Protocol_state.blockchain_state
+                |> Mina_state.Blockchain_state.timestamp
+                |> Block_time.to_time_exn
+              in
+              Perf_histograms.add_span ~name:"accepted_transition_local_latency"
+                (Core_kernel.Time.diff
+                   Block_time.(now time_controller |> to_time_exn)
+                   transition_time )
+          | _ ->
+              () ) ;
       let%map.Deferred () =
         Transition_frontier.add_breadcrumbs_exn Context.frontier
           (List.map ~f:snd breadcrumbs)
@@ -306,10 +395,10 @@ let run ~context:(module Context_ : Transition_handler.Validator.CONTEXT)
         | _ ->
             Transition_handler.Processor.record_block_inclusion_time
               (Frontier_base.Breadcrumb.validated_transition b)
-              ~time_controller ~consensus_constants:Context_.consensus_constants
+              ~time_controller ~consensus_constants:Context.consensus_constants
         ) ;
-        State_hash.Table.change transition_states
-          ~f:(Option.bind ~f:promote_do)
+        Transition_states.update' transition_states
           (Frontier_base.Breadcrumb.state_hash b)
+          ~f:promote_do
       in
       List.iter breadcrumbs ~f:promote )

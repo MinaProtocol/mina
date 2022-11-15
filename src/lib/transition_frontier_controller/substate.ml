@@ -22,8 +22,11 @@ let view (type state_t)
 
     Returned list of states is in the parent-first order.
 *)
-let collect_states (type state_t) ~predicate ~state_functions ~transition_states
-    top_state =
+let collect_states (type state_t) ~predicate ~state_functions
+    ~(transition_states : state_t transition_states) top_state =
+  let (Transition_states ((module Transition_states), transition_states)) =
+    transition_states
+  in
   let (module F : State_functions with type state_t = state_t) =
     state_functions
   in
@@ -45,7 +48,7 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
         else
           (* Parent is of different state => it's of higher state => we don't need to go deeper *)
           [] )
-      (State_hash.Table.find transition_states parent_hash)
+      (Transition_states.find transition_states parent_hash)
   in
   loop top_state []
 
@@ -55,13 +58,13 @@ let collect_states (type state_t) ~predicate ~state_functions ~transition_states
     and [children] of the substate when substate has [Processing (Done x)] status
     and [Result.Error] otherwise.
 *)
-let mark_processed_modifier ~is_recursive_call subst =
+let mark_processed_modifier ~is_recursive_call old_st subst =
   let reshape res =
     match res with
     | Result.Error _ as e ->
         (subst, e)
     | Result.Ok (subst', children) ->
-        (subst', Result.Ok children)
+        (subst', Result.Ok (old_st, children))
   in
   let children =
     { subst.children with
@@ -96,13 +99,16 @@ let mark_processed_modifier ~is_recursive_call subst =
     *)
 let is_parent_of_higher_state (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
-    ~transition_states state =
-  let parent_hash = (F.transition_meta state).parent_state_hash in
+    ~(transition_states : state_t transition_states) old_state =
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
+  in
+  let parent_hash = (F.transition_meta old_state).parent_state_hash in
   Option.value_map
-    (State_hash.Table.find transition_states parent_hash)
+    (Transition_states.find states parent_hash)
     ~f:
       (* Parent is found and differs in state level, hence it's of higher state *)
-      (Fn.compose not (F.equal_state_levels state))
+      (Fn.compose not (F.equal_state_levels old_state))
     ~default:
       (* Parent is not found which means the parent is in frontier.
          There is an invariant is that only non-processed states may have parent neither
@@ -115,13 +121,16 @@ let is_parent_of_higher_state (type state_t)
 *)
 let kickstart_waiting_for_parent (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
-    ~logger ~transition_states state_hash =
-  let modifier subst =
+    ~logger ~(transition_states : state_t transition_states) state_hash =
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
+  in
+  let ext_modifier old_st subst =
     match subst.status with
     | Waiting_for_parent mk_status ->
-        ({ subst with status = mk_status () }, true)
+        ({ subst with status = mk_status () }, Some (F.transition_meta old_st))
     | _ ->
-        (subst, false)
+        (subst, None)
   in
   let update_children_modifier subst =
     ( { subst with
@@ -135,30 +144,26 @@ let kickstart_waiting_for_parent (type state_t)
       }
     , () )
   in
-  let update_children =
-    Fn.compose (Option.map ~f:fst)
-      (F.modify_substate ~f:{ modifier = update_children_modifier })
+  let modified_opt =
+    Transition_states.modify_substate states ~f:{ ext_modifier } state_hash
   in
-  match State_hash.Table.find transition_states state_hash with
+  match modified_opt with
   | None ->
       [%log warn] "child $state_hash not found"
         ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
-  | Some state -> (
-      match F.modify_substate ~f:{ modifier } state with
-      | Some (data, true) ->
-          State_hash.Table.set transition_states ~key:state_hash ~data ;
-          let parent_hash = (F.transition_meta state).parent_state_hash in
-          State_hash.Table.change transition_states parent_hash
-            ~f:(Option.bind ~f:update_children)
-      | _ ->
-          [%log warn] "child $state_hash is not in waiting_for_parent state"
-            ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] )
+  | Some None ->
+      [%log warn] "child $state_hash is not in waiting_for_parent state"
+        ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
+  | Some (Some meta) ->
+      Transition_states.modify_substate_ states meta.parent_state_hash
+        ~f:{ modifier = update_children_modifier }
 
 (** Update children of the parent upon transition aquiring the [Processed] status *)
-let update_children_on_processed (type state_t) ~transition_states ~parent_hash
+let update_children_on_processed (type state_t)
+    ~(transition_states : state_t transition_states) ~parent_hash
     ~state_functions:(module F : State_functions with type state_t = state_t)
     state_hash =
-  let update_children_modifier subst =
+  let modifier subst =
     ( { subst with
         children =
           { subst.children with
@@ -170,12 +175,10 @@ let update_children_on_processed (type state_t) ~transition_states ~parent_hash
       }
     , () )
   in
-  let update_children =
-    Fn.compose (Option.map ~f:fst)
-      (F.modify_substate ~f:{ modifier = update_children_modifier })
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
   in
-  State_hash.Table.change transition_states parent_hash
-    ~f:(Option.bind ~f:update_children)
+  Transition_states.modify_substate_ states ~f:{ modifier } parent_hash
 
 (** [mark_processed processed] marks a list of state hashes as Processed.
 
@@ -186,10 +189,13 @@ let update_children_on_processed (type state_t) ~transition_states ~parent_hash
    2. Respective substates for states from [processed] are in [Processing (Done _)] status
 
   Post-condition: list returned respects parent-child relationship and parent always comes first *)
-let mark_processed (type state_t) ~logger ~state_functions ~transition_states
-    processed =
+let mark_processed (type state_t) ~logger ~state_functions
+    ~(transition_states : state_t transition_states) processed =
   let (module F : State_functions with type state_t = state_t) =
     state_functions
+  in
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
   in
   let processed_set = ref (State_hash.Set.of_list processed) in
   let rec handle is_recursive_call hash =
@@ -198,29 +204,27 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
       let%bind () =
         Option.some_if (State_hash.Set.mem !processed_set hash) ()
       in
-      let%bind state = State_hash.Table.find transition_states hash in
-      processed_set := State_hash.Set.remove !processed_set hash ;
-      let%bind state', res =
-        F.modify_substate
-          ~f:
-            { modifier =
-                (fun st -> mark_processed_modifier ~is_recursive_call st)
-            }
-          state
+      let ext_modifier old_st subst =
+        mark_processed_modifier ~is_recursive_call old_st subst
       in
+      let%bind res =
+        Transition_states.modify_substate states ~f:{ ext_modifier } hash
+      in
+      processed_set := State_hash.Set.remove !processed_set hash ;
       Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
-      let%map children = Result.ok res in
-      State_hash.Table.set transition_states ~key:hash ~data:state' ;
-      let parent_hash = (F.transition_meta state).parent_state_hash in
+      let%map old_state, children = Result.ok res in
+      let meta = F.transition_meta old_state in
+      let parent_hash = meta.parent_state_hash in
       update_children_on_processed ~transition_states ~state_functions
-        ~parent_hash (F.transition_meta state).state_hash ;
+        ~parent_hash meta.state_hash ;
       State_hash.Set.iter children.waiting_for_parent
         ~f:
           (kickstart_waiting_for_parent ~state_functions ~logger
              ~transition_states ) ;
       if
         is_recursive_call
-        || is_parent_of_higher_state ~state_functions ~transition_states state
+        || is_parent_of_higher_state ~state_functions ~transition_states
+             old_state
       then
         let children =
           List.append (State_hash.Set.to_list children.processed)
@@ -243,9 +247,13 @@ let mark_processed (type state_t) ~logger ~state_functions ~transition_states
     transition is not added to any of the parent's children sets.
 *)
 let update_children_on_promotion (type state_t) ~state_functions
-    ~transition_states ~parent_hash ~state_hash state_opt =
+    ~(transition_states : state_t transition_states) ~parent_hash ~state_hash
+    state_opt =
   let (module F : State_functions with type state_t = state_t) =
     state_functions
+  in
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
   in
   let add_if condition set =
     if condition then State_hash.Set.add set state_hash else set
@@ -263,7 +271,7 @@ let update_children_on_promotion (type state_t) ~state_functions
     Option.value ~default:(false, false)
     @@ Option.bind state_opt ~f:(view ~state_functions ~f:{ viewer })
   in
-  let update_children_modifier subst =
+  let modifier subst =
     ( { subst with
         children =
           { processed =
@@ -276,12 +284,7 @@ let update_children_on_promotion (type state_t) ~state_functions
       }
     , () )
   in
-  let update_children =
-    Fn.compose (Option.map ~f:fst)
-      (F.modify_substate ~f:{ modifier = update_children_modifier })
-  in
-  State_hash.Table.change transition_states parent_hash
-    ~f:(Option.bind ~f:update_children)
+  Transition_states.modify_substate_ states ~f:{ modifier } parent_hash
 
 (** [is_processing_done] functions takes state and returns true iff
     the status of the state is [Substate.Processing (Substate.Done _)]. *)

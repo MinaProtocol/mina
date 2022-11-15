@@ -41,8 +41,27 @@ val build :
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
-       | `Invalid_staged_ledger_hash of Error.t
-       | `Fatal_error of exn ] )
+       | `Invalid_staged_ledger_hash of Error.t ] )
+     Result.t
+     Deferred.t
+
+val build_no_reporting :
+     ?skip_staged_ledger_verification:[ `All | `Proofs ]
+  -> logger:Logger.t
+  -> precomputed_values:Precomputed_values.t
+  -> verifier:Verifier.t
+  -> parent:t
+  -> transition:Mina_block.almost_valid_block
+  -> transition_receipt_time:Time.t option
+  -> unit
+  -> ( t
+     , [> `Invalid_body_reference
+       | `Invalid_staged_ledger_diff of
+         [ `Incorrect_target_snarked_ledger_hash
+         | `Incorrect_target_staged_ledger_hash ]
+         list
+       | `Staged_ledger_application_failed of
+         Staged_ledger.Staged_ledger_error.t ] )
      Result.t
      Deferred.t
 

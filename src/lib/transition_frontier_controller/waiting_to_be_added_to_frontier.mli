@@ -1,5 +1,3 @@
-open Mina_base
-
 (** Promote a transition that is in [Building_breadcrumb] state with
     [Processed] status to [Waiting_to_be_added_to_frontier] state.
 *)
@@ -13,6 +11,6 @@ val promote_to :
 (** [handle_produced_transition] adds locally produced block to the catchup state *)
 val handle_produced_transition :
      context:(module Context.CONTEXT)
-  -> transition_states:Transition_state.t State_hash.Table.t
+  -> transition_states:Transition_states.t
   -> Frontier_base.Breadcrumb.t
   -> unit

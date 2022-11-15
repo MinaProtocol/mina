@@ -15,8 +15,8 @@ let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_result =
     let%bind.Result () =
-      Option.value_map (Hashtbl.find transition_states hash) ~default:(Ok ())
-        ~f:(fun st -> Error (`In_process st))
+      Option.value_map (Transition_states.find transition_states hash)
+        ~default:(Ok ()) ~f:(fun st -> Error (`In_process st))
     in
     Transition_handler.Validator.verify_header_is_relevant
       ~context:(module Context)

@@ -41,10 +41,14 @@ end
 module Error = struct
   type t =
     | Verification_failed of Verifier.Failure.t
+    (** Transition is invalid, proof verification failed *)
+
     | Coinbase_error of string
     | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
     | Internal_command_status_mismatch
+    
     | Unexpected of Error.t
+    (** Failure communicating to verifier *)
   [@@deriving sexp]
 
   let to_string = function

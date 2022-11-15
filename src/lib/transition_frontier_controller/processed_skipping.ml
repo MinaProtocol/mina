@@ -43,9 +43,14 @@ let is_status_processed ~state_functions =
 *)
 let collect_unprocessed (type state_t)
     ?(predicate = { Substate.viewer = (fun _ -> (`Take true, `Continue true)) })
-    ~state_functions ~transition_states ~dsu top_state =
+    ~state_functions ~(transition_states : state_t Substate.transition_states)
+    ~dsu top_state =
   let (module F : Substate.State_functions with type state_t = state_t) =
     state_functions
+  in
+  let (Substate.Transition_states
+        ((module Transition_states_impl), transition_states_) ) =
+    transition_states
   in
   let viewer subst =
     match subst.Substate.status with
@@ -66,7 +71,7 @@ let collect_unprocessed (type state_t)
         Option.value ~default:[]
         @@ let%bind.Option ancestor = Dsu.get ~key dsu in
            let%map.Option parent =
-             State_hash.Table.find transition_states
+             Transition_states_impl.find transition_states_
                ancestor.Substate.parent_state_hash
            in
            go (rest_states :: res) parent

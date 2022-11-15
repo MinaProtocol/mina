@@ -10,7 +10,7 @@ type aux_data =
   { received_via_gossip : bool
         (* TODO consider storing all senders and received_at times *)
   ; received_at : Time.t
-  ; sender : Network_peer.Envelope.Sender.t
+  ; sender : Network_peer.Peer.t
   }
 
 (** Transition state type.
@@ -182,39 +182,6 @@ let is_failed st =
   | _ ->
       false
 
-(** Mark transition and all its descedandants invalid. *)
-let mark_invalid ~transition_states ~error:err top_state_hash =
-  let tag =
-    sprintf "(from state hash %s) " (State_hash.to_base58_check top_state_hash)
-  in
-  let error = Error.tag ~tag err in
-  let rec go = State_hash.Table.change transition_states ~f
-  and f st_opt =
-    let%bind.Option state = st_opt in
-    let%map.Option () = match state with Invalid _ -> None | _ -> Some () in
-    ( match state with
-    | Received { gossip_data; _ }
-    | Verifying_blockchain_proof { gossip_data; _ } ->
-        Gossip_types.drop_gossip_data `Reject gossip_data
-    | Downloading_body { block_vc; _ }
-    | Verifying_complete_works { block_vc; _ }
-    | Building_breadcrumb { block_vc; _ } ->
-        Option.iter
-          ~f:
-            (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
-               `Reject )
-          block_vc
-    | Invalid _ | Waiting_to_be_added_to_frontier _ ->
-        () ) ;
-    let transition_meta = State_functions.transition_meta state in
-    let children = children state in
-    State_hash.Set.iter children.processing_or_failed ~f:go ;
-    State_hash.Set.iter children.processed ~f:go ;
-    State_hash.Set.iter children.waiting_for_parent ~f:go ;
-    Invalid { transition_meta; error }
-  in
-  go top_state_hash
-
 (** Modify auxiliary data stored in the transition state. *)
 let modify_aux_data ~f = function
   | Received ({ aux; _ } as r) ->
@@ -229,3 +196,13 @@ let modify_aux_data ~f = function
       Building_breadcrumb { r with aux = f aux }
   | (Waiting_to_be_added_to_frontier _ as st) | (Invalid _ as st) ->
       st
+
+let aux_data = function
+  | Received { aux; _ }
+  | Verifying_blockchain_proof { aux; _ }
+  | Downloading_body { aux; _ }
+  | Verifying_complete_works { aux; _ }
+  | Building_breadcrumb { aux; _ } ->
+      Some aux
+  | _ ->
+      None

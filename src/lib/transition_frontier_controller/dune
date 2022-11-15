@@ -51,4 +51,6 @@
    mina_numbers
    ledger_proof
    dsu
+   perf_histograms
+   protocol_version
 ))
