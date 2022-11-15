@@ -438,8 +438,8 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
   let peers =
     Peer.Set.to_list preferred_peers @ Peer.Set.to_list non_preferred_peers
   in
-  let open Deferred.Result.Let_syntax in
   find_map_ok ~how:(`Max_concurrent_jobs 5) peers ~f:(fun peer ->
+      let open Deferred.Result.Let_syntax in
       let%bind transition_chain_proof =
         let open Deferred.Let_syntax in
         match%map
@@ -1198,22 +1198,18 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 "Catchup job started with $target_parent_hash " ;
               let state_hashes =
                 let target_length =
-                  let len =
-                    forest_pick forest |> Tuple2.get1 |> Cached.peek
-                    |> Envelope.Incoming.data |> Mina_block.Validation.block
-                    |> Mina_block.blockchain_length
-                  in
-                  Option.value_exn (Length.sub len (Length.of_int 1))
+                  forest_pick forest |> Tuple2.get1 |> Cached.peek
+                  |> Envelope.Incoming.data |> Mina_block.Validation.block
+                  |> Mina_block.blockchain_length |> Length.pred
                 in
                 let blockchain_length_of_target_hash =
-                  let blockchain_length_of_dangling_block =
-                    List.hd_exn forest |> Rose_tree.root |> Tuple2.get1
-                    |> Cached.peek |> Envelope.Incoming.data
-                    |> Mina_block.Validation.block
-                    |> Mina_block.blockchain_length
-                  in
-                  Unsigned.UInt32.pred blockchain_length_of_dangling_block
+                  List.hd_exn forest |> Rose_tree.root |> Tuple2.get1
+                  |> Cached.peek |> Envelope.Incoming.data
+                  |> Mina_block.Validation.block |> Mina_block.blockchain_length
+                  |> Unsigned.UInt32.pred
                 in
+                (* NB: target_length = blockchain_length_of_target_hash,
+                   not fixing this because super-catchup is likely to soon become obsolete*)
                 (* check if the target_parent_hash's own parent is a part of the transition frontier, or not *)
                 match
                   List.find_map (List.concat_map ~f:Rose_tree.flatten forest)

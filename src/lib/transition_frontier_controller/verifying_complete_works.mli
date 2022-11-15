@@ -6,7 +6,7 @@ open Mina_base
 val promote_to :
      mark_processed_and_promote:(State_hash.t list -> unit)
   -> context:(module Context.CONTEXT)
-  -> transition_states:Transition_state.t State_hash.Table.t
+  -> transition_states:Transition_states.t
   -> header:Mina_block.Validation.initial_valid_with_header
   -> substate:Mina_block.Body.t Substate.t
   -> block_vc:Mina_net2.Validation_callback.t option
@@ -25,6 +25,6 @@ val promote_to :
 val make_independent :
      context:(module Context.CONTEXT)
   -> mark_processed_and_promote:(State_hash.t list -> unit)
-  -> transition_states:Transition_state.t State_hash.Table.t
+  -> transition_states:Transition_states.t
   -> State_hash.t
   -> unit

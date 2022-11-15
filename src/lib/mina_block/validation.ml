@@ -526,7 +526,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
       ]
     "Staged_ledger.apply takes $time_elapsed" ;
-  let target_ledger_hash =
+  let snarked_ledger_hash =
     match proof_opt with
     | None ->
         Option.value_map
@@ -539,30 +539,25 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     | Some (proof, _) ->
         target_hash_of_ledger_proof proof
   in
-  let maybe_errors =
-    Option.all
-      [ Option.some_if
-          (not
-             (Staged_ledger_hash.equal staged_ledger_hash
-                (Blockchain_state.staged_ledger_hash blockchain_state) ) )
-          `Incorrect_target_staged_ledger_hash
-      ; Option.some_if
-          (not
-             (Frozen_ledger_hash.equal target_ledger_hash
-                (Blockchain_state.snarked_ledger_hash blockchain_state) ) )
-          `Incorrect_target_snarked_ledger_hash
-      ]
+  let incorrect_staged =
+    let open Staged_ledger_hash in
+    staged_ledger_hash <> Blockchain_state.staged_ledger_hash blockchain_state
   in
-  Deferred.return
-    ( match maybe_errors with
-    | Some errors ->
-        Error (`Invalid_staged_ledger_diff errors)
-    | None ->
-        Ok
-          ( `Just_emitted_a_proof (Option.is_some proof_opt)
-          , `Block_with_validation
-              (t, Unsafe.set_valid_staged_ledger_diff validation)
-          , `Staged_ledger transitioned_staged_ledger ) )
+  let incorrect_snarked =
+    let open Frozen_ledger_hash in
+    snarked_ledger_hash <> Blockchain_state.snarked_ledger_hash blockchain_state
+  in
+  let error_ e = Deferred.Result.fail (`Invalid_staged_ledger_diff e) in
+  if incorrect_staged && incorrect_snarked then
+    error_ `Incorrect_target_staged_and_snarked_ledger_hashes
+  else if incorrect_staged then error_ `Incorrect_target_staged_ledger_hash
+  else if incorrect_snarked then error_ `Incorrect_target_snarked_ledger_hash
+  else
+    Deferred.Result.return
+      ( `Just_emitted_a_proof (Option.is_some proof_opt)
+      , `Block_with_validation
+          (t, Unsafe.set_valid_staged_ledger_diff validation)
+      , `Staged_ledger transitioned_staged_ledger )
 
 let validate_staged_ledger_hash
     (`Staged_ledger_already_materialized staged_ledger_hash) (t, validation) =

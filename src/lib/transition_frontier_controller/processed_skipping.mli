@@ -23,7 +23,7 @@ val collect_unprocessed :
      ?predicate:([ `Take of bool ] * [ `Continue of bool ]) Substate_types.viewer
   -> state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Mina_base.State_hash.Table.t
+  -> transition_states:'state_t Substate_types.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t list
@@ -36,7 +36,7 @@ val collect_unprocessed :
 val next_unprocessed :
      state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Mina_base.State_hash.Table.t
+  -> transition_states:'state_t Substate_types.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t option
@@ -56,7 +56,7 @@ val next_unprocessed :
 val collect_to_in_progress :
      state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Mina_base.State_hash.Table.t
+  -> transition_states:'state_t Substate_types.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t list

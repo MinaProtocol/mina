@@ -29,7 +29,7 @@ let validate_frontier_dependencies ~transition_states
     in
     Option.is_some (Transition_frontier.find Context.frontier state_hash)
     || Option.value_map ~default:false ~f
-         (State_hash.Table.find transition_states state_hash)
+         (Transition_states.find transition_states state_hash)
   in
   Mina_block.Validation.validate_frontier_dependencies
     ~to_header:Mina_block.header
@@ -63,20 +63,20 @@ let update_status_for_unprocessed ~transition_states ~state_hash status =
           | _ ->
               block_vc
         in
-        Transition_state.Building_breadcrumb
-          { r with substate = { r.substate with status }; block_vc }
+        Some
+          (Transition_state.Building_breadcrumb
+             { r with substate = { r.substate with status }; block_vc } )
     | st ->
-        st
+        Some st
   in
-  State_hash.Table.change transition_states state_hash ~f:(Option.map ~f)
+  Transition_states.update' transition_states state_hash ~f
 
 (** [upon_f] is a callback to be executed upon completion of building
   a breadcrumb (or a failure).
 *)
 let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
-  let mark_invalid ~tag e =
-    Transition_state.mark_invalid ~transition_states ~error:(Error.tag ~tag e)
-      state_hash
+  let mark_invalid ?reason error =
+    Transition_states.mark_invalid ?reason transition_states ~error ~state_hash
   in
   function
   | Result.Error () ->
@@ -86,13 +86,10 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
       update_status_for_unprocessed ~transition_states ~state_hash
         (Processing (Done breadcrumb)) ;
       mark_processed_and_promote [ state_hash ]
-  | Result.Ok (Result.Error (`Invalid_staged_ledger_diff e)) ->
-      mark_invalid ~tag:"invalid staged ledger diff" e
-  | Result.Ok (Result.Error (`Invalid_staged_ledger_hash e)) ->
-      mark_invalid ~tag:"invalid staged ledger hash" e
-  | Result.Ok (Result.Error (`Fatal_error e)) ->
-      update_status_for_unprocessed ~transition_states ~state_hash
-      @@ Failed (Error.of_exn e)
+  | Result.Ok (Result.Error (`Invalid (e, reason))) ->
+      mark_invalid ~reason e
+  | Result.Ok (Result.Error (`Verifier_error e)) ->
+      update_status_for_unprocessed ~transition_states ~state_hash @@ Failed e
 
 (** [building_breadcrumb_status ~parent block] decides upon status of [block]
   that is a child of transition with the already-built breadcrumb [parent].
@@ -101,7 +98,7 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
   returns a [Processing (In_progress _)] status and [Failed] otherwise.  
 *)
 let building_breadcrumb_status ~context ~mark_processed_and_promote
-    ~transition_states ~received_at ~sender ~parent block =
+    ~transition_states ~received ~parent block =
   let (module Context : CONTEXT) = context in
   let state_hash =
     State_hash.With_state_hashes.state_hash
@@ -115,9 +112,9 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       Mina_block.blockchain_length (Mina_block.Validation.block block)
     in
     let module I = Interruptible.Make () in
+    let received_at = (List.last_exn received).Transition_state.received_at in
     let action =
-      Context.build_breadcrumb ~received_at ~sender ~parent ~transition
-        (module I)
+      Context.build_breadcrumb ~received_at ~parent ~transition (module I)
     in
     let timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout in
     Async_kernel.Deferred.upon (I.force action)
@@ -134,17 +131,20 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
   | Result.Ok ctx ->
       Substate.Processing ctx
   | Result.Error err ->
+      let senders =
+        List.map received ~f:(fun { Transition_state.sender; _ } -> sender)
+      in
       let err_str =
         match err with
         | `Already_in_frontier ->
             Context.record_event
             @@ `Invalid_frontier_dependencies
-                 (`Already_in_frontier, state_hash, sender) ;
+                 (`Already_in_frontier, state_hash, senders) ;
             "already in frontier"
         | `Not_selected_over_frontier_root ->
             Context.record_event
             @@ `Invalid_frontier_dependencies
-                 (`Not_selected_over_frontier_root, state_hash, sender) ;
+                 (`Not_selected_over_frontier_root, state_hash, senders) ;
             "not selected over frontier root"
         | `Parent_missing_from_frontier ->
             "parent missing from frontier"
@@ -155,7 +155,7 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
 let get_parent ~transition_states ~context meta =
   let (module Context : CONTEXT) = context in
   let parent_hash = meta.Substate.parent_state_hash in
-  match State_hash.Table.find transition_states parent_hash with
+  match Transition_states.find transition_states parent_hash with
   | Some
       (Transition_state.Building_breadcrumb
         { substate = { status = Processed parent; _ }; _ } )
@@ -196,7 +196,7 @@ let get_parent ~transition_states ~context meta =
     and returns a map with processed or higher state transitions removed. *)
 let filter_unprocessed ~transition_states ancestors =
   let is_processed state_hash =
-    match State_hash.Table.find transition_states state_hash with
+    match Transition_states.find transition_states state_hash with
     | Some
         (Transition_state.Building_breadcrumb
           { substate = { status = Processed _; _ }; _ } ) ->
@@ -218,18 +218,17 @@ let filter_unprocessed ~transition_states ancestors =
 
 let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
     ancestor_hash =
-  match State_hash.Table.find transition_states ancestor_hash with
+  match Transition_states.find transition_states ancestor_hash with
   | Some
       ( Transition_state.Building_breadcrumb
           ({ substate = { status = Failed _; _ }; _ } as r) as st ) -> (
       let ancestor_meta = Transition_state.State_functions.transition_meta st in
       match get_parent ~transition_states ~context ancestor_meta with
       | Ok parent ->
-          State_hash.Table.set transition_states ~key:ancestor_hash
-            ~data:
-              (Building_breadcrumb
-                 { r with substate = { r.substate with status = build parent } }
-              )
+          Transition_states.update transition_states
+            (Building_breadcrumb
+               { r with substate = { r.substate with status = build parent } }
+            )
       | _ ->
           let (module Context : CONTEXT) = context in
           [%log' error Context.logger]
@@ -254,8 +253,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
   in
   let build parent =
     building_breadcrumb_status ~context ~mark_processed_and_promote
-      ~transition_states ~received_at:aux.Transition_state.received_at
-      ~sender:aux.sender ~parent block
+      ~transition_states ~received:aux.Transition_state.received ~parent block
   in
   let mk_status () =
     (Option.value_map ~f:build

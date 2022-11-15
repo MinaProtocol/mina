@@ -50,7 +50,7 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
   let (module Context : CONTEXT) = context in
   let top_state_hash = !holder in
   match res with
-  | Result.Error () ->
+  | Error () ->
       (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
       let for_restart_opt =
         update_to_failed ~dsu:Context.processed_dsu ~transition_states
@@ -59,13 +59,13 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
       in
       Option.iter for_restart_opt
         ~f:(start ~context ~mark_processed_and_promote ~transition_states)
-  | Result.Ok (Result.Ok (Error e)) ->
+  | Ok (Ok (Error e)) ->
       (* We mark invalid only the first header because it is the only one for which
          we can be sure it's invalid *)
-      Transition_state.mark_invalid ~transition_states
-        ~error:(Error.tag e ~tag:"wrong blockchain proof")
-        top_state_hash
-  | Result.Ok (Result.Ok (Ok ())) ->
+      Transition_states.mark_invalid transition_states
+        ~error:(Error.tag e ~tag:"wrong transaction proof")
+        ~state_hash:top_state_hash
+  | Ok (Ok (Ok ())) ->
       List.iter state_hashes ~f:(fun state_hash ->
           let for_restart_opt =
             update_to_processing_done ~transition_states ~state_hash
@@ -77,7 +77,7 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
               start ~context ~mark_processed_and_promote ~transition_states
                 for_restart ;
               mark_processed_and_promote [ state_hash ] ) )
-  | Result.Ok (Result.Error e) ->
+  | Ok (Error e) ->
       let for_restart_opt =
         update_to_failed ~dsu:Context.processed_dsu ~transition_states
           ~state_hash:top_state_hash e
@@ -93,17 +93,10 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
          ~transition_states states
      in
      match top_state with
-     | Transition_state.Verifying_complete_works ({ block; substate; _ } as r)
-       ->
-         let key =
-           State_hash.With_state_hashes.state_hash
-             (Mina_block.Validation.block_with_hash block)
-         in
-         State_hash.Table.set transition_states ~key
-           ~data:
-             (Transition_state.Verifying_complete_works
-                { r with substate = { substate with status = Processing ctx } }
-             )
+     | Transition_state.Verifying_complete_works ({ substate; _ } as r) ->
+         Transition_states.update transition_states
+           (Transition_state.Verifying_complete_works
+              { r with substate = { substate with status = Processing ctx } } )
      | _ ->
          ()
 
