@@ -105,6 +105,7 @@
    snark_params
    kimchi_backend.pasta
    mina_wire_types
+   file_system
    inline_test_quiet_logs
  )
  (instrumentation (backend bisect_ppx))

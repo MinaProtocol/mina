@@ -1729,7 +1729,7 @@ let create ?wallets (config : Config.t) =
                         .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff
+                config.net_config.log_gossip_heard.snark_pool_diff ()
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -2200,9 +2200,6 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    (* instantiate just once *)
-    let snark_remote_sink_ref = ref None
-
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
@@ -2249,7 +2246,7 @@ let%test_module "Epoch ledger sync tests" =
       let%bind verifier =
         Verifier.create ~logger ~proof_level:precomputed_values.proof_level
           ~constraint_constants:precomputed_values.constraint_constants ~pids
-          ~conf_dir:None
+          ~conf_dir:(Some (make_dirname "verifier"))
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
@@ -2268,28 +2265,22 @@ let%test_module "Epoch ledger sync tests" =
           ~on_remote_push ~log_gossip_heard:false
       in
       let%bind snark_remote_sink =
-        (* instantiate this just once *)
-        match !snark_remote_sink_ref with
-        | Some sink ->
-            return sink
-        | None ->
-            let config =
-              Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-                ~trust_system ~disk_location:"snark_pool_config"
-            in
-            let%map _snark_pool, snark_remote_sink, _snark_local_sink =
-              Network_pool.Snark_pool.load ~config ~constraint_constants
-                ~consensus_constants ~time_controller ~logger
-                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-                ~expiry_ns:
-                  (Time_ns.Span.of_hr
-                     (Float.of_int
-                        precomputed_values.genesis_constants
-                          .transaction_expiry_hr ) )
-                ~on_remote_push ~log_gossip_heard:false
-            in
-            snark_remote_sink_ref := Some snark_remote_sink ;
-            snark_remote_sink
+        let config =
+          Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+            ~trust_system
+            ~disk_location:(make_dirname "snark_pool_config")
+        in
+        let%map _snark_pool, snark_remote_sink, _snark_local_sink =
+          Network_pool.Snark_pool.load ~allow_multiple_instances_for_tests:true
+            ~config ~constraint_constants ~consensus_constants ~time_controller
+            ~logger ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            ~expiry_ns:
+              (Time_ns.Span.of_hr
+                 (Float.of_int
+                    precomputed_values.genesis_constants.transaction_expiry_hr ) )
+            ~on_remote_push ~log_gossip_heard:false ()
+        in
+        snark_remote_sink
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
       let genesis_ledger =
@@ -2315,7 +2306,7 @@ let%test_module "Epoch ledger sync tests" =
       let libp2p_keypair =
         Mina_net2.Keypair.of_string libp2p_keypair_str |> Or_error.ok_exn
       in
-      let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance - 1 in
+      let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance in
       let creatable_gossip_net =
         let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
@@ -2323,7 +2314,7 @@ let%test_module "Epoch ledger sync tests" =
         let addrs_and_ports =
           let external_ip = Unix.Inet_addr.localhost in
           let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
-          let client_port = Cli_lib.Flag.Port.default_client - instance - 5 in
+          let client_port = Cli_lib.Flag.Port.default_client - instance in
           ( { external_ip; bind_ip; peer = None; client_port; libp2p_port }
             : Node_addrs_and_ports.t )
         in
@@ -2451,7 +2442,11 @@ let%test_module "Epoch ledger sync tests" =
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
       return
-        (mina_networking, network_peer, consensus_local_state, no_answer_ivar)
+        ( mina_networking
+        , network_peer
+        , consensus_local_state
+        , no_answer_ivar
+        , pids )
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
@@ -2501,6 +2496,35 @@ let%test_module "Epoch ledger sync tests" =
 
         let trust_system = Trust_system.create (make_dirname "trust_system")
       end in
+      let test_finished = ref false in
+      let cleanup (pid_tables : Child_processes.Termination.t list) =
+        let logger = Context.logger in
+        (* test finished, prevents timeout causing exn *)
+        test_finished := true ;
+        List.iter pid_tables
+          ~f:
+            (Pid.Table.iteri ~f:(fun ~key:pid ~data:process_kind ->
+                 match
+                   (process_kind : Child_processes.Termination.process_kind)
+                 with
+                 | Libp2p_helper -> (
+                     let pid_n = Pid.to_int pid in
+                     [%log debug]
+                       "Cleanup, attempting to kill libp2p process with pid %d"
+                       pid_n ;
+                     match Core.Unix.system (sprintf "kill %d" pid_n) with
+                     | Ok () ->
+                         [%log debug] "Killed libp2p process with pid %d" pid_n ;
+                         ()
+                     | Error _ ->
+                         (* report error, allow test to succeed *)
+                         [%log error]
+                           "Error when killing libp2p process with pid %d" pid_n
+                     )
+                 | _ ->
+                     () ) ) ;
+        File_system.remove_dir dir_prefix
+      in
       let staking_ledger_root =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
           staking_epoch_ledger
@@ -2512,7 +2536,8 @@ let%test_module "Epoch ledger sync tests" =
       let%bind ( _mina_network1
                , network_peer1
                , consensus_local_state1
-               , no_answer_ivar1 ) =
+               , no_answer_ivar1
+               , pids1 ) =
         make_mina_network
           ~context:(module Context)
           ~instance:0
@@ -2520,6 +2545,7 @@ let%test_module "Epoch ledger sync tests" =
             "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
           ~initial_peers:[]
       in
+
       let staking_epoch_snapshot =
         Consensus.Data.Local_state.For_tests.snapshot_of_ledger
           staking_epoch_ledger
@@ -2536,13 +2562,15 @@ let%test_module "Epoch ledger sync tests" =
       let%bind ( mina_network2
                , _network_peer2
                , _consensus_local_state2
-               , _no_answer_ivar2 ) =
+               , _no_answer_ivar2
+               , pids2 ) =
         make_mina_network ~instance:1
           ~context:(module Context2)
           ~libp2p_keypair_str:
             "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
           ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
       in
+      let all_pids = [ pids1; pids2 ] in
       let make_sync_ledger () =
         let db_ledger = make_empty_db_ledger (module Context) in
         List.iter starting_accounts ~f:(fun (acct : Account.t) ->
@@ -2568,12 +2596,13 @@ let%test_module "Epoch ledger sync tests" =
       in
       (* should only happen when syncing to a genesis ledger *)
       don't_wait_for
-        (let%map () = Ivar.read no_answer_ivar1 in
+        (let%bind () = Ivar.read no_answer_ivar1 in
+         let%map () = cleanup all_pids in
          raise No_sync_answer ) ;
-      (* set timeout *)
+      (* set timeout so CI doesn't run forever *)
       don't_wait_for
         (let%map () = after (Time.Span.of_min 3.0) in
-         raise Sync_timeout ) ;
+         if not !test_finished then raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
       let%bind () =
@@ -2583,20 +2612,24 @@ let%test_module "Epoch ledger sync tests" =
         with
         | `Ok ledger ->
             let ledger_root = Ledger.Db.merkle_root ledger in
-            assert (Ledger_hash.equal ledger_root staking_ledger_root)
+            assert (Ledger_hash.equal ledger_root staking_ledger_root) ;
+            [%log debug] "Synced current epoch ledger successfully"
         | `Target_changed _ ->
             failwith "Target changed when getting staking ledger"
       in
       (* sync next staking ledger *)
       let sync_ledger2 = make_sync_ledger () in
-      match%map
+      match%bind
         Mina_ledger.Sync_ledger.Db.fetch sync_ledger2 next_epoch_ledger_root
           ~data:() ~equal:(fun () () -> true)
       with
       | `Ok ledger ->
+          let%map () = cleanup all_pids in
           let ledger_root = Ledger.Db.merkle_root ledger in
-          assert (Ledger_hash.equal ledger_root next_epoch_ledger_root)
+          assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
+          [%log debug] "Synced next epoch ledger, sync test succeeded"
       | `Target_changed _ ->
+          let%map () = cleanup all_pids in
           failwith "Target changed when getting next epoch ledger"
 
     let make_genesis_ledger (module Context : CONTEXT)
