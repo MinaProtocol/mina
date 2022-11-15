@@ -1,3 +1,4 @@
+module Basic = Kimchi_pasta_basic
 module Rounds = Basic.Rounds
 module Bigint256 = Basic.Bigint256
 module Fp = Basic.Fp

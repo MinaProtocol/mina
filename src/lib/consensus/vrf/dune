@@ -18,6 +18,7 @@
    mina_wire_types
    mina_base.util
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    genesis_constants
    crypto_params
    random_oracle

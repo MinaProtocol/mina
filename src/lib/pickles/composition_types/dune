@@ -13,6 +13,7 @@
    ;; local libraries
    mina_wire_types
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    snarky.backendless
    pickles_types
    pickles.limb_vector
