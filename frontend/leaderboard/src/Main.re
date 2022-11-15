@@ -15,6 +15,7 @@ let getEnvOrFail = name =>
 
 /* The Google Sheets API expects the credentials to be a local file instead of a parameter
        Thus, we set an environment variable indicating it's path.
+       x
    */
 Node.Process.putEnvVar(
   "GOOGLE_APPLICATION_CREDENTIALS",

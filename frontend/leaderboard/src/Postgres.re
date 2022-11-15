@@ -6,7 +6,7 @@ let getBlocksChallenge = pk => {
   {j|
     SELECT COUNT(*)
     FROM
-      (SELECT DISTINCT ON (global_slot) global_slot, state_hash
+      (SELECT DISTINCT ON (global_slot_since_genesis) global_slot_since_genesis, state_hash
       FROM blocks
       INNER JOIN public_keys AS p ON creator_id=p.id
       WHERE p.value = '$(pk)') AS blocksCreated
