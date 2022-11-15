@@ -265,42 +265,37 @@ module Zkapp_account_update_info = struct
     }
   [@@deriving to_yojson]
 
-  module T (M : Monad_fail.S) = struct
-    module Op_build = Op.T (M)
-
-    let to_operations (t : t) : (Operation.t list, Errors.t) M.t =
-      let label =
-        if String.is_prefix t.balance_change ~prefix:"-" then `Balance_dec
-        else `Balance_inc
-      in
-      let plan = [ { Op.label; related_to = None } ] in
-      Op_build.build ~a_eq:[%equal: [ `Balance_inc | `Balance_dec ]] ~plan
-        ~f:(fun ~related_operations ~operation_identifier op ->
-          let status = Some (Operation_statuses.name t.status) in
+  let to_operations (t : t) : Operation.t list =
+    let label =
+      if String.is_prefix t.balance_change ~prefix:"-" then `Balance_dec
+      else `Balance_inc
+    in
+    let plan = [ { Op.label; related_to = None } ] in
+    Op.build ~a_eq:[%equal: [ `Balance_inc | `Balance_dec ]] ~plan
+      ~f:(fun ~related_operations ~operation_identifier op ->
+        let status = Some (Operation_statuses.name t.status) in
+        let amount =
           let amount =
-            let amount =
-              Unsigned_extended.UInt64.of_string
-              @@ String.chop_prefix_if_exists ~prefix:"-" t.balance_change
-            in
-            match (t.status, op.label) with
-            | `Success, `Balance_inc ->
-                Some Amount_of.(token t.token amount)
-            | `Success, `Balance_dec ->
-                Some Amount_of.(negated @@ token t.token amount)
-            | `Failed, _ ->
-                None
+            Unsigned_extended.UInt64.of_string
+            @@ String.chop_prefix_if_exists ~prefix:"-" t.balance_change
           in
-          M.return
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account = Some (account_id t.account t.token)
-            ; _type = Operation_types.name `Zkapp_balance_update
-            ; amount
-            ; coin_change = None
-            ; metadata = None
-            } )
-  end
+          match (t.status, op.label) with
+          | `Success, `Balance_inc ->
+              Some Amount_of.(token t.token amount)
+          | `Success, `Balance_dec ->
+              Some Amount_of.(negated @@ token t.token amount)
+          | `Failed, _ ->
+              None
+        in
+        { Operation.operation_identifier
+        ; related_operations
+        ; status
+        ; account = Some (account_id t.account t.token)
+        ; _type = Operation_types.name `Zkapp_balance_update
+        ; amount
+        ; coin_change = None
+        ; metadata = None
+        } )
 
   let dummies =
     [ { authorization_kind = "OK"
@@ -337,45 +332,36 @@ module Zkapp_command_info = struct
     ; memo : string option
     ; hash : string
     ; failure_reasons : string list
+    ; account_updates : Zkapp_account_update_info.t list
     }
   [@@deriving to_yojson]
 
-  module T (M : Monad_fail.S) = struct
-    module Op_build = Op.T (M)
-
-    let to_operations (t : t) : (Operation.t list, Errors.t) M.t =
-      (* We choose to represent the dec-side of fee transfers from txns from the
-       * canonical user command that created them so we are able consistently
-       * produce more balance changing operations in the mempool or a block.
-       * *)
-      Op_build.build ~a_eq:[%equal: [ `Zkapp_fee_payer_dec ]] ~plan:[]
-        ~f:(fun ~related_operations ~operation_identifier op ->
-          let status =
-            match t.failure_reasons with
-            | [] ->
-                Some (Operation_statuses.name `Success)
-            | _ ->
-                Some (Operation_statuses.name `Failed)
-          in
-          match op.label with
-          | `Zkapp_fee_payer_dec ->
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status
-                ; account =
-                    Some
-                      (account_id t.fee_payer
-                         (`Token_id Amount_of.Token_id.default) )
-                ; _type = Operation_types.name `Zkapp_fee_payer_dec
-                ; amount =
-                    Some
-                      (Amount_of.token (`Token_id Amount_of.Token_id.default)
-                         t.fee )
-                ; coin_change = None
-                ; metadata = None
-                } )
-  end
+  let to_operations (t : t) : Operation.t list =
+    Op.build ~a_eq:[%equal: [ `Zkapp_fee_payer_dec ]]
+      ~plan:[ { Op.label = `Zkapp_fee_payer_dec; related_to = None } ]
+      ~f:(fun ~related_operations ~operation_identifier op ->
+        let status =
+          match t.failure_reasons with
+          | [] ->
+              Some (Operation_statuses.name `Success)
+          | _ ->
+              Some (Operation_statuses.name `Failed)
+        in
+        match op.label with
+        | `Zkapp_fee_payer_dec ->
+            { Operation.operation_identifier
+            ; related_operations
+            ; status
+            ; account =
+                Some
+                  (account_id t.fee_payer (`Token_id Amount_of.Token_id.default))
+            ; _type = Operation_types.name `Zkapp_fee_payer_dec
+            ; amount =
+                Some
+                  (Amount_of.token (`Token_id Amount_of.Token_id.default) t.fee)
+            ; coin_change = None
+            ; metadata = None
+            } )
 
   let dummies =
     [ { fee_payer = `Pk "Eve"
@@ -387,6 +373,7 @@ module Zkapp_command_info = struct
       ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
       ; nonce = Unsigned.UInt32.of_int 3
       ; memo = Some "Hey"
+      ; account_updates = Zkapp_account_update_info.dummies
       }
     ; { fee_payer = `Pk "Alice"
       ; fee = Unsigned.UInt64.of_int 10_000_000_000
@@ -397,6 +384,7 @@ module Zkapp_command_info = struct
       ; valid_until = Some (Unsigned.UInt32.of_int 20_000)
       ; nonce = Unsigned.UInt32.of_int 2
       ; memo = None
+      ; account_updates = Zkapp_account_update_info.dummies
       }
     ]
 end
@@ -412,7 +400,6 @@ module Block_info = struct
     ; internal_info : Internal_command_info.t list
     ; user_commands : User_command_info.t list
     ; zkapp_commands : Zkapp_command_info.t list
-    ; zkapps_account_updates : Zkapp_account_update_info.t list
     }
 
   let creator_metadata { creator = `Pk pk; _ } =
@@ -432,7 +419,6 @@ module Block_info = struct
     ; internal_info = Internal_command_info.dummies
     ; user_commands = User_command_info.dummies
     ; zkapp_commands = Zkapp_command_info.dummies
-    ; zkapps_account_updates = Zkapp_account_update_info.dummies
     }
 end
 
@@ -846,17 +832,6 @@ WHERE zc.id = ?
       Zkapp_commands.run (module Conn) block_id
       |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
     in
-    let%bind raw_zkapp_account_update =
-      List.fold_left raw_zkapp_commands ~init:(M.return [])
-        ~f:(fun acc (cmd_id, _) ->
-          let%bind acc = acc in
-          let%bind account_updates =
-            Zkapp_account_update.run (module Conn) cmd_id
-            |> Errors.Lift.sql
-                 ~context:"Finding zkapp account updates within block"
-          in
-          M.return (acc @ account_updates) )
-    in
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
           let%map kind =
@@ -951,49 +926,53 @@ WHERE zc.id = ?
           ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
           } )
     in
-    let%bind zkapp_commands =
-      M.List.map raw_zkapp_commands ~f:(fun (_, cmd) ->
+    let%map zkapp_commands =
+      M.List.map raw_zkapp_commands ~f:(fun (cmd_id, cmd) ->
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
-          M.return
-            { Zkapp_command_info.fee =
-                Unsigned.UInt64.of_string @@ Zkapp_commands.Extras.fee cmd
-            ; fee_payer = Zkapp_commands.Extras.fee_payer cmd
-            ; valid_until =
-                Option.map ~f:Unsigned.UInt32.of_int64 cmd.valid_until
-            ; nonce = Unsigned.UInt32.of_int64 cmd.nonce
-            ; token = `Token_id token
-            ; sequence_no = cmd.sequence_no
-            ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
-            ; hash = cmd.hash
-            ; failure_reasons = Array.to_list cmd.failure_reasons
-            } )
-    in
-    let%map zkapps_account_updates =
-      M.List.map raw_zkapp_account_update ~f:(fun (upd, extras) ->
-          (* TODO: check if this holds *)
-          let token = Mina_base.Token_id.(to_string default) in
-          let status =
-            match extras.Zkapp_account_update.Extras.status with
-            | "applied" ->
-                `Success
-            | _ ->
-                `Failed
+          let%bind raw_zkapp_account_update =
+            Zkapp_account_update.run (module Conn) cmd_id
+            |> Errors.Lift.sql
+                 ~context:"Finding zkapp account updates within command"
           in
-          M.return
-            { Zkapp_account_update_info.authorization_kind =
-                upd
-                  .Archive_lib.Processor.Zkapp_account_update_body
-                   .authorization_kind
-            ; account = Zkapp_account_update.Extras.account extras
-            ; balance_change = upd.balance_change
-            ; increment_nonce = upd.increment_nonce
-            ; caller = upd.caller
-            ; call_depth = Unsigned.UInt64.of_int upd.call_depth
-            ; use_full_commitment = upd.use_full_commitment
-            ; status
-            ; token = `Token_id token
-            } )
+          let%map account_updates =
+            M.List.map raw_zkapp_account_update ~f:(fun (upd, extras) ->
+                (* TODO: check if this holds *)
+                let token = Mina_base.Token_id.(to_string default) in
+                let status =
+                  match extras.Zkapp_account_update.Extras.status with
+                  | "applied" ->
+                      `Success
+                  | _ ->
+                      `Failed
+                in
+                M.return
+                  { Zkapp_account_update_info.authorization_kind =
+                      upd
+                        .Archive_lib.Processor.Zkapp_account_update_body
+                         .authorization_kind
+                  ; account = Zkapp_account_update.Extras.account extras
+                  ; balance_change = upd.balance_change
+                  ; increment_nonce = upd.increment_nonce
+                  ; caller = upd.caller
+                  ; call_depth = Unsigned.UInt64.of_int upd.call_depth
+                  ; use_full_commitment = upd.use_full_commitment
+                  ; status
+                  ; token = `Token_id token
+                  } )
+          in
+          { Zkapp_command_info.fee =
+              Unsigned.UInt64.of_string @@ Zkapp_commands.Extras.fee cmd
+          ; fee_payer = Zkapp_commands.Extras.fee_payer cmd
+          ; valid_until = Option.map ~f:Unsigned.UInt32.of_int64 cmd.valid_until
+          ; nonce = Unsigned.UInt32.of_int64 cmd.nonce
+          ; token = `Token_id token
+          ; sequence_no = cmd.sequence_no
+          ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
+          ; hash = cmd.hash
+          ; failure_reasons = Array.to_list cmd.failure_reasons
+          ; account_updates
+          } )
     in
     { Block_info.block_identifier =
         { Block_identifier.index = raw_block.height
@@ -1009,7 +988,6 @@ WHERE zc.id = ?
     ; internal_info = internal_commands
     ; user_commands
     ; zkapp_commands
-    ; zkapps_account_updates
     }
 end
 
@@ -1114,7 +1092,6 @@ module Specific = struct
             ; internal_info = []
             ; user_commands = []
             ; zkapp_commands = []
-            ; zkapps_account_updates = []
             }
         else env.db_block query
       in
@@ -1147,8 +1124,9 @@ module Specific = struct
                       info.hash
                 }
             ; operations
-            ; metadata= None
-            ; related_transactions= [] }
+            ; metadata = None
+            ; related_transactions = []
+            }
             :: acc )
         |> M.map ~f:List.rev
       in
@@ -1163,24 +1141,40 @@ module Specific = struct
                       [%log debug]
                         ~metadata:[ ("info", User_command_info.to_yojson info) ]
                         "Block user received $info" ;
-                      { Transaction.transaction_identifier=
-                          {Transaction_identifier.hash= info.hash}
-                      ; operations= User_command_info.to_operations' info
-                      ; metadata= Option.bind info.memo ~f:(fun base58_check ->
-                        try
-                          let memo =
-                            let open Mina_base.Signed_command_memo in
-                            base58_check |> of_base58_check_exn |> to_string_hum
-                          in
-                          if String.is_empty memo then
-                            None
-                          else
-                            Some (`Assoc [("memo", `String memo)])
-                        with
-                        | _ -> None)
-                      ;related_transactions= []} )
-            ; metadata= Some (Block_info.creator_metadata block_info) }
-      ; other_transactions= [] }
+                      { Transaction.transaction_identifier =
+                          { Transaction_identifier.hash = info.hash }
+                      ; operations = User_command_info.to_operations' info
+                      ; metadata =
+                          Option.bind info.memo ~f:(fun base58_check ->
+                              try
+                                let memo =
+                                  let open Mina_base.Signed_command_memo in
+                                  base58_check |> of_base58_check_exn
+                                  |> to_string_hum
+                                in
+                                if String.is_empty memo then None
+                                else Some (`Assoc [ ("memo", `String memo) ])
+                              with _ -> None )
+                      ; related_transactions = []
+                      } )
+                @ List.map block_info.zkapp_commands ~f:(fun cmd ->
+                      [%log debug]
+                        ~metadata:[ ("info", Zkapp_command_info.to_yojson cmd) ]
+                        "Block zkapp received $info" ;
+                      { Transaction.transaction_identifier =
+                          { Transaction_identifier.hash = cmd.hash }
+                      ; operations =
+                          Zkapp_command_info.to_operations cmd
+                          @ List.concat
+                          @@ List.map ~f:Zkapp_account_update_info.to_operations
+                               cmd.account_updates
+                      ; metadata = None
+                      ; related_transactions = []
+                      } )
+            ; metadata = Some (Block_info.creator_metadata block_info)
+            }
+      ; other_transactions = []
+      }
   end
 
   module Real = Impl (Deferred.Result)
