@@ -2201,6 +2201,8 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
+    let timeout_min = 10.0
+
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
@@ -2594,7 +2596,7 @@ let%test_module "Epoch ledger sync tests" =
          raise No_sync_answer ) ;
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min 3.0) in
+        (let%map () = after (Time.Span.of_min timeout_min) in
          if not !test_finished then raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
