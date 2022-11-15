@@ -138,9 +138,15 @@ let validate_transaction =
     if !num_fails > 0 then (
       Format.printf "Some transactions failed to verify@." ;
       exit 1 )
-    else (
-      Format.printf "All transactions were valid@." ;
-      exit 0 ) )
+    else
+      let[@alert "--deprecated"] first = Caml.Stream.peek jsons in
+      match first with
+      | None ->
+          Format.printf "Could not parse any transactions@." ;
+          exit 1
+      | _ ->
+          Format.printf "All transactions were valid@." ;
+          exit 0 )
 
 module Vrf = struct
   let generate_witness =
@@ -212,8 +218,9 @@ module Vrf = struct
                     vrf_threshold =
                       Some
                         { delegated_stake =
-                            Currency.Balance.of_int delegated_stake
-                        ; total_stake = Currency.Amount.of_int total_stake
+                            Currency.Balance.of_nanomina_int_exn delegated_stake
+                        ; total_stake =
+                            Currency.Amount.of_nanomina_int_exn total_stake
                         }
                   }
               | _ ->

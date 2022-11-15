@@ -438,8 +438,8 @@ struct
                   Gauge.set Snark_work.snark_pool_size
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
+                    ( fee.Mina_base.Fee_with_prover.fee
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =
@@ -1020,7 +1020,7 @@ let%test_module "random set test" =
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
@@ -1066,7 +1066,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )

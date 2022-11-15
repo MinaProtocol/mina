@@ -1708,17 +1708,22 @@ var caml_pasta_fp_proof_evaluations_to_rust = function(x) {
       w.push(caml_fp_vector_to_rust(x[1][i + 1]));
     }
 
-    var z = caml_fp_vector_to_rust(x[2]);
+    var coefficients = new plonk_wasm.WasmVecVecFp(COLUMNS);
+    for (var i = 0; i < COLUMNS; ++i) {
+      coefficients.push(caml_fp_vector_to_rust(x[2][i + 1]));
+    }
+
+    var z = caml_fp_vector_to_rust(x[3]);
 
     var s = new plonk_wasm.WasmVecVecFp(PERMUTS_MINUS_1);
     for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fp_vector_to_rust(x[3][i + 1]));
+      s.push(caml_fp_vector_to_rust(x[4][i + 1]));
     }
 
-    var generic_selector = caml_fp_vector_to_rust(x[4]);
-    var poseidon_selector = caml_fp_vector_to_rust(x[5]);
+    var generic_selector = caml_fp_vector_to_rust(x[5]);
+    var poseidon_selector = caml_fp_vector_to_rust(x[6]);
 
-    return new plonk_wasm.WasmFpProofEvaluations(w, z, s, generic_selector, poseidon_selector);
+    return new plonk_wasm.WasmFpProofEvaluations(w, coefficients, z, s, generic_selector, poseidon_selector);
 };
 
 // Provides: caml_pasta_fp_proof_evaluations_of_rust
@@ -1733,13 +1738,14 @@ var caml_pasta_fp_proof_evaluations_of_rust = function(x) {
     };
 
     var w = convertArray(x.w, COLUMNS);
+    var coefficients = convertArray(x.coefficients, COLUMNS);
     var z = caml_fp_vector_of_rust(x.z);
     var s = convertArray(x.s, PERMUTS_MINUS_1);
     var generic_selector = caml_fp_vector_of_rust(x.generic_selector);
     var poseidon_selector = caml_fp_vector_of_rust(x.poseidon_selector);
 
     x.free();
-    return [0, w, z, s, generic_selector, poseidon_selector];
+    return [0, w, coefficients, z, s, generic_selector, poseidon_selector];
 };
 
 // Provides: caml_pasta_fp_opening_proof_to_rust
@@ -1933,17 +1939,22 @@ var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
       w.push(caml_fq_vector_to_rust(x[1][i + 1]));
     }
 
-    var z = caml_fq_vector_to_rust(x[2]);
+    var coefficients = new plonk_wasm.WasmVecVecFq(COLUMNS);
+    for (var i = 0; i < COLUMNS; ++i) {
+      coefficients.push(caml_fq_vector_to_rust(x[2][i + 1]));
+    }
+
+    var z = caml_fq_vector_to_rust(x[3]);
 
     var s = new plonk_wasm.WasmVecVecFq(PERMUTS_MINUS_1);
     for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fq_vector_to_rust(x[3][i + 1]));
+      s.push(caml_fq_vector_to_rust(x[4][i + 1]));
     }
 
-    var generic_selector = caml_fq_vector_to_rust(x[4]);
-    var poseidon_selector = caml_fq_vector_to_rust(x[5]);
+    var generic_selector = caml_fq_vector_to_rust(x[5]);
+    var poseidon_selector = caml_fq_vector_to_rust(x[6]);
 
-    return new plonk_wasm.WasmFqProofEvaluations(w, z, s, generic_selector, poseidon_selector);
+    return new plonk_wasm.WasmFqProofEvaluations(w, coefficients, z, s, generic_selector, poseidon_selector);
 };
 
 // Provides: caml_pasta_fq_proof_evaluations_of_rust
@@ -1958,13 +1969,14 @@ var caml_pasta_fq_proof_evaluations_of_rust = function(x) {
     };
 
     var w = convertArray(x.w, COLUMNS);
+    var coefficients = convertArray(x.coefficients, COLUMNS);
     var z = caml_fq_vector_of_rust(x.z);
     var s = convertArray(x.s, PERMUTS_MINUS_1);
     var generic_selector = caml_fq_vector_of_rust(x.generic_selector);
     var poseidon_selector = caml_fq_vector_of_rust(x.poseidon_selector);
 
     x.free();
-    return [0, w, z, s, generic_selector, poseidon_selector];
+    return [0, w, coefficients, z, s, generic_selector, poseidon_selector];
 };
 
 // Provides: caml_pasta_fq_opening_proof_to_rust

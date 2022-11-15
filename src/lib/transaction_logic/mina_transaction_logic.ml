@@ -180,13 +180,13 @@ module Transaction_applied = struct
     let account_creation_fees =
       let account_creation_fee_int =
         Genesis_constants.Constraint_constants.compiled.account_creation_fee
-        |> Currency.Fee.to_int
+        |> Currency.Fee.to_nanomina_int
       in
       let num_accounts_created = List.length @@ new_accounts t in
       (* int type is OK, no danger of overflow *)
       Currency.Amount.(
         Signed.of_unsigned
-        @@ of_int (account_creation_fee_int * num_accounts_created))
+        @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
     in
     let txn : Transaction.t =
       match t.varying with
@@ -1359,9 +1359,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
-      let zkapp_uri (a : t) = a.zkapp_uri
+      let zkapp_uri (a : t) =
+        Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
 
-      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) : t =
+        { a with
+          zkapp = Option.map a.zkapp ~f:(fun zkapp -> { zkapp with zkapp_uri })
+        }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -2172,8 +2176,7 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Zkapp_account.t option
-      , string )
+      , Zkapp_account.t option )
       Account.Poly.t
     [@@deriving sexp, compare]
   end
@@ -2260,10 +2263,16 @@ module For_tests = struct
         fst init_ledger.(i)
       in
       let gen_amount () =
-        Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Amount.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let gen_fee () =
-        Currency.Fee.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Fee.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in

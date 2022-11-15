@@ -121,14 +121,12 @@ module Network_config = struct
            1 )
         num_block_producers
     in
-    if List.length bp_keypairs < num_block_producers then
+    if Mina_stdlib.List.Length.Compare.(bp_keypairs < num_block_producers) then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    assert (List.length bp_keypairs >= num_block_producers) ;
-    if List.length bp_keypairs < num_block_producers then
-      failwith
-        "not enough sample keypairs for specified number of extra keypairs" ;
-    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+
+    assert (
+      Stdlib.List.compare_lengths extra_keypairs extra_genesis_accounts >= 0 ) ;
     let extra_keypairs_cut =
       List.take extra_keypairs (List.length extra_genesis_accounts)
     in
@@ -154,7 +152,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -201,7 +199,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = None
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing

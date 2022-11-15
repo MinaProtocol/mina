@@ -920,7 +920,6 @@ module Make (Inputs : Inputs_intf) = struct
           (* Check that account_update has a valid caller. *)
           assert_ ~pos:__POS__ Bool.(is_normal_call ||| is_delegate_call) )
     in
-
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
        Pop from the call stack to get another forest, which is guaranteed to be non-empty.

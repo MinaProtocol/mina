@@ -19,6 +19,7 @@
    async.async_command
    ;; local libraries
    currency
+   mina_stdlib
    logger
  )
  (preprocessor_deps ../../config.mlh)

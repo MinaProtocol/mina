@@ -18,6 +18,7 @@
    mina_wire_types
    crypto_params
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    bitstring_lib
    codable

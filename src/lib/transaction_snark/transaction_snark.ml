@@ -1325,10 +1325,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
             { data = { a with zkapp = { a.zkapp with sequence_state } }; hash }
 
-          let zkapp_uri (a : t) = a.data.zkapp_uri
+          let zkapp_uri (a : t) = a.data.zkapp.zkapp_uri
 
           let set_zkapp_uri zkapp_uri ({ data = a; hash } : t) : t =
-            { data = { a with zkapp_uri }; hash }
+            { data = { a with zkapp = { a.zkapp with zkapp_uri } }; hash }
 
           let token_symbol (a : t) = a.data.token_symbol
 
@@ -2806,7 +2806,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; timing
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
-                ; zkapp_uri = account.zkapp_uri
                 } ) )
       in
       let%bind receiver_increase =
@@ -3034,7 +3033,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; timing = account.timing
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
-                ; zkapp_uri = account.zkapp_uri
                 } ) )
       in
       let%bind user_command_fails =
@@ -3197,7 +3195,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; timing
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
-                ; zkapp_uri = account.zkapp_uri
                 } ) )
       in
       let%bind fee_excess =
@@ -4931,7 +4928,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
       let id = Account_id.create pk Token_id.default in
-      { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
+      { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
       ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
       }
@@ -4975,7 +4972,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           |> fun pk -> Account_id.create pk Token_id.default
         in
         Ledger.get_or_create_account ledger id
-          (Account.create id Balance.(of_int 888_888))
+          (Account.create id Balance.(of_nanomina_int_exn 888_888))
         |> Or_error.ok_exn
       in
       let () =

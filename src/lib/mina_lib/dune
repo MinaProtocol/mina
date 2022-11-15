@@ -40,6 +40,7 @@
    transition_frontier_base
    with_hash
    currency
+   mina_stdlib
    mina_user_error
    gossip_net
    transition_frontier
@@ -104,6 +105,7 @@
    pickles
    snark_params
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_wire_types
    file_system
    inline_test_quiet_logs

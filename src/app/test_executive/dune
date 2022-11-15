@@ -16,6 +16,7 @@
    data_hash_lib
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    pickles_types
    random_oracle_input
@@ -24,6 +25,7 @@
    integration_test_lib
    signature_lib
    mina_base
+   mina_stdlib
    mina_transaction
    file_system
    currency
@@ -46,6 +48,7 @@
    sgn
    zkapp_command_builder
    network_pool
+   transaction_snark_work
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))
