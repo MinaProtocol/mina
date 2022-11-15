@@ -331,7 +331,8 @@
             mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
+            mina-image-slim mina-image-full mina-archive-image-full
+            mina-rosetta-image-full;
         };
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -367,7 +368,6 @@
           name = "mina-operations";
           packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
         };
-
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 

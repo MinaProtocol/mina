@@ -1,6 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip }:
+, jq, stdenv, rsync, bash, gnutar, gzip, gnused, cacert, writeShellScript, doas
+, less, shadow }:
 let
   mkdir = name:
     runCommand "mkdir-${name}" { } "mkdir -p $out${lib.escapeShellArg name}";
@@ -45,28 +46,76 @@ let
     '';
   };
 
-  mkFullImage = name: packages: dockerTools.streamLayeredImage {
-    name = "${name}-full";
-    contents = [
-      dumb-init
-      coreutils
-      bashInteractive
-      python3
-      libp2p_helper
-      procps
-      curl
-      jq
-    ] ++ packages;
-    extraCommands = ''
-      mkdir root tmp
-      chmod 777 tmp
+  init-rosetta-db = writeShellScript "init-db" ''
+    MINA_NETWORK=$1
+    POSTGRES_DBNAME=$2
+    POSTGRES_USERNAME=$3
+    POSTGRES_DATA_DIR=$4
+    DUMP_TIME=''${5:=0000}
+    PG_CONN=postgres://$POSTGRES_USERNAME:$POSTGRES_USERNAME@127.0.0.1:5432/$POSTGRES_DBNAME
+
+    useradd -r -u 0 -U -d /root root
+    useradd -r -U -M postgres
+
+    echo 'permit nopass root' > /etc/doas.conf
+
+    mkdir -p /run/postgresql /data/postgresql
+
+    chown postgres:postgres /data/postgresql /run/postgresql
+
+    doas -u postgres initdb -D $POSTGRES_DATA_DIR --auth trust --auth-local trust -g
+    doas -u postgres pg_ctl -D $POSTGRES_DATA_DIR start
+    doas -u postgres psql -c "SHOW ALL;"
+    doas -u postgres psql -c "CREATE USER \"$POSTGRES_USERNAME\" WITH SUPERUSER PASSWORD '$POSTGRES_USERNAME';"
+    doas -u postgres createdb -O $POSTGRES_USERNAME $POSTGRES_DBNAME
+    DATE="$(date -Idate)_$DUMP_TIME"
+    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+    curl "https://storage.googleapis.com/mina-archive-dumps/''${MINA_NETWORK}-archive-dump-''${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+    tar -xvf o1labs-archive-dump.tar.gz
+    doas -u postgres psql -f "''${MINA_NETWORK}-archive-dump-''${DATE}.sql" "$PG_CONN"
+    rm -f o1labs-archive-dump.tar.gz
+    echo "[POPULATE] Top 10 blocks in populated archiveDB:"
+    psql "$PG_CONN" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
+  '';
+
+  mina-rosetta-scripts = stdenv.mkDerivation {
+    pname = "mina-rosetta-scripts";
+    version = "dev";
+    buildCommand = ''
+      mkdir -p $out/rosetta
+      cp -r ${../src/app/rosetta}/{*.sh,*.conf,*.json} $out/rosetta
+      chmod -R +x $out
+      rm $out/rosetta/init-db.sh
+      ln -s ${init-rosetta-db} $out/rosetta/init-db.sh
+      sed 's/pg_ctlcluster ''${POSTGRES_VERSION} main/doas -u postgres pg_ctl/' -i $out/rosetta/docker-start.sh
+      cp -r "${../genesis_ledgers}" $out/genesis_ledgers
+      patchShebangs $out
     '';
-    config = {
-      env = [ "MINA_TIME_OFFSET=0" ];
-      WorkingDir = "/root";
-      cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-    };
   };
+
+  mkFullImage = name: packages: extraArgs:
+    dockerTools.streamLayeredImage (lib.recursiveUpdate {
+      name = "${name}-full";
+      contents = [
+        dumb-init
+        coreutils
+        bashInteractive
+        python3
+        libp2p_helper
+        procps
+        curl
+        jq
+      ] ++ packages;
+      extraCommands = ''
+        mkdir root tmp
+        chmod 777 tmp
+      '';
+      config = {
+        env = [ "MINA_TIME_OFFSET=0" ];
+        WorkingDir = "/root";
+        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+      };
+    } extraArgs);
 
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
@@ -80,12 +129,35 @@ in {
     mina.out
     mina.mainnet
     mina.genesis
-  ]);
-  mina-archive-image-full = mkFullImage "mina-archive" (with ocamlPackages_mina; [
-    mina-archive-scripts
-    gnutar
-    gzip
+  ]) { };
+  mina-archive-image-full = mkFullImage "mina-archive"
+    (with ocamlPackages_mina; [
+      mina-archive-scripts
+      gnutar
+      gzip
 
-    mina.archive
-  ]);
+      mina.archive
+    ]) { };
+  mina-rosetta-image-full = mkFullImage "mina-rosetta"
+    (with ocamlPackages_mina; [
+      mina-rosetta-scripts
+
+      gnutar
+      gzip
+      postgresql
+      gnused
+      (doas.override { withPAM = false; })
+      shadow
+      less
+
+      mina.out
+      mina.rosetta
+      mina.archive
+      mina.mainnet
+    ]) {
+      config = {
+        cmd = [ "/bin/dumb-init" "/rosetta/docker-start.sh" ];
+        WorkingDir = "/rosetta";
+      };
+    };
 }

@@ -195,15 +195,15 @@ let
         '';
 
         outputs =
-          [ "out" "archive" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
+          [ "out" "archive" "rosetta" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $rosetta/bin $archive/bin $genesis_ledgers $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
           cp src/app/cli/src/mina.exe $out/bin/mina
           cp src/app/logproc/logproc.exe $out/bin/logproc
-          cp src/app/rosetta/rosetta.exe $out/bin/rosetta
+          cp src/app/rosetta/rosetta.exe $rosetta/bin/mina-rosetta
           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
           cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
