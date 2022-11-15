@@ -2216,8 +2216,11 @@ let%test_module "Epoch ledger sync tests" =
       let uuid = Uuid_unix.create () |> Uuid.to_string in
       dir_prefix ^/ sprintf "%s_%s" s uuid
 
+    (* [instance] and [test_number] are used to make ports distinct
+       among tests
+    *)
     let make_mina_network ~context:(module Context : CONTEXT) ~instance
-        ~libp2p_keypair_str ~initial_peers =
+        ~test_number ~libp2p_keypair_str ~initial_peers ~genesis_ledger_hashes =
       let open Context in
       let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
         Broadcast_pipe.create None
@@ -2307,7 +2310,9 @@ let%test_module "Epoch ledger sync tests" =
       let libp2p_keypair =
         Mina_net2.Keypair.of_string libp2p_keypair_str |> Or_error.ok_exn
       in
-      let libp2p_port = Cli_lib.Flag.Port.default_libp2p + instance in
+      let libp2p_port =
+        Cli_lib.Flag.Port.default_libp2p + instance + (test_number * 2)
+      in
       let creatable_gossip_net =
         let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
@@ -2315,7 +2320,9 @@ let%test_module "Epoch ledger sync tests" =
         let addrs_and_ports =
           let external_ip = Unix.Inet_addr.localhost in
           let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
-          let client_port = Cli_lib.Flag.Port.default_client - instance in
+          let client_port =
+            Cli_lib.Flag.Port.default_client - instance - (test_number * 2)
+          in
           ( { external_ip; bind_ip; peer = None; client_port; libp2p_port }
             : Node_addrs_and_ports.t )
         in
@@ -2393,8 +2400,12 @@ let%test_module "Epoch ledger sync tests" =
              | Some answer ->
                  Ok answer
              | None ->
-                 (* should happen only when trying to sync to genesis ledger *)
-                 Ivar.fill_if_empty no_answer_ivar () ;
+                 if
+                   List.mem genesis_ledger_hashes ledger_hash
+                     ~equal:Frozen_ledger_hash.equal
+                 then
+                   (* should happen only when trying to sync to genesis ledger *)
+                   Ivar.fill_if_empty no_answer_ivar () ;
                  Error (Error.of_string "No answer to sync query") )
       in
       let unimplemented name _ = failwithf "RPC %s unimplemented" name () in
@@ -2443,11 +2454,7 @@ let%test_module "Epoch ledger sync tests" =
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
       return
-        ( mina_networking
-        , network_peer
-        , consensus_local_state
-        , no_answer_ivar
-        , pids )
+        (mina_networking, network_peer, consensus_local_state, no_answer_ivar)
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
@@ -2491,39 +2498,15 @@ let%test_module "Epoch ledger sync tests" =
       return (module Context : CONTEXT)
 
     let run_test (module Context : CONTEXT) ~staking_epoch_ledger
-        ~next_epoch_ledger ~starting_accounts =
+        ~next_epoch_ledger ~starting_accounts ~test_number =
       let module Context2 = struct
         include Context
 
         let trust_system = Trust_system.create (make_dirname "trust_system")
       end in
       let test_finished = ref false in
-      let cleanup (pid_tables : Child_processes.Termination.t list) =
-        let logger = Context.logger in
-        (* test finished, prevents timeout causing exn *)
+      let cleanup () =
         test_finished := true ;
-        List.iter pid_tables
-          ~f:
-            (Pid.Table.iteri ~f:(fun ~key:pid ~data:process_kind ->
-                 match
-                   (process_kind : Child_processes.Termination.process_kind)
-                 with
-                 | Libp2p_helper -> (
-                     let pid_n = Pid.to_int pid in
-                     [%log debug]
-                       "Cleanup, attempting to kill libp2p process with pid %d"
-                       pid_n ;
-                     match Core.Unix.system (sprintf "kill %d" pid_n) with
-                     | Ok () ->
-                         [%log debug] "Killed libp2p process with pid %d" pid_n ;
-                         ()
-                     | Error _ ->
-                         (* report error, allow test to succeed *)
-                         [%log error]
-                           "Error when killing libp2p process with pid %d" pid_n
-                     )
-                 | _ ->
-                     () ) ) ;
         File_system.remove_dir dir_prefix
       in
       let staking_ledger_root =
@@ -2534,17 +2517,27 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
           next_epoch_ledger
       in
+      let genesis_ledger_hashes =
+        match (staking_epoch_ledger, next_epoch_ledger) with
+        | Genesis_epoch_ledger _, Genesis_epoch_ledger _ ->
+            [ staking_ledger_root; next_epoch_ledger_root ]
+        | Genesis_epoch_ledger _, Ledger_db _ ->
+            [ staking_ledger_root ]
+        | Ledger_db _, Genesis_epoch_ledger _ ->
+            [ next_epoch_ledger_root ]
+        | Ledger_db _, Ledger_db _ ->
+            []
+      in
       let%bind ( _mina_network1
                , network_peer1
                , consensus_local_state1
-               , no_answer_ivar1
-               , pids1 ) =
+               , no_answer_ivar1 ) =
         make_mina_network
           ~context:(module Context)
-          ~instance:0
+          ~instance:0 ~test_number
           ~libp2p_keypair_str:
             "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
-          ~initial_peers:[]
+          ~initial_peers:[] ~genesis_ledger_hashes
       in
 
       let staking_epoch_snapshot =
@@ -2563,15 +2556,14 @@ let%test_module "Epoch ledger sync tests" =
       let%bind ( mina_network2
                , _network_peer2
                , _consensus_local_state2
-               , _no_answer_ivar2
-               , pids2 ) =
-        make_mina_network ~instance:1
+               , _no_answer_ivar2 ) =
+        make_mina_network ~instance:1 ~test_number
           ~context:(module Context2)
           ~libp2p_keypair_str:
             "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
           ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
+          ~genesis_ledger_hashes
       in
-      let all_pids = [ pids1; pids2 ] in
       let make_sync_ledger () =
         let db_ledger = make_empty_db_ledger (module Context) in
         List.iter starting_accounts ~f:(fun (acct : Account.t) ->
@@ -2598,7 +2590,7 @@ let%test_module "Epoch ledger sync tests" =
       (* should only happen when syncing to a genesis ledger *)
       don't_wait_for
         (let%bind () = Ivar.read no_answer_ivar1 in
-         let%map () = cleanup all_pids in
+         let%map () = cleanup () in
          raise No_sync_answer ) ;
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
@@ -2625,12 +2617,12 @@ let%test_module "Epoch ledger sync tests" =
           ~data:() ~equal:(fun () () -> true)
       with
       | `Ok ledger ->
-          let%map () = cleanup all_pids in
+          let%map () = cleanup () in
           let ledger_root = Ledger.Db.merkle_root ledger in
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
           [%log debug] "Synced next epoch ledger, sync test succeeded"
       | `Target_changed _ ->
-          let%map () = cleanup all_pids in
+          let%map () = cleanup () in
           failwith "Target changed when getting next epoch ledger"
 
     let make_genesis_ledger (module Context : CONTEXT)
@@ -2669,7 +2661,7 @@ let%test_module "Epoch ledger sync tests" =
           let next_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 20)
           in
-          run_test
+          run_test ~test_number:1
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
 
@@ -2688,7 +2680,7 @@ let%test_module "Epoch ledger sync tests" =
              the ledger to sync to, see issue #12170
           *)
           let starting_accounts = List.take test_accounts 8 in
-          run_test
+          run_test ~test_number:2
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts )
 
@@ -2712,7 +2704,7 @@ let%test_module "Epoch ledger sync tests" =
               make_genesis_ledger (module Context) (List.take test_accounts 10)
             in
             let next_epoch_ledger = staking_epoch_ledger in
-            run_test
+            run_test ~test_number:3
               (module Context)
               ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
       in
