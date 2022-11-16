@@ -23,26 +23,7 @@ let%test_module "Tokens test" =
 
     let account_id = Account_id.create pk_compressed token_id
 
-    let ( tag
-        , _
-        , p_module
-        , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
-        ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N2)
-        ~max_proofs_verified:(module Nat.N0)
-        ~name:"empty_update"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
-        ~choices:(fun ~self:_ ->
-          [ Zkapps_tokens.Rules.Initialize_state.rule
-          ; Zkapps_tokens.Rules.Update_state.rule
-          ] )
-
-    module P = (val p_module)
-
-    let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+    let vk = Lazy.force Zkapps_tokens.vk
 
     module Deploy_account_update = struct
       let account_update_body : Account_update.Body.t =
@@ -93,10 +74,7 @@ let%test_module "Tokens test" =
     module Initialize_account_update = struct
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
-          (initialize_prover
-             ~handler:
-               (Zkapps_tokens.Rules.Initialize_state.handler pk_compressed
-                  token_id ) )
+          (Zkapps_tokens.initialize pk_compressed token_id)
     end
 
     module Update_state_account_update = struct
@@ -104,10 +82,7 @@ let%test_module "Tokens test" =
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
-          (update_state_prover
-             ~handler:
-               (Zkapps_tokens.Rules.Update_state.handler pk_compressed token_id
-                  new_state ) )
+          (Zkapps_tokens.update_state pk_compressed token_id new_state)
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =

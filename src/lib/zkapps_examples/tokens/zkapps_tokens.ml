@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_params.Tick.Run
 open Signature_lib
 open Mina_base
+open Pickles_types
 
 (** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
@@ -89,3 +90,65 @@ module Rules = struct
       { identifier = "Update state"; prevs = []; main; uses_lookup = false }
   end
 end
+
+let lazy_compiled =
+  lazy
+    (Zkapps_examples.compile () ~cache:Cache_dir.cache
+       ~auxiliary_typ:Impl.Typ.unit
+       ~branches:(module Nat.N2)
+       ~max_proofs_verified:(module Nat.N0)
+       ~name:"empty_update"
+       ~constraint_constants:
+         Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
+       ~choices:(fun ~self:_ ->
+         [ Rules.Initialize_state.rule; Rules.Update_state.rule ] ) )
+
+let compile () = ignore (Lazy.force lazy_compiled : _)
+
+let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
+
+let vk = Lazy.map ~f:Pickles.Side_loaded.Verification_key.of_compiled tag
+
+let p_module = Lazy.map lazy_compiled ~f:(fun (_, _, p_module, _) -> p_module)
+
+module P = struct
+  type statement = Zkapp_statement.t
+
+  type t = (Nat.N0.n, Nat.N0.n) Pickles.Proof.t
+
+  module type Proof_intf =
+    Pickles.Proof_intf with type statement = statement and type t = t
+
+  let verification_key =
+    Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.verification_key)
+
+  let id = Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.id)
+
+  let verify statements =
+    let module P : Proof_intf = (val Lazy.force p_module) in
+    P.verify statements
+
+  let verify_promise statements =
+    let module P : Proof_intf = (val Lazy.force p_module) in
+    P.verify_promise statements
+end
+
+let initialize_prover =
+  Lazy.map lazy_compiled
+    ~f:(fun (_, _, _, Pickles.Provers.[ initialize_prover; _ ]) ->
+      initialize_prover )
+
+let initialize public_key token_id =
+  let initialize_prover = Lazy.force initialize_prover in
+  initialize_prover
+    ~handler:(Rules.Initialize_state.handler public_key token_id)
+
+let update_state_prover =
+  Lazy.map lazy_compiled
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; update_state_prover ]) ->
+      update_state_prover )
+
+let update_state public_key token_id new_state =
+  let update_state_prover = Lazy.force update_state_prover in
+  update_state_prover
+    ~handler:(Rules.Update_state.handler public_key token_id new_state)

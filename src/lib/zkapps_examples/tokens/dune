@@ -2,26 +2,29 @@
  (name zkapps_tokens)
  (libraries
    ;; opam libraries
+   async_kernel
    base
    core_kernel
    ;; local libraries
+   cache_dir
    crypto_params
    currency
-   pasta_bindings
+   genesis_constants
    kimchi_backend
    kimchi_backend_common
    kimchi_pasta
    mina_base
    mina_base.import
+   pasta_bindings
    pickles
    pickles.backend
    pickles_types
    random_oracle
    random_oracle_input
-   snarky.backendless
-   snark_params
    sgn
    signature_lib
+   snark_params
+   snarky.backendless
    tuple_lib
    with_hash
    zkapps_examples)
