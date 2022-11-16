@@ -216,7 +216,7 @@ module T = struct
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
-    |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
+    |> Option.bind ~f:(Fn.compose Mina_stdlib.Nonempty_list.of_list_opt snd)
 
   let scan_state { scan_state; _ } = scan_state
 
