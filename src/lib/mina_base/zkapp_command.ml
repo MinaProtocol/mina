@@ -200,6 +200,8 @@ module Call_forest = struct
       module Checked : sig
         include Digest_intf.S_checked
 
+        val empty : t
+
         val cons : Tree.Checked.t -> t -> t
       end
 
@@ -290,6 +292,8 @@ module Call_forest = struct
 
       module Checked = struct
         include Checked
+
+        let empty = constant empty
 
         let cons hash h_tl =
           Random_oracle.Checked.hash
