@@ -187,15 +187,6 @@ let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
     )
     |> filterNonePromises;
 
-  let snarkFeeChallenge =
-    getPromisifiedChallenge(
-      users,
-      pgPool,
-      Postgres.getSnarkFeeChallenge,
-      0,
-      "sum",
-    )
-    |> filterNonePromises;
 
   let transactionSentChallenge =
     getPromisifiedChallenge(
@@ -207,7 +198,7 @@ let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
     )
     |> filterNonePromises;
 
-  [|blocksChallenge, snarkFeeChallenge, transactionSentChallenge|]
+  [|blocksChallenge, transactionSentChallenge|]
   |> all
   |> then_(result => {
        result

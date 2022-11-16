@@ -13,14 +13,11 @@ let getBlocksChallenge = pk => {
   |j};
 };
 
+// leaving as a stub, user_commands has different schema now
 let getTransactionsSentChallenge = pk => {
   {j|
     SELECT MAX(nonce)
     FROM user_commands
-    INNER JOIN public_keys AS p ON source_id=p.id
-    WHERE status = 'applied'
-    AND type = 'payment'
-    AND p.value = '$(pk)'
   |j};
 };
 
