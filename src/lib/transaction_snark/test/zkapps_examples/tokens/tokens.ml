@@ -9,6 +9,33 @@ module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
+(* TODO: Find a home for this. *)
+let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
+    ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
+    ~initialize_ledger ~finalize_ledger zkapp_command =
+  let fee_payer : Account_update.Fee_payer.t =
+    { body =
+        { Account_update.Body.Fee_payer.dummy with
+          public_key = fee_payer_pk
+        ; fee
+        }
+    ; authorization = Signature.dummy
+    }
+  in
+  let zkapp_command : Zkapp_command.t =
+    Array.fold signers
+      ~init:
+        ({ fee_payer; account_updates = zkapp_command; memo } : Zkapp_command.t)
+      ~f:(fun zkapp_command (pk_compressed, sk) ->
+        Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
+  in
+  Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+      let aux = initialize_ledger ledger in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          check_zkapp_command_with_merges_exn ?expected_failure ledger
+            [ zkapp_command ] ) ;
+      finalize_ledger aux ledger )
+
 let%test_module "Tokens test" =
   ( module struct
     let () = Base.Backtrace.elide := false
@@ -46,33 +73,6 @@ let%test_module "Tokens test" =
         account_update
     end
 
-    let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
-        ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~signers
-        ~initialize_ledger ~finalize_ledger zkapp_command =
-      let fee_payer : Account_update.Fee_payer.t =
-        { body =
-            { Account_update.Body.Fee_payer.dummy with
-              public_key = pk_compressed
-            ; fee
-            }
-        ; authorization = Signature.dummy
-        }
-      in
-      let zkapp_command : Zkapp_command.t =
-        Array.fold signers
-          ~init:
-            ( { fee_payer; account_updates = zkapp_command; memo }
-              : Zkapp_command.t )
-          ~f:(fun zkapp_command (pk_compressed, sk) ->
-            Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
-      in
-      Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-          let aux = initialize_ledger ledger in
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              check_zkapp_command_with_merges_exn ?expected_failure ledger
-                [ zkapp_command ] ) ;
-          finalize_ledger aux ledger )
-
     let signers = [| (pk_compressed, sk) |]
 
     let initialize_ledger ledger =
@@ -95,7 +95,8 @@ let%test_module "Tokens test" =
         []
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -110,7 +111,8 @@ let%test_module "Tokens test" =
         |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -126,7 +128,8 @@ let%test_module "Tokens test" =
         |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -140,7 +143,8 @@ let%test_module "Tokens test" =
         []
         |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -151,7 +155,8 @@ let%test_module "Tokens test" =
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -163,7 +168,8 @@ let%test_module "Tokens test" =
         |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger
+        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+             ~initialize_ledger ~finalize_ledger
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
@@ -177,7 +183,8 @@ let%test_module "Tokens test" =
             []
             |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
             |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-            |> test_zkapp_command ~signers ~initialize_ledger ~finalize_ledger )
+            |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
+                 ~initialize_ledger ~finalize_ledger )
       in
       assert (Or_error.is_error account)
   end )
