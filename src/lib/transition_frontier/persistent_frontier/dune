@@ -40,7 +40,7 @@
    verifier
    with_hash
    debug_assert
-   non_empty_list
+   mina_stdlib
    ppx_version.runtime
    pickles.backend
    snark_params

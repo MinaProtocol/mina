@@ -149,7 +149,7 @@ module Make (Inputs : Inputs_intf) :
     let root_transition_with_hash =
       With_hash.of_data root ~hash_data:state_hashes
     in
-    let%bind (_ : State_hash.t Non_empty_list.t) =
+    let%bind (_ : State_hash.t Mina_stdlib.Nonempty_list.t) =
       Deferred.return
         (Result.of_option
            (Merkle_list_verifier.verify
