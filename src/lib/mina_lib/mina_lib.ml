@@ -2507,10 +2507,7 @@ let%test_module "Epoch ledger sync tests" =
         let trust_system = Trust_system.create (make_dirname "trust_system")
       end in
       let test_finished = ref false in
-      let cleanup () =
-        test_finished := true ;
-        File_system.remove_dir dir_prefix
-      in
+      let cleanup () = test_finished := true in
       let staking_ledger_root =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
           staking_epoch_ledger
@@ -2591,9 +2588,8 @@ let%test_module "Epoch ledger sync tests" =
       in
       (* should only happen when syncing to a genesis ledger *)
       don't_wait_for
-        (let%bind () = Ivar.read no_answer_ivar1 in
-         let%map () = cleanup () in
-         raise No_sync_answer ) ;
+        (let%map () = Ivar.read no_answer_ivar1 in
+         cleanup () ; raise No_sync_answer ) ;
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
         (let%map () = after (Time.Span.of_min test_timeout_min) in
@@ -2619,12 +2615,13 @@ let%test_module "Epoch ledger sync tests" =
           ~data:() ~equal:(fun () () -> true)
       with
       | `Ok ledger ->
-          let%map () = cleanup () in
+          cleanup () ;
           let ledger_root = Ledger.Db.merkle_root ledger in
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
-          [%log debug] "Synced next epoch ledger, sync test succeeded"
+          [%log debug] "Synced next epoch ledger, sync test succeeded" ;
+          Deferred.unit
       | `Target_changed _ ->
-          let%map () = cleanup () in
+          cleanup () ;
           failwith "Target changed when getting next epoch ledger"
 
     let make_genesis_ledger (module Context : CONTEXT)
