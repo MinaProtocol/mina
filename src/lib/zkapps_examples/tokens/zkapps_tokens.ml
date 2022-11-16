@@ -220,15 +220,20 @@ module Rules = struct
         let recursive_input =
           { Statement.Circuit.state; self_token; running_total }
         in
+        let proof_must_verify =
+          Boolean.not (state_is_empty recursive_input.state)
+        in
+        let zero_total = Field.equal Field.zero recursive_input.running_total in
+        (* Either there are more account updates to handle, or the running
+           total must be zero.
+        *)
+        Boolean.Assert.any [ proof_must_verify; zero_total ] ;
         let proof =
           exists (Typ.Internal.ref ()) ~compute:(fun () ->
               Lazy.force dummy_proof )
         in
         { Pickles.Inductive_rule.previous_proof_statements =
-            [ { public_input = recursive_input
-              ; proof
-              ; proof_must_verify = Boolean.not (state_is_empty state)
-              }
+            [ { public_input = recursive_input; proof; proof_must_verify }
             ; (* dummy to avoid pickles bug *)
               { public_input = recursive_input
               ; proof =
@@ -272,16 +277,20 @@ module Rules = struct
             { Recursive.Statement.Circuit.state; self_token; running_total } )
           input
       in
+      let proof_must_verify =
+        Boolean.not (state_is_empty recursive_input.state)
+      in
+      let zero_total = Field.equal Field.zero recursive_input.running_total in
+      (* Either there are more account updates to handle, or the running total
+         must be zero.
+      *)
+      Boolean.Assert.any [ proof_must_verify; zero_total ] ;
       let proof =
         exists (Typ.Internal.ref ()) ~compute:(fun () ->
             Lazy.force dummy_proof )
       in
       { Pickles.Inductive_rule.previous_proof_statements =
-          [ { public_input = recursive_input
-            ; proof
-            ; proof_must_verify =
-                Boolean.not (state_is_empty recursive_input.state)
-            }
+          [ { public_input = recursive_input; proof; proof_must_verify }
           ; (* dummy to avoid pickles bug *)
             { public_input = recursive_input
             ; proof =
