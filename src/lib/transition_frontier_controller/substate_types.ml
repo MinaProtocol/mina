@@ -145,7 +145,12 @@ module type Transition_states_intf = sig
   val add_new : t -> state_t -> unit
 
   (** Mark transition and all its descedandants invalid. *)
-  val mark_invalid : t -> error:Error.t -> state_hash:State_hash.t -> unit
+  val mark_invalid :
+       ?reason:[ `Proof | `Signature_or_proof | `Other ]
+    -> t
+    -> error:Error.t
+    -> state_hash:State_hash.t
+    -> unit
 
   (** Find state in transition states *)
   val find : t -> State_hash.t -> state_t option

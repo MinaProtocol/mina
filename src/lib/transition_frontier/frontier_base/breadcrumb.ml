@@ -111,14 +111,15 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                 Actions.(Gossiped_invalid_transition, Some (message, [])))
       in
       Error (`Invalid_staged_ledger_diff (Error.of_string message))
-  | Error (`Invalid_staged_ledger_diff errors) ->
+  | Error (`Invalid_staged_ledger_diff error) ->
       let reasons =
-        String.concat ~sep:" && "
-          (List.map errors ~f:(function
-            | `Incorrect_target_staged_ledger_hash ->
-                "staged ledger hash"
-            | `Incorrect_target_snarked_ledger_hash ->
-                "snarked ledger hash" ) )
+        match error with
+        | `Incorrect_target_snarked_ledger_hash ->
+            "snarked ledger hash"
+        | `Incorrect_target_staged_and_snarked_ledger_hashes ->
+            "snarked ledger hash && staged ledger hash"
+        | `Incorrect_target_staged_ledger_hash ->
+            "staged ledger hash"
       in
       let message = "invalid staged ledger diff: incorrect " ^ reasons in
       let%map () =

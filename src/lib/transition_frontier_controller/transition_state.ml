@@ -1,17 +1,18 @@
 open Mina_base
 open Core_kernel
 
+type received_info =
+  { gossip : bool  (** Was it a gossip or a response to an RPC request *)
+  ; received_at : Time.t
+  ; sender : Network_peer.Peer.t
+  }
+
 (** Auxiliary data of a transition.
     
     It's used across many transition states to store details
     of how the transition was received.
 *)
-type aux_data =
-  { received_via_gossip : bool
-        (* TODO consider storing all senders and received_at times *)
-  ; received_at : Time.t
-  ; sender : Network_peer.Peer.t
-  }
+type aux_data = { received_via_gossip : bool; received : received_info list }
 
 (** Transition state type.
     

@@ -3,7 +3,8 @@ open Mina_base
 
 module type Inmem_context = sig
   val on_invalid :
-       error:Error.t
+       ?reason:[ `Proof | `Signature_or_proof | `Other ]
+    -> error:Error.t
     -> aux:Transition_state.aux_data
     -> Substate.transition_meta
     -> unit

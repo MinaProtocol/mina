@@ -53,4 +53,7 @@
    dsu
    perf_histograms
    protocol_version
+   staged_ledger
+   transition_chain_verifier
+   async_unix
 ))

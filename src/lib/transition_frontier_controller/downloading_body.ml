@@ -82,8 +82,8 @@ and upon_f ~context ~transition_states ~state_hash ~mark_processed_and_promote =
   Otherwise starts downloading body for a transition and returns the
   [Substate.In_progress] context.
 *)
-and make_download_body_ctx ~body_opt ~header ~transition_states ~context
-    ~mark_processed_and_promote =
+and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
+    ~context ~mark_processed_and_promote =
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_header_with_validation header in
   match body_opt with
@@ -92,7 +92,12 @@ and make_download_body_ctx ~body_opt ~header ~transition_states ~context
   | None ->
       let open Context in
       let module I = Interruptible.Make () in
-      let action = Context.download_body ~header (module I) in
+      let action =
+        Context.download_body
+          ~header:(Mina_block.Validation.header_with_hash header)
+          ~preferred_peers
+          (module I)
+      in
       Async_kernel.Deferred.upon (I.force action)
         (upon_f ~context ~transition_states ~state_hash
            ~mark_processed_and_promote ) ;
@@ -115,10 +120,17 @@ and make_download_body_ctx ~body_opt ~header ~transition_states ~context
 and restart_failed ~transition_states ~mark_processed_and_promote ~context =
   function
   | Transition_state.Downloading_body
-      ({ header; substate = { status = Failed _; _ } as s; _ } as r) ->
+      ( { header
+        ; substate = { status = Failed _; _ } as s
+        ; aux = { received; _ }
+        ; _
+        } as r ) ->
+      let preferred_peers =
+        List.map received ~f:(fun { sender; _ } -> sender)
+      in
       let ctx =
-        make_download_body_ctx ~body_opt:None ~header ~transition_states
-          ~mark_processed_and_promote ~context
+        make_download_body_ctx ~preferred_peers ~body_opt:None ~header
+          ~transition_states ~mark_processed_and_promote ~context
       in
       Transition_states.update transition_states
         (Transition_state.Downloading_body
@@ -173,8 +185,10 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
   let consensus_state =
     Mina_state.Protocol_state.consensus_state protocol_state
   in
+  let { Transition_state.received; _ } = aux in
+  let preferred_peers = List.map received ~f:(fun { sender; _ } -> sender) in
   let ctx =
-    make_download_body_ctx ~body_opt ~header ~transition_states
+    make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
       ~mark_processed_and_promote ~context
   in
   let substate = { substate with status = Processing ctx } in

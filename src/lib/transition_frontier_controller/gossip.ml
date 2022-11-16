@@ -71,7 +71,7 @@ let preserve_body ~body = function
     performed in case the gossiped data triggering a change of state.
     *)
 let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
-    ~gossip_header st =
+    ~gossip_header ~sender st =
   let (module Ctx : CONTEXT) = context in
   let state_hash =
     (Transition_state.State_functions.transition_meta st).state_hash
@@ -114,7 +114,10 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
   in
   let st =
     Transition_state.modify_aux_data st ~f:(fun d ->
-        { d with received_via_gossip = true } )
+        { received_via_gossip = true
+        ; received =
+            { received_at = Time.now (); gossip = true; sender } :: d.received
+        } )
   in
   let st, pre_decision =
     Option.value_map

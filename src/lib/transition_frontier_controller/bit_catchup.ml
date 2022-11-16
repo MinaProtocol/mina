@@ -3,6 +3,224 @@ open Core_kernel
 open Async
 open Context
 
+let retrieve_hash_chain_max_jobs = 5
+
+let sec_per_block =
+  Option.value_map
+    (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
+    ~default:15. ~f:Float.of_string
+
+let convert_breadcrumb_error =
+  let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
+  let open Staged_ledger.Staged_ledger_error in
+  function
+  | `Invalid_body_reference ->
+      invalid "body reference"
+  | `Invalid_staged_ledger_diff `Incorrect_target_snarked_ledger_hash ->
+      invalid "snarked ledger hash"
+  | `Invalid_staged_ledger_diff
+      `Incorrect_target_staged_and_snarked_ledger_hashes ->
+      invalid "snarked ledger hash && staged ledger hash"
+  | `Invalid_staged_ledger_diff `Incorrect_target_staged_ledger_hash ->
+      invalid "staged ledger hash"
+  | `Staged_ledger_application_failed (Couldn't_reach_verifier _ as e)
+  | `Staged_ledger_application_failed (Pre_diff (Unexpected _) as e) ->
+      `Verifier_error (to_error e)
+  | `Staged_ledger_application_failed (Invalid_proofs _ as e) ->
+      `Invalid (to_error e, `Proof)
+  | `Staged_ledger_application_failed (Pre_diff (Verification_failed _) as e) ->
+      `Invalid (to_error e, `Signature_or_proof)
+  | `Staged_ledger_application_failed (Pre_diff _ as e)
+  | `Staged_ledger_application_failed (Non_zero_fee_excess _ as e)
+  | `Staged_ledger_application_failed (Insufficient_work _ as e)
+  | `Staged_ledger_application_failed (Mismatched_statuses _ as e)
+  | `Staged_ledger_application_failed (Invalid_public_key _ as e)
+  | `Staged_ledger_application_failed (Unexpected _ as e) ->
+      `Invalid (to_error e, `Other)
+
+let hash_chain_to_metas_impl ~target_length hashes target_hash =
+  Tuple3.get1
+  @@ List.fold_right hashes ~init:([], target_length, target_hash)
+       ~f:(fun parent_state_hash (res, blockchain_length, state_hash) ->
+         ( Substate.{ state_hash; parent_state_hash; blockchain_length } :: res
+         , Mina_numbers.Length.pred blockchain_length
+         , parent_state_hash ) )
+
+let hash_chain_to_metas ~target_length hashes =
+  List.hd hashes
+  |> Option.value_map ~default:[]
+       ~f:(hash_chain_to_metas_impl ~target_length (List.drop hashes 1))
+
+let try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length
+    hashes =
+  List.fold_until
+    (Non_empty_list.to_list hashes)
+    ~init:(target_length, [])
+    ~f:(fun (blockchain_length, acc) hash ->
+      match lookup_transition hash with
+      | `Present | `Invalid ->
+          Continue_or_stop.Stop (Ok (hash :: acc))
+      | `Not_present ->
+          Continue (Mina_numbers.Length.pred blockchain_length, hash :: acc) )
+    ~finish:(fun (blockchain_length, _) ->
+      if Mina_numbers.Length.(blockchain_length <= root_length) then
+        Result.fail `No_common_ancestor
+      else Result.fail `Peer_moves_too_fast )
+
+let of_multipeer_error ~f =
+  Fn.compose Error.of_string
+  @@ Fn.compose (String.concat ~sep:", ") (List.map ~f)
+
+let of_download_error =
+  of_multipeer_error ~f:(fun (peer, e) ->
+      Network_peer.Peer.to_string peer ^ " " ^ Error.to_string_hum e )
+
+let of_hash_chain_error =
+  of_multipeer_error ~f:(fun (peer, e) ->
+      let str =
+        match e with
+        | `Failed_to_download_transition_chain_proof ->
+            " failed to download transition chain proof"
+        | `Invalid_transition_chain_proof ->
+            " invalid transition chain proof"
+        | `No_common_ancestor ->
+            " no common ancestor"
+        | `Peer_moves_too_fast ->
+            " peer moves too fast"
+      in
+      Network_peer.Peer.to_string peer ^ str )
+
+let result_pair_both a =
+  Fn.compose
+    (Result.map ~f:(fun x -> (a, x)))
+    (Result.map_error ~f:(fun x -> (a, x)))
+
+let retrieve_hash_chain_from_peer ~network ~trust_system ~logger ~root_length
+    ~peer ~target_hash ~target_length ~lookup_transition
+    (module I : Interruptible.F) =
+  let%bind.I.Result transition_chain_proof =
+    I.map
+      ~f:
+        (Result.map_error
+           ~f:(const `Failed_to_download_transition_chain_proof) )
+    @@ I.lift
+    @@ Mina_networking.get_transition_chain_proof
+         ~timeout:(Time.Span.of_sec 10.) network peer target_hash
+  in
+  (* a list of state_hashes from new to old *)
+  let%bind.I.Result hashes =
+    match
+      Transition_chain_verifier.verify ~target_hash ~transition_chain_proof
+    with
+    | Some hs ->
+        I.Result.return hs
+    | None ->
+        let error_msg =
+          sprintf !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof" peer
+        in
+        let%bind.I () =
+          I.lift
+          @@ Trust_system.(
+               record trust_system logger peer
+                 Actions.
+                   ( Sent_invalid_transition_chain_merkle_proof
+                   , Some (error_msg, []) ))
+        in
+        I.return (Result.Error `Invalid_transition_chain_proof)
+  in
+  I.return
+    (try_to_connect_hash_chain hashes ~lookup_transition ~target_length
+       ~root_length )
+
+let remove_duplicate_peers peers =
+  let open Network_peer.Peer in
+  List.stable_sort peers ~compare
+  |> List.remove_consecutive_duplicates ~which_to_keep:`First ~equal
+
+let get_peers ~preferred_peers network =
+  Deferred.map ~f:(fun x -> remove_duplicate_peers @@ preferred_peers @ x)
+  @@ Mina_networking.peers network
+
+let retrieve_hash_chain ~network ~trust_system ~logger ~root_length
+    ~preferred_peers ~target_hash ~target_length ~lookup_transition
+    (module I : Interruptible.F) =
+  let%bind.I peers = I.lift (get_peers ~preferred_peers network) in
+  let f peer =
+    I.map ~f:(result_pair_both peer)
+    @@ retrieve_hash_chain_from_peer ~network ~trust_system ~logger ~root_length
+         ~peer ~target_hash ~target_length ~lookup_transition
+         (module I)
+  in
+  let%map.I res =
+    I.Result.find_map ~how:(`Max_concurrent_jobs retrieve_hash_chain_max_jobs)
+      peers ~f
+  in
+  Result.map_error ~f:of_hash_chain_error res
+
+let download_ancestors ~preferred_peers ~lookup_transition ~network ~target_hash
+    metas (module I : Interruptible.F) =
+  let%bind.I peers = I.lift (get_peers ~preferred_peers network) in
+  let rev_metas = List.rev metas in
+  let max_ = Transition_frontier.max_catchup_chunk_length in
+  let downloaded = State_hash.Table.create () in
+  let need_transition state_hash =
+    if State_hash.Table.mem downloaded state_hash then false
+    else
+      match lookup_transition state_hash with
+      | `Not_present ->
+          true
+      | _ ->
+          false
+  in
+  let hash_data block =
+    Mina_block.(header block |> Header.protocol_state)
+    |> Mina_state.Protocol_state.hashes
+  in
+  let map_res ~peer =
+    Fn.compose (result_pair_both peer)
+    @@ Result.bind ~f:(fun blocks ->
+           List.iter
+             ~f:(fun b ->
+               let bh = With_hash.of_data ~hash_data b in
+               ignore
+                 ( State_hash.Table.add downloaded
+                     ~key:(State_hash.With_state_hashes.state_hash bh)
+                     ~data:bh
+                   : [ `Duplicate | `Ok ] ) )
+             blocks ;
+           match State_hash.Table.find downloaded target_hash with
+           | None ->
+               Result.fail @@ Error.of_string "target hash not retrieved"
+           | Some _ ->
+               Result.return () )
+  in
+  let f peer =
+    let n, request =
+      List.fold_until rev_metas ~init:(0, []) ~finish:Fn.id
+        ~f:(fun (n, acc) meta ->
+          let need = need_transition meta.Substate.state_hash in
+          if need && n = max_ - 1 then
+            Continue_or_stop.Stop (n + 1, meta.state_hash :: acc)
+          else if need then Continue (n + 1, meta.state_hash :: acc)
+          else Continue (n, acc) )
+    in
+    let sec = Float.of_int n *. sec_per_block in
+    I.lift
+    @@ Deferred.map ~f:(map_res ~peer)
+    @@ Mina_networking.get_transition_chain
+         ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+         ~timeout:(Time.Span.of_sec sec) network peer request
+  in
+  let%map.I.Result peer, () =
+    I.Result.find_map ~how:`Sequential peers ~f
+    |> I.map ~f:(Result.map_error ~f:of_download_error)
+  in
+  List.map metas ~f:(fun meta ->
+      Option.value_map
+        ~default:(`Meta meta, peer)
+        (State_hash.Table.find downloaded meta.state_hash)
+        ~f:(fun block -> (`Block block, peer)) )
+
 (** [promote_to_higher_state_impl] takes state with [Processed] status and
     returns the next state with [Processing] status or [None] if the transition
     exits the catchup state.
@@ -174,8 +392,6 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let trust_system = trust_system
 
-    let network = network
-
     let write_verified_transition (`Transition t, `Source s) : unit =
       (* TODO remove validation_callback from Transition_router and then remove the `Valid_cb argument *)
       Pipe_lib.Strict_pipe.Writer.write verified_transition_writer
@@ -197,37 +413,68 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let ancestry_verification_timeout = Time.Span.of_sec 30.
 
-    let ancestry_download_timeout = Time.Span.of_sec 30.
+    let ancestry_download_timeout = Time.Span.of_sec 300.
 
     let transaction_snark_verification_timeout = Time.Span.of_sec 30.
 
-    let download_body ~header:_ (module I : Interruptible.F) =
-      I.lift @@ Deferred.never ()
+    let download_body ~header ~preferred_peers (module I : Interruptible.F) =
+      let target_hash = State_hash.With_state_hashes.state_hash header in
+      let metas = [ Substate.transition_meta_of_header_with_hash header ] in
+      let%bind.I.Result res =
+        download_ancestors ~preferred_peers
+          ~lookup_transition:(const `Not_present)
+          ~network ~target_hash metas
+          (module I)
+      in
+      match res with
+      | [ (`Block bh, _) ] ->
+          I.Result.return (With_hash.data bh |> Mina_block.body)
+      | _ ->
+          I.return
+            ( Result.fail
+            @@ Error.of_string "unexpected return of download_ancestors" )
 
     let build_breadcrumb ~received_at ~parent ~transition
         (module I : Interruptible.F) =
-      let f = function
-        | `Invalid_body_reference -> Error.of_string "invalid body reference"
-       | `Invalid_staged_ledger_diff lst -> 
-          String.concat ~sep:" and " @@
-          List.map ~f:(function
-
-          )
-         [ `Incorrect_target_snarked_ledger_hash
-         | `Incorrect_target_staged_ledger_hash ]
-         list
-       | `Staged_ledger_application_failed of
-         Staged_ledger.Staged_ledger_error.t ]
-    in
       I.lift
-        (Frontier_base.Breadcrumb.build_no_reporting
-           ~skip_staged_ledger_verification:`Proofs ~logger ~precomputed_values
-           ~verifier ~parent ~transition
-           ~transition_receipt_time:(Some received_at) () |> Deferred.Result.map_error ~f)
+        ( Frontier_base.Breadcrumb.build_no_reporting
+            ~skip_staged_ledger_verification:`Proofs ~logger ~precomputed_values
+            ~verifier ~parent ~transition
+            ~transition_receipt_time:(Some received_at) ()
+        |> Deferred.Result.map_error ~f:convert_breadcrumb_error )
 
-    let retrieve_chain ~some_ancestors:_ ~target:_ ~parent_cache:_ ~sender:_
-        ~lookup_transition:_ (module I : Interruptible.F) =
-      I.lift @@ Deferred.never ()
+    let retrieve_chain ~some_ancestors ~target_hash ~target_length
+        ~preferred_peers ~lookup_transition (module I : Interruptible.F) =
+      match lookup_transition target_hash with
+      | `Invalid | `Present ->
+          I.return (Or_error.error_string "target transition is present")
+      | `Not_present when List.is_empty some_ancestors -> (
+          let root_length =
+            Transition_frontier.root frontier
+            |> Frontier_base.Breadcrumb.consensus_state
+            |> Consensus.Data.Consensus_state.blockchain_length
+          in
+          let%bind.I.Result peer, hashes =
+            retrieve_hash_chain ~network ~trust_system ~logger ~root_length
+              ~preferred_peers ~target_hash ~target_length ~lookup_transition
+              (module I)
+          in
+          let metas = hash_chain_to_metas ~target_length hashes in
+          match Option.map ~f:lookup_transition @@ List.hd hashes with
+          | Some `Invalid ->
+              I.Result.return (List.map ~f:(fun x -> (`Meta x, peer)) metas)
+          | _ ->
+              (* Present *)
+              download_ancestors ~preferred_peers:(peer :: preferred_peers)
+                ~lookup_transition ~network ~target_hash metas
+                (module I) )
+      | `Not_present ->
+          let metas =
+            hash_chain_to_metas_impl ~target_length some_ancestors target_hash
+          in
+          download_ancestors ~preferred_peers ~lookup_transition ~network
+            ~target_hash metas
+            (module I)
 
     let genesis_state_hash =
       let genesis_protocol_state =
@@ -244,40 +491,64 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let processed_dsu = Processed_skipping.Dsu.create ()
 
+    let remote s = Network_peer.Envelope.Sender.Remote s
+
     let record_event = function
-      | `Invalid_frontier_dependencies (e, state_hash, sender) ->
+      | `Invalid_frontier_dependencies (e, state_hash, senders) ->
           Transition_handler.Processor.handle_frontier_validation_error
-            ~trust_system ~logger ~sender ~state_hash e
+            ~trust_system ~logger
+            ~senders:(List.map ~f:remote senders)
+            ~state_hash e
       | `Verified_header_relevance (Ok (), header_with_hash, sender) ->
+          let sender = Network_peer.Envelope.Sender.Remote sender in
           (* This action is deferred because it may potentially trigger change of
              ban status of a peer which requires writing to a synchonous pipe. *)
           don't_wait_for
           @@ Transition_handler.Validator.record_transition_is_relevant ~logger
                ~trust_system ~sender ~time_controller header_with_hash
       | `Verified_header_relevance (Error error, header_with_hash, sender) ->
+          let sender = Network_peer.Envelope.Sender.Remote sender in
           (* This action is deferred because it may potentially trigger change of
              ban status of a peer which requires writing to a synchonous pipe. *)
           don't_wait_for
           @@ Transition_handler.Validator.record_transition_is_irrelevant
                ~logger ~trust_system ~sender ~error header_with_hash
       | `Pre_validate_header_invalid (sender, header, e) ->
+          let sender = Network_peer.Envelope.Sender.Remote sender in
           let action = pre_validate_header_invalid_action ~header e in
+          (* This action is deferred because it may potentially trigger change of
+             ban status of a peer which requires writing to a synchonous pipe. *)
           don't_wait_for
           @@ Trust_system.record_envelope_sender trust_system logger sender
                action
   end in
   (module Context : CONTEXT)
 
-module Transition_states_callbacks (Context : CONTEXT) = struct
-  open Context
+module Transition_states_callbacks (Context : sig
+  val trust_system : Trust_system.t
 
+  val logger : Logger.t
+end) =
+struct
   (* TODO add logging *)
-  let on_invalid ~error ~aux _meta =
-    don't_wait_for
-    @@ Trust_system.record_envelope_sender trust_system logger
-         aux.Transition_state.sender
-         ( Trust_system.Actions.Gossiped_invalid_transition
-         , Some (Error.to_string_hum error, []) )
+  let on_invalid ?(reason = `Other) ~error ~aux _meta =
+    let f { Transition_state.sender; gossip; _ } =
+      let action =
+        match reason with
+        | `Other when gossip ->
+            Trust_system.Actions.Gossiped_invalid_transition
+        | `Other ->
+            Sent_invalid_transition
+        | `Proof ->
+            Sent_invalid_proof
+        | `Signature_or_proof ->
+            Sent_invalid_signature_or_proof
+      in
+      Trust_system.record_envelope_sender Context.trust_system Context.logger
+        (Network_peer.Envelope.Sender.Remote sender)
+        (action, Some (Error.to_string_hum error, []))
+    in
+    don't_wait_for (Deferred.List.iter ~f aux.Transition_state.received)
 
   let on_add_new _ =
     Mina_metrics.Gauge.inc_one
@@ -307,8 +578,14 @@ let run ~context ~trust_system ~verifier ~network ~time_controller
       ~breadcrumb_notification_writer
   in
   let (module Context : CONTEXT) = context in
+  let logger = Context.logger in
   let transition_states =
-    Transition_states.create_inmem (module Transition_states_callbacks (Context))
+    Transition_states.create_inmem
+      ( module Transition_states_callbacks (struct
+        let trust_system = trust_system
+
+        let logger = logger
+      end) )
   in
   let state =
     { transition_states
@@ -319,7 +596,6 @@ let run ~context ~trust_system ~verifier ~network ~time_controller
   let mark_processed_and_promote =
     mark_processed_and_promote ~context ~transition_states
   in
-  let logger = Context.logger in
   List.iter collected_transitions
     ~f:
       (Received.handle_collected_transition ~context ~mark_processed_and_promote

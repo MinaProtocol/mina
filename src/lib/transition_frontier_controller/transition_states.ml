@@ -11,7 +11,8 @@ let shutdown_modifier = function
 
 module type Inmem_context = sig
   val on_invalid :
-       error:Error.t
+       ?reason:[ `Proof | `Signature_or_proof | `Other ]
+    -> error:Error.t
     -> aux:Transition_state.aux_data
     -> Substate.transition_meta
     -> unit
@@ -35,7 +36,8 @@ module Inmem (C : Inmem_context) = struct
     C.on_add_new key
 
   (** Mark transition and all its descedandants invalid. *)
-  let mark_invalid transition_states ~error:err ~state_hash:top_state_hash =
+  let mark_invalid ?reason transition_states ~error:err
+      ~state_hash:top_state_hash =
     let open Transition_state in
     let tag =
       sprintf "(from state hash %s) "
@@ -47,7 +49,7 @@ module Inmem (C : Inmem_context) = struct
       let%bind.Option state = st_opt in
       let%map.Option aux = Transition_state.aux_data state in
       let transition_meta = State_functions.transition_meta state in
-      C.on_invalid ~error ~aux transition_meta ;
+      C.on_invalid ?reason ~error ~aux transition_meta ;
       ( match state with
       | Received { gossip_data; _ }
       | Verifying_blockchain_proof { gossip_data; _ } ->
@@ -124,14 +126,13 @@ type state_t = Transition_state.t
 
 type t = Transition_state.t Substate_types.transition_states
 
-(* TODO add handlers on transition added and removed *)
 let create_inmem (module C : Inmem_context) : t =
   Substate.Transition_states ((module Inmem (C)), State_hash.Table.create ())
 
 let add_new (Substate.Transition_states ((module Impl), m) : t) = Impl.add_new m
 
-let mark_invalid (Substate.Transition_states ((module Impl), m) : t) =
-  Impl.mark_invalid m
+let mark_invalid ?reason (Substate.Transition_states ((module Impl), m) : t) =
+  Impl.mark_invalid ?reason m
 
 let find (Substate.Transition_states ((module Impl), m) : t) = Impl.find m
 

@@ -52,5 +52,19 @@ module type F = sig
     type nonrec ('a, 'b) t = ('a, 'b) Result.t t
 
     include Monad.S2 with type ('a, 'b) t := ('a, 'b) t
+
+    (** Find an element of the list [a] for which [f a] returns
+        a successful result.
+
+      Note that when [how] is not [`Sequential], some actions may continue
+      running even when the function returns.
+
+      Caller should implicitly interrupt action if needed.
+    *)
+    val find_map :
+         ?how:[ `Sequential | `Parallel | `Max_concurrent_jobs of int ]
+      -> 'a list
+      -> f:('a -> ('b, 'c) t)
+      -> ('b, 'c list) t
   end
 end

@@ -100,17 +100,20 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(Mina_block.Validated.state_hash transition)
 
-let handle_frontier_validation_error ~trust_system ~logger ~sender ~state_hash =
+let handle_frontier_validation_error ~trust_system ~logger ~senders ~state_hash
+    =
   let metadata = [ ("state_hash", State_hash.to_yojson state_hash) ] in
+  let f sender =
+    Trust_system.record_envelope_sender trust_system logger sender
+      ( Trust_system.Actions.Gossiped_invalid_transition
+      , Some
+          ( "The transition with hash $state_hash was not selected over the \
+             transition frontier root"
+          , metadata ) )
+  in
   function
   | `Not_selected_over_frontier_root ->
-      don't_wait_for
-      @@ Trust_system.record_envelope_sender trust_system logger sender
-           ( Trust_system.Actions.Gossiped_invalid_transition
-           , Some
-               ( "The transition with hash $state_hash was not selected over \
-                  the transition frontier root"
-               , metadata ) )
+      don't_wait_for (Deferred.List.iter senders ~f)
   | `Already_in_frontier ->
       [%log warn] ~metadata
         "Refusing to process the transition with hash $state_hash because is \
@@ -205,8 +208,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                 return (Error ()) )
         | Error (`Not_selected_over_frontier_root as e)
         | Error (`Already_in_frontier as e) ->
-            handle_frontier_validation_error ~trust_system ~logger ~sender
-              ~state_hash e ;
+            handle_frontier_validation_error ~trust_system ~logger
+              ~senders:[ sender ] ~state_hash e ;
             let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
               Cached.invalidate_with_failure
                 cached_initially_validated_transition

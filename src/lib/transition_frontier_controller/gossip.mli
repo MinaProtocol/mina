@@ -11,7 +11,7 @@ include module type of Gossip_types
 *)
 val verify_header_is_relevant :
      context:(module Context.CONTEXT)
-  -> sender:Network_peer.Envelope.Sender.t
+  -> sender:Network_peer.Peer.t
   -> transition_states:Transition_states.t
   -> Mina_block.Header.with_hash
   -> [ `Irrelevant | `Preserve_gossip_data | `Relevant ]
@@ -47,6 +47,7 @@ val preserve_relevant_gossip :
   -> context:(module Context.CONTEXT)
   -> gossip_type:[ `Block | `Header ]
   -> gossip_header:Mina_block.initial_valid_header
+  -> sender:Network_peer.Peer.t
   -> Transition_state.t
   -> Transition_state.t
      * [ `Nop

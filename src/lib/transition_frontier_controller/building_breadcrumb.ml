@@ -75,9 +75,8 @@ let update_status_for_unprocessed ~transition_states ~state_hash status =
   a breadcrumb (or a failure).
 *)
 let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
-  let mark_invalid ~tag e =
-    Transition_states.mark_invalid transition_states ~error:(Error.tag ~tag e)
-      ~state_hash
+  let mark_invalid ?reason error =
+    Transition_states.mark_invalid ?reason transition_states ~error ~state_hash
   in
   function
   | Result.Error () ->
@@ -87,13 +86,10 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
       update_status_for_unprocessed ~transition_states ~state_hash
         (Processing (Done breadcrumb)) ;
       mark_processed_and_promote [ state_hash ]
-  | Result.Ok (Result.Error (`Invalid_staged_ledger_diff e)) ->
-      mark_invalid ~tag:"invalid staged ledger diff" e
-  | Result.Ok (Result.Error (`Invalid_staged_ledger_hash e)) ->
-      mark_invalid ~tag:"invalid staged ledger hash" e
-  | Result.Ok (Result.Error (`Fatal_error e)) ->
-      update_status_for_unprocessed ~transition_states ~state_hash
-      @@ Failed (Error.of_exn e)
+  | Result.Ok (Result.Error (`Invalid (e, reason))) ->
+      mark_invalid ~reason e
+  | Result.Ok (Result.Error (`Verifier_error e)) ->
+      update_status_for_unprocessed ~transition_states ~state_hash @@ Failed e
 
 (** [building_breadcrumb_status ~parent block] decides upon status of [block]
   that is a child of transition with the already-built breadcrumb [parent].
@@ -102,7 +98,7 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
   returns a [Processing (In_progress _)] status and [Failed] otherwise.  
 *)
 let building_breadcrumb_status ~context ~mark_processed_and_promote
-    ~transition_states ~received_at ~sender ~parent block =
+    ~transition_states ~received ~parent block =
   let (module Context : CONTEXT) = context in
   let state_hash =
     State_hash.With_state_hashes.state_hash
@@ -116,9 +112,9 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
       Mina_block.blockchain_length (Mina_block.Validation.block block)
     in
     let module I = Interruptible.Make () in
+    let received_at = (List.last_exn received).Transition_state.received_at in
     let action =
-      Context.build_breadcrumb ~received_at ~sender ~parent ~transition
-        (module I)
+      Context.build_breadcrumb ~received_at ~parent ~transition (module I)
     in
     let timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout in
     Async_kernel.Deferred.upon (I.force action)
@@ -135,17 +131,20 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
   | Result.Ok ctx ->
       Substate.Processing ctx
   | Result.Error err ->
+      let senders =
+        List.map received ~f:(fun { Transition_state.sender; _ } -> sender)
+      in
       let err_str =
         match err with
         | `Already_in_frontier ->
             Context.record_event
             @@ `Invalid_frontier_dependencies
-                 (`Already_in_frontier, state_hash, sender) ;
+                 (`Already_in_frontier, state_hash, senders) ;
             "already in frontier"
         | `Not_selected_over_frontier_root ->
             Context.record_event
             @@ `Invalid_frontier_dependencies
-                 (`Not_selected_over_frontier_root, state_hash, sender) ;
+                 (`Not_selected_over_frontier_root, state_hash, senders) ;
             "not selected over frontier root"
         | `Parent_missing_from_frontier ->
             "parent missing from frontier"
@@ -254,8 +253,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
   in
   let build parent =
     building_breadcrumb_status ~context ~mark_processed_and_promote
-      ~transition_states ~received_at:aux.Transition_state.received_at
-      ~sender:aux.sender ~parent block
+      ~transition_states ~received:aux.Transition_state.received ~parent block
   in
   let mk_status () =
     (Option.value_map ~f:build
