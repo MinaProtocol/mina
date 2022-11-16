@@ -600,3 +600,50 @@ let compile :
     go provers
   in
   (tag, cache_handle, proof, provers)
+
+module Deploy_account_update = struct
+  let body public_key token_id vk : Account_update.Body.t =
+    { Account_update.Body.dummy with
+      public_key
+    ; token_id
+    ; update =
+        { Account_update.Update.dummy with
+          verification_key =
+            Set
+              { data = vk
+              ; hash =
+                  (* TODO: This function should live in
+                     [Side_loaded_verification_key].
+                  *)
+                  Zkapp_account.digest_vk vk
+              }
+        ; permissions =
+            Set
+              { edit_state = Proof
+              ; send = Either
+              ; receive = None
+              ; set_delegate = Proof
+              ; set_permissions = Proof
+              ; set_verification_key = Proof
+              ; set_zkapp_uri = Proof
+              ; edit_sequence_state = Proof
+              ; set_token_symbol = Proof
+              ; increment_nonce = Proof
+              ; set_voting_for = Proof
+              }
+        }
+    ; use_full_commitment = true
+    ; preconditions =
+        { Account_update.Preconditions.network =
+            Zkapp_precondition.Protocol_state.accept
+        ; account = Accept
+        }
+    ; authorization_kind = Signature
+    }
+
+  let full public_key token_id vk : Account_update.t =
+    (* TODO: This is a pain. *)
+    { body = body public_key token_id vk
+    ; authorization = Signature Signature.dummy
+    }
+end
