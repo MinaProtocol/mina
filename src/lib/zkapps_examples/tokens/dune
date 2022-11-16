@@ -2,7 +2,9 @@
  (name zkapps_tokens)
  (libraries
    ;; opam libraries
+   async
    async_kernel
+   async_unix
    base
    core_kernel
    ;; local libraries
@@ -27,9 +29,11 @@
    snarky.backendless
    tuple_lib
    with_hash
+   yojson
    zkapps_examples)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
-   h_list.ppx)))
+   h_list.ppx
+   ppx_let)))
