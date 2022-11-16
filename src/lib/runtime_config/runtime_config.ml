@@ -194,6 +194,7 @@ module Json_layout = struct
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
+          ; zkapp_uri : string
           }
         [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
 
@@ -217,7 +218,6 @@ module Json_layout = struct
         ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
-        ; zkapp_uri : string option [@default None]
         }
       [@@deriving sexp, fields, yojson, dhall_type]
 
@@ -239,7 +239,6 @@ module Json_layout = struct
         ; zkapp = None
         ; permissions = None
         ; token_symbol = None
-        ; zkapp_uri = None
         }
     end
 
@@ -446,7 +445,6 @@ module Accounts = struct
       ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
-      ; zkapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -477,7 +475,6 @@ module Accounts = struct
     ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
-    ; zkapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]

@@ -495,10 +495,10 @@ module T = struct
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~epoch_ledger_location
                  ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
-                 ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~block_production_keypairs ~monitor ~consensus_local_state
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000
-                 ~precomputed_values ~start_time ~upload_blocks_to_gcloud:false
+                 ~snark_work_fee:Currency.Fee.zero ~block_production_keypairs
+                 ~monitor ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.

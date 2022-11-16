@@ -42,7 +42,7 @@
    child_processes
    verifier
    genesis_constants
-   non_empty_list
+   mina_stdlib
    network_pool
    mina_net2
    mina_numbers
@@ -51,6 +51,7 @@
    snark_params
    pickles
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))

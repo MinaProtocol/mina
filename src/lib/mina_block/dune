@@ -39,7 +39,7 @@
    staged_ledger
    data_hash_lib
    block_time
-   non_empty_list
+   mina_stdlib
    with_hash
    signature_lib
    genesis_constants
@@ -52,6 +52,7 @@
    pickles.backend
    pasta_bindings
    kimchi_pasta
+   kimchi_backend.pasta.basic
    random_oracle
    random_oracle_input
    ppx_version.runtime

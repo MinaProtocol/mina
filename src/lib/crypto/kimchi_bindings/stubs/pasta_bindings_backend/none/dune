@@ -1,0 +1,9 @@
+(library
+ (public_name pasta_bindings.backend.none)
+ (name pasta_bindings_backend_none)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test))
+ (implements pasta_bindings.backend))

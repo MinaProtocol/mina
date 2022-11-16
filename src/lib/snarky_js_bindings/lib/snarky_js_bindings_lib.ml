@@ -558,10 +558,6 @@ let () =
           with Failure _ -> Js.Opt.empty )
       | _ ->
           Js.Opt.empty ) ;
-  let from f x = new%js field_constr (As_field.of_field (f x)) in
-  static_method "fromNumber" (from As_field.of_number_exn) ;
-  static_method "fromString" (from As_field.of_string_exn) ;
-  static_method "fromBigInt" (from As_field.of_bigint_exn) ;
   static_method "check" (fun _x -> ())
 
 let () =
@@ -1549,7 +1545,9 @@ module Circuit = struct
       Impl.constraint_system ~input_typ:Impl.Typ.unit
         ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
-    let rows = List.length cs.rows_rev in
+    let rows =
+      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len
+    in
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in

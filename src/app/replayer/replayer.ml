@@ -307,7 +307,8 @@ let account_creation_fee_uint64 =
   Currency.Fee.to_uint64 constraint_constants.account_creation_fee
 
 let account_creation_fee_int64 =
-  Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
+  Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+  |> Int64.of_int
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]

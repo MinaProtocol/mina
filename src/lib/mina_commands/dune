@@ -37,7 +37,7 @@
    trust_system
    network_pool
    merkle_list_verifier
-   non_empty_list
+   mina_stdlib
    genesis_constants
    block_time
    mina_block
@@ -46,6 +46,7 @@
    data_hash_lib
    mina_ledger
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    protocol_version
    random_oracle

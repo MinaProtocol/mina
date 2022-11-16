@@ -2458,8 +2458,7 @@ module Zkapp_account = struct
 
   let table_name = "zkapp_accounts"
 
-  (* TODO: when zkapp_uri moved to Zkapp.Account in OCaml, no need to pass it in separately *)
-  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri zkapp_account =
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_account =
     let open Deferred.Result.Let_syntax in
     let ({ app_state
          ; verification_key
@@ -2467,6 +2466,7 @@ module Zkapp_account = struct
          ; sequence_state
          ; last_sequence_slot
          ; proved_state
+         ; zkapp_uri
          }
           : Mina_base.Zkapp_account.t ) =
       zkapp_account
@@ -2602,9 +2602,8 @@ module Accounts_accessed = struct
             account.permissions
         in
         let%bind zkapp_id =
-          (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
           Mina_caqti.add_if_some
-            (Zkapp_account.add_if_doesn't_exist (module Conn) account.zkapp_uri)
+            (Zkapp_account.add_if_doesn't_exist (module Conn))
             account.zkapp
         in
         let account_accessed : t =

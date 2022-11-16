@@ -820,7 +820,7 @@ module Wrap = struct
 end
 
 module Step = struct
-  module Plonk_polys = Vector.Nat.N10
+  module Plonk_polys = Nat.N10
 
   module Bulletproof = struct
     include Plonk_types.Openings.Bulletproof

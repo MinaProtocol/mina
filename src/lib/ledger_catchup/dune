@@ -39,7 +39,7 @@
    mina_metrics
    pipe_lib
    transition_handler
-   non_empty_list
+   mina_stdlib
    transition_frontier
    consensus
    mina_base
@@ -62,6 +62,7 @@
    pickles
    snark_params
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    o1trace
    mina_net2
 ))

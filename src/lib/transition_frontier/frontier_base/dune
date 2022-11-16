@@ -46,7 +46,7 @@
    protocol_version
    mina_net2
    transaction_snark
-   non_empty_list
+   mina_stdlib
    coda_genesis_proof
    ppx_version.runtime
    pickles.backend
@@ -56,6 +56,7 @@
    sgn
    sgn_type
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_wire_types
  )
  (instrumentation (backend bisect_ppx))

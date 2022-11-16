@@ -22,7 +22,7 @@ use groupmap::GroupMap;
 use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -84,6 +84,8 @@ macro_rules! impl_proof {
                 #[wasm_bindgen(skip)]
                 pub w: Vec<Vec<$F>>,
                 #[wasm_bindgen(skip)]
+                pub coefficients: Vec<Vec<$F>>,
+                #[wasm_bindgen(skip)]
                 pub z: WasmFlatVector<$WasmF>,
                 #[wasm_bindgen(skip)]
                 pub s: Vec<Vec<$F>>,
@@ -100,16 +102,28 @@ macro_rules! impl_proof {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
                     w: WasmVecVecF,
+                    coefficients: WasmVecVecF,
                     z: WasmFlatVector<$WasmF>,
                     s: WasmVecVecF,
                     generic_selector: WasmFlatVector<$WasmF>,
                     poseidon_selector: WasmFlatVector<$WasmF>) -> Self {
-                    WasmProofEvaluations { w: w.0, z, s: s.0, generic_selector, poseidon_selector }
+                    WasmProofEvaluations {
+                        w: w.0,
+                        coefficients: coefficients.0,
+                        z,
+                        s: s.0,
+                        generic_selector, poseidon_selector
+                    }
                 }
 
                 #[wasm_bindgen(getter)]
                 pub fn w(&self) -> WasmVecVecF {
                     [<WasmVecVec $field_name:camel>](self.w.clone())
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn coefficients(&self) -> WasmVecVecF {
+                    [<WasmVecVec $field_name:camel>](self.coefficients.clone())
                 }
 
                 #[wasm_bindgen(getter)]
@@ -137,6 +151,10 @@ macro_rules! impl_proof {
                     self.w = x.0
                 }
                 #[wasm_bindgen(setter)]
+                pub fn set_coefficients(&mut self, x: WasmVecVecF) {
+                    self.coefficients = x.0
+                }
+                #[wasm_bindgen(setter)]
                 pub fn set_s(&mut self, x: WasmVecVecF) {
                     self.s = x.0
                 }
@@ -158,6 +176,7 @@ macro_rules! impl_proof {
                 fn from(x: &WasmProofEvaluations) -> Self {
                     ProofEvaluations {
                         w: array_init(|i| x.w[i].clone()),
+                        coefficients: array_init(|i| x.coefficients[i].clone()),
                         s: array_init(|i| x.s[i].clone()),
                         z: x.z.iter().map(|a| a.clone().into()).collect(),
                         generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
@@ -172,6 +191,7 @@ macro_rules! impl_proof {
                 fn from(x: WasmProofEvaluations) -> Self {
                     ProofEvaluations {
                         w: array_init(|i| x.w[i].clone()),
+                        coefficients: array_init(|i| x.coefficients[i].clone()),
                         s: array_init(|i| x.s[i].clone()),
                         z: x.z.into_iter().map(Into::into).collect(),
                         generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
@@ -186,6 +206,7 @@ macro_rules! impl_proof {
                 fn from(x: &ProofEvaluations<Vec<$F>>) -> Self {
                     WasmProofEvaluations {
                         w: x.w.to_vec(),
+                        coefficients: x.coefficients.to_vec(),
                         s: x.s.to_vec(),
                         z: x.z.iter().map(|a| a.clone().into()).collect(),
                         generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
@@ -198,6 +219,7 @@ macro_rules! impl_proof {
                 fn from(x: ProofEvaluations<Vec<$F>>) -> Self {
                     WasmProofEvaluations {
                         w: x.w.to_vec(),
+                        coefficients: x.coefficients.to_vec(),
                         s: x.s.to_vec(),
                         z: x.z.into_iter().map(Into::into).collect(),
                         generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
@@ -776,6 +798,7 @@ macro_rules! impl_proof {
                 };
                 let proof_evals = ProofEvaluations {
                     w: array_init(|_| vec![$F::one()]),
+                    coefficients: array_init(|_| vec![$F::one()]),
                     z: vec![$F::one()],
                     s: array_init(|_| vec![$F::one()]),
                     lookup: None,
@@ -828,8 +851,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -853,8 +876,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq

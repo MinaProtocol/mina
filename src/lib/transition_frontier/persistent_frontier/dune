@@ -40,7 +40,7 @@
    verifier
    with_hash
    debug_assert
-   non_empty_list
+   mina_stdlib
    ppx_version.runtime
    pickles.backend
    snark_params
@@ -51,6 +51,7 @@
    currency
    mina_numbers
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_wire_types
  )
  (instrumentation (backend bisect_ppx))

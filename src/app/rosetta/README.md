@@ -41,7 +41,7 @@ https://www.rosetta-api.org/docs/models/Operation.html
    on the ability to enable and disable staking via GrapQL.
    That feature of the daemon had been deprecated, and has been
    removed. A new test-agent may appear in the future.
-- Update for release/1.3.0 as opposed to purpose-built rosetta branches
+- Update for master as opposed to purpose-built rosetta branches
 
 2022/01/18:
 
@@ -199,11 +199,24 @@ https://www.rosetta-api.org/docs/models/Operation.html
 
 ## How to build your own docker image
 
-Checkout the "release/1.3.0" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "master" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production | docker build -t mina-rosetta-ubuntu:v1.3.0 --build-arg "MINA_BRANCH=release/1.3.0" -`
+```
+cat dockerfiles/stages/1-build-deps \
+    dockerfiles/stages/2-opam-deps \
+    dockerfiles/stages/3-builder \
+    dockerfiles/stages/4-production \
+    | docker build -t mina-rosetta-ubuntu:v1.3.0 \
+        --build-arg "DUNE_PROFILE=mainnet"
+        --build-arg "MINA_BRANCH=master" -
+```
 
-This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu 20.04 and includes the most recent release of the mina daemon along with mina-archive and mina-rosetta.
+This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu
+20.04 and includes the most recent release of the mina daemon along
+with mina-archive and mina-rosetta. Note the `DUNE_PROFILE` argument,
+which should take a different value depending on which network you
+want to connect to. Complete list of predefined `dune` profiles can be
+found in `src/config` directory in the main repository.
 
 Alternatively, you could use the official image `minaprotocol/mina-rosetta-ubuntu:1.3.0beta1-087f715-stretch` which is built in exactly this way by buildkite CI/CD.
 
@@ -219,12 +232,16 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta-ubuntu:v1.3.0
+docker run -it --rm --name rosetta \
+    --entrypoint=./docker-devnet-start.sh \
+    -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
 Note: It will take 20min-1hr for your node to sync
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
+* The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * PostgreSQL runs on port 3086
 * Rosetta runs on port 3087
@@ -250,7 +267,13 @@ It might be convenient to set up the database inside a docker container anyway,
 for instance like so:
 
 ```shell
-$ docker run -d --name pg-mina-archive -p 5432:5432 -e POSTGRES_PASSWORD='*******' -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=mina_archive -e POSTGRES_USER=pguser postgres:14.5
+$ docker run -d --name pg-mina-archive \
+    -p 5432:5432 \
+    -e POSTGRES_PASSWORD='*******' \
+    -e POSTGRES_HOST_AUTH_METHOD=trust 
+    -e POSTGRES_DB=mina_archive \
+    -e POSTGRES_USER=pguser \
+    postgres:14.5
 ```
 
 The `POSTGRES_HOST_AUTH_METHOD=trust` instructs the database not to require
@@ -269,7 +292,10 @@ Once this is done, the Rosetta server can be launched with the following
 command:
 
 ```shell
-$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe --port 3087 --graphql-uri http://localhost:3085/graphql --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe \
+    --port 3087 \
+    --graphql-uri http://localhost:3085/graphql \
+    --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
 ```
 
 The `--graphql-uri` parameter gives address at which Rosetta can connect to
@@ -362,7 +388,10 @@ The signer library used by the test agent can be used as a reference for further
 
 ### Rosetta CLI Validation
 
-The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction. There are no reconcilliation errors. We are in the middle of verifying reconcilliation errors against devnet.
+The Data API is fully validated using the official `rosetta-cli`
+against private networks that issue every different type of
+transaction. For instructions on how to run these tests manually,
+see [README.md](rosetta-cli-config/README.md).
 
 The Construction API is _not_ validated using `rosetta-cli` as this would require an implementation of the signer in the rosetta-go-sdk.
 
@@ -374,7 +403,11 @@ using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccf
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v16
+$ docker run -d --rm \
+    --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 \
+    --name mina-rosetta-test \
+    --entrypoint ./docker-test-start.sh \
+    minaprotocol/mina-rosetta:v16
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -382,7 +415,13 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta-ubuntu:v1.3.0
+$ docker run -d --rm \
+    --publish 3087:3087 \
+    --publish 3086:3086 \
+    --publish 3085:3085 \
+    --name mina-rosetta-demo \
+    --entrypoint ./docker-demo-start.sh \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 
 $ docker logs --follow mina-rosetta-demo
 
@@ -420,10 +459,11 @@ then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-openapi-generator generate -i api.json -g ocaml
-cp -p src/models/* $MINA/src/lib/rosetta_models/
+openapi-generator generate -i api.json -g ocaml -o out
+cp -p out/src/models/* out/src/support/enums.ml $MINA/src/lib/rosetta_models/
 ```
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
 Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
+

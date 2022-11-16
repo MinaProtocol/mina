@@ -47,6 +47,7 @@ type ( 'a_var
           (module Requests.Step.S
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
+              and type proofs_verified = 'proofs_verified
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights

@@ -45,7 +45,7 @@ let all_possible_domains =
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
+                 and type Impl.Bigint.t = Tock.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
 struct
   open Inputs
@@ -483,12 +483,12 @@ struct
       ; zeta = zeta_1
       } =
     if lookup_verification_enabled then failwith "TODO" else () ;
-    chal beta_0 beta_1 ;
-    chal gamma_0 gamma_1 ;
-    scalar_chal alpha_0 alpha_1 ;
-    scalar_chal zeta_0 zeta_1
+    with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
+    with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
+    with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
+    with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
-  let assert_eq_marlin
+  let assert_eq_plonk
       (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
@@ -671,7 +671,7 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N26.n in
+          let num_commitments_without_degree_bound = Nat.N41.n in
           let without_degree_bound =
             (* sg_old
                x_hat
@@ -686,8 +686,13 @@ struct
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
                 :: [| m.psm_comm |]
                 :: Vector.append w_comm
-                     (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                     (snd (Columns.add Permuts_minus_1.n))
+                     (Vector.append
+                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                     (snd
+                        Plonk_types.(
+                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
               |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
               (snd
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
@@ -705,7 +710,7 @@ struct
         let joint_combiner =
           if lookup_verification_enabled then failwith "TODO" else None
         in
-        assert_eq_marlin
+        assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
