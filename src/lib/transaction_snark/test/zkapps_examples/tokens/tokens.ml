@@ -120,4 +120,19 @@ let%test_module "Tokens test" =
              ~finalize_ledger
       in
       ignore account
+
+    let%test_unit "Initialize, mint, transfer none" =
+      let account =
+        []
+        |> Zkapp_command.Call_forest.cons_tree
+             ( fst @@ Async.Thread_safe.block_on_async_exn
+             @@ Zkapps_tokens.child_forest pk token_id )
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons
+             (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
+        |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
+             ~finalize_ledger
+      in
+      ignore account
   end )

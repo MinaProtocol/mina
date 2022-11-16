@@ -118,7 +118,81 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Update state"; prevs = []; main; uses_lookup = false }
+      { identifier = "Mint token"; prevs = []; main; uses_lookup = false }
+  end
+
+  (** Rule to transfer tokens. *)
+  module Transfer = struct
+    let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
+        (Snarky_backendless.Request.With { request; respond }) =
+      match request with
+      | Public_key ->
+          respond (Provide public_key)
+      | Token_id ->
+          respond (Provide token_id)
+      | _ ->
+          respond Unhandled
+
+    let dummy_account_update : Zkapp_call_forest.Checked.account_update Lazy.t =
+      lazy
+        (let dummy_body = Account_update.Body.dummy in
+         { account_update =
+             { data = constant (Account_update.Body.typ ()) dummy_body
+             ; hash =
+                 constant Zkapp_command.Digest.Account_update.typ
+                   (Zkapp_command.Digest.Account_update.create_body dummy_body)
+             }
+         ; control = Prover_value.create (fun () -> Control.None_given)
+         } )
+
+    let next_account_update () = ((), Lazy.force dummy_account_update)
+
+    let skip_subtree_if _skip () = ()
+
+    let main input =
+      let public_key =
+        exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+      in
+      let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
+      Zkapps_examples.wrap_main ~public_key ~token_id
+        (fun account_update ->
+          let self_token =
+            Account_id.Checked.derive_token_id
+              ~owner:(Account_id.Checked.create public_key token_id)
+          in
+          (* Accumulators *)
+          let state = ref () in
+          let running_total = ref Field.zero in
+          let consume_account_update () =
+            let next_state, account_update = next_account_update !state in
+            state := next_state ;
+            let can_access_this_token =
+              Token_id.Checked.equal self_token
+                account_update.account_update.data.caller
+            in
+            let using_this_token =
+              Token_id.Checked.equal self_token
+                account_update.account_update.data.token_id
+            in
+            let amount =
+              if_ using_this_token ~typ:Field.typ
+                ~then_:
+                  ( account_update.account_update.data.balance_change
+                  |> Currency.Amount.Signed.Checked.to_field_var |> run_checked
+                  )
+                ~else_:Field.zero
+            in
+            running_total := Field.( + ) !running_total amount ;
+            state := skip_subtree_if (Boolean.not can_access_this_token) !state
+          in
+          for _i = 0 to 5 do
+            consume_account_update ()
+          done ;
+          account_update#assert_state_proved )
+        input
+
+    let rule : _ Pickles.Inductive_rule.t =
+      { identifier = "Transfer tokens"; prevs = []; main; uses_lookup = false }
   end
 end
 
@@ -126,12 +200,14 @@ let lazy_compiled =
   lazy
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
        ~auxiliary_typ:Impl.Typ.unit
-       ~branches:(module Nat.N2)
+       ~branches:(module Nat.N3)
        ~max_proofs_verified:(module Nat.N0)
        ~name:"tokens"
        ~constraint_constants:
          Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
-       ~choices:(fun ~self:_ -> [ Rules.Initialize_state.rule; Rules.Mint.rule ]) )
+       ~choices:(fun ~self:_ ->
+         [ Rules.Initialize_state.rule; Rules.Mint.rule; Rules.Transfer.rule ]
+         ) )
 
 let compile () = ignore (Lazy.force lazy_compiled : _)
 
@@ -165,7 +241,7 @@ end
 
 let initialize_prover =
   Lazy.map lazy_compiled
-    ~f:(fun (_, _, _, Pickles.Provers.[ initialize_prover; _ ]) ->
+    ~f:(fun (_, _, _, Pickles.Provers.[ initialize_prover; _; _ ]) ->
       initialize_prover )
 
 let initialize public_key token_id =
@@ -175,7 +251,7 @@ let initialize public_key token_id =
 
 let mint_prover =
   Lazy.map lazy_compiled
-    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover ]) -> mint_prover)
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover)
 
 let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key =
   let mint_prover = Lazy.force mint_prover in
@@ -183,3 +259,12 @@ let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key =
     ~handler:
       (Rules.Mint.handler ~owner_public_key ~owner_token_id ~amount
          ~mint_to_public_key )
+
+let child_forest_prover =
+  Lazy.map lazy_compiled
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; _; child_forest_prover ]) ->
+      child_forest_prover )
+
+let child_forest public_key token_id =
+  let child_forest_prover = Lazy.force child_forest_prover in
+  child_forest_prover ~handler:(Rules.Transfer.handler public_key token_id)
