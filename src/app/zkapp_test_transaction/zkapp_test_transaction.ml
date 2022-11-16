@@ -170,7 +170,7 @@ let transfer_funds_one_receiver =
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
-           (Currency.Fee.to_formatted_string Flags.min_fee)
+           (Currency.Fee.to_mina_string Flags.min_fee)
            () ;
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receiver ~amount ))
