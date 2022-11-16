@@ -2201,7 +2201,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 3.0
+    let test_timeout_min = 10.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2716,6 +2716,7 @@ let%test_module "Epoch ledger sync tests" =
       | Error exn -> (
           match Monitor.extract_exn exn with
           | No_sync_answer ->
+              [%log debug] "Did not sync to genesis ledger, sync test succeeded" ;
               ()
           | exn' ->
               failwithf "Unexpected exception: %s" (Exn.to_string exn') () )
