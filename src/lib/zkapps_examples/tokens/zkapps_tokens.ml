@@ -50,8 +50,7 @@ module Rules = struct
       { identifier = "Initialize zkapp"; prevs = []; main; uses_lookup = false }
   end
 
-  (** Rule to tokens.
-  *)
+  (** Rule to mint tokens. *)
   module Mint = struct
     let handler ~(owner_public_key : Public_key.Compressed.t)
         ~(owner_token_id : Token_id.t) ~(amount : Currency.Amount.t)
