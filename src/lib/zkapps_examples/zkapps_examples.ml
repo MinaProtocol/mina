@@ -181,6 +181,7 @@ module Account_update_under_construction = struct
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
+      ; balance_change : Currency.Amount.Signed.Checked.t
       ; caller : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
@@ -191,12 +192,15 @@ module Account_update_under_construction = struct
       ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
+      ; authorization_kind : Account_update.Authorization_kind.Checked.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default))
         ?(caller = token_id) () =
       { public_key
       ; token_id
+      ; balance_change =
+          Amount.Signed.Checked.constant { magnitude = Amount.zero; sgn = Pos }
       ; caller
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
@@ -204,6 +208,8 @@ module Account_update_under_construction = struct
       ; call_data = None
       ; events = Events.create ()
       ; sequence_events = Sequence_events.create ()
+      ; authorization_kind =
+          { is_signed = Boolean.false_; is_proved = Boolean.true_ }
       }
 
     let to_account_update_and_calls (t : t) :
@@ -221,8 +227,7 @@ module Account_update_under_construction = struct
         { public_key = t.public_key
         ; token_id = t.token_id
         ; update = Update.to_zkapp_command_update t.update
-        ; balance_change =
-            var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
+        ; balance_change = t.balance_change
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
@@ -264,8 +269,7 @@ module Account_update_under_construction = struct
             }
         ; use_full_commitment = Boolean.false_
         ; caller = t.caller
-        ; authorization_kind =
-            { is_signed = Boolean.false_; is_proved = Boolean.true_ }
+        ; authorization_kind = t.authorization_kind
         }
       in
       let calls =
@@ -306,6 +310,11 @@ module Account_update_under_construction = struct
         sequence_events =
           Sequence_events.add_sequence_events t.sequence_events sequence_events
       }
+
+    let set_balance_change balance_change (t : t) = { t with balance_change }
+
+    let set_authorization_kind authorization_kind (t : t) =
+      { t with authorization_kind }
   end
 end
 
@@ -354,6 +363,16 @@ class account_update ~public_key ?token_id ?caller =
       account_update <-
         Account_update_under_construction.In_circuit.add_sequence_events
           sequence_events account_update
+
+    method set_balance_change balance_change =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_balance_change
+          balance_change account_update
+
+    method set_authorization_kind authorization_kind =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_authorization_kind
+          authorization_kind account_update
 
     method account_update_under_construction = account_update
   end
@@ -602,9 +621,11 @@ let compile :
   (tag, cache_handle, proof, provers)
 
 module Deploy_account_update = struct
-  let body public_key token_id vk : Account_update.Body.t =
+  let body ?(balance_change = Account_update.Body.dummy.balance_change)
+      public_key token_id vk : Account_update.Body.t =
     { Account_update.Body.dummy with
       public_key
+    ; balance_change
     ; token_id
     ; update =
         { Account_update.Update.dummy with
@@ -641,9 +662,9 @@ module Deploy_account_update = struct
     ; authorization_kind = Signature
     }
 
-  let full public_key token_id vk : Account_update.t =
+  let full ?balance_change public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    { body = body public_key token_id vk
+    { body = body ?balance_change public_key token_id vk
     ; authorization = Signature Signature.dummy
     }
 end

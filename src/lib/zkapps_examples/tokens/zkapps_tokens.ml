@@ -8,7 +8,8 @@ open Pickles_types
 type _ Snarky_backendless.Request.t +=
   | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
   | Token_id : Token_id.t Snarky_backendless.Request.t
-  | New_state : Field.Constant.t list Snarky_backendless.Request.t
+  | Amount_to_mint : Currency.Amount.t Snarky_backendless.Request.t
+  | Mint_to_public_key : Public_key.Compressed.t Snarky_backendless.Request.t
 
 module Rules = struct
   (** Rule to initialize the zkApp.
@@ -49,26 +50,22 @@ module Rules = struct
       { identifier = "Initialize zkapp"; prevs = []; main; uses_lookup = false }
   end
 
-  (** Rule to update the zkApp state.
-
-      Asserts that the state was last updated by a proof (ie. that the zkApp
-      has been correctly initialized, and all subsequent updates have been via
-      proof executions).
-
-      This calls into another zkApp method whose shape matches [Call_data], and
-      uses the output value as the new state.
+  (** Rule to tokens.
   *)
-  module Update_state = struct
-    let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
-        (new_state : Field.Constant.t list)
+  module Mint = struct
+    let handler ~(owner_public_key : Public_key.Compressed.t)
+        ~(owner_token_id : Token_id.t) ~(amount : Currency.Amount.t)
+        ~(mint_to_public_key : Public_key.Compressed.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
       | Public_key ->
-          respond (Provide public_key)
+          respond (Provide owner_public_key)
       | Token_id ->
-          respond (Provide token_id)
-      | New_state ->
-          respond (Provide new_state)
+          respond (Provide owner_token_id)
+      | Amount_to_mint ->
+          respond (Provide amount)
+      | Mint_to_public_key ->
+          respond (Provide mint_to_public_key)
       | _ ->
           respond Unhandled
 
@@ -79,11 +76,46 @@ module Rules = struct
       let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
       Zkapps_examples.wrap_main ~public_key ~token_id
         (fun account_update ->
-          let new_state =
-            exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
+          let amount_to_mint =
+            exists Currency.Amount.typ ~request:(fun () -> Amount_to_mint)
           in
-          account_update#assert_state_proved ;
-          account_update#set_full_state new_state )
+          let destination_pk =
+            exists Public_key.Compressed.typ ~request:(fun () ->
+                Mint_to_public_key )
+          in
+          let self_token =
+            Account_id.Checked.derive_token_id
+              ~owner:(Account_id.Checked.create public_key token_id)
+          in
+          let destination_account_update, destination_account_calls =
+            let account_update =
+              new Zkapps_examples.account_update
+                ~public_key:destination_pk ~token_id:self_token
+                ~caller:self_token
+            in
+            account_update#set_balance_change
+              Currency.Amount.Signed.Checked.(of_unsigned amount_to_mint) ;
+            account_update#set_authorization_kind
+              { is_proved = Boolean.false_; is_signed = Boolean.false_ } ;
+            let final_update, calls =
+              account_update#account_update_under_construction
+              |> Zkapps_examples.Account_update_under_construction.In_circuit
+                 .to_account_update_and_calls
+            in
+            let digest =
+              Zkapp_command.Digest.Account_update.Checked.create final_update
+            in
+            ( { Zkapp_call_forest.Checked.account_update =
+                  { data = final_update; hash = digest }
+              ; control = Prover_value.create (fun () -> Control.None_given)
+              }
+            , calls )
+          in
+          account_update#register_call destination_account_update
+            destination_account_calls ;
+          account_update#add_sequence_events
+            [ [| Currency.Amount.Checked.to_field amount_to_mint |] ] ;
+          account_update#assert_state_proved )
         input
 
     let rule : _ Pickles.Inductive_rule.t =
@@ -100,8 +132,7 @@ let lazy_compiled =
        ~name:"tokens"
        ~constraint_constants:
          Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
-       ~choices:(fun ~self:_ ->
-         [ Rules.Initialize_state.rule; Rules.Update_state.rule ] ) )
+       ~choices:(fun ~self:_ -> [ Rules.Initialize_state.rule; Rules.Mint.rule ]) )
 
 let compile () = ignore (Lazy.force lazy_compiled : _)
 
@@ -143,12 +174,13 @@ let initialize public_key token_id =
   initialize_prover
     ~handler:(Rules.Initialize_state.handler public_key token_id)
 
-let update_state_prover =
+let mint_prover =
   Lazy.map lazy_compiled
-    ~f:(fun (_, _, _, Pickles.Provers.[ _; update_state_prover ]) ->
-      update_state_prover )
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover ]) -> mint_prover)
 
-let update_state public_key token_id new_state =
-  let update_state_prover = Lazy.force update_state_prover in
-  update_state_prover
-    ~handler:(Rules.Update_state.handler public_key token_id new_state)
+let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key =
+  let mint_prover = Lazy.force mint_prover in
+  mint_prover
+    ~handler:
+      (Rules.Mint.handler ~owner_public_key ~owner_token_id ~amount
+         ~mint_to_public_key )

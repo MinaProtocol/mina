@@ -36,52 +36,71 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
             [ zkapp_command ] ) ;
       finalize_ledger aux ledger )
 
+let gen_keys () =
+  let sk = Private_key.create () in
+  let pk = Public_key.of_private_key_exn sk in
+  let pk_compressed = Public_key.compress pk in
+  (pk_compressed, sk)
+
+let fee_to_create n =
+  Genesis_constants.Constraint_constants.compiled.account_creation_fee
+  |> Currency.Amount.of_fee
+  |> (fun x -> Currency.Amount.scale x n)
+  |> Option.value_exn
+
+let fee_to_create_signed n =
+  fee_to_create n |> Currency.Amount.Signed.of_unsigned
+  |> Currency.Amount.Signed.negate
+
 let%test_module "Tokens test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
-    let sk = Private_key.create ()
-
-    let pk = Public_key.of_private_key_exn sk
-
-    let pk_compressed = Public_key.compress pk
+    let pk, sk = gen_keys ()
 
     let token_id = Token_id.default
 
-    let account_id = Account_id.create pk_compressed token_id
+    let account_id = Account_id.create pk token_id
 
     let vk = Lazy.force Zkapps_tokens.vk
 
+    let mint_to_keys = gen_keys ()
+
     module Account_updates = struct
-      let deploy =
-        Zkapps_examples.Deploy_account_update.full pk_compressed token_id vk
+      let deploy ~balance_change =
+        Zkapps_examples.Deploy_account_update.full ~balance_change pk token_id
+          vk
 
       let initialize =
         let account_update, () =
           Async.Thread_safe.block_on_async_exn
-            (Zkapps_tokens.initialize pk_compressed token_id)
+            (Zkapps_tokens.initialize pk token_id)
         in
         account_update
 
-      let update_state =
-        let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one) in
-
+      let mint =
+        let amount_to_mint = Currency.Amount.of_nanomina_int_exn 200 in
         let account_update, () =
           Async.Thread_safe.block_on_async_exn
-            (Zkapps_tokens.update_state pk_compressed token_id new_state)
+            (Zkapps_tokens.mint ~owner_public_key:pk ~owner_token_id:token_id
+               ~amount:amount_to_mint ~mint_to_public_key:(fst mint_to_keys) )
         in
         account_update
     end
 
-    let signers = [| (pk_compressed, sk) |]
+    let signers = [| (pk, sk) |]
 
     let initialize_ledger ledger =
-      let account =
-        Account.create account_id
-          Currency.Balance.(
-            Option.value_exn
-              (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)))
+      let balance =
+        let open Currency.Balance in
+        let add_amount x y = add_amount y x in
+        zero
+        |> add_amount (Currency.Amount.of_nanomina_int_exn 500)
+        |> Option.value_exn
+        |> add_amount (fee_to_create 50)
+        |> Option.value_exn
       in
+      let account = Account.create account_id balance in
       let _, loc =
         Ledger.get_or_create_account ledger account_id account
         |> Or_error.ok_exn
@@ -90,101 +109,15 @@ let%test_module "Tokens test" =
 
     let finalize_ledger loc ledger = Ledger.get ledger loc
 
-    let%test_unit "Initialize" =
+    let%test_unit "Initialize and mint" =
       let account =
         []
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
+        |> Zkapp_command.Call_forest.cons
+             (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
+        |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
+             ~finalize_ledger
       in
-      let zkapp_state =
-        (Option.value_exn (Option.value_exn account).zkapp).app_state
-      in
-      Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
-        zkapp_state
-
-    let%test_unit "Initialize and update" =
-      let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
-      in
-      let zkapp_state =
-        (Option.value_exn (Option.value_exn account).zkapp).app_state
-      in
-      Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
-        zkapp_state
-
-    let%test_unit "Initialize and multiple update" =
-      let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
-      in
-      let zkapp_state =
-        (Option.value_exn (Option.value_exn account).zkapp).app_state
-      in
-      Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
-        zkapp_state
-
-    let%test_unit "Update without initialize fails" =
-      let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
-      in
-      assert (Option.is_none (Option.value_exn account).zkapp)
-
-    let%test_unit "Double initialize fails" =
-      let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
-      in
-      assert (Option.is_none (Option.value_exn account).zkapp)
-
-    let%test_unit "Initialize after update fails" =
-      let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons Account_updates.deploy
-        |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-             ~initialize_ledger ~finalize_ledger
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
-      in
-      assert (Option.is_none (Option.value_exn account).zkapp)
-
-    let%test_unit "Initialize without deploy fails" =
-      let account =
-        Or_error.try_with (fun () ->
-            (* Raises an exception due to verifying a proof without a valid vk
-               in the account.
-            *)
-            []
-            |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
-            |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-            |> test_zkapp_command ~fee_payer_pk:pk_compressed ~signers
-                 ~initialize_ledger ~finalize_ledger )
-      in
-      assert (Or_error.is_error account)
+      ignore account
   end )

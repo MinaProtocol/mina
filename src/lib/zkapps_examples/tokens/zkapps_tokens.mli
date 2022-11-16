@@ -30,10 +30,11 @@ val initialize :
      * unit )
      Async_kernel.Deferred.t
 
-val update_state :
-     Public_key.Compressed.t
-  -> Token_id.t
-  -> Snark_params.Tick.Field.t list
+val mint :
+     owner_public_key:Public_key.Compressed.t
+  -> owner_token_id:Token_id.t
+  -> amount:Currency.Amount.t
+  -> mint_to_public_key:Public_key.Compressed.t
   -> unit
   -> ( ( Account_update.t
        , Zkapp_command.Digest.Account_update.t
