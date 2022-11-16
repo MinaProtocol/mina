@@ -183,11 +183,15 @@ module Call_forest = struct
         include Digest_intf.S_checked
 
         val create : Account_update.Checked.t -> t
+
+        val create_body : Account_update.Body.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
       val create : Account_update.t -> t
+
+      val create_body : Account_update.Body.t -> t
     end
 
     module rec Forest : sig
@@ -262,9 +266,13 @@ module Call_forest = struct
         include Checked
 
         let create = Account_update.Checked.digest
+
+        let create_body = Account_update.Body.Checked.digest
       end
 
       let create : Account_update.t -> t = Account_update.digest
+
+      let create_body : Account_update.Body.t -> t = Account_update.Body.digest
     end
 
     module Forest = struct
