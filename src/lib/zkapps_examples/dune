@@ -18,6 +18,7 @@
    pickles.backend
    pickles_types
    random_oracle
+   random_oracle_input
    snarky.backendless
    snark_params
    sgn
