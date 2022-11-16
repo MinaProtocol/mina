@@ -25,64 +25,25 @@ let%test_module "Tokens test" =
 
     let vk = Lazy.force Zkapps_tokens.vk
 
-    module Deploy_account_update = struct
-      let account_update_body : Account_update.Body.t =
-        { Account_update.Body.dummy with
-          public_key = pk_compressed
-        ; update =
-            { Account_update.Update.dummy with
-              verification_key =
-                Set
-                  { data = vk
-                  ; hash =
-                      (* TODO: This function should live in
-                         [Side_loaded_verification_key].
-                      *)
-                      Zkapp_account.digest_vk vk
-                  }
-            ; permissions =
-                Set
-                  { edit_state = Proof
-                  ; send = Proof
-                  ; receive = Proof
-                  ; set_delegate = Proof
-                  ; set_permissions = Proof
-                  ; set_verification_key = Proof
-                  ; set_zkapp_uri = Proof
-                  ; edit_sequence_state = Proof
-                  ; set_token_symbol = Proof
-                  ; increment_nonce = Proof
-                  ; set_voting_for = Proof
-                  }
-            }
-        ; use_full_commitment = true
-        ; preconditions =
-            { Account_update.Preconditions.network =
-                Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
-            }
-        ; authorization_kind = Signature
-        }
+    module Account_updates = struct
+      let deploy =
+        Zkapps_examples.Deploy_account_update.full pk_compressed token_id vk
 
-      let account_update : Account_update.t =
-        (* TODO: This is a pain. *)
-        { body = account_update_body
-        ; authorization = Signature Signature.dummy
-        }
-    end
+      let initialize =
+        let account_update, () =
+          Async.Thread_safe.block_on_async_exn
+            (Zkapps_tokens.initialize pk_compressed token_id)
+        in
+        account_update
 
-    module Initialize_account_update = struct
-      let account_update, () =
-        Async.Thread_safe.block_on_async_exn
-          (Zkapps_tokens.initialize pk_compressed token_id)
-    end
+      let update_state =
+        let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one) in
 
-    module Update_state_account_update = struct
-      let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
-
-      let account_update, () =
-        Async.Thread_safe.block_on_async_exn
-          (Zkapps_tokens.update_state pk_compressed token_id new_state)
+        let account_update, () =
+          Async.Thread_safe.block_on_async_exn
+            (Zkapps_tokens.update_state pk_compressed token_id new_state)
+        in
+        account_update
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
@@ -169,9 +130,8 @@ let%test_module "Tokens test" =
     let%test_unit "Initialize" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -184,11 +144,9 @@ let%test_module "Tokens test" =
     let%test_unit "Initialize and update" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -201,13 +159,10 @@ let%test_module "Tokens test" =
     let%test_unit "Initialize and multiple update" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -220,9 +175,8 @@ let%test_module "Tokens test" =
     let%test_unit "Update without initialize fails" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
@@ -231,11 +185,9 @@ let%test_module "Tokens test" =
     let%test_unit "Double initialize fails" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
@@ -244,13 +196,10 @@ let%test_module "Tokens test" =
     let%test_unit "Initialize after update fails" =
       let account =
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons_tree
-             Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons Account_updates.deploy
         |> test_zkapp_command
              ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
@@ -263,10 +212,8 @@ let%test_module "Tokens test" =
                in the account.
             *)
             []
-            |> Zkapp_command.Call_forest.cons_tree
-                 Update_state_account_update.account_update
-            |> Zkapp_command.Call_forest.cons_tree
-                 Initialize_account_update.account_update
+            |> Zkapp_command.Call_forest.cons_tree Account_updates.update_state
+            |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
             |> test_zkapp_command )
       in
       assert (Or_error.is_error account)

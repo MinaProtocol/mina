@@ -97,7 +97,7 @@ let lazy_compiled =
        ~auxiliary_typ:Impl.Typ.unit
        ~branches:(module Nat.N2)
        ~max_proofs_verified:(module Nat.N0)
-       ~name:"empty_update"
+       ~name:"tokens"
        ~constraint_constants:
          Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
        ~choices:(fun ~self:_ ->
