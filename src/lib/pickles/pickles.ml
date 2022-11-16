@@ -194,26 +194,28 @@ module Make_str (_ : Wire_types.Concrete) = struct
         local_max_proofs_verifieds
         H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
     let dummy_chals = Dummy.Ipa.Wrap.challenges in
-    let module Messages = H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap) in
-    let module Maxes =  H1.T(Nat) in
+    let module Messages =
+      H1.T (Proof_.Messages_for_next_proof_over_same_field.Wrap) in
+    let module Maxes = H1.T (Nat) in
     let (T (messages_len, _)) = Messages.length messages_for_next_wrap_proofs in
     let (T (maxes_len, _)) = Maxes.length M.maxes in
-    let T difference =
-      let rec sub : type n m. n Nat.t -> m Nat.t -> Nat.e = fun x y ->
+    let (T difference) =
+      let rec sub : type n m. n Nat.t -> m Nat.t -> Nat.e =
+       fun x y ->
         let open Nat in
-        match x, y with
-        | _, Z -> T x
-        | Z, S _ -> assert false
-        | S x, S y -> sub x y
+        match (x, y) with
+        | _, Z ->
+            T x
+        | Z, S _ ->
+            assert false
+        | S x, S y ->
+            sub x y
       in
       sub maxes_len messages_len
     in
     let rec go :
         type len ms ns.
-           len Nat.t
-        -> ms Maxes.t
-        -> ns Messages.t
-        -> ms Messages.t =
+        len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t =
      fun pad maxes messages_for_next_wrap_proofs ->
       match (pad, maxes, messages_for_next_wrap_proofs) with
       | S pad, m :: maxes, _ ->
@@ -221,7 +223,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
           }
           :: go pad maxes messages_for_next_wrap_proofs
-      | S _, [], _ -> assert false
+      | S _, [], _ ->
+          assert false
       | Z, [], [] ->
           []
       | ( Z
@@ -235,8 +238,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   dummy_chals
             }
           in
-          messages_for_next_wrap_proof :: go Z maxes messages_for_next_wrap_proofs
-      | (Z, [], _ :: _) | (Z, _ :: _, []) -> assert false
+          messages_for_next_wrap_proof
+          :: go Z maxes messages_for_next_wrap_proofs
+      | Z, [], _ :: _ | Z, _ :: _, [] ->
+          assert false
     in
     go difference M.maxes messages_for_next_wrap_proofs
 
