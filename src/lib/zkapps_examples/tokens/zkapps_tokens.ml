@@ -310,6 +310,14 @@ module Rules = struct
           Token_id.Checked.equal self_token
             account_update.account_update.data.caller
         in
+        let is_self =
+          Account_id.Checked.derive_token_id
+            ~owner:
+              (Account_id.Checked.create
+                 account_update.account_update.data.public_key
+                 account_update.account_update.data.token_id )
+          |> Token_id.Checked.equal self_token
+        in
         let using_this_token =
           Token_id.Checked.equal self_token
             account_update.account_update.data.token_id
@@ -322,7 +330,10 @@ module Rules = struct
             ~else_:Field.zero
         in
         running_total := Field.( + ) !running_total amount ;
-        state := skip_subtree_if (Boolean.not can_access_this_token) !state
+        state :=
+          skip_subtree_if
+            Boolean.((not can_access_this_token) ||| is_self)
+            !state
       in
       for _i = 0 to n do
         consume_account_update ()

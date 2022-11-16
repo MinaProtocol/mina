@@ -87,14 +87,17 @@ let%test_module "Tokens test" =
         in
         account_update
 
-      let mint =
+      let mint_with_caller caller =
         let amount_to_mint = Currency.Amount.of_nanomina_int_exn 200 in
         let account_update, () =
           Async.Thread_safe.block_on_async_exn
             (Zkapps_tokens.mint ~owner_public_key:pk ~owner_token_id:token_id
-               ~amount:amount_to_mint ~mint_to_public_key:(fst mint_to_keys) )
+               ~caller ~amount:amount_to_mint
+               ~mint_to_public_key:(fst mint_to_keys) )
         in
         account_update
+
+      let mint = mint_with_caller Token_id.default
     end
 
     let signers = [| (pk, sk); mint_to_keys |]
@@ -278,32 +281,47 @@ let%test_module "Tokens test" =
                           ~token_id:owned_token_id ~caller:owned_token_id
                     }
                     ~calls:
-                      ( []
-                      (* Delegate call, should be checked. *)
-                      |> Zkapp_command.Call_forest.cons
-                           { Account_update.authorization =
-                               Control.Signature Signature.dummy
-                           ; body =
-                               Zkapps_examples.mk_update_body (fst mint_to_keys)
-                                 ~use_full_commitment:true
-                                 ~balance_change:(int_to_amount 2)
-                                 ~token_id:owned_token_id ~caller:owned_token_id
-                           }
-                      (* Call, should be skipped. *)
-                      |> Zkapp_command.Call_forest.cons
-                           { Account_update.authorization =
-                               Control.Signature Signature.dummy
-                           ; body =
-                               Zkapps_examples.mk_update_body (fst mint_to_keys)
-                                 ~use_full_commitment:true
-                                 ~balance_change:(int_to_amount (-15))
-                                 ~token_id:Token_id.default
-                                 ~caller:
-                                   (Account_id.derive_token_id
-                                      ~owner:
-                                        (Account_id.create (fst mint_to_keys)
-                                           owned_token_id ) )
-                           } ) )
+                      (let call_token_id =
+                         Account_id.derive_token_id
+                           ~owner:
+                             (Account_id.create (fst mint_to_keys)
+                                owned_token_id )
+                       in
+                       []
+                       (* Delegate call, should be checked. *)
+                       |> Zkapp_command.Call_forest.cons
+                            { Account_update.authorization =
+                                Control.Signature Signature.dummy
+                            ; body =
+                                Zkapps_examples.mk_update_body
+                                  (fst mint_to_keys) ~use_full_commitment:true
+                                  ~balance_change:(int_to_amount 2)
+                                  ~token_id:owned_token_id
+                                  ~caller:owned_token_id
+                            }
+                       (* Call, should be skipped. *)
+                       |> Zkapp_command.Call_forest.cons
+                            { Account_update.authorization =
+                                Control.Signature Signature.dummy
+                            ; body =
+                                Zkapps_examples.mk_update_body
+                                  (fst mint_to_keys) ~use_full_commitment:true
+                                  ~balance_change:(int_to_amount (-15))
+                                  ~token_id:Token_id.default
+                                  ~caller:call_token_id
+                            }
+                       (* Minting by delegate call should be ignored by the sum
+                          check.
+                       *)
+                       |> Zkapp_command.Call_forest.cons_tree
+                            (Account_updates.mint_with_caller owned_token_id)
+                       (* Minting by call should be ignored by the sum check.
+                       *)
+                       |> Zkapp_command.Call_forest.cons_tree
+                            (Account_updates.mint_with_caller call_token_id) )
+               (* Minting should be ignored by the sum check. *)
+               |> Zkapp_command.Call_forest.cons_tree
+                    (Account_updates.mint_with_caller owned_token_id) )
         (* This account update should be ignored by the token zkApp. *)
         |> Zkapp_command.Call_forest.cons
              { Account_update.authorization = Control.Signature Signature.dummy
