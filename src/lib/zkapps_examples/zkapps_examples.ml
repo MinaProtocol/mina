@@ -178,6 +178,16 @@ module Account_update_under_construction = struct
           ~f:(Fn.flip Zkapp_account.Sequence_events.push_to_data_as_hash)
     end
 
+    module Calls_kind = struct
+      type t =
+        | No_calls
+        | Rev_calls of
+            ( Zkapp_call_forest.Checked.account_update
+            * Zkapp_call_forest.Checked.t )
+            list
+        | Calls of Zkapp_call_forest.Checked.t
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
@@ -185,10 +195,7 @@ module Account_update_under_construction = struct
       ; caller : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
-      ; rev_calls :
-          ( Zkapp_call_forest.Checked.account_update
-          * Zkapp_call_forest.Checked.t )
-          list
+      ; calls : Calls_kind.t
       ; call_data : Field.t option
       ; events : Events.t
       ; sequence_events : Sequence_events.t
@@ -204,7 +211,7 @@ module Account_update_under_construction = struct
       ; caller
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
-      ; rev_calls = []
+      ; calls = No_calls
       ; call_data = None
       ; events = Events.create ()
       ; sequence_events = Sequence_events.create ()
@@ -273,9 +280,15 @@ module Account_update_under_construction = struct
         }
       in
       let calls =
-        List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
-          ~f:(fun acc (account_update, calls) ->
-            Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+        match t.calls with
+        | No_calls ->
+            Zkapp_call_forest.Checked.empty ()
+        | Rev_calls rev_calls ->
+            List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
+              ~f:(fun acc (account_update, calls) ->
+                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+        | Calls calls ->
+            calls
       in
       (account_update, calls)
 
@@ -298,7 +311,27 @@ module Account_update_under_construction = struct
       { t with update = Update.set_state idx data t.update }
 
     let register_call account_update calls (t : t) =
-      { t with rev_calls = (account_update, calls) :: t.rev_calls }
+      let rev_calls =
+        match t.calls with
+        | No_calls ->
+            []
+        | Rev_calls rev_calls ->
+            rev_calls
+        | Calls _ ->
+            failwith "Cannot append calls to an already-completed tree"
+      in
+      { t with calls = Rev_calls ((account_update, calls) :: rev_calls) }
+
+    let set_calls calls (t : t) =
+      ( match t.calls with
+      | No_calls ->
+          ()
+      | Rev_calls _ ->
+          failwith
+            "Cannot append an already-completed tree to the current calls"
+      | Calls _ ->
+          failwith "Cannot join two already-completed trees" ) ;
+      { t with calls = Calls calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
 
@@ -353,6 +386,11 @@ class account_update ~public_key ?token_id ?caller =
       account_update <-
         Account_update_under_construction.In_circuit.register_call
           called_account_update sub_calls account_update
+
+    method set_calls calls =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_calls calls
+          account_update
 
     method add_events events =
       account_update <-
@@ -619,6 +657,28 @@ let compile :
     go provers
   in
   (tag, cache_handle, proof, provers)
+
+let mk_update_body ?(token_id = Token_id.default)
+    ?(update = Account_update.Update.dummy)
+    ?(balance_change = Amount.Signed.zero) ?(increment_nonce = false)
+    ?(events = []) ?(sequence_events = []) ?(call_data = Field.Constant.zero)
+    ?(preconditions = Account_update.Preconditions.accept)
+    ?(use_full_commitment = false) ?(caller = Token_id.default)
+    ?(authorization_kind = Account_update.Authorization_kind.Signature)
+    public_key =
+  { Account_update.Body.public_key
+  ; update
+  ; token_id
+  ; balance_change
+  ; increment_nonce
+  ; events
+  ; sequence_events
+  ; call_data
+  ; preconditions
+  ; use_full_commitment
+  ; caller
+  ; authorization_kind
+  }
 
 module Deploy_account_update = struct
   let body ?(balance_change = Account_update.Body.dummy.balance_change)

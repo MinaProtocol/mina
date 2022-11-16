@@ -46,6 +46,7 @@ val mint :
 val child_forest :
      Public_key.Compressed.t
   -> Token_id.t
+  -> Zkapp_call_forest.t
   -> unit
   -> ( ( Account_update.t
        , Zkapp_command.Digest.Account_update.t

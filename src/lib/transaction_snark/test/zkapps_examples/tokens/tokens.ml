@@ -52,6 +52,13 @@ let fee_to_create_signed n =
   fee_to_create n |> Currency.Amount.Signed.of_unsigned
   |> Currency.Amount.Signed.negate
 
+let int_to_amount amt =
+  let magnitude, sgn = if amt < 0 then (-amt, Sgn.Pos) else (amt, Sgn.Neg) in
+  { Currency.Signed_poly.magnitude =
+      Currency.Amount.of_nanomina_int_exn magnitude
+  ; sgn
+  }
+
 let%test_module "Tokens test" =
   ( module struct
     let () = Base.Backtrace.elide := false
@@ -61,6 +68,8 @@ let%test_module "Tokens test" =
     let token_id = Token_id.default
 
     let account_id = Account_id.create pk token_id
+
+    let owned_token_id = Account_id.derive_token_id ~owner:account_id
 
     let vk = Lazy.force Zkapps_tokens.vk
 
@@ -88,7 +97,7 @@ let%test_module "Tokens test" =
         account_update
     end
 
-    let signers = [| (pk, sk) |]
+    let signers = [| (pk, sk); mint_to_keys |]
 
     let initialize_ledger ledger =
       let balance =
@@ -126,11 +135,118 @@ let%test_module "Tokens test" =
         []
         |> Zkapp_command.Call_forest.cons_tree
              ( fst @@ Async.Thread_safe.block_on_async_exn
-             @@ Zkapps_tokens.child_forest pk token_id )
+             @@ Zkapps_tokens.child_forest pk token_id [] )
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
+        |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
+             ~finalize_ledger
+      in
+      ignore account
+
+    let%test_unit "Initialize, mint, transfer one fails" =
+      let subtree =
+        []
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-1)) ~token_id:owned_token_id
+             }
+      in
+      match
+        Or_error.try_with (fun () ->
+            Async.Thread_safe.block_on_async_exn
+            @@ Zkapps_tokens.child_forest pk token_id subtree )
+      with
+      | Ok _ ->
+          failwith
+            "Should be unable to produce a proof when the balances do not sum \
+             to 0"
+      | Error _ ->
+          ()
+
+    let%test_unit "Initialize, mint, transfer two succeeds" =
+      let subtree =
+        []
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-1)) ~token_id:owned_token_id
+             }
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true ~balance_change:(int_to_amount 1)
+                   ~token_id:owned_token_id
+             }
+      in
+      let account =
+        []
+        |> Zkapp_command.Call_forest.cons_tree
+             ( fst @@ Async.Thread_safe.block_on_async_exn
+             @@ Zkapps_tokens.child_forest pk token_id subtree )
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons
+             (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
+        |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
+             ~finalize_ledger
+      in
+      ignore account
+
+    let%test_unit "Initialize, mint, transfer two succeeds, ignores non-token" =
+      let subtree =
+        []
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-1)) ~token_id:owned_token_id
+                   ~caller:owned_token_id
+             }
+        (* This account update should be ignored by the token zkApp. *)
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-30))
+                   ~token_id:Token_id.default ~caller:owned_token_id
+             }
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true ~balance_change:(int_to_amount 1)
+                   ~token_id:owned_token_id ~caller:owned_token_id
+             }
+      in
+      let account =
+        []
+        (* This account update should bring the total balance back to 0,
+           counteracting the effect of the ignored update above.
+        *)
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true ~balance_change:(int_to_amount 30)
+                   ~token_id:Token_id.default ~caller:Token_id.default
+             }
+        |> Zkapp_command.Call_forest.cons_tree
+             ( fst @@ Async.Thread_safe.block_on_async_exn
+             @@ Zkapps_tokens.child_forest pk token_id subtree )
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons
+             (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
       in
