@@ -149,51 +149,175 @@ module Rules = struct
 
     let skip_subtree_if _skip () = ()
 
+    let check_children ~self_token ~running_total ~state n =
+      let state = ref state in
+      let running_total = ref running_total in
+      let consume_account_update () =
+        let next_state, account_update = next_account_update !state in
+        state := next_state ;
+        let can_access_this_token =
+          Token_id.Checked.equal self_token
+            account_update.account_update.data.caller
+        in
+        let using_this_token =
+          Token_id.Checked.equal self_token
+            account_update.account_update.data.token_id
+        in
+        let amount =
+          if_ using_this_token ~typ:Field.typ
+            ~then_:
+              ( account_update.account_update.data.balance_change
+              |> Currency.Amount.Signed.Checked.to_field_var |> run_checked )
+            ~else_:Field.zero
+        in
+        running_total := Field.( + ) !running_total amount ;
+        state := skip_subtree_if (Boolean.not can_access_this_token) !state
+      in
+      for _i = 0 to n do
+        consume_account_update ()
+      done ;
+      (!state, !running_total)
+
+    let state_is_empty () = Boolean.true_
+
+    let dummy_proof =
+      lazy (Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15)
+
+    module Recursive = struct
+      module Statement = struct
+        module Value = struct
+          type t =
+            { state : unit
+            ; self_token : Token_id.t
+            ; running_total : Field.Constant.t
+            }
+          [@@deriving hlist]
+        end
+
+        module Circuit = struct
+          type t =
+            { state : unit
+            ; self_token : Token_id.Checked.t
+            ; running_total : Field.t
+            }
+          [@@deriving hlist]
+        end
+
+        let typ =
+          Typ.of_hlistable
+            [ Typ.unit; Token_id.typ; Field.typ ]
+            ~var_to_hlist:Circuit.to_hlist ~var_of_hlist:Circuit.of_hlist
+            ~value_to_hlist:Value.to_hlist ~value_of_hlist:Value.of_hlist
+      end
+
+      let main
+          { Pickles.Inductive_rule.public_input =
+              ({ state; self_token; running_total } : Statement.Circuit.t)
+          } =
+        let state, running_total =
+          check_children ~self_token ~running_total ~state 3
+        in
+        let recursive_input =
+          { Statement.Circuit.state; self_token; running_total }
+        in
+        let proof =
+          exists (Typ.Internal.ref ()) ~compute:(fun () ->
+              Lazy.force dummy_proof )
+        in
+        { Pickles.Inductive_rule.previous_proof_statements =
+            [ { public_input = recursive_input
+              ; proof
+              ; proof_must_verify = Boolean.not (state_is_empty state)
+              }
+            ; (* dummy to avoid pickles bug *)
+              { public_input = recursive_input
+              ; proof =
+                  exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                      Lazy.force dummy_proof )
+              ; proof_must_verify = Boolean.false_
+              }
+            ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        }
+
+      let rule self : _ Pickles.Inductive_rule.t =
+        { identifier = "Transfer tokens"
+        ; prevs = [ self; self ]
+        ; main
+        ; uses_lookup = false
+        }
+    end
+
     let main input =
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
-      Zkapps_examples.wrap_main ~public_key ~token_id
-        (fun account_update ->
-          let self_token =
-            Account_id.Checked.derive_token_id
-              ~owner:(Account_id.Checked.create public_key token_id)
-          in
-          (* Accumulators *)
-          let state = ref () in
-          let running_total = ref Field.zero in
-          let consume_account_update () =
-            let next_state, account_update = next_account_update !state in
-            state := next_state ;
-            let can_access_this_token =
-              Token_id.Checked.equal self_token
-                account_update.account_update.data.caller
+      let { Pickles.Inductive_rule.previous_proof_statements = _
+          ; public_output = account_update
+          ; auxiliary_output = recursive_input
+          } =
+        Zkapps_examples.wrap_main ~public_key ~token_id
+          (fun account_update ->
+            let self_token =
+              Account_id.Checked.derive_token_id
+                ~owner:(Account_id.Checked.create public_key token_id)
             in
-            let using_this_token =
-              Token_id.Checked.equal self_token
-                account_update.account_update.data.token_id
+            (* Accumulators *)
+            let state, running_total =
+              check_children ~self_token ~running_total:Field.zero ~state:() 3
             in
-            let amount =
-              if_ using_this_token ~typ:Field.typ
-                ~then_:
-                  ( account_update.account_update.data.balance_change
-                  |> Currency.Amount.Signed.Checked.to_field_var |> run_checked
-                  )
-                ~else_:Field.zero
-            in
-            running_total := Field.( + ) !running_total amount ;
-            state := skip_subtree_if (Boolean.not can_access_this_token) !state
-          in
-          for _i = 0 to 5 do
-            consume_account_update ()
-          done ;
-          account_update#assert_state_proved )
-        input
+            account_update#assert_state_proved ;
+            { Recursive.Statement.Circuit.state; self_token; running_total } )
+          input
+      in
+      let proof =
+        exists (Typ.Internal.ref ()) ~compute:(fun () ->
+            Lazy.force dummy_proof )
+      in
+      { Pickles.Inductive_rule.previous_proof_statements =
+          [ { public_input = recursive_input
+            ; proof
+            ; proof_must_verify =
+                Boolean.not (state_is_empty recursive_input.state)
+            }
+          ; (* dummy to avoid pickles bug *)
+            { public_input = recursive_input
+            ; proof =
+                exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                    Lazy.force dummy_proof )
+            ; proof_must_verify = Boolean.false_
+            }
+          ]
+      ; public_output = account_update
+      ; auxiliary_output = ()
+      }
 
-    let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Transfer tokens"; prevs = []; main; uses_lookup = false }
+    let rule prev : _ Pickles.Inductive_rule.t =
+      { identifier = "Transfer tokens"
+      ; prevs = [ prev; prev ]
+      ; main
+      ; uses_lookup = false
+      }
   end
+end
+
+module Transfer_recursive = struct
+  let lazy_compiled =
+    lazy
+      (Pickles.compile () ~cache:Cache_dir.cache
+         ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
+         ~auxiliary_typ:Impl.Typ.unit
+         ~branches:(module Nat.N1)
+         ~max_proofs_verified:(module Nat.N2)
+         ~name:"transfer recurse"
+         ~constraint_constants:
+           Genesis_constants.Constraint_constants.(
+             to_snark_keys_header compiled)
+         ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
+
+  let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
 end
 
 let lazy_compiled =
@@ -201,13 +325,15 @@ let lazy_compiled =
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
        ~auxiliary_typ:Impl.Typ.unit
        ~branches:(module Nat.N3)
-       ~max_proofs_verified:(module Nat.N0)
+       ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
        ~constraint_constants:
          Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
        ~choices:(fun ~self:_ ->
-         [ Rules.Initialize_state.rule; Rules.Mint.rule; Rules.Transfer.rule ]
-         ) )
+         [ Rules.Initialize_state.rule
+         ; Rules.Mint.rule
+         ; Rules.Transfer.rule (Lazy.force Transfer_recursive.tag)
+         ] ) )
 
 let compile () = ignore (Lazy.force lazy_compiled : _)
 
@@ -220,7 +346,7 @@ let p_module = Lazy.map lazy_compiled ~f:(fun (_, _, p_module, _) -> p_module)
 module P = struct
   type statement = Zkapp_statement.t
 
-  type t = (Nat.N0.n, Nat.N0.n) Pickles.Proof.t
+  type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
 
   module type Proof_intf =
     Pickles.Proof_intf with type statement = statement and type t = t
