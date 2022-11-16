@@ -2316,9 +2316,7 @@ let%test_module "Epoch ledger sync tests" =
         Cli_lib.Flag.Port.default_libp2p + instance + (test_number * 2)
       in
       let creatable_gossip_net =
-        let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
-        let seed_peer_list_url = None in
         let addrs_and_ports =
           let external_ip = Unix.Inet_addr.localhost in
           let bind_ip = Unix.Inet_addr.of_string "0.0.0.0" in
@@ -2339,9 +2337,9 @@ let%test_module "Epoch ledger sync tests" =
           { timeout = Time.Span.of_sec 10.
           ; logger
           ; conf_dir
-          ; chain_id
-          ; unsafe_no_trust_ip = false
-          ; seed_peer_list_url
+          ; chain_id = "dummy_chain_id"
+          ; unsafe_no_trust_ip = true
+          ; seed_peer_list_url = None
           ; initial_peers
           ; addrs_and_ports
           ; metrics_port = None
@@ -2349,7 +2347,7 @@ let%test_module "Epoch ledger sync tests" =
           ; flooding = false
           ; direct_peers = []
           ; peer_protection_ratio = 0.2
-          ; peer_exchange = false
+          ; peer_exchange = true
           ; min_connections = Cli_lib.Default.min_connections
           ; max_connections = Cli_lib.Default.max_connections
           ; validation_queue_size = Cli_lib.Default.validation_queue_size
