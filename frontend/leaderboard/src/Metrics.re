@@ -2,22 +2,6 @@
   Metrics.re has the responsibilities of making all the necessary queries to
   the archive node to gather user metrics on testnet challenges and transforming
   that data into a map of public_keys to metricRecord types.
-
-  The data visualized for a Map is as follows, where x is some int value:
-
- "public_key1": {
-    blocksCreated: x,
-    transactionSent: x,
-    snarkFeesCollected: x,
-    highestSnarkFeeCollected: x,
-    transactionsReceivedByEcho: x,
-    coinbaseReceiver: x,
-    createAndSendToken: x,
- }
-
-  All the metrics to be computed are specified in calculateMetrics(). Each
-  metric to be computed is contained within it's own Map structure and is then
-  combined together with all other metric Maps.
  */
 
 module StringMap = Map.Make(String);
@@ -134,7 +118,7 @@ let filterNonePromises = challenges => {
 };
 
 let calculateMetrics =
-    (users, blocksChallenge, snarkChallenge, transactionChallenge) => {
+    (users, zkAppDeployed) => {
   let usersMap =
     Array.fold_left(
       (map, user) => {StringMap.add(user, (), map)},
@@ -142,22 +126,11 @@ let calculateMetrics =
       users,
     );
 
-  let highestSnarkFeeCollected = StringMap.empty;
-  let transactionsReceivedByEcho = StringMap.empty;
-  let coinbaseReceiverChallenge = StringMap.empty;
-
   usersMap
   |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
   |> StringMap.mapi((key, _) =>
        {
-         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksChallenge),
-         transactionSent: StringMap.find_opt(key, transactionChallenge),
-         snarkFeesCollected: StringMap.find_opt(key, snarkChallenge),
-         highestSnarkFeeCollected:
-           StringMap.find_opt(key, highestSnarkFeeCollected),
-         transactionsReceivedByEcho:
-           StringMap.find_opt(key, transactionsReceivedByEcho),
-         coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
+         Types.Metrics.appsDeployed: StringMap.find_opt(key, zkAppDeployed)
        }
      );
 };
@@ -177,28 +150,18 @@ let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
          |> resolve
        });
 
-  let blocksChallenge =
+  let zkAppDeployedChallange =
     getPromisifiedChallenge(
       users,
       pgPool,
-      Postgres.getBlocksChallenge,
+      Postgres.getZkAppDeployedChallenge,
       0,
       "count",
     )
     |> filterNonePromises;
 
 
-  let transactionSentChallenge =
-    getPromisifiedChallenge(
-      users,
-      pgPool,
-      Postgres.getTransactionsSentChallenge,
-      0,
-      "max",
-    )
-    |> filterNonePromises;
-
-  [|blocksChallenge, transactionSentChallenge|]
+  [|zkAppDeployedChallange|]
   |> all
   |> then_(result => {
        result
@@ -206,25 +169,17 @@ let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
        |> then_(result => {
             users
             |> then_(users => {
-                 let blocksMetrics = result[0];
-                 let snarkFeeMetrics = result[1];
-                 let transactionMetrics = result[2];
+                 let zkAppDeployedMetrics = result[0];
 
-                 let blocksChallenge =
-                   convertDBRowsToMap(blocksMetrics, int_of_string);
-                 let snarkFeeChallenge =
-                   convertDBRowsToMap(snarkFeeMetrics, Int64.of_string);
-                 let transactionChallenge =
-                   convertDBRowsToMap(transactionMetrics, int_of_string);
+                 let zkAppDeployed =
+                   convertDBRowsToMap(zkAppDeployedMetrics, int_of_string);
 
                  Js.log("Computing Metrics - In Progress");
 
                  let metrics =
                    calculateMetrics(
                      users,
-                     blocksChallenge,
-                     snarkFeeChallenge,
-                     transactionChallenge,
+                     zkAppDeployed
                    );
 
                  Js.log("Computing Metrics - Done");

@@ -18,95 +18,29 @@
 
 module StringMap = Map.Make(String);
 
-let echoServiceChallenge = metricsMap => {
-  metricsMap
-  |> Points.addPointsToUsersWithAtleastN(
-       (metricRecord: Types.Metrics.t) =>
-         metricRecord.transactionsReceivedByEcho,
-       1,
-       1000,
-     );
-};
-
-let coinbaseReceiverChallenge = (points, metricsMap) => {
-  metricsMap
-  |> StringMap.fold(
-       (key, metric: Types.Metrics.t, map) => {
-         switch (metric.coinbaseReceiver) {
-         | Some(metricValue) =>
-           metricValue ? StringMap.add(key, points, map) : map
-         | None => map
-         }
-       },
-       StringMap.empty,
-     );
-};
-
-let snarkFeeChallenge = metricsMap => {
-  Js.log("SNARK Fee Challenge");
+let appsDeployed = metricsMap => {
+  Js.log("appsDeployed Tracking");
   Points.applyTopNPoints(
     [|
-      (0, 6500), // 1st place: 6500 pts
-      (1, 5000), // 2nd place: 5000 pts
-      (2, 4000), // 3rd place: 4000 pts
-      (51, 3500), // Top 50: 3500 pts.
-      (101, 3000), // Top 100: 3000 pts
-      (251, 2000), // Top 250: 2000 pts
+      (0, 1000), // 1st place: 6500 pts
+      (1, 1000), // 2nd place: 5000 pts
+      (2, 1000), // 3rd place: 4000 pts
+      (51, 1000), // Top 50: 3500 pts.
+      (101, 1000), // Top 100: 3000 pts
+      (251, 1000), // Top 250: 2000 pts
       (501, 1000), // Top 500: 1000 pts
-      (751, 750), // Top 750: 750 pts
-      (1001, 500) // Top 1000: 500 pts
+      (751, 1000), // Top 750: 750 pts
+      (1001, 1000) // Top 1000: 500 pts
     |],
     metricsMap,
-    (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
-    compare,
-  );
-};
-
-let blocksChallenge = metricsMap => {
-  Js.log("Blocks Challenge");
-  Points.applyTopNPoints(
-    [|
-      (0, 6500), // 1st place: 6500 pts
-      (1, 5000), // 2nd place: 5000 pts
-      (2, 4000), // 3rd place: 4000 pts
-      (51, 3500), // Top 50: 3500 pts.
-      (101, 3000), // Top 100: 3000 pts
-      (251, 2000), // Top 250: 2000 pts
-      (501, 1000), // Top 500: 1000 pts
-      (751, 750), // Top 750: 750 pts
-      (1001, 500) // Top 1000: 500 pts
-    |],
-    metricsMap,
-    (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
-    compare,
-  );
-};
-
-let sendMinaChallenge = metricsMap => {
-  Js.log("Send Mina Challenge");
-  Points.applyTopNPoints(
-    [|
-      (0, 6500), // 1st place: 6500 pts
-      (1, 5000), // 2nd place: 5000 pts
-      (2, 4000), // 3rd place: 4000 pts
-      (51, 3500), // Top 50: 3500 pts.
-      (101, 3000), // Top 100: 3000 pts
-      (251, 2000), // Top 250: 2000 pts
-      (501, 1000), // Top 500: 1000 pts
-      (751, 750), // Top 750: 750 pts
-      (1001, 500) // Top 1000: 500 pts
-    |],
-    metricsMap,
-    (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+    (metricRecord: Types.Metrics.t) => metricRecord.appsDeployed,
     compare,
   );
 };
 
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
-  | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
-  | "produce & sell snarks" => Some(snarkFeeChallenge(metricsMap))
-  | "send transactions" => Some(sendMinaChallenge(metricsMap))
+  | "deploy zkApp on mina" => Some(appsDeployed(metricsMap))
   | _ => None
   };
 };

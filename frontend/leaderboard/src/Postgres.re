@@ -2,44 +2,19 @@ open Bindings.Postgres;
 
 let getUsers = "SELECT * FROM public_keys";
 
-let getBlocksChallenge = pk => {
+let getZkAppDeployedChallenge = pk => {
   {j|
-    SELECT COUNT(*)
-    FROM
-      (SELECT DISTINCT ON (global_slot_since_genesis) global_slot_since_genesis, state_hash
-      FROM blocks
-      INNER JOIN public_keys AS p ON creator_id=p.id
-      WHERE p.value = '$(pk)') AS blocksCreated
-  |j};
-};
-
-// leaving as a stub, user_commands has different schema now
-let getTransactionsSentChallenge = pk => {
-  {j|
-    SELECT MAX(nonce)
-    FROM user_commands
-  |j};
-};
-
-let getSnarkFeeChallenge = pk => {
-  {j|
-    SELECT SUM(fee)
-    FROM internal_commands as ic
-    INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
-    INNER JOIN blocks as b ON b.id = bic.block_id
-    INNER JOIN public_keys as p ON p.id=ic.receiver_id
-    WHERE type = 'fee_transfer'
-    AND value = '$(pk)'
-    AND b.id NOT IN
-    (
-      SELECT b.id
-      FROM internal_commands as ic
-      INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
-      INNER JOIN blocks as b ON b.id = bic.block_id
-      INNER JOIN public_keys as p ON p.id=ic.receiver_id
-      WHERE type = 'coinbase'
-      AND value = '$(pk)'
-    )
+      SELECT
+        zvk.hash
+      FROM
+        account_identifiers as ai
+        INNER JOIN public_keys as pk on pk.id = ai.public_key_id
+        INNER JOIN accounts_accessed as aa ON aa.account_identifier_id = ai.id
+        INNER JOIN zkapp_accounts as za ON za.id = aa.zkapp_id
+        INNER JOIN zkapp_verification_keys as zvk ON zvk.id = za.verification_key_id
+        AND pk.value = '$(pk)'
+      WHERE
+        zkapp_id is not null;
   |j};
 };
 
