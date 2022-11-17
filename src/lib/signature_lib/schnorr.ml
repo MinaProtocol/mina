@@ -674,7 +674,7 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
   let open Tick.Typ in
   let const_typ =
     Typ
-      { check = (fun _ -> Tick.make_checked_ast @@ Tick.Checked.return ())
+      { check = (fun _ -> Tick.Checked.return ())
       ; var_to_fields = (fun t -> ([||], t))
       ; var_of_fields = (fun (_, t) -> t)
       ; value_to_fields = (fun t -> ([||], t))
