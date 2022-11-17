@@ -1,3 +1,7 @@
+#!/bin/bash
+
+set -e
+
 SNARKY_JS_PATH=$1
 [ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
@@ -10,7 +14,7 @@ export DUNE_USE_DEFAULT_LINKER="y"
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js \
 && dune b src/lib/snarky_js_bindings/snarkyjs/src/provable/gen/js-layout.ts \
-&& dune b src/lib/snarky_js_bindings/snarkyjs/src/js_crypto/constants.ts || exit 1
+&& dune b src/lib/snarky_js_bindings/snarkyjs/src/js_crypto/constants.ts
 
 BINDINGS_PATH="$SNARKY_JS_PATH"/dist/node/_node_bindings/
 mkdir -p "$BINDINGS_PATH"
