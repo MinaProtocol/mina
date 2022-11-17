@@ -111,8 +111,9 @@ nix develop mina#with-lsp -c $EDITOR .
 if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
-This will drop you in your favorite editor within a Nix sanbdbox containing an
-OCaml LSP server.
+This will drop you in your favorite editor within a Nix environment containing an
+OCaml LSP server. You might need to configure your editor appropriately;
+See [Per-editor instructions](#per-editor-instructions).
 
 However, for LSP to work its magic, you will need to have to make type
 informations available. They can for example be obtained by running `dune build
@@ -120,6 +121,42 @@ informations available. They can for example be obtained by running `dune build
 
 Don't forget to exit and re-enter the editor using this command after switching
 branches, or otherwise changing the dependency tree of Mina.
+
+#### Per-editor instructions
+
+##### Visual Studio Code / vscodium
+
+You have to install the "OCaml Platform" extension, either from
+[official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
+or [openvsix](https://open-vsx.org/extension/ocamllabs/ocaml-platform).
+
+After installing it, run `code` (or `codium`) from within the `nix develop mina#with-lsp` shell,
+click "Select Sandbox" in the extension menu, and then pick "Global Sandbox". From then on, it should just work.
+
+##### Vim
+
+Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to its configuration (`$HOME/.config/nvim`, or just enter command `:CocConfig`):
+
+```
+{
+  "languageserver": {
+    "ocaml-lsp": {
+      "command": "ocamllsp",
+      "args": [],
+      "filetypes": [
+        "ocaml", "reason"
+      ]
+    }
+  }
+}
+```
+
+Now, whenever you start vim from `nix develop mina#with-lsp`, it should just work.
+
+##### Emacs
+
+You need to install the [tuareg](https://github.com/ocaml/tuareg) and [lsp-mode](https://github.com/emacs-lsp/lsp-mode).
+This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
 
 ### "Pure" build
 
@@ -355,7 +392,7 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 
 ## Troubleshooting
 
-### `Error: File unavailable:`, missing dependency libraries, or incorrect dependency library versions
+### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
 If you get an error like this:
 
@@ -376,13 +413,45 @@ Error: File unavailable:
 /nix/store/2i0iqm48p20mrn69nbgr0pf76vdzjxj6-marlin_plonk_bindings_stubs-0.1.0/lib/lib/libwires_15_stubs.a
 ```
 
-It is likely that you have switched branches but didn't re-enter the development
+or like this:
+
+```
+Undefined symbols for architecture x86_64:
+  "____chkstk_darwin", referenced from:
+      __GLOBAL__sub_I_clock_cache.cc in librocksdb_stubs.a(clock_cache.o)
+      __GLOBAL__sub_I_lru_cache.cc in librocksdb_stubs.a(lru_cache.o)
+      __GLOBAL__sub_I_sharded_cache.cc in librocksdb_stubs.a(sharded_cache.o)
+      __GLOBAL__sub_I_builder.cc in librocksdb_stubs.a(builder.o)
+      __GLOBAL__sub_I_c.cc in librocksdb_stubs.a(c.o)
+      __GLOBAL__sub_I_column_family.cc in librocksdb_stubs.a(column_family.o)
+      __GLOBAL__sub_I_compacted_db_impl.cc in librocksdb_stubs.a(compacted_db_impl.o)
+      ...
+ld: symbol(s) not found for architecture x86_64
+```
+
+or like this:
+
+```
+Compiler version mismatch: this project seems to be compiled with OCaml
+compiler version 4.11, but the running OCaml LSP supports OCaml version 4.14.
+OCaml language support will not work properly until this problem is fixed.
+Hint: Make sure your editor runs OCaml LSP that supports this version of
+compiler.
+```
+
+This could be caused by having some non-Nix setup polluting the environment
+in your shell init file. Try running `nix develop mina -c bash --norc` or
+`nix develop mina -c zsh --no-rc` and see if that helps. If it does, look through
+the corresponding shell init files for anything suspicious (e.g. `eval $(opam env)`
+or `PATH` modifications).
+
+Alternatively, you might have switched branches but didn't re-enter the development
 shell. Exit the development shell (with `exit`, Ctrl+D, or however else you like
 exiting your shells) and re-enter it again with `nix develop mina`. `direnv` can
 also sometimes not reload the environment automatically, in that case, try
 `direnv reload`.
 
-Alternatively, in some circumstances, `dune` is not smart enough to rebuild
+Finally, in some circumstances, `dune` is not smart enough to rebuild
 things even if the environment changed and they should be rebuilt. Try removing
 the `_build` directory (or running `dune clean`, which does the same thing).
 
