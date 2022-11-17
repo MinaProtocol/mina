@@ -529,35 +529,36 @@ let () =
       this##toString ) ;
   static_method "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : field_class Js.t Js.Opt.t ->
-      let return x =
-        Js.Opt.return (new%js field_constr (As_field.of_field x))
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : field_class Js.t ->
+      let return x = Some (new%js field_constr (As_field.of_field x)) in
+      let result : field_class Js.t option =
+        match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+        | "number" ->
+            let value = Js.float_of_number (Obj.magic value) in
+            if Caml.Float.is_integer value then
+              return (Field.of_int (Float.to_int value))
+            else None
+        | "boolean" ->
+            let value = Js.to_bool (Obj.magic value) in
+            return (if value then Field.one else Field.zero)
+        | "string" -> (
+            let value : Js.js_string Js.t = Obj.magic value in
+            let s = Js.to_string value in
+            try
+              return
+                (Field.constant
+                   ( if
+                     String.length s > 1
+                     && Char.equal s.[0] '0'
+                     && Char.equal (Char.lowercase s.[1]) 'x'
+                   then
+                     Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+                   else Field.Constant.of_string s ) )
+            with Failure _ -> None )
+        | _ ->
+            None
       in
-      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
-      | "number" ->
-          let value = Js.float_of_number (Obj.magic value) in
-          if Caml.Float.is_integer value then
-            return (Field.of_int (Float.to_int value))
-          else Js.Opt.empty
-      | "boolean" ->
-          let value = Js.to_bool (Obj.magic value) in
-          return (if value then Field.one else Field.zero)
-      | "string" -> (
-          let value : Js.js_string Js.t = Obj.magic value in
-          let s = Js.to_string value in
-          try
-            return
-              (Field.constant
-                 ( if
-                   String.length s > 1
-                   && Char.equal s.[0] '0'
-                   && Char.equal (Char.lowercase s.[1]) 'x'
-                 then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
-                 else Field.Constant.of_string s ) )
-          with Failure _ -> Js.Opt.empty )
-      | _ ->
-          Js.Opt.empty ) ;
+      Option.value_exn ~message:"Field.fromJSON failed" result ) ;
   static_method "check" (fun _x -> ())
 
 let () =
@@ -677,14 +678,12 @@ let () =
       Js.Unsafe.coerce this##toBoolean ) ;
   static_method "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : bool_class Js.t Js.Opt.t ->
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : bool_class Js.t ->
       match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
       | "boolean" ->
-          Js.Opt.return
-            (new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value)))
-      | _ ->
-          Js.Opt.empty )
+          new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value))
+      | s ->
+          failwith ("Bool.fromJSON: expected boolean, got " ^ s) )
 
 type coords = < x : As_field.t Js.prop ; y : As_field.t Js.prop > Js.t
 
@@ -1203,6 +1202,8 @@ let poseidon =
         val accountUpdateCons = Js.string (account_update_cons :> string)
 
         val accountUpdateNode = Js.string (account_update_node :> string)
+
+        val zkappMemo = Js.string (zkapp_memo :> string)
       end
   end
 
@@ -2788,7 +2789,7 @@ module Ledger = struct
   module Account_update = Mina_base.Account_update
   module Zkapp_command = Mina_base.Zkapp_command
 
-  let account_update_of_json =
+  let account_update_of_json, account_update_to_json =
     let deriver =
       Account_update.Graphql_repr.deriver
       @@ Fields_derivers_zkapps.Derivers.o ()
@@ -2799,13 +2800,17 @@ module Ledger = struct
         (account_update |> Js.to_string |> Yojson.Safe.from_string)
       |> Account_update.of_graphql_repr
     in
-    account_update_of_json
-
-  (* TODO hash two zkapp_command together in the correct way *)
+    let account_update_to_json (account_update : Account_update.t) :
+        Js.js_string Js.t =
+      Fields_derivers_zkapps.to_json deriver
+        (Account_update.to_graphql_repr account_update ~call_depth:0)
+      |> Yojson.Safe.to_string |> Js.string
+    in
+    (account_update_of_json, account_update_to_json)
 
   let hash_account_update (p : Js.js_string Js.t) =
-    Account_update.digest (p |> account_update_of_json)
-    |> Field.constant |> to_js_field
+    p |> account_update_of_json |> Account_update.digest |> Field.constant
+    |> to_js_field
 
   let forest_digest_of_field : Field.Constant.t -> Zkapp_command.Digest.Forest.t
       =
@@ -2861,17 +2866,20 @@ module Ledger = struct
       Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let commitment = Zkapp_command.commitment tx in
+    let fee_payer = Account_update.of_fee_payer tx.fee_payer in
+    let fee_payer_hash = Zkapp_command.Digest.Account_update.create fee_payer in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
-        ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
-             (Account_update.of_fee_payer tx.fee_payer) )
+        ~fee_payer_hash
     in
     object%js
       val commitment = to_js_field_unchecked commitment
 
       val fullCommitment = to_js_field_unchecked full_commitment
+
+      (* for testing *)
+      val feePayerHash = to_js_field_unchecked (fee_payer_hash :> Impl.field)
     end
 
   let zkapp_public_input (tx_json : Js.js_string Js.t)
@@ -3002,6 +3010,11 @@ module Ledger = struct
   let memo_to_base58 (memo : Js.js_string Js.t) : Js.js_string Js.t =
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
+
+  let memo_hash_base58 (memo_base58 : Js.js_string Js.t) : field_class Js.t =
+    memo_base58 |> Js.to_string
+    |> Mina_base.Signed_command_memo.of_base58_check_exn
+    |> Mina_base.Signed_command_memo.hash |> to_js_field_unchecked
 
   (* low-level building blocks for encoding *)
   let binary_string_to_base58_check bin_string (version_byte : int) :
@@ -3231,6 +3244,7 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
+    static_method "memoHashBase58" memo_hash_base58 ;
 
     static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
@@ -3246,6 +3260,10 @@ module Ledger = struct
         val epochSeed = Char.to_int epoch_seed
 
         val stateHash = Char.to_int state_hash
+
+        val publicKey = Char.to_int non_zero_curve_point_compressed
+
+        val userCommandMemo = Char.to_int user_command_memo
       end
     in
     static "encoding"
