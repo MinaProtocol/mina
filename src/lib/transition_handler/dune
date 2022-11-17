@@ -42,7 +42,7 @@
    child_processes
    verifier
    genesis_constants
-   non_empty_list
+   mina_stdlib
    network_pool
    mina_net2
    mina_numbers

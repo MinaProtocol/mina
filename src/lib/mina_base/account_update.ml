@@ -26,12 +26,15 @@ module Authorization_kind = struct
     module V1 = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
-        | None_given
         | Signature
         | Proof
+        | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      (* control tags are the same thing *)
+      let _f () : (t, Control.Tag.t) Type_equal.t = Type_equal.T
     end
   end]
 
@@ -187,7 +190,7 @@ module Update = struct
         Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
       in
       let%map vesting_increment =
-        Amount.gen_incl Amount.one (Amount.of_int 100)
+        Amount.gen_incl Amount.one (Amount.of_nanomina_int_exn 100)
       in
       { initial_minimum_balance
       ; cliff_time

@@ -1,9 +1,10 @@
-# kubectl apply -f helm/cron_jobs/devnet2-dump-archive-cronjob.yaml
+# kubectl apply -f helm/cron_jobs/berkeley-dump-archive-cronjob.yml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
-apiVersion: batch/v1beta1
+# has to be in the berkeley namespace and the same cluster
+apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: devnet2-dump-archive-cronjob
+  name: berkeley-dump-archive-cronjob
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
@@ -24,7 +25,7 @@ spec:
             echo "installed gsutil";
 
             DATE="$(date +%F_%H%M)";
-            FILENAME=devnet2-archive-dump-"$DATE".sql;
+            FILENAME=berkeley-archive-dump-"${DATE}".sql;
 
             pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive > $FILENAME;
 
@@ -42,7 +43,7 @@ spec:
               value: /gcloud/keyfile.json
             image: postgres:11-alpine
             imagePullPolicy: IfNotPresent
-            name: devnet2-dump-archive-cronjob
+            name: berkeley-dump-archive-cronjob
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
