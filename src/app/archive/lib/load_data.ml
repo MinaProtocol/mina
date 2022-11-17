@@ -326,7 +326,6 @@ let protocol_state_precondition_of_id pool id =
             ; blockchain_length_id
             ; min_window_density_id
             ; total_currency_id
-            ; curr_global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data_id
             ; next_epoch_data_id
@@ -348,9 +347,6 @@ let protocol_state_precondition_of_id pool id =
   let%bind blockchain_length = get_length_bounds pool blockchain_length_id in
   let%bind min_window_density = get_length_bounds pool min_window_density_id in
   let%bind total_currency = get_amount_bounds pool total_currency_id in
-  let%bind global_slot_since_hard_fork =
-    get_global_slot_bounds pool curr_global_slot_since_hard_fork
-  in
   let%bind global_slot_since_genesis =
     get_global_slot_bounds pool global_slot_since_genesis
   in
@@ -361,7 +357,6 @@ let protocol_state_precondition_of_id pool id =
     ; min_window_density
     ; last_vrf_output = ()
     ; total_currency
-    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; staking_epoch_data
     ; next_epoch_data

@@ -47,8 +47,6 @@ let%test_module "Protocol state precondition tests" =
       ; min_window_density = Check (interval protocol_state.min_window_density)
       ; last_vrf_output = ()
       ; total_currency = Check (interval protocol_state.total_currency)
-      ; global_slot_since_hard_fork =
-          Check (interval protocol_state.global_slot_since_hard_fork)
       ; global_slot_since_genesis =
           Check (interval protocol_state.global_slot_since_genesis)
       ; staking_epoch_data = epoch_data protocol_state.staking_epoch_data

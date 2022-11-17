@@ -1339,7 +1339,6 @@ module Zkapp_network_precondition = struct
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
     ; total_currency_id : int option
-    ; curr_global_slot_since_hard_fork : int option
     ; global_slot_since_genesis : int option
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
@@ -1384,11 +1383,6 @@ module Zkapp_network_precondition = struct
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
-    let%bind curr_global_slot_since_hard_fork =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
-        ps.global_slot_since_hard_fork
-    in
     let%bind global_slot_since_genesis =
       Mina_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
@@ -1405,7 +1399,6 @@ module Zkapp_network_precondition = struct
       ; blockchain_length_id
       ; min_window_density_id
       ; total_currency_id
-      ; curr_global_slot_since_hard_fork
       ; global_slot_since_genesis
       ; staking_epoch_data_id
       ; next_epoch_data_id

@@ -409,21 +409,6 @@ let gen_protocol_state_precondition
     }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
-  let%bind global_slot_since_hard_fork =
-    let open Mina_numbers in
-    let%bind epsilon1 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
-    in
-    let%bind epsilon2 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
-    in
-    { lower =
-        Global_slot.sub psv.global_slot_since_hard_fork epsilon1
-        |> Option.value ~default:Global_slot.zero
-    ; upper = Global_slot.add psv.global_slot_since_hard_fork epsilon2
-    }
-    |> return |> Zkapp_basic.Or_ignore.gen
-  in
   let%bind global_slot_since_genesis =
     let open Mina_numbers in
     let%bind epsilon1 =
@@ -448,7 +433,6 @@ let gen_protocol_state_precondition
   ; min_window_density
   ; last_vrf_output = ()
   ; total_currency
-  ; global_slot_since_hard_fork
   ; global_slot_since_genesis
   ; staking_epoch_data
   ; next_epoch_data
@@ -462,7 +446,6 @@ let gen_invalid_protocol_state_precondition
       | Blockchain_length
       | Min_window_density
       | Total_currency
-      | Global_slot_since_hard_fork
       | Global_slot_since_genesis
   end in
   let open Quickcheck.Let_syntax in
@@ -474,7 +457,6 @@ let gen_invalid_protocol_state_precondition
       ( [ Blockchain_length
         ; Min_window_density
         ; Total_currency
-        ; Global_slot_since_hard_fork
         ; Global_slot_since_genesis
         ]
         : Tamperable.t list )
@@ -536,25 +518,6 @@ let gen_invalid_protocol_state_precondition
       in
       { protocol_state_precondition with
         total_currency = Zkapp_basic.Or_ignore.Check total_currency
-      }
-  | Global_slot_since_hard_fork ->
-      let open Mina_numbers in
-      let%map global_slot_since_hard_fork =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_hard_fork > epsilon) then
-          { lower = Global_slot.zero
-          ; upper =
-              Global_slot.sub psv.global_slot_since_hard_fork epsilon
-              |> Option.value ~default:Global_slot.zero
-          }
-        else
-          { lower = Global_slot.add psv.global_slot_since_hard_fork epsilon
-          ; upper = Global_slot.max_value
-          }
-      in
-      { protocol_state_precondition with
-        global_slot_since_hard_fork =
-          Zkapp_basic.Or_ignore.Check global_slot_since_hard_fork
       }
   | Global_slot_since_genesis ->
       let open Mina_numbers in

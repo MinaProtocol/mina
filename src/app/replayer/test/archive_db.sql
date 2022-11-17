@@ -1052,11 +1052,9 @@ ALTER SEQUENCE public.zkapp_length_bounds_id_seq OWNED BY public.zkapp_length_bo
 CREATE TABLE public.zkapp_network_precondition (
     id integer NOT NULL,
     snarked_ledger_hash_id integer,
-    timestamp_id integer,
     blockchain_length_id integer,
     min_window_density_id integer,
     total_currency_id integer,
-    curr_global_slot_since_hard_fork integer,
     global_slot_since_genesis integer,
     staking_epoch_data_id integer,
     next_epoch_data_id integer
@@ -1509,42 +1507,6 @@ CREATE SEQUENCE public.zkapp_states_nullable_id_seq
 
 ALTER SEQUENCE public.zkapp_states_nullable_id_seq OWNED BY public.zkapp_states_nullable.id;
 
-
---
--- Name: zkapp_timestamp_bounds; Type: TABLE; Schema: public;
---
-
-CREATE TABLE public.zkapp_timestamp_bounds (
-    id integer NOT NULL,
-    timestamp_lower_bound text NOT NULL,
-    timestamp_upper_bound text NOT NULL
-);
-
-
-
-
---
--- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE; Schema: public;
---
-
-CREATE SEQUENCE public.zkapp_timestamp_bounds_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-
-
---
--- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
---
-
-ALTER SEQUENCE public.zkapp_timestamp_bounds_id_seq OWNED BY public.zkapp_timestamp_bounds.id;
-
-
 --
 -- Name: zkapp_timing_info; Type: TABLE; Schema: public;
 --
@@ -1964,14 +1926,6 @@ ALTER TABLE ONLY public.zkapp_states ALTER COLUMN id SET DEFAULT nextval('public
 --
 
 ALTER TABLE ONLY public.zkapp_states_nullable ALTER COLUMN id SET DEFAULT nextval('public.zkapp_states_nullable_id_seq'::regclass);
-
-
---
--- Name: zkapp_timestamp_bounds id; Type: DEFAULT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_timestamp_bounds ALTER COLUMN id SET DEFAULT nextval('public.zkapp_timestamp_bounds_id_seq'::regclass);
-
 
 --
 -- Name: zkapp_timing_info id; Type: DEFAULT; Schema: public;
@@ -2563,8 +2517,8 @@ COPY public.zkapp_length_bounds (id, length_lower_bound, length_upper_bound) FRO
 -- Data for Name: zkapp_network_precondition; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
-1	\N	\N	\N	\N	\N	\N	\N	1	1
+COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, blockchain_length_id, min_window_density_id, total_currency_id, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
+1	\N	\N	\N	\N	\N	1	1
 \.
 
 
@@ -3971,15 +3925,6 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_network_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
 
-
---
--- Name: zkapp_network_precondition zkapp_network_precondition_curr_global_slot_since_hard_for_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_network_precondition
-    ADD CONSTRAINT zkapp_network_precondition_curr_global_slot_since_hard_for_fkey FOREIGN KEY (curr_global_slot_since_hard_fork) REFERENCES public.zkapp_global_slot_bounds(id);
-
-
 --
 -- Name: zkapp_network_precondition zkapp_network_precondition_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public;
 --
@@ -4018,15 +3963,6 @@ ALTER TABLE ONLY public.zkapp_network_precondition
 
 ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_network_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_network_precondition zkapp_network_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_network_precondition
-    ADD CONSTRAINT zkapp_network_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
-
 
 --
 -- Name: zkapp_network_precondition zkapp_network_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public;

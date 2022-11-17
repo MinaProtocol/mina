@@ -237,7 +237,6 @@ module Account_update_under_construction = struct
                   ; min_window_density = Ignore
                   ; last_vrf_output = ()
                   ; total_currency = Ignore
-                  ; global_slot_since_hard_fork = Ignore
                   ; global_slot_since_genesis = Ignore
                   ; staking_epoch_data =
                       { ledger =

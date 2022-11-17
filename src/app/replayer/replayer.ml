@@ -557,10 +557,6 @@ module Zkapp_helpers = struct
           let total_currency =
             Currency.Amount.of_string parent_block.total_currency
           in
-          let global_slot_since_hard_fork =
-            parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
-          in
           let global_slot_since_genesis =
             parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
@@ -616,7 +612,6 @@ module Zkapp_helpers = struct
             ; min_window_density
             ; last_vrf_output
             ; total_currency
-            ; global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data
             ; next_epoch_data

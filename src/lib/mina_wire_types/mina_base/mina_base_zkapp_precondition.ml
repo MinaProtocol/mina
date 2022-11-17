@@ -39,7 +39,6 @@ module Protocol_state = struct
         ; min_window_density : 'length
         ; last_vrf_output : 'vrf_output
         ; total_currency : 'amount
-        ; global_slot_since_hard_fork : 'global_slot
         ; global_slot_since_genesis : 'global_slot
         ; staking_epoch_data : 'epoch_data
         ; next_epoch_data : 'epoch_data
