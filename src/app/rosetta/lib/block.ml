@@ -640,7 +640,7 @@ WITH RECURSIVE chain AS (
         ; nonce : int64
         ; sequence_no : int
         ; status : string
-        ; failure_reasons : string array
+        ; failure_reasons : string array option
         }
       [@@deriving hlist]
 
@@ -663,7 +663,7 @@ WITH RECURSIVE chain AS (
             ; int64
             ; int
             ; string
-            ; Mina_caqti.array_string_typ
+            ; option Mina_caqti.array_string_typ
             ]
     end
 
@@ -710,7 +710,7 @@ SELECT zaub.account_identifier_id, zaub.id,
     zaub.balance_change, zaub.increment_nonce, zaub.events_id,
     zaub.sequence_events_id, zaub.call_data_id, zaub.call_depth,
     zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
-    zaub.use_full_commitment, zaub.caller, zau.authorization_kind,
+    zaub.use_full_commitment, zaub.caller, zaub.authorization_kind,
     pk.value as account, bzc.status
 FROM zkapp_commands zc
  INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
@@ -906,7 +906,8 @@ WHERE zc.id = ?
           ; sequence_no = cmd.sequence_no
           ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
           ; hash = cmd.hash
-          ; failure_reasons = Array.to_list cmd.failure_reasons
+          ; failure_reasons =
+              Option.value_map ~default:[] ~f:Array.to_list cmd.failure_reasons
           ; account_updates
           } )
     in
