@@ -155,7 +155,7 @@ Now, whenever you start vim from `nix develop mina#with-lsp`, it should just wor
 
 ##### Emacs
 
-You need to install the [tuareg](https://github.com/ocaml/tuareg) and [lsp-mode](https://github.com/emacs-lsp/lsp-mode).
+You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
 This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
 
 ### "Pure" build
