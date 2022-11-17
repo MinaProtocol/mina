@@ -135,6 +135,17 @@ module Printing = struct
     let type_decl_no_attrs = type_decl_remove_internal_attributes type_decl in
     { type_decl_no_attrs with ptype_attributes }
 
+  (* remove manifests from non-abstract types, so these print the same:
+     type t = Quux.t = Foo | Bar
+     type t = Foo | Bar
+  *)
+  let filter_type_manifests type_decl =
+    match type_decl.ptype_kind with
+    | Ptype_abstract | Ptype_open ->
+        type_decl
+    | Ptype_variant _ | Ptype_record _ ->
+        { type_decl with ptype_manifest = None }
+
   (* convert type_decls to structure item so we can print it *)
   let type_decls_to_stri type_decls =
     (* type derivers only work with recursive types *)
@@ -154,7 +165,10 @@ module Printing = struct
     let type_decls_filtered_attrs =
       List.map type_decls ~f:filter_type_decls_attrs
     in
-    let stri = type_decls_to_stri type_decls_filtered_attrs in
+    let type_decls_filtered_manifests =
+      List.map type_decls_filtered_attrs ~f:filter_type_manifests
+    in
+    let stri = type_decls_to_stri type_decls_filtered_manifests in
     Pprintast.structure_item Versioned_util.diff_formatter stri ;
     Format.pp_print_flush Versioned_util.diff_formatter () ;
     printf "\n%!" ;
