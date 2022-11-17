@@ -107,9 +107,10 @@ let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
     ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup
 
-let dummy () : t =
-  let (Typ { var_of_fields; value_to_fields; _ }) =
-    typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
-  in
-  let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
-  var_of_fields (Array.map ~f:Field.constant xs, aux)
+let dummy : unit -> t =
+  Memo.unit (fun () ->
+      let (Typ { var_of_fields; value_to_fields; _ }) =
+        typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+      in
+      let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
+      var_of_fields (Array.map ~f:Field.constant xs, aux) )

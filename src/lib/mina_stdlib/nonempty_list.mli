@@ -53,7 +53,7 @@ val find : 'a t -> f:('a -> bool) -> 'a option
 
 val find_map : 'a t -> f:('a -> 'b option) -> 'b option
 
-val fold : 'a t -> init:('a -> 'accum) -> f:('accum -> 'a -> 'accum) -> 'accum
+val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 
 val iter : 'a t -> f:('a -> unit) -> unit
 
