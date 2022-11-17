@@ -903,6 +903,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       module Max_width = Width.Max
+
+      module For_tests = struct
+        let forget_wrap_vk (t : t) = {t with wrap_vk = None}
+      end
     end
 
     let in_circuit tag vk =

@@ -306,6 +306,10 @@ module type S = sig
       module Max_branches : Nat.Add.Intf
 
       module Max_width = Nat.N2
+
+      module For_tests : sig
+        val forget_wrap_vk : t -> t
+      end
     end
 
     module Proof : sig
