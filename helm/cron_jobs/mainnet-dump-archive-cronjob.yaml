@@ -1,9 +1,10 @@
 # kubectl apply -f helm/cron_jobs/mainnet-dump-archive-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: mainnet-dump-archive-cronjob
+  namespace: mainnet
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
@@ -26,7 +27,7 @@ spec:
             DATE="$(date +%F_%H%M)";
             FILENAME=mainnet-archive-dump-"${DATE}".sql;
 
-            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive_balances_migrated > $FILENAME;
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-4-postgresql:5432/archive > $FILENAME;
 
             tar -czvf $FILENAME.tar.gz $FILENAME;
 
