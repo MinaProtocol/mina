@@ -1115,7 +1115,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:`Or_undefined @@ uint32 @@ o ())
+              option ~js_type:Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
 
