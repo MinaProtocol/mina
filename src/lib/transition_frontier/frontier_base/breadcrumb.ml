@@ -437,7 +437,8 @@ module For_tests = struct
         in
         Mina_block.Validated.unsafe_of_trusted_block
           ~delta_block_chain_proof:
-            (Non_empty_list.singleton previous_state_hashes.state_hash)
+            (Mina_stdlib.Nonempty_list.singleton
+               previous_state_hashes.state_hash )
           (`This_block_is_trusted_to_be_safe block)
       in
       let transition_receipt_time = Some (Time.now ()) in

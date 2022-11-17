@@ -645,7 +645,7 @@ let get_snarked_ledger t state_hash_opt =
               | Some txns -> (
                   match
                     List.fold_until ~init:(Ok ())
-                      (Non_empty_list.to_list txns)
+                      (Mina_stdlib.Nonempty_list.to_list txns)
                       ~f:(fun _acc (txn, state_hash) ->
                         (*Validate transactions against the protocol state associated with the transaction*)
                         match
