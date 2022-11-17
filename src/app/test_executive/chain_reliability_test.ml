@@ -6,6 +6,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -74,5 +76,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       Util.check_common_prefixes chains ~tolerance:1 ~logger )
+       check_common_prefixes chains ~tolerance:1 ~logger )
 end

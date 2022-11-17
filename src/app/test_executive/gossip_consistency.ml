@@ -7,6 +7,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -80,11 +82,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
     let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
+    let%bind receiver_pub_key = pub_key_of_node receiver_bp in
     let sender_bp =
       Core_kernel.List.nth_exn (Network.block_producers network) 1
     in
-    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in

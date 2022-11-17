@@ -411,7 +411,7 @@ module Dsl = struct
          and module Event_router := Event_router
          and module Network_state := Network_state
 
-    module Util : Util_intf with module Engine := Engine
+    (* module Util : Util_intf with module Engine := Engine *)
 
     type t
 
