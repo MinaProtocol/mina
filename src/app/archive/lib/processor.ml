@@ -1336,6 +1336,7 @@ end
 module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
+    ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
     ; total_currency_id : int option
@@ -1355,6 +1356,7 @@ module Zkapp_network_precondition = struct
         ; option int
         ; option int
         ; option int
+        ; option int
         ; int
         ; int
         ]
@@ -1368,6 +1370,11 @@ module Zkapp_network_precondition = struct
       Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
+    in
+    let%bind timestamp_id =
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
+        ps.timestamp
     in
     let%bind blockchain_length_id =
       Mina_caqti.add_if_zkapp_check
@@ -1402,6 +1409,7 @@ module Zkapp_network_precondition = struct
     in
     let value =
       { snarked_ledger_hash_id
+      ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
       ; total_currency_id

@@ -28,6 +28,7 @@ module Protocol_state = struct
   module Poly = struct
     module V1 = struct
       type ( 'snarked_ledger_hash
+           , 'time
            , 'length
            , 'vrf_output
            , 'global_slot
@@ -35,6 +36,7 @@ module Protocol_state = struct
            , 'epoch_data )
            t =
         { snarked_ledger_hash : 'snarked_ledger_hash
+        ; timestamp : 'time
         ; blockchain_length : 'length
         ; min_window_density : 'length
         ; last_vrf_output : 'vrf_output
@@ -50,6 +52,7 @@ module Protocol_state = struct
   module V1 = struct
     type t =
       ( Mina_base_ledger_hash.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
+      , Block_time.V1.t Numeric.V1.t
       , Mina_numbers.Length.V1.t Numeric.V1.t
       , unit (* TODO *)
       , Mina_numbers.Global_slot.V1.t Numeric.V1.t
