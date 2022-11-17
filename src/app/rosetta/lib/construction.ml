@@ -824,7 +824,7 @@ end
 module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
-      type t =
+      type params =
         { nonce : int64
         ; source : string
         ; receiver : string
@@ -833,16 +833,16 @@ module Submit = struct
         }
       [@@deriving hlist]
 
-      let typ =
+      let params_typ =
         let open Mina_caqti.Type_spec in
         let spec = Caqti_type.[ int64; string; string; string; string ] in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
+        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
         Caqti_request.find_opt
-          typ
+          params_typ
           Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
