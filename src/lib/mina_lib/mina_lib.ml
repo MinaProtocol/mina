@@ -2499,6 +2499,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let run_test (module Context : CONTEXT) ~staking_epoch_ledger
         ~next_epoch_ledger ~starting_accounts ~test_number =
+      [%log info] "[%d] Started running test" test_number ;
       let module Context2 = struct
         include Context
 
@@ -2536,7 +2537,7 @@ let%test_module "Epoch ledger sync tests" =
             "CAESQFzI5/57gycQ1qumCq00OFo60LArXgbrgV0b5P8tNiSujUZT5Psc+74luHmSSf7kVIZ7w0YObC//UVXPCOgeh4o=,CAESII1GU+T7HPu+Jbh5kkn+5FSGe8NGDmwv/1FVzwjoHoeK,12D3KooWKKqrPfHi4PNkWms5Z9oANjRftE5vueTmkt4rpz9sXM69"
           ~initial_peers:[] ~genesis_ledger_hashes
       in
-
+      [%log info] "[%d] initialized net 1" test_number ;
       let staking_epoch_snapshot =
         Consensus.Data.Local_state.For_tests.snapshot_of_ledger
           staking_epoch_ledger
@@ -2550,6 +2551,7 @@ let%test_module "Epoch ledger sync tests" =
         Staking_epoch_snapshot staking_epoch_snapshot ;
       Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
         Next_epoch_snapshot next_epoch_snapshot ;
+      [%log info] "[%d] set consensus local state for net 1" test_number ;
       let%bind ( mina_network2
                , _network_peer2
                , _consensus_local_state2
@@ -2561,6 +2563,7 @@ let%test_module "Epoch ledger sync tests" =
           ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
           ~genesis_ledger_hashes
       in
+      [%log info] "[%d] initialized net 2" test_number ;
       let make_sync_ledger () =
         let db_ledger = make_empty_db_ledger (module Context) in
         List.iter starting_accounts ~f:(fun (acct : Account.t) ->
@@ -2594,12 +2597,14 @@ let%test_module "Epoch ledger sync tests" =
          if not !test_finished then raise Sync_timeout ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
+      [%log info] "[%d] created sync ledger 1" test_number ;
       let%bind () =
         match%map
           Mina_ledger.Sync_ledger.Db.fetch sync_ledger1 staking_ledger_root
             ~data:() ~equal:(fun () () -> true)
         with
         | `Ok ledger ->
+            [%log info] "[%d] fetched sync ledger 1" test_number ;
             let ledger_root = Ledger.Db.merkle_root ledger in
             assert (Ledger_hash.equal ledger_root staking_ledger_root) ;
             [%log debug] "Synced current epoch ledger successfully"
@@ -2608,11 +2613,13 @@ let%test_module "Epoch ledger sync tests" =
       in
       (* sync next staking ledger *)
       let sync_ledger2 = make_sync_ledger () in
+      [%log info] "[%d] created sync ledger 2" test_number ;
       match%bind
         Mina_ledger.Sync_ledger.Db.fetch sync_ledger2 next_epoch_ledger_root
           ~data:() ~equal:(fun () () -> true)
       with
       | `Ok ledger ->
+          [%log info] "[%d] fetched sync ledger 2" test_number ;
           cleanup () ;
           let ledger_root = Ledger.Db.merkle_root ledger in
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
