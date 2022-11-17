@@ -505,6 +505,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
       Timer.clock __LOC__ ;
+      let actual_wrap_domain_size =
+        match override_wrap_domain with
+        | None ->
+            Pickles_base.Proofs_verified.of_nat (Nat.Add.n max_proofs_verified)
+        | Some override_wrap_domain ->
+            override_wrap_domain
+      in
       let wrap_domains =
         match override_wrap_domain with
         | None ->
@@ -593,6 +600,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 let res =
                   Common.time "make step data" (fun () ->
                       Step_branch_data.create ~index:!i ~step_uses_lookup
+                        ~actual_wrap_domain_size
                         ~max_proofs_verified:Max_proofs_verified.n
                         ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                         Arg_var.to_field_elements Arg_value.to_field_elements
@@ -895,11 +903,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let of_compiled tag : t =
         let d = Types_map.lookup_compiled tag.Tag.id in
+        let actual_wrap_domain_size =
+          Common.actual_wrap_domain_size
+            ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
+        in
         { wrap_vk = Some (Lazy.force d.wrap_vk)
         ; wrap_index = Lazy.force d.wrap_key
         ; max_proofs_verified =
             Pickles_base.Proofs_verified.of_nat
               (Nat.Add.n d.max_proofs_verified)
+        ; actual_wrap_domain_size
         }
 
       module Max_width = Width.Max
@@ -2081,10 +2094,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let proofs_verifieds = Vector.[ 2 ] in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~step_uses_lookup:No
-              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
-              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
-              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
-              ~proofs_verifieds
+              ~max_proofs_verified:Max_proofs_verified.n
+              ~actual_wrap_domain_size:N2 ~branches:Branches.n ~self
+              ~public_input:(Input typ) ~auxiliary_typ:typ A.to_field_elements
+              A_value.to_field_elements rule ~wrap_domains ~proofs_verifieds
           in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
@@ -3006,10 +3019,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let proofs_verifieds = Vector.[ 2 ] in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~step_uses_lookup:No
-              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
-              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
-              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
-              ~proofs_verifieds
+              ~max_proofs_verified:Max_proofs_verified.n
+              ~actual_wrap_domain_size:N2 ~branches:Branches.n ~self
+              ~public_input:(Input typ) ~auxiliary_typ:typ A.to_field_elements
+              A_value.to_field_elements rule ~wrap_domains ~proofs_verifieds
           in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =

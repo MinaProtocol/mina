@@ -192,16 +192,27 @@ module Stable = struct
 
       let version_byte = Base58_check.Version_bytes.verification_key
 
-      let to_repr { Poly.max_proofs_verified; wrap_index; wrap_vk = _ } =
-        { Repr.Stable.V2.max_proofs_verified; wrap_index }
+      let to_repr
+          { Poly.max_proofs_verified
+          ; actual_wrap_domain_size
+          ; wrap_index
+          ; wrap_vk = _
+          } =
+        { Repr.Stable.V2.max_proofs_verified
+        ; actual_wrap_domain_size
+        ; wrap_index
+        }
 
       let of_repr
-          ({ Repr.Stable.V2.max_proofs_verified; wrap_index = c } :
+          ({ Repr.Stable.V2.max_proofs_verified
+           ; actual_wrap_domain_size
+           ; wrap_index = c
+           } :
             R.Stable.V2.t ) : t =
         let d =
           (Common.wrap_domains
              ~proofs_verified:
-               (Pickles_base.Proofs_verified.to_int max_proofs_verified) )
+               (Pickles_base.Proofs_verified.to_int actual_wrap_domain_size) )
             .h
         in
         let log2_size = Import.Domain.log2_size d in
@@ -247,7 +258,11 @@ module Stable = struct
               ; lookup_index = None
               } )
         in
-        { Poly.max_proofs_verified; wrap_index = c; wrap_vk }
+        { Poly.max_proofs_verified
+        ; actual_wrap_domain_size
+        ; wrap_index = c
+        ; wrap_vk
+        }
 
       (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
 
@@ -297,6 +312,7 @@ Stable.Latest.
 
 let dummy : t =
   { max_proofs_verified = N2
+  ; actual_wrap_domain_size = N2
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
@@ -319,6 +335,9 @@ module Checked = struct
     { max_proofs_verified :
         Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
+    ; actual_wrap_domain_size :
+        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+          (** The actual domain size used by the wrap circuit. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
               is used to verify.
@@ -362,10 +381,15 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Impl in
   Typ.of_hlistable
     [ Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
+    ; Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
       failwith "Side_loaded_verification_key: value_of_hlist" )
-    ~value_to_hlist:(fun { Poly.wrap_index; max_proofs_verified; _ } ->
-      [ max_proofs_verified; wrap_index ] )
+    ~value_to_hlist:(fun { Poly.wrap_index
+                         ; actual_wrap_domain_size
+                         ; max_proofs_verified
+                         ; _
+                         } ->
+      [ max_proofs_verified; actual_wrap_domain_size; wrap_index ] )
