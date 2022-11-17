@@ -66,7 +66,7 @@
  (modules snarky_js_constants)
  (link_flags (-linkall))
  (modes native)
- (libraries core_kernel sponge hash_prefixes yojson)
+ (libraries core_kernel sponge hash_prefixes base58_check yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

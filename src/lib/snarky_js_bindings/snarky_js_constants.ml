@@ -14,9 +14,23 @@ let prefixes =
     ; ("zkappMemo", `String (zkapp_memo :> string))
     ]
 
+let version_bytes =
+  let open Base58_check.Version_bytes in
+  let open Core_kernel in
+  `Assoc
+    [ ("tokenIdKey", `Int (Char.to_int token_id_key))
+    ; ("receiptChainHash", `Int (Char.to_int receipt_chain_hash))
+    ; ("ledgerHash", `Int (Char.to_int ledger_hash))
+    ; ("epochSeed", `Int (Char.to_int epoch_seed))
+    ; ("stateHash", `Int (Char.to_int state_hash))
+    ; ("publicKey", `Int (Char.to_int non_zero_curve_point_compressed))
+    ; ("userCommandMemo", `Int (Char.to_int user_command_memo))
+    ]
+
 let () =
   let constants =
     [ ("prefixes", prefixes)
+    ; ("versionBytes", version_bytes)
     ; ("mds", array (array string) Sponge.Params.pasta_p_kimchi.mds)
     ; ( "roundConstants"
       , array (array string) Sponge.Params.pasta_p_kimchi.round_constants )
