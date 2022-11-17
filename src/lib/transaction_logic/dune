@@ -17,6 +17,7 @@
    integers
    base_quickcheck
    ;; local libraries
+   mina_wire_types
    block_time
    currency
    data_hash_lib
@@ -28,6 +29,7 @@
    kimchi_backend.common
    kimchi_backend
    kimchi_pasta
+   kimchi_backend.pasta.basic
    mina_base
    mina_base.import
    mina_numbers

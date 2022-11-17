@@ -32,8 +32,9 @@
    graphql-cohttp
    cohttp-async
    graphql-async
-   archive_lib
    ;;local libraries
+   archive_lib
+   mina_wire_types
    perf_histograms
    one_or_two
    block_time
@@ -105,11 +106,12 @@
    random_oracle
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles_types
    pickles
    pickles.backend
    snark_params
-   parties_builder
+   zkapp_command_builder
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

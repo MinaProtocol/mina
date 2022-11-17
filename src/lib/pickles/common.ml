@@ -41,7 +41,7 @@ let hash_messages_for_next_step_proof ~app_state
 
 let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (proofs_verified, Nat.N26.n, total) Nat.Adds.t ) =
+      total Nat.t * (proofs_verified, Nat.N41.n, total) Nat.Adds.t ) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
@@ -202,7 +202,7 @@ end
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
-    Impls.Wrap.generate_public_input [ typ ] prev_statement
+    Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
@@ -217,7 +217,7 @@ let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Tock.Rounds.n ~uses_lookup
     in
-    Impls.Step.generate_public_input [ input ] prev_statement
+    Impls.Step.generate_public_input input prev_statement
   in
   List.init
     (Backend.Tick.Field.Vector.length input)

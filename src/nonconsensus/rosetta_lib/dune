@@ -15,6 +15,7 @@
    base.caml
    result
    ;;local libraries
+   mina_wire_types
    rosetta_models
    random_oracle_input
    mina_numbers_nonconsensus
@@ -27,6 +28,10 @@
    snark_params_nonconsensus
    unsigned_extended_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv

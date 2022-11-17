@@ -42,10 +42,12 @@
    kimchi_types
    pasta_bindings
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    data_hash_lib
    transition_handler
    network_pool
    mina_intf
+   pipe_lib
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std)))

@@ -121,7 +121,7 @@ module Engine = struct
       val send_zkapp :
            logger:Logger.t
         -> t
-        -> parties:Mina_base.Parties.t
+        -> zkapp_command:Mina_base.Zkapp_command.t
         -> string Deferred.Or_error.t
 
       val must_send_test_payments :
@@ -167,7 +167,7 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Party.Update.t Deferred.Or_error.t
+        -> Mina_base.Account_update.Update.t Deferred.Or_error.t
 
       val get_peer_id :
         logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
@@ -355,6 +355,7 @@ module Dsl = struct
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
       | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -382,7 +383,9 @@ module Dsl = struct
     val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
-      has_failures:bool -> parties:Mina_base.Parties.t -> t
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
   end
 
   module type Util_intf = sig

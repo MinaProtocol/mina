@@ -25,5 +25,11 @@
    data_hash_lib
    transition_frontier_base
    merkle_list_prover
-   non_empty_list
+   mina_stdlib
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
 ))

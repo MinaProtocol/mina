@@ -19,6 +19,7 @@
    base.base_internalhash_types
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    mina_base.import
    mina_ledger
@@ -48,7 +49,7 @@
    one_or_two
    o1trace
    mina_state
-   non_empty_list
+   mina_stdlib
    snark_work_lib
    child_processes
    consensus
@@ -61,8 +62,9 @@
    random_oracle
    kimchi_backend
    pickles.backend
-   parties_builder
+   zkapp_command_builder
    ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

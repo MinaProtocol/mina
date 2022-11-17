@@ -70,6 +70,12 @@
    mina_compile_config
    unsigned_extended
    ppx_version.runtime
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
 
  (preprocessor_deps ../../../../config.mlh)

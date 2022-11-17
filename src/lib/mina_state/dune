@@ -40,12 +40,15 @@
    linked_tree
    mina_numbers
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    kimchi_backend
    mina_base.util
    mina_ledger
    unsigned_extended
    sgn
+   sgn_type
    blake2
    ppx_version.runtime
+   mina_wire_types
  )
 )

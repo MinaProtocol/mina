@@ -216,7 +216,7 @@ module T = struct
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
-    |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
+    |> Option.bind ~f:(Fn.compose Mina_stdlib.Nonempty_list.of_list_opt snd)
 
   let scan_state { scan_state; _ } = scan_state
 
@@ -565,7 +565,7 @@ module T = struct
           Fee_transfer.receivers t
       | Command t ->
           let t = (t :> User_command.t) in
-          User_command.accounts_accessed t
+          User_command.accounts_referenced t
       | Coinbase c ->
           let ft_receivers =
             Option.map ~f:Coinbase.Fee_transfer.receiver c.fee_transfer
@@ -1004,9 +1004,9 @@ module T = struct
     Or_error.try_with (fun () ->
         let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
-          (Int.to_float @@ Fee.to_int total_snark_fee) ;
+          (Int.to_float @@ Fee.to_nanomina_int total_snark_fee) ;
         Gauge.set Scan_state_metrics.transaction_fees_per_block
-          (Int.to_float @@ Fee.to_int total_txn_fee) ;
+          (Int.to_float @@ Fee.to_nanomina_int total_txn_fee) ;
         Gauge.set Scan_state_metrics.purchased_snark_work_per_block
           (Float.of_int @@ List.length work) ;
         Gauge.set Scan_state_metrics.snark_work_required
@@ -1784,7 +1784,7 @@ module T = struct
       epoch_ledger
     |> not
 
-  let validate_party_proofs ~logger ~validating_ledger
+  let validate_account_update_proofs ~logger ~validating_ledger
       (txn : User_command.Valid.t) =
     let open Result.Let_syntax in
     let get_verification_keys account_ids =
@@ -1811,29 +1811,32 @@ module T = struct
               [%log error]
                 ~metadata:[ ("account_id", Account_id.to_yojson id) ]
                 "Staged_ledger_diff creation: Verification key not found for \
-                 party with proof authorization and account_id $account_id" ;
+                 account_update with proof authorization and account_id \
+                 $account_id" ;
               Stop Account_id.Map.empty )
         ~finish:Fn.id
     in
     match txn with
-    | Parties p ->
+    | Zkapp_command p ->
         let%map checked_verification_keys =
           Account_id.Map.of_alist_or_error p.verification_keys
         in
-        let proof_parties =
-          Parties.Call_forest.fold ~init:Account_id.Set.empty
-            p.parties.other_parties ~f:(fun acc p ->
-              if Control.(Tag.equal Proof (tag (Party.authorization p))) then
-                Account_id.Set.add acc (Party.account_id p)
+        let proof_zkapp_command =
+          Zkapp_command.Call_forest.fold ~init:Account_id.Set.empty
+            p.zkapp_command.account_updates ~f:(fun acc p ->
+              if
+                Control.(Tag.equal Proof (tag (Account_update.authorization p)))
+              then Account_id.Set.add acc (Account_update.account_id p)
               else acc )
         in
         let current_verification_keys =
-          get_verification_keys (Account_id.Set.to_list proof_parties)
+          get_verification_keys (Account_id.Set.to_list proof_zkapp_command)
         in
         if
-          Account_id.Set.length proof_parties
+          Account_id.Set.length proof_zkapp_command
           = Account_id.Map.length checked_verification_keys
-          && Account_id.Map.equal Parties.Valid.Verification_key_hash.equal
+          && Account_id.Map.equal
+               Zkapp_command.Valid.Verification_key_hash.equal
                checked_verification_keys current_verification_keys
         then true
         else (
@@ -1841,11 +1844,13 @@ module T = struct
             ~metadata:
               [ ( "checked_verification_keys"
                 , [%to_yojson:
-                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
+                    list]
                     (Account_id.Map.to_alist checked_verification_keys) )
               ; ( "current_verification_keys"
                 , [%to_yojson:
-                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
+                    list]
                     (Account_id.Map.to_alist current_verification_keys) )
               ]
             "Staged_ledger_diff creation: Verifcation keys used for verifying \
@@ -1940,7 +1945,8 @@ module T = struct
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
                     let%bind valid_proofs =
-                      validate_party_proofs ~logger ~validating_ledger txn
+                      validate_account_update_proofs ~logger ~validating_ledger
+                        txn
                     in
                     let%bind () =
                       if valid_proofs then Ok ()
@@ -2040,7 +2046,7 @@ module T = struct
               []
           | Failed ->
               [] )
-      | Command (Parties { new_accounts; _ }) ->
+      | Command (Zkapp_command { new_accounts; _ }) ->
           new_accounts
       | Fee_transfer { new_accounts; _ } ->
           new_accounts
@@ -2520,32 +2526,33 @@ let%test_module "staged ledger tests" =
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind parties_and_fee_payer_keypairs, ledger =
-        Mina_generators.User_command_generators.sequence_parties_with_ledger
+      let%bind zkapp_command_and_fee_payer_keypairs, ledger =
+        Mina_generators.User_command_generators
+        .sequence_zkapp_command_with_ledger ~max_token_updates:1
           ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
-        List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties_valid, _fee_payer_keypair, keymap ->
-              let parties_with_auths =
+        List.map zkapp_command_and_fee_payer_keypairs ~f:(function
+          | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
+              let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Parties_builder.replace_authorizations ~keymap
-                      (Parties.Valid.forget parties_valid) )
+                    Zkapp_command_builder.replace_authorizations ~keymap
+                      (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
-              let valid_parties_with_auths : Parties.Valid.t =
+              let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Parties.Valid.to_valid parties_with_auths ~ledger
+                  Zkapp_command.Valid.to_valid zkapp_command_with_auths ~ledger
                     ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
                 | Some ps ->
                     ps
                 | None ->
-                    failwith "Could not create Parties.Valid.t"
+                    failwith "Could not create Zkapp_command.Valid.t"
               in
-              User_command.Parties valid_parties_with_auths
+              User_command.Zkapp_command valid_zkapp_command_with_auths
           | Signed_command _, _, _ ->
-              failwith "Expected a Parties, got a Signed command" )
+              failwith "Expected a Zkapp_command, got a Signed command" )
       in
       assert (List.length zkapps = num_zkapps) ;
       return (ledger, zkapps, List.init iters ~f:(Fn.const None))
@@ -2557,7 +2564,8 @@ let%test_module "staged ledger tests" =
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let num_zkapps = transaction_capacity * iters in
       gen_zkapps
-        ~failure:Mina_generators.Parties_generators.Invalid_account_precondition
+        ~failure:
+          Mina_generators.Zkapp_command_generators.Invalid_account_precondition
         ~num_zkapps iters
 
     let gen_zkapps_at_capacity :
@@ -2863,7 +2871,8 @@ let%test_module "staged ledger tests" =
         let prover = stmt_to_prover stmts in
         Some
           { Transaction_snark_work.Checked.fee =
-              Currency.Fee.(sub work_fee (of_int 1)) |> Option.value_exn
+              Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+              |> Option.value_exn
           ; proofs = proofs stmts
           ; prover
           }
@@ -3191,7 +3200,8 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (of_int 1) (of_int 20))
+                  Fee.(
+                    gen_incl (of_nanomina_int_exn 1) (of_nanomina_int_exn 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3215,7 +3225,8 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (of_int 1) (of_int 20))
+                  Fee.(
+                    gen_incl (of_nanomina_int_exn 1) (of_nanomina_int_exn 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3240,7 +3251,7 @@ let%test_module "staged ledger tests" =
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
-      let f_pop_and_add =
+      let f_pop_and_add () =
         let open Snark_params.Tick in
         let open Pending_coinbase in
         let proof_emitted =
@@ -3387,14 +3398,14 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.of_int 100_000_000_000 in
+      let balance = Balance.of_mina_int_exn 100 in
       (*Should fully vest by slot = 7*)
       let acc =
         Account.create_timed account_id balance ~initial_minimum_balance:balance
           ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
           ~cliff_amount:Amount.zero
           ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
-          ~vesting_increment:(Amount.of_int 50_000_000_000)
+          ~vesting_increment:(Amount.of_mina_int_exn 50)
         |> Or_error.ok_exn
       in
       (keypair, acc)
@@ -3410,7 +3421,7 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.of_int 100_000_000_000 in
+      let balance = Balance.of_mina_int_exn 100 in
       let acc = Account.create account_id balance in
       (keypair, acc)
 
@@ -3610,8 +3621,9 @@ let%test_module "staged ledger tests" =
           Public_key.Compressed.gen
       in
       let insufficient_account_creation_fee =
-        Currency.Fee.to_int constraint_constants.account_creation_fee / 2
-        |> Currency.Amount.of_int
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+        / 2
+        |> Currency.Amount.of_nanomina_int_exn
       in
       let source_pk = Public_key.compress kp.public_key in
       let body =
@@ -3679,9 +3691,10 @@ let%test_module "staged ledger tests" =
                     |> Option.value_exn ) )
             | `Invalid ->
                 (* Not enough account creation fee and using full balance for fee*)
-                ( Currency.Fee.to_int constraint_constants.account_creation_fee
+                ( Currency.Fee.to_nanomina_int
+                    constraint_constants.account_creation_fee
                   / 2
-                  |> Currency.Amount.of_int
+                  |> Currency.Amount.of_nanomina_int_exn
                 , Currency.Amount.to_fee balance )
           in
           let source_pk = Public_key.compress kp.public_key in
@@ -3786,16 +3799,16 @@ let%test_module "staged ledger tests" =
       in
       Quickcheck.test ~trials:1 gen
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
           let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
           let snapp_update =
-            { Party.Update.dummy with
+            { Account_update.Update.dummy with
               delegate = Zkapp_basic.Set_or_keep.Set snapp_pk
             }
           in
           let memo = Signed_command_memo.dummy in
-          let test_spec : Spec.t =
+          let test_spec : Update_states_spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
             ; fee_payer = None
@@ -3842,15 +3855,16 @@ let%test_module "staged ledger tests" =
                       ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
                     l
                   in
-                  let%bind parties =
+                  let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
-                  let valid_parties =
+                  let valid_zkapp_command =
                     Option.value_exn
-                      (Parties.Valid.to_valid ~ledger:valid_against_ledger
+                      (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
                          ~get:Ledger.get
-                         ~location_of_account:Ledger.location_of_account parties )
+                         ~location_of_account:Ledger.location_of_account
+                         zkapp_command )
                   in
                   ignore
                     (Ledger.unregister_mask_exn valid_against_ledger
@@ -3862,11 +3876,12 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties valid_parties))
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
-                  (*Parties with incompatible vk should not be in the diff*)
+                  (*Zkapp_command with incompatible vk should not be in the diff*)
                   assert (List.is_empty commands) ;
                   (*Update the account to have correct vk*)
                   let loc =
@@ -3885,19 +3900,23 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties valid_parties))
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
                   assert (List.length commands = 1) ;
                   match List.hd_exn commands with
-                  | { With_status.data = Parties _ps; status = Applied } ->
+                  | { With_status.data = Zkapp_command _ps; status = Applied }
+                    ->
                       return ()
-                  | { With_status.data = Parties _ps; status = Failed tbl } ->
+                  | { With_status.data = Zkapp_command _ps
+                    ; status = Failed tbl
+                    } ->
                       failwith
-                        (sprintf "Parties application failed %s"
+                        (sprintf "Zkapp_command application failed %s"
                            ( Transaction_status.Failure.Collection.to_yojson tbl
                            |> Yojson.Safe.to_string ) )
                   | _ ->
-                      failwith "expecting parties transaction" ) ) )
+                      failwith "expecting zkapp_command transaction" ) ) )
   end )

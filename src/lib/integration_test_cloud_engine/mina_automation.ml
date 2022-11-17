@@ -121,14 +121,12 @@ module Network_config = struct
            1 )
         num_block_producers
     in
-    if List.length bp_keypairs < num_block_producers then
+    if Mina_stdlib.List.Length.Compare.(bp_keypairs < num_block_producers) then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    assert (List.length bp_keypairs >= num_block_producers) ;
-    if List.length bp_keypairs < num_block_producers then
-      failwith
-        "not enough sample keypairs for specified number of extra keypairs" ;
-    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+
+    assert (
+      Stdlib.List.compare_lengths extra_keypairs extra_genesis_accounts >= 0 ) ;
     let extra_keypairs_cut =
       List.take extra_keypairs (List.length extra_genesis_accounts)
     in
@@ -154,7 +152,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -201,7 +199,7 @@ module Network_config = struct
             pk = Some (Public_key.Compressed.to_string pk)
           ; sk = None
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -219,6 +217,12 @@ module Network_config = struct
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
             ; transaction_expiry_hr = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_sequence_event_elements = None
             }
       ; genesis =
           Some
@@ -443,7 +447,7 @@ module Network_manager = struct
           accum + (max_nodes * 3) )
       (*
         the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  
+          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
           then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
     in
     let nodes_available = max_nodes - num_kube_nodes in

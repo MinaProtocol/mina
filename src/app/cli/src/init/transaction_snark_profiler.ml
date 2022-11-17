@@ -58,8 +58,8 @@ let create_ledger_and_transactions num_transactions :
     let sender_pk = Public_key.compress sender.public_key in
     let nonce = Hashtbl.find_exn nonces sender_pk in
     Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account.Nonce.succ) ;
-    let fee = Currency.Fee.of_int (1 + Random.int 100) in
-    let amount = Currency.Amount.of_int (1 + Random.int 100) in
+    let fee = Currency.Fee.of_nanomina_int_exn (1 + Random.int 100) in
+    let amount = Currency.Amount.of_nanomina_int_exn (1 + Random.int 100) in
     txn sender receiver amount fee nonce
   in
   match num_transactions with
@@ -95,12 +95,12 @@ let create_ledger_and_transactions num_transactions :
   | `Two_from_same ->
       let a =
         txn keys.(0) keys.(1)
-          (Currency.Amount.of_int 10)
+          (Currency.Amount.of_nanomina_int_exn 10)
           Currency.Fee.zero Account.Nonce.zero
       in
       let b =
         txn keys.(0) keys.(1)
-          (Currency.Amount.of_int 10)
+          (Currency.Amount.of_nanomina_int_exn 10)
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
@@ -119,9 +119,9 @@ module Transaction_key = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let of_parties ~ledger (p : Parties.t) =
+  let of_zkapp_command ~ledger (p : Zkapp_command.t) =
     let segments, _ =
-      Transaction_snark.parties_witnesses_exn ~constraint_constants
+      Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
@@ -142,7 +142,7 @@ module Transaction_key = struct
       ~f:(fun ({ proof_segments; signed_single; signed_pair } as acc)
               (_, segment, _) ->
         match segment with
-        | Transaction_snark.Parties_segment.Basic.Proved ->
+        | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
             { acc with proof_segments = proof_segments + 1 }
         | Opt_signed ->
             { acc with signed_single = signed_single + 1 }
@@ -163,7 +163,7 @@ end
 let transaction_combinations = Transaction_key.Table.create ()
 
 let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
-    ~max_num_parties : Mina_ledger.Ledger.t * Parties.t list =
+    ~max_num_parties : Mina_ledger.Ledger.t * Zkapp_command.t list =
   let _length =
     match num_transactions with
     | `Count length ->
@@ -192,13 +192,13 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
   let balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
-      Currency.Fee.to_int min_cmd_fee
+      Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000
-      |> Currency.Balance.of_int
+      |> Currency.Balance.of_nanomina_int_exn
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "10000000.0" in
+      let max_bal = Currency.Balance.of_mina_string_exn "10000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)
@@ -268,21 +268,21 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
     in
     Quickcheck.Generator.list_with_length list_len array_gen
   in
-  let fee = Currency.Fee.of_int 1_000_000 in
+  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
   let sequence_events =
     Quickcheck.random_value (field_array_list_gen ~array_len:1 ~list_len:2)
   in
   let snapp_update =
-    { Party.Update.dummy with
+    { Account_update.Update.dummy with
       app_state =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
             Zkapp_basic.Set_or_keep.Set (Snark_params.Tick.Field.of_int i) )
     }
   in
-  let amount = Currency.Amount.of_int 1_000_000_000 in
+  let amount = Currency.Amount.of_nanomina_int_exn 1_000_000_000 in
   let sender_parties = 1 in
   let test_spec nonce ~num_parties ~num_proof_parties :
-      bool * Transaction_snark.For_tests.Spec.t =
+      bool * Transaction_snark.For_tests.Update_states_spec.t =
     let receiver_count =
       max 0 (num_parties - num_proof_parties - sender_parties)
     in
@@ -338,11 +338,11 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
               ~constraint_constants ~empty_sender spec
               ~receiver_auth:Control.Tag.Signature )
       in
-      let simple_parties = Parties.to_simple parties in
-      let other_parties = simple_parties.other_parties in
+      let simple_parties = Zkapp_command.to_simple parties in
+      let other_parties = simple_parties.account_updates in
       let proof_parties, signature_parties, no_auths, _next_nonce =
         List.fold ~init:([], [], [], nonce) other_parties
-          ~f:(fun (pc, sc, na, nonce) (p : Party.Simple.t) ->
+          ~f:(fun (pc, sc, na, nonce) (p : Account_update.Simple.t) ->
             let nonce =
               if
                 Public_key.Compressed.equal p.body.public_key fee_payer_pk
@@ -368,14 +368,15 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
         Time.(Span.to_sec (diff (now ()) start)) ;
       let permutations =
         permute proof_parties (signature_parties @ no_auths) [] []
-        |> List.filter_mapi ~f:(fun i (other_parties : Party.Simple.t list) ->
+        |> List.filter_mapi
+             ~f:(fun i (account_updates : Account_update.Simple.t list) ->
                let p =
-                 Parties.of_simple { simple_parties with other_parties }
+                 Zkapp_command.of_simple { simple_parties with account_updates }
                in
-               let combination = Transaction_key.of_parties ~ledger p in
+               let combination = Transaction_key.of_zkapp_command ~ledger p in
                let perm_string =
                  List.fold ~init:"S" other_parties
-                   ~f:(fun acc (p : Party.Simple.t) ->
+                   ~f:(fun acc (p : Account_update.Simple.t) ->
                      match p.authorization with
                      | Proof _ ->
                          acc ^ "P"
@@ -397,7 +398,8 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
                  (*Update the authorizations*)
                  let p =
                    Async.Thread_safe.block_on_async_exn (fun () ->
-                       Parties_builder.replace_authorizations ~prover ~keymap p )
+                       Zkapp_command_builder.replace_authorizations ~prover
+                         ~keymap p )
                  in
                  Transaction_key.Table.add_exn transaction_combinations
                    ~key:combination
@@ -412,7 +414,7 @@ let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
       Mina_base.Account.Nonce.zero )
 
 let _create_ledger_and_zkapps_from_generator num_transactions :
-    Mina_ledger.Ledger.t * Parties.t list =
+    Mina_ledger.Ledger.t * Zkapp_command.t list =
   let length =
     match num_transactions with
     | `Count length ->
@@ -420,8 +422,10 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
     | `Two_from_same ->
         failwith "Must provide a count when profiling with snapps"
   in
-  let max_other_parties = 6 in
-  printf !"Generating zkApp transactions with %d parties\n%!" max_other_parties ;
+  let max_account_updates = 6 in
+  printf
+    !"Generating zkApp transactions with %d parties\n%!"
+    max_account_updates ;
   let start = Time.now () in
   (*let `VK vk, `Prover prover, `Proof proof =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -433,19 +437,19 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
   in
   let cmd_infos, ledger =
     Quickcheck.random_value
-      (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~length ~vk () )
+      (Mina_generators.User_command_generators
+       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
         match user_cmd with
-        | User_command.Parties parties_valid ->
-            let parties = Parties.Valid.forget parties_valid in
-            let other_parties = Parties.other_parties_list parties in
+        | User_command.Zkapp_command parties_valid ->
+            let parties = Zkapp_command.Valid.forget parties_valid in
+            let other_parties = Zkapp_command.account_updates_list parties in
             let proof_count, signature_count, no_auths =
               List.fold ~init:(0, 0, 0)
-                (Party.of_fee_payer parties.fee_payer :: other_parties)
-                ~f:(fun (pc, sc, na) (p : Party.t) ->
+                (Account_update.of_fee_payer parties.fee_payer :: other_parties)
+                ~f:(fun (pc, sc, na) (p : Account_update.t) ->
                   match p.authorization with
                   | Proof _ ->
                       (pc + 1, sc, na)
@@ -461,12 +465,12 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
               (List.length other_parties + 1)
               signature_count proof_count no_auths ;
             Async.Thread_safe.block_on_async_exn (fun () ->
-                Parties_builder.replace_authorizations
+                Zkapp_command_builder.replace_authorizations
                   ~prover (*~dummy_proof:proof*)
                   ~keymap
-                  (Parties.Valid.forget parties_valid) )
+                  (Zkapp_command.Valid.forget parties_valid) )
         | User_command.Signed_command _ ->
-            failwith "Expected Parties user command" )
+            failwith "Expected Zkapp_command user command" )
   in
   printf
     !"Time to generate zkapps: %f secs\n%!"
@@ -536,7 +540,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
         in
         let tm0 = Core.Unix.gettimeofday () in
         let%map proof =
-          T.of_non_parties_transaction
+          T.of_non_zkapp_command_transaction
             ~statement:
               { sok_digest = Sok_message.Digest.default
               ; source =
@@ -599,28 +603,30 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
 
-let profile_zkapps ~verifier ledger partiess =
+let profile_zkapps ~verifier ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
-    let num_partiess = List.length partiess in
-    Async.Deferred.List.iteri partiess ~f:(fun ndx parties ->
-        let other_parties = Parties.other_parties_list parties in
+    let num_zkapp_commands = List.length zkapp_commands in
+    Async.Deferred.List.iteri zkapp_commands ~f:(fun ndx zkapp_command ->
+        let account_updates =
+          Zkapp_command.account_updates_list zkapp_command
+        in
         printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
-          num_partiess
-          (List.length other_parties) ;
+          num_zkapp_commands
+          (List.length account_updates) ;
         let v_start_time = Time.now () in
         let%bind res =
           Verifier.verify_commands verifier
             [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
                 ~location_of_account:Mina_ledger.Ledger.location_of_account
-                (Parties parties)
+                (Zkapp_command zkapp_command)
             ]
         in
         let proof_count, signature_count =
           List.fold ~init:(0, 0)
-            (Party.of_fee_payer parties.fee_payer :: other_parties)
-            ~f:(fun (pc, sc) (p : Party.t) ->
+            ( Account_update.of_fee_payer zkapp_command.fee_payer
+            :: account_updates ) ~f:(fun (pc, sc) (p : Account_update.t) ->
               match p.authorization with
               | Proof _ ->
                   (pc + 1, sc)
@@ -640,8 +646,8 @@ let profile_zkapps ~verifier ledger partiess =
         let%map () =
           match%map
             Async_kernel.Monitor.try_with (fun () ->
-                Transaction_snark_tests.Util.check_parties_with_merges_exn
-                  ~ignore_outside_snark:true ledger [ parties ] )
+                Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
+                  ~ignore_outside_snark:true ledger [ zkapp_command ] )
           with
           | Ok () ->
               ()
@@ -656,7 +662,9 @@ let profile_zkapps ~verifier ledger partiess =
         let time_values =
           { Time_values.verification_time; proving_time = zkapp_span }
         in
-        let combination = Transaction_key.of_parties ~ledger parties in
+        let combination =
+          Transaction_key.of_zkapp_command ~ledger zkapp_command
+        in
         Transaction_key.Table.change transaction_combinations combination
           ~f:(fun data_opt ->
             let txn, _, perm_string = Option.value_exn data_opt in
@@ -824,7 +832,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_parties
       Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
         (List.fold ~init:[] transactions ~f:(fun participants t ->
              List.rev_append
-               (Transaction.accounts_accessed (Transaction.forget t))
+               (Transaction.accounts_referenced (Transaction.forget t))
                participants ) )
     in
     let rec go n =

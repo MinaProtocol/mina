@@ -475,7 +475,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
       (* STEP 5 *)
-      Non_empty_list.iter
+      Mina_stdlib.Nonempty_list.iter
         (Option.value_exn
            (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
@@ -776,12 +776,24 @@ let update_metrics_with_diff (type mutant)
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
+      let valid_commands =
+        Breadcrumb.validated_transition best_tip
+        |> Mina_block.Validated.valid_commands
+      in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float
-             (List.length
-                ( Breadcrumb.validated_transition best_tip
-                |> Mina_block.Validated.valid_commands ) ) ) ;
+          (Int.to_float (List.length valid_commands)) ;
+        Mina_metrics.(
+          Gauge.set Transition_frontier.best_tip_zkapp_txns
+            (Int.to_float
+               (List.fold ~init:0
+                  ~f:(fun c cmd ->
+                    match cmd.data with
+                    | Mina_base.User_command.Poly.Zkapp_command _ ->
+                        c + 1
+                    | _ ->
+                        c )
+                  valid_commands ) )) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;

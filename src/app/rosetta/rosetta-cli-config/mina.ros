@@ -1,0 +1,41 @@
+create_account(1){
+  create_account{
+    network = {"network":"debug", "blockchain":"mina"};
+    key = generate_key({"curve_type":"pallas"});
+    account = derive({
+      "network_identifier": {{network}},
+      "public_key": {{key.public_key}}
+    });
+    save_account({
+      "account_identifier": {{account.account_identifier}},
+      "keypair": {{key}}
+    });
+  }
+}
+
+request_funds(1){
+  find_account{
+    currency = {
+      "symbol":"mina",
+      "decimals":9
+    };
+    random_account = find_balance({
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit":1
+    });
+  },
+  request{
+    min_balance = load_env("MIN_BALANCE");
+    adjusted_min = {{min_balance}} + 600;
+    loaded_account = find_balance({
+      "account_identifier": {{random_account.account_identifier}},
+      "minimum_balance":{
+        "value": {{adjusted_min}},
+        "currency": {{currency}}
+      }
+    });
+  }
+}

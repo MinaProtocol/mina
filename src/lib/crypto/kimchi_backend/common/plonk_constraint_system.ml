@@ -297,6 +297,15 @@ type ('f, 'rust_gates) t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
+let get_public_input_size sys = sys.public_input_size
+
+let get_rows_len sys = List.length sys.rows_rev
+
+let get_prev_challenges sys = sys.prev_challenges
+
+let set_prev_challenges sys challenges =
+  Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -311,8 +320,62 @@ module Make
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
-    end) =
-struct
+    end) : sig
+  open Core_kernel
+
+  type nonrec t = (Fp.t, Gates.t) t
+
+  val create : unit -> t
+
+  val get_public_input_size : t -> int Set_once.t
+
+  val get_primary_input_size : t -> int
+
+  val set_primary_input_size : t -> int -> unit
+
+  val get_auxiliary_input_size : t -> int
+
+  val set_auxiliary_input_size : t -> int -> unit
+
+  val get_prev_challenges : t -> int option
+
+  val set_prev_challenges : t -> int -> unit
+
+  val get_rows_len : t -> int
+
+  val next_row : t -> int
+
+  val add_constraint :
+       ?label:string
+    -> t
+    -> ( Fp.t Snarky_backendless.Cvar.t
+       , Fp.t )
+       Snarky_backendless.Constraint.basic
+    -> unit
+
+  val compute_witness : t -> (int -> Fp.t) -> Fp.t array array
+
+  val finalize : t -> unit
+
+  val finalize_and_get_gates : t -> Gates.t
+
+  val digest : t -> Md5.t
+
+  val to_json :
+       t
+    -> ([ `Null
+        | `Bool of bool
+        | `Int of int
+        | `Intlit of string
+        | `Float of float
+        | `String of string
+        | `Assoc of (string * 'json) list
+        | `List of 'json list
+        | `Tuple of 'json list
+        | `Variant of string * 'json option ]
+        as
+        'json )
+end = struct
   open Core_kernel
   open Pickles_types
 
@@ -440,7 +503,7 @@ struct
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
   (** Returns the number of previous challenges. *)
-  let get_prev_challenges t = Set_once.get_exn t.prev_challenges [%here]
+  let get_prev_challenges t = Set_once.get t.prev_challenges
 
   (* Non-public part of the witness. *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
@@ -452,6 +515,12 @@ struct
   (** Sets the number of previous challenges. It must and can only be called once. *)
   let set_prev_challenges (sys : t) num_prev_challenges =
     Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
+
+  let get_public_input_size (sys : t) = get_public_input_size sys
+
+  let get_rows_len (sys : t) = get_rows_len sys
+
+  let next_row (sys : t) = sys.next_row
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.

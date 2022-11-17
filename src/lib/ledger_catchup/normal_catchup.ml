@@ -276,7 +276,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
       in
       Deferred.return
       @@ List.fold_until
-           (Non_empty_list.to_list hashes)
+           (Mina_stdlib.Nonempty_list.to_list hashes)
            ~init:(blockchain_length_of_target_hash, [])
            ~f:(fun (blockchain_length, acc) hash ->
              match Transition_frontier.find frontier hash with
@@ -575,7 +575,8 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let build_start_time = Core.Time.now () in
   let trees_of_transitions =
-    Option.fold (Non_empty_list.of_list_opt transitions_with_initial_validation)
+    Option.fold
+      (Mina_stdlib.Nonempty_list.of_list_opt transitions_with_initial_validation)
       ~init:subtrees ~f:(fun _ transitions ->
         [ Rose_tree.of_non_empty_list ~subtrees transitions ] )
   in

@@ -10,7 +10,7 @@ module Get_all_transactions =
         chainId
       }
       pooledUserCommands(publicKey: null) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -25,7 +25,7 @@ module Get_transactions_by_hash =
         peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
         amount @ppxCustom(module: "Scalars.UInt64")
         fee @ppxCustom(module: "Scalars.UInt64")
         kind
@@ -280,7 +280,8 @@ module Transaction = struct
           { Transaction.transaction_identifier=
               {Transaction_identifier.hash= req.transaction_identifier.hash}
           ; operations= user_command_info |> User_command_info.to_operations'
-          ; metadata= None }
+          ; metadata= None
+          ; related_transactions= [] }
       ; metadata= None }
   end
 

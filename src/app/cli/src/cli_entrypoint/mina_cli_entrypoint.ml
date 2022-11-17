@@ -203,7 +203,8 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee) )
+           (Currency.Fee.to_nanomina_int
+              Mina_compile_config.default_snark_worker_fee ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -249,12 +250,10 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--discovery-keypair" ~aliases:[ "discovery-keypair" ]
-      (optional string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (required string)
       ~doc:
-        "KEYFILE Keypair (generated from `mina advanced \
-         generate-libp2p-keypair`) to use with libp2p discovery (default: \
-         generate per-run temporary keypair)"
+        "KEYFILE Keypair (generated from `mina libp2p generate-keypair`) to \
+         use with libp2p discovery"
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
@@ -273,13 +272,10 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
-  and mina_peer_exchange =
-    flag "--enable-mina-peer-exchange"
-      ~aliases:[ "enable-mina-peer-exchange" ]
-      ~doc:
-        "true|false Help keep the mesh connected when closing connections \
-         (default: true)"
-      (optional_with_default true bool)
+  and peer_protection_ratio =
+    flag "--peer-protection-rate" ~aliases:[ "peer-protection-rate" ]
+      ~doc:"float Proportion of peers to be marked as protected (default: 0.2)"
+      (optional_with_default 0.2 float)
   and min_connections =
     flag "--min-connections" ~aliases:[ "min-connections" ]
       ~doc:
@@ -551,28 +547,23 @@ let setup_daemon logger =
         in
         let%bind libp2p_keypair =
           let libp2p_keypair_old_format =
-            Option.bind libp2p_keypair ~f:(fun s ->
-                match Mina_net2.Keypair.of_string s with
-                | Ok kp ->
-                    Some kp
-                | Error _ ->
-                    if String.contains s ',' then
-                      [%log warn]
-                        "I think -discovery-keypair is in the old format, but \
-                         I failed to parse it! Using it as a path..." ;
-                    None )
+            match Mina_net2.Keypair.of_string libp2p_keypair with
+            | Ok kp ->
+                Some kp
+            | Error _ ->
+                if String.contains libp2p_keypair ',' then
+                  [%log warn]
+                    "I think -libp2p-keypair is in the old format, but I \
+                     failed to parse it! Using it as a path..." ;
+                None
           in
-          match libp2p_keypair_old_format with
-          | Some kp ->
-              return (Some kp)
-          | None -> (
-              match libp2p_keypair with
-              | None ->
-                  return None
-              | Some s ->
-                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                    ~should_prompt_user:false ~which:"libp2p keypair" s
-                  |> Deferred.map ~f:Option.some )
+          Option.value_map
+            ~default:(fun () ->
+              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                ~should_prompt_user:false ~which:"libp2p keypair" libp2p_keypair
+              )
+            ~f:(Fn.compose const Deferred.return)
+            libp2p_keypair_old_format ()
         in
         let%bind () =
           let version_filename = conf_dir ^/ "mina.version" in
@@ -791,7 +782,8 @@ let setup_daemon logger =
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
-              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+              YJ.Util.to_int_option json
+              |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:Mina_compile_config.default_snark_worker_fee
@@ -1131,7 +1123,7 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
-          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+          if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
@@ -1175,7 +1167,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; trust_system
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
-              ; mina_peer_exchange
+              ; peer_protection_ratio
               ; peer_exchange = Option.value ~default:false peer_exchange
               ; min_connections
               ; max_connections
@@ -1212,12 +1204,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ~f:(fun pk -> `Other pk)
           in
           let current_protocol_version =
-            Coda_run.get_current_protocol_version
+            Mina_run.get_current_protocol_version
               ~compile_time_current_protocol_version ~conf_dir ~logger
               curr_protocol_version
           in
           let proposed_protocol_version_opt =
-            Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+            Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
               proposed_protocol_version
           in
           ( match
@@ -1323,7 +1315,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             in
             Node_error_service.set_config ~get_node_state
               ~node_error_url:(Uri.of_string url) ~contact_info ) ;
-        Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+        Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
           ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
@@ -1340,7 +1332,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
-        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
+        Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           mina ;
         let%bind () =
@@ -1738,6 +1730,7 @@ let mina_commands logger =
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("ledger", Client.ledger)
+  ; ("libp2p", Client.libp2p)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
@@ -1797,7 +1790,7 @@ let () =
      use the Jane Street scripts that generate their version information
   *)
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
-   let is_version_cmd = make_list_mem [ "version"; "-version" ] in
+   let is_version_cmd = make_list_mem [ "version"; "-version"; "--version" ] in
    let is_help_flag = make_list_mem [ "-help"; "-?" ] in
    match Sys.get_argv () with
    | [| _coda_exe; version |] when is_version_cmd version ->

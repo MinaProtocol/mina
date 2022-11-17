@@ -20,12 +20,14 @@
    core_kernel.uuid
    ppx_inline_test.config
    ;; local libraries
+   mina_wire_types
    sgn
    syncable_ledger
    snark_params
-   parties_builder
+   zkapp_command_builder
    pickles
    pickles.backend
+   pickles_types
    mina_base.import
    o1trace
    rocksdb
@@ -34,6 +36,7 @@
    genesis_constants
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    merkle_mask
    merkle_ledger
    mina_base

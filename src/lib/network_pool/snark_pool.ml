@@ -436,8 +436,8 @@ struct
                   Gauge.set Snark_work.snark_pool_size
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
+                    ( fee.Mina_base.Fee_with_prover.fee
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =
@@ -1018,7 +1018,7 @@ let%test_module "random set test" =
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
@@ -1064,7 +1064,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )
@@ -1183,7 +1183,8 @@ let%test_module "random set test" =
           in
           ignore
             ( ok_exn res1
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1194,7 +1195,8 @@ let%test_module "random set test" =
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1207,7 +1209,8 @@ let%test_module "random set test" =
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1234,7 +1237,8 @@ let%test_module "random set test" =
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

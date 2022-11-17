@@ -1,4 +1,4 @@
-/CODEOWNERS @nholland94 @bkase @imeckler
+/CODEOWNERS @nholland94 @bkase @imeckler @mrmr1993
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
@@ -11,6 +11,7 @@
 /LICENSE @imeckler
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
+/graphql_schema.json @MinaProtocol/product-eng-reviewers
 
 /src/external/ @bkase @psteckler @imeckler @mrmr1993
 

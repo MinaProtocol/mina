@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 #wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
-wasm-bindgen-rayon = { git = "https://github.com/o1-labs/wasm-bindgen-rayon", branch = "feature/nodejs-support", features = ["no-bundler"]}
+wasm-bindgen-rayon = { git = "https://github.com/o1-labs/wasm-bindgen-rayon", rev = "68303317c96549feae6b7dcc72d891afbfbda070", features = ["no-bundler"]}
 wasm-bindgen = { version = "0.2.78" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
@@ -34,7 +34,7 @@ commitment_dlog = { path = "../../proof-systems/poly-commitment" }
 groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
-oracle = { path = "../../proof-systems/oracle" }
+mina-poseidon = { path = "../../proof-systems/poseidon" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
 array-init = "2.0.0"

@@ -18,9 +18,11 @@
    uri
    async.async_command
    ;; local libraries
+   mina_wire_types
    mina_base
    mina_base.import
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pasta_bindings
    pickles
    pickles_types

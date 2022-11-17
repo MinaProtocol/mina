@@ -11,10 +11,12 @@
    core_kernel
    yojson
    ;; local libraries
+   mina_wire_types
    mina_base.import
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    kimchi_backend.common
    kimchi_backend
    cache_dir

@@ -37,6 +37,7 @@ var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]ext
 	ipc.Libp2pHelperInterface_PushMessage_Which_deleteResource:   fromDeleteResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_downloadResource: fromDownloadResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_validation:       fromValidationPush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_heartbeatPeer:    fromHeartbeatPeerPush,
 }
 
 func (app *app) handleIncomingMsg(msg *ipc.Libp2pHelperInterface_Message) {

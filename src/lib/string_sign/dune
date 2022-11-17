@@ -10,6 +10,7 @@
    kimchi_backend
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    signature_lib
    snark_params

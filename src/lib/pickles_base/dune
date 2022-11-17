@@ -2,7 +2,11 @@
  (inline_tests)
  (name pickles_base)
  (public_name pickles_base)
- (flags -warn-error -22)
+ ; Deactivated warnings
+ ;
+ ; 44: open-shadow-identifier (the use of Core_kernel makes it ubiquitous)
+ (flags
+  (:standard -w +a-44 -warn-error +a))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps h_list.ppx ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
@@ -15,6 +19,7 @@
    ppx_inline_test.config
    core_kernel
    ;; local libraries
+   mina_wire_types
    snarky.backendless
    random_oracle_input
    pickles_types

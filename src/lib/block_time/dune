@@ -15,6 +15,7 @@
    base
    base.base_internalhash_types
    ;; local libraries
+   mina_wire_types
    bitstring_lib
    pickles
    unsigned_extended

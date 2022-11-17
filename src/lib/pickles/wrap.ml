@@ -517,7 +517,7 @@ let wrap
               Tock.Field.of_int domain_index )
         in
         k
-          (Vector.extend_exn wrap_domain_indices max_proofs_verified
+          (Vector.extend_front_exn wrap_domain_indices max_proofs_verified
              Tock.Field.one )
     | _ ->
         Snarky_backendless.Request.unhandled
@@ -551,7 +551,7 @@ let wrap
         end)
     in
     let module V = H1.To_vector (Tick.Curve.Affine) in
-    Vector.trim
+    Vector.trim_front
       (V.f Max_local_max_proof_verifieds.length
          (M.f messages_for_next_wrap_proof) )
       lte
@@ -584,27 +584,27 @@ let wrap
     P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
       next_statement.proof_state.messages_for_next_wrap_proof
   in
+  let next_accumulator =
+    Vector.map2
+      (Vector.extend_front_exn
+         prev_statement.proof_state.messages_for_next_step_proof
+           .challenge_polynomial_commitments max_proofs_verified
+         (Lazy.force Dummy.Ipa.Wrap.sg) )
+      messages_for_next_wrap_proof_prepared.old_bulletproof_challenges
+      ~f:(fun sg chals ->
+        { Tock.Proof.Challenge_polynomial.commitment = sg
+        ; challenges = Vector.to_array chals
+        } )
+    |> Wrap_hack.pad_accumulator
+  in
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
-              ~auxiliary:auxiliary_inputs pk
-              ~message:
-                ( Vector.map2
-                    (Vector.extend_exn
-                       prev_statement.proof_state.messages_for_next_step_proof
-                         .challenge_polynomial_commitments max_proofs_verified
-                       (Lazy.force Dummy.Ipa.Wrap.sg) )
-                    messages_for_next_wrap_proof_prepared
-                      .old_bulletproof_challenges
-                    ~f:(fun sg chals ->
-                      { Tock.Proof.Challenge_polynomial.commitment = sg
-                      ; challenges = Vector.to_array chals
-                      } )
-                |> Wrap_hack.pad_accumulator ) )
-          [ input ]
+              ~auxiliary:auxiliary_inputs pk ~message:next_accumulator )
+          ~input_typ:input
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )

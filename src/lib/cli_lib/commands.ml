@@ -120,8 +120,9 @@ let validate_transaction =
                 | Error err ->
                     incr num_fails ;
                     Format.eprintf
-                      "Failed to validate transaction:@.%s@.Failed with \
-                       error:%s@."
+                      "@[<v>Failed to validate transaction:@,\
+                       %s@,\
+                       Failed with error:%s@]@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
                          (Error_json.error_to_yojson err) ) )
@@ -130,16 +131,22 @@ let validate_transaction =
     | Ok () ->
         ()
     | Error err ->
-        Format.eprintf "Error:@.%s@.@."
+        Format.eprintf "@[<v>Error:@,%s@,@]@."
           (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
         Format.printf "Invalid transaction.@." ;
         Core_kernel.exit 1 ) ;
     if !num_fails > 0 then (
       Format.printf "Some transactions failed to verify@." ;
       exit 1 )
-    else (
-      Format.printf "All transactions were valid@." ;
-      exit 0 ) )
+    else
+      let[@alert "--deprecated"] first = Caml.Stream.peek jsons in
+      match first with
+      | None ->
+          Format.printf "Could not parse any transactions@." ;
+          exit 1
+      | _ ->
+          Format.printf "All transactions were valid@." ;
+          exit 0 )
 
 module Vrf = struct
   let generate_witness =
@@ -148,7 +155,7 @@ module Vrf = struct
         "Generate a vrf evaluation witness. This may be used to calculate \
          whether a given private key will win a given slot (by checking \
          threshold_met = true in the JSON output), or to generate a witness \
-         that a 3rd party can use to verify a vrf evaluation."
+         that a 3rd account_update can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
@@ -211,8 +218,9 @@ module Vrf = struct
                     vrf_threshold =
                       Some
                         { delegated_stake =
-                            Currency.Balance.of_int delegated_stake
-                        ; total_stake = Currency.Amount.of_int total_stake
+                            Currency.Balance.of_nanomina_int_exn delegated_stake
+                        ; total_stake =
+                            Currency.Amount.of_nanomina_int_exn total_stake
                         }
                   }
               | _ ->
@@ -284,7 +292,7 @@ module Vrf = struct
                 | Ok x ->
                     x
                 | Error err ->
-                    Format.eprintf "Error:@.%s@.@."
+                    Format.eprintf "@[<v>Error:@,%s@,@]@."
                       (Yojson.Safe.pretty_to_string
                          (Error_json.error_to_yojson err) ) ;
                     `Repeat () )
@@ -338,7 +346,7 @@ module Vrf = struct
             | Ok x ->
                 x
             | Error err ->
-                Format.eprintf "Error:@.%s@.@."
+                Format.eprintf "@[<v>Error:@,%s@,@]@."
                   (Yojson.Safe.pretty_to_string
                      (Error_json.error_to_yojson err) ) ;
                 `Repeat () )

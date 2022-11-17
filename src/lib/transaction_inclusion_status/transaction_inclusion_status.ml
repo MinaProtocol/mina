@@ -106,7 +106,7 @@ let%test_module "transaction_status" =
       Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
         ~trust_system ~max_length ~size:frontier_size ()
 
-    (*TODO: Generate snapp txns*)
+    (* TODO: Generate zkApps txns *)
     let gen_user_command =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
@@ -114,7 +114,7 @@ let%test_module "transaction_status" =
     let create_pool ~frontier_broadcast_pipe =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
-          ~verifier
+          ~verifier ~genesis_constants:precomputed_values.genesis_constants
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
@@ -196,7 +196,7 @@ let%test_module "transaction_status" =
         let%map tail_user_commands =
           Quickcheck.Generator.list_with_length 10 gen_user_command
         in
-        Non_empty_list.init head_user_command tail_user_commands
+        Mina_stdlib.Nonempty_list.init head_user_command tail_user_commands
       in
       Quickcheck.test ~trials:1
         (Quickcheck.Generator.tuple2 gen_frontier user_commands_generator)
@@ -209,7 +209,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let unknown_user_command, pool_user_commands =
-                Non_empty_list.uncons user_commands
+                Mina_stdlib.Nonempty_list.uncons user_commands
               in
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer

@@ -1,6 +1,7 @@
 (library
  (name mina_transaction)
  (public_name mina_transaction)
+ (inline_tests)
  (libraries
    ;; opam libraries
    base.caml
@@ -8,8 +9,10 @@
    base.base_internalhash_types
    bin_prot.shape
    core_kernel
+   ppx_inline_test.config
    result
    sexplib0
+   base64
    ;; local libraries
    base58_check
    blake2
@@ -25,13 +28,16 @@
    snark_params
    snarky.backendless
    ppx_version.runtime
-   with_hash)
+   with_hash
+   mina_wire_types
+ )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
     h_list.ppx
     ppx_mina
+    ppx_inline_test
     ppx_compare
     ppx_deriving_yojson
     ppx_hash

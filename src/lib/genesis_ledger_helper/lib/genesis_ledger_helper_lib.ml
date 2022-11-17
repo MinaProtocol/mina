@@ -119,34 +119,38 @@ module Accounts = struct
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             } ->
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Zkapp_state.Max_state_size.n
-                <> List.length state
-              then
+                Mina_stdlib.List.Length.Compare.(
+                  state = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n)
+              then Ok (Zkapp_state.V.of_list_exn state)
+              else
                 Or_error.errorf
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t (List.length state)
-              else Ok (Zkapp_state.V.of_list_exn state)
             in
+
             let verification_key =
               Option.map verification_key
                 ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
             let%map sequence_state =
               if
-                Pickles_types.Vector.Nat.to_int Pickles_types.Nat.N5.n
-                <> List.length sequence_state
-              then
+                Mina_stdlib.List.Length.Compare.(
+                  sequence_state
+                  = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
+              then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
+              else
                 Or_error.errorf
                   !"Snap account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t
                   (List.length sequence_state)
-              else Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
             in
+
             let last_sequence_slot =
               Mina_numbers.Global_slot.of_int last_sequence_slot
             in
@@ -157,6 +161,7 @@ module Accounts = struct
               ; sequence_state
               ; last_sequence_slot
               ; proved_state
+              ; zkapp_uri
               }
       in
       ( { public_key = account.public_key
@@ -177,7 +182,6 @@ module Accounts = struct
               ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
         ; zkapp
         ; permissions
-        ; zkapp_uri = Option.value ~default:"" t.zkapp_uri
         }
         : Mina_base.Account.t )
 
@@ -268,6 +272,7 @@ module Accounts = struct
                ; sequence_state
                ; last_sequence_slot
                ; proved_state
+               ; zkapp_uri
                }
              ->
             let state = Zkapp_state.V.to_list app_state in
@@ -284,6 +289,7 @@ module Accounts = struct
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             } )
       in
       { pk =
@@ -308,7 +314,6 @@ module Accounts = struct
       ; zkapp
       ; permissions
       ; token_symbol = Some account.token_symbol
-      ; zkapp_uri = Some account.zkapp_uri
       }
   end
 
@@ -353,7 +358,9 @@ module Accounts = struct
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind balance = Int.gen_incl 10 500 >>| Currency.Balance.of_int in
+    let%bind balance =
+      Int.gen_incl 10 500 >>| Currency.Balance.of_nanomina_int_exn
+    in
     gen_with_balance balance
 
   let generate n : (Private_key.t option * Account.t) list =
@@ -576,6 +583,24 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; transaction_expiry_hr =
       Option.value ~default:default.transaction_expiry_hr
         (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
+  ; zkapp_proof_update_cost =
+      Option.value ~default:default.zkapp_proof_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
+  ; zkapp_signed_single_update_cost =
+      Option.value ~default:default.zkapp_signed_single_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_single_update_cost)
+  ; zkapp_signed_pair_update_cost =
+      Option.value ~default:default.zkapp_signed_pair_update_cost
+        (config.daemon >>= fun cfg -> cfg.zkapp_signed_pair_update_cost)
+  ; zkapp_transaction_cost_limit =
+      Option.value ~default:default.zkapp_transaction_cost_limit
+        (config.daemon >>= fun cfg -> cfg.zkapp_transaction_cost_limit)
+  ; max_event_elements =
+      Option.value ~default:default.max_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_event_elements)
+  ; max_sequence_event_elements =
+      Option.value ~default:default.max_sequence_event_elements
+        (config.daemon >>= fun cfg -> cfg.max_sequence_event_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -604,6 +629,25 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           ; peer_list_url = None
           ; transaction_expiry_hr =
               Some precomputed_values.genesis_constants.transaction_expiry_hr
+          ; zkapp_proof_update_cost =
+              Some precomputed_values.genesis_constants.zkapp_proof_update_cost
+          ; zkapp_signed_single_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_single_update_cost
+          ; zkapp_signed_pair_update_cost =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_signed_pair_update_cost
+          ; zkapp_transaction_cost_limit =
+              Some
+                precomputed_values.genesis_constants
+                  .zkapp_transaction_cost_limit
+          ; max_event_elements =
+              Some precomputed_values.genesis_constants.max_event_elements
+          ; max_sequence_event_elements =
+              Some
+                precomputed_values.genesis_constants.max_sequence_event_elements
           }
     ; genesis =
         Some

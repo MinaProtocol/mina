@@ -18,10 +18,12 @@
    base.caml
    bin_prot.shape
    ppx_inline_test.config
+   integers
    ;; local libraries
    mina_compile_config
    mina_generators
    sgn
+   sgn_type
    transition_frontier_base
    staged_ledger
    child_processes
@@ -42,6 +44,7 @@
    quickcheck_lib
    mina_base
    mina_transaction
+   mina_state
    transaction_snark
    transaction_snark_tests
    consensus
@@ -54,7 +57,6 @@
    inline_test_quiet_logs
    pickles
    pickles_types
-   kimchi_backend.pasta
    pickles.backend
    random_oracle
    error_json
@@ -66,8 +68,16 @@
    mina_ledger
    mina_base.import
    snark_params
-   parties_builder
+   zkapp_command_builder
    ppx_version.runtime
+   random_oracle_input
+   kimchi_backend
+   kimchi_backend_common
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   genesis_ledger
+   staged_ledger_diff
+   mina_wire_types
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

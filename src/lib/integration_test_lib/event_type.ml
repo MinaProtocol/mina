@@ -244,6 +244,19 @@ module Breadcrumb_added = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
+module Persisted_frontier_loaded = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Persisted_frontier_loaded"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_loaded_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
 module Gossip = struct
   open Or_error.Let_syntax
 
@@ -332,7 +345,7 @@ end
 module Snark_work_failed = struct
   type t = unit [@@deriving yojson]
 
-  let name = "Transactions_gossip"
+  let name = "Snark_work_failed"
 
   let id = Snark_worker.generating_snark_work_failed_structured_events_id
 
@@ -359,6 +372,7 @@ type 'a t =
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
+  | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -383,6 +397,8 @@ let existential_to_string = function
       "Transactions_gossip"
   | Event_type Snark_work_failed ->
       "Snark_work_failed"
+  | Event_type Persisted_frontier_loaded ->
+      "Persisted_frontier_loaded"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -407,6 +423,8 @@ let existential_of_string_exn = function
       Event_type Transactions_gossip
   | "Snark_work_failed" ->
       Event_type Snark_work_failed
+  | "Persisted_frontier_loaded" ->
+      Event_type Persisted_frontier_loaded
   | _ ->
       failwith "invalid event type string"
 
@@ -448,6 +466,7 @@ let all_event_types =
   ; Event_type Snark_work_gossip
   ; Event_type Transactions_gossip
   ; Event_type Snark_work_failed
+  ; Event_type Persisted_frontier_loaded
   ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
@@ -472,6 +491,8 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Gossip.Transactions)
   | Snark_work_failed ->
       (module Snark_work_failed)
+  | Persisted_frontier_loaded ->
+      (module Persisted_frontier_loaded)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
@@ -590,7 +611,12 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Transactions_gossip, Transactions_gossip ->
       h e
+  | Snark_work_failed, Snark_work_failed ->
+      h e
+  | Persisted_frontier_loaded, Persisted_frontier_loaded ->
+      h e
   | _ ->
-      failwith "TODO: better error message :)"
+      failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
+        ()
 
 (* TODO: tests on sexp and dispatch (etc) against all_event_types *)

@@ -14,6 +14,7 @@
    base
    base.base_internalhash_types
    ;; local libraries
+   mina_wire_types
    snarky.backendless
    random_oracle_input
    pickles.backend
@@ -25,6 +26,7 @@
    random_oracle
    bitstring_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    test_util
    ppx_version.runtime
  )

@@ -4,7 +4,7 @@ open Mina_base
 open Signature_lib
 module Tick = Snark_params.Tick
 module Impl = Pickles.Impls.Step
-module Parties_segment = Transaction_snark.Parties_segment
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -62,9 +62,9 @@ let pending_coinbase_state_stack ~state_body_hash =
   ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
   }
 
-let apply_parties ledger parties =
-  let parties =
-    match parties with
+let apply_zkapp_command ledger zkapp_command =
+  let zkapp_command =
+    match zkapp_command with
     | [] ->
         []
     | [ ps ] ->
@@ -97,9 +97,9 @@ let apply_parties ledger parties =
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
   let witnesses, final_ledger =
-    Transaction_snark.parties_witnesses_exn ~constraint_constants
+    Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      (`Ledger ledger) parties
+      (`Ledger ledger) zkapp_command
   in
   let open Impl in
   List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
@@ -108,8 +108,9 @@ let apply_parties ledger parties =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
           let _opt_snapp_stmt =
-            Transaction_snark.Base.Parties_snark.main ~constraint_constants
-              (Parties_segment.Basic.to_single_list spec)
+            Transaction_snark.Base.Zkapp_command_snark.main
+              ~constraint_constants
+              (Zkapp_command_segment.Basic.to_single_list spec)
               s ~witness
           in
           fun () -> () )
@@ -120,22 +121,22 @@ let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?(state_body = genesis_state_body) ledger partiess =
+let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
+    ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
-  (*TODO: merge multiple snapp transactions*)
+  (*TODO: merge multiple zkApp transactions*)
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-  Async.Deferred.List.iter partiess ~f:(fun parties ->
+  Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
       match
         Or_error.try_with (fun () ->
-            Transaction_snark.parties_witnesses_exn ~constraint_constants
+            Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
               ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
                     (pending_coinbase_state_stack ~state_body_hash)
-                , parties )
+                , zkapp_command )
               ] )
       with
       | Error e -> (
@@ -154,20 +155,22 @@ let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
           let applied =
             if ignore_outside_snark then
               Ledger.Transaction_applied.Varying.Command
-                (Parties
-                   { command = { With_status.status = Applied; data = parties }
+                (Zkapp_command
+                   { command =
+                       { With_status.status = Applied; data = zkapp_command }
                    ; accounts = []
                    ; new_accounts = []
                    } )
             else
               ( Ledger.apply_transaction ~constraint_constants
                   ~txn_state_view:state_view ledger
-                  (Mina_transaction.Transaction.Command (Parties parties))
+                  (Mina_transaction.Transaction.Command
+                     (Zkapp_command zkapp_command) )
               |> Or_error.ok_exn )
                 .varying
           in
           match applied with
-          | Command (Parties { command; _ }) -> (
+          | Command (Zkapp_command { command; _ }) -> (
               match command.status with
               | Applied -> (
                   match expected_failure with
@@ -187,7 +190,7 @@ let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
                             let open Async.Deferred.Or_error.Let_syntax in
                             let%bind p1 =
                               Async.Deferred.Or_error.try_with (fun () ->
-                                  T.of_parties_segment_exn ~statement:stmt
+                                  T.of_zkapp_command_segment_exn ~statement:stmt
                                     ~witness ~spec )
                             in
                             Async.Deferred.List.fold ~init:(Ok p1) rest
@@ -195,8 +198,8 @@ let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
                                 let%bind prev = Async.Deferred.return acc in
                                 let%bind curr =
                                   Async.Deferred.Or_error.try_with (fun () ->
-                                      T.of_parties_segment_exn ~statement:stmt
-                                        ~witness ~spec )
+                                      T.of_zkapp_command_segment_exn
+                                        ~statement:stmt ~witness ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero
@@ -244,7 +247,7 @@ let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
                              failure failure_tbl )
                       else Async.Deferred.unit ) )
           | _ ->
-              failwith "parties expected" ) )
+              failwith "zkapp_command expected" ) )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in
@@ -301,14 +304,14 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
           Transaction_snark.For_tests.create_trivial_zkapp_account
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
-          let%bind parties =
+          let%bind zkapp_command =
             Transaction_snark.For_tests.update_states ~zkapp_prover
               ~constraint_constants test_spec
           in
-          check_parties_with_merges_exn ?expected_failure ?state_body ledger
-            [ parties ] ) )
+          check_zkapp_command_with_merges_exn ?expected_failure ?state_body
+            ledger [ zkapp_command ] ) )
 
-let permissions_from_update (update : Party.Update.t) ~auth =
+let permissions_from_update (update : Account_update.Update.t) ~auth =
   let default = Permissions.user_default in
   { default with
     edit_state =
@@ -356,7 +359,7 @@ module Wallet = struct
       { private_key
       ; account =
           Account.create account_id
-            (Balance.of_int ((50 + Random.int 100) * 1_000_000_000))
+            (Balance.of_mina_int_exn (50 + Random.int 100))
       }
     in
     Array.init n ~f:(fun _ -> random_wallet ())
@@ -367,7 +370,10 @@ module Wallet = struct
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
+        ~body:
+          (Payment
+             { source_pk; receiver_pk; amount = Amount.of_nanomina_int_exn amt }
+          )
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -426,7 +432,7 @@ let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
 let check_balance pk balance ledger =
   let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
   let acc = Ledger.get ledger loc |> Option.value_exn in
-  [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
+  [%test_eq: Balance.t] acc.balance (Balance.of_nanomina_int_exn balance)
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
@@ -439,8 +445,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
         `Transaction (Fee_transfer x)
     | Coinbase x ->
         `Transaction (Coinbase x)
-    | Command (Parties x) ->
-        `Parties x
+    | Command (Zkapp_command x) ->
+        `Zkapp_command x
   in
   let source = Ledger.merkle_root ledger in
   let pending_coinbase_stack = Pending_coinbase.Stack.empty in
@@ -486,10 +492,10 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     in
     match txn_unchecked with
     | Command (Signed_command uc) ->
-        ( Signed_command.accounts_accessed (uc :> Signed_command.t)
+        ( Signed_command.accounts_referenced (uc :> Signed_command.t)
         , pending_coinbase_stack )
-    | Command (Parties _) ->
-        failwith "Parties commands not supported here"
+    | Command (Zkapp_command _) ->
+        failwith "Zkapp_command commands not supported here"
     | Fee_transfer ft ->
         (Fee_transfer.receivers ft, pending_coinbase_stack)
     | Coinbase cb ->
@@ -500,8 +506,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     match to_preunion txn_unchecked with
     | `Transaction t ->
         (Transaction_union.of_transaction t).signer |> Public_key.compress
-    | `Parties c ->
-        Account_id.public_key (Parties.fee_payer c)
+    | `Zkapp_command c ->
+        Account_id.public_key (Zkapp_command.fee_payer c)
   in
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
