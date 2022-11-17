@@ -1,14 +1,56 @@
 (* test_common.ml -- code common to tests *)
 
-(* open Core_kernel *)
 open Integration_test_lib
 open Core
 open Async
+open Mina_base
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
-  (* open Engine *)
-  (* open Dsl *)
+
+  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
+      n =
+    let open Malleable_error.Let_syntax in
+    let rec go n hashlist =
+      if n = 0 then return hashlist
+      else
+        let%bind hash =
+          let%map { hash; _ } =
+            Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
+              ~receiver_pub_key ~amount ~fee node
+          in
+          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
+            n
+            (Transaction_hash.to_base58_check hash) ;
+          hash
+        in
+        go (n - 1) (List.append hashlist [ hash ])
+    in
+    go n []
+
+  let wait_for_payments ~logger ~dsl ~hashlist n =
+    let open Malleable_error.Let_syntax in
+    let rec go n hashlist =
+      if n = 0 then return ()
+      else
+        (* confirm payment *)
+        let%bind () =
+          let hash = List.hd_exn hashlist in
+          let%map () =
+            Dsl.wait_for dsl
+              (Dsl.Wait_condition.signed_command_to_be_included_in_frontier
+                 ~txn_hash:hash ~node_included_in:`Any_node )
+          in
+          [%log info]
+            "gossip_consistency test: payment #%d with hash %s successfully \
+             included in frontier."
+            n
+            (Transaction_hash.to_base58_check hash) ;
+          ()
+        in
+        go (n - 1) (List.tl_exn hashlist)
+    in
+    go n hashlist
 
   let pub_key_of_node node =
     let open Signature_lib in
