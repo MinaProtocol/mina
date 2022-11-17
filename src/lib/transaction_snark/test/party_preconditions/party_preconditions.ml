@@ -43,6 +43,7 @@ let%test_module "Protocol state precondition tests" =
       in
       { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash =
           Check protocol_state.snarked_ledger_hash
+      ; timestamp = Check (interval protocol_state.timestamp)
       ; blockchain_length = Check (interval protocol_state.blockchain_length)
       ; min_window_density = Check (interval protocol_state.min_window_density)
       ; last_vrf_output = ()
