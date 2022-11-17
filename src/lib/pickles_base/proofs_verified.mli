@@ -53,6 +53,6 @@ module Prefix_mask : sig
     -> ( 'f Checked.t
        , t
        , 'f
-       , (unit, 'f) Snarky_backendless.Checked_ast.t )
+       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless__.Types.Typ.t
 end
