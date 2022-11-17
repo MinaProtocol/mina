@@ -415,9 +415,8 @@ let step_main :
                   , { proof_must_verify = should_verify; _ } :: stmts
                   , S pi
                   , actual_wrap_domain :: actual_wrap_domains ) ->
-                    let d =
-                      (* Use the domain of the proof if it is side-loaded, or
-                         fail with an error if the proof's domain differs from
+                    let () =
+                      (* Fail with an error if the proof's domain differs from
                          the hard-coded one otherwise.
                       *)
                       match d.wrap_domain with
@@ -444,19 +443,9 @@ let step_main :
                                     expected actual ()
                               | Pow_2_roots_of_unity _, Pow_2_roots_of_unity _
                                 ->
-                                  () ) ;
-                          d
+                                  () )
                       | `Side_loaded _ ->
-                          let actual_wrap_domain =
-                            exists
-                              (Pickles_base.Proofs_verified.One_hot.typ
-                                 (module Impls.Step) )
-                              ~compute:(fun () ->
-                                As_prover.Ref.get actual_wrap_domain )
-                          in
-                          { d with
-                            wrap_domain = `Side_loaded actual_wrap_domain
-                          }
+                          ()
                     in
                     let chals, v =
                       verify_one p d messages_for_next_wrap_proof unfinalized
