@@ -140,7 +140,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     for row in 0..num_gates {
         gates.push(CircuitGate {
             typ: GateType::Lookup,
-            wires: Wire::new(row),
+            wires: Wire::for_row(row),
             coeffs: vec![],
         });
     }
