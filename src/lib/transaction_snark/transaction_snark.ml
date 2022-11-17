@@ -4315,12 +4315,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~constraint_constants:
             (Genesis_constants.Constraint_constants.to_snark_keys_header
                constraint_constants )
-          ~choices:(fun ~self:_ -> [ trivial_rule ] )
+          ~choices:(fun ~self:_ -> [ trivial_rule ])
       in
       let trivial_prover ?handler stmt =
         let open Async.Deferred.Let_syntax in
         let%map (), (), proof = trivial_prover ?handler stmt in
-        (), (), Pickles.Side_loaded.Proof.of_proof proof
+        ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
