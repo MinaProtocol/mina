@@ -335,7 +335,7 @@ module Rules = struct
             Boolean.((not can_access_this_token) ||| is_self)
             !state
       in
-      for _i = 0 to n do
+      for _i = 1 to n do
         consume_account_update ()
       done ;
       (!state, !running_total)
