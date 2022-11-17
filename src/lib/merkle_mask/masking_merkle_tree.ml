@@ -455,7 +455,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
       let set_location_batch ~last_location t account_to_location_list =
         t.current_location <- Some last_location ;
-        Non_empty_list.iter account_to_location_list ~f:(fun (key, data) ->
+        Mina_stdlib.Nonempty_list.iter account_to_location_list
+          ~f:(fun (key, data) ->
             Account_id.Table.set t.location_tbl ~key ~data )
 
       let set_raw_account_batch t locations_and_accounts =

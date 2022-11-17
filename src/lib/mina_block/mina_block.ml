@@ -38,7 +38,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     , (`Proof, Truth.True ())
     , ( `Delta_block_chain
       , Truth.True
-          ( Non_empty_list.singleton
+          ( Mina_stdlib.Nonempty_list.singleton
           @@ Protocol_state.previous_state_hash protocol_state ) )
     , (`Frontier_dependencies, Truth.True ())
     , (`Staged_ledger_diff, Truth.True ())
