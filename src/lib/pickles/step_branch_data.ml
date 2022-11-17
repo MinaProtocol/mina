@@ -74,7 +74,7 @@ let create
     a_var a_value ret_var ret_value prev_vars prev_values ) ~index
     ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
     ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
-    ~(max_proofs_verified : max_proofs_verified Nat.t) ~actual_wrap_domain_size
+    ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
        ( var
@@ -138,7 +138,6 @@ let create
       ~basic:
         { public_input = typ
         ; proofs_verifieds
-        ; actual_wrap_domain_size
         ; wrap_domains
         ; step_domains
         ; step_uses_lookup

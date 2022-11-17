@@ -84,7 +84,6 @@ module Compiled = struct
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; step_uses_lookup : Plonk_types.Opt.Flag.t
