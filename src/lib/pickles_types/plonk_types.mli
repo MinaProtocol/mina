@@ -232,12 +232,12 @@ module Openings : sig
          ( 'a
          , 'b
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_ast.t )
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> ( 'd
          , 'e
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_ast.t )
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> length:int
       -> (('d, 'a) t, ('e, 'b) t, 'c) Snarky_backendless.Typ.t
@@ -322,7 +322,7 @@ module All_evals : sig
          In_circuit.t
        , ('f, 'f array) t
        , 'f
-       , (unit, 'f) Snarky_backendless.Checked_ast.t )
+       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless.Types.Typ.typ
 end
 
