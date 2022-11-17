@@ -12,6 +12,8 @@ let prefixes =
     ; ("accountUpdateCons", `String (account_update_cons :> string))
     ; ("accountUpdateNode", `String (account_update_node :> string))
     ; ("zkappMemo", `String (zkapp_memo :> string))
+    ; ("signatureMainnet", `String (signature_mainnet :> string))
+    ; ("signatureTestnet", `String (signature_testnet :> string))
     ]
 
 let version_bytes =
@@ -25,6 +27,8 @@ let version_bytes =
     ; ("stateHash", `Int (Char.to_int state_hash))
     ; ("publicKey", `Int (Char.to_int non_zero_curve_point_compressed))
     ; ("userCommandMemo", `Int (Char.to_int user_command_memo))
+    ; ("privateKey", `Int (Char.to_int private_key))
+    ; ("signature", `Int (Char.to_int signature))
     ]
 
 let () =
