@@ -15,7 +15,7 @@ Using the `mina.ros` file from the parent folder, in the local sandbox:
   - https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L195
   - https://github.com/MinaProtocol/mina/blob/develop/src/lib/mina_base/signed_command_payload.ml#L310
 
-- [ ] in the meantime it may be possible to only generate tests where this field is present to work around this problem.
+- [x] in the meantime it may be possible to only generate tests where this field is present to work around this problem.
 
 # tmp
 
