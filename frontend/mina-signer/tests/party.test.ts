@@ -51,7 +51,6 @@ let mockedZkappCommand = {
             blockchainLength: { lower: "0", upper: "4294967295" },
             minWindowDensity: { lower: "0", upper: "4294967295" },
             totalCurrency: { lower: "0", upper: "18446744073709551615" },
-            globalSlotSinceHardFork: { lower: "0", upper: "4294967295" },
             globalSlotSinceGenesis: { lower: "0", upper: "4294967295" },
             stakingEpochData: {
               ledger: {

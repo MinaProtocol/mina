@@ -2110,18 +2110,6 @@
               "deprecationReason": null
             },
             {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "globalSlotSinceGenesis",
               "description": null,
               "args": [],
@@ -2199,16 +2187,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "CurrencyAmountIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
                 "ofType": null
               },
               "defaultValue": null
@@ -7036,18 +7014,6 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "CurrencyAmountInterval",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "GlobalSlotInterval",
                 "ofType": null
               },
               "isDeprecated": false,
