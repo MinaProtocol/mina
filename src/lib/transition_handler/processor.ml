@@ -173,7 +173,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               let timeout_duration =
                 Option.fold
                   (Transition_frontier.find frontier
-                     (Non_empty_list.head delta_state_hashes) )
+                     (Mina_stdlib.Nonempty_list.head delta_state_hashes) )
                   ~init:(Block_time.Span.of_ms 0L)
                   ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in

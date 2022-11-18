@@ -353,8 +353,7 @@ let step_main :
                   ~f:(fun uses_lookup ->
                     Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
                       ~uses_lookup )
-                  lookup_usage
-                  (* Vector.extend lookup_usage lte Max_proofs_verified.n No *) ) )
+                  lookup_usage ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)

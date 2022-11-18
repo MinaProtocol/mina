@@ -30,7 +30,7 @@
    coda_genesis_ledger
    trust_system
    genesis_constants
-   non_empty_list
+   mina_stdlib
    inline_test_quiet_logs
    mina_base.import
    mina_block
