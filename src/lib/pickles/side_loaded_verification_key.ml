@@ -350,13 +350,19 @@ module Checked = struct
 
   let to_input =
     let open Random_oracle_input.Chunked in
-    fun { max_proofs_verified; wrap_index } : _ Random_oracle_input.Chunked.t ->
+    fun { max_proofs_verified; actual_wrap_domain_size; wrap_index } :
+        _ Random_oracle_input.Chunked.t ->
       let max_proofs_verified =
         Pickles_base.Proofs_verified.One_hot.Checked.to_input
           max_proofs_verified
       in
+      let actual_wrap_domain_size =
+        Pickles_base.Proofs_verified.One_hot.Checked.to_input
+          actual_wrap_domain_size
+      in
       List.reduce_exn ~f:append
         [ max_proofs_verified
+        ; actual_wrap_domain_size
         ; wrap_index_to_input
             (Fn.compose Array.of_list Inner_curve.to_field_elements)
             wrap_index
