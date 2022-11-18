@@ -1903,11 +1903,8 @@ let create ?wallets (config : Config.t) =
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
-          (* we're going to set and sync the epoch ledgers in the test
-             so router should not do a sync
-          *)
           let valid_transitions, initialization_finish_signal =
-            Transition_router.run ~sync_local_state:false
+            Transition_router.run
               ~context:(module Context)
               ~trust_system:config.trust_system ~verifier ~network:net
               ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
@@ -2440,7 +2437,10 @@ let%test_module "Epoch ledger sync tests" =
             |> Validation.reset_frontier_dependencies_validation
             |> Validation.reset_staged_ledger_diff_validation )
         in
-        Transition_router.run
+        (* we're going to set and sync the epoch ledgers in the test
+           so router should not do a sync
+        *)
+        Transition_router.run ~sync_local_state:false
           ~context:(module Context)
           ~trust_system:config.trust_system ~verifier ~network:mina_networking
           ~is_seed:config.is_seed ~is_demo_mode:false
