@@ -2510,10 +2510,7 @@ let%test_module "Epoch ledger sync tests" =
         let trust_system = Trust_system.create (make_dirname "trust_system")
       end in
       let test_finished = ref false in
-      let cleanup () =
-        test_finished := true ;
-        ignore (Core.Unix.system (sprintf "rm -rf %s" dir_prefix) : _)
-      in
+      let cleanup () = test_finished := true in
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
         (let%map () = after (Time.Span.of_min test_timeout_min) in
