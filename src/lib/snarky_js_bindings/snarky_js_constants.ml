@@ -31,16 +31,27 @@ let version_bytes =
     ; ("signature", `Int (Char.to_int signature))
     ]
 
-let () =
-  let constants =
-    [ ("prefixes", prefixes)
-    ; ("versionBytes", version_bytes)
-    ; ("mds", array (array string) Sponge.Params.pasta_p_kimchi.mds)
+let poseidon_params =
+  `Assoc
+    [ ("mds", array (array string) Sponge.Params.pasta_p_kimchi.mds)
     ; ( "roundConstants"
       , array (array string) Sponge.Params.pasta_p_kimchi.round_constants )
+    ; ("fullRounds", `Int Pickles.Tick_field_sponge.Inputs.rounds_full)
+    ; ("partialRounds", `Int Pickles.Tick_field_sponge.Inputs.rounds_partial)
+    ; ( "hasInitialRoundConstant"
+      , `Bool Pickles.Tick_field_sponge.Inputs.initial_ark )
+    ; ("stateSize", `Int Random_oracle.state_size)
+    ; ("rate", `Int Random_oracle.rate)
+    ; ("power", `Int Pickles.Tick_field_sponge.Inputs.alpha)
     ]
-  in
 
+let constants =
+  [ ("prefixes", prefixes)
+  ; ("versionBytes", version_bytes)
+  ; ("poseidonParams", poseidon_params)
+  ]
+
+let () =
   let to_js (key, value) =
     "let " ^ key ^ " = " ^ Yojson.Safe.pretty_to_string value ^ ";\n"
   in
