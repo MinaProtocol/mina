@@ -4286,7 +4286,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let create_trivial_snapp ~constraint_constants () =
-      let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
+      let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
           let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
               unit Checked.t =
@@ -4309,49 +4309,18 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Pickles.compile () ~cache:Cache_dir.cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N2)
-          ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
+          ~branches:(module Nat.N1)
+          ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
           ~constraint_constants:
             (Genesis_constants.Constraint_constants.to_snark_keys_header
                constraint_constants )
-          ~choices:(fun ~self ->
-            [ trivial_rule
-            ; { identifier = "dummy"
-              ; prevs = [ self; self ]
-              ; main =
-                  (fun { public_input = _ } ->
-                    let s =
-                      Run.exists Field.typ ~compute:(fun () ->
-                          Run.Field.Constant.zero )
-                    in
-                    let public_input =
-                      Run.exists Zkapp_statement.typ ~compute:(fun () ->
-                          assert false )
-                    in
-                    let proof =
-                      Run.exists (Typ.Internal.ref ()) ~compute:(fun () ->
-                          assert false )
-                    in
-                    Impl.run_checked (dummy_constraints ()) ;
-                    (* Unsatisfiable. *)
-                    Run.Field.(Assert.equal s (s + one)) ;
-                    { previous_proof_statements =
-                        [ { public_input
-                          ; proof
-                          ; proof_must_verify = Boolean.true_
-                          }
-                        ; { public_input
-                          ; proof
-                          ; proof_must_verify = Boolean.true_
-                          }
-                        ]
-                    ; public_output = ()
-                    ; auxiliary_output = ()
-                    } )
-              ; uses_lookup = false
-              }
-            ] )
+          ~choices:(fun ~self:_ -> [ trivial_rule ])
+      in
+      let trivial_prover ?handler stmt =
+        let open Async.Deferred.Let_syntax in
+        let%map (), (), proof = trivial_prover ?handler stmt in
+        ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
