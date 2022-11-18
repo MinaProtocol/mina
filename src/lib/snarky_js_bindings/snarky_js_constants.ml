@@ -48,7 +48,7 @@ let poseidon_params =
 let constants =
   [ ("prefixes", prefixes)
   ; ("versionBytes", version_bytes)
-  ; ("poseidonParams", poseidon_params)
+  ; ("poseidonParamsKimchiFp", poseidon_params)
   ]
 
 let () =
