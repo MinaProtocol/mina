@@ -1348,15 +1348,7 @@ module Zkapp_network_precondition = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; int
-        ; int
-        ]
+        [ option int; option int; option int; option int; option int; int; int ]
 
   let table_name = "zkapp_network_precondition"
 
