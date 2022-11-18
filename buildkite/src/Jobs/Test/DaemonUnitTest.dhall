@@ -45,6 +45,6 @@ Pipeline.build
         name = "DaemonUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/mina_lib" Size.XLarge
+      buildTestCmd "dev" "src/lib" Size.XLarge
     ]
   }

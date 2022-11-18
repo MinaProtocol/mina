@@ -8,8 +8,7 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
-
-(* open Inline_test_quiet_logs *)
+open Inline_test_quiet_logs
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -2202,7 +2201,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 5.0
+    let test_timeout_min = 10.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2341,7 +2340,7 @@ let%test_module "Epoch ledger sync tests" =
           ; logger
           ; conf_dir
           ; chain_id
-          ; unsafe_no_trust_ip = true
+          ; unsafe_no_trust_ip = false
           ; seed_peer_list_url
           ; initial_peers
           ; addrs_and_ports
@@ -2350,7 +2349,7 @@ let%test_module "Epoch ledger sync tests" =
           ; flooding = false
           ; direct_peers = []
           ; peer_protection_ratio = 0.2
-          ; peer_exchange = true
+          ; peer_exchange = false
           ; min_connections = Cli_lib.Default.min_connections
           ; max_connections = Cli_lib.Default.max_connections
           ; validation_queue_size = Cli_lib.Default.validation_queue_size
