@@ -27,7 +27,7 @@ in
 
 Pipeline.build
   Pipeline.Config::{
-    spec = 
+    spec =
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/nonconsensus"),
@@ -45,6 +45,6 @@ Pipeline.build
         name = "DaemonUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib" Size.XLarge
+      buildTestCmd "dev" "src/lib/mina_lib" Size.XLarge
     ]
   }
