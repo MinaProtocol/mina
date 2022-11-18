@@ -1748,6 +1748,9 @@ let%test_module _ =
       let sender = (sender_kp, sender_nonce) in
       let amount = Currency.Amount.of_nanomina_int_exn amount in
       let receiver_kp = test_keys.(receiver_idx) in
+      let receiver =
+        receiver_kp.public_key |> Signature_lib.Public_key.compress
+      in
       let fee_payer =
         match fee_payer_idx with
         | None ->
@@ -1769,7 +1772,7 @@ let%test_module _ =
         { sender
         ; fee_payer
         ; fee
-        ; receivers = [ (receiver_kp, amount) ]
+        ; receivers = [ (receiver, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"

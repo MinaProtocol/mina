@@ -911,7 +911,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -980,7 +980,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1059,7 +1059,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1269,7 +1269,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1354,7 +1354,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1429,7 +1429,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1505,7 +1505,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1584,7 +1584,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo
@@ -1657,7 +1657,7 @@ let%test_module "account timing check" =
             { sender = (sender_keypair, nonce)
             ; fee
             ; fee_payer = None
-            ; receivers = [ (zkapp_keypair, amount) ]
+            ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
             ; memo

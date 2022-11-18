@@ -149,15 +149,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "zkApp transfer, timed account"
       in
       let sender_keypair = timed_account_keypair in
-      let receiver_key =
-        keypair.public_key |> Signature_lib.Public_key.compress
-      in
+      let receiver = keypair.public_key |> Signature_lib.Public_key.compress in
       let (zkapp_command_spec
             : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = [ (receiver_key, amount) ]
+        ; receivers = [ (receiver, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo
@@ -182,15 +180,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "Invalid transfer, timed account"
       in
       let sender_keypair = timed_account_keypair in
-      let receiver_key =
-        keypair.public_key |> Signature_lib.Public_key.compress
-      in
+      let receiver = keypair.public_key |> Signature_lib.Public_key.compress in
       let (zkapp_command_spec
             : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = [ (keypair, amount) ]
+        ; receivers = [ (receiver, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo

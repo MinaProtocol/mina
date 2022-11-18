@@ -4270,7 +4270,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
+        ; receivers :
+            ( ( Signature_lib.Keypair.t
+              , Signature_lib.Public_key.Compressed.t )
+              Either.t
+            * Currency.Amount.t )
+            list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -4355,23 +4360,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
-
-    let rec interleave left right dir acc =
-      if List.length left = 0 && List.length right = 0 then List.rev acc
-      else
-        match dir with
-        | `Left -> (
-            match left with
-            | [] ->
-                interleave [] right `Right acc
-            | l :: ls ->
-                interleave ls right `Right (l :: acc) )
-        | `Right -> (
-            match right with
-            | [] ->
-                interleave left [] `Left acc
-            | r :: rs ->
-                interleave left rs `Left (r :: acc) )
 
     let create_zkapp_command ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
@@ -4524,21 +4512,26 @@ module Make_str (A : Wire_types.Concrete) = struct
               : Account_update.Simple.t ) )
       in
       let other_receivers =
-        List.map receivers
-          ~f:(fun (receiver_kp, amt) : Account_update.Simple.t ->
+        List.map receivers ~f:(fun (receiver, amt) : Account_update.Simple.t ->
             let receiver =
-              Signature_lib.Public_key.compress receiver_kp.public_key
+              match receiver with
+              | First receiver_kp ->
+                  Signature_lib.Public_key.compress receiver_kp.public_key
+              | Second receiver ->
+                  receiver
             in
-            let receiver_auth, use_full_commitment =
+            let receiver_auth, authorization_kind, use_full_commitment =
               match receiver_auth with
               | Some Control.Tag.Signature ->
-                  (Control.Signature Signature.dummy, true)
+                  ( Control.Signature Signature.dummy
+                  , Account_update.Authorization_kind.Signature
+                  , true )
               | Some Proof ->
                   failwith
                     "Not implemented. Pickles_types.Nat.N2.n \
                      Pickles_types.Nat.N2.n ~domain_log2:15)"
               | Some None_given | None ->
-                  (None_given, false)
+                  (None_given, None_given, false)
             in
             { body =
                 { public_key = receiver
@@ -4553,17 +4546,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
                 ; caller = Call
-                ; authorization_kind = None_given
+                ; authorization_kind
                 }
             ; authorization = receiver_auth
             } )
       in
       let account_updates_data =
-        interleave snapp_zkapp_command
-          ( Option.value_map ~default:[] sender_account_update ~f:(fun p ->
-                [ p ] )
-          @ other_receivers )
-          `Left []
+        Option.value_map ~default:[] sender_account_update ~f:(fun p -> [ p ])
+        @ snapp_zkapp_command @ other_receivers
       in
       let ps =
         Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
@@ -4604,16 +4594,24 @@ module Make_str (A : Wire_types.Concrete) = struct
             { body = s.body; authorization = Signature sender_signature_auth } )
       in
       let other_receivers =
-        List.map2_exn other_receivers receivers ~f:(fun s receiver_kp ->
+        List.map2_exn other_receivers receivers ~f:(fun s (receiver, _amt) ->
             match s.authorization with
             | Control.Signature _ ->
                 let commitment =
                   if s.body.use_full_commitment then full_commitment
                   else commitment
                 in
+                let receiver_kp =
+                  match receiver with
+                  | First receiver_kp ->
+                      receiver_kp
+                  | Second _ ->
+                      failwith
+                        "Receiver authorization is signature, expecting \
+                         receiver keypair but got receiver public key"
+                in
                 let receiver_signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign
-                    (fst receiver_kp).private_key
+                  Signature_lib.Schnorr.Chunked.sign receiver_kp.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { Account_update.Simple.body = s.body
@@ -4804,7 +4802,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { fee
         ; sender
         ; fee_payer
-        ; receivers
+        ; receivers = List.map receivers ~f:(fun (r, amt) -> (First r, amt))
         ; amount
         ; zkapp_account_keypairs
         ; memo
@@ -4908,12 +4906,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   "Current authorization not Proof or Signature or None_given" )
       in
       let account_updates =
-        interleave snapp_zkapp_command
-          ( Option.value_map ~default:[]
-              ~f:(fun p -> [ p ])
-              sender_account_update
-          @ receivers )
-          `Left []
+        Option.value_map ~default:[] ~f:(fun p -> [ p ]) sender_account_update
+        @ snapp_zkapp_command @ receivers
       in
       let zkapp_command : Zkapp_command.t =
         Zkapp_command.of_simple { fee_payer; account_updates; memo }
@@ -4926,7 +4920,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
+        ; receivers :
+            (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -4958,7 +4953,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { fee
         ; sender
         ; fee_payer
-        ; receivers
+        ; receivers = List.map receivers ~f:(fun (r, amt) -> (Second r, amt))
         ; amount
         ; zkapp_account_keypairs
         ; memo
