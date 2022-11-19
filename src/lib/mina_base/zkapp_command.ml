@@ -1515,6 +1515,14 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
+  (* Ensures that there's a verification_key available for all account_updates
+   * and creates a valid command associating the correct keys with each
+   * account_id.
+   *
+   * If an account_update replaces the verification_key (or deletes it),
+   * subsequent account_updates use the replaced key instead of looking in the
+   * ledger for the key (ie set by a previous transaction).
+   *)
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
     let open Option.Let_syntax in
     let find_vk account_id =
@@ -1524,15 +1532,48 @@ struct
       zkapp.verification_key
     in
     let tbl = Account_id.Table.create () in
-    let%map () =
-      Call_forest.fold t.account_updates ~init:(Some ()) ~f:(fun acc p ->
-          let%bind _ok = acc in
+    let%map (_all_succeeded : _ Account_id.Map.t) =
+      Call_forest.fold t.account_updates
+        ~init:
+          ((* keep track of the verification keys that have been set so far
+            * during this transaction -- the option tracks if we should stop
+            * early due to an error *)
+             Some
+             Account_id.Map.empty ) ~f:(fun acc p ->
+          let%bind vks_overrided = acc in
           let account_id = Account_update.account_id p in
+          let vks_overrided' =
+            match Account_update.verification_key p with
+            | Zkapp_basic.Set_or_keep.Set None ->
+                Account_id.Map.change vks_overrided account_id ~f:(fun _ ->
+                    Some None )
+            | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+                Account_id.Map.change vks_overrided account_id ~f:(fun _ ->
+                    Some (Some vk) )
+            | Zkapp_basic.Set_or_keep.Keep ->
+                vks_overrided
+          in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            Option.map (find_vk account_id) ~f:(fun vk ->
+            let prioritized_vk =
+              (* only lookup _past_ vk setting, ie exclude the new one we
+               * potentially set in this account_update (use the non-'
+               * vks_overrided) . *)
+              match Account_id.Map.find vks_overrided account_id with
+              | Some (Some vk) ->
+                  Some vk
+              | Some None ->
+                  (* we explicitly have erased the key *)
+                  None
+              | None ->
+                  (* we haven't set anything; lookup the vk in the ledger *)
+                  find_vk account_id
+            in
+            Option.map prioritized_vk ~f:(fun vk ->
                 Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash vk ) )
-          else acc )
+                    With_hash.hash vk ) ;
+                (* return the updated overrides *)
+                vks_overrided' )
+          else Some vks_overrided' )
     in
     create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end
@@ -1648,26 +1689,26 @@ end = struct
   end
 
   (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-    statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
-    number of snark proofs needed to prove all of the zkapp_command.
+      statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+      number of snark proofs needed to prove all of the zkapp_command.
 
-    This function is intended to take the zkapp_command from multiple transactions as
-    its input, which may be converted from a [Zkapp_command.t list] using
-    [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-    the same length, with 1 more state than the number of zkapp_command for each
-    transaction.
+      This function is intended to take the zkapp_command from multiple transactions as
+      its input, which may be converted from a [Zkapp_command.t list] using
+      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
+      the same length, with 1 more state than the number of zkapp_command for each
+      transaction.
 
-    For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
-    [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
-    where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
-    where [s0] is the initial state before any of the transactions have been
-    applied.
+      For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
+      [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
+      where each [s_n] is the state after applying [p_n] on top of [s_{n-1}], and
+      where [s0] is the initial state before any of the transactions have been
+      applied.
 
-    Each pair is also identified with one of [`Same], [`New], or [`Two_new],
-    indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
-    will need to be passed as part of the snark witness while applying that
-    pair.
-*)
+      Each pair is also identified with one of [`Same], [`New], or [`Two_new],
+      indicating that the next one ([`New]) or next two ([`Two_new]) [Zkapp_command.t]s
+      will need to be passed as part of the snark witness while applying that
+      pair.
+  *)
   let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
       (stmtss : (global_state * local_state) list list) :
       Zkapp_command_intermediate_state.t list =
