@@ -1540,25 +1540,21 @@ struct
             * early due to an error *)
              Some
              Account_id.Map.empty ) ~f:(fun acc p ->
-          let%bind vks_overrided = acc in
+          let%bind vks_overriden = acc in
           let account_id = Account_update.account_id p in
-          let vks_overrided' =
-            match Account_update.verification_key p with
-            | Zkapp_basic.Set_or_keep.Set None ->
-                Account_id.Map.change vks_overrided account_id ~f:(fun _ ->
-                    Some None )
-            | Zkapp_basic.Set_or_keep.Set (Some vk) ->
-                Account_id.Map.change vks_overrided account_id ~f:(fun _ ->
-                    Some (Some vk) )
+          let vks_overriden' =
+            match Account_update.verification_key_update_to_option p with
+            | Zkapp_basic.Set_or_keep.Set vk_next ->
+                Account_id.Map.set vks_overriden ~key:account_id ~data:vk_next
             | Zkapp_basic.Set_or_keep.Keep ->
-                vks_overrided
+                vks_overriden
           in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let prioritized_vk =
+          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then (
+            let%map prioritized_vk =
               (* only lookup _past_ vk setting, ie exclude the new one we
                * potentially set in this account_update (use the non-'
                * vks_overrided) . *)
-              match Account_id.Map.find vks_overrided account_id with
+              match Account_id.Map.find vks_overriden account_id with
               | Some (Some vk) ->
                   Some vk
               | Some None ->
@@ -1568,12 +1564,11 @@ struct
                   (* we haven't set anything; lookup the vk in the ledger *)
                   find_vk account_id
             in
-            Option.map prioritized_vk ~f:(fun vk ->
-                Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash vk ) ;
-                (* return the updated overrides *)
-                vks_overrided' )
-          else Some vks_overrided' )
+            Account_id.Table.update tbl account_id ~f:(fun _ ->
+                With_hash.hash prioritized_vk ) ;
+            (* return the updated overrides *)
+            vks_overriden' )
+          else Some vks_overriden' )
     in
     create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end

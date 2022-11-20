@@ -1538,7 +1538,7 @@ include T
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
-let verification_key (t : t) :
+let verification_key_update_to_option (t : t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
