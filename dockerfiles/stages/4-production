@@ -77,6 +77,8 @@ COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 # --- Set up postgres
