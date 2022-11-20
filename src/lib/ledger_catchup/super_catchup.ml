@@ -9,6 +9,16 @@ open Mina_base
 open Mina_block
 open Network_peer
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
     from its peer. It receives the state_hash to catchup from
@@ -119,8 +129,9 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~context:(module Context : CONTEXT) ~trust_system
+    ~frontier ~unprocessed_transition_cache enveloped_transition =
+  let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -138,8 +149,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Transition_handler.Validator.validate_transition ~logger ~frontier
-      ~consensus_constants ~unprocessed_transition_cache
+    Transition_handler.Validator.validate_transition
+      ~context:(module Context)
+      ~frontier ~unprocessed_transition_cache
       enveloped_initially_validated_transition
   in
   let state_hash =
@@ -313,7 +325,7 @@ let try_to_connect_hash_chain t hashes ~frontier
     |> Consensus.Data.Consensus_state.blockchain_length
   in
   List.fold_until
-    (Non_empty_list.to_list hashes)
+    (Mina_stdlib.Nonempty_list.to_list hashes)
     ~init:(blockchain_length_of_target_hash, [])
     ~f:(fun (blockchain_length, acc) hash ->
       let f x = Continue_or_stop.Stop (Ok (x, acc)) in
@@ -389,7 +401,7 @@ module Downloader = struct
 end
 
 let with_lengths hs ~target_length =
-  List.filter_mapi (Non_empty_list.to_list hs) ~f:(fun i x ->
+  List.filter_mapi (Mina_stdlib.Nonempty_list.to_list hs) ~f:(fun i x ->
       let open Option.Let_syntax in
       let%map x_len = Length.sub target_length (Length.of_int i) in
       (x, x_len) )
@@ -556,9 +568,10 @@ module Verify_work_batcher = struct
   let verify (t : _ t) = verify t
 end
 
-let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
-    ~trust_system ~(batcher : _ Initial_validate_batcher.t) ~frontier
+let initial_validate ~context:(module Context : CONTEXT) ~trust_system
+    ~(batcher : _ Initial_validate_batcher.t) ~frontier
     ~unprocessed_transition_cache transition =
+  let open Context in
   let verification_start_time = Core.Time.now () in
   let open Deferred.Result.Let_syntax in
   let state_hash =
@@ -572,9 +585,12 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     match%bind Initial_validate_batcher.verify batcher transition with
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
-    | Ok (Error ()) ->
-        let s = "initial_validate: proof failed to verify" in
-        [%log warn] ~metadata:[ ("state_hash", state_hash) ] "%s" s ;
+    | Ok (Error invalid) ->
+        let s = "initial_validate: block failed to verify, invalid proof" in
+        [%log warn]
+          ~metadata:[ ("state_hash", state_hash) ]
+          "%s, %s" s
+          (Verifier.invalid_to_string invalid) ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -606,20 +622,19 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
       ; ("state_hash", state_hash)
       ]
     "initial_validate: verification of proofs complete" ;
-  verify_transition ~logger
-    ~consensus_constants:precomputed_values.consensus_constants ~trust_system
-    ~frontier ~unprocessed_transition_cache tv
+  verify_transition
+    ~context:(module Context)
+    ~trust_system ~frontier ~unprocessed_transition_cache tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
 
 let check_invariant ~downloader t =
-  O1trace.sync_thread "check_super_catchup_invariants" (fun () ->
-      Downloader.check_invariant downloader ;
-      [%test_eq: int]
-        (Downloader.total_jobs downloader)
-        (Hashtbl.count t.nodes ~f:(fun node ->
-             Node.State.Enum.equal (Node.State.enum node.state) To_download ) ) )
+  Downloader.check_invariant downloader ;
+  [%test_eq: int]
+    (Downloader.total_jobs downloader)
+    (Hashtbl.count t.nodes ~f:(fun node ->
+         Node.State.Enum.equal (Node.State.enum node.state) To_download ) )
 
 let download s d ~key ~attempts =
   let logger = Logger.create () in
@@ -673,13 +688,14 @@ let create_node ~downloader t x =
 
 let set_state t node s = set_state t node s ; write_graph t
 
-let pick ~constants
+let pick ~context:(module Context : CONTEXT)
     (x : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t)
     (y : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t) =
   let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
   match
-    Consensus.Hooks.select ~constants ~existing:(f x) ~candidate:(f y)
-      ~logger:(Logger.null ())
+    Consensus.Hooks.select
+      ~context:(module Context)
+      ~existing:(f x) ~candidate:(f y)
   with
   | `Keep ->
       x
@@ -691,8 +707,8 @@ let forest_pick forest =
       List.iter forest ~f:(Rose_tree.iter ~f:return) ;
       assert false )
 
-let setup_state_machine_runner ~t ~verifier ~downloader ~logger
-    ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
+let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
+    ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -711,6 +727,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
             | `Fatal_error of exn ] )
           Result.t
           Deferred.t ) =
+  let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
     Initial_validate_batcher.create ~verifier ~precomputed_values
@@ -725,279 +742,263 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
         "set_state $exn"
   in
   let rec run_node (node : Node.t) =
-    O1trace.thread "exec_super_catchup_fstm" (fun () ->
-        let state_hash = node.state_hash in
-        let failed ?error ~sender failure_reason =
-          [%log' debug t.logger] "failed with $error"
-            ~metadata:
-              [ ( "error"
-                , Option.value_map ~default:`Null error ~f:(fun e ->
-                      `String (Error.to_string_hum e) ) )
-              ; ( "reason"
-                , Attempt_history.Attempt.reason_to_yojson failure_reason )
-              ] ;
-          node.attempts <-
-            ( match sender with
-            | Envelope.Sender.Local ->
-                node.attempts
-            | Remote peer ->
-                Map.set node.attempts ~key:peer ~data:{ failure_reason } ) ;
-          set_state t node
-            (To_download
-               (download "failed" downloader
-                  ~key:(state_hash, node.blockchain_length)
-                  ~attempts:node.attempts ) ) ;
-          run_node node
+    let state_hash = node.state_hash in
+    let failed ?error ~sender failure_reason =
+      [%log' debug t.logger] "failed with $error"
+        ~metadata:
+          [ ( "error"
+            , Option.value_map ~default:`Null error ~f:(fun e ->
+                  `String (Error.to_string_hum e) ) )
+          ; ("reason", Attempt_history.Attempt.reason_to_yojson failure_reason)
+          ] ;
+      node.attempts <-
+        ( match sender with
+        | Envelope.Sender.Local ->
+            node.attempts
+        | Remote peer ->
+            Map.set node.attempts ~key:peer ~data:{ failure_reason } ) ;
+      set_state t node
+        (To_download
+           (download "failed" downloader
+              ~key:(state_hash, node.blockchain_length)
+              ~attempts:node.attempts ) ) ;
+      run_node node
+    in
+    let step d : (_, [ `Finished ]) Deferred.Result.t =
+      (* TODO: See if the bail out is happening. *)
+      Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ]
+    in
+    let open Deferred.Result.Let_syntax in
+    let retry () =
+      let%bind () =
+        step (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
+      in
+      run_node node
+    in
+    match node.state with
+    | Failed | Finished | Root _ ->
+        return ()
+    | To_download download_job ->
+        let start_time = Time.now () in
+        let%bind external_block, attempts =
+          step (Downloader.Job.result download_job)
         in
-        let step d : (_, [ `Finished ]) Deferred.Result.t =
-          (* TODO: See if the bail out is happening. *)
-          Deferred.any
-            [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ]
-        in
-        let open Deferred.Result.Let_syntax in
-        let retry () =
-          let%bind () =
-            step (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
-          in
-          run_node node
-        in
-        [%log' debug t.logger] "Supercatchup for $state_hash: state $state"
+        [%log' debug t.logger]
           ~metadata:
             [ ("state_hash", State_hash.to_yojson state_hash)
-            ; ("state", Node.State.Enum.to_yojson (Node.State.enum node.state))
-            ] ;
-        match node.state with
-        | Failed | Finished | Root _ ->
-            return ()
-        | To_download download_job ->
-            let start_time = Time.now () in
-            let%bind external_block, attempts =
-              step (Downloader.Job.result download_job)
-            in
-            [%log' debug t.logger]
-              ~metadata:
-                [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ( "donwload_number"
-                  , `Int
-                      (Hashtbl.count t.nodes ~f:(fun node ->
-                           Node.State.Enum.equal
-                             (Node.State.enum node.state)
-                             To_download ) ) )
-                ; ("total_nodes", `Int (Hashtbl.length t.nodes))
-                ; ( "node_states"
-                  , let s = Node.State.Enum.Table.create () in
-                    Hashtbl.iter t.nodes ~f:(fun node ->
-                        Hashtbl.incr s (Node.State.enum node.state) ) ;
-                    `List
-                      (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                           `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
-                ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-                ; ("downloader", Downloader.to_yojson downloader)
-                ]
-              "download finished $state_hash" ;
-            node.attempts <- attempts ;
+            ; ( "donwload_number"
+              , `Int
+                  (Hashtbl.count t.nodes ~f:(fun node ->
+                       Node.State.Enum.equal
+                         (Node.State.enum node.state)
+                         To_download ) ) )
+            ; ("total_nodes", `Int (Hashtbl.length t.nodes))
+            ; ( "node_states"
+              , let s = Node.State.Enum.Table.create () in
+                Hashtbl.iter t.nodes ~f:(fun node ->
+                    Hashtbl.incr s (Node.State.enum node.state) ) ;
+                `List
+                  (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
+                       `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
+            ; ("total_jobs", `Int (Downloader.total_jobs downloader))
+            ; ("downloader", Downloader.to_yojson downloader)
+            ]
+          "download finished $state_hash" ;
+        node.attempts <- attempts ;
+        Mina_metrics.(
+          Gauge.set Catchup.download_time
+            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+        set_state t node (To_initial_validate external_block) ;
+        run_node node
+    | To_initial_validate external_block -> (
+        let start_time = Time.now () in
+        match%bind
+          step
+            ( initial_validate
+                ~context:(module Context)
+                ~trust_system ~batcher:initial_validation_batcher ~frontier
+                ~unprocessed_transition_cache
+                { external_block with
+                  data =
+                    { With_hash.data = external_block.data; hash = state_hash }
+                }
+            |> Deferred.map ~f:(fun x -> Ok x) )
+        with
+        | Error (`Error e) ->
+            (* TODO: Log *)
+            (* Validation failed. Record the failure and go back to download. *)
+            failed ~error:e ~sender:external_block.sender `Initial_validate
+        | Error `Couldn't_reach_verifier ->
+            retry ()
+        | Ok result -> (
             Mina_metrics.(
-              Gauge.set Catchup.download_time
+              Gauge.set Catchup.initial_validation_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-            set_state t node (To_initial_validate external_block) ;
-            run_node node
-        | To_initial_validate external_block -> (
-            let start_time = Time.now () in
-            match%bind
-              step
-                ( initial_validate ~precomputed_values ~logger ~trust_system
-                    ~batcher:initial_validation_batcher ~frontier
-                    ~unprocessed_transition_cache
-                    { external_block with
-                      data =
-                        { With_hash.data = external_block.data
-                        ; hash = state_hash
-                        }
-                    }
-                |> Deferred.map ~f:(fun x -> Ok x) )
-            with
-            | Error (`Error e) ->
-                (* TODO: Log *)
-                (* Validation failed. Record the failure and go back to download. *)
-                failed ~error:e ~sender:external_block.sender `Initial_validate
-            | Error `Couldn't_reach_verifier ->
-                retry ()
-            | Ok result -> (
-                Mina_metrics.(
-                  Gauge.set Catchup.initial_validation_time
-                    Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                match result with
-                | `In_frontier hash ->
-                    finish t node
-                      (Ok (Transition_frontier.find_exn frontier hash)) ;
-                    Deferred.return (Ok ())
-                | `Building_path tv ->
-                    (* To_initial_validate may only occur for a downloaded block,
-                       hence there is no validation callback *)
-                    set_state t node (To_verify (tv, None)) ;
-                    run_node node ) )
-        | To_verify (tv, valid_cb) -> (
-            [%log debug] "To_verify $state_hash %s callback"
-              ~metadata:
-                [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-              (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
-            let start_time = Time.now () in
-            let iv = Cached.peek tv in
-            (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
-            match%bind
-              step
-                (* TODO: give the batch verifier a way to somehow throw away stuff if
-                    this node gets removed from the tree. *)
-                ( Verify_work_batcher.verify verify_work_batcher iv
-                |> Deferred.map ~f:Result.return )
-            with
-            | Error _e ->
-                [%log' debug t.logger] "Couldn't reach verifier. Retrying"
+            match result with
+            | `In_frontier hash ->
+                finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
+                Deferred.return (Ok ())
+            | `Building_path tv ->
+                (* To_initial_validate may only occur for a downloaded block,
+                   hence there is no validation callback *)
+                set_state t node (To_verify (tv, None)) ;
+                run_node node ) )
+    | To_verify (tv, valid_cb) -> (
+        [%log debug] "To_verify $state_hash %s callback"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+        let start_time = Time.now () in
+        let iv = Cached.peek tv in
+        (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
+        match%bind
+          step
+            (* TODO: give the batch verifier a way to somehow throw away stuff if
+               this node gets removed from the tree. *)
+            ( Verify_work_batcher.verify verify_work_batcher iv
+            |> Deferred.map ~f:Result.return )
+        with
+        | Error _e ->
+            [%log' debug t.logger] "Couldn't reach verifier. Retrying"
+              ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
+            (* No need to redownload in this case. We just wait a little and try again. *)
+            retry ()
+        | Ok result -> (
+            Mina_metrics.(
+              Gauge.set Catchup.verification_time
+                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+            match result with
+            | Error err ->
+                [%log' warn t.logger] "verification failed! redownloading"
                   ~metadata:
-                    [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
-                (* No need to redownload in this case. We just wait a little and try again. *)
-                retry ()
-            | Ok result -> (
-                Mina_metrics.(
-                  Gauge.set Catchup.verification_time
-                    Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                match result with
-                | Error () ->
-                    [%log' warn t.logger] "verification failed! redownloading"
-                      ~metadata:
-                        [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
-                    ( match iv.sender with
-                    | Local ->
-                        ()
-                    | Remote peer ->
-                        Trust_system.(
-                          record trust_system logger peer
-                            Actions.(Sent_invalid_proof, None))
-                        |> don't_wait_for ) ;
-                    Option.value_map valid_cb ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Reject ;
-                    ignore
-                      ( Cached.invalidate_with_failure tv
-                        : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
-                    failed ~sender:iv.sender `Verify
-                | Ok av ->
-                    let av =
-                      { av with
-                        data =
-                          Validation.skip_frontier_dependencies_validation
-                            `This_block_belongs_to_a_detached_subtree av.data
-                      }
-                    in
-                    let av = Cached.transform tv ~f:(fun _ -> av) in
-                    set_state t node (Wait_for_parent (av, valid_cb)) ;
-                    run_node node ) )
-        | Wait_for_parent (av, valid_cb) ->
-            [%log debug] "Wait_for_parent $state_hash %s callback"
-              ~metadata:
-                [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-              (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
-            let%bind parent =
-              step
-                (let parent = Hashtbl.find_exn t.nodes node.parent in
-                 match%map.Async.Deferred Ivar.read parent.result with
-                 | Ok `Added_to_frontier ->
-                     Ok parent.state_hash
-                 | Error _ ->
-                     (* TODO consider rejecting the callback in some cases,
-                        see https://github.com/MinaProtocol/mina/issues/11087 *)
-                     Option.value_map valid_cb ~default:ignore
-                       ~f:
-                         Mina_net2.Validation_callback.fire_if_not_already_fired
-                       `Ignore ;
-                     ignore
-                       ( Cached.invalidate_with_failure av
-                         : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-                     finish t node (Error ()) ;
-                     Error `Finished )
-            in
-            set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
-            run_node node
-        | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) -> (
-            [%log debug] "To_build_breadcrumb $state_hash %s callback"
-              ~metadata:
-                [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-              (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
-            let start_time = Time.now () in
-            let transition_receipt_time = Some start_time in
-            let av = Cached.peek c in
-            match%bind
-              let s =
-                let open Deferred.Result.Let_syntax in
-                let%bind parent =
-                  Deferred.return
-                    ( match Transition_frontier.find frontier parent_hash with
-                    | None ->
-                        Error `Parent_breadcrumb_not_found
-                    | Some breadcrumb ->
-                        Ok breadcrumb )
-                in
-                build_func ~logger ~skip_staged_ledger_verification:`Proofs
-                  ~precomputed_values ~verifier ~trust_system ~parent
-                  ~transition:av.data ~sender:(Some av.sender)
-                  ~transition_receipt_time ()
-              in
-              step (Deferred.map ~f:Result.return s)
-            with
-            | Error e ->
-                (* TODO consider rejecting the callback in some cases,
-                   see https://github.com/MinaProtocol/mina/issues/11087 *)
+                    [ ("state_hash", State_hash.to_yojson node.state_hash)
+                    ; ("error", `String (Verifier.invalid_to_string err))
+                    ] ;
+                ( match iv.sender with
+                | Local ->
+                    ()
+                | Remote peer ->
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Sent_invalid_proof, None))
+                    |> don't_wait_for ) ;
                 Option.value_map valid_cb ~default:ignore
                   ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                  `Ignore ;
+                  `Reject ;
                 ignore
-                  ( Cached.invalidate_with_failure c
-                    : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-                let e =
-                  match e with
-                  | `Exn e ->
-                      Error.tag (Error.of_exn e) ~tag:"exn"
-                  | `Fatal_error e ->
-                      Error.tag (Error.of_exn e) ~tag:"fatal"
-                  | `Invalid_staged_ledger_diff e ->
-                      Error.tag e ~tag:"invalid staged ledger diff"
-                  | `Invalid_staged_ledger_hash e ->
-                      Error.tag e ~tag:"invalid staged ledger hash"
-                  | `Parent_breadcrumb_not_found ->
-                      Error.tag
-                        (Error.of_string
-                           (sprintf
-                              "Parent breadcrumb with state_hash %s not found"
-                              (State_hash.to_base58_check parent_hash) ) )
-                        ~tag:"parent breadcrumb not found"
+                  ( Cached.invalidate_with_failure tv
+                    : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+                failed ~sender:iv.sender `Verify
+            | Ok av ->
+                let av =
+                  { av with
+                    data =
+                      Validation.skip_frontier_dependencies_validation
+                        `This_block_belongs_to_a_detached_subtree av.data
+                  }
                 in
-                failed ~error:e ~sender:av.sender `Build_breadcrumb
-            | Ok breadcrumb ->
-                Mina_metrics.(
-                  Gauge.set Catchup.build_breadcrumb_time
-                    Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                let%bind () =
-                  Scheduler.yield () |> Deferred.map ~f:Result.return
-                in
-                let finished = Ivar.create () in
-                let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
-                Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                  ( [ Rose_tree.of_non_empty_list
-                        (Non_empty_list.singleton (c, valid_cb))
-                    ]
-                  , `Ledger_catchup finished ) ;
-                let%bind () =
-                  (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-                  step (Deferred.map (Ivar.read finished) ~f:Result.return)
-                in
-                Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-                set_state t node Finished ;
-                return () ) )
+                let av = Cached.transform tv ~f:(fun _ -> av) in
+                set_state t node (Wait_for_parent (av, valid_cb)) ;
+                run_node node ) )
+    | Wait_for_parent (av, valid_cb) ->
+        [%log debug] "Wait_for_parent $state_hash %s callback"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+        let%bind parent =
+          step
+            (let parent = Hashtbl.find_exn t.nodes node.parent in
+             match%map.Async.Deferred Ivar.read parent.result with
+             | Ok `Added_to_frontier ->
+                 Ok parent.state_hash
+             | Error _ ->
+                 (* TODO consider rejecting the callback in some cases,
+                    see https://github.com/MinaProtocol/mina/issues/11087 *)
+                 Option.value_map valid_cb ~default:ignore
+                   ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                   `Ignore ;
+                 ignore
+                   ( Cached.invalidate_with_failure av
+                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+                 finish t node (Error ()) ;
+                 Error `Finished )
+        in
+        set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
+        run_node node
+    | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) -> (
+        [%log debug] "To_build_breadcrumb $state_hash %s callback"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+        let start_time = Time.now () in
+        let transition_receipt_time = Some start_time in
+        let av = Cached.peek c in
+        match%bind
+          let s =
+            let open Deferred.Result.Let_syntax in
+            let%bind parent =
+              Deferred.return
+                ( match Transition_frontier.find frontier parent_hash with
+                | None ->
+                    Error `Parent_breadcrumb_not_found
+                | Some breadcrumb ->
+                    Ok breadcrumb )
+            in
+            build_func ~logger ~skip_staged_ledger_verification:`Proofs
+              ~precomputed_values ~verifier ~trust_system ~parent
+              ~transition:av.data ~sender:(Some av.sender)
+              ~transition_receipt_time ()
+          in
+          step (Deferred.map ~f:Result.return s)
+        with
+        | Error e ->
+            (* TODO consider rejecting the callback in some cases,
+               see https://github.com/MinaProtocol/mina/issues/11087 *)
+            Option.value_map valid_cb ~default:ignore
+              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+            ignore
+              ( Cached.invalidate_with_failure c
+                : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+            let e =
+              match e with
+              | `Exn e ->
+                  Error.tag (Error.of_exn e) ~tag:"exn"
+              | `Fatal_error e ->
+                  Error.tag (Error.of_exn e) ~tag:"fatal"
+              | `Invalid_staged_ledger_diff e ->
+                  Error.tag e ~tag:"invalid staged ledger diff"
+              | `Invalid_staged_ledger_hash e ->
+                  Error.tag e ~tag:"invalid staged ledger hash"
+              | `Parent_breadcrumb_not_found ->
+                  Error.tag
+                    (Error.of_string
+                       (sprintf "Parent breadcrumb with state_hash %s not found"
+                          (State_hash.to_base58_check parent_hash) ) )
+                    ~tag:"parent breadcrumb not found"
+            in
+            failed ~error:e ~sender:av.sender `Build_breadcrumb
+        | Ok breadcrumb ->
+            Mina_metrics.(
+              Gauge.set Catchup.build_breadcrumb_time
+                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+            let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
+            let finished = Ivar.create () in
+            let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer
+              ( [ Rose_tree.of_non_empty_list
+                    (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+                ]
+              , `Ledger_catchup finished ) ;
+            let%bind () =
+              (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+              step (Deferred.map (Ivar.read finished) ~f:Result.return)
+            in
+            Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
+            set_state t node Finished ;
+            return () )
   in
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
+    ~network ~frontier ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1006,7 +1007,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
          * Mina_net2.Validation_callback.t option )
          Rose_tree.t
          list )
-       Strict_pipe.Reader.t ) ~precomputed_values ~unprocessed_transition_cache
+       Strict_pipe.Reader.t ) ~unprocessed_transition_cache
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -1016,6 +1017,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t ) =
+  let open Context in
   let t =
     match Transition_frontier.catchup_tree frontier with
     | Full t ->
@@ -1027,12 +1029,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
-  let combine =
-    Option.merge
-      ~f:
-        (pick
-           ~constants:precomputed_values.Precomputed_values.consensus_constants )
-  in
+  let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :
         ((Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t * _)
@@ -1077,31 +1074,28 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
               | None ->
                   `Some [] ) )
     in
-    O1trace.thread "super_catchup_downloader" (fun () ->
-        Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
-          ~get:(fun peer hs ->
-            let sec =
-              let sec_per_block =
-                Option.value_map
-                  (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
-                  ~default:15. ~f:Float.of_string
-              in
-              Float.of_int (List.length hs) *. sec_per_block
-            in
-            Mina_networking.get_transition_chain
-              ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-              ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
-            )
-          ~peers:(fun () -> Mina_networking.peers network)
-          ~knowledge_context:
-            (Broadcast_pipe.map best_tip_r
-               ~f:
-                 (Option.map ~f:(fun x ->
-                      ( State_hash.With_state_hashes.state_hash x
-                      , Mina_state.Protocol_state.consensus_state x.data
-                        |> Consensus.Data.Consensus_state.blockchain_length ) )
-                 ) )
-          ~knowledge )
+    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+      ~get:(fun peer hs ->
+        let sec =
+          let sec_per_block =
+            Option.value_map
+              (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
+              ~default:15. ~f:Float.of_string
+          in
+          Float.of_int (List.length hs) *. sec_per_block
+        in
+        Mina_networking.get_transition_chain
+          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst) )
+      ~peers:(fun () -> Mina_networking.peers network)
+      ~knowledge_context:
+        (Broadcast_pipe.map best_tip_r
+           ~f:
+             (Option.map ~f:(fun x ->
+                  ( State_hash.With_state_hashes.state_hash x
+                  , Mina_state.Protocol_state.consensus_state x.data
+                    |> Consensus.Data.Consensus_state.blockchain_length ) ) ) )
+      ~knowledge
   in
   check_invariant ~downloader t ;
   let () =
@@ -1110,14 +1104,14 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   in
   (*
   every ~stop (Time.Span.of_sec 10.) (fun () ->
-      (* HERE!!! *)
       [%log debug]
         ~metadata:[ ("states", to_yojson t) ]
         "Catchup states $states") ;
   *)
   let run_state_machine =
-    setup_state_machine_runner ~t ~verifier ~downloader ~logger
-      ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
+    setup_state_machine_runner ~t ~verifier ~downloader
+      ~context:(module Context)
+      ~trust_system ~frontier ~unprocessed_transition_cache
       ~catchup_breadcrumbs_writer ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
@@ -1140,9 +1134,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
               [%log debug]
                 ~metadata:
                   [ ( "target_parent_hash"
-                    , Yojson.Safe.from_string
-                        (Marlin_plonk_bindings_pasta_fp.to_string
-                           target_parent_hash ) )
+                    , State_body_hash.to_yojson target_parent_hash )
                   ]
                 "Catchup job started with $target_parent_hash " ;
               let state_hashes =
@@ -1326,13 +1318,14 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
-    ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
-      run_catchup ~logger ~trust_system ~verifier ~network ~frontier
-        ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
-        ~catchup_breadcrumbs_writer
+      run_catchup
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+        ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
 (* Unit tests *)
@@ -1372,6 +1365,16 @@ let%test_module "Ledger_catchup tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()) )
+
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
 
     (* let mock_verifier =
        Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1425,9 +1428,10 @@ let%test_module "Ledger_catchup tests" =
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
-      run ~logger ~precomputed_values ~verifier ~trust_system ~network ~frontier
-        ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ;
+      run
+        ~context:(module Context)
+        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

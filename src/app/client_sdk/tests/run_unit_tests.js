@@ -1,5 +1,6 @@
-var mina = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").minaSDK;
+var mina =
+  require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").minaSDK;
 
 console.log("Running client SDK unit tests");
-mina.runUnitTests () ();
+mina.runUnitTests()();
 console.log("Done.");

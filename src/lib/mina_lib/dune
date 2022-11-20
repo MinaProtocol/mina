@@ -35,6 +35,7 @@
    transition_frontier_base
    with_hash
    currency
+   mina_stdlib
    mina_user_error
    gossip_net
    transition_frontier
@@ -62,12 +63,14 @@
    child_processes
    secrets
    work_selector
+   mina_ledger
    protocol_version
    snark_worker
    participating_state
    cli_lib
    signature_lib
    mina_base
+   mina_transaction
    mina_block
    transition_frontier_extensions
    block_time
@@ -80,15 +83,25 @@
    timeout_lib
    prover
    verifier
-   non_empty_list
    snark_work_lib
    truth
    ledger_catchup
    genesis_ledger_helper
    coda_genesis_proof
+   mina_base.import
    data_hash_lib
    transition_handler
-)
+   ppx_version.runtime
+   mina_intf
+   node_error_service
+   mina_transaction_logic
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
  (synopsis "Coda gut layer"))

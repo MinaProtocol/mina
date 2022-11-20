@@ -60,7 +60,7 @@ locals {
 
   seed_static_peers = [
     for index, name in keys(data.local_file.libp2p_seed_peers) : {
-      full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
+      full_peer = "/dns4/${name}.${var.testnet_name}.o1test.net/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
       port      = var.seed_starting_host_port + index
       name      = local.seed_names[index]
       unique_node_index= -1
@@ -78,16 +78,15 @@ locals {
 
     postgresHost            = "archive-1-postgresql"
     postgresPort            = 5432
-    postgresDB              = "archive"
-    postgresqlUsername      = "postgres"
-    postgresqlPassword      = "foobar"
+    # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
     remoteSchemaFile        = var.mina_archive_schema
-
+    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
+    
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
-    preemptibleAllowed      = "false"
+    spotAllowed      = "false"
   }
 
   static_peers = local.seed_static_peers

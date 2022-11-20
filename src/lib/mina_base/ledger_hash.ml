@@ -1,9 +1,12 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_import
 open Snark_params
 open Snarky_backendless
 open Tick
 open Let_syntax
+
+let merge_var ~height h1 h2 =
+  Random_oracle.Checked.hash ~init:(Hash_prefix.merkle_tree height) [| h1; h2 |]
 
 module Merkle_tree =
   Snarky_backendless.Merkle_tree.Checked
@@ -16,10 +19,7 @@ module Merkle_tree =
       let typ = Field.typ
 
       let merge ~height h1 h2 =
-        Tick.make_checked (fun () ->
-            Random_oracle.Checked.hash
-              ~init:(Hash_prefix.merkle_tree height)
-              [| h1; h2 |] )
+        Tick.make_checked (fun () -> merge_var ~height h1 h2)
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -68,7 +68,7 @@ let reraise_merkle_requests (With { request; respond }) =
 
 let get ~depth t addr =
   handle
-    (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
+    (fun () -> Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
     reraise_merkle_requests
 
 (*
@@ -81,18 +81,19 @@ let get ~depth t addr =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account ~depth t aid
-    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
+let%snarkydef_ modify_account ~depth t aid
+    ~(filter : Account.var -> 'a Checked.t) ~f =
   let%bind addr =
     request_witness
       (Account.Index.Unpacked.typ ~ledger_depth:depth)
       As_prover.(map (read Account_id.typ aid) ~f:(fun s -> Find_index s))
   in
   handle
-    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-       ~f:(fun account ->
-         let%bind x = filter account in
-         f x account ) )
+    (fun () ->
+      Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+        ~f:(fun account ->
+          let%bind x = filter account in
+          f x account ) )
     reraise_merkle_requests
   >>| var_of_hash_packed
 
@@ -104,26 +105,27 @@ let%snarkydef modify_account ~depth t aid
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
+let%snarkydef_ modify_account_send ~depth t aid ~is_writeable ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label "modify_account_send filter"]
-        (let%bind account_already_there =
-           Account_id.Checked.equal (Account.identifier_of_var account) aid
-         in
-         let%bind account_not_there =
-           Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
-         in
-         let%bind not_there_but_writeable =
-           Boolean.(account_not_there && is_writeable)
-         in
-         let%bind () =
-           [%with_label "account is either present or empty and writeable"]
-             (Boolean.Assert.any
-                [ account_already_there; not_there_but_writeable ] )
-         in
-         return not_there_but_writeable ) )
+      [%with_label_ "modify_account_send filter"] (fun () ->
+          let%bind account_already_there =
+            Account_id.Checked.equal (Account.identifier_of_var account) aid
+          in
+          let%bind account_not_there =
+            Public_key.Compressed.Checked.equal account.public_key
+              Public_key.Compressed.(var_of_t empty)
+          in
+          let%bind not_there_but_writeable =
+            Boolean.(account_not_there && is_writeable)
+          in
+          let%bind () =
+            [%with_label_ "account is either present or empty and writeable"]
+              (fun () ->
+                Boolean.Assert.any
+                  [ account_already_there; not_there_but_writeable ] )
+          in
+          return not_there_but_writeable ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -134,20 +136,20 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv ~depth t aid ~f =
+let%snarkydef_ modify_account_recv ~depth t aid ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label "modify_account_recv filter"]
-        (let%bind account_already_there =
-           Account_id.Checked.equal (Account.identifier_of_var account) aid
-         in
-         let%bind account_not_there =
-           Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
-         in
-         let%bind () =
-           [%with_label "account is either present or empty"]
-             (Boolean.Assert.any [ account_already_there; account_not_there ])
-         in
-         return account_not_there ) )
+      [%with_label_ "modify_account_recv filter"] (fun () ->
+          let%bind account_already_there =
+            Account_id.Checked.equal (Account.identifier_of_var account) aid
+          in
+          let%bind account_not_there =
+            Public_key.Compressed.Checked.equal account.public_key
+              Public_key.Compressed.(var_of_t empty)
+          in
+          let%bind () =
+            [%with_label_ "account is either present or empty"] (fun () ->
+                Boolean.Assert.any [ account_already_there; account_not_there ] )
+          in
+          return account_not_there ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)

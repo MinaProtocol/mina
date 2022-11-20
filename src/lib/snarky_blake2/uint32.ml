@@ -15,9 +15,9 @@ module type S = sig
 
   val zero : t
 
-  val xor : t -> t -> (t, _) Checked.t
+  val xor : t -> t -> t Checked.t
 
-  val sum : t list -> (t, _) Checked.t
+  val sum : t list -> t Checked.t
 
   val rotr : t -> int -> t
 
@@ -92,7 +92,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
     acc
 
   let sum (xs : t list) =
-    assert (List.length xs < 30) ;
+    assert (Mina_stdlib.List.Length.Compare.(xs < 30)) ;
     let c, vars =
       List.fold xs ~init:(0, []) ~f:(fun (c, vs) t ->
           match to_constant t with

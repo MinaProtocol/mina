@@ -19,6 +19,11 @@ ARG MINA_DIR=mina
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
+# Rust nightly toolchain for WebAssembly builds
+ARG RUST_NIGHTLY=2022-09-12
+
+ENV PATH "$PATH:$HOME/.cargo/bin"
+
 # don't keep sources, to force reinstall of pinned packages from Mina sources
 # and to keep Docker image reasonable size
 ENV OPAMKEEPBUILDDIR=false
@@ -28,7 +33,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # OS package dependencies
 RUN sudo apt-get update -y \
-  && sudo apt-get install -y \
+    && sudo apt-get install -y \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -62,15 +67,15 @@ RUN sudo apt-get update -y \
 # Buster images are used in our migrated integration tests which reqiure python2 jinja2
 # Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
 RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
-          python \
-          python-pip \
-          python-jinja2 \
-          python-flake8 \
-          python-sexpdata \
-          python3-sexpdata \
-      && sudo pip install readchar \
-      || exit 0
+    && sudo apt-get install -y \
+    python \
+    python-pip \
+    python-jinja2 \
+    python-flake8 \
+    python-sexpdata \
+    python3-sexpdata \
+    && sudo pip install readchar \
+    || exit 0
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
@@ -101,8 +106,8 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && sudo apt-get update -y \
     && sudo apt-get install -y helm
 
-# Get yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
+# --- yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt update \
@@ -115,3 +120,8 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
     | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
     | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+
+# --- extra Rust toolchain and wasm-pack for Wasm builds
+RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
+    && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh

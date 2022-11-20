@@ -131,9 +131,8 @@ module Api = struct
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
-      User_command_input.create ~signer:pk_of_sk ~fee
-        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk ~memo ~valid_until
-        ~body
+      User_command_input.create ~signer:pk_of_sk ~fee ~fee_payer_pk:pk_of_sk
+        ~memo ~valid_until ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
              (Keypair.of_private_key_exn sk) )
@@ -163,8 +162,7 @@ module Api = struct
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
-      ~body:
-        (Payment { source_pk; receiver_pk; token_id = Token_id.default; amount })
+      ~body:(Payment { source_pk; receiver_pk; amount })
 
   let new_block t i key =
     run_online_worker
@@ -566,7 +564,7 @@ module Payments : sig
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
-    let amount = Currency.Amount.of_int 10 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10 in
     let valid_until = None in
     let fee = Signed_command.minimum_fee in
     let%bind (_ : unit option list) =
@@ -629,7 +627,7 @@ end = struct
      This is most appropriate todo when #2336 is completed *)
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
-    let amount = Currency.Amount.of_int 10 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10 in
     let fee = Signed_command.minimum_fee in
     let valid_until = None in
     let%bind new_payment_readers =

@@ -18,12 +18,13 @@ spec:
             - '
             apk add curl;
             apk add python3;
-            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
-            tar -xzf google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-408.0.1-linux-x86_64.tar.gz;
+            tar -xzf google-cloud-cli-408.0.1-linux-x86_64.tar.gz;
+            ./google-cloud-sdk/install.sh --quiet;
             echo "installed gsutil";
 
             DATE="$(date +%F_%H%M)";
-            FILENAME=mainnet-archive-dump-"${DATE:: -1}0".sql;
+            FILENAME=mainnet-archive-dump-"${DATE}".sql;
 
             pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive_balances_migrated > $FILENAME;
 

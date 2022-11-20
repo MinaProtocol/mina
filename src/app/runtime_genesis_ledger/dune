@@ -13,18 +13,11 @@
    ;;local libraries
    genesis_constants
    coda_runtime_config
+   mina_ledger
    genesis_ledger_helper
    logger
    cache_dir
-   mina_base
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
-
-(rule
- (targets genesis_filename.txt)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<})))

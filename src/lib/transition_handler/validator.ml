@@ -7,8 +7,25 @@ open Cache_lib
 open Mina_block
 open Network_peer
 
-let validate_transition ~consensus_constants ~logger ~frontier
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
+let validate_transition ~context:(module Context : CONTEXT) ~frontier
     ~unprocessed_transition_cache enveloped_transition =
+  let module Context = struct
+    include Context
+
+    let logger =
+      Logger.extend logger
+        [ ("selection_context", `String "Transition_handler.Validator") ]
+  end in
   let open Result.Let_syntax in
   let transition =
     Envelope.Incoming.data enveloped_transition
@@ -32,11 +49,8 @@ let validate_transition ~consensus_constants ~logger ~frontier
   let%map () =
     Result.ok_if_true
       (Consensus.Hooks.equal_select_status `Take
-         (Consensus.Hooks.select ~constants:consensus_constants
-            ~logger:
-              (Logger.extend logger
-                 [ ("selection_context", `String "Transition_handler.Validator")
-                 ] )
+         (Consensus.Hooks.select
+            ~context:(module Context)
             ~existing:
               (Transition_frontier.Breadcrumb.consensus_state_with_hashes
                  root_breadcrumb )
@@ -47,8 +61,8 @@ let validate_transition ~consensus_constants ~logger ~frontier
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
 
-let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
-    ~transition_reader
+let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
+    ~frontier ~transition_reader
     ~(valid_transition_writer :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -58,6 +72,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
        , drop_head buffered
        , unit )
        Writer.t ) ~unprocessed_transition_cache =
+  let open Context in
   let module Lru = Core_extended_cache.Lru in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Reader.iter transition_reader
@@ -69,8 +84,9 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
           let transition = With_hash.data transition_with_hash in
           let sender = Envelope.Incoming.sender transition_env in
           match
-            validate_transition ~consensus_constants ~logger ~frontier
-              ~unprocessed_transition_cache transition_env
+            validate_transition
+              ~context:(module Context)
+              ~frontier ~unprocessed_transition_cache transition_env
           with
           | Ok cached_transition ->
               let%map () =
@@ -85,12 +101,12 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
               let transition_time =
                 Mina_block.header transition
                 |> Header.protocol_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.timestamp |> Block_time.to_time
+                |> Blockchain_state.timestamp |> Block_time.to_time_exn
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
                 (Core_kernel.Time.diff
-                   Block_time.(now time_controller |> to_time)
+                   Block_time.(now time_controller |> to_time_exn)
                    transition_time ) ;
               Writer.write valid_transition_writer
                 (`Block cached_transition, `Valid_cb vc)

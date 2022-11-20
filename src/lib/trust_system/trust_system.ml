@@ -1,7 +1,7 @@
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
 
-open Async
+open Async_kernel
 
 module Actions = struct
   type action =
@@ -21,8 +21,7 @@ module Actions = struct
         (** Peer sent us some data that doesn't hash to the expected value *)
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
-    | Sent_snapp_transaction
-        (** Peer sent us a snapp transaction, but they are currently disabled. *)
+    | Sent_invalid_transaction  (** Peer sent us an invalid transaction *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
     | Sent_invalid_signature_or_proof
         (** Peer either sent us a proof or a signature that does not verify. *)
@@ -103,7 +102,7 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_signature ->
         Insta_ban
-    | Sent_snapp_transaction ->
+    | Sent_invalid_transaction ->
         Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
@@ -173,6 +172,9 @@ module Actions = struct
         (show_action action, [])
     | Some (fmt, metadata) ->
         (sprintf !"%s (%s)" (show_action action) fmt, metadata)
+
+  let is_reason_for_heartbeat (a, _) =
+    match a with Sent_useful_gossip | Fulfilled_request -> true | _ -> false
 end
 
 module Banned_status = Banned_status

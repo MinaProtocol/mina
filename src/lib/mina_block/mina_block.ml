@@ -1,14 +1,12 @@
 open Core_kernel
 open Mina_base
 open Mina_state
-module Body = Body
-module Body_reference = Body_reference
+module Body = Staged_ledger_diff.Body
 module Header = Header
 module Validation = Validation
 module Validated = Validated_block
 module Precomputed = Precomputed_block
 module Internal_transition = Internal_transition
-module External_transition = External_transition
 
 type fully_invalid_block = Validation.fully_invalid_with_block
 
@@ -24,11 +22,9 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   in
   let protocol_state = With_hash.data genesis_state in
   let block_with_hash =
-    let body = Body.create Staged_ledger_diff.empty_diff in
-    let body_reference = Body_reference.of_body body in
+    let body = Staged_ledger_diff.Body.create Staged_ledger_diff.empty_diff in
     let header =
-      Header.create ~body_reference ~protocol_state
-        ~protocol_state_proof:Proof.blockchain_dummy
+      Header.create ~protocol_state ~protocol_state_proof:Proof.blockchain_dummy
         ~delta_block_chain_proof:
           (Protocol_state.previous_state_hash protocol_state, [])
         ()
@@ -42,7 +38,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     , (`Proof, Truth.True ())
     , ( `Delta_block_chain
       , Truth.True
-          ( Non_empty_list.singleton
+          ( Mina_stdlib.Nonempty_list.singleton
           @@ Protocol_state.previous_state_hash protocol_state ) )
     , (`Frontier_dependencies, Truth.True ())
     , (`Staged_ledger_diff, Truth.True ())

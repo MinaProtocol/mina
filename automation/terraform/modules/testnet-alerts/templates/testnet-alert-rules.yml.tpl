@@ -140,7 +140,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
 
   - alert: CriticallyLowMinWindowDensity
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density ${rule_filter}) <= 30
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_min_window_density ${rule_filter}) <= 13
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -244,6 +244,18 @@ groups:
       description: "{{ $value }} Missing block count is critically high on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
+  - alert: FewBlocksPerHour
+    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+      runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
+
+
 - name: Warnings
   rules:
   - alert: HighBlockGossipLatency
@@ -307,18 +319,6 @@ groups:
       summary: "{{ $labels.testnet }} seed list is degraded (less than 50% reachable)"
       description: "Seed list is degraded at {{ $value }} on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
-
-  - alert: FewBlocksPerHour
-    expr: quantile by (testnet) (0.5, increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
-    for: ${alert_evaluation_duration}
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: warning
-    annotations:
-      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
-      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
-      runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
-
 
   - alert: LowDisconnectedBlocksPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 0

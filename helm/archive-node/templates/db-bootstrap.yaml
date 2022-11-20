@@ -7,18 +7,10 @@ spec:
   template:
     spec:
       containers:
-      - name: create-db
-        image: bitnami/postgresql
-        command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} createdb --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --echo {{ .Values.archive.postgresDB}}"]
       - name: import-schema
-        image: bitnami/postgresql
+        image: gcr.io/o1labs-192920/postgresql-curl:latest
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f <(curl -Ls {{ .Values.archive.remoteSchemaFile }})"]
-      - name: update-transaction-isolation-level
-        image: bitnami/postgresql
-        command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB }} -c 'ALTER DATABASE {{ .Values.archive.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;'"]
+        args: ["sleep 60 && cd /tmp && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }} PGPASSWORD={{ .Values.postgresql.auth.password }} psql --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} -f /tmp/{{ .Values.archive.remoteSchemaFile }} "]
       restartPolicy: Never
   backoffLimit: 10
 {{- end }}

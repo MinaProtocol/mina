@@ -10,6 +10,10 @@
    rose_tree
    currency_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

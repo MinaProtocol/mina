@@ -1,14 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%endif]
-
 open Currency
 open Mina_numbers
 
@@ -99,7 +93,7 @@ let to_record t =
         ; vesting_increment
         }
 
-let to_bits t =
+let to_input t =
   let As_record.
         { is_timed
         ; initial_minimum_balance
@@ -110,39 +104,39 @@ let to_bits t =
         } =
     to_record t
   in
-  is_timed
-  :: ( Balance.to_bits initial_minimum_balance
-     @ Global_slot.to_bits cliff_time
-     @ Amount.to_bits cliff_amount
-     @ Global_slot.to_bits vesting_period
-     @ Amount.to_bits vesting_increment )
+  let open Random_oracle_input.Chunked in
+  Array.reduce_exn ~f:append
+    [| packed ((if is_timed then Field.one else Field.zero), 1)
+     ; Balance.to_input initial_minimum_balance
+     ; Global_slot.to_input cliff_time
+     ; Amount.to_input cliff_amount
+     ; Global_slot.to_input vesting_period
+     ; Amount.to_input vesting_increment
+    |]
 
 [%%ifdef consensus_mechanism]
 
 type var =
   (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
 
-let var_to_bits
+let var_to_input
     As_record.
-      { is_timed
+      { is_timed : Boolean.var
       ; initial_minimum_balance
       ; cliff_time
       ; cliff_amount
       ; vesting_period
       ; vesting_increment
       } =
-  let open Bitstring_lib.Bitstring.Lsb_first in
-  let initial_minimum_balance =
-    to_list @@ Balance.var_to_bits initial_minimum_balance
-  in
-  let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
-  let cliff_amount = to_list @@ Amount.var_to_bits cliff_amount in
-  let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
-  let vesting_increment = to_list @@ Amount.var_to_bits vesting_increment in
-  of_list
-    ( is_timed
-    :: ( initial_minimum_balance @ cliff_time @ cliff_amount @ vesting_period
-       @ vesting_increment ) )
+  let open Random_oracle_input.Chunked in
+  Array.reduce_exn ~f:append
+    [| packed ((is_timed :> Field.Var.t), 1)
+     ; Balance.var_to_input initial_minimum_balance
+     ; Global_slot.Checked.to_input cliff_time
+     ; Amount.var_to_input cliff_amount
+     ; Global_slot.Checked.to_input vesting_period
+     ; Amount.var_to_input vesting_increment
+    |]
 
 let var_of_t (t : t) : var =
   let As_record.
@@ -167,16 +161,6 @@ let var_of_t (t : t) : var =
 let untimed_var = var_of_t Untimed
 
 let typ : (var, t) Typ.t =
-  let spec =
-    let open Data_spec in
-    [ Boolean.typ
-    ; Balance.typ
-    ; Global_slot.typ
-    ; Amount.typ
-    ; Global_slot.typ
-    ; Amount.typ
-    ]
-  in
   (* because we represent the types t (a sum type) and var (a record) differently,
       we can't use the trick, used elsewhere, of polymorphic to_hlist and of_hlist
       functions to handle both types
@@ -232,8 +216,15 @@ let typ : (var, t) Typ.t =
   in
   let var_of_hlist = As_record.of_hlist in
   let var_to_hlist = As_record.to_hlist in
-  Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
-    ~value_of_hlist
+  Typ.of_hlistable
+    [ Boolean.typ
+    ; Balance.typ
+    ; Global_slot.typ
+    ; Amount.typ
+    ; Global_slot.typ
+    ; Amount.typ
+    ]
+    ~var_to_hlist ~var_of_hlist ~value_to_hlist ~value_of_hlist
 
 (* we can't use the generic if_ with the above typ, because Global_slot.typ doesn't work correctly with it
     so we define a custom if_

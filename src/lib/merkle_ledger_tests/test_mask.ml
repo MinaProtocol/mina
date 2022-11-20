@@ -364,7 +364,7 @@ module Make (Test : Test_intf) = struct
             @@ Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
                  (Mask.Addr.root ())
           in
-          assert (List.length accounts = List.length retrieved_accounts) ;
+          assert (Stdlib.List.compare_lengths accounts retrieved_accounts = 0) ;
           assert (List.equal Account.equal accounts retrieved_accounts) )
 
   let%test_unit "get_all_accounts should preserve the ordering of accounts by \
@@ -421,9 +421,7 @@ module Make (Test : Test_intf) = struct
                  (Mask.Addr.root ())
           in
           assert (
-            Int.equal
-              (List.length base_accounts)
-              (List.length retrieved_accounts) ) ;
+            Stdlib.List.compare_lengths base_accounts retrieved_accounts = 0 ) ;
           assert (List.equal Account.equal expected_accounts retrieved_accounts) )
 
   let%test_unit "removing accounts from mask restores Merkle root" =
@@ -516,7 +514,7 @@ module Make (Test : Test_intf) = struct
         let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let total =
           List.fold balances ~init:0 ~f:(fun accum balance ->
-              Balance.to_int balance + accum )
+              Balance.to_nanomina_int balance + accum )
         in
         let parent_accounts, mask_accounts =
           List.split_n accounts num_accounts_parent
@@ -531,7 +529,7 @@ module Make (Test : Test_intf) = struct
         let retrieved_total =
           Mask.Attached.foldi attached_mask ~init:0
             ~f:(fun _addr total account ->
-              Balance.to_int (Account.balance account) + total )
+              Balance.to_nanomina_int (Account.balance account) + total )
         in
         assert (Int.equal retrieved_total total) )
 
@@ -542,7 +540,8 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+          List.init num_accounts ~f:(fun n ->
+              Balance.of_nanomina_int_exn (n + 1) )
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -561,7 +560,7 @@ module Make (Test : Test_intf) = struct
             ignore @@ create_existing_account_exn attached_mask account ) ;
         let mask_list = Mask.Attached.to_list attached_mask in
         (* same number of accounts after adding them to mask *)
-        assert (Int.equal (List.length parent_list) (List.length mask_list)) ;
+        assert (Stdlib.List.compare_lengths parent_list mask_list = 0) ;
         (* should only see the zero balances in mask list *)
         let is_in_same_order =
           List.for_all2_exn parent_list mask_list
@@ -582,7 +581,8 @@ module Make (Test : Test_intf) = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
-          List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+          List.init num_accounts ~f:(fun n ->
+              Balance.of_nanomina_int_exn (n + 1) )
         in
         let parent_accounts =
           List.map2_exn account_ids balances ~f:Account.create
@@ -591,7 +591,7 @@ module Make (Test : Test_intf) = struct
         List.iter parent_accounts ~f:(fun account ->
             ignore @@ parent_create_new_account_exn maskable account ) ;
         let balance_summer _addr accum acct =
-          accum + Balance.to_int (Account.balance acct)
+          accum + Balance.to_nanomina_int (Account.balance acct)
         in
         let parent_sum = Maskable.foldi maskable ~init:0 ~f:balance_summer in
         (* non-zero sum of parent account balances *)
@@ -675,7 +675,7 @@ module Make (Test : Test_intf) = struct
         in
         (* the number of accounts in parent, mask should agree *)
         assert (
-          Int.equal parent_num_accounts (List.length accounts)
+          Mina_stdlib.List.Length.Compare.(accounts = parent_num_accounts)
           && Int.equal parent_num_accounts mask_num_accounts_before
           && Int.equal parent_num_accounts mask_num_accounts_after ) )
 
@@ -722,12 +722,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let k = Account_id.gen_accounts 1 |> List.hd_exn in
-        let acct1 = Account.create k (Balance.of_int 10) in
+        let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
         let loc =
           Mask.Attached.get_or_create_account attached_mask k acct1
           |> Or_error.ok_exn |> snd
         in
-        let acct2 = Account.create k (Balance.of_int 5) in
+        let acct2 = Account.create k (Balance.of_nanomina_int_exn 5) in
         Maskable.set maskable loc acct2 ;
         [%test_result: Account.t] ~message:"account in mask should be unchanged"
           ~expect:acct1

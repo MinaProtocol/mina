@@ -1,5 +1,4 @@
 open Core_kernel
-module Nat = Nat
 
 module type Nat_intf = Nat.Intf
 
@@ -7,16 +6,28 @@ type z = Nat.z
 
 type 'a s = 'a Nat.s
 
-type 'a nat = 'a Nat.t = Z : z nat | S : 'n nat -> 'n s nat
-
 module T = struct
   type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
 end
 
 include T
 
+let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
+
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
+
+let iteri (type a n) (t : (a, n) t) ~(f : int -> a -> unit) : unit =
+  let rec go : type n. int -> (a, n) t -> unit =
+   fun acc t ->
+    match t with
+    | [] ->
+        ()
+    | x :: xs ->
+        f acc x ;
+        go (acc + 1) xs
+  in
+  go 0 t
 
 let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit =
  fun t1 t2 ~f ->
@@ -71,18 +82,18 @@ let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
 
 let to_array t = Array.of_list (to_list t)
 
-let rec length : type a n. (a, n) t -> n nat = function
+let rec length : type a n. (a, n) t -> n Nat.t = function
   | [] ->
       Z
   | _ :: xs ->
       S (length xs)
 
-let rec init : type a n. int -> n nat -> f:(int -> a) -> (a, n) t =
+let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
  fun i n ~f -> match n with Z -> [] | S n -> f i :: init (i + 1) n ~f
 
 let init n ~f = init 0 n ~f
 
-let rec fold_map :
+let rec _fold_map :
     type acc a b n.
     (a, n) t -> f:(acc -> a -> acc * b) -> init:acc -> acc * (b, n) t =
  fun t ~f ~init ->
@@ -91,7 +102,7 @@ let rec fold_map :
       (init, [])
   | x :: xs ->
       let acc, y = f init x in
-      let res, ys = fold_map xs ~f ~init:acc in
+      let res, ys = _fold_map xs ~f ~init:acc in
       (res, y :: ys)
 
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
@@ -105,9 +116,6 @@ let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
 
 let unzip ts = (map ts ~f:fst, map ts ~f:snd)
 
-let unzip3 ts =
-  (map ts ~f:Tuple3.get1, map ts ~f:Tuple3.get2, map ts ~f:Tuple3.get3)
-
 type _ e = T : ('a, 'n) t -> 'a e
 
 let rec of_list : type a. a list -> a e = function
@@ -117,39 +125,31 @@ let rec of_list : type a. a list -> a e = function
       let (T xs) = of_list xs in
       T (x :: xs)
 
-let to_sequence : type a n. (a, n) t -> a Sequence.t =
- fun t ->
-  Sequence.unfold ~init:(T t) ~f:(fun (T t) ->
-      match t with [] -> None | x :: xs -> Some (x, T xs) )
-
-let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
+let rec of_list_and_length_exn : type a n. a list -> n Nat.t -> (a, n) t =
  fun xs n ->
   match (xs, n) with
   | [], Z ->
       []
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
-  | _ ->
+  | [], S _ | _ :: _, Z ->
       failwith "Vector: Length mismatch"
 
-let of_list_and_length xs n =
-  Option.try_with (fun () -> of_list_and_length_exn xs n)
-
-let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
+let of_array_and_length_exn : type a n. a array -> n Nat.t -> (a, n) t =
  fun xs n ->
   if Array.length xs <> Nat.to_int n then
     failwithf "of_array_and_length_exn: got %d (expected %d)" (Array.length xs)
       (Nat.to_int n) () ;
   init n ~f:(Array.get xs)
 
-let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
+let rec _take_from_list : type a n. a list -> n Nat.t -> (a, n) t =
  fun xs n ->
   match (xs, n) with
   | _, Z ->
       []
   | x :: xs, S n ->
-      x :: take_from_list xs n
-  | _ ->
+      x :: _take_from_list xs n
+  | [], S _ ->
       failwith "take_from_list: Not enough to take"
 
 let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
@@ -171,8 +171,6 @@ let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
 
-let reduce (init :: xs) ~f = fold xs ~f ~init
-
 let reduce_exn (type n) (t : (_, n) t) ~f =
   match t with
   | [] ->
@@ -182,17 +180,6 @@ let reduce_exn (type n) (t : (_, n) t) ~f =
 
 module L = struct
   type 'a t = 'a list [@@deriving yojson]
-end
-
-module type Yojson_intf1 = sig
-  type 'a t
-
-  val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
-
-  val of_yojson :
-       (Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or)
-    -> Yojson.Safe.t
-    -> 'a t Ppx_deriving_yojson_runtime.error_or
 end
 
 module Make = struct
@@ -206,7 +193,7 @@ module Make = struct
     val unit : unit t
   end) =
   struct
-    let rec f : type n a. n nat -> a F.t -> (a, n) t F.t =
+    let rec f : type n a. n Nat.t -> a F.t -> (a, n) t F.t =
      fun n tc ->
       match n with
       | Z ->
@@ -226,8 +213,8 @@ module Make = struct
     let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
   end
 
-  module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
-  struct
+  module Yojson (N : Nat_intf) :
+    Sigs.Jsonable.S1 with type 'a t := ('a, N.n) t = struct
     let to_yojson f t = L.to_yojson f (to_list t)
 
     let of_yojson f s =
@@ -378,6 +365,31 @@ let rec append :
   | x :: t1, S adds ->
       x :: append t1 t2 adds
 
+(* TODO: Make more efficient *)
+let rev (type a n) (xs : (a, n) t) : (a, n) t =
+  of_list_and_length_exn
+    (fold ~init:[] ~f:(fun acc x -> List.cons x acc) xs)
+    (length xs)
+
+let rec _last : type a n. (a, n s) t -> a = function
+  | [ x ] ->
+      x
+  | _ :: (_ :: _ as xs) ->
+      _last xs
+
+let rec split :
+    type n m n_m a. (a, n_m) t -> (n, m, n_m) Nat.Adds.t -> (a, n) t * (a, m) t
+    =
+ fun t adds ->
+  match (t, adds) with
+  | [], Z ->
+      ([], [])
+  | _ :: _, Z ->
+      ([], t)
+  | x :: t1, S adds ->
+      let xs, ys = split t1 adds in
+      (x :: xs, ys)
+
 let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
  fun xss ->
   match xss with
@@ -391,6 +403,18 @@ let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
 
 let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
  fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
+
+let trim_front (type a n m) (v : (a, m) t) (p : (n, m) Nat.Lte.t) : (a, n) t =
+  rev (trim (rev v) p)
+
+let extend_front_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
+ fun v m dummy ->
+  let v = to_array v in
+  let n = Array.length v in
+  let m' = Nat.to_int m in
+  assert (n <= m') ;
+  let padding = m' - n in
+  init m ~f:(fun i -> if i < padding then dummy else v.(i - padding))
 
 let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
  fun v m default ->
@@ -415,6 +439,36 @@ let rec extend :
       default :: extend [] Z m default
   | x :: xs, S p, S m ->
       x :: extend xs p m default
+
+let extend_front :
+    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+ fun v _p m default -> extend_front_exn v m default
+
+module type S = sig
+  type 'a t [@@deriving compare, yojson, sexp, hash, equal]
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val of_list_exn : 'a list -> 'a t
+
+  val to_list : 'a t -> 'a list
+end
+
+module type VECTOR = sig
+  type 'a t
+
+  include S with type 'a t := 'a t
+
+  module Stable : sig
+    module V1 : sig
+      include S with type 'a t = 'a t
+
+      include Sigs.Binable.S1 with type 'a t = 'a t
+
+      include Sigs.VERSIONED
+    end
+  end
+end
 
 module With_version (N : Nat.Intf) = struct
   module type S = sig
@@ -447,10 +501,6 @@ module Vector_2 = struct
       include Make.Binable (Nat.N2)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -476,10 +526,81 @@ module Vector_4 = struct
       include Make.Binable (Nat.N4)
 
       include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
 
-      module Tests = struct
-        (* TODO *)
-      end
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_5 = struct
+  module T = With_length (Nat.N5)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N5.n) vec
+
+      include Make.Binable (Nat.N5)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_6 = struct
+  module T = With_length (Nat.N6)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N6.n) vec
+
+      include Make.Binable (Nat.N6)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_7 = struct
+  module T = With_length (Nat.N7)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N7.n) vec
+
+      include Make.Binable (Nat.N7)
+
+      include (T : module type of T with type 'a t := 'a t)
     end
   end]
 
@@ -505,10 +626,6 @@ module Vector_8 = struct
       include Make.Binable (Nat.N8)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -521,23 +638,19 @@ module Vector_8 = struct
     ()
 end
 
-module Vector_17 = struct
-  module T = With_length (Nat.N17)
+module Vector_15 = struct
+  module T = With_length (Nat.N15)
 
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type 'a t = ('a, Nat.N17.n) vec
+      type 'a t = ('a, Nat.N15.n) vec
 
-      include Make.Binable (Nat.N17)
+      include Make.Binable (Nat.N15)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -550,23 +663,19 @@ module Vector_17 = struct
     ()
 end
 
-module Vector_18 = struct
-  module T = With_length (Nat.N18)
+module Vector_16 = struct
+  module T = With_length (Nat.N16)
 
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type 'a t = ('a, Nat.N18.n) vec
+      type 'a t = ('a, Nat.N16.n) vec
 
-      include Make.Binable (Nat.N18)
+      include Make.Binable (Nat.N16)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 

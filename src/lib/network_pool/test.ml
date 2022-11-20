@@ -22,6 +22,10 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int precomputed_values.genesis_constants.transaction_expiry_hr)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -49,7 +53,7 @@ let%test_module "network pool test" =
         { Priced_proof.proof =
             One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
-            { fee = Currency.Fee.of_int 0
+            { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
             }
         }
@@ -57,7 +61,7 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller
+              ~consensus_constants ~time_controller ~expiry_ns
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
@@ -101,7 +105,7 @@ let%test_module "network pool test" =
               { proof =
                   One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
-                  { fee = Currency.Fee.of_int 0
+                  { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty
                   }
               } )
@@ -112,7 +116,7 @@ let%test_module "network pool test" =
         let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
         let network_pool, remote_sink, local_sink =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller
+            ~consensus_constants ~time_controller ~expiry_ns
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         in

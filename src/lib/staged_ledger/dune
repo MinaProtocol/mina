@@ -18,7 +18,11 @@
    async_unix
    base.base_internalhash_types
    ;; local libraries
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
+   mina_base.import
+   mina_ledger
    quickcheck_lib
    mina_metrics
    coda_genesis_ledger
@@ -31,9 +35,12 @@
    ledger_proof
    logger
    transaction_snark
+   transaction_snark_tests
    transaction_snark_scan_state
    sgn
    mina_base
+   mina_transaction
+   mina_transaction_logic
    verifier
    staged_ledger_diff
    signature_lib
@@ -42,20 +49,26 @@
    one_or_two
    o1trace
    mina_state
-   non_empty_list
+   mina_stdlib
    snark_work_lib
    child_processes
    consensus
    merkle_ledger
    pickles
+   pickles_types
    snark_params
    with_hash
+   mina_generators
    random_oracle
+   kimchi_backend
    pickles.backend
+   zkapp_command_builder
+   ppx_version.runtime
+   mina_wire_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_optcomp lens.ppx_deriving ppx_coda ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving.make
+               ppx_optcomp lens.ppx_deriving ppx_mina ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving.make
                ppx_deriving_yojson ppx_custom_printf ppx_let ppx_inline_test ppx_assert ppx_pipebang))
  (synopsis "Staged Ledger updates the current ledger with new transactions"))
