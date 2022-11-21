@@ -97,6 +97,11 @@ module Js_layout = struct
     | Custom s ->
         s
 
+  type option_type =
+    | Flagged_option
+    | Closed_interval of (string * string)
+    | Or_undefined
+
   let leaf_type (s : leaf_type) =
     `Assoc [ ("type", `String (leaf_type_to_string s)) ]
 
@@ -130,22 +135,32 @@ module Js_layout = struct
         ] ;
     obj
 
-  let option x obj ~(js_type : [ `Flagged_option | `Or_undefined ]) : _ Input.t
-      =
+  let option x obj ~(js_type : option_type) : _ Input.t =
     let inner = !(x#js_layout) in
-    let js_type =
+    let layout =
       match js_type with
-      | `Flagged_option ->
-          "flaggedOption"
-      | `Or_undefined ->
-          "orUndefined"
+      | Flagged_option ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "flaggedOption")
+            ; ("inner", inner)
+            ]
+      | Closed_interval (min, max) ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "closedInterval")
+            ; ("rangeMin", `String min)
+            ; ("rangeMax", `String max)
+            ; ("inner", inner)
+            ]
+      | Or_undefined ->
+          `Assoc
+            [ ("type", `String "option")
+            ; ("optionType", `String "orUndefined")
+            ; ("inner", inner)
+            ]
     in
-    obj#js_layout :=
-      `Assoc
-        [ ("type", `String "option")
-        ; ("optionType", `String js_type)
-        ; ("inner", inner)
-        ] ;
+    obj#js_layout := layout ;
     obj
 
   let wrapped x obj =

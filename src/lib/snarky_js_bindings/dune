@@ -4,6 +4,7 @@
    (compilation_mode whole_program))))
 
 (data_only_dirs test_module)
+
 (vendored_dirs snarkyjs)
 
 (executable
@@ -59,3 +60,22 @@
   (with-stdout-to
    jsLayout.json
    (run %{exe:./snarky_js_types.exe}))))
+
+(executable
+ (name snarky_js_constants)
+ (modules snarky_js_constants)
+ (link_flags (-linkall))
+ (modes native)
+ (libraries
+  core_kernel
+  sponge
+  hash_prefixes
+  base58_check
+  pickles
+  random_oracle
+  random_oracle.permutation.ocaml
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
