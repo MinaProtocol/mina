@@ -553,7 +553,7 @@ module Account = struct
     |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
-    let b = Balance.of_int 1000 in
+    let b = Balance.of_nanomina_int_exn 1000 in
     let predicate : t =
       { accept with
         balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }

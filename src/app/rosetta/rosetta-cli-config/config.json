@@ -60,7 +60,10 @@
   "results_output_file": "",
   "pruning_block_disabled": false,
   "pruning_balance_disabled": false,
-  "initial_balance_fetch_disabled": false
+  "initial_balance_fetch_disabled": false,
+  "end_conditions": {
+    "index": 3
+  }
  },
  "perf": null
 }

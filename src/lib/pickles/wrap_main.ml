@@ -178,6 +178,7 @@ let wrap_main
             ~first_zero:
               (Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
             Max_proofs_verified.n
+          |> Vector.rev
         in
         let domain_log2 =
           Pseudo.choose
@@ -186,15 +187,16 @@ let wrap_main
             ~f:Field.of_int
         in
         let () =
-          (* Check that the branch_data public-input is correct *)
-          Branch_data.Checked.pack
-            (module Impl)
-            { proofs_verified_mask =
-                Vector.extend_exn actual_proofs_verified_mask Nat.N2.n
-                  Boolean.false_
-            ; domain_log2
-            }
-          |> Field.Assert.equal branch_data
+          with_label __LOC__ (fun () ->
+              (* Check that the branch_data public-input is correct *)
+              Branch_data.Checked.pack
+                (module Impl)
+                { proofs_verified_mask =
+                    Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n
+                      Boolean.false_
+                ; domain_log2
+                }
+              |> Field.Assert.equal branch_data )
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->

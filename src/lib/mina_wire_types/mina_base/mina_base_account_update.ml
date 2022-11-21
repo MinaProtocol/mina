@@ -1,6 +1,6 @@
 module Authorization_kind = struct
   module V1 = struct
-    type t = None_given | Signature | Proof
+    type t = Signature | Proof | None_given
   end
 end
 

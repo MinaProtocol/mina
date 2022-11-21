@@ -596,15 +596,20 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N26.n in
+          let num_commitments_without_degree_bound = Nat.N41.n in
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
               :: [| m.psm_comm |]
               :: Vector.append w_comm
-                   (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                   (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (Vector.append
+                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                      (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (snd
+                      Plonk_types.(
+                        Columns.add (fst (Columns.add Permuts_minus_1.n))) ) )
               (snd
                  (Wrap_hack.Padded_length.add
                     num_commitments_without_degree_bound ) )
@@ -915,7 +920,7 @@ struct
       let sg_evals pt =
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
-          (Vector.trim actual_width_mask
+          (Vector.trim_front actual_width_mask
              (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
           sg_olds
       in
@@ -925,7 +930,7 @@ struct
       let challenge_digest =
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
-          (Vector.trim actual_width_mask
+          (Vector.trim_front actual_width_mask
              (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
           prev_challenges
           ~f:(fun keep chals ->
@@ -1111,6 +1116,7 @@ struct
     let after_index = sponge_after_index index in
     ( after_index
     , stage (fun t ~widths ~max_width ~proofs_verified_mask ->
+          (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
           let sponge = Sponge.copy after_index in
           let t =
             { t with

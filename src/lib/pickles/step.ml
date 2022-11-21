@@ -265,7 +265,7 @@ struct
         in
         O.create dlog_vk
           ( Vector.map2
-              (Vector.extend_exn
+              (Vector.extend_front_exn
                  statement.messages_for_next_step_proof
                    .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
@@ -352,13 +352,13 @@ struct
             }
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
-            Vector.extend_exn
+            Vector.extend_front_exn
               t.statement.messages_for_next_step_proof
                 .challenge_polynomial_commitments Local_max_proofs_verified.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
-            Vector.extend_exn
+            Vector.extend_front_exn
               (Vector.map
                  t.statement.messages_for_next_step_proof
                    .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
@@ -550,10 +550,11 @@ struct
       prev_proofs := Some prev_proofs' ;
       actual_wrap_domains := Some actual_wrap_domains'
     in
+    let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
       lazy
-        (Vector.extend
-           (Option.value_exn !unfinalized_proofs)
+        (Vector.extend_front
+           (Lazy.force unfinalized_proofs)
            lte Max_proofs_verified.n
            (Lazy.force Unfinalized.Constant.dummy) )
     in
@@ -647,10 +648,12 @@ struct
             :: pad [] ms n
       in
       lazy
-        (pad
-           (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
-                s.proof_state.messages_for_next_wrap_proof ) )
-           Maxes.maxes Maxes.length )
+        (Vector.rev
+           (pad
+              (Vector.map
+                 (Vector.rev (Option.value_exn !statements_with_hashes))
+                 ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
+              Maxes.maxes Maxes.length ) )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
@@ -671,7 +674,7 @@ struct
           auxiliary_value := Some res ;
           k ()
       | Req.Unfinalized_proofs ->
-          k (Lazy.force unfinalized_proofs_extended)
+          k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force messages_for_next_wrap_proof_padded)
       | _ -> (
@@ -766,7 +769,7 @@ struct
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
-          Vector.extend
+          Vector.extend_front
             (Vector.map2 prev_evals (Option.value_exn !x_hats)
                ~f:(fun (es, ft_eval1) x_hat ->
                  Plonk_types.All_evals.

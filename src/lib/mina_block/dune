@@ -39,7 +39,7 @@
    staged_ledger
    data_hash_lib
    block_time
-   non_empty_list
+   mina_stdlib
    with_hash
    signature_lib
    genesis_constants
