@@ -228,6 +228,20 @@ module Statement = struct
         [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
+
+        (* Override hash functions with faster partial versions.
+         * The assumption here is that the target ledger hash by itself
+         * is unique enough to differentiate between statements, so
+         * there will be no clashes.
+         *)
+
+        let hash_fold_t state t =
+          let state' =
+            Frozen_ledger_hash.Stable.V1.hash_fold_t state t.source.ledger
+          in
+          Frozen_ledger_hash.Stable.V1.hash_fold_t state' t.target.ledger
+
+        let hash = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
       end
     end]
 
