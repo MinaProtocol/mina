@@ -1408,7 +1408,8 @@ let replay_blocks logger =
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
-           "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
+           "Daemon is ready, replayed precomputed blocks. Clients can now \
+            connect" ;
          Async.never () ) )
 
 let dump_type_shapes =

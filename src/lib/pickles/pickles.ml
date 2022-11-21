@@ -194,46 +194,56 @@ module Make_str (_ : Wire_types.Concrete) = struct
         local_max_proofs_verifieds
         H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
     let dummy_chals = Dummy.Ipa.Wrap.challenges in
-    let rev_magic :
-        type ms.
-           (* This type is wrong actually, the "ms" type-level list should be
-              reversed but there's no way to do that. *)
-           ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
-        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
-     fun xs -> Obj.magic (List.rev (Obj.magic xs))
+    let module Messages =
+      H1.T (Proof_.Messages_for_next_proof_over_same_field.Wrap) in
+    let module Maxes = H1.T (Nat) in
+    let (T (messages_len, _)) = Messages.length messages_for_next_wrap_proofs in
+    let (T (maxes_len, _)) = Maxes.length M.maxes in
+    let (T difference) =
+      let rec sub : type n m. n Nat.t -> m Nat.t -> Nat.e =
+       fun x y ->
+        let open Nat in
+        match (x, y) with
+        | _, Z ->
+            T x
+        | Z, S _ ->
+            assert false
+        | S x, S y ->
+            sub x y
+      in
+      sub maxes_len messages_len
     in
     let rec go :
         type len ms ns.
-           ms H1.T(Nat).t
-        -> ns H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
-        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
-     fun maxes messages_for_next_wrap_proofs ->
-      match (maxes, messages_for_next_wrap_proofs) with
-      | [], _ :: _ ->
-          assert false
-      | [], [] ->
-          []
-      | m :: maxes, [] ->
+        len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t =
+     fun pad maxes messages_for_next_wrap_proofs ->
+      match (pad, maxes, messages_for_next_wrap_proofs) with
+      | S pad, m :: maxes, _ ->
           { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
           ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
           }
-          :: go maxes []
-      | ( m :: maxes
+          :: go pad maxes messages_for_next_wrap_proofs
+      | S _, [], _ ->
+          assert false
+      | Z, [], [] ->
+          []
+      | ( Z
+        , m :: maxes
         , messages_for_next_wrap_proof :: messages_for_next_wrap_proofs ) ->
           let messages_for_next_wrap_proof =
             { messages_for_next_wrap_proof with
               old_bulletproof_challenges =
-                Vector.extend_front_exn
+                Vector.extend_exn
                   messages_for_next_wrap_proof.old_bulletproof_challenges m
                   dummy_chals
             }
           in
-          messages_for_next_wrap_proof :: go maxes messages_for_next_wrap_proofs
+          messages_for_next_wrap_proof
+          :: go Z maxes messages_for_next_wrap_proofs
+      | Z, [], _ :: _ | Z, _ :: _, [] ->
+          assert false
     in
-    rev_magic
-      (go
-         (Obj.magic (List.rev (Obj.magic M.maxes)))
-         (rev_magic messages_for_next_wrap_proofs) )
+    go difference M.maxes messages_for_next_wrap_proofs
 
   module Verification_key = struct
     include Verification_key
