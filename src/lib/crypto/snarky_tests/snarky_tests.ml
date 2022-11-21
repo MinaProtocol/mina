@@ -225,6 +225,36 @@ let generate_witness () =
 
   ()
 
+(****************************
+ * outside-of-circuit tests *
+ ****************************)
+
+let out_of_circuit_constant () =
+  let one = Impl.Field.Constant.one in
+  let two = Impl.Field.Constant.of_int 2 in
+  let x = Impl.Field.constant one in
+  let y = Impl.Field.constant two in
+  let _const_mul : Impl.Field.t = Impl.Field.mul x y in
+  ()
+
+let out_of_circuit_constraint () =
+  let one = Impl.Field.constant Impl.Field.Constant.one in
+  let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
+  Impl.Field.Assert.not_equal one two
+
+let out_of_circuit_constraint () =
+  Alcotest.(
+    check_raises "should fail to create constraints outside of a circuit"
+      (Failure "This function can't be run outside of a checked computation."))
+    out_of_circuit_constraint
+
+let outside_circuit_tests =
+  [ ("out-of-circuit constant", `Quick, out_of_circuit_constant)
+  ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_constraint)
+  ]
+
+(* run tests *)
+
 let api_tests =
   [ ("generate witness", `Quick, generate_witness)
   ; ("compile imperative API", `Quick, get_hash_of_circuit)
@@ -234,5 +264,8 @@ let api_tests =
 (* run tests *)
 
 let () =
-  Alcotest.run "BooleanCircuit snarky tests"
-    [ ("API tests", api_tests); ("circuit tests", circuit_tests) ]
+  Alcotest.run "Simple snarky tests"
+    [ ("outside of circuit tests", outside_circuit_tests)
+    ; ("API tests", api_tests)
+    ; ("circuit tests", circuit_tests)
+    ]
