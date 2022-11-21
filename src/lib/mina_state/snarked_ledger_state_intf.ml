@@ -182,6 +182,8 @@ module type Full = sig
 
   val to_field_elements : t -> Tick.Field.t array
 
+  val work_id : t -> int
+
   module Checked : sig
     type t = var
 

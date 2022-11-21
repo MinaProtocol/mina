@@ -43,7 +43,7 @@ module Statement = struct
       |> One_or_two.to_list )
 
   let work_ids t : int One_or_two.t =
-    One_or_two.map t ~f:Transaction_snark.Statement.hash
+    One_or_two.map t ~f:Transaction_snark.Statement.work_id
 end
 
 module Info = struct
