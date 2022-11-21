@@ -13,5 +13,6 @@
    pickles.backend
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
 )
 (implements random_oracle.permutation))

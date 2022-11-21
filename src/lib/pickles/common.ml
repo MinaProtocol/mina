@@ -30,24 +30,18 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
-let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
+let hash_messages_for_next_step_proof ~app_state
+    (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Step.Proof_state.Me_only.to_field_elements t ~g
+    (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
-let hash_dlog_me_only (type n) (_max_proofs_verified : n Nat.t)
-    (t : (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t)
-    =
-  Tock_field_sponge.digest Tock_field_sponge.params
-    (Types.Wrap.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
-
 let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (proofs_verified, Nat.N26.n, total) Nat.Adds.t ) =
+      total Nat.t * (proofs_verified, Nat.N41.n, total) Nat.Adds.t ) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
@@ -66,15 +60,6 @@ let time lab f =
       printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
       x )
     f ()
-
-let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
-  fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
-    |> List.concat_map ~f:(fun c ->
-           let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
-    |> fun a -> List.take a length
 
 let bits_to_bytes bits =
   let byte_of_bits bs =
@@ -101,6 +86,37 @@ module Shifts = struct
 
   let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
     Shifted_value.Type2.Shift.create (module Tick.Field)
+end
+
+module Lookup_parameters = struct
+  let tick_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Step.Field.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value
+              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+        }
+    }
+
+  let tock_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Wrap.Field.zero
+        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+        }
+    }
+
+  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
+    { use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
@@ -186,7 +202,7 @@ end
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
-    Impls.Wrap.generate_public_input [ typ ] prev_statement
+    Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
@@ -194,14 +210,14 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified
+let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n
+        ~wrap_rounds:Tock.Rounds.n ~uses_lookup
     in
-    Impls.Step.generate_public_input [ input ] prev_statement
+    Impls.Step.generate_public_input input prev_statement
   in
   List.init
     (Backend.Tick.Field.Vector.length input)
@@ -283,3 +299,29 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
   in
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
+
+let combined_evaluation (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~(xi : Impl.Field.t) (without_degree_bound : _ list) =
+  let open Impl in
+  let open Field in
+  let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
+      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+    match fx with
+    | None ->
+        acc
+    | Some fx ->
+        fx + (xi * acc)
+    | Maybe (b, fx) ->
+        Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
+  in
+  with_label __LOC__ (fun () ->
+      Pcs_batch.combine_split_evaluations ~mul_and_add
+        ~init:(function
+          | Some x ->
+              x
+          | None ->
+              Field.zero
+          | Maybe (b, x) ->
+              (b :> Field.t) * x )
+        ~xi without_degree_bound )

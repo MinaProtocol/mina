@@ -18,7 +18,7 @@ module Sparse_ledger : module type of Mina_ledger.Sparse_ledger
 
 val ledger_depth : Ledger.index
 
-module T : Transaction_snark.S
+val snark_module : (module Transaction_snark.S) lazy_t
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
@@ -32,7 +32,7 @@ val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
-val apply_parties : Ledger.t -> Parties.t list -> Sparse_ledger.t
+val apply_zkapp_command : Ledger.t -> Zkapp_command.t list -> Sparse_ledger.t
 
 val dummy_rule :
      (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
@@ -40,19 +40,24 @@ val dummy_rule :
      , 'a * ('a * unit)
      , 'b * ('b * unit)
      , 'c * ('c * unit)
-     , 'd
-     , 'e )
+     , Zkapp_statement.Checked.t
+     , Zkapp_statement.t
+     , unit
+     , 'i
+     , unit
+     , unit )
      Pickles.Inductive_rule.t
 
-(** Generates base and merge snarks of all the party segments
+(** Generates base and merge snarks of all the account_update segments
 
     Raises if either the snark generation or application fails
 *)
-val check_parties_with_merges_exn :
+val check_zkapp_command_with_merges_exn :
      ?expected_failure:Mina_base.Transaction_status.Failure.t
+  -> ?ignore_outside_snark:bool
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> Ledger.t
-  -> Parties.t list
+  -> Zkapp_command.t list
   -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
@@ -63,7 +68,9 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t ] )
   Lazy.t
@@ -77,21 +84,23 @@ val test_snapp_update :
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
-  -> snapp_prover:
+  -> zkapp_prover:
        ( unit
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t
-  -> Transaction_snark.For_tests.Spec.t
+  -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
   -> snapp_pk:Account.key
   -> unit
 
 val permissions_from_update :
-     Party.Update.t
+     Account_update.Update.t
   -> auth:Permissions.Auth_required.t
   -> Permissions.Auth_required.t Permissions.Poly.t
 
@@ -118,9 +127,16 @@ module Wallet : sig
 
   val user_command :
        fee_payer:t
-    -> source_pk:Signature_lib.Public_key.Compressed.t
     -> receiver_pk:Signature_lib.Public_key.Compressed.t
     -> int
+    -> Currency.Fee.t
+    -> Mina_numbers.Account_nonce.t
+    -> Mina_base.Signed_command_memo.t
+    -> Mina_base.Signed_command.With_valid_signature.t
+
+  val stake_delegation :
+       fee_payer:t
+    -> delegate_pk:Signature_lib.Public_key.Compressed.t
     -> Currency.Fee.t
     -> Mina_numbers.Account_nonce.t
     -> Mina_base.Signed_command_memo.t
@@ -128,3 +144,10 @@ module Wallet : sig
 end
 
 val check_balance : Account_id.t -> int -> Ledger.t -> unit
+
+val test_transaction_union :
+     ?expected_failure:Transaction_status.Failure.t list
+  -> ?txn_global_slot:Mina_numbers.Global_slot.t
+  -> Ledger.t
+  -> Mina_transaction.Transaction.Valid.t
+  -> unit

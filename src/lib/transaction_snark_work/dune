@@ -15,6 +15,13 @@
    one_or_two
    ledger_proof
    signature_lib
-   )
+   ppx_version.runtime
+   mina_wire_types
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

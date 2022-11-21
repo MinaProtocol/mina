@@ -17,6 +17,7 @@
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    transaction_snark
    snark_params
    mina_ledger
@@ -32,9 +33,10 @@
    transaction_snark_tests
    test_util
    mina_transaction_logic
+   mina_transaction
    )
   (library_flags -linkall)
   (inline_tests)
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_coda))
+    (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))

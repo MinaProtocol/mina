@@ -9,11 +9,12 @@ export { basicCircuit };
 let FieldArrayTyp = (size) => ({
   sizeInFields: () => size,
   toFields: (f) => f,
-  ofFields: (f) => f,
+  fromFields: (f) => f,
+  check: () => {},
 });
 class Main extends Circuit {
   static snarkyMain(preimage, [hash]) {
-    Poseidon.hash(preimage).assertEquals(hash);
+    Poseidon.hash(preimage, true).assertEquals(hash);
   }
   static snarkyWitnessTyp = FieldArrayTyp(4);
   static snarkyPublicTyp = FieldArrayTyp(1);
@@ -28,7 +29,7 @@ function basicCircuit() {
     Field.random(),
     Field.random(),
   ];
-  let hash = Poseidon.hash(preimage);
+  let hash = Poseidon.hash(preimage, false);
 
   console.log("generating keypair...");
   let kp = Main.generateKeypair();

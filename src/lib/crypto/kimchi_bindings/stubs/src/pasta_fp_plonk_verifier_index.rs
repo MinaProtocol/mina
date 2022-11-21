@@ -9,19 +9,19 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
-use kimchi::circuits::constraints::Shifts;
+use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use mina_curves::pasta::{Fp, Pallas, Vesta};
 use std::convert::TryInto;
 use std::path::Path;
 
 pub type CamlPastaFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFp, CamlFpSrs, CamlPolyComm<CamlGVesta>>;
 
-impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
-    fn from(vi: VerifierIndex<GAffine>) -> Self {
+impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
+    fn from(vi: VerifierIndex<Vesta>) -> Self {
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -29,7 +29,9 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
-            srs: CamlFpSrs(vi.srs),
+            public: vi.public as isize,
+            prev_challenges: vi.prev_challenges as isize,
+            srs: CamlFpSrs(vi.srs.get().expect("have an srs").clone()),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
                 coefficients_comm: vi
@@ -55,24 +57,24 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
 }
 
 // TODO: This should really be a TryFrom or TryInto
-impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
+impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
     fn from(index: CamlPastaFpPlonkVerifierIndex) -> Self {
         let evals = index.evals;
         let shifts = index.shifts;
 
-        let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+        let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
         let domain = Domain::<Fp>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
-        let coefficients_comm: Vec<PolyComm<GAffine>> =
+        let coefficients_comm: Vec<PolyComm<Vesta>> =
             evals.coefficients_comm.iter().map(Into::into).collect();
         let coefficients_comm: [_; COLUMNS] = coefficients_comm.try_into().expect("wrong size");
 
-        let sigma_comm: Vec<PolyComm<GAffine>> = evals.sigma_comm.iter().map(Into::into).collect();
+        let sigma_comm: Vec<PolyComm<Vesta>> = evals.sigma_comm.iter().map(Into::into).collect();
         let sigma_comm: [_; PERMUTS] = sigma_comm
             .try_into()
             .expect("vector of sigma comm is of wrong size");
 
-        let chacha_comm: Option<Vec<PolyComm<GAffine>>> = evals
+        let chacha_comm: Option<Vec<PolyComm<Vesta>>> = evals
             .chacha_comm
             .map(|x| x.iter().map(Into::into).collect());
         let chacha_comm: Option<[_; 4]> =
@@ -82,14 +84,21 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(domain, false, None);
+        let (linearization, powers_of_alpha) =
+            expr_linearization(false, false, None, false, false, true);
 
-        VerifierIndex::<GAffine> {
+        VerifierIndex::<Vesta> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
+            public: index.public as usize,
+            prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
-            srs: index.srs.0,
+            srs: {
+                let res = once_cell::sync::OnceCell::new();
+                res.set(index.srs.0).unwrap();
+                res
+            },
 
             sigma_comm,
             coefficients_comm,
@@ -103,17 +112,28 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
             chacha_comm,
+            xor_comm: None,
+
+            range_check_comm: None,
+            foreign_field_add_comm: None,
+
+            foreign_field_modulus: None,
 
             shift,
-            zkpm: zk_polynomial(domain),
-            w: zk_w3(domain),
+            zkpm: {
+                let res = once_cell::sync::OnceCell::new();
+                res.set(zk_polynomial(domain)).unwrap();
+                res
+            },
+            w: {
+                let res = once_cell::sync::OnceCell::new();
+                res.set(zk_w3(domain)).unwrap();
+                res
+            },
             endo: endo_q,
 
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
-
-            fr_sponge_params: oracle::pasta::fp_kimchi::params(),
-            fq_sponge_params: oracle::pasta::fq_kimchi::params(),
         }
     }
 }
@@ -122,24 +142,16 @@ pub fn read_raw(
     offset: Option<ocaml::Int>,
     srs: CamlFpSrs,
     path: String,
-) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
+) -> Result<VerifierIndex<Vesta>, ocaml::Error> {
     let path = Path::new(&path);
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fq_kimchi::params();
-    let fr_sponge_params = oracle::pasta::fp_kimchi::params();
-    VerifierIndex::<GAffine>::from_file(
-        srs.0,
-        path,
-        offset.map(|x| x as u64),
-        endo_q,
-        fq_sponge_params,
-        fr_sponge_params,
+    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+    VerifierIndex::<Vesta>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q).map_err(
+        |_e| {
+            ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
+                .err()
+                .unwrap()
+        },
     )
-    .map_err(|_e| {
-        ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
-            .err()
-            .unwrap()
-    })
 }
 
 //
@@ -164,7 +176,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
     index: CamlPastaFpPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let index: VerifierIndex<GAffine> = index.into();
+    let index: VerifierIndex<Vesta> = index.into();
     let path = Path::new(&path);
     index.to_file(path, append).map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
@@ -179,7 +191,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
 ) -> CamlPastaFpPlonkVerifierIndex {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
@@ -199,7 +211,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<C
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierIndex {
     fn comm() -> CamlPolyComm<CamlGVesta> {
-        let g: CamlGVesta = GAffine::prime_subgroup_generator().into();
+        let g: CamlGVesta = Vesta::prime_subgroup_generator().into();
         CamlPolyComm {
             shifted: Some(g),
             unshifted: vec![g, g, g],
@@ -216,6 +228,8 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
+        public: 0,
+        prev_challenges: 0,
         srs: CamlFpSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),

@@ -21,6 +21,8 @@ struct
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
+  let of_decimal_string (s : string) = Field.of_string s
+
   let to_bytes t =
     Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
@@ -71,7 +73,7 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let%snarkydef var_to_bits t =
+  let%snarkydef_ var_to_bits t =
     match t.bits with
     | Some bits ->
         return (bits :> Boolean.var list)
@@ -105,43 +107,16 @@ struct
 end
 
 module T0 = struct
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Field.t
-      [@@deriving sexp, compare, hash, version { asserted }, bin_io]
+      [@@@with_all_version_tags]
+
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
 
       let to_latest = Fn.id
     end
-
-    module Tests = struct end
   end]
-
-  module Tests = struct
-    (* these test the stability of the serialization derived from the
-       string representation of Field.t, not the direct serialization of
-       Field.t
-    *)
-
-    let field =
-      Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
-        Field.gen
-
-    [%%if curve_size = 255]
-
-    let%test "Binable from stringable V1" =
-      let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module Stable.V1)
-        field known_good_digest
-
-    [%%else]
-
-    let%test "Binable from stringable V1" =
-      failwith "No test for this curve size"
-
-    [%%endif]
-  end
 end
 
 module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
@@ -152,7 +127,8 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   include Basic
 
   module Base58_check = Codable.Make_base58_check (struct
-    include T0.Stable.Latest
+    (* for compatibility with legacy Base58Check serializations *)
+    include T0.Stable.Latest.With_all_version_tags
 
     (* the serialization here is only used for the hash impl which is only
        used for hashtbl, it's ok to disagree with the "real" serialization *)
@@ -173,9 +149,13 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
+  let to_field = Fn.id
+
   [%%ifdef consensus_mechanism]
 
   let var_of_hash_packed digest = { digest; bits = None }
+
+  let var_to_field { digest; _ } = digest
 
   let if_ cond ~then_ ~else_ =
     let%map digest =

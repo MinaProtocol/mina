@@ -24,6 +24,8 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
+    cpuRequest = var.cpu_request
+    memRequest= var.mem_request
   }
 
   healthcheck_vars = {
@@ -64,7 +66,7 @@ locals {
         name             = config.name
         class            = config.class
         libp2pSecret     = config.libp2p_secret
-        privateKeySecret = config.private_key_secret
+        # privateKeySecret = config.private_key_secret
         externalPort     = config.external_port
         externalIp       = config.external_ip
         enableArchive    = config.enableArchive
@@ -108,7 +110,7 @@ locals {
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
         privateKeySecret     = config.private_key_secret
-        libp2pSecret         = config.libp2p_secret
+        # libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
         enableArchive        = config.enableArchive
@@ -144,8 +146,8 @@ locals {
                   {
                     matchExpressions = [
                       {
-                        key = "cloud.google.com/gke-preemptible"
-                        operator = item["preemptibleAllowed"] ? "In" : "NotIn"
+                        key = "cloud.google.com/gke-spot"
+                        operator = item["spotAllowed"] ? "In" : "NotIn"
                         values = ["true"]
                       }
                     ]
@@ -173,6 +175,9 @@ locals {
       publicKey =snark.snark_worker_public_key
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
+
+      workerCpuRequest = var.worker_cpu_request
+      workerMemRequest= var.worker_mem_request
     }
   ]
 

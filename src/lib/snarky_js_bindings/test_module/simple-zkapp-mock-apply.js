@@ -11,6 +11,7 @@ import {
   Mina,
   signFeePayer,
   Permissions,
+  verify,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
@@ -41,6 +42,7 @@ class SimpleZkapp extends SmartContract {
 
   update(y) {
     let x = this.x.get();
+    this.x.assertEquals(x);
     y.assertGt(0);
     this.x.set(x.add(y));
   }
@@ -59,39 +61,51 @@ let senderKey = sender.privateKey;
 let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
 
+tic("compute circuit digest");
+SimpleZkapp.digest();
+toc();
+
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
+let { verificationKey } = await SimpleZkapp.compile();
 toc();
 
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, {
+let zkappCommandJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
-  verificationKey,
   initialBalance,
-  feePayerKey: sender.privateKey,
-  shouldSignFeePayer: true,
-  transactionFee,
+  feePayer: { feePayerKey: sender.privateKey, fee: transactionFee },
 });
 toc();
 
 tic("apply deploy transaction");
-Local.applyJsonTransaction(partiesJsonDeploy);
+Local.applyJsonTransaction(zkappCommandJsonDeploy);
 toc();
 
 tic("create initialize transaction (with proof)");
 let transaction = await Mina.transaction(() => {
   new SimpleZkapp(zkappAddress).initialize();
 });
-await transaction.prove();
-let partiesJsonInitialize = transaction.toJSON();
-partiesJsonInitialize = signFeePayer(partiesJsonInitialize, senderKey, {
-  transactionFee,
-});
+let [proof] = await transaction.prove();
+let zkappCommandJsonInitialize = transaction.toJSON();
+zkappCommandJsonInitialize = signFeePayer(
+  zkappCommandJsonInitialize,
+  senderKey,
+  {
+    transactionFee,
+  }
+);
 toc();
 
+// verify the proof
+tic("verify transaction proof");
+let ok = await verify(proof, verificationKey.data);
+toc();
+console.log("did proof verify?", ok);
+if (!ok) throw Error("proof didn't verify");
+
 tic("apply initialize transaction");
-Local.applyJsonTransaction(partiesJsonInitialize);
+Local.applyJsonTransaction(zkappCommandJsonInitialize);
 toc();
 
 // check that deploy and initialize txns were applied
@@ -106,14 +120,14 @@ transaction = await Mina.transaction(() => {
   zkapp.sign(zkappKey);
 });
 transaction.sign();
-let partiesJsonUpdate = transaction.toJSON();
-partiesJsonUpdate = signFeePayer(partiesJsonUpdate, senderKey, {
+let zkappCommandJsonUpdate = transaction.toJSON();
+zkappCommandJsonUpdate = signFeePayer(zkappCommandJsonUpdate, senderKey, {
   transactionFee,
 });
 toc();
 
 tic("apply update transaction (no proof)");
-Local.applyJsonTransaction(partiesJsonUpdate);
+Local.applyJsonTransaction(zkappCommandJsonUpdate);
 toc();
 
 // check that first update txn was applied
@@ -126,16 +140,16 @@ transaction = await Mina.transaction(() => {
   new SimpleZkapp(zkappAddress).update(Field(2));
 });
 await transaction.prove();
-let partiesJsonUpdateWithProof = transaction.toJSON();
-partiesJsonUpdateWithProof = signFeePayer(
-  partiesJsonUpdateWithProof,
+let zkappCommandJsonUpdateWithProof = transaction.toJSON();
+zkappCommandJsonUpdateWithProof = signFeePayer(
+  zkappCommandJsonUpdateWithProof,
   senderKey,
   { transactionFee }
 );
 toc();
 
 tic("apply update transaction (with proof)");
-Local.applyJsonTransaction(partiesJsonUpdateWithProof);
+Local.applyJsonTransaction(zkappCommandJsonUpdateWithProof);
 toc();
 
 // check that second update txn was applied

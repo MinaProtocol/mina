@@ -1,5 +1,12 @@
 open Core
-module Balance = Currency.Balance
+
+module Balance = struct
+  include Currency.Balance
+
+  let to_int = to_nanomina_int
+
+  let of_int = of_nanomina_int_exn
+end
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
@@ -195,7 +202,15 @@ module Base_inputs = struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
-  module Balance = Balance
+
+  module Balance = struct
+    include Balance
+
+    let of_int = of_nanomina_int_exn
+
+    let to_int = to_nanomina_int
+  end
+
   module Account = Account
   module Hash = Hash
 end

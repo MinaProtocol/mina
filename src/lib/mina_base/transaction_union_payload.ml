@@ -92,17 +92,15 @@ module Body = struct
     , Boolean.var )
     t_
 
-  let spec =
-    Data_spec.
+  let typ =
+    Typ.of_hlistable
       [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
       ; Token_id.typ
       ; Currency.Amount.typ
       ]
-
-  let typ =
-    Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
+      ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
@@ -311,7 +309,7 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   | Coinbase ->
       Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
-let supply_increase (payload : payload) =
+let expected_supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->

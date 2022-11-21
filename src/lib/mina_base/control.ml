@@ -8,7 +8,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t =
+    type t = Mina_wire_types.Mina_base.Control.V2.t =
       | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
       | Signature of Signature.Stable.V1.t
       | None_given
@@ -19,16 +19,20 @@ module Stable = struct
 end]
 
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
-let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
-  lazy
-    (Quickcheck.Generator.of_list
-       (let dummy_proof =
-          let n2 = Pickles_types.Nat.N2.n in
-          let proof = Pickles.Proof.dummy n2 n2 n2 in
-          Proof proof
-        in
-        let dummy_signature = Signature Signature.dummy in
-        [ dummy_proof; dummy_signature; None_given ] ) )
+let gen_with_dummies : t Quickcheck.Generator.t =
+  let gen =
+    lazy
+      (Quickcheck.Generator.of_list
+         (let dummy_proof =
+            let n2 = Pickles_types.Nat.N2.n in
+            let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+            Proof proof
+          in
+          let dummy_signature = Signature Signature.dummy in
+          [ dummy_proof; dummy_signature; None_given ] ) )
+  in
+  Quickcheck.Generator.create (fun ~size ~random ->
+      Quickcheck.Generator.generate (Lazy.force gen) ~size ~random )
 
 [%%else]
 
@@ -65,7 +69,11 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+  type t = Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
+    | Signature
+    | Proof
+    | None_given
+  [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
 end
@@ -83,7 +91,7 @@ let tag : t -> Tag.t = function
 let dummy_of_tag : Tag.t -> t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
-      let proof = Pickles.Proof.dummy n2 n2 n2 in
+      let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
       Proof proof
   | Signature ->
       Signature Signature.dummy
@@ -93,7 +101,8 @@ let dummy_of_tag : Tag.t -> t = function
 let signature_deriver obj =
   Fields_derivers_zkapps.Derivers.iso_string obj ~name:"Signature"
     ~js_type:String ~to_string:Signature.to_base58_check
-    ~of_string:Signature.of_base58_check_exn
+    ~of_string:
+      (Fields_derivers_zkapps.except ~f:Signature.of_base58_check_exn `Signature)
 
 module As_record = struct
   type t =

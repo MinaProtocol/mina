@@ -5,11 +5,11 @@ use ark_ff::{
 };
 use ark_ff::{FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
+use mina_curves::pasta::{fields::fq::FqParameters as Fq_params, Fq};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
-use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
 #[repr(C)]

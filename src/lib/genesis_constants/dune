@@ -9,11 +9,11 @@
    base
    bin_prot.shape
    core_kernel
-   ppx_version.runtime
    base.caml
    sexplib0
    integers
    ;; local libraries
+   mina_wire_types
    unsigned_extended
    mina_numbers
    pickles
@@ -24,11 +24,14 @@
    pickles.backend
    snark_keys_header
    kimchi_backend.pasta
-   )
+   kimchi_backend.pasta.basic
+   test_util
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
+               ppx_mina ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
                ppx_fields_conv ppx_compare ppx_deriving.ord
                ppx_sexp_conv ppx_let ppx_custom_printf ppx_deriving_yojson
                h_list.ppx

@@ -15,11 +15,12 @@ crate-type = ["cdylib"]
 
 [dependencies]
 #wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
-wasm-bindgen-rayon = { path = "../../../../external/wasm-bindgen-rayon", features = ["no-bundler"] }
+wasm-bindgen-rayon = { git = "https://github.com/o1-labs/wasm-bindgen-rayon", rev = "68303317c96549feae6b7dcc72d891afbfbda070", features = ["no-bundler"]}
 wasm-bindgen = { version = "0.2.78" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
 
+once_cell = "1.10.0"
 libc = { version = "0.2.0" }
 
 # arkworks
@@ -33,23 +34,19 @@ commitment_dlog = { path = "../../proof-systems/poly-commitment" }
 groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
-oracle = { path = "../../proof-systems/oracle" }
+mina-poseidon = { path = "../../proof-systems/poseidon" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
-rand = { version = "0.8.0" }
+array-init = "2.0.0"
+base64 = "0.13.0"
 getrandom = { version = "0.2", features = ["js"] }
-#num-bigint = { version = "0.2.3" }
-#sprs = { version = "0.7.1" }
-
-#rand = { version = "0.8.0", features = [ "wasm-bindgen" ] }
 num-bigint = { version = "0.4.0" }
 paste = "1.0.5"
-sprs = { version = "0.11.0" }
+rand = { version = "0.8.0" }
 rayon = { version = "1" }
-array-init = "2.0.0"
-
-serde = "1.0.130"
 rmp-serde = "1.0.0"
+sprs = { version = "0.11.0" }
+serde = "1.0.130"
 serde_json = "1.0"
 
 [dev-dependencies]

@@ -30,10 +30,11 @@
    coda_genesis_ledger
    trust_system
    genesis_constants
-   non_empty_list
+   mina_stdlib
    inline_test_quiet_logs
    mina_base.import
    mina_block
-)
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version)))

@@ -1,9 +1,10 @@
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use ark_ff::One;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
 use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -49,6 +50,17 @@ macro_rules! impl_oracles {
                         .collect::<Vec<_>>(),
                 );
 
+                let p_comm = {
+                    index
+                        .srs()
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
+
                 let proof: ProverProof<$G> = proof.into();
 
                 let oracles_result =
@@ -57,7 +69,7 @@ macro_rules! impl_oracles {
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
@@ -99,16 +111,13 @@ macro_rules! impl_oracles {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{
-        fp::Fp,
-        vesta::{Affine as GAffine, VestaParameters},
-    };
+    use mina_curves::pasta::{Fp, Vesta, VestaParameters};
 
     impl_oracles!(
         CamlFp,
         Fp,
         CamlGVesta,
-        GAffine,
+        Vesta,
         CamlPastaFpPlonkVerifierIndex,
         VestaParameters
     );
@@ -121,16 +130,13 @@ pub mod fq {
         oracles::CamlOracles,
         pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
     };
-    use mina_curves::pasta::{
-        fq::Fq,
-        pallas::{Affine as GAffine, PallasParameters},
-    };
+    use mina_curves::pasta::{Fq, Pallas, PallasParameters};
 
     impl_oracles!(
         CamlFq,
         Fq,
         CamlGPallas,
-        GAffine,
+        Pallas,
         CamlPastaFqPlonkVerifierIndex,
         PallasParameters
     );

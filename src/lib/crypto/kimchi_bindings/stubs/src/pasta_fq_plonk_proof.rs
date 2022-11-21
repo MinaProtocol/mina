@@ -10,16 +10,12 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
-use mina_curves::pasta::{
-    fp::Fp,
-    fq::Fq,
-    pallas::{Affine as GAffine, PallasParameters},
-};
-use oracle::{
+use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -34,40 +30,37 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
-    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
-        if prev_challenges.is_empty() {
-            Vec::new()
-        } else {
-            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
-            prev_sgs
-                .into_iter()
-                .map(Into::<GAffine>::into)
-                .enumerate()
-                .map(|(i, sg)| {
-                    (
-                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
-                            .iter()
-                            .map(Into::<Fq>::into)
-                            .collect(),
-                        PolyComm::<GAffine> {
-                            unshifted: vec![sg],
-                            shifted: None,
-                        },
-                    )
-                })
-                .collect()
-        }
+    let prev = if prev_challenges.is_empty() {
+        Vec::new()
+    } else {
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs
+            .into_iter()
+            .map(Into::<Pallas>::into)
+            .enumerate()
+            .map(|(i, sg)| {
+                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    .iter()
+                    .map(Into::<Fq>::into)
+                    .collect();
+                let comm = PolyComm::<Pallas> {
+                    unshifted: vec![sg],
+                    shifted: None,
+                };
+                RecursionChallenge { chals, comm }
+            })
+            .collect()
     };
 
     let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");
-    let index: &ProverIndex<GAffine> = &index.as_ref().0;
+    let index: &ProverIndex<Pallas> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
@@ -80,7 +73,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, index, prev)
+        >(&group_map, witness, &[], index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
     })
@@ -92,10 +85,10 @@ pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> bool {
-    let group_map = <GAffine as CommitmentCurve>::Map::setup();
+    let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
     batch_verify::<
-        GAffine,
+        Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &[(&index.into(), &proof.into())].to_vec())
@@ -117,7 +110,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     let group_map = GroupMap::<Fp>::setup();
 
     batch_verify::<
-        GAffine,
+        Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
@@ -127,21 +120,21 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
-    fn comm() -> PolyComm<GAffine> {
-        let g = GAffine::prime_subgroup_generator();
+    fn comm() -> PolyComm<Pallas> {
+        let g = Pallas::prime_subgroup_generator();
         PolyComm {
             shifted: Some(g),
             unshifted: vec![g, g, g],
         }
     }
 
-    let prev_challenges = vec![
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
-    ];
+    let prev = RecursionChallenge {
+        chals: vec![Fq::one(), Fq::one()],
+        comm: comm(),
+    };
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
 
-    let g = GAffine::prime_subgroup_generator();
+    let g = Pallas::prime_subgroup_generator();
     let proof = OpeningProof {
         lr: vec![(g, g), (g, g), (g, g)],
         z1: Fq::one(),
@@ -151,6 +144,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     };
     let proof_evals = ProofEvaluations {
         w: array_init(|_| vec![Fq::one()]),
+        coefficients: array_init(|_| vec![Fq::one()]),
         z: vec![Fq::one()],
         s: array_init(|_| vec![Fq::one()]),
         lookup: None,

@@ -8,14 +8,17 @@ let wrap_domains = Common.wrap_domains
 
 let evals =
   let open Plonk_types in
-  let e () =
+  let e =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        Array.create n (Ro.tock ()) )
+        let a () = Array.create ~len:n (Ro.tock ()) in
+        (a (), a ()) )
   in
-  let ex () =
-    { All_evals.With_public_input.evals = e (); public_input = Ro.tock () }
+  let ex =
+    { All_evals.With_public_input.evals = e
+    ; public_input = (Ro.tock (), Ro.tock ())
+    }
   in
-  { All_evals.ft_eval1 = Ro.tock (); evals = (ex (), ex ()) }
+  { All_evals.ft_eval1 = Ro.tock (); evals = ex }
 
 let evals_combined =
   Plonk_types.All_evals.map evals ~f1:Fn.id
@@ -33,8 +36,7 @@ module Ipa = struct
           Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
   end
 
   module Step = struct
@@ -48,7 +50,6 @@ module Ipa = struct
           Ipa.Step.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
   end
 end

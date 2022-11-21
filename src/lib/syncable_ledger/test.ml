@@ -228,7 +228,7 @@ module Db = struct
       let load_ledger num_accounts (balance : int) =
         let ledger = create ~depth:Depth.depth () in
         let account_ids = Account_id.gen_accounts num_accounts in
-        let currency_balance = Currency.Balance.of_int balance in
+        let currency_balance = Currency.Balance.of_nanomina_int_exn balance in
         List.iter account_ids ~f:(fun aid ->
             let account = Account.create aid currency_balance in
             ignore
@@ -333,7 +333,8 @@ module Mask = struct
         List.iter account_ids ~f:(fun account_id ->
             let account =
               Account.create account_id
-                (Currency.Balance.of_int (initial_balance_multiplier * 2))
+                (Currency.Balance.of_nanomina_int_exn
+                   (initial_balance_multiplier * 2) )
             in
             let action, _ =
               Maskable.get_or_create_account maskable account_id account
@@ -356,7 +357,7 @@ module Mask = struct
             List.iter account_ids ~f:(fun account_id ->
                 let account =
                   Account.create account_id
-                    (Currency.Balance.of_int child_balance)
+                    (Currency.Balance.of_nanomina_int_exn child_balance)
                 in
                 let action, location =
                   Mask.Attached.get_or_create_account attached_mask account_id

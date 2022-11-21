@@ -79,12 +79,12 @@ module T = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Transaction_snark_work.V2.t =
         { fee : Fee.Stable.V1.t
         ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
         }
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
     end

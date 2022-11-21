@@ -6,7 +6,8 @@ open Mina_base
 module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
 
-let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
+let raise_js_error s =
+  Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 type string_js = Js.js_string Js.t
 
@@ -23,35 +24,25 @@ type payload_common_js =
   ; memo : string_js Js.prop >
   Js.t
 
-type payload_fee_payer_party_js =
+type payload_fee_payer_js =
   < fee : string_js Js.prop
   ; feePayer : string_js Js.prop
   ; nonce : string_js Js.prop
   ; memo : string_js Js.prop >
   Js.t
 
-let payload_of_fee_payer_party_js
-    (fee_payer_party_js : payload_fee_payer_party_js) : Party.Fee_payer.t =
+let payload_of_fee_payer_js (fee_payer_js : payload_fee_payer_js) :
+    Account_update.Fee_payer.t =
   let fee_payer_pk =
-    fee_payer_party_js##.feePayer
-    |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
+    fee_payer_js##.feePayer |> Js.to_string
+    |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
-  let fee =
-    fee_payer_party_js##.fee |> Js.to_string |> Currency.Fee.of_string
-  in
+  let fee = fee_payer_js##.fee |> Js.to_string |> Currency.Fee.of_string in
   let nonce =
-    fee_payer_party_js##.nonce |> Js.to_string
-    |> Mina_numbers.Account_nonce.of_string
+    fee_payer_js##.nonce |> Js.to_string |> Mina_numbers.Account_nonce.of_string
   in
-  { Party.Fee_payer.body =
-      { public_key = fee_payer_pk
-      ; update = Party.Update.noop
-      ; fee
-      ; events = []
-      ; sequence_events = []
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; nonce
-      }
+  { Account_update.Fee_payer.body =
+      { public_key = fee_payer_pk; fee; valid_until = None; nonce }
   ; authorization = Signature.dummy
   }
 

@@ -1,0 +1,24 @@
+(library
+ (name graphql_basic_scalars)
+ (public_name graphql_basic_scalars)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   async
+   async_unix
+   async_kernel
+   core_kernel
+   integers
+   core
+   graphql
+   graphql-async
+   graphql_parser
+   yojson
+   sexplib0
+   ppx_inline_test.config
+   ;; local libraries
+   graphql_wrapper
+   unix
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version)))

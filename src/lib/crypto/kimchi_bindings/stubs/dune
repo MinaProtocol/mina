@@ -1,34 +1,94 @@
-(data_only_dirs src)
+;; src/ contains no dune-related files
 
-(dirs :standard \ target)
+(data_only_dirs src)
 
 ;; Ignore target if it exists locally
 
-(rule
- (targets cargo-target-path)
- (locks /cargo-lock)
- (action
-  (with-stdout-to cargo-target-path
-   (pipe-stdout
-    (run cargo metadata)
-    (run cargo_target_dir/cargo_target_dir.exe)))))
+(dirs :standard \ target)
+
+;; we first create a `dune-build-root` file that contains the dune workspace root
 
 (rule
+ (target dune-build-root)
+ (deps
+  ; no sandbox, we want the path to the _build directory
+  (sandbox none))
+ (action
+  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
+
+;;
+;; Rules to set the optimisation flags for the rust compiler.
+;;
+;; By default, we compile with optimisations enabled. The instructions that
+;; these generate may not be available on all CPU architectures; to build a
+;; slower version that does not use these instructions, set the environment
+;; variable `RUST_TARGET_FEATURE_OPTIMISATIONS=n`.
+;;
+
+(rule
+ (enabled_if
+  (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=+bmi2,+adx"))))
+
+(rule
+ (enabled_if
+  (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=-bmi2,-adx"))))
+
+;;
+;; rules to build the static library for kimchi
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+
+(rule
+ (enabled_if
+  (= %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
+  rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../proof-systems))
- (locks /cargo-lock)
+  (source_tree ../../proof-systems)
+  (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
    (setenv
-    RUSTFLAGS
-    "-C target-feature=+bmi2,+adx"
-    (run cargo build --release))
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
+    CARGO_TARGET_DIR
+    "%{read:dune-build-root}/cargo_kimchi_stubs"
+    (setenv
+     RUSTFLAGS
+     %{read:rustflags.sexp}
+     (run cargo build --release)))
+   (run
+    cp
+    %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    .))))
 
-;; libraries
+;; this is used by nix
+
+(rule
+ (enabled_if
+  (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (targets libwires_15_stubs.a)
+ (deps
+  (env_var MARLIN_PLONK_STUBS))
+ (action
+  (progn
+   (copy
+    %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
+    libwires_15_stubs.a))))
+
+;;
+;; declare the libraries we're going to generate to match the bindings
+;;
 
 (library
  (public_name kimchi_types)
@@ -44,9 +104,7 @@
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
- (libraries kimchi_types)
- (foreign_archives wires_15_stubs)
- (c_library_flags :standard "-lpthread")
+ (libraries kimchi_types pasta_bindings.backend)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests)
@@ -57,32 +115,66 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries
-   pasta_bindings
-   kimchi_types)
+ (libraries pasta_bindings kimchi_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests)
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
+(library
+ (public_name pasta_bindings.backend.native)
+ (name pasta_bindings_backend_native)
+ (modules pasta_bindings_backend)
+ (foreign_archives wires_15_stubs)
+ (c_library_flags :standard "-lpthread")
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test))
+ (implements pasta_bindings.backend))
+
+;;
 ;; generate the OCaml bindings
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (enabled_if
+  (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  Cargo.toml
   ../../../../.ocamlformat
+  Cargo.toml
+  rust-toolchain.toml
   (source_tree src)
-  (source_tree binding_generation)
-  (source_tree ../../proof-systems))
- (locks /cargo-lock)
+  (source_tree ../../proof-systems)
+  (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
-  (chdir
-   binding_generation
-   (progn
-    (run rm -rf ./target)
-    (run rm -f ./Cargo.lock)
-    (run cargo run %{targets})
-    (run ocamlformat -i %{targets})))))
+  (progn
+   (run rm -rf ./target)
+   (run rm -f ./Cargo.lock)
+   (setenv
+    CARGO_TARGET_DIR
+    "%{read:dune-build-root}/cargo_kimchi_bindgen"
+    (run cargo run %{targets}))
+   (run ocamlformat -i %{targets}))))
+
+;; this is used by nix
+
+(rule
+ (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (enabled_if
+  (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (mode promote)
+ (deps
+  ../../../../.ocamlformat
+  (env_var MARLIN_PLONK_STUBS))
+ (action
+  (progn
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
+   (run ocamlformat -i %{targets}))))

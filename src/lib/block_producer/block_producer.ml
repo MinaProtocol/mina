@@ -6,6 +6,16 @@ open Mina_transaction
 open Mina_state
 open Mina_block
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
 
@@ -109,6 +119,47 @@ end = struct
     t.timeout <- Some timeout
 end
 
+(** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
+let report_transaction_inclusion_failures ~logger failed_txns =
+  let num_failures = List.length failed_txns in
+  let count_size = Fn.compose String.length Yojson.Safe.to_string in
+  let wrap_error failed_txns_json =
+    `Assoc
+      [ ( "message"
+        , `String
+            "Some transactions failed to apply to the ledger when creating the \
+             staged ledger diff" )
+      ; ("num_failures", `Int num_failures)
+      ; ("sampled_failures", failed_txns_json)
+      ]
+  in
+  let rec generate_errors failures available_bytes =
+    if available_bytes <= 0 then []
+    else
+      match failures with
+      | [] ->
+          []
+      | (txn, error) :: remaining_failures ->
+          let element =
+            `Assoc
+              [ ("transaction", User_command.Valid.to_yojson txn)
+              ; ("error", Error_json.error_to_yojson error)
+              ]
+          in
+          let element_size = count_size element in
+          (* subtract an additional byte for each element here to account for commas *)
+          element
+          :: generate_errors remaining_failures
+               (available_bytes - element_size - 1)
+  in
+  Node_error_service.send_dynamic_report ~logger
+    ~generate_error:(fun available_bytes ->
+      (* subtract 2 bytes to account for empty string *)
+      let base_error_size = count_size (wrap_error (`String "")) - 2 in
+      (* subtract 2 bytes to account for list brackets that wrap failed_txns *)
+      let leftover_bytes = available_bytes - base_error_size - 2 in
+      wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
+
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
@@ -140,36 +191,47 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       let coinbase_receiver =
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
+
       let diff =
-        let diff =
-          Staged_ledger.create_diff ~constraint_constants staged_ledger
-            ~coinbase_receiver ~logger ~current_state_view:previous_state_view
-            ~transactions_by_fee:transactions ~get_completed_work
-            ~log_block_creation ~supercharge_coinbase
-          |> Result.map_error ~f:(fun err ->
-                 Staged_ledger.Staged_ledger_error.Pre_diff err )
-        in
-        match (diff, block_reward_threshold) with
-        | Ok d, Some threshold ->
-            let net_return =
-              Option.value ~default:Currency.Amount.zero
-                (Staged_ledger_diff.net_return ~constraint_constants
-                   ~supercharge_coinbase
-                   (Staged_ledger_diff.forget d) )
+        O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+            (* TODO: handle transaction inclusion failures here *)
+            let diff_result =
+              Staged_ledger.create_diff ~constraint_constants staged_ledger
+                ~coinbase_receiver ~logger
+                ~current_state_view:previous_state_view
+                ~transactions_by_fee:transactions ~get_completed_work
+                ~log_block_creation ~supercharge_coinbase
+              |> Result.map ~f:(fun (diff, failed_txns) ->
+                     if not (List.is_empty failed_txns) then
+                       don't_wait_for
+                         (report_transaction_inclusion_failures ~logger
+                            failed_txns ) ;
+                     diff )
+              |> Result.map_error ~f:(fun err ->
+                     Staged_ledger.Staged_ledger_error.Pre_diff err )
             in
-            if Currency.Amount.(net_return >= threshold) then diff
-            else (
-              [%log info]
-                "Block reward $reward is less than the min-block-reward \
-                 $threshold, creating empty block"
-                ~metadata:
-                  [ ("threshold", Currency.Amount.to_yojson threshold)
-                  ; ("reward", Currency.Amount.to_yojson net_return)
-                  ] ;
-              Ok Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
-              )
-        | _ ->
-            diff
+            match (diff_result, block_reward_threshold) with
+            | Ok diff, Some threshold ->
+                let net_return =
+                  Option.value ~default:Currency.Amount.zero
+                    (Staged_ledger_diff.net_return ~constraint_constants
+                       ~supercharge_coinbase
+                       (Staged_ledger_diff.forget diff) )
+                in
+                if Currency.Amount.(net_return >= threshold) then diff_result
+                else (
+                  [%log info]
+                    "Block reward $reward is less than the min-block-reward \
+                     $threshold, creating empty block"
+                    ~metadata:
+                      [ ("threshold", Currency.Amount.to_yojson threshold)
+                      ; ("reward", Currency.Amount.to_yojson net_return)
+                      ] ;
+                  Ok
+                    Staged_ledger_diff.With_valid_signatures_and_proofs
+                    .empty_diff )
+            | _ ->
+                diff_result )
       in
       match%map
         let%bind.Deferred.Result diff = return diff in
@@ -254,7 +316,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
                   (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.zero
+                ~default:Currency.Amount.Signed.zero
+            in
+            let body_reference =
+              Staged_ledger_diff.Body.compute_reference
+                (Body.create @@ Staged_ledger_diff.forget diff)
             in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
@@ -267,7 +333,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~registers:next_registers ~genesis_ledger_hash
-                ~staged_ledger_hash:next_staged_ledger_hash
+                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
             in
             let current_time =
               Block_time.now time_controller
@@ -533,15 +599,13 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator t
 end
 
-let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
-    ~get_completed_work ~transaction_resource_pool ~time_controller
-    ~consensus_local_state ~coinbase_receiver ~frontier_reader
+let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
+    ~trust_system ~get_completed_work ~transaction_resource_pool
+    ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
-    ~block_produced_bvar =
+    ~block_reward_threshold ~block_produced_bvar =
+  let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
-      let constraint_constants = precomputed_values.constraint_constants in
-      let consensus_constants = precomputed_values.consensus_constants in
       let genesis_breadcrumb =
         let started = ref false in
         let genesis_breadcrumb_ivar = Ivar.create () in
@@ -581,7 +645,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (scheduled_time, block_data, winner_pk) =
+      let produce ivar (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -650,7 +714,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                   @@ Mina_block.header (With_hash.data previous_transition) )
             in
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions ~logger
+              Network_pool.Transaction_pool.Resource_pool.transactions
                 transaction_resource_pool
               |> Sequence.map
                    ~f:Transaction_hash.User_command_with_valid_signature.data
@@ -663,7 +727,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold
+                ~winner_pk:winner_pubkey ~block_reward_threshold
             in
             match next_state_opt with
             | None ->
@@ -681,11 +745,12 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 in
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [ `Take | `Keep ]]
-                      (Consensus.Hooks.select ~constants:consensus_constants
+                      (Consensus.Hooks.select
+                         ~context:(module Context)
                          ~existing:
                            (With_hash.map ~f:Mina_block.consensus_state
                               previous_transition )
-                         ~candidate:consensus_state_with_hashes ~logger )
+                         ~candidate:consensus_state_with_hashes )
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
@@ -696,9 +761,9 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     in
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select
+                         ~context:(module Context)
                          ~existing:root_consensus_state_with_hashes
-                         ~constants:consensus_constants
-                         ~candidate:consensus_state_with_hashes ~logger )
+                         ~candidate:consensus_state_with_hashes )
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
@@ -744,10 +809,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                             (let body = Body.create staged_ledger_diff in
                              Mina_block.create ~body
                                ~header:
-                                 (Header.create
-                                    ~body_reference:
-                                      (Body_reference.of_body body)
-                                    ~protocol_state ~protocol_state_proof
+                                 (Header.create ~protocol_state
+                                    ~protocol_state_proof
                                     ~delta_block_chain_proof () ) )
                         }
                       |> Validation.skip_time_received_validation
@@ -763,8 +826,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                             `This_block_was_generated_internally
                       >>| Validation.skip_delta_block_chain_validation
                             `This_block_was_not_received_via_gossip
-                      >>= Validation.validate_frontier_dependencies ~logger
-                            ~consensus_constants
+                      >>= Validation.validate_frontier_dependencies
+                            ~context:(module Context)
                             ~root_block:
                               ( Transition_frontier.root frontier
                               |> Breadcrumb.block_with_hash )
@@ -809,7 +872,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         Time.(
                           Span.to_ms
                           @@ diff (now ())
-                          @@ Block_time.to_time scheduled_time)) ;
+                          @@ Block_time.to_time_exn scheduled_time)) ;
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -1147,10 +1210,9 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
               ~f:(fun _ -> start ())
             : unit Block_time.Timeout.t ) )
 
-let run_precomputed ~logger ~verifier ~trust_system ~time_controller
-    ~frontier_reader ~transition_writer ~precomputed_blocks
-    ~(precomputed_values : Precomputed_values.t) =
-  let consensus_constants = precomputed_values.consensus_constants in
+let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
+    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
+  let open Context in
   let log_bootstrap_mode () =
     [%log info] "Pausing block production while bootstrapping"
   in
@@ -1200,11 +1262,12 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
-              (Consensus.Hooks.select ~constants:consensus_constants
+              (Consensus.Hooks.select
+                 ~context:(module Context)
                  ~existing:
                    (With_hash.map ~f:Mina_block.consensus_state
                       previous_transition )
-                 ~candidate:consensus_state_with_hashes ~logger )
+                 ~candidate:consensus_state_with_hashes )
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over \
@@ -1214,9 +1277,10 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               |> Breadcrumb.consensus_state_with_hashes
             in
             [%test_result: [ `Take | `Keep ]]
-              (Consensus.Hooks.select ~existing:root_consensus_state_with_hashes
-                 ~constants:consensus_constants
-                 ~candidate:consensus_state_with_hashes ~logger )
+              (Consensus.Hooks.select
+                 ~context:(module Context)
+                 ~existing:root_consensus_state_with_hashes
+                 ~candidate:consensus_state_with_hashes )
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over the \
@@ -1234,9 +1298,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   (let body = Body.create staged_ledger_diff in
                    Mina_block.create ~body
                      ~header:
-                       (Header.create
-                          ~body_reference:(Body_reference.of_body body)
-                          ~protocol_state ~protocol_state_proof
+                       (Header.create ~protocol_state ~protocol_state_proof
                           ~delta_block_chain_proof () ) )
               }
             |> Validation.skip_time_received_validation
@@ -1252,8 +1314,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state )
-            >>= Validation.validate_frontier_dependencies ~logger
-                  ~consensus_constants
+            >>= Validation.validate_frontier_dependencies
+                  ~context:(module Context)
                   ~root_block:
                     ( Transition_frontier.root frontier
                     |> Breadcrumb.block_with_hash )
@@ -1293,7 +1355,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Mina_metrics.Block_producer.(
             Block_production_delay_histogram.observe block_production_delay
               Time.(
-                Span.to_ms @@ diff (now ()) @@ Block_time.to_time scheduled_time)) ;
+                Span.to_ms
+                @@ diff (now ())
+                @@ Block_time.to_time_exn scheduled_time)) ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
@@ -1348,7 +1412,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         | Some (precomputed_block, precomputed_blocks) ->
             let new_time_offset =
               Time.diff (Time.now ())
-                (Block_time.to_time precomputed_block.Precomputed.scheduled_time)
+                (Block_time.to_time_exn
+                   precomputed_block.Precomputed.scheduled_time )
             in
             [%log info]
               "Changing time offset from $old_time_offset to $new_time_offset"

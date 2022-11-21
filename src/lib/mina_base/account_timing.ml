@@ -161,16 +161,6 @@ let var_of_t (t : t) : var =
 let untimed_var = var_of_t Untimed
 
 let typ : (var, t) Typ.t =
-  let spec =
-    let open Data_spec in
-    [ Boolean.typ
-    ; Balance.typ
-    ; Global_slot.typ
-    ; Amount.typ
-    ; Global_slot.typ
-    ; Amount.typ
-    ]
-  in
   (* because we represent the types t (a sum type) and var (a record) differently,
       we can't use the trick, used elsewhere, of polymorphic to_hlist and of_hlist
       functions to handle both types
@@ -226,8 +216,15 @@ let typ : (var, t) Typ.t =
   in
   let var_of_hlist = As_record.of_hlist in
   let var_to_hlist = As_record.to_hlist in
-  Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
-    ~value_of_hlist
+  Typ.of_hlistable
+    [ Boolean.typ
+    ; Balance.typ
+    ; Global_slot.typ
+    ; Amount.typ
+    ; Global_slot.typ
+    ; Amount.typ
+    ]
+    ~var_to_hlist ~var_of_hlist ~value_to_hlist ~value_of_hlist
 
 (* we can't use the generic if_ with the above typ, because Global_slot.typ doesn't work correctly with it
     so we define a custom if_

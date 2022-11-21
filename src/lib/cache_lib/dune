@@ -15,4 +15,4 @@
    )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf ppx_inline_test ppx_optcomp)))
+ (preprocess (pps ppx_mina ppx_version ppx_base ppx_let ppx_custom_printf ppx_inline_test ppx_optcomp)))

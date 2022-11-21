@@ -120,10 +120,7 @@ macro_rules! impl_projective {
 pub mod pallas {
     use super::*;
     use crate::arkworks::{CamlFp, CamlFq, CamlGPallas, CamlGroupProjectivePallas};
-    use mina_curves::pasta::{
-        fp::Fp,
-        pallas::{Affine as GAffine, Projective},
-    };
+    use mina_curves::pasta::{curves::pallas::ProjectivePallas, Fp, Pallas as GAffine};
 
     impl_projective!(
         pallas,
@@ -132,17 +129,14 @@ pub mod pallas {
         CamlFq,
         Fp,
         CamlFp,
-        Projective
+        ProjectivePallas
     );
 }
 
 pub mod vesta {
     use super::*;
     use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
-    use mina_curves::pasta::{
-        fq::Fq,
-        vesta::{Affine as GAffine, Projective},
-    };
+    use mina_curves::pasta::{curves::vesta::ProjectiveVesta, Fq, Vesta as GAffine};
 
     impl_projective!(
         vesta,
@@ -151,6 +145,6 @@ pub mod vesta {
         CamlFp,
         Fq,
         CamlFq,
-        Projective
+        ProjectiveVesta
     );
 }

@@ -9,13 +9,17 @@ let rec absorb :
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
     -> mask_g1_opt:(g1_opt -> g1)
-    -> (a, < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt >) Type.t
+    -> ( a
+       , < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt ; base_field : f > )
+       Type.t
     -> a
     -> unit =
  fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
   match ty with
   | PC ->
       List.iter ~f:absorb_field (g1_to_field_elements t)
+  | Field ->
+      absorb_field t
   | Scalar ->
       absorb_scalar t
   | Without_degree_bound ->
@@ -35,6 +39,9 @@ let rec absorb :
       let t1, t2 = t in
       absorb ty1 t1 ; absorb ty2 t2
 
+(** [ones_vector (module I) ~first_zero n] returns a vector of booleans of
+   length n which is all ones until position [first_zero], at which it is zero,
+   and zero thereafter. *)
 let ones_vector :
     type f n.
        first_zero:f Snarky_backendless.Cvar.t
@@ -80,7 +87,7 @@ let seal (type f)
   let open Impl in
   match Field.to_constant_and_terms x with
   | None, [ (x, i) ] when Field.Constant.(equal x one) ->
-      Snarky_backendless.Cvar.Var (Impl.Var.index i)
+      Snarky_backendless.Cvar.Var i
   | Some c, [] ->
       Field.constant c
   | _ ->

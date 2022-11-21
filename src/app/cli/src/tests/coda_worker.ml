@@ -111,7 +111,7 @@ module T = struct
     ; validated_transitions_keyswaptest :
         ( 'worker
         , unit
-        , External_transition.Validated.t Pipe.Reader.t )
+        , Mina_block.Validated.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     }
 
@@ -134,7 +134,7 @@ module T = struct
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker : unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest :
-        unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
+        unit -> Mina_block.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff : unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal : unit -> unit Pipe.Reader.t Deferred.t
     ; coda_new_block :
@@ -296,8 +296,7 @@ module T = struct
     let validated_transitions_keyswaptest =
       C.create_pipe ~name:"validated_transitions_keyswaptest"
         ~f:validated_transitions_keyswaptest_impl ~bin_input:Unit.bin_t
-        ~bin_output:
-          [%bin_type_class: External_transition.Validated.Stable.Latest.t] ()
+        ~bin_output:[%bin_type_class: Mina_block.Validated.Stable.Latest.t] ()
 
     let replace_snark_worker_key =
       C.create_rpc ~name:"replace_snark_worker_key"
@@ -362,13 +361,22 @@ module T = struct
         >>| Or_error.ok_exn
       in
       let constraint_constants = precomputed_values.constraint_constants in
+      let module Context = struct
+        let logger = logger
+
+        let precomputed_values = precomputed_values
+
+        let constraint_constants = precomputed_values.constraint_constants
+
+        let consensus_constants = precomputed_values.consensus_constants
+      end in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d )
+            Mina_tracing.start d )
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -401,11 +409,11 @@ module T = struct
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
-            Consensus.Data.Local_state.create block_production_pubkeys
-              ~genesis_ledger:Genesis_ledger.t
+            Consensus.Data.Local_state.create
+              ~context:(module Context)
+              block_production_pubkeys ~genesis_ledger:Genesis_ledger.t
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
-              ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -431,8 +439,8 @@ module T = struct
               ; pubsub_v0 = RW
               ; validation_queue_size = 150
               ; peer_exchange = true
-              ; mina_peer_exchange = true
-              ; keypair = Some libp2p_keypair
+              ; peer_protection_ratio = 0.2
+              ; keypair = libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
               ; time_controller
@@ -457,6 +465,7 @@ module T = struct
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            ; precomputed_values
             }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
@@ -486,10 +495,10 @@ module T = struct
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~epoch_ledger_location
                  ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
-                 ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~block_production_keypairs ~monitor ~consensus_local_state
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000
-                 ~precomputed_values ~start_time ~upload_blocks_to_gcloud:false
+                 ~snark_work_fee:Currency.Fee.zero ~block_production_keypairs
+                 ~monitor ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
@@ -497,16 +506,15 @@ module T = struct
                  ~log_precomputed_blocks:false ~stop_time:48 () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger ~node_error_url:None
-            ~contact_info:None coda_ref ;
+          Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+            ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
-                Coda_run.setup_local_server coda ;
+                Mina_run.setup_local_server coda ;
                 coda )
               ()
           in
@@ -574,10 +582,7 @@ module T = struct
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
-                   let block_with_hash =
-                     External_transition.Validated.lower t
-                     |> Mina_block.Validated.forget
-                   in
+                   let block_with_hash = Mina_block.Validated.forget t in
                    let prev_state_hash =
                      With_hash.data block_with_hash
                      |> Mina_block.header |> Header.protocol_state

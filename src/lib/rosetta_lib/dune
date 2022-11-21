@@ -16,9 +16,11 @@
    sexplib0
    integers
    ;; local libraries
+   mina_wire_types
    hex
    random_oracle_input
    mina_numbers
+   mina_stdlib
    signature_lib
    snark_params
    rosetta_models
@@ -30,7 +32,7 @@
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_assert ppx_let ppx_sexp_conv
+ (preprocess (pps ppx_mina ppx_version ppx_assert ppx_let ppx_sexp_conv
                   ppx_compare ppx_deriving.std ppx_custom_printf
                   ppx_deriving_yojson ppx_inline_test))
  (synopsis "Rosetta-related support code"))

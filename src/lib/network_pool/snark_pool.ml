@@ -436,8 +436,8 @@ struct
                   Gauge.set Snark_work.snark_pool_size
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
+                    ( fee.Mina_base.Fee_with_prover.fee
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =
@@ -504,22 +504,47 @@ struct
                   Error e )
           in
           let work = One_or_two.map proofs ~f:snd in
-          let prover_account_exists =
+          let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            Option.is_some
-              (let%bind ledger = t.best_tip_ledger () in
-               if Deferred.is_determined (Base_ledger.detached_signal ledger)
-               then None
-               else
-                 Account_id.create prover Token_id.default
-                 |> Base_ledger.location_of_account ledger )
+            let%bind ledger = t.best_tip_ledger () in
+            if Deferred.is_determined (Base_ledger.detached_signal ledger) then
+              None
+            else
+              let%bind loc =
+                Account_id.create prover Token_id.default
+                |> Base_ledger.location_of_account ledger
+              in
+              Base_ledger.get ledger loc
+          in
+          let prover_account_exists = Option.is_some account_opt in
+          let prover_permitted_to_receive =
+            let open Option.Let_syntax in
+            let%map account = account_opt in
+            Mina_base.Account.has_permission ~to_:`Receive account
           in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
-              "Prover $prover did not have sufficient balance" ~metadata ;
+              "Snark work did not have sufficient fee to create prover $prover \
+               acccount"
+              ~metadata ;
+            return false )
+          else if
+            Option.value_map ~default:false ~f:not prover_permitted_to_receive
+          then (
+            [%log' warn t.logger]
+              "Snark work prover $prover not permitted to receive fees. \
+               Required permission to receive is $receive_permission"
+              ~metadata:
+                ( ( "receive_permission"
+                  , Mina_base.Permissions.Auth_required.to_yojson
+                      (Option.value_map account_opt
+                         ~default:Mina_base.Permissions.user_default
+                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
+                        .receive )
+                :: metadata ) ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
@@ -993,7 +1018,7 @@ let%test_module "random set test" =
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
@@ -1039,7 +1064,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )
@@ -1158,7 +1183,8 @@ let%test_module "random set test" =
           in
           ignore
             ( ok_exn res1
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1169,7 +1195,8 @@ let%test_module "random set test" =
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1182,7 +1209,8 @@ let%test_module "random set test" =
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1209,7 +1237,8 @@ let%test_module "random set test" =
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

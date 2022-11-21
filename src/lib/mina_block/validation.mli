@@ -13,6 +13,14 @@ open Mina_state
    validation state without using this library as intended. *)
 include module type of Validation_types
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 val validation :
   ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) t
 
@@ -125,18 +133,20 @@ val extract_delta_block_chain_witness :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
      t
-  -> State_hash.t Non_empty_list.t
+  -> State_hash.t Mina_stdlib.Nonempty_list.t
 
 val validate_delta_block_chain :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -144,7 +154,8 @@ val validate_delta_block_chain :
   -> ( ( 'a
        , 'b
        , 'c
-       , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+       , [ `Delta_block_chain ]
+         * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
        , 'd
        , 'e
        , 'f )
@@ -157,7 +168,8 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -165,15 +177,15 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
      with_block
 
 val validate_frontier_dependencies :
-     logger:Logger.t
-  -> consensus_constants:Consensus.Constants.t
+     context:(module CONTEXT)
   -> root_block:Block.with_hash
   -> get_block_by_hash:(State_hash.t -> Block.with_hash option)
   -> ( 'a
@@ -263,6 +275,7 @@ val validate_staged_ledger_diff :
        * [ `Staged_ledger of Staged_ledger.t ]
      , [> `Staged_ledger_application_failed of
           Staged_ledger.Staged_ledger_error.t
+       | `Invalid_body_reference
        | `Invalid_staged_ledger_diff of
          [ `Incorrect_target_staged_ledger_hash
          | `Incorrect_target_snarked_ledger_hash ]

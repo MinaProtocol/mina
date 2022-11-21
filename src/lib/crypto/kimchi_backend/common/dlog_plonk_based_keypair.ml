@@ -45,7 +45,13 @@ module type Inputs_intf = sig
   end
 
   module Constraint_system : sig
-    type t = (Scalar_field.t, Gate_vector.t) Plonk_constraint_system.t
+    type t
+
+    val get_primary_input_size : t -> int
+
+    val get_prev_challenges : t -> int option
+
+    val set_prev_challenges : t -> int -> unit
 
     val finalize_and_get_gates : t -> Gate_vector.t
   end
@@ -53,7 +59,7 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
-    val create : Gate_vector.t -> int -> Urs.t -> t
+    val create : Gate_vector.t -> int -> int -> Urs.t -> t
   end
 
   module Curve : sig
@@ -90,11 +96,7 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Core_kernel
 
-  type t =
-    { index : Inputs.Index.t
-    ; cs :
-        (Inputs.Scalar_field.t, Inputs.Gate_vector.t) Plonk_constraint_system.t
-    }
+  type t = { index : Inputs.Index.t; cs : Inputs.Constraint_system.t }
 
   let name =
     sprintf "%s_%d_v4" Inputs.name (Pickles_types.Nat.to_int Inputs.Rounds.n)
@@ -153,10 +155,23 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create cs =
+  let create ~prev_challenges cs =
     let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
-    let public_input_size = Set_once.get_exn cs.public_input_size [%here] in
-    let index = Inputs.Index.create gates public_input_size (load_urs ()) in
+    let public_input_size =
+      Inputs.Constraint_system.get_primary_input_size cs
+    in
+    let prev_challenges =
+      match Inputs.Constraint_system.get_prev_challenges cs with
+      | None ->
+          Inputs.Constraint_system.set_prev_challenges cs prev_challenges ;
+          prev_challenges
+      | Some prev_challenges' ->
+          assert (prev_challenges = prev_challenges') ;
+          prev_challenges'
+    in
+    let index =
+      Inputs.Index.create gates public_input_size prev_challenges (load_urs ())
+    in
     { index; cs }
 
   let vk t = Inputs.Verifier_index.create t.index

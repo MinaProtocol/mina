@@ -10,6 +10,7 @@
    base
    core_kernel
    ;; local libraries
+   mina_wire_types
    pickles.backend
    string_sign
    snark_params
@@ -20,12 +21,13 @@
    mina_base.import
    mina_signature_kind
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
- (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60))
+ (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60-69))
 
 (executable
  (package client_sdk)
@@ -48,7 +50,11 @@
    signature_lib_nonconsensus
    currency_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
- (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60))
+ (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60-69))

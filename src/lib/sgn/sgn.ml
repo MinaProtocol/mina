@@ -35,7 +35,9 @@ type var = Field.Var.t
 let typ : (var, t) Typ.t =
   let open Typ in
   Typ
-    { check = (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
+    { check =
+        (fun x ->
+          make_checked_ast @@ assert_r1cs x x (Field.Var.constant Field.one) )
     ; var_to_fields = (fun t -> ([| t |], ()))
     ; var_of_fields = (fun (ts, ()) -> ts.(0))
     ; value_to_fields = (fun t -> ([| to_field t |], ()))

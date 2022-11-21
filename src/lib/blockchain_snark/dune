@@ -32,10 +32,12 @@
    sgn
    random_oracle
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    data_hash_lib
-   )
+   ppx_version.runtime
+ )
  (inline_tests)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_compare))
+  (pps ppx_snarky ppx_mina ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))
  (synopsis "blockchain state transition snarking library"))

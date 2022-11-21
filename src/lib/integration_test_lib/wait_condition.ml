@@ -31,8 +31,19 @@ struct
         'b Event_type.t * 'a * ('a -> Node.t -> 'b -> 'a predicate_result)
         -> predicate
 
+  type wait_condition_id =
+    | Nodes_to_initialize
+    | Blocks_to_be_produced
+    | Nodes_to_synchronize
+    | Signed_command_to_be_included_in_frontier
+    | Ledger_proofs_emitted_since_genesis
+    | Block_height_growth
+    | Zkapp_to_be_included_in_frontier
+    | Persisted_frontier_loaded
+
   type t =
-    { description : string
+    { id : wait_condition_id
+    ; description : string
     ; predicate : predicate
     ; soft_timeout : Network_time_span.t
     ; hard_timeout : Network_time_span.t
@@ -44,22 +55,25 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let network_state ~description ~(f : Network_state.t -> bool) : t =
+  let network_state ~id ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
       if f state then Predicate_passed else Predicate_continuation ()
     in
-    { description
+    { id
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Literal (Time.Span.of_hr 1.0)
     ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
 
+  let wait_condition_id t = t.id
+
   let nodes_to_initialize nodes =
     let open Network_state in
-    network_state
+    network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-        |> Printf.sprintf "[%s] to initialize" )
+        |> sprintf "[%s] to initialize" )
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
@@ -87,7 +101,27 @@ struct
       *)
       (2 * n) + 1
     in
-    { description = Printf.sprintf "%d blocks to be produced" n
+    { id = Blocks_to_be_produced
+    ; description = sprintf "%d blocks to be produced" n
+    ; predicate = Network_state_predicate (init, check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let block_height_growth ~height_growth =
+    (* block height is an objective measurement for the whole chain.  block height growth checks that the block height increased by the desired_height since the wait condition was called *)
+    let init state = Predicate_continuation state.block_height in
+    let check initial_height (state : Network_state.t) =
+      if state.block_height - initial_height >= height_growth then
+        Predicate_passed
+      else Predicate_continuation initial_height
+    in
+    let description =
+      sprintf "chain block height greater than equal to [%d] " height_growth
+    in
+    let soft_timeout_in_slots = (2 * height_growth) + 1 in
+    { id = Block_height_growth
+    ; description
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -115,7 +149,8 @@ struct
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
       |> String.concat ~sep:", "
     in
-    { description = Printf.sprintf "%s to synchronize" formatted_nodes
+    { id = Nodes_to_synchronize
+    ; description = sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -148,8 +183,9 @@ struct
     in
 
     let soft_timeout_in_slots = 8 in
-    { description =
-        Printf.sprintf "signed command with hash %s"
+    { id = Signed_command_to_be_included_in_frontier
+    ; description =
+        sprintf "signed command with hash %s"
           (Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
@@ -163,31 +199,31 @@ struct
       else Predicate_continuation ()
     in
     let description =
-      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
-        num_proofs
+      sprintf "[%d] snarked_ledgers to be generated since genesis" num_proofs
     in
-    { description
+    { id = Ledger_proofs_emitted_since_genesis
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots 15
     ; hard_timeout = Slots 20
     }
 
-  let snapp_to_be_included_in_frontier ~has_failures ~parties =
-    let command_matches_parties cmd =
+  let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
+    let command_matches_zkapp_command cmd =
       let open User_command in
       match cmd with
-      | Parties p ->
-          Parties.equal p parties
+      | Zkapp_command p ->
+          Zkapp_command.equal p zkapp_command
       | Signed_command _ ->
           false
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let snapp_opt =
+      let zkapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_parties )
+            |> command_matches_zkapp_command )
       in
-      match snapp_opt with
+      match zkapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
           let successful =
@@ -208,21 +244,40 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
-    { description =
-        sprintf "snapp with fee payer %s and other parties (%s)"
+    { id = Zkapp_to_be_included_in_frontier
+    ; description =
+        sprintf "zkApp with fee payer %s and other zkapp_command (%s), memo: %s"
           (Signature_lib.Public_key.Compressed.to_base58_check
-             parties.fee_payer.body.public_key )
-          (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
-             ~f:(fun acc party ->
+             zkapp_command.fee_payer.body.public_key )
+          (Zkapp_command.Call_forest.Tree.fold_forest ~init:""
+             zkapp_command.account_updates ~f:(fun acc account_update ->
                let str =
                  Signature_lib.Public_key.Compressed.to_base58_check
-                   party.body.public_key
+                   account_update.body.public_key
                in
                if !is_first then (
                  is_first := false ;
                  str )
                else acc ^ ", " ^ str ) )
+          (Signed_command_memo.to_string_hum zkapp_command.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let persisted_frontier_loaded node =
+    let check () event_node
+        (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
+      let event_node_id = Node.id event_node in
+      let node_id = Node.id node in
+      if String.equal event_node_id node_id then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 4 in
+    { id = Persisted_frontier_loaded
+    ; description = "persisted transition frontier to load"
+    ; predicate =
+        Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }

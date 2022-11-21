@@ -13,6 +13,7 @@
    base.caml
    ;; local libraries
    mina_net2
+   mina_stdlib
    inline_test_quiet_logs
    logger
    child_processes
@@ -20,5 +21,5 @@
    file_system
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version))
+ (preprocess (pps ppx_jane ppx_mina ppx_version))
  (inline_tests))

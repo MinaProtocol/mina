@@ -1,6 +1,5 @@
 open Core_kernel
 open Pickles_types
-module Ds = Domains
 
 let bits ~len n = List.init len ~f:(fun i -> (n lsr i) land 1 = 1)
 
@@ -113,23 +112,10 @@ module Max_branches = struct
   let%test "check max_branches" = Nat.to_int n = 1 lsl Nat.to_int Log2.n
 end
 
-module Max_branches_vec = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a At_most.At_most_8.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
-    end
-  end]
-
-  let () =
-    let _f : type a. unit -> (a t, (a, Max_branches.n) At_most.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
-end
-
+(* TODO: remove since it looks very much like the Domains module in the same directory *)
 module Domains = struct
+  [@@@warning "-40-42"]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -137,10 +123,6 @@ module Domains = struct
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
-
-  let iter { h } ~f = f h
-
-  let map { h } ~f = { h = f h }
 end
 
 module Repr = struct
@@ -148,15 +130,10 @@ module Repr = struct
   module Stable = struct
     module V2 = struct
       type 'g t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
+        { max_proofs_verified : Proofs_verified.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
       [@@deriving sexp, equal, compare, yojson]
-
-      let to_latest = Fn.id
     end
   end]
 end
@@ -165,11 +142,12 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('g, 'vk) t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
+      type ('g, 'proofs_verified, 'vk) t =
+            ( 'g
+            , 'proofs_verified
+            , 'vk )
+            Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
+        { max_proofs_verified : 'proofs_verified
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
@@ -178,48 +156,44 @@ module Poly = struct
   end]
 end
 
-let dummy_domains = { Domains.h = Domain.Pow_2_roots_of_unity 0 }
-
-let dummy_width = Width.zero
-
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
-  let [ v1; v2; g1; g2; g3; g4; g5; g6 ] =
-    Plonk_verification_key_evals.to_hlist k
+  let Plonk_verification_key_evals.
+        { sigma_comm
+        ; coefficients_comm
+        ; generic_comm
+        ; psm_comm
+        ; complete_add_comm
+        ; mul_comm
+        ; emul_comm
+        ; endomul_scalar_comm
+        } =
+    k
   in
   List.map
-    (Vector.to_list v1 @ Vector.to_list v2 @ [ g1; g2; g3; g4; g5; g6 ])
+    ( Vector.to_list sigma_comm
+    @ Vector.to_list coefficients_comm
+    @ [ generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ] )
     ~f:g
   |> Array.concat
 
 let wrap_index_to_input (type gs f) (g : gs -> f array) t =
   Random_oracle_input.Chunked.field_elements (index_to_field_elements t ~g)
 
-let width_size = Nat.to_int Width.Length.n
-
 let to_input (type a) ~(field_of_int : int -> a) :
-    (a * a, _) Poly.t -> a Random_oracle_input.Chunked.t =
+    (a * a, _, _) Poly.t -> a Random_oracle_input.Chunked.t =
   let open Random_oracle_input.Chunked in
-  let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.Chunked.t ->
-    let num_branches =
-      packed
-        (field_of_int (At_most.length step_data), Nat.to_int Max_branches.Log2.n)
-    in
-    let step_domains, step_widths =
-      At_most.extend_to_vector step_data
-        (dummy_domains, dummy_width)
-        Max_branches.n
-      |> Vector.unzip
-    in
-    let width w = (field_of_int (Width.to_int w), width_size) in
+  fun Poly.{ max_proofs_verified; wrap_index; wrap_vk = _ } :
+      _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
-      [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
-            map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                packed (field_of_int x, max_log2_degree) ) )
-      ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
-      ; packed (width max_width)
+      [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
+          ~one:(field_of_int 1) max_proofs_verified
       ; wrap_index_to_input
           (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index
-      ; num_branches
       ]

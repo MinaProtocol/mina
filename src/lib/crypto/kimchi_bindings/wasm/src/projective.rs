@@ -119,10 +119,7 @@ pub mod pallas {
     use crate::arkworks::group_projective::WasmPallasGProjective;
     use crate::arkworks::pasta_fp::WasmPastaFp;
     use crate::arkworks::pasta_fq::WasmPastaFq;
-    use mina_curves::pasta::{
-        fp::Fp,
-        pallas::{Affine as GAffine, Projective},
-    };
+    use mina_curves::pasta::{Fp, Pallas as GAffine, ProjectivePallas};
 
     impl_projective!(
         pallas,
@@ -131,7 +128,7 @@ pub mod pallas {
         WasmPastaFq,
         Fp,
         WasmPastaFp,
-        Projective
+        ProjectivePallas
     );
 }
 
@@ -141,10 +138,7 @@ pub mod vesta {
     use crate::arkworks::group_projective::WasmVestaGProjective;
     use crate::arkworks::pasta_fp::WasmPastaFp;
     use crate::arkworks::pasta_fq::WasmPastaFq;
-    use mina_curves::pasta::{
-        fq::Fq,
-        vesta::{Affine as GAffine, Projective},
-    };
+    use mina_curves::pasta::{Fq, ProjectiveVesta, Vesta as GAffine};
 
     impl_projective!(
         vesta,
@@ -153,27 +147,6 @@ pub mod vesta {
         WasmPastaFp,
         Fq,
         WasmPastaFq,
-        Projective
+        ProjectiveVesta
     );
 }
-
-/*
-pub mod vesta {
-    use super::*;
-    use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
-    use mina_curves::pasta::{
-        fq::Fq,
-        vesta::{Affine as GAffine, Projective},
-    };
-
-    impl_projective!(
-        vesta,
-        CamlGroupProjectiveVesta,
-        CamlGVesta,
-        CamlFp,
-        Fq,
-        CamlFq,
-        Projective
-    );
-}
-*/

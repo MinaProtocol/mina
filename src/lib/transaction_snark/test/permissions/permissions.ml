@@ -8,7 +8,7 @@ struct
     Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
 
   let snapp_update =
-    { Party.Update.dummy with
+    { Account_update.Update.dummy with
       permissions =
         Zkapp_basic.Set_or_keep.Set
           { Permissions.user_default with

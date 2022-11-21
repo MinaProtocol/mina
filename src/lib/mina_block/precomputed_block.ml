@@ -69,7 +69,9 @@ include T
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  [@@@with_versioned_json]
+
+  module V3 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
@@ -82,12 +84,15 @@ module Stable = struct
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
-          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
 
     let to_latest = Fn.id
   end
 end]
+
+(* functions for the versioned json, not the unversioned ones provided by `T` *)
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -158,7 +163,8 @@ let of_block ~logger
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
-  ; staged_ledger_diff = Body.staged_ledger_diff (Block.body block)
+  ; staged_ledger_diff =
+      Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; accounts_accessed
   ; accounts_created
@@ -169,16 +175,14 @@ let of_block ~logger
     If the underlying types change, you should write a conversion, or add
     optional fields and handle them appropriately.
 *)
+(* But if you really need to update it, see output of CLI command:
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "Sexp serialization is stable" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_sexp
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
   ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
 
 let%test_unit "Sexp serialization roundtrips" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_sexp
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
   let sexp = Sexp.of_string serialized_block in
   let sexp_roundtrip = sexp_of_t @@ t_of_sexp sexp in
   [%test_eq: Sexp.t] sexp sexp_roundtrip
@@ -187,10 +191,10 @@ let%test_unit "Sexp serialization roundtrips" =
     If the underlying types change, you should write a conversion, or add
     optional fields and handle them appropriately.
 *)
+(* But if you really need to update it, see output of CLI command:
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "JSON serialization is stable" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_json
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_json in
   match of_yojson @@ Yojson.Safe.from_string serialized_block with
   | Ok _ ->
       ()
@@ -198,9 +202,7 @@ let%test_unit "JSON serialization is stable" =
       failwith err
 
 let%test_unit "JSON serialization roundtrips" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_json
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_json in
   let json = Yojson.Safe.from_string serialized_block in
   let json_roundtrip =
     match Result.map ~f:to_yojson @@ of_yojson json with

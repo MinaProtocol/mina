@@ -18,6 +18,7 @@
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    transaction_snark
    snark_params
    mina_ledger
@@ -36,8 +37,9 @@
    with_hash
    random_oracle
    sexplib0
+   zkapp_command_builder
    )
   (link_flags (-linkall))
   (preprocess
-    (pps ppx_coda ppx_snarky ppx_version ppx_jane))
+    (pps ppx_mina ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

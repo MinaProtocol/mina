@@ -6,6 +6,16 @@ open Mina_block
 open Frontier_base
 module Database = Database
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
@@ -180,9 +190,10 @@ module Instance = struct
          ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
-  let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~precomputed_values
+  let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
+      ~consensus_local_state ~max_length ~ignore_consensus_local_state
       ~persistent_root_instance =
+    let open Context in
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
@@ -229,10 +240,11 @@ module Instance = struct
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
-      Full_frontier.create ~logger:t.factory.logger
+      Full_frontier.create
+        ~context:(module Context)
         ~time_controller:t.factory.time_controller
         ~root_data:
-          { transition = External_transition.Validated.lift root_transition
+          { transition = root_transition
           ; staged_ledger = root_staged_ledger
           ; protocol_states =
               List.map protocol_states
@@ -242,8 +254,7 @@ module Instance = struct
           (Mina_ledger.Ledger.Any_ledger.cast
              (module Mina_ledger.Ledger.Db)
              root_ledger )
-        ~consensus_local_state ~max_length ~precomputed_values
-        ~persistent_root_instance
+        ~consensus_local_state ~max_length ~persistent_root_instance
     in
     let%bind extensions =
       Deferred.map
@@ -339,8 +350,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-          @@ Mina_block.Validated.state_hash
-               (External_transition.Validated.lower root_transition) )
+          @@ Mina_block.Validated.state_hash root_transition )
       ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in

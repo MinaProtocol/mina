@@ -1,17 +1,4 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-
-(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
-module Mina_currency = Currency
-open Rosetta_models
-module Signature = Mina_base.Signature
-module Transaction = Rosetta_lib.Transaction
-module Public_key = Signature_lib.Public_key
-module Signed_command_payload = Mina_base.Signed_command_payload
-module User_command = Mina_base.User_command
-module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_transaction.Transaction_hash
+module Scalars = Graphql_lib.Scalars
 
 module Get_options_metadata =
 [%graphql
@@ -20,7 +7,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee @bsDecoder(fn: "Decoders.uint64")
+            fee @ppxCustom(module: "Scalars.UInt64")
           }
         }
       }
@@ -31,7 +18,7 @@ module Get_options_metadata =
 
       account(publicKey: $sender, token: $token_id) {
         balance {
-          blockHeight @bsDecoder(fn: "Decoders.uint32")
+          blockHeight @ppxCustom(module: "Scalars.UInt32")
           stateHash
         }
         nonce
@@ -46,10 +33,14 @@ module Get_options_metadata =
 module Send_payment =
 [%graphql
 {|
-  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
-    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
+  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64,
+                $amount: UInt64!, $fee: UInt64!, $validUntil: UInt64,
+                $memo: String, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input:
+                  {from: $from, to:$to_, token:$token, amount:$amount,
+                  fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
   }}
   |}]
@@ -66,11 +57,27 @@ mutation ($sender: PublicKey!,
   sendDelegation(signature: {rawSignature: $signature}, input:
     {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
     delegation {
-      hash
+      hash @ppxCustom(module: "Scalars.String_json")
     }
   }
 }
 |}]
+
+(* Avoid shadowing graphql_ppx functions *)
+open Core_kernel
+open Async
+open Rosetta_lib
+
+(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
+module Mina_currency = Currency
+open Rosetta_models
+module Signature = Mina_base.Signature
+module Transaction = Rosetta_lib.Transaction
+module Public_key = Signature_lib.Public_key
+module Signed_command_payload = Mina_base.Signed_command_payload
+module User_command = Mina_base.User_command
+module Signed_command = Mina_base.Signed_command
+module Transaction_hash = Mina_transaction.Transaction_hash
 
 module Options = struct
   type t =
@@ -231,7 +238,7 @@ module Metadata = struct
       { gql =
           (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
-              (Get_options_metadata.make
+              Get_options_metadata.(make @@ makeVariables
                  ~sender:
                    (`String (Public_key.Compressed.to_base58_check address))
                    (* for now, nonce is based on the fee payer's account using the default token,
@@ -308,7 +315,7 @@ module Metadata = struct
           ~graphql_uri
       in
       let%bind account =
-        match res#account with
+        match res.Get_options_metadata.account with
         | None ->
             M.fail
               (Errors.create
@@ -317,23 +324,19 @@ module Metadata = struct
         | Some account ->
             M.return account
       in
-      let nonce =
-        Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
-          account#nonce
-        |> Option.value ~default:Unsigned.UInt32.zero
+      let nonce = Option.value ~default:Unsigned.UInt32.zero account.nonce
       in
       (* suggested fee *)
       (* Take the median of all the fees in blocks and add a bit extra using
        * the interquartile range *)
       let%map suggested_fee =
         let%map fees =
-          match res#bestChain with
+          match res.bestChain with
           | Some chain ->
               let a =
                 Array.fold chain ~init:[] ~f:(fun fees block ->
-                    Array.fold block#transactions#userCommands ~init:fees
-                      ~f:(fun fees (`UserCommand cmd) -> cmd#fee :: fees))
+                    Array.fold block.transactions.userCommands ~init:fees
+                      ~f:(fun fees cmd -> cmd.fee :: fees))
                 |> Array.of_list
               in
               Array.sort a ~compare:Unsigned_extended.UInt64.compare ;
@@ -360,7 +363,7 @@ module Metadata = struct
           ]
       in
       let receiver_exists =
-        Option.is_some res#receiver
+        Option.is_some res.receiver
       in
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
@@ -538,7 +541,7 @@ module Payloads = struct
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }
@@ -821,27 +824,25 @@ end
 module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
-      type t =
-        { nonce: int64
-        ; source: string
-        ; receiver: string
-        ; amount: int64
-        ; fee: int64
+      type params =
+        { nonce : int64
+        ; source : string
+        ; receiver : string
+        ; amount : string
+        ; fee : string
         }
       [@@deriving hlist]
 
-      let typ =
+      let params_typ =
         let open Mina_caqti.Type_spec in
-        let spec =
-          Caqti_type.[int64; string; string; int64; int64]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        let spec = Caqti_type.[ int64; string; string; string; string ] in
+        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
+        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
         Caqti_request.find_opt
-          typ
+          params_typ
           Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
@@ -859,12 +860,12 @@ module Submit = struct
           { nonce = (UInt32.to_int64 nonce)
           ; source
           ; receiver
-          ; amount = (UInt64.to_int64 amount)
-          ; fee = (UInt64.to_int64 fee) }
+          ; amount = UInt64.to_string amount
+          ; fee = UInt64.to_string fee
+          }
         |> Deferred.Result.map ~f:Option.is_some
     end
   end
-
 
   module Env = struct
     module T (M : Monad_fail.S) = struct
@@ -914,7 +915,7 @@ module Submit = struct
         { gql_payment =
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
-                (Send_payment.make ~from:(`String payment.from)
+                Send_payment.(make @@ makeVariables ~from:(`String payment.from)
                    ~to_:(`String payment.to_) ~token:(`String payment.token)
                    ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
@@ -924,7 +925,7 @@ module Submit = struct
         ; gql_delegation =
             (fun ~delegation ~signature () ->
               Graphql.query
-                (Send_delegation.make ~sender:(`String delegation.delegator)
+                Send_delegation.(make @@ makeVariables ~sender:(`String delegation.delegator)
                    ~receiver:(`String delegation.new_delegate)
                    ~fee:
                      (uint64 delegation.fee)
@@ -1007,8 +1008,7 @@ module Submit = struct
             | `Successful res ->
                let cache = Lazy.force submitted_cache in
                Cache.add cache txn;
-               let (`UserCommand payment) = res#sendPayment#payment in
-               M.return payment#hash
+               M.return res.Send_payment.sendPayment.payment.hash
             | `Failed e ->
                let cache = Lazy.force submitted_cache in
                if
@@ -1038,8 +1038,7 @@ module Submit = struct
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
             in
-            let (`UserCommand delegation) = res#sendDelegation#delegation in
-            delegation#hash
+            res.Send_delegation.sendDelegation.delegation.hash
         | _ ->
             M.fail
               (Errors.create

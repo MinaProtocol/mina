@@ -17,18 +17,20 @@ mina:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 archive:
   hostPort: "10909"
   image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
   # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
   remoteSchemaFile: "create_schema.sql"
-  remoteSchemaAuxFiles: 
+  remoteSchemaAuxFiles:
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
     - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
-  postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.postgresql.auth.database }}
   ports:
     server: 3086
     postgres: "5432"
@@ -37,11 +39,20 @@ archive:
   enablePostgresDB: true
 
 postgresql:
-  postgresqlPassword: "foobar"
-  postgresqlUsername: "postgres"
+  primary:
+    name: "archive"
+    persistence:
+      enabled: false
+    initdb:
+      user: "mina"
+      password: "zo3moong7moog4Iep7eNgo3iecaesahH"
+  auth:
+    username: "mina"
+    password: "zo3moong7moog4Iep7eNgo3iecaesahH"
+    database: "archive"
 
 nodeSelector:
-  preemptible: false
+  preemptible: true
 
 healthcheck:
   enabled: true

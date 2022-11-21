@@ -14,6 +14,8 @@
    sexplib0
    extlib
    ;;local libraries
+   o1trace
+   mina_metrics
    trust_system
    truth
    staged_ledger
@@ -38,7 +40,19 @@
    verifier
    with_hash
    debug_assert
-   non_empty_list
-   )
+   mina_stdlib
+   ppx_version.runtime
+   pickles.backend
+   snark_params
+   pickles
+   kimchi_backend
+   sgn
+   sgn_type
+   currency
+   mina_numbers
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_bin_prot ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_bin_prot ppx_deriving_yojson)))

@@ -15,8 +15,10 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
-    type t =
+  [@@@with_versioned_json]
+
+  module V3 : sig
+    type nonrec t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
@@ -27,7 +29,7 @@ module Stable : sig
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
-          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
   end
 end]

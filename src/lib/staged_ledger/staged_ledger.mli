@@ -112,7 +112,9 @@ val of_scan_state_and_ledger_unchecked :
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
-  t -> (Transaction.t With_status.t * State_hash.t) Non_empty_list.t option
+     t
+  -> (Transaction.t With_status.t * State_hash.t) Mina_stdlib.Nonempty_list.t
+     option
 
 val copy : t -> t
 
@@ -173,6 +175,7 @@ val create_diff :
         -> Transaction_snark_work.Checked.t option )
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       * (User_command.Valid.t * Error.t) list
      , Pre_diff_info.Error.t )
      Result.t
 
@@ -221,7 +224,7 @@ val check_commands :
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
 
-(** account ids created in the latest block, taken from the previous_empty_accounts
+(** account ids created in the latest block, taken from the new_accounts
     in the latest and next-to-latest trees of the scan state
 *)
 val latest_block_accounts_created :

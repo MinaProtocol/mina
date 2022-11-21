@@ -12,10 +12,12 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
+let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(trials : Natural) -> \(cmd_target : Size) ->
+  let trials = Natural/show trials in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path}",
+      commands = RunInToolchain.runInToolchainStretch ([] : List Text)
+        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${trials}",
       label = "Fuzzy zkapp unit tests",
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
@@ -43,6 +45,6 @@ Pipeline.build
         name = "FuzzyZkappTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 20 Size.Small
     ]
   }

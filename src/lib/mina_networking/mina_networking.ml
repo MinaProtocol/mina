@@ -47,6 +47,7 @@ module Rpcs = struct
      types.
   *)
 
+  [%%versioned_rpc
   module Get_some_initial_peers = struct
     module Master = struct
       let name = "get_some_initial_peers"
@@ -84,10 +85,9 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = unit [@@deriving bin_io, version { rpc }]
+        type query = unit
 
         type response = Network_peer.Peer.Stable.V1.t list
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -109,8 +109,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     module Master = struct
       let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
@@ -158,7 +159,7 @@ module Rpcs = struct
 
     module V2 = struct
       module T = struct
-        type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
+        type query = State_hash.Stable.V1.t
 
         type response =
           ( Staged_ledger.Scan_state.Stable.V2.t
@@ -166,7 +167,6 @@ module Rpcs = struct
           * Pending_coinbase.Stable.V2.t
           * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -188,8 +188,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Answer_sync_ledger_query = struct
     module Master = struct
       let name = "answer_sync_ledger_query"
@@ -228,10 +229,10 @@ module Rpcs = struct
     module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
+        [@@deriving sexp]
 
         type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
+        [@@deriving sexp]
 
         let query_of_caller_model = Fn.id
 
@@ -253,8 +254,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_transition_chain = struct
     module Master = struct
       let name = "get_transition_chain"
@@ -292,21 +294,17 @@ module Rpcs = struct
 
     module V2 = struct
       module T = struct
-        type query = State_hash.Stable.V1.t list
-        [@@deriving bin_io, sexp, version { rpc }]
+        type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-        type response = External_transition.Raw.Stable.V2.t list option
-        [@@deriving bin_io, version { rpc }]
+        type response = Mina_block.Stable.V2.t list option
 
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          Option.map ~f:(List.map ~f:External_transition.compose)
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          Option.map ~f:(List.map ~f:External_transition.decompose)
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -320,8 +318,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_transition_chain_proof = struct
     module Master = struct
       let name = "get_transition_chain_proof"
@@ -359,12 +358,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = State_hash.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
+        type query = State_hash.Stable.V1.t [@@deriving sexp]
 
         type response =
           (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -386,8 +383,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_transition_knowledge = struct
     module Master = struct
       let name = "Get_transition_knowledge"
@@ -425,10 +423,9 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = unit [@@deriving bin_io, sexp, version { rpc }]
+        type query = unit [@@deriving sexp]
 
         type response = State_hash.Stable.V1.t list
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -450,12 +447,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
-  let map_proof_caryying_data_option ~f =
-    Option.map ~f:(fun { Proof_carrying_data.data; proof = hashes, block } ->
-        { Proof_carrying_data.data = f data; proof = (hashes, f block) } )
-
+  [%%versioned_rpc
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -503,25 +497,21 @@ module Rpcs = struct
           ( Consensus.Data.Consensus_state.Value.Stable.V1.t
           , State_hash.Stable.V1.t )
           With_hash.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
+        [@@deriving sexp]
 
         type response =
-          ( External_transition.Raw.Stable.V2.t
-          , State_body_hash.Stable.V1.t list
-            * External_transition.Raw.Stable.V2.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          map_proof_caryying_data_option ~f:External_transition.compose
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          map_proof_caryying_data_option ~f:External_transition.decompose
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -535,8 +525,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Ban_notify = struct
     module Master = struct
       let name = "ban_notify"
@@ -574,10 +565,9 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Core.Time.Stable.V1.t
-        [@@deriving bin_io, sexp, version { rpc }]
+        type query = Core.Time.Stable.V1.t [@@deriving sexp]
 
-        type response = unit [@@deriving bin_io, version { rpc }]
+        type response = unit
 
         let query_of_caller_model = Fn.id
 
@@ -599,8 +589,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_best_tip = struct
     module Master = struct
       let name = "get_best_tip"
@@ -641,25 +632,21 @@ module Rpcs = struct
 
     module V2 = struct
       module T = struct
-        type query = unit [@@deriving bin_io, sexp, version { rpc }]
+        type query = unit [@@deriving sexp]
 
         type response =
-          ( External_transition.Raw.Stable.V2.t
-          , State_body_hash.Stable.V1.t list
-            * External_transition.Raw.Stable.V2.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          map_proof_caryying_data_option ~f:External_transition.compose
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          map_proof_caryying_data_option ~f:External_transition.decompose
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -673,8 +660,9 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
+  [%%versioned_rpc
   module Get_node_status = struct
     module Node_status = struct
       [%%versioned
@@ -805,10 +793,9 @@ module Rpcs = struct
 
     module V2 = struct
       module T = struct
-        type query = unit [@@deriving bin_io, sexp, version { rpc }]
+        type query = unit [@@deriving sexp]
 
         type response = Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -833,10 +820,9 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = unit [@@deriving bin_io, sexp, version { rpc }]
+        type query = unit [@@deriving sexp]
 
         type response = Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
-        [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
@@ -878,7 +864,7 @@ module Rpcs = struct
       include T'
       include Register (T')
     end
-  end
+  end]
 
   type ('query, 'response) rpc =
     | Get_some_initial_peers
@@ -1014,6 +1000,7 @@ module Config = struct
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; precomputed_values : Precomputed_values.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
@@ -1080,7 +1067,14 @@ let create (config : Config.t) ~sinks
     ~(get_transition_knowledge :
           Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
        -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
-  let logger = config.logger in
+  let module Context = struct
+    let logger = config.logger
+
+    let consensus_constants = config.precomputed_values.consensus_constants
+
+    let constraint_constants = config.constraint_constants
+  end in
+  let open Context in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
@@ -1398,7 +1392,8 @@ let create (config : Config.t) ~sinks
     ]
     @ Consensus.Hooks.Rpcs.(
         List.map
-          (rpc_handlers ~logger:config.logger
+          (rpc_handlers
+             ~context:(module Context)
              ~local_state:config.consensus_local_state
              ~genesis_ledger_hash:
                (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )

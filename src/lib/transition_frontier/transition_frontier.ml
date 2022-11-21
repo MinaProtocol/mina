@@ -7,7 +7,6 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-open Mina_block
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -16,6 +15,16 @@ module Persistent_frontier = Persistent_frontier
 module Catchup_tree = Catchup_tree
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
 
 let max_catchup_chunk_length = 20
 
@@ -51,10 +60,12 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event { msg = "Applying diffs: $diffs" }]
 
+type Structured_log_events.t += Persisted_frontier_loaded
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let transition =
-    External_transition.Validated.lift @@ Mina_block.Validated.lift
-    @@ Mina_block.genesis ~precomputed_values
+    Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
   in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
@@ -68,10 +79,11 @@ let genesis_root_data ~precomputed_values =
   Root_data.Limited.create ~transition ~scan_state ~pending_coinbase
     ~protocol_states
 
-let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
-    ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
-    ~persistent_frontier_instance ~precomputed_values ~catchup_mode
-    ignore_consensus_local_state =
+let load_from_persistence_and_start ~context:(module Context : CONTEXT)
+    ~verifier ~consensus_local_state ~max_length ~persistent_root
+    ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
+    ~catchup_mode ignore_consensus_local_state =
+  let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
     match
@@ -105,19 +117,23 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           Error (`Failure msg) )
   in
   let%bind full_frontier, extensions =
-    Deferred.map
-      (Persistent_frontier.Instance.load_full_frontier
-         persistent_frontier_instance ~max_length
-         ~root_ledger:
-           (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state ~ignore_consensus_local_state
-         ~precomputed_values ~persistent_root_instance )
-      ~f:
-        (Result.map_error ~f:(function
-          | `Sync_cannot_be_running ->
-              `Failure "sync job is already running on persistent frontier"
-          | `Failure _ as err ->
-              err ) )
+    O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
+        let open Deferred.Let_syntax in
+        match%map
+          Persistent_frontier.Instance.load_full_frontier
+            ~context:(module Context)
+            persistent_frontier_instance ~max_length
+            ~root_ledger:
+              (Persistent_root.Instance.snarked_ledger persistent_root_instance)
+            ~consensus_local_state ~ignore_consensus_local_state
+            ~persistent_root_instance
+        with
+        | Error `Sync_cannot_be_running ->
+            Error (`Failure "sync job is already running on persistent frontier")
+        | Error (`Failure _) as err ->
+            err
+        | Ok result ->
+            Ok result )
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
@@ -149,53 +165,80 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   }
 
 let rec load_with_max_length :
-       max_length:int
+       context:(module CONTEXT)
+    -> max_length:int
     -> ?retry_with_fresh_db:bool
-    -> logger:Logger.t
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> unit
     -> ( t
        , [> `Bootstrap_required
          | `Persistent_frontier_malformed
+         | `Snarked_ledger_mismatch
          | `Failure of string ] )
        Deferred.Result.t =
- fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
-     ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~precomputed_values ~catchup_mode () ->
+ fun ~context:(module Context : CONTEXT) ~max_length
+     ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
+     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+  let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state
       ~snarked_ledger_hash =
+    let snarked_ledger_hash_json =
+      Frozen_ledger_hash.to_yojson snarked_ledger_hash
+    in
     match
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
-    | Error _ as err ->
+    | Error _err as err_result ->
+        (* _err has type [> `Snarked_ledger_mismatch ] *)
+        [%log warn] "Persisted frontier failed to load"
+          ~metadata:
+            [ ("error", `String "SNARKed ledger mismatch on load from disk")
+            ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+            ] ;
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        err
+        err_result
     | Ok persistent_root_instance -> (
         match%bind
-          load_from_persistence_and_start ~logger ~verifier
-            ~consensus_local_state ~max_length ~persistent_root
+          load_from_persistence_and_start
+            ~context:(module Context)
+            ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ~precomputed_values
-            ignore_consensus_local_state
+            ~persistent_frontier_instance ignore_consensus_local_state
         with
         | Ok _ as result ->
+            [%str_log trace] Persisted_frontier_loaded ;
             return result
-        | Error _ as err ->
+        | Error err as err_result ->
+            let err_str =
+              match err with
+              | `Failure msg ->
+                  sprintf "Failure: %s" msg
+              | `Bootstrap_required ->
+                  "Bootstrap required"
+              (* next two cases aren't reachable, needed for types to work out *)
+              | `Snarked_ledger_mismatch | `Persistent_frontier_malformed ->
+                  failwith "Unexpected failure on loading transition frontier"
+            in
+            [%log warn] "Persisted frontier failed to load"
+              ~metadata:
+                [ ("error", `String err_str)
+                ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+                ] ;
+
             let%map () =
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
             Persistent_root.Instance.close persistent_root_instance ;
-            err )
+            err_result )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
@@ -264,9 +307,10 @@ let rec load_with_max_length :
         let%bind () =
           Persistent_frontier.destroy_database_exn persistent_frontier
         in
-        load_with_max_length ~max_length ~logger ~verifier
-          ~consensus_local_state ~persistent_root ~persistent_frontier
-          ~retry_with_fresh_db:false ~precomputed_values ~catchup_mode ()
+        load_with_max_length
+          ~context:(module Context)
+          ~max_length ~verifier ~consensus_local_state ~persistent_root
+          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -292,14 +336,17 @@ let rec load_with_max_length :
       | res ->
           return res )
 
-let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~precomputed_values ~catchup_mode () =
+let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
+    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
+    ~catchup_mode () =
+  let open Context in
   let max_length =
     global_max_length (Precomputed_values.genesis_constants precomputed_values)
   in
-  load_with_max_length ~max_length ~retry_with_fresh_db ~logger ~verifier
-    ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~precomputed_values ~catchup_mode ()
+  load_with_max_length
+    ~context:(module Context)
+    ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~catchup_mode ()
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -377,9 +424,6 @@ let add_breadcrumb_exn t breadcrumb =
     Mina_block.Validated.valid_commands
     @@ Breadcrumb.validated_transition breadcrumb
   in
-  (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
-     command or snapp command
-  *)
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"
@@ -615,6 +659,17 @@ module For_tests = struct
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
           ~precomputed_values ()) ~max_length ~size
       ?(use_super_catchup : bool option) () =
+    (* TODO: Take this as an argument *)
+    let module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = precomputed_values.constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end in
+    let open Context in
     let open Quickcheck.Generator.Let_syntax in
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
@@ -627,11 +682,11 @@ module For_tests = struct
       Option.value consensus_local_state
         ~default:
           (Consensus.Data.Local_state.create
+             ~context:(module Context)
              ~genesis_ledger:
                (Precomputed_values.genesis_ledger precomputed_values)
              ~genesis_epoch_data:precomputed_values.genesis_epoch_data
              ~epoch_ledger_location Public_key.Compressed.Set.empty
-             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
              ~genesis_state_hash:
                (State_hash.With_state_hashes.state_hash
                   precomputed_values.protocol_state_with_hashes ) )
@@ -646,15 +701,13 @@ module For_tests = struct
              (Quickcheck.Generator.return root)
              (Breadcrumb.For_tests.gen_non_deferred ~logger ~precomputed_values
                 ~verifier ~trust_system
-                ~accounts_with_secret_keys:root_ledger_accounts ) )
+                ~accounts_with_secret_keys:root_ledger_accounts () ) )
       in
       (root, branches, protocol_states)
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:
-          ( External_transition.Validated.lift
-          @@ Breadcrumb.validated_transition root )
+        ~transition:(Breadcrumb.validated_transition root)
         ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
@@ -672,14 +725,14 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         let transition = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
-          ( Mina_block.Validated.state_hash
-          @@ External_transition.Validated.lower transition ) ;
+          (Mina_block.Validated.state_hash transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
+          load_with_max_length ~max_length ~retry_with_fresh_db:false
+            ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
             ~catchup_mode:
               ( match use_super_catchup with
@@ -689,7 +742,7 @@ module For_tests = struct
                   `Normal
               | None ->
                   `Normal )
-            ~persistent_frontier ~precomputed_values () )
+            ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

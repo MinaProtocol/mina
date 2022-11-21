@@ -21,17 +21,20 @@
    uri
    core_kernel
    core
+   base
    async
    cohttp
    graphql_parser
    async.async_command
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    graphql-cohttp
    cohttp-async
    graphql-async
-   archive_lib
    ;;local libraries
+   archive_lib
+   mina_wire_types
    perf_histograms
    one_or_two
    block_time
@@ -57,6 +60,7 @@
    o1trace_webkit_event
    generated_graphql_queries
    mina_transaction
+   mina_generators
    mina_user_error
    mina_ledger
    mina_block
@@ -77,6 +81,7 @@
    precomputed_values
    with_hash
    transaction_snark
+   transaction_snark_tests
    transaction_protocol_state
    test_util
    file_system
@@ -96,7 +101,26 @@
    snark_work_lib
    mina_compile_config
    mina_transaction_logic
+   verifier
+   parallel
+   random_oracle
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pickles_types
+   pickles
+   pickles.backend
+   snark_params
+   zkapp_command_builder
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)
- (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocessor_deps ../../../../config.mlh
+                    ../../../../../graphql_schema.json
+                    ../../../../graphql-ppx-config.inc)
+ (preprocess (pps ppx_deriving_yojson ppx_mina ppx_version
+                  ; ppx_jane except ppx_optcomp
+                  ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf
+                  ppx_fields_conv ppx_fixed_literal ppx_here ppx_inline_test ppx_let
+                  ppx_module_timer ppx_optional ppx_pipebang ppx_sexp_message
+                  ppx_sexp_value ppx_string ppx_typerep_conv ppx_variants_conv
+                  graphql_ppx -- %{read-lines:../../../../graphql-ppx-config.inc})))

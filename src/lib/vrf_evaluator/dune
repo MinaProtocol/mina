@@ -13,6 +13,7 @@
    sexplib0
    base.caml
    ;; local libraries
+   mina_wire_types
    error_json
    currency
    unsigned_extended
@@ -25,7 +26,8 @@
    genesis_constants
    logger
    logger.file_system
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))

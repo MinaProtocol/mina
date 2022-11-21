@@ -1,7 +1,3 @@
-open Core
-open Snark_params
-open Tick
-
 (** Transactions included in a block with the associated block data which is the protocol state body of the previous block. TODO: This will change to current block*)
 
 module Block_data : sig
@@ -17,7 +13,7 @@ module Block_data : sig
 
   val typ :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> (var, t) Typ.t
+    -> (var, t) Snark_params.Tick.Typ.t
 end
 
 module Poly : sig

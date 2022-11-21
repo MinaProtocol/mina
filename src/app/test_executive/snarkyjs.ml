@@ -15,9 +15,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_fee_payer_balance = Currency.Balance.of_formatted_string "8000000"
+  let initial_fee_payer_balance = Currency.Balance.of_mina_string_exn "8000000"
 
-  let zkapp_target_balance = Currency.Balance.of_formatted_string "10"
+  let zkapp_target_balance = Currency.Balance.of_mina_string_exn "10"
 
   let config =
     let open Test_config in
@@ -25,8 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance =
-              Currency.Balance.to_formatted_string initial_fee_payer_balance
+        [ { balance = Currency.Balance.to_mina_string initial_fee_payer_balance
           ; timing = Untimed
           }
         ]
@@ -47,7 +46,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let wait_for_zkapp parties =
+    let wait_for_zkapp zkapp_command =
       let with_timeout =
         let soft_timeout = Network_time_span.Slots 3 in
         let hard_timeout = Network_time_span.Slots 4 in
@@ -55,8 +54,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
-             ~parties
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+             ~zkapp_command
       in
       [%log info] "zkApp transaction included in transition frontier"
     in
@@ -81,12 +80,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         | `Deploy ->
             ("deploy", "0")
         | `Update ->
-            ("update", "2")
+            ("update", "1")
       in
       (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
       [%log info] "Running JS script with command $jscommand"
         ~metadata:[ ("jscommand", `String which_str) ] ;
-      let%bind.Deferred parties_contract_str, unit_with_error =
+      let%bind.Deferred zkapp_command_contract_str, unit_with_error =
         Deferred.both
           (let%bind.Deferred process =
              Async_unix.Process.create_exn
@@ -103,27 +102,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            wait_and_stdout ~logger process )
           (wait_for t (Wait_condition.node_to_initialize node))
       in
-      let parties_contract =
-        Mina_base.Parties.of_json (Yojson.Safe.from_string parties_contract_str)
+      let zkapp_command_contract =
+        Mina_base.Zkapp_command.of_json
+          (Yojson.Safe.from_string zkapp_command_contract_str)
       in
       let%bind () = Deferred.return unit_with_error in
       (* TODO: switch to external sending script once the rest is working *)
-      let%bind () = send_zkapp ~logger node parties_contract in
-      return parties_contract
+      let%bind () = send_zkapp ~logger node zkapp_command_contract in
+      return zkapp_command_contract
     in
-    let%bind parties_deploy_contract = make_sign_and_send `Deploy in
+    let%bind zkapp_command_deploy_contract = make_sign_and_send `Deploy in
     let%bind () =
       section
         "Wait for deploy contract transaction to be included in transition \
          frontier"
-        (wait_for_zkapp parties_deploy_contract)
+        (wait_for_zkapp zkapp_command_deploy_contract)
     in
-    let%bind parties_update_contract = make_sign_and_send `Update in
+    let%bind zkapp_command_update_contract = make_sign_and_send `Update in
     let%bind () =
       section
         "Wait for update contract transaction to be included in transition \
          frontier"
-        (wait_for_zkapp parties_update_contract)
+        (wait_for_zkapp zkapp_command_update_contract)
     in
     let%bind () =
       section "Verify that the update transaction did update the ledger"

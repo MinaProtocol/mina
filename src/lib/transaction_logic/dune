@@ -9,7 +9,6 @@
    ppx_inline_test.config
    sexplib0
    yojson
-   ppx_version.runtime
    sexp_diff_kernel
    core_kernel
    base.caml
@@ -18,6 +17,7 @@
    integers
    base_quickcheck
    ;; local libraries
+   mina_wire_types
    block_time
    currency
    data_hash_lib
@@ -29,6 +29,7 @@
    kimchi_backend.common
    kimchi_backend
    kimchi_pasta
+   kimchi_backend.pasta.basic
    mina_base
    mina_base.import
    mina_numbers
@@ -44,6 +45,7 @@
    snarky.backendless
    snark_params
    unsigned_extended
+   ppx_version.runtime
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess

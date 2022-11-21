@@ -11,21 +11,19 @@ import type {
   Payment,
   StakeDelegation,
   Message,
-  Party,
+  ZkappCommand,
+  AccountUpdates,
   SignableData,
 } from "./TSTypes";
 
-import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
+import {
+  isPayment,
+  isMessage,
+  isStakeDelegation,
+  isZkappCommand,
+} from "./Utils";
 
 const defaultValidUntil = "4294967295";
-
-// Shut down wasm workers, which are not needed here
-if (globalThis.wasm_rayon_poolbuilder) {
-  globalThis.wasm_rayon_poolbuilder.free();
-  for (let worker of globalThis.wasm_workers) {
-    worker.terminate();
-  }
-}
 
 class Client {
   private network: Network;
@@ -329,23 +327,39 @@ class Client {
   }
 
   /**
-   * Sign a parties transaction using a private key.
+   * Sign a zkapp command transaction using a private key.
    *
    * This type of transaction allows a user to update state on a given
    * Smart Contract running on Mina.
    *
-   * @param party A object representing a Parties tx
+   * @param zkappCommand A object representing a zkApp command tx
    * @param privateKey The fee payer private key
-   * @returns Signed parties
+   * @returns Signed ZkappCommand
    */
-  public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
-    const parties = JSON.stringify(party.parties.otherParties);
-    const memo = party.feePayer.memo ?? "";
-    const fee = String(party.feePayer.fee);
-    const nonce = String(party.feePayer.nonce);
-    const feePayer = String(party.feePayer.feePayer);
-    const signedParties = minaSDK.signParty(
-      parties,
+  public signZkappCommand(
+    zkappCommand: ZkappCommand,
+    privateKey: PrivateKey
+  ): Signed<ZkappCommand> {
+    const account_updates = JSON.stringify(
+      zkappCommand.zkappCommand.accountUpdates
+    );
+    if (
+      zkappCommand.feePayer.fee === undefined ||
+      zkappCommand.feePayer.fee <
+        this.getAccountUpdateMinimumFee(
+          zkappCommand.zkappCommand.accountUpdates
+        )
+    ) {
+      throw `Fee must be greater than ${this.getAccountUpdateMinimumFee(
+        zkappCommand.zkappCommand.accountUpdates
+      )}`;
+    }
+    const memo = zkappCommand.feePayer.memo ?? "";
+    const fee = String(zkappCommand.feePayer.fee);
+    const nonce = String(zkappCommand.feePayer.nonce);
+    const feePayer = String(zkappCommand.feePayer.feePayer);
+    const signedZkappCommand = minaSDK.signZkappCommand(
+      account_updates,
       {
         feePayer,
         fee,
@@ -355,9 +369,9 @@ class Client {
       privateKey
     );
     return {
-      signature: JSON.parse(signedParties).feePayer.authorization,
+      signature: JSON.parse(signedZkappCommand).feePayer.authorization,
       data: {
-        parties: signedParties,
+        zkappCommand: signedZkappCommand,
         feePayer: {
           feePayer,
           fee,
@@ -395,7 +409,7 @@ class Client {
 
   /**
    * Signs an arbitrary payload using a private key. This function can sign messages,
-   * payments, stake delegations, and parties. If the payload is unrecognized, an Error
+   * payments, stake delegations, and zkapp commands. If the payload is unrecognized, an Error
    * is thrown.
    *
    * @param payload A signable payload
@@ -418,11 +432,23 @@ class Client {
     if (isStakeDelegation(payload)) {
       return this.signStakeDelegation(payload, privateKey);
     }
-    if (isParty(payload)) {
-      return this.signParty(payload, privateKey);
+    if (isZkappCommand(payload)) {
+      return this.signZkappCommand(payload, privateKey);
     } else {
       throw new Error(`Expected signable payload, got '${payload}'.`);
     }
+  }
+
+  /**
+   * Calculates the minimum fee of a zkapp command transaction. A fee for a zkapp command transaction is
+   * the sum of all account updates plus the specified fee amount. If no fee is passed in, `0.001`
+   * is used (according to the Mina spec) by default.
+   * @param p An accountUpdates object
+   * @param fee The fee per accountUpdate amount
+   * @returns  The fee to be paid by the fee payer accountUpdate
+   */
+  public getAccountUpdateMinimumFee(p: AccountUpdates, fee: number = 0.001) {
+    return p.reduce((accumulatedFee, _) => accumulatedFee + fee, 0);
   }
 }
 

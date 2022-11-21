@@ -121,13 +121,16 @@ module type S = sig
 end
 
 module type S_with_version = sig
+  [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t [@@deriving version, sexp, bin_io, compare, yojson, hash, equal]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 end
@@ -143,9 +146,14 @@ module Make (F : Input_intf) :
 
   let size_in_bits = size_in_bits ()
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version { asserted }]
+      [@@@with_all_version_tags]
+
+      type t = (F.t[@version_asserted]) [@@deriving version]
+
+      let to_latest = Fn.id
 
       include
         Binable.Of_binable
@@ -200,9 +208,7 @@ module Make (F : Input_intf) :
         | _ ->
             Error "expected hex string"
     end
-
-    module Latest = V1
-  end
+  end]
 
   include (
     Stable.Latest : module type of Stable.Latest with type t := Stable.Latest.t )

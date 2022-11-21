@@ -56,12 +56,16 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( Challenge.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t
       , Impl.Field.t Shifted_value.Type1.t
-      , Step_verifier.Make(Step_main_inputs).Other_field.t
+      , ( ( Challenge.Make(Impl).t Scalar_challenge.t
+          , Impl.Field.t Shifted_value.Type1.t )
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+        , Impl.Boolean.var )
+        Plonk_types.Opt.t
       , unit
       , Digest.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
         Types.Step_bp_vec.t
-      , 'num_branches One_hot_vector.t )
+      , Impl.field Branch_data.Checked.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -69,10 +73,13 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       previous "wrap" circuit was unable to verify directly, due to its internal field
       being different.
       - `sponge_digest_before_evaluations`: the sponge state: TODO
-      - me_only
+      - `messages_for_next_wrap_proof`
   *)
   ; prev_proof_evals :
-      (Impl.Field.t, Impl.Field.t array) Plonk_types.All_evals.t
+      ( Impl.Field.t
+      , Impl.Field.t array
+      , Impl.Boolean.var )
+      Plonk_types.All_evals.In_circuit.t
         (** The evaluations from the step proof that this proof wraps *)
   ; prev_challenges :
       ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
@@ -85,6 +92,11 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
   }
 [@@deriving hlist]
 
+module No_app_state = struct
+  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+    (unit, 'max_proofs_verified, 'num_branches) t
+end
+
 module Constant = struct
   open Kimchi_backend
 
@@ -95,12 +107,15 @@ module Constant = struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
-        , Tock.Field.t
+        , ( Challenge.Constant.t Scalar_challenge.t
+          , Tick.Field.t Shifted_value.Type1.t )
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+          option
         , unit
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
           Types.Step_bp_vec.t
-        , Types.Index.t )
+        , Branch_data.t )
         Types.Wrap.Proof_state.In_circuit.t
     ; prev_proof_evals :
         (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
@@ -110,34 +125,42 @@ module Constant = struct
         (Tick.Inner_curve.Affine.t, 'max_proofs_verified) Vector.t
     }
   [@@deriving hlist]
+
+  module No_app_state = struct
+    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+      (unit, 'max_proofs_verified, 'num_branches) t
+  end
 end
 
 open Core_kernel
 
-let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
+let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+  let module Sc = Scalar_challenge in
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
-  let index =
-    Typ.transport (One_hot_vector.typ branches) ~there:Types.Index.to_int
-      ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
-  in
   Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
     ~var_of_hlist:of_hlist ~value_to_hlist:Constant.to_hlist
     ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
-    ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
-        ~scalar_challenge:Challenge.typ
+    ; Types.Wrap.Proof_state.In_circuit.typ
+        (module Impl)
+        ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup
+        ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+        ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
-        Other_field.typ
         (Snarky_backendless.Typ.unit ())
-        Digest.typ index
-    ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
-       Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero
-      )
+        Digest.typ
+        (Branch_data.typ
+           (module Impl)
+           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+    ; Plonk_types.All_evals.typ
+        (module Impl)
+        (* Assume we have lookup iff we have runtime tables *)
+        { lookup; runtime = lookup }
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]

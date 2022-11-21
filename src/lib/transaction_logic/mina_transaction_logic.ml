@@ -3,7 +3,7 @@ open Mina_base
 open Currency
 open Signature_lib
 open Mina_transaction
-module Parties_logic = Parties_logic
+module Zkapp_command_logic = Zkapp_command_logic
 module Global_slot = Mina_numbers.Global_slot
 
 module Transaction_applied = struct
@@ -16,7 +16,6 @@ module Transaction_applied = struct
         module V2 = struct
           type t =
             { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t
-            ; previous_receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
             }
           [@@deriving sexp]
 
@@ -30,8 +29,7 @@ module Transaction_applied = struct
       module Stable = struct
         module V2 = struct
           type t =
-            | Payment of
-                { previous_empty_accounts : Account_id.Stable.V2.t list }
+            | Payment of { new_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
                 { previous_delegate : Public_key.Compressed.Stable.V1.t option }
             | Failed
@@ -51,17 +49,24 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let new_accounts (t : t) =
+      match t.body with
+      | Payment { new_accounts; _ } ->
+          new_accounts
+      | Stake_delegation _ | Failed ->
+          []
   end
 
-  module Parties_applied = struct
+  module Zkapp_command_applied = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t =
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
-          ; command : Parties.Stable.V1.t With_status.Stable.V2.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
+          ; new_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -76,7 +81,7 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           | Signed_command of Signed_command_applied.Stable.V2.t
-          | Parties of Parties_applied.Stable.V1.t
+          | Zkapp_command of Zkapp_command_applied.Stable.V1.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -89,8 +94,9 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          { fee_transfer : Fee_transfer.Stable.V2.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          { fee_transfer : Fee_transfer.Stable.V2.t With_status.Stable.V2.t
+          ; new_accounts : Account_id.Stable.V2.t list
+          ; burned_tokens : Currency.Amount.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -104,8 +110,9 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          { coinbase : Coinbase.Stable.V1.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
+          ; new_accounts : Account_id.Stable.V2.t list
+          ; burned_tokens : Currency.Amount.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -142,32 +149,103 @@ module Transaction_applied = struct
     end
   end]
 
+  let burned_tokens : t -> Currency.Amount.t =
+   fun { varying; _ } ->
+    match varying with
+    | Command _ ->
+        Currency.Amount.zero
+    | Fee_transfer f ->
+        f.burned_tokens
+    | Coinbase c ->
+        c.burned_tokens
+
+  let new_accounts : t -> Account_id.t list =
+   fun { varying; _ } ->
+    match varying with
+    | Command c -> (
+        match c with
+        | Signed_command sc ->
+            Signed_command_applied.new_accounts sc
+        | Zkapp_command zc ->
+            zc.new_accounts )
+    | Fee_transfer f ->
+        f.new_accounts
+    | Coinbase c ->
+        c.new_accounts
+
+  let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
+   fun t ->
+    let open Or_error.Let_syntax in
+    let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
+    let account_creation_fees =
+      let account_creation_fee_int =
+        Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        |> Currency.Fee.to_nanomina_int
+      in
+      let num_accounts_created = List.length @@ new_accounts t in
+      (* int type is OK, no danger of overflow *)
+      Currency.Amount.(
+        Signed.of_unsigned
+        @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
+    in
+    let txn : Transaction.t =
+      match t.varying with
+      | Command
+          (Signed_command { common = { user_command = { data; _ }; _ }; _ }) ->
+          Command (Signed_command data)
+      | Command (Zkapp_command c) ->
+          Command (Zkapp_command c.command.data)
+      | Fee_transfer f ->
+          Fee_transfer f.fee_transfer.data
+      | Coinbase c ->
+          Coinbase c.coinbase.data
+    in
+    let%bind expected_supply_increase =
+      Transaction.expected_supply_increase txn
+    in
+    let rec process_decreases total = function
+      | [] ->
+          Some total
+      | amt :: amts ->
+          let%bind.Option sum =
+            Currency.Amount.Signed.(add @@ negate amt) total
+          in
+          process_decreases sum amts
+    in
+    let total =
+      process_decreases
+        (Currency.Amount.Signed.of_unsigned expected_supply_increase)
+        [ burned_tokens; account_creation_fees ]
+    in
+    Option.value_map total ~default:(Or_error.error_string "overflow")
+      ~f:(fun v -> Ok v)
+
   let transaction_with_status : t -> Transaction.t With_status.t =
    fun { varying; _ } ->
     match varying with
     | Command (Signed_command uc) ->
         With_status.map uc.common.user_command ~f:(fun cmd ->
             Transaction.Command (User_command.Signed_command cmd) )
-    | Command (Parties s) ->
+    | Command (Zkapp_command s) ->
         With_status.map s.command ~f:(fun c ->
-            Transaction.Command (User_command.Parties c) )
+            Transaction.Command (User_command.Zkapp_command c) )
     | Fee_transfer f ->
-        { data = Fee_transfer f.fee_transfer; status = Applied }
+        With_status.map f.fee_transfer ~f:(fun f -> Transaction.Fee_transfer f)
     | Coinbase c ->
-        { data = Coinbase c.coinbase; status = Applied }
+        With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-  let user_command_status : t -> Transaction_status.t =
+  let transaction_status : t -> Transaction_status.t =
    fun { varying; _ } ->
     match varying with
     | Command
         (Signed_command { common = { user_command = { status; _ }; _ }; _ }) ->
         status
-    | Command (Parties c) ->
+    | Command (Zkapp_command c) ->
         c.command.status
-    | Fee_transfer _ ->
-        Applied
-    | Coinbase _ ->
-        Applied
+    | Fee_transfer f ->
+        f.fee_transfer.status
+    | Coinbase c ->
+        c.coinbase.status
 end
 
 module type S = sig
@@ -177,15 +255,13 @@ module type S = sig
     module Signed_command_applied : sig
       module Common : sig
         type t = Transaction_applied.Signed_command_applied.Common.t =
-          { user_command : Signed_command.t With_status.t
-          ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-          }
+          { user_command : Signed_command.t With_status.t }
         [@@deriving sexp]
       end
 
       module Body : sig
         type t = Transaction_applied.Signed_command_applied.Body.t =
-          | Payment of { previous_empty_accounts : Account_id.t list }
+          | Payment of { new_accounts : Account_id.t list }
           | Stake_delegation of
               { previous_delegate : Public_key.Compressed.t option }
           | Failed
@@ -197,11 +273,11 @@ module type S = sig
       [@@deriving sexp]
     end
 
-    module Parties_applied : sig
-      type t = Transaction_applied.Parties_applied.t =
+    module Zkapp_command_applied : sig
+      type t = Transaction_applied.Zkapp_command_applied.t =
         { accounts : (Account_id.t * Account.t option) list
-        ; command : Parties.t With_status.t
-        ; previous_empty_accounts : Account_id.t list
+        ; command : Zkapp_command.t With_status.t
+        ; new_accounts : Account_id.t list
         }
       [@@deriving sexp]
     end
@@ -209,21 +285,25 @@ module type S = sig
     module Command_applied : sig
       type t = Transaction_applied.Command_applied.t =
         | Signed_command of Signed_command_applied.t
-        | Parties of Parties_applied.t
+        | Zkapp_command of Zkapp_command_applied.t
       [@@deriving sexp]
     end
 
     module Fee_transfer_applied : sig
       type t = Transaction_applied.Fee_transfer_applied.t =
-        { fee_transfer : Fee_transfer.t
-        ; previous_empty_accounts : Account_id.t list
+        { fee_transfer : Fee_transfer.t With_status.t
+        ; new_accounts : Account_id.t list
+        ; burned_tokens : Currency.Amount.t
         }
       [@@deriving sexp]
     end
 
     module Coinbase_applied : sig
       type t = Transaction_applied.Coinbase_applied.t =
-        { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+        { coinbase : Coinbase.t With_status.t
+        ; new_accounts : Account_id.t list
+        ; burned_tokens : Currency.Amount.t
+        }
       [@@deriving sexp]
     end
 
@@ -239,15 +319,20 @@ module type S = sig
       { previous_hash : Ledger_hash.t; varying : Varying.t }
     [@@deriving sexp]
 
+    val burned_tokens : t -> Currency.Amount.t
+
+    val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
+
     val transaction : t -> Transaction.t With_status.t
 
-    val user_command_status : t -> Transaction_status.t
+    val transaction_status : t -> Transaction_status.t
   end
 
   module Global_state : sig
     type t =
       { ledger : ledger
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
   end
@@ -266,26 +351,34 @@ module type S = sig
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
-  val apply_parties_unchecked :
+  val update_sequence_state :
+       Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+    -> Zkapp_account.Sequence_events.t
+    -> txn_global_slot:Global_slot.t
+    -> last_sequence_slot:Global_slot.t
+    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
+
+  val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
-    -> Parties.t
-    -> ( Transaction_applied.Parties_applied.t
+    -> Zkapp_command.t
+    -> ( Transaction_applied.Zkapp_command_applied.t
        * ( ( Stack_frame.value
            , Stack_frame.value list
            , Token_id.t
            , Amount.Signed.t
            , ledger
            , bool
-           , unit
+           , Zkapp_command.Transaction_commitment.t
+           , Mina_numbers.Index.t
            , Transaction_status.Failure.Collection.t )
-           Parties_logic.Local_state.t
+           Zkapp_command_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
 
-  (** Apply all parties within a parties transaction. This behaves as
-      [apply_parties_unchecked], except that the [~init] and [~f] arguments
+  (** Apply all zkapp_command within a zkapp_command transaction. This behaves as
+      [apply_zkapp_command_unchecked], except that the [~init] and [~f] arguments
       are provided to allow for the accumulation of the intermediate states.
 
       Invariant: [f] is always applied at least once, so it is valid to use an
@@ -294,11 +387,11 @@ module type S = sig
 
       This can be used to collect the intermediate states to make them
       available for snark work. In particular, since the transaction snark has
-      a cap on the number of parties of each kind that may be included, we can
+      a cap on the number of zkapp_command of each kind that may be included, we can
       use this to retrieve the (source, target) pairs for each batch of
-      parties to include in the snark work spec / transaction snark witness.
+      zkapp_command to include in the snark work spec / transaction snark witness.
   *)
-  val apply_parties_unchecked_aux :
+  val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
@@ -311,14 +404,16 @@ module type S = sig
                , Amount.Signed.t
                , ledger
                , bool
-               , unit
+               , Zkapp_command.Transaction_commitment.t
+               , Mina_numbers.Index.t
                , Transaction_status.Failure.Collection.t )
-               Parties_logic.Local_state.t
+               Zkapp_command_logic.Local_state.t
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
+    -> ?supply_increase:Amount.Signed.t
     -> ledger
-    -> Parties.t
-    -> (Transaction_applied.Parties_applied.t * 'acc) Or_error.t
+    -> Zkapp_command.t
+    -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
 
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -381,14 +476,14 @@ let timing_error_to_user_command_status err =
     * [[`Insufficient_balance of bool | `Invalid_timing of bool]] encodes
       possible errors, with the invariant that the return value is always
       [`Invalid_timing false] if there was no error.
-      - [`Insufficient_balance true] results if [txn_amount] is larger than the
+    - [`Insufficient_balance true] results if [txn_amount] is larger than the
         balance held in [account].
-      - [`Invalid_timing true] results if [txn_amount] is larger than the
+    - [`Invalid_timing true] results if [txn_amount] is larger than the
         balance available in [account] at global slot [txn_global_slot].
     * [Timing.t], the new timing for [account] calculated at [txn_global_slot].
     * [[`Min_balance of Balance.t]] returns the computed available balance at
       [txn_global_slot].
-      - NOTE: We skip this calculation if the error is
+    - NOTE: We skip this calculation if the error is
         [`Insufficient_balance true].  In this scenario, this value MUST NOT be
         used, as it contains an incorrect placeholder value.
 *)
@@ -492,8 +587,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | Some account ->
             Ok (`Existing location, account)
         | None ->
-            (* Needed to support sparse ledger. *)
-            Ok (`New, Account.create account_id Balance.zero) )
+            failwith "Ledger location with no account" )
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
@@ -548,48 +642,37 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
               Transaction.Command (User_command.Signed_command cmd) )
-      | Command (Parties s) ->
+      | Command (Zkapp_command s) ->
           With_status.map s.command ~f:(fun c ->
-              Transaction.Command (User_command.Parties c) )
+              Transaction.Command (User_command.Zkapp_command c) )
       | Fee_transfer f ->
-          { data = Fee_transfer f.fee_transfer; status = Applied }
+          With_status.map f.fee_transfer ~f:(fun f ->
+              Transaction.Fee_transfer f )
       | Coinbase c ->
-          { data = Coinbase c.coinbase; status = Applied }
+          With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let user_command_status : t -> Transaction_status.t =
+    let transaction_status : t -> Transaction_status.t =
      fun { varying; _ } ->
       match varying with
       | Command
           (Signed_command { common = { user_command = { status; _ }; _ }; _ })
         ->
           status
-      | Command (Parties c) ->
+      | Command (Zkapp_command c) ->
           c.command.status
-      | Fee_transfer _ ->
-          Applied
-      | Coinbase _ ->
-          Applied
+      | Fee_transfer f ->
+          f.fee_transfer.status
+      | Coinbase c ->
+          c.coinbase.status
   end
 
-  let previous_empty_accounts action pk =
+  let get_new_accounts action pk =
     if Ledger_intf.equal_account_state action `Added then [ pk ] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
     let%map _, account = get_with_location ledger account_id in
     Account.has_locked_tokens ~global_slot account
-
-  let get_user_account_with_location ledger account_id =
-    let open Or_error.Let_syntax in
-    let%bind ((_, acct) as r) = get_with_location ledger account_id in
-    let%map () =
-      check
-        (Option.is_none acct.zkapp)
-        !"Expected account %{sexp: Account_id.t} to be a user account, got a \
-          snapp account."
-        account_id
-    in
-    r
 
   let failure (e : Transaction_status.Failure.t) = e
 
@@ -604,9 +687,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let%bind location, account =
-      get_user_account_with_location ledger fee_payer
-    in
+    let%bind location, account = get_with_location ledger fee_payer in
     let%bind () =
       match location with
       | `Existing _ ->
@@ -622,12 +703,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~account
     in
     ( location
-    , account
     , { account with
         balance
       ; nonce = Account.Nonce.succ account.nonce
       ; receipt_chain_hash =
-          Receipt.Chain_hash.cons command account.receipt_chain_hash
+          Receipt.Chain_hash.cons_signed_command_payload command
+            account.receipt_chain_hash
       ; timing
       } )
 
@@ -663,17 +744,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       in
       ()
     in
-    let%map loc, account, account' =
-      pay_fee' ~command:(Signed_command user_command.payload) ~nonce ~fee_payer
+    let%map loc, account' =
+      pay_fee' ~command:(Signed_command_payload user_command.payload) ~nonce
+        ~fee_payer
         ~fee:(Signed_command.fee user_command)
         ~ledger ~current_global_slot
     in
-    let applied_common : Transaction_applied.Signed_command_applied.Common.t =
-      { user_command = { data = user_command; status = Applied }
-      ; previous_receipt_chain_hash = account.receipt_chain_hash
-      }
-    in
-    (loc, account', applied_common)
+    (loc, account')
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
      in the case that the sender is equal to the receiver, but it complicates the SNARK, so
@@ -692,8 +769,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     (* Fee-payer information *)
     let fee_payer = Signed_command.fee_payer user_command in
-    let%bind fee_payer_location, fee_payer_account, applied_common =
+    let%bind fee_payer_location, fee_payer_account =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
+    in
+    let%bind () =
+      if Account.has_permission ~to_:`Send fee_payer_account then Ok ()
+      else
+        Or_error.error_string
+          Transaction_status.Failure.(describe Update_not_permitted_balance)
     in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
@@ -719,6 +802,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           let source_location, source_account =
             get_with_location ledger source |> ok_or_reject
+          in
+          let%bind () =
+            if Account.has_permission ~to_:`Set_delegate source_account then
+              Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
             match (source_location, receiver_location) with
@@ -750,6 +838,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Payment { amount; _ } ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
+          in
+          let%bind () =
+            if Account.has_permission ~to_:`Receive receiver_account then Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_account =
             let ret =
@@ -805,6 +897,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                           (Transaction_status.Failure.describe failure) ) )
             else ret
           in
+          let%bind () =
+            if Account.has_permission ~to_:`Send source_account then Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_balance
+          in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
             match receiver_location with
@@ -820,7 +916,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
           in
-          let previous_empty_accounts =
+          let new_accounts =
             match receiver_location with
             | `Existing _ ->
                 []
@@ -831,7 +927,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ; (source_location, source_account)
             ]
           , Transaction_applied.Signed_command_applied.Body.Payment
-              { previous_empty_accounts } )
+              { new_accounts } )
     in
     match compute_updates () with
     | Ok (located_accounts, applied_body) ->
@@ -842,19 +938,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%bind () = acc in
               set_with_location ledger location account )
         in
-        let applied_common =
-          { applied_common with
-            user_command = { data = user_command; status = Applied }
-          }
+        let applied_common : Transaction_applied.Signed_command_applied.Common.t
+            =
+          { user_command = { data = user_command; status = Applied } }
         in
         return
           ( { common = applied_common; body = applied_body }
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
         (* Do not update the ledger. Except for the fee payer which is already updated *)
-        let applied_common =
-          { applied_common with
-            user_command =
+        let applied_common : Transaction_applied.Signed_command_applied.Common.t
+            =
+          { user_command =
               { data = user_command
               ; status =
                   Failed
@@ -881,6 +976,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     type t =
       { ledger : L.t
       ; fee_excess : Amount.Signed.t
+      ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
@@ -894,6 +990,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let set_fee_excess t fee_excess = { t with fee_excess }
 
+    let supply_increase { supply_increase; _ } = supply_increase
+
+    let set_supply_increase t supply_increase = { t with supply_increase }
+
     let global_slot_since_genesis { protocol_state; _ } =
       protocol_state.global_slot_since_genesis
   end
@@ -901,24 +1001,30 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   module Inputs = struct
     let with_label ~label:_ f = f ()
 
+    let value_if b ~then_ ~else_ = if b then then_ else else_
+
     module Global_state = Global_state
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Bool = struct
       type t = bool
 
       module Assert = struct
-        let is_true b = assert b
+        let is_true ~pos b =
+          try assert b
+          with Assert_failure _ ->
+            let file, line, col, _ecol = pos in
+            raise (Assert_failure (file, line, col))
 
-        let any bs = List.exists ~f:Fn.id bs |> is_true
+        let any ~pos bs = List.exists ~f:Fn.id bs |> is_true ~pos
       end
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let true_ = true
 
@@ -942,26 +1048,35 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let is_empty t = List.join t |> List.is_empty
 
-      let assert_with_failure_status_tbl b failure_status_tbl =
+      let assert_with_failure_status_tbl ~pos b failure_status_tbl =
+        let file, line, col, ecol = pos in
         if (not b) && not (is_empty failure_status_tbl) then
           (* Raise a more useful error message if we have a failure
              description. *)
-          Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
-          @@ Transaction_status.Failure.Collection.display_to_yojson
-          @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
-        else assert b
+          let failure_msg =
+            Yojson.Safe.to_string
+            @@ Transaction_status.Failure.Collection.Display.to_yojson
+            @@ Transaction_status.Failure.Collection.to_display
+                 failure_status_tbl
+          in
+          Error.raise @@ Error.of_string
+          @@ sprintf "File %S, line %d, characters %d-%d: %s" file line col ecol
+               failure_msg
+        else
+          try assert b
+          with Assert_failure _ -> raise (Assert_failure (file, line, col))
     end
 
     module Account_id = struct
       include Account_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Ledger = struct
       type t = L.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty = L.empty
 
@@ -969,7 +1084,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let get_account p l =
         let loc, acct =
-          Or_error.ok_exn (get_with_location l (Party.account_id p))
+          Or_error.ok_exn (get_with_location l (Account_update.account_id p))
         in
         (acct, loc)
 
@@ -987,27 +1102,45 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Transaction_commitment = struct
-      type t = unit
+      type t = Field.t
 
-      let empty = ()
+      let empty = Zkapp_command.Transaction_commitment.empty
 
-      let if_ = Parties.value_if
+      let commitment ~account_updates =
+        let account_updates_hash =
+          Mina_base.Zkapp_command.Call_forest.hash account_updates
+        in
+        Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
-      let commitment ~other_parties:_ = ()
+      let full_commitment ~account_update ~memo_hash ~commitment =
+        (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
+        let fee_payer_hash =
+          Zkapp_command.Digest.Account_update.create account_update
+        in
+        Zkapp_command.Transaction_commitment.create_complete commitment
+          ~memo_hash ~fee_payer_hash
 
-      let full_commitment ~party:_ ~memo_hash:_ ~commitment:_ = ()
+      let if_ = value_if
+    end
+
+    module Index = struct
+      type t = Mina_numbers.Index.t
+
+      let zero, succ = Mina_numbers.Index.(zero, succ)
+
+      let if_ = value_if
     end
 
     module Public_key = struct
       type t = Public_key.Compressed.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Controller = struct
       type t = Permissions.Auth_required.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let check ~proof_verifies ~signature_verifies perm =
         (* Invariant: We either have a proof, a signature, or neither. *)
@@ -1023,27 +1156,43 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Global_slot = struct
       include Mina_numbers.Global_slot
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Nonce = struct
       type t = Account.Nonce.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let succ = Account.Nonce.succ
+    end
+
+    module Receipt_chain_hash = struct
+      type t = Receipt.Chain_hash.t
+
+      module Elt = struct
+        type t = Receipt.Zkapp_command_elt.t
+
+        let of_transaction_commitment tc =
+          Receipt.Zkapp_command_elt.Zkapp_command_commitment tc
+      end
+
+      let cons_zkapp_command_commitment =
+        Receipt.Chain_hash.cons_zkapp_command_commitment
+
+      let if_ = value_if
     end
 
     module State_hash = struct
       include State_hash
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Timing = struct
-      type t = Party.Update.Timing_info.t option
+      type t = Account_update.Update.Timing_info.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let vesting_period (t : t) =
         match t with
@@ -1056,33 +1205,33 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Balance = struct
       include Balance
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Verification_key = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
-    module Events = struct
-      type t = Field.t array list
+    module Sequence_events = struct
+      type t = Zkapp_account.Sequence_events.t
 
       let is_empty = List.is_empty
 
-      let push_events = Party.Sequence_events.push_events
+      let push_events = Account_update.Sequence_events.push_events
     end
 
     module Zkapp_uri = struct
       type t = string
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Token_symbol = struct
       type t = Account.Token_symbol.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Account = struct
@@ -1121,20 +1270,23 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
         type t = Permissions.t
 
-        let if_ = Parties.value_if
+        let if_ = value_if
       end
 
-      type timing = Party.Update.Timing_info.t option
+      type timing = Account_update.Update.Timing_info.t option
 
       let timing (a : t) : timing =
-        Party.Update.Timing_info.of_account_timing a.timing
+        Account_update.Update.Timing_info.of_account_timing a.timing
 
       let set_timing (a : t) (timing : timing) : t =
         { a with
           timing =
             Option.value_map ~default:Account_timing.Untimed
-              ~f:Party.Update.Timing_info.to_account_timing timing
+              ~f:Account_update.Update.Timing_info.to_account_timing timing
         }
+
+      let is_timed (a : t) =
+        match a.timing with Account_timing.Untimed -> false | _ -> true
 
       let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
 
@@ -1147,7 +1299,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           validate_timing_with_min_balance' ~txn_amount:Amount.zero
             ~txn_global_slot ~account
         in
-        (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+        ( invalid_timing
+        , Account_update.Update.Timing_info.of_account_timing timing )
+
+      let receipt_chain_hash (a : t) : Receipt.Chain_hash.t =
+        a.receipt_chain_hash
+
+      let set_receipt_chain_hash (a : t) hash =
+        { a with receipt_chain_hash = hash }
 
       let make_zkapp (a : t) =
         let zkapp =
@@ -1200,9 +1359,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
-      let zkapp_uri (a : t) = a.zkapp_uri
+      let zkapp_uri (a : t) =
+        Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
 
-      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) : t =
+        { a with
+          zkapp = Option.map a.zkapp ~f:(fun zkapp -> { zkapp with zkapp_uri })
+        }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -1242,12 +1405,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type t = unsigned
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       module Signed = struct
         include Signed
 
-        let if_ = Parties.value_if
+        let if_ = value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
       end
@@ -1281,39 +1444,35 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Token_id = struct
       include Token_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Protocol_state_precondition = struct
       include Zkapp_precondition.Protocol_state
     end
 
-    module Party = struct
-      include Party
+    module Account_update = struct
+      include Account_update
 
       module Account_precondition = struct
-        include Party.Account_precondition
+        include Account_update.Account_precondition
 
-        let nonce (t : Party.t) = nonce t.body.account_precondition
+        let nonce (t : Account_update.t) = nonce t.body.preconditions.account
       end
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
-      type parties =
-        ( Party.t
-        , Parties.Digest.Party.t
-        , Parties.Digest.Forest.t )
-        Parties.Call_forest.t
+      type call_forest = Zkapp_call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
       let caller (p : t) = p.body.caller
 
-      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
-        match party.authorization with
+        match account_update.authorization with
         | Signature _ ->
             (`Proof_verifies false, `Signature_verifies true)
         | Proof _ ->
@@ -1321,31 +1480,51 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         | None_given ->
             (`Proof_verifies false, `Signature_verifies false)
 
+      let is_proved (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Proof ->
+            true
+        | Signature | None_given ->
+            false
+
+      let is_signed (account_update : t) =
+        match account_update.body.authorization_kind with
+        | Signature ->
+            true
+        | Proof | None_given ->
+            false
+
       module Update = struct
         open Zkapp_basic
 
         type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
-        let timing (party : t) : Account.timing set_or_keep =
-          Set_or_keep.map ~f:Option.some party.body.update.timing
+        let timing (account_update : t) : Account.timing set_or_keep =
+          Set_or_keep.map ~f:Option.some account_update.body.update.timing
 
-        let app_state (party : t) = party.body.update.app_state
+        let app_state (account_update : t) =
+          account_update.body.update.app_state
 
-        let verification_key (party : t) =
+        let verification_key (account_update : t) =
           Zkapp_basic.Set_or_keep.map ~f:Option.some
-            party.body.update.verification_key
+            account_update.body.update.verification_key
 
-        let sequence_events (party : t) = party.body.sequence_events
+        let sequence_events (account_update : t) =
+          account_update.body.sequence_events
 
-        let zkapp_uri (party : t) = party.body.update.zkapp_uri
+        let zkapp_uri (account_update : t) =
+          account_update.body.update.zkapp_uri
 
-        let token_symbol (party : t) = party.body.update.token_symbol
+        let token_symbol (account_update : t) =
+          account_update.body.update.token_symbol
 
-        let delegate (party : t) = party.body.update.delegate
+        let delegate (account_update : t) = account_update.body.update.delegate
 
-        let voting_for (party : t) = party.body.update.voting_for
+        let voting_for (account_update : t) =
+          account_update.body.update.voting_for
 
-        let permissions (party : t) = party.body.update.permissions
+        let permissions (account_update : t) =
+          account_update.body.update.permissions
       end
     end
 
@@ -1374,7 +1553,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     struct
       type t = Elt.t list
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty () = []
 
@@ -1395,28 +1574,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push x ~onto : t = x :: onto
     end
 
-    module Parties = struct
-      type t = Party.parties
-
-      let empty () = []
-
-      let if_ = Parties.value_if
-
-      let is_empty = List.is_empty
-
-      let pop_exn : t -> (Party.t * t) * t = function
-        | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
-            ((party, calls), xs)
-        | _ ->
-            failwith "pop_exn"
-    end
+    module Call_forest = Zkapp_call_forest
 
     module Stack_frame = struct
       include Stack_frame
 
       type t = value
 
-      let if_ = Parties.if_
+      let if_ = Zkapp_command.value_if
 
       let make = Stack_frame.make
     end
@@ -1432,8 +1597,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
+        , Index.t
         , Bool.failure_status_tbl )
-        Parties_logic.Local_state.t
+        Zkapp_command_logic.Local_state.t
 
       let add_check (t : t) failure b =
         let failure_status_tbl =
@@ -1467,8 +1633,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     open Inputs
 
     type t =
-      < party : Party.t
-      ; parties : Parties.t
+      < account_update : Account_update.t
+      ; zkapp_command : Zkapp_command.t
       ; account : Account.t
       ; ledger : Ledger.t
       ; amount : Amount.t
@@ -1485,52 +1651,64 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , L.t
           , bool
           , Transaction_commitment.t
+          , Index.t
           , Transaction_status.Failure.Collection.t )
-          Parties_logic.Local_state.t
+          Zkapp_command_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
-      ; transaction_commitment : unit
-      ; full_transaction_commitment : unit
+      ; transaction_commitment : Transaction_commitment.t
+      ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
     let perform ~constraint_constants:_ (type r)
-        (eff : (r, t) Parties_logic.Eff.t) : r =
+        (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
       | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (party, account, local_state) -> (
-          match party.body.account_precondition with
+      | Check_account_precondition
+          (account_update, account, new_account, local_state) -> (
+          match account_update.body.preconditions.account with
           | Accept ->
               local_state
           | Nonce n ->
               let nonce_matches = Account.Nonce.equal account.nonce n in
               Inputs.Local_state.add_check local_state
                 Account_nonce_precondition_unsatisfied nonce_matches
-          | Full p ->
+          | Full precondition_account ->
               let local_state = ref local_state in
               let check failure b =
                 local_state :=
                   Inputs.Local_state.add_check !local_state failure b
               in
-              Zkapp_precondition.Account.check ~check p account ;
+              Zkapp_precondition.Account.check ~new_account ~check
+                precondition_account account ;
               !local_state )
-      | Init_account { party = _; account = a } ->
+      | Init_account { account_update = _; account = a } ->
           a
   end
 
-  module M = Parties_logic.Make (Inputs)
+  module M = Zkapp_command_logic.Make (Inputs)
 
-  let apply_parties_unchecked_aux (type user_acc)
+  let update_sequence_state sequence_state sequence_events ~txn_global_slot
+      ~last_sequence_slot =
+    let sequence_state', last_sequence_slot' =
+      M.update_sequence_state sequence_state sequence_events ~txn_global_slot
+        ~last_sequence_slot
+    in
+    (sequence_state', last_sequence_slot')
+
+  let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
-      ?(fee_excess = Amount.Signed.zero) (ledger : L.t) (c : Parties.t) :
-      (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
+      ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
+      (ledger : L.t) (c : Zkapp_command.t) :
+      (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
-      List.map (Parties.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
@@ -1540,7 +1718,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
-        , (l_state : _ Parties_logic.Local_state.t) ) :
+        , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
         (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
       if List.is_empty l_state.stack_frame.Stack_frame.calls then
         Ok (user_acc, l_state.failure_status_tbl)
@@ -1551,33 +1729,36 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         step_all (f user_acc states) states
     in
-    let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess }
+    let initial_state :
+        Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
+      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
              ; caller_caller = Token_id.default
              } : Inputs.Stack_frame.t)
         ; call_stack = []
-        ; transaction_commitment = ()
-        ; full_transaction_commitment = ()
+        ; transaction_commitment = Inputs.Transaction_commitment.empty
+        ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
+        ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
+        ; account_update_index = Inputs.Index.zero
         ; failure_status_tbl = []
         } )
     in
     let user_acc = f init initial_state in
     let%bind (start : Inputs.Global_state.t * _) =
-      let parties = Parties.parties c in
+      let zkapp_command = Zkapp_command.zkapp_command c in
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
-            { parties; memo_hash = Signed_command_memo.hash c.memo }
+            { zkapp_command; memo_hash = Signed_command_memo.hash c.memo }
             { perform } initial_state )
     in
     let account_states_after_fee_payer =
-      List.map (Parties.accounts_accessed c) ~f:(fun id ->
+      List.map (Zkapp_command.accounts_referenced c) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
@@ -1591,7 +1772,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok (s, failure_status_tbl) ->
+    | Ok (s, reversed_failure_status_tbl) ->
+        let failure_status_tbl = List.rev reversed_failure_status_tbl in
         let account_ids_originally_not_in_ledger =
           List.filter_map original_account_states
             ~f:(fun (acct_id, loc_and_acct) ->
@@ -1600,35 +1782,39 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let successfully_applied =
           Transaction_status.Failure.Collection.is_empty failure_status_tbl
         in
+        (* if the zkapp command fails in at least 1 account update,
+           then all the account updates would be cancelled except
+           the fee payer one
+        *)
+        let failure_status_tbl =
+          if successfully_applied then failure_status_tbl
+          else
+            List.mapi failure_status_tbl ~f:(fun idx fs ->
+                if idx > 0 && List.is_empty fs then
+                  [ Transaction_status.Failure.Cancelled ]
+                else fs )
+        in
         (* accounts not originally in ledger, now present in ledger *)
-        let previous_empty_accounts =
-          List.filter_map account_ids_originally_not_in_ledger
-            ~f:(fun acct_id ->
-              let open Option.Let_syntax in
-              let%bind loc = L.location_of_account ledger acct_id in
-              let%bind acc = L.get ledger loc in
-              (*Check account ids because sparse ledger stores empty
-                accounts at new account locations*)
-              Option.some_if
-                (Account_id.equal (Account.identifier acc) acct_id)
-                acct_id )
+        let new_accounts =
+          List.filter account_ids_originally_not_in_ledger ~f:(fun acct_id ->
+              Option.is_some @@ L.location_of_account ledger acct_id )
         in
         let valid_result =
           Ok
-            ( { Transaction_applied.Parties_applied.accounts = accounts ()
+            ( { Transaction_applied.Zkapp_command_applied.accounts = accounts ()
               ; command =
                   { With_status.data = c
                   ; status =
                       ( if successfully_applied then Applied
                       else Failed failure_status_tbl )
                   }
-              ; previous_empty_accounts
+              ; new_accounts
               }
             , s )
         in
         if successfully_applied then valid_result
         else
-          let other_party_accounts_unchanged =
+          let other_account_update_accounts_unchanged =
             List.fold_until account_states_after_fee_payer ~init:true
               ~f:(fun acc (_, loc_opt) ->
                 match
@@ -1643,26 +1829,74 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                     Stop false )
               ~finish:Fn.id
           in
-          (*Other parties failed, therefore, updates in those should not get applied*)
+          (* Other zkapp_command failed, therefore, updates in those should not get applied *)
           if
-            List.is_empty previous_empty_accounts
-            && other_party_accounts_unchanged
+            List.is_empty new_accounts
+            && other_account_update_accounts_unchanged
           then valid_result
           else
             Or_error.error_string
-              "Parties application failed but new accounts created or some of \
-               the other party updates applied"
+              "Zkapp_command application failed but new accounts created or \
+               some of the other account_update updates applied"
 
-  let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
-    apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
+  let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger c =
+    apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ledger c
       ~init:None ~f:(fun _acc (global_state, local_state) ->
         Some (local_state, global_state.fee_excess) )
-    |> Result.map ~f:(fun (party_applied, state_res) ->
-           (party_applied, Option.value_exn state_res) )
+    |> Result.map ~f:(fun (account_update_applied, state_res) ->
+           (account_update_applied, Option.value_exn state_res) )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
 
+  let has_permission_to_receive ~ledger receiver_account_id :
+      Account.t
+      * Ledger_intf.account_state
+      * [> `Has_permission_to_receive of bool ] =
+    let init_account = Account.initialize receiver_account_id in
+    match location_of_account ledger receiver_account_id with
+    | None ->
+        (* new account, check that default permissions allow receiving *)
+        ( init_account
+        , `Added
+        , `Has_permission_to_receive
+            (Account.has_permission ~to_:`Receive init_account) )
+    | Some loc -> (
+        match get ledger loc with
+        | None ->
+            failwith "Ledger location with no account"
+        | Some receiver_account ->
+            ( receiver_account
+            , `Existed
+            , `Has_permission_to_receive
+                (Account.has_permission ~to_:`Receive receiver_account) ) )
+
+  let no_failure = []
+
+  let update_failed =
+    [ Transaction_status.Failure.Update_not_permitted_balance ]
+
+  let empty = Transaction_status.Failure.Collection.empty
+
+  let single_failure =
+    Transaction_status.Failure.Collection.of_single_failure
+      Update_not_permitted_balance
+
+  let append_entry f (s : Transaction_status.Failure.Collection.t) :
+      Transaction_status.Failure.Collection.t =
+    match s with [] -> [ f ] | h :: t -> h :: f :: t
+
+  (*Structure of the failure status:
+     I. Only one fee transfer in the transaction (`One) and it fails:
+        [[failure]]
+     II. Two fee transfers in the transaction (`Two)-
+      Both fee transfers fail:
+        [[failure-of-first-fee-transfer]; [failure-of-second-fee-transfer]]
+      First succeeds and second one fails:
+        [[];[failure-of-second-fee-transfer]]
+      First fails and second succeeds:
+        [[failure-of-first-fee-transfer];[]]
+  *)
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
     let open Or_error.Let_syntax in
@@ -1678,53 +1912,85 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match Fee_transfer.to_singles transfer with
     | `One ft ->
         let account_id = Fee_transfer.Single.receiver ft in
-        (* TODO(#4496): Do not use get_or_create here; we should not create a
-           new account before we know that the transaction will go through and
-           thus the creation fee has been paid.
-        *)
-        let%bind action, a, loc = get_or_create t account_id in
-        let emptys = previous_empty_accounts action account_id in
+        let a, action, `Has_permission_to_receive can_receive =
+          has_permission_to_receive ~ledger:t account_id
+        in
         let%bind timing = modify_timing a in
-        let%map balance = modify_balance action account_id a.balance ft.fee in
-        set t loc { a with balance; timing } ;
-        emptys
+        let%bind balance = modify_balance action account_id a.balance ft.fee in
+        if can_receive then (
+          let%map _action, a, loc = get_or_create t account_id in
+          let new_accounts = get_new_accounts action account_id in
+          set t loc { a with balance; timing } ;
+          (new_accounts, empty, Currency.Amount.zero) )
+        else Ok ([], single_failure, Currency.Amount.of_fee ft.fee)
     | `Two (ft1, ft2) ->
         let account_id1 = Fee_transfer.Single.receiver ft1 in
-        (* TODO(#4496): Do not use get_or_create here; we should not create a
-           new account before we know that the transaction will go through and
-           thus the creation fee has been paid.
-        *)
-        let%bind action1, a1, l1 = get_or_create t account_id1 in
-        let emptys1 = previous_empty_accounts action1 account_id1 in
+        let a1, action1, `Has_permission_to_receive can_receive1 =
+          has_permission_to_receive ~ledger:t account_id1
+        in
         let account_id2 = Fee_transfer.Single.receiver ft2 in
-        if Account_id.equal account_id1 account_id2 then (
+        if Account_id.equal account_id1 account_id2 then
           let%bind fee = error_opt "overflow" (Fee.add ft1.fee ft2.fee) in
           let%bind timing = modify_timing a1 in
-          let%map balance = modify_balance action1 account_id1 a1.balance fee in
-          set t l1 { a1 with balance; timing } ;
-          emptys1 )
+          let%bind balance =
+            modify_balance action1 account_id1 a1.balance fee
+          in
+          if can_receive1 then (
+            let%map _action1, a1, l1 = get_or_create t account_id1 in
+            let new_accounts1 = get_new_accounts action1 account_id1 in
+            set t l1 { a1 with balance; timing } ;
+            (new_accounts1, empty, Currency.Amount.zero) )
+          else
+            (*failure for each fee transfer single*)
+            Ok
+              ( []
+              , append_entry update_failed single_failure
+              , Currency.Amount.of_fee fee )
         else
-          (* TODO(#4496): Do not use get_or_create here; we should not create a
-             new account before we know that the transaction will go through
-             and thus the creation fee has been paid.
-          *)
-          let%bind action2, a2, l2 = get_or_create t account_id2 in
-          let emptys2 = previous_empty_accounts action2 account_id2 in
+          let a2, action2, `Has_permission_to_receive can_receive2 =
+            has_permission_to_receive ~ledger:t account_id2
+          in
           let%bind balance1 =
             modify_balance action1 account_id1 a1.balance ft1.fee
           in
           (*Note: Not updating the timing field of a1 to avoid additional check in transactions snark (check_timing for "receiver"). This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account. (#5973)*)
           let%bind timing2 = modify_timing a2 in
-          let%map balance2 =
+          let%bind balance2 =
             modify_balance action2 account_id2 a2.balance ft2.fee
           in
-          set t l1 { a1 with balance = balance1 } ;
-          set t l2 { a2 with balance = balance2; timing = timing2 } ;
-          emptys1 @ emptys2
+          let%bind new_accounts1, failures, burned_tokens1 =
+            if can_receive1 then (
+              let%map _action1, a1, l1 = get_or_create t account_id1 in
+              let new_accounts1 = get_new_accounts action1 account_id1 in
+              set t l1 { a1 with balance = balance1 } ;
+              ( new_accounts1
+              , append_entry no_failure empty
+              , Currency.Amount.zero ) )
+            else Ok ([], single_failure, Currency.Amount.of_fee ft1.fee)
+          in
+          let%bind new_accounts2, failures', burned_tokens2 =
+            if can_receive2 then (
+              let%map _action2, a2, l2 = get_or_create t account_id2 in
+              let new_accounts2 = get_new_accounts action2 account_id2 in
+              set t l2 { a2 with balance = balance2; timing = timing2 } ;
+              ( new_accounts2
+              , append_entry no_failure failures
+              , Currency.Amount.zero ) )
+            else
+              Ok
+                ( []
+                , append_entry update_failed failures
+                , Currency.Amount.of_fee ft2.fee )
+          in
+          let%map burned_tokens =
+            error_opt "burned tokens overflow"
+              (Currency.Amount.add burned_tokens1 burned_tokens2)
+          in
+          (new_accounts1 @ new_accounts2, failures', burned_tokens)
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
-    let%map previous_empty_accounts =
+    let%map new_accounts, failures, burned_tokens =
       process_fee_transfer t transfer
         ~modify_balance:(fun action _ b f ->
           let%bind amount =
@@ -1735,19 +2001,38 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~modify_timing:(fun acc ->
           update_timing_when_no_deduction ~txn_global_slot acc )
     in
+    let ft_with_status =
+      if Transaction_status.Failure.Collection.is_empty failures then
+        { With_status.data = transfer; status = Applied }
+      else { data = transfer; status = Failed failures }
+    in
     Transaction_applied.Fee_transfer_applied.
-      { fee_transfer = transfer; previous_empty_accounts }
+      { fee_transfer = ft_with_status; new_accounts; burned_tokens }
 
+  (*Structure of the failure status:
+     I. No fee transfer and coinbase transfer fails: [[failure]]
+     II. With fee transfer-
+      Both fee transfer and coinbase fails:
+        [[failure-of-fee-transfer]; [failure-of-coinbase]]
+      Fee transfer succeeds and coinbase fails:
+        [[];[failure-of-coinbase]]
+      Fee transfer fails and coinbase succeeds:
+        [[failure-of-fee-transfer];[]]
+  *)
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
         ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
       =
     let open Or_error.Let_syntax in
-    let%bind receiver_reward, emptys1, transferee_update, transferee_timing_prev
-        =
+    let%bind ( receiver_reward
+             , new_accounts1
+             , transferee_update
+             , transferee_timing_prev
+             , failures1
+             , burned_tokens1 ) =
       match fee_transfer with
       | None ->
-          return (coinbase_amount, [], None, None)
+          return (coinbase_amount, [], None, None, empty, Currency.Amount.zero)
       | Some ({ receiver_pk = transferee; fee } as ft) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
           let transferee_id = Coinbase.Fee_transfer.receiver ft in
@@ -1756,39 +2041,45 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
-          let%bind action, transferee_account, transferee_location =
-            (* TODO(#4496): Do not use get_or_create here; we should not create
-               a new account before we know that the transaction will go
-               through and thus the creation fee has been paid.
-            *)
-            get_or_create t transferee_id
+          let transferee_account, action, `Has_permission_to_receive can_receive
+              =
+            has_permission_to_receive ~ledger:t transferee_id
           in
-          let emptys = previous_empty_accounts action transferee_id in
+          let new_accounts = get_new_accounts action transferee_id in
           let%bind timing =
             update_timing_when_no_deduction ~txn_global_slot transferee_account
           in
-          let%map balance =
+          let%bind balance =
             let%bind amount =
               sub_account_creation_fee ~constraint_constants action fee
             in
             add_amount transferee_account.balance amount
           in
-          ( receiver_reward
-          , emptys
-          , Some
-              (transferee_location, { transferee_account with balance; timing })
-          , Some transferee_account.timing )
+          if can_receive then
+            let%map _action, transferee_account, transferee_location =
+              get_or_create t transferee_id
+            in
+            ( receiver_reward
+            , new_accounts
+            , Some
+                ( transferee_location
+                , { transferee_account with balance; timing } )
+            , Some transferee_account.timing
+            , append_entry no_failure empty
+            , Currency.Amount.zero )
+          else return (receiver_reward, [], None, None, single_failure, fee)
     in
     let receiver_id = Account_id.create receiver Token_id.default in
-    let%bind action2, receiver_account, receiver_location =
-      (* TODO(#4496): Do not use get_or_create here; we should not create a new
-         account before we know that the transaction will go through and thus
-         the creation fee has been paid.
-      *)
-      get_or_create t receiver_id
+    let receiver_account, action2, `Has_permission_to_receive can_receive =
+      has_permission_to_receive ~ledger:t receiver_id
     in
-    let emptys2 = previous_empty_accounts action2 receiver_id in
-    (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
+    let new_accounts2 = get_new_accounts action2 receiver_id in
+    (* Note: Updating coinbase receiver timing only if there is no fee transfer.
+       This is so as to not add any extra constraints in transaction snark for checking
+       "receiver" timings. This is OK because timing rules will not be violated when
+       balance increases and will be checked whenever an amount is deducted from the
+       account (#5973)
+    *)
     let%bind coinbase_receiver_timing =
       match transferee_timing_prev with
       | None ->
@@ -1799,20 +2090,40 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Some _timing ->
           Ok receiver_account.timing
     in
-    let%map receiver_balance =
+    let%bind receiver_balance =
       let%bind amount =
         sub_account_creation_fee ~constraint_constants action2 receiver_reward
       in
       add_amount receiver_account.balance amount
     in
-    set t receiver_location
-      { receiver_account with
-        balance = receiver_balance
-      ; timing = coinbase_receiver_timing
-      } ;
+    let%bind failures, burned_tokens2 =
+      if can_receive then (
+        let%map _action2, receiver_account, receiver_location =
+          get_or_create t receiver_id
+        in
+        set t receiver_location
+          { receiver_account with
+            balance = receiver_balance
+          ; timing = coinbase_receiver_timing
+          } ;
+        (append_entry no_failure failures1, Currency.Amount.zero) )
+      else return (append_entry update_failed failures1, receiver_reward)
+    in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
+    let%map burned_tokens =
+      error_opt "burned tokens overflow"
+        (Amount.add burned_tokens1 burned_tokens2)
+    in
+    let coinbase_with_status =
+      if Transaction_status.Failure.Collection.is_empty failures then
+        { With_status.data = cb; status = Applied }
+      else { With_status.data = cb; status = Failed failures }
+    in
     Transaction_applied.Coinbase_applied.
-      { coinbase = cb; previous_empty_accounts = emptys1 @ emptys2 }
+      { coinbase = coinbase_with_status
+      ; new_accounts = new_accounts1 @ new_accounts2
+      ; burned_tokens
+      }
 
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
@@ -1826,11 +2137,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (apply_user_command_unchecked ~constraint_constants ~txn_global_slot
                ledger txn ) ~f:(fun applied ->
               Transaction_applied.Varying.Command (Signed_command applied) )
-      | Command (Parties txn) ->
+      | Command (Zkapp_command txn) ->
           Or_error.map
-            (apply_parties_unchecked ~state_view:txn_state_view
+            (apply_zkapp_command_unchecked ~state_view:txn_state_view
                ~constraint_constants ledger txn ) ~f:(fun (applied, _) ->
-              Transaction_applied.Varying.Command (Parties applied) )
+              Transaction_applied.Varying.Command (Zkapp_command applied) )
       | Fee_transfer t ->
           Or_error.map
             (apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t)
@@ -1864,8 +2175,7 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Zkapp_account.t option
-      , string )
+      , Zkapp_account.t option )
       Account.Poly.t
     [@@deriving sexp, compare]
   end
@@ -1952,10 +2262,16 @@ module For_tests = struct
         fst init_ledger.(i)
       in
       let gen_amount () =
-        Currency.Amount.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Amount.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let gen_fee () =
-        Currency.Fee.(gen_incl (of_int 1_000_000) (of_int 100_000_000))
+        Currency.Fee.(
+          gen_incl
+            (of_nanomina_int_exn 1_000_000)
+            (of_nanomina_int_exn 100_000_000))
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in
@@ -2013,48 +2329,47 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let party_send ?(use_full_commitment = true)
+  let account_update_send ?(use_full_commitment = true)
+      ?(double_sender_nonce = true)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       { Transaction_spec.fee
       ; sender = sender, sender_nonce
       ; receiver
       ; amount
       ; receiver_is_new
-      } : Parties.t =
+      } : Zkapp_command.t =
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
          time for the 'sender' part of the payment.
       *)
-      (* TODO: We should make bumping the nonce for signed parties optional,
-         flagged by a field in the party (but always true for the fee payer).
+      (* TODO: We should make bumping the nonce for signed zkapp_command optional,
+         flagged by a field in the account_update (but always true for the fee payer).
 
          This would also allow us to prevent replays of snapp proofs, by
          allowing them to bump their nonce.
       *)
-      sender_nonce |> Account.Nonce.to_uint32
-      |> Unsigned.UInt32.(mul (of_int 2))
-      |> Account.Nonce.to_uint32
+      if double_sender_nonce then
+        sender_nonce |> Account.Nonce.to_uint32
+        |> Unsigned.UInt32.(mul (of_int 2))
+        |> Account.Nonce.to_uint32
+      else sender_nonce
     in
-    let parties : Parties.Wire.t =
+    let zkapp_command : Zkapp_command.Simple.t =
       { fee_payer =
-          { Party.Fee_payer.body =
+          { Account_update.Fee_payer.body =
               { public_key = sender_pk
-              ; update = Party.Update.noop
               ; fee
-              ; events = []
-              ; sequence_events = []
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; valid_until = None
               ; nonce = actual_nonce
               }
               (* Real signature added in below *)
           ; authorization = Signature.dummy
           }
-      ; other_parties =
+      ; account_updates =
           [ { body =
                 { public_key = sender_pk
-                ; update = Party.Update.noop
+                ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
                 ; increment_nonce = not use_full_commitment
@@ -2062,17 +2377,20 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
+                ; preconditions =
+                    { Account_update.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    }
                 ; caller = Call
                 ; use_full_commitment
+                ; authorization_kind = Signature
                 }
             ; authorization = None_given
             }
           ; { body =
                 { public_key = receiver
-                ; update = Party.Update.noop
+                ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change =
                     Amount.Signed.of_unsigned
@@ -2087,11 +2405,14 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Accept
+                ; preconditions =
+                    { Account_update.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Accept
+                    }
                 ; caller = Call
                 ; use_full_commitment = false
+                ; authorization_kind = None_given
                 }
             ; authorization = None_given
             }
@@ -2099,36 +2420,38 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let parties = Parties.of_wire parties in
-    let commitment = Parties.commitment parties in
+    let zkapp_command = Zkapp_command.of_simple zkapp_command in
+    let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
-      Parties.Transaction_commitment.create_complete commitment
-        ~memo_hash:(Signed_command_memo.hash parties.memo)
+      Zkapp_command.Transaction_commitment.create_complete commitment
+        ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Parties.Digest.Party.create (Party.of_fee_payer parties.fee_payer))
+          (Zkapp_command.Digest.Account_update.create
+             (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
-    let other_parties_signature =
+    let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
       Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field c)
     in
-    let other_parties =
-      Parties.Call_forest.map parties.other_parties ~f:(fun (party : Party.t) ->
-          match party.body.account_precondition with
+    let account_updates =
+      Zkapp_command.Call_forest.map zkapp_command.account_updates
+        ~f:(fun (account_update : Account_update.t) ->
+          match account_update.body.preconditions.account with
           | Nonce _ ->
-              { party with
-                authorization = Control.Signature other_parties_signature
+              { account_update with
+                authorization = Control.Signature account_updates_signature
               }
           | _ ->
-              party )
+              account_update )
     in
     let signature =
       Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
-    { parties with
-      fee_payer = { parties.fee_payer with authorization = signature }
-    ; other_parties
+    { zkapp_command with
+      fee_payer = { zkapp_command.fee_payer with authorization = signature }
+    ; account_updates
     }
 
   let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
@@ -2193,14 +2516,14 @@ module For_tests = struct
     ; next_epoch_data = epoch_data
     }
 
-  (* Quickcheck generator for Parties.t, derived from Test_spec generator *)
-  let gen_parties_from_test_spec =
+  (* Quickcheck generator for Zkapp_command.t, derived from Test_spec generator *)
+  let gen_zkapp_command_from_test_spec =
     let open Quickcheck.Let_syntax in
     let%bind use_full_commitment = Bool.quickcheck_generator in
     match%map Test_spec.mk_gen ~num_transactions:1 () with
     | { specs = [ spec ]; _ } ->
-        party_send ~use_full_commitment spec
+        account_update_send ~use_full_commitment spec
     | { specs; _ } ->
-        failwithf "gen_parties_from_test_spec: expected one spec, got %d"
+        failwithf "gen_zkapp_command_from_test_spec: expected one spec, got %d"
           (List.length specs) ()
 end

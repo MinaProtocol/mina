@@ -49,6 +49,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   in
   let nybbles_per_row = 8 in
   let bits_per_row = 2 * nybbles_per_row in
+  [%test_eq: int] (num_bits mod bits_per_row) 0 ;
   let rows = num_bits / bits_per_row in
   let nybbles_by_row =
     lazy
@@ -119,12 +120,11 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   done ;
   with_label __LOC__ (fun () ->
       assert_
-        [ { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T (EC_endoscalar { state = Array.of_list_rev !state }))
-          }
-        ] ) ;
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+              T (EC_endoscalar { state = Array.of_list_rev !state }))
+        } ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -286,18 +286,17 @@ struct
     let xs, ys = !acc in
     with_label __LOC__ (fun () ->
         assert_
-          [ { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                  T
-                    (EC_endoscale
-                       { xs
-                       ; ys
-                       ; n_acc = !n_acc
-                       ; state = Array.of_list_rev !rounds_rev
-                       } ))
-            }
-          ] ) ;
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+                T
+                  (EC_endoscale
+                     { xs
+                     ; ys
+                     ; n_acc = !n_acc
+                     ; state = Array.of_list_rev !rounds_rev
+                     } ))
+          } ) ;
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 

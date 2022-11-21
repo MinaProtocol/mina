@@ -3,7 +3,7 @@
  (public_name ledger_catchup)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane))
+ (preprocess (pps ppx_mina ppx_version ppx_jane))
  (libraries
    ;; opam libraries
    integers
@@ -17,6 +17,8 @@
    ppx_inline_test.config
    async_unix
    ;; local libraries
+   mina_wire_types
+   genesis_constants
    mina_base.import
    pickles.backend
    one_or_two
@@ -37,7 +39,7 @@
    mina_metrics
    pipe_lib
    transition_handler
-   non_empty_list
+   mina_stdlib
    transition_frontier
    consensus
    mina_base
@@ -60,5 +62,7 @@
    pickles
    snark_params
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    o1trace
+   mina_net2
 ))

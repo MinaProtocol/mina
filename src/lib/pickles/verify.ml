@@ -44,7 +44,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks =
+  let in_circuit_plonks, computed_bp_chals =
     List.map ts
       ~f:(fun
            (T
@@ -63,7 +63,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.start __LOC__ ;
         let statement =
           { statement with
-            pass_through = { statement.pass_through with app_state }
+            messages_for_next_step_proof =
+              { statement.messages_for_next_step_proof with app_state }
           }
         in
         let open Types.Wrap.Proof_state in
@@ -74,36 +75,41 @@ let verify_heterogenous (ts : Instance.t list) =
         let { Deferred_values.xi
             ; plonk = plonk0
             ; combined_inner_product
-            ; which_branch
+            ; branch_data
             ; bulletproof_challenges
+            ; b
             } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
             ~scalar:sc statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
-        let step_domains = key.step_domains.(Index.to_int which_branch) in
+        let step_domain = Branch_data.domain branch_data in
         let w =
-          Tick.Field.domain_generator
-            ~log2_size:(Domain.log2_size step_domains.h)
+          Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
         let zetaw = Tick.Field.mul zeta w in
         let tick_plonk_minimal :
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
           let chal = Challenge.Constant.to_tick_field in
-          { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
+          { zeta
+          ; alpha
+          ; beta = chal plonk0.beta
+          ; gamma = chal plonk0.gamma
+          ; joint_combiner = Option.map ~f:sc plonk0.joint_combiner
+          }
         in
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
             (module Tick.Field)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
-            ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+            evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+          |> Plonk_types.Evals.to_in_circuit
         in
         let tick_domain =
           Plonk_checks.domain
             (module Tick.Field)
-            step_domains.h ~shifts:Common.tick_shifts
+            step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
         let tick_env =
@@ -128,6 +134,13 @@ let verify_heterogenous (ts : Instance.t list) =
           ; alpha = plonk0.alpha
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
+          ; lookup =
+              Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
+                  { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+                    .Lookup
+                    .lookup_gate = l.lookup_gate
+                  ; joint_combiner = Option.value_exn plonk0.joint_combiner
+                  } )
           }
         in
         Timer.clock __LOC__ ;
@@ -149,36 +162,37 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           (absorb sponge, squeeze)
         in
-        let absorb_evals
-            { Plonk_types.All_evals.With_public_input.public_input = x_hat
-            ; evals = e
-            } =
-          let xs, ys = Plonk_types.Evals.to_vectors e in
-          List.iter
-            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
-            ~f:(Array.iter ~f:absorb)
+        let old_bulletproof_challenges =
+          Vector.map ~f:Ipa.Step.compute_challenges
+            statement.messages_for_next_step_proof.old_bulletproof_challenges
         in
-        Double.(iter ~f:absorb_evals evals.evals) ;
-        absorb evals.ft_eval1 ;
+        (let challenges_digest =
+           let open Tick_field_sponge.Field in
+           let sponge = create Tick_field_sponge.params in
+           Vector.iter old_bulletproof_challenges
+             ~f:(Vector.iter ~f:(absorb sponge)) ;
+           squeeze sponge
+         in
+         absorb challenges_digest ;
+         absorb evals.ft_eval1 ;
+         let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
+         let x1, x2 = evals.evals.public_input in
+         absorb x1 ;
+         absorb x2 ;
+         List.iter xs ~f:(fun (x1, x2) ->
+             Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
-        let actual_proofs_verified =
-          Vector.length statement.pass_through.old_bulletproof_challenges
-        in
+        let actual_proofs_verified = Vector.length old_bulletproof_challenges in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
             ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
-            ~x_hat:(Double.map evals.evals ~f:(fun e -> e.public_input))
-            ~old_bulletproof_challenges:
-              (Vector.map ~f:Ipa.Step.compute_challenges
-                 statement.pass_through.old_bulletproof_challenges )
-            ~r:r_actual ~xi ~zeta ~zetaw ~step_branch_domains:step_domains
+            evals.evals ~old_bulletproof_challenges ~r:r_actual ~xi ~zeta ~zetaw
         in
         let check_eq lab x y =
           check
@@ -189,26 +203,60 @@ let verify_heterogenous (ts : Instance.t list) =
             , Tick_field.equal x y )
         in
         Timer.clock __LOC__ ;
+        let bulletproof_challenges =
+          Ipa.Step.compute_challenges bulletproof_challenges
+        in
         Timer.clock __LOC__ ;
+        let shifted_value =
+          Shifted_value.Type1.to_field (module Tick.Field) ~shift:Shifts.tick1
+        in
+        let b_actual =
+          let challenge_poly =
+            unstage
+              (Wrap.challenge_polynomial
+                 (Vector.to_array bulletproof_challenges) )
+          in
+          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+        in
+        let () =
+          let [ Pow_2_roots_of_unity greatest_wrap_domain
+              ; _
+              ; Pow_2_roots_of_unity least_wrap_domain
+              ] =
+            Wrap_verifier.all_possible_domains ()
+          in
+          let actual_wrap_domain = key.index.domain.log_size_of_group in
+          check
+            ( lazy
+                (sprintf !"wrap_domain: %i > %i" actual_wrap_domain
+                   least_wrap_domain )
+            , Int.( <= ) actual_wrap_domain least_wrap_domain ) ;
+          check
+            ( lazy
+                (sprintf !"wrap_domain: %i < %i" actual_wrap_domain
+                   greatest_wrap_domain )
+            , Int.( >= ) actual_wrap_domain greatest_wrap_domain )
+        in
         List.iter
           ~f:(fun (s, x, y) -> check_eq s x y)
           (* Both these values can actually be omitted from the proof on the wire since we recompute them
              anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , Shifted_value.Type1.to_field
-                (module Tick.Field)
-                combined_inner_product ~shift:Shifts.tick1
+            , shifted_value combined_inner_product
             , combined_inner_product_actual )
+          ; ("b", shifted_value b, b_actual)
           ] ;
-        plonk )
+        (plonk, bulletproof_challenges) )
+    |> List.unzip
   in
   let open Backend.Tock.Proof in
   let open Promise.Let_syntax in
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
       (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
-           ( t.statement.proof_state.me_only.challenge_polynomial_commitment
+           ( t.statement.proof_state.messages_for_next_wrap_proof
+               .challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
                t.statement.proof_state.deferred_values.bulletproof_challenges ) )
       )
@@ -228,19 +276,24 @@ let verify_heterogenous (ts : Instance.t list) =
               plonk
             ->
            let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
-             { pass_through =
-                 Common.hash_step_me_only ~app_state:A_value.to_field_elements
-                   (Reduced_me_only.Step.prepare
+             { messages_for_next_step_proof =
+                 Common.hash_messages_for_next_step_proof
+                   ~app_state:A_value.to_field_elements
+                   (Reduced_messages_for_next_proof_over_same_field.Step.prepare
                       ~dlog_plonk_index:key.commitments
-                      { t.statement.pass_through with app_state } )
+                      { t.statement.messages_for_next_step_proof with
+                        app_state
+                      } )
              ; proof_state =
                  { t.statement.proof_state with
                    deferred_values =
                      { t.statement.proof_state.deferred_values with plonk }
-                 ; me_only =
-                     Common.hash_dlog_me_only Max_proofs_verified.n
-                       (Reduced_me_only.Wrap.prepare
-                          t.statement.proof_state.me_only )
+                 ; messages_for_next_wrap_proof =
+                     Wrap_hack.hash_messages_for_next_wrap_proof
+                       Max_proofs_verified.n
+                       (Reduced_messages_for_next_proof_over_same_field.Wrap
+                        .prepare
+                          t.statement.proof_state.messages_for_next_wrap_proof )
                  }
              }
            in
@@ -251,20 +304,20 @@ let verify_heterogenous (ts : Instance.t list) =
            , t.proof
            , input
            , Some
-               (Vector.to_list
+               (Wrap_hack.pad_accumulator
                   (Vector.map2
                      ~f:(fun g cs ->
                        { Challenge_polynomial.challenges =
                            Vector.to_array (Ipa.Wrap.compute_challenges cs)
                        ; commitment = g
                        } )
-                     (Vector.extend_exn
-                        t.statement.pass_through
+                     (Vector.extend_front_exn
+                        t.statement.messages_for_next_step_proof
                           .challenge_polynomial_commitments
                         Max_proofs_verified.n
                         (Lazy.force Dummy.Ipa.Wrap.sg) )
-                     t.statement.proof_state.me_only.old_bulletproof_challenges ) )
-           ) ) )
+                     t.statement.proof_state.messages_for_next_wrap_proof
+                       .old_bulletproof_challenges ) ) ) ) )
   in
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   match result () with
@@ -274,7 +327,8 @@ let verify_heterogenous (ts : Instance.t list) =
       eprintf !"bad verify: %s\n%!" e ;
       false
 
-let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a return_typ n)
+    (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous

@@ -8,7 +8,7 @@
  (preprocess
   (pps
    ppx_version
-   ppx_coda
+   ppx_mina
    ppx_jane
    ppx_compare
    ppx_deriving_yojson
@@ -29,10 +29,13 @@
    async_kernel
    bin_prot.shape
    ;; local libraries
+   mina_wire_types
    kimchi_bindings
    kimchi_types
    pasta_bindings
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    bitstring_lib
    snarky.intf
    pickles.backend
@@ -60,4 +63,5 @@
    tuple_lib
    promise
    kimchi_backend.common
+   ppx_version.runtime
 ))

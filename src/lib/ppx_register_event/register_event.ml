@@ -1,9 +1,5 @@
 open Core_kernel
 open Ppxlib
-module Conv_to_ppx_deriving =
-  Migrate_parsetree.Convert (Selected_ast) (Migrate_parsetree.OCaml_current)
-module Conv_from_ppx_deriving =
-  Migrate_parsetree.Convert (Migrate_parsetree.OCaml_current) (Selected_ast)
 
 let deriver = "register_event"
 
@@ -11,7 +7,7 @@ let digest s = Md5.digest_string s |> Md5.to_hex
 
 let checked_interpolations_statically ~loc msg label_names =
   match msg with
-  | { pexp_desc = Pexp_constant (Pconst_string (s, _)); _ } -> (
+  | { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } -> (
       (* check that every interpolation point $foo in msg has a matching label;
          OK to have extra labels not mentioned in message
       *)
@@ -107,42 +103,32 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
   let split_path = String.split path ~on:'.' in
-  let to_yojson x =
-    Conv_from_ppx_deriving.copy_expression
-    @@ Ppx_deriving_yojson.ser_expr_of_typ
-    @@ Conv_to_ppx_deriving.copy_core_type x
-  in
-  let of_yojson ~path x =
-    Conv_from_ppx_deriving.copy_expression
-    @@ Ppx_deriving_yojson.desu_expr_of_typ ~path
-    @@ Conv_to_ppx_deriving.copy_core_type x
-  in
+  let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
+  let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
   let elist ~f l = elist (List.map ~f l) in
   let record_pattern =
-    let open Ast_helper.Pat in
     let arg =
       if has_record_arg then
         let fields =
           List.map label_names ~f:(fun label ->
               (Located.mk (Lident label), pvar label) )
         in
-        Some (record fields Closed)
+        Some (ppat_record fields Closed)
       else None
     in
-    construct (Located.mk (Lident ctor)) arg
+    ppat_construct (Located.mk (Lident ctor)) arg
   in
   let record_expr =
-    let open Ast_helper.Exp in
     let arg =
       if has_record_arg then
         let fields =
           List.map label_names ~f:(fun label ->
               (Located.mk (Lident label), evar label) )
         in
-        Some (record fields None)
+        Some (pexp_record fields None)
       else None
     in
-    construct (Located.mk (Lident ctor)) arg
+    pexp_construct (Located.mk (Lident ctor)) arg
   in
   let stris =
     [ [%stri
@@ -165,9 +151,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                         elist label_decls
                           ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ }
                              ->
-                            Conv_from_ppx_deriving.copy_expression
-                            @@ Ppx_deriving_yojson.wrap_runtime
-                            @@ Conv_to_ppx_deriving.copy_expression
+                            Ppx_deriving_yojson.wrap_runtime
                             @@ [%expr
                                  [%e estring name]
                                  , [%e to_yojson pld_type] [%e evar name]] )] )
@@ -182,15 +166,14 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   [%e
                     List.fold_right label_decls
                       ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
-                        Conv_from_ppx_deriving.copy_expression
-                        @@ Ppx_deriving_yojson.wrap_runtime
-                        @@ Conv_to_ppx_deriving.copy_expression
+                        Ppx_deriving_yojson.wrap_runtime
                         @@ [%expr
+                             let module Result = Core_kernel.Result in
                              match
                                Core_kernel.Map.find args_list [%e estring name]
                              with
                              | Some [%p pvar name] ->
-                                 Core_kernel.Result.bind
+                                 Result.bind
                                    ([%e
                                       of_yojson
                                         ~path:(split_path @ [ ctor; name ])
@@ -198,7 +181,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                       [%e evar name] )
                                    ~f:(fun [%p pvar name] -> [%e acc])
                              | None ->
-                                 Core_kernel.Result.fail
+                                 Result.fail
                                    [%e
                                      estring
                                        (sprintf "%s, parse: missing argument %s"

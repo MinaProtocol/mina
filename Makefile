@@ -2,7 +2,7 @@
 ## Configuration
 
 # Current OCaml version
-OCAML_VERSION = "4.11.2"
+OCAML_VERSION = "4.14.0"
 
 # machine word size
 WORD_SIZE = "64"
@@ -70,7 +70,20 @@ ocaml_version:
 ocaml_word_size:
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
-ocaml_checks: ocaml_version ocaml_word_size
+
+# Checks that the current opam switch contains the packages from opam.export at the same version.
+# This check is disabled in the pure nix environment (that does not use opam).
+check_opam_switch:
+ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
+    ifeq (, $(shell which check_opam_switch))
+	$(warning The check_opam_switch binary was not found in the PATH.)
+	$(error The current opam switch should likely be updated by running: "opam switch import opam.export")
+    else
+	check_opam_switch opam.export
+    endif
+endif
+
+ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 	make -C src/app/libp2p_helper
@@ -117,7 +130,7 @@ build_intgtest: ocaml_checks
 
 client_sdk: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune b src/lib/crypto/kimchi_bindings/js/node_js && dune b src/app/client_sdk/client_sdk.bc.js
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
 	$(info Build complete)
 
 client_sdk_test_sigs: ocaml_checks
@@ -136,7 +149,7 @@ mina_signer: ocaml_checks
 	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
 	&& dune b src/app/client_sdk/client_sdk.bc.js \
 	&& (cd frontend/mina-signer; \
-	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run build; \
 	cd ../..)
 	$(info Build complete)
 
@@ -284,16 +297,13 @@ genesis-ledger-ocaml:
 ## Tests
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_coda/tests
-
-web:
-	./scripts/web.sh
+	$(MAKE) -C src/lib/ppx_mina/tests
 
 ########################################
 ## Benchmarks
 
 benchmarks: ocaml_checks
-	dune build src/app/benchmarks/main.exe
+	dune build src/app/benchmarks/benchmarks.exe
 
 ########################################
 # Coverage testing and output

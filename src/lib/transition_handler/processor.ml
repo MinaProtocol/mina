@@ -17,6 +17,16 @@ open Cache_lib
 open Mina_block
 open Network_peer
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
@@ -43,6 +53,13 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
+  [%log debug] "add_and_finalize $state_hash %s callback"
+    ~metadata:
+      [ ( "state_hash"
+        , Transition_frontier.Breadcrumb.state_hash breadcrumb
+          |> State_hash.to_yojson )
+      ]
+    (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
   let%map () =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
@@ -79,10 +96,11 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(Mina_block.Validated.state_hash transition)
 
-let process_transition ~logger ~trust_system ~verifier ~frontier
-    ~catchup_scheduler ~processed_transition_writer ~time_controller
-    ~transition:cached_initially_validated_transition ~valid_cb
-    ~precomputed_values =
+let process_transition ~context:(module Context : CONTEXT) ~trust_system
+    ~verifier ~frontier ~catchup_scheduler ~processed_transition_writer
+    ~time_controller ~transition:cached_initially_validated_transition ~valid_cb
+    =
+  let open Context in
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
@@ -107,8 +125,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
       let open Deferred.Let_syntax in
       match
         Mina_block.Validation.validate_frontier_dependencies
-          ~consensus_constants:
-            precomputed_values.Precomputed_values.consensus_constants ~logger
+          ~context:(module Context)
           ~root_block:
             Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
           ~get_block_by_hash:
@@ -156,12 +173,13 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
               let timeout_duration =
                 Option.fold
                   (Transition_frontier.find frontier
-                     (Non_empty_list.head delta_state_hashes) )
+                     (Mina_stdlib.Nonempty_list.head delta_state_hashes) )
                   ~init:(Block_time.Span.of_ms 0L)
                   ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
-                ~cached_transition:cached_initially_validated_transition ;
+                ~cached_transition:cached_initially_validated_transition
+                ~valid_cb ;
               return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
@@ -200,8 +218,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
          ~processed_transition_writer ~only_if_present:false ~time_controller
          ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb ))
 
-let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
-    ~trust_system ~time_controller ~frontier
+let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
+    ~time_controller ~frontier
     ~(primary_transition_reader :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -210,29 +228,24 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
-    ~(clean_up_catchup_scheduler : unit Ivar.t)
-    ~(catchup_job_writer :
-       ( State_hash.t
-         * ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
-           list
-       , crash buffered
-       , unit )
-       Writer.t )
+    ~(clean_up_catchup_scheduler : unit Ivar.t) ~catchup_job_writer
     ~(catchup_breadcrumbs_reader :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+         * Mina_net2.Validation_callback.t option )
+         Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
        Reader.t )
     ~(catchup_breadcrumbs_writer :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+         * Mina_net2.Validation_callback.t option )
+         Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
        Writer.t ) ~processed_transition_writer =
+  let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -243,9 +256,10 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
       ~time_controller ~precomputed_values
   in
   let process_transition =
-    process_transition ~logger ~trust_system ~verifier ~frontier
-      ~catchup_scheduler ~processed_transition_writer ~time_controller
-      ~precomputed_values
+    process_transition
+      ~context:(module Context)
+      ~trust_system ~verifier ~frontier ~catchup_scheduler
+      ~processed_transition_writer ~time_controller
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Reader.Merge.iter
@@ -279,16 +293,16 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                             subtree
                             (* It could be the case that by the time we try and
                                * add the breadcrumb, it's no longer relevant when
-                               * we're catching up *)
-                            ~f:
-                              (add_and_finalize ~logger ~only_if_present:true
-                                 ~source:`Catchup ~valid_cb:None ) )
+                               * we're catching up *) ~f:(fun (b, valid_cb) ->
+                              add_and_finalize ~logger ~only_if_present:true
+                                ~source:`Catchup ~valid_cb b ) )
                     with
                   | Ok () ->
                       ()
                   | Error err ->
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
+                          Rose_tree.iter tree
+                            ~f:(fun (cached_breadcrumb, _vc) ->
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
                               in
@@ -313,12 +327,12 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                     |> Mina_block.Validated.header
                     |> Mina_block.Header.protocol_state
                     |> Protocol_state.blockchain_state
-                    |> Blockchain_state.timestamp |> Block_time.to_time
+                    |> Blockchain_state.timestamp |> Block_time.to_time_exn
                   in
                   Perf_histograms.add_span
                     ~name:"accepted_transition_local_latency"
                     (Core_kernel.Time.diff
-                       Block_time.(now time_controller |> to_time)
+                       Block_time.(now time_controller |> to_time_exn)
                        transition_time ) ;
                   let%map () =
                     match%map
@@ -373,6 +387,16 @@ let%test_module "Transition_handler.Processor tests" =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()) )
 
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
     let downcast_breadcrumb breadcrumb =
       let transition =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -415,12 +439,14 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
                 let cache = Unprocessed_transition_cache.create ~logger in
-                run ~logger ~time_controller ~verifier ~trust_system
+                run
+                  ~context:(module Context)
+                  ~time_controller ~verifier ~trust_system
                   ~clean_up_catchup_scheduler ~frontier
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ~precomputed_values ;
+                  ~processed_transition_writer ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb

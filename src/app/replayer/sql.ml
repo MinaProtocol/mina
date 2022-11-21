@@ -207,7 +207,7 @@ module User_command = struct
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT typ,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
+      {sql| SELECT command_type,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,status
 
@@ -247,7 +247,7 @@ end
 module Zkapp_command = struct
   type t =
     { zkapp_fee_payer_body_id : int
-    ; zkapp_other_parties_ids : int array
+    ; zkapp_account_updates_ids : int array
     ; memo : string
     ; block_id : int
     ; global_slot_since_genesis : int64
@@ -272,7 +272,7 @@ module Zkapp_command = struct
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT zkapp_fee_payer_body_id,zkapp_other_parties_ids,memo,
+      {sql| SELECT zkapp_fee_payer_body_id,zkapp_account_updates_ids,memo,
                    blocks.id,blocks.global_slot_since_genesis,
                    parent.global_slot_since_genesis,
                    sequence_no,hash
@@ -333,7 +333,7 @@ module Internal_command = struct
   *)
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT typ,receiver_id,fee,
+      {sql| SELECT command_type,receiver_id,fee,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,
                    parent.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no

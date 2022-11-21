@@ -41,9 +41,9 @@ module Step = struct
 
     let create = Fields.create
 
-    let generate cs =
+    let generate ~prev_challenges cs =
       let open Tick.Keypair in
-      let keypair = create cs in
+      let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -114,9 +114,10 @@ module Step = struct
         Boolean.( && ) x_eq b_eq
       in
       let (Typ typ_unchecked) = typ_unchecked in
-      let%bind () = typ_unchecked.check t in
-      Checked.List.map forbidden_shifted_values ~f:(equal t)
-      >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+      make_checked_ast
+      @@ let%bind () = run_checked_ast @@ typ_unchecked.check t in
+         Checked.List.map forbidden_shifted_values ~f:(equal t)
+         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
     let typ : _ Snarky_backendless.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
@@ -128,22 +129,48 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds =
+  let input ~proofs_verified ~wrap_rounds ~uses_lookup =
     let open Types.Step.Statement in
-    let spec = spec proofs_verified wrap_rounds in
+    let lookup :
+        ( Challenge.Constant.t
+        , Impl.Field.t
+        , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
+        , Other_field.t Pickles_types.Shifted_value.Type2.t )
+        Types.Wrap.Lookup_parameters.t =
+      { use = uses_lookup
+      ; zero =
+          { value =
+              { challenge = Limb_vector.Challenge.Constant.zero
+              ; scalar = Shifted_value Other_field.Constant.zero
+              }
+          ; var =
+              { challenge = Field.zero
+              ; scalar = Shifted_value (Field.zero, Boolean.false_)
+              }
+          }
+      }
+    in
+    let spec = spec (module Impl) proofs_verified wrap_rounds lookup in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
+               Impl.run_checked_ast (Other_field.check x) ;
                t )
            , Fn.id ) )
         spec
     in
-    let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    let typ =
+      Typ.transport typ
+        ~there:(to_data ~option_map:Option.map)
+        ~back:(of_data ~option_map:Option.map)
+    in
+    Spec.ETyp.T
+      ( typ
+      , (fun x -> of_data ~option_map:Plonk_types.Opt.map (f x))
+      , fun x -> f_inv (to_data ~option_map:Plonk_types.Opt.map x) )
 end
 
 module Wrap = struct
@@ -161,9 +188,9 @@ module Wrap = struct
 
     let create = Fields.create
 
-    let generate cs =
+    let generate ~prev_challenges cs =
       let open Tock.Keypair in
-      let keypair = create cs in
+      let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -212,9 +239,10 @@ module Wrap = struct
         let open Internal_Basic in
         let open Let_syntax in
         let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
-        let%bind () = t0.check t in
-        Checked.List.map forbidden_shifted_values ~f:(equal t)
-        >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+        make_checked_ast
+        @@ let%bind () = run_checked_ast @@ t0.check t in
+           Checked.List.map forbidden_shifted_values ~f:(equal t)
+           >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
       (typ_unchecked, check)
 
@@ -226,7 +254,24 @@ module Wrap = struct
   end
 
   let input () =
-    let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
+    let lookup =
+      { Types.Wrap.Lookup_parameters.use = No
+      ; zero =
+          { value =
+              { challenge = Limb_vector.Challenge.Constant.zero
+              ; scalar =
+                  Shifted_value.Type1.Shifted_value Other_field.Constant.zero
+              }
+          ; var =
+              { challenge = Impl.Field.zero
+              ; scalar = Shifted_value.Type1.Shifted_value Impl.Field.zero
+              }
+          }
+      }
+    in
+    let fp : (Impl.Field.t, Other_field.Constant.t) Typ.t =
+      Other_field.typ_unchecked
+    in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
@@ -234,16 +279,18 @@ module Wrap = struct
         (T
            ( Shifted_value.Type1.typ fp
            , (fun (Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
+               Impl.run_checked_ast (Other_field.check x) ;
                t )
            , Fn.id ) )
-        In_circuit.spec
+        (In_circuit.spec (module Impl) lookup)
     in
     let typ =
-      Typ.transport typ ~there:In_circuit.to_data ~back:In_circuit.of_data
+      Typ.transport typ
+        ~there:(In_circuit.to_data ~option_map:Option.map)
+        ~back:(In_circuit.of_data ~option_map:Option.map)
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> In_circuit.of_data (f x))
-      , fun x -> f_inv (In_circuit.to_data x) )
+      , (fun x -> In_circuit.of_data ~option_map:Plonk_types.Opt.map (f x))
+      , fun x -> f_inv (In_circuit.to_data ~option_map:Plonk_types.Opt.map x) )
 end

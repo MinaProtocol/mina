@@ -364,8 +364,10 @@ let%test_module "transaction logic consistency" =
             let error = Error.of_exn ~backtrace:`Get exn in
             passed := false ;
             Format.printf
-              "The following transaction was inconsistently \
-               applied:@.%s@.%s@.%s@."
+              "@[<v>The following transaction was inconsistently applied:@,\
+               %s@,\
+               %s@,\
+               %s@]@."
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
@@ -590,8 +592,10 @@ let%test_module "transaction logic consistency" =
             let error = Error.of_exn ~backtrace:`Get exn in
             passed := false ;
             Format.printf
-              "The following transaction was inconsistently \
-               applied:@.%s@.%s@.%s@."
+              "@[<v>The following transaction was inconsistently applied:@,\
+               %s@,\
+               %s@,\
+               %s@]@."
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))

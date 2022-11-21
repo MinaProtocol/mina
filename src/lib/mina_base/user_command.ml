@@ -4,7 +4,10 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('u, 's) t = Signed_command of 'u | Parties of 's
+      type ('u, 's) t =
+            ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
+        | Signed_command of 'u
+        | Zkapp_command of 's
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -25,7 +28,7 @@ end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
   | Signed_command of 'u
-  | Parties of 's
+  | Zkapp_command of 's
 
 module Gen_make (C : Signed_command_intf.Gen_intf) = struct
   let to_signed_command f =
@@ -58,32 +61,50 @@ end
 
 module Gen = Gen_make (Signed_command)
 
-module Valid = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V2.t
-        , Parties.Valid.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+let gen_signed =
+  let module G = Signed_command.Gen in
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2
+      Mina_base_import.Signature_keypair.gen
+  in
+  G.payment_with_random_participants ~sign_type:`Real ~keys:(Array.of_list keys)
+    ~max_amount:10000 ~fee_range:1000 ()
 
-      let to_latest = Fn.id
-    end
-  end]
-
-  module Gen = Gen_make (Signed_command.With_valid_signature)
-end
+let gen = Gen.to_signed_command gen_signed
 
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (Signed_command.Stable.V2.t, Parties.Stable.V1.t) Poly.Stable.V2.t
+    type t =
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
 end]
+
+let to_base64 : t -> string = function
+  | Signed_command sc ->
+      Signed_command.to_base64 sc
+  | Zkapp_command zc ->
+      Zkapp_command.to_base64 zc
+
+let of_base64 s : t Or_error.t =
+  match Signed_command.of_base64 s with
+  | Ok sc ->
+      Ok (Signed_command sc)
+  | Error err1 -> (
+      match Zkapp_command.of_base64 s with
+      | Ok zc ->
+          Ok (Zkapp_command zc)
+      | Error err2 ->
+          Error
+            (Error.of_string
+               (sprintf
+                  "Could decode Base64 neither to signed command (%s), nor to \
+                   zkApp (%s)"
+                  (Error.to_string_hum err1) (Error.to_string_hum err2) ) ) )
 
 (*
 include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
@@ -122,7 +143,7 @@ module Verifiable = struct
     module V2 = struct
       type t =
         ( Signed_command.Stable.V2.t
-        , Parties.Verifiable.Stable.V1.t )
+        , Zkapp_command.Verifiable.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -134,29 +155,30 @@ module Verifiable = struct
     match t with
     | Signed_command x ->
         Signed_command.fee_payer x
-    | Parties p ->
-        Party.Fee_payer.account_id p.fee_payer
+    | Zkapp_command p ->
+        Account_update.Fee_payer.account_id p.fee_payer
 end
 
 let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Party.t) =
+  let find_vk (p : Account_update.t) =
     let ( ! ) x = Option.value_exn x in
-    let id = Party.account_id p in
+    let id = Account_update.account_id p in
     Option.try_with (fun () ->
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.zkapp).verification_key).data )
+        !(!(account.zkapp).verification_key) )
   in
   match t with
   | Signed_command c ->
       Signed_command c
-  | Parties { fee_payer; other_parties; memo } ->
-      Parties
+  | Zkapp_command { fee_payer; account_updates; memo } ->
+      Zkapp_command
         { fee_payer
-        ; other_parties =
-            other_parties
-            |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))
+        ; account_updates =
+            account_updates
+            |> Zkapp_command.Call_forest.map ~f:(fun account_update ->
+                   (account_update, find_vk account_update) )
         ; memo
         }
 
@@ -164,76 +186,109 @@ let of_verifiable (t : Verifiable.t) : t =
   match t with
   | Signed_command x ->
       Signed_command x
-  | Parties p ->
-      Parties (Parties.of_verifiable p)
+  | Zkapp_command p ->
+      Zkapp_command (Zkapp_command.of_verifiable p)
 
 let fee : t -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
-  | Parties p ->
-      Parties.fee p
+  | Zkapp_command p ->
+      Zkapp_command.fee p
 
 (* for filtering *)
 let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) =
+let accounts_accessed (t : t) (status : Transaction_status.t) =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x
-  | Parties ps ->
-      Parties.accounts_accessed ps
+      Signed_command.accounts_accessed x status
+  | Zkapp_command ps ->
+      Zkapp_command.accounts_accessed ps status
 
-let to_base58_check (t : t) =
-  match t with
-  | Signed_command x ->
-      Signed_command.to_base58_check x
-  | Parties ps ->
-      Parties.to_base58_check ps
+let accounts_referenced (t : t) = accounts_accessed t Applied
 
 let fee_payer (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.fee_payer x
-  | Parties p ->
-      Parties.fee_payer p
+  | Zkapp_command p ->
+      Zkapp_command.fee_payer p
 
-let nonce_exn (t : t) =
+(** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
+let applicable_at_nonce (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
-  | Parties p ->
-      Parties.nonce p
+  | Zkapp_command p ->
+      Zkapp_command.applicable_at_nonce p
 
-let check (t : t) : Valid.t option =
+let expected_target_nonce t = Account.Nonce.succ (applicable_at_nonce t)
+
+(** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
+let target_nonce_on_success (t : t) =
   match t with
   | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
-  | Parties p ->
-      Some (Parties (p :> Parties.Valid.t))
+      Account.Nonce.succ (Signed_command.nonce x)
+  | Zkapp_command p ->
+      Zkapp_command.target_nonce_on_success p
 
 let fee_token (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.fee_token x
-  | Parties x ->
-      Parties.fee_token x
+  | Zkapp_command x ->
+      Zkapp_command.fee_token x
 
 let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Parties _ ->
+  | Zkapp_command _ ->
       Mina_numbers.Global_slot.max_value
 
-let forget_check (t : Valid.t) : t = (t :> t)
+module Valid = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        ( Signed_command.With_valid_signature.Stable.V2.t
+        , Zkapp_command.Valid.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Gen = Gen_make (Signed_command.With_valid_signature)
+end
+
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+  match t with
+  | Signed_command x ->
+      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Zkapp_command p ->
+      Option.map
+        (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
+        ~f:(fun p -> Zkapp_command p)
+
+let forget_check (t : Valid.t) : t =
+  match t with
+  | Zkapp_command x ->
+      Zkapp_command (Zkapp_command.Valid.forget x)
+  | Signed_command c ->
+      Signed_command (c :> Signed_command.t)
 
 let to_valid_unsafe (t : t) =
   `If_this_is_used_it_should_have_a_comment_justifying_it
     ( match t with
-    | Parties x ->
-        Parties x
+    | Zkapp_command x ->
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
+          Zkapp_command.Valid.to_valid_unsafe x
+        in
+        Zkapp_command x
     | Signed_command x ->
         (* This is safe due to being immediately wrapped again. *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
@@ -244,7 +299,7 @@ let to_valid_unsafe (t : t) =
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed user_command)
+        (accounts_referenced user_command)
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
@@ -252,13 +307,19 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : Stable.Latest.t -> int = function
+let weight : t -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
-  | Parties parties ->
-      Parties.weight parties
+  | Zkapp_command zkapp_command ->
+      Zkapp_command.weight zkapp_command
 
 (* Fee per weight unit *)
 let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
+
+let valid_size ~genesis_constants = function
+  | Signed_command _ ->
+      Ok ()
+  | Zkapp_command zkapp_command ->
+      Zkapp_command.valid_size ~genesis_constants zkapp_command

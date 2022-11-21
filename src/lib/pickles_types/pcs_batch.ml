@@ -63,8 +63,8 @@ let combine_evaluations' (type a n m)
   in
   List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
 
-let combine_evaluations' (type n) (t : (_, n, _) t) ~shifted_pow ~mul ~add ~one
-    ~evaluation_point ~xi (evals0 : (_, n) Vector.t) evals1 =
+let[@warning "-45"] combine_evaluations' (type n) (t : (_, n, _) t) ~shifted_pow
+    ~mul ~add ~one ~evaluation_point ~xi (evals0 : (_, n) Vector.t) evals1 =
   match evals0 with
   | Vector.[] ->
       failwith "Empty evals0"
@@ -96,21 +96,10 @@ let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
       List.fold_left comms ~init:(i init) ~f:(fun acc p ->
           scale_and_add ~acc ~xi p )
 
-let combine_split_evaluations (type a n m f f')
-    ({ without_degree_bound = _; with_degree_bound } : (a, n, m) t)
-    ~(shifted_pow : a -> f' -> f') ~(mul : f -> f' -> f)
-    ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~(evaluation_point : f')
-    ~init:(i : f -> f') ~(last : f array -> f) ~(xi : f')
-    (evals0 : (f array, n) Vector.t) (evals1 : (f array, m) Vector.t) : f' =
-  let flat =
-    List.concat_map (Vector.to_list evals0) ~f:Array.to_list
-    @ List.concat
-        (Vector.to_list
-           (Vector.map2 with_degree_bound evals1 ~f:(fun deg unshifted ->
-                let u = last unshifted in
-                Array.to_list unshifted
-                @ [ mul u (shifted_pow deg evaluation_point) ] ) ) )
-  in
+let combine_split_evaluations (type f f')
+    ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~init:(i : f -> f') ~(xi : f')
+    (evals0 : f array list) : f' =
+  let flat = List.concat_map evals0 ~f:Array.to_list in
   match List.rev flat with
   | [] ->
       failwith "combine_split_evaluations: empty"
