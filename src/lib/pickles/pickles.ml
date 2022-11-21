@@ -2153,7 +2153,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 64000 do
@@ -3078,7 +3078,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 61000 do

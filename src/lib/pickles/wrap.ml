@@ -13,7 +13,8 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  Tick.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+  let open Backend.Tick.Field in
+  Wrap_verifier.G.challenge_polynomial ~add ~mul ~one
 
 module Plonk_checks = struct
   include Plonk_checks
