@@ -2,6 +2,8 @@
  (name snarky_tests)
  (instrumentation
   (backend bisect_ppx))
+ (deps
+  (source_tree examples))
  (preprocess
   (pps
    ppx_version
@@ -50,6 +52,7 @@
   mina_version
   base58_check
   codable
+  random_oracle
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
