@@ -1169,8 +1169,13 @@ struct
             | None ->
                 Error Diff_error.Fee_payer_account_not_found
             | Some account ->
-                if not (Account.has_permission ~to_:`Send account) then
-                  Error Diff_error.Fee_payer_not_permitted_to_send
+                if
+                  not
+                    ( Account.has_permission ~to_:`Access
+                        ~control:Control.Tag.Signature account
+                    && Account.has_permission ~to_:`Send
+                         ~control:Control.Tag.Signature account )
+                then Error Diff_error.Fee_payer_not_permitted_to_send
                 else Ok ()
         in
         let pool, add_results =

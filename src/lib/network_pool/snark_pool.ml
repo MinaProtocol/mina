@@ -521,7 +521,10 @@ struct
           let prover_permitted_to_receive =
             let open Option.Let_syntax in
             let%map account = account_opt in
-            Mina_base.Account.has_permission ~to_:`Receive account
+            Mina_base.Account.has_permission
+              ~control:Mina_base.Control.Tag.None_given ~to_:`Access account
+            && Mina_base.Account.has_permission
+                 ~control:Mina_base.Control.Tag.None_given ~to_:`Receive account
           in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
