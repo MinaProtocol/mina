@@ -167,24 +167,37 @@ module Numeric = struct
     end
   end]
 
-  let deriver name inner obj =
+  let deriver name inner range_max obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
-    Or_ignore.deriver closed_interval obj
+    Or_ignore.deriver_interval ~range_max closed_interval obj
 
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
 
-    let nonce obj = deriver "Nonce" uint32 obj
+    let range_uint32 =
+      Unsigned_extended.UInt32.(to_string zero, to_string max_int)
 
-    let balance obj = deriver "Balance" balance obj
+    let range_uint64 =
+      Unsigned_extended.UInt64.(to_string zero, to_string max_int)
 
-    let amount obj = deriver "CurrencyAmount" amount obj
+    let block_time_inner obj =
+      let ( ^^ ) = Fn.compose in
+      iso_string ~name:"BlockTime" ~js_type:UInt64
+        ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
+        ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
+        obj
 
-    let length obj = deriver "Length" uint32 obj
+    let nonce obj = deriver "Nonce" uint32 range_uint32 obj
 
-    let global_slot obj = deriver "GlobalSlot" uint32 obj
+    let balance obj = deriver "Balance" balance range_uint64 obj
 
-    let token_id obj = deriver "TokenId" Token_id.deriver obj
+    let amount obj = deriver "CurrencyAmount" amount range_uint64 obj
+
+    let length obj = deriver "Length" uint32 range_uint32 obj
+
+    let global_slot obj = deriver "GlobalSlot" uint32 range_uint32 obj
+
+    let block_time obj = deriver "BlockTime" block_time_inner range_uint64 obj
   end
 
   let%test_module "Numeric" =
@@ -206,7 +219,7 @@ module Numeric = struct
         let deriver obj =
           let open Fields_derivers_zkapps.Derivers in
           let ( !. ) = ( !. ) ~t_fields_annots in
-          Fields.make_creator obj ~foo:!.(deriver "Int" int)
+          Fields.make_creator obj ~foo:!.(deriver "Int" int ("0", "1000"))
           |> finish "T" ~t_toplevel_annots
       end
 
@@ -511,12 +524,15 @@ module Account = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
+    let sequence_state =
+      with_checked ~checked:field ~name:"SequenceState" field
+    in
     Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
-      ~sequence_state:!.(Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver sequence_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
     |> finish "AccountPrecondition" ~t_toplevel_annots
