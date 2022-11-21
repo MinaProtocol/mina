@@ -41,6 +41,7 @@ struct
     Timer.clock __LOC__ ;
     let t =
       Fix_domains.domains
+        (module Impls.Wrap.R1CS_constraint_system)
         (module Impls.Wrap)
         (Impls.Wrap.input ())
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))

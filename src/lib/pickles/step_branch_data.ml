@@ -160,6 +160,7 @@ let create
       (* TODO *)
     in
     Fix_domains.domains
+      (module Impls.Step.R1CS_constraint_system)
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main

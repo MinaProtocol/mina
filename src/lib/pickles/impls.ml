@@ -33,6 +33,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick)
   include Impl
+  module R1CS_constraint_system = Tick.R1CS_constraint_system
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key
 
@@ -180,6 +181,7 @@ module Wrap = struct
   module Digest = Digest.Make (Impl)
   module Wrap_field = Tock.Field
   module Step_field = Tick.Field
+  module R1CS_constraint_system = Tock.R1CS_constraint_system
   module Verification_key = Tock.Verification_key
   module Proving_key = Tock.Proving_key
 

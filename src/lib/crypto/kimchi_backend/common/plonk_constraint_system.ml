@@ -327,8 +327,6 @@ module Make
 
   val create : unit -> t
 
-  val get_public_input_size : t -> int Set_once.t
-
   val get_primary_input_size : t -> int
 
   val set_primary_input_size : t -> int -> unit
