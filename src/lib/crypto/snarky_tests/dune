@@ -1,7 +1,9 @@
-(executable
+(test
  (name snarky_tests)
  (instrumentation
   (backend bisect_ppx))
+ (deps
+  (source_tree examples))
  (preprocess
   (pps
    ppx_version
