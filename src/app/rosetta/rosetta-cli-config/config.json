@@ -19,7 +19,7 @@
  "error_stack_trace_disabled": false,
  "coin_supported": false,
  "construction": {
-   "offline_url":                "http://localhost:3087",
+   "offline_url":                "http://localhost:3088",
    "max_offline_connections":    4,
    "force_retry":                false,
    "stale_depth":                3,
@@ -60,7 +60,10 @@
   "results_output_file": "",
   "pruning_block_disabled": false,
   "pruning_balance_disabled": false,
-  "initial_balance_fetch_disabled": false
+  "initial_balance_fetch_disabled": false,
+  "end_conditions": {
+    "index": 3
+  }
  },
  "perf": null
 }

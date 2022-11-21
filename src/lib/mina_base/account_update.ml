@@ -26,12 +26,15 @@ module Authorization_kind = struct
     module V1 = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
-        | None_given
         | Signature
         | Proof
+        | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      (* control tags are the same thing *)
+      let _f () : (t, Control.Tag.t) Type_equal.t = Type_equal.T
     end
   end]
 
@@ -1115,7 +1118,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:`Or_undefined @@ uint32 @@ o ())
+              option ~js_type:Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
 
@@ -1149,6 +1152,33 @@ module Body = struct
         }
     ; use_full_commitment = true
     ; caller = Token_id.default
+    ; authorization_kind = Signature
+    }
+
+  let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
+    { public_key = t.public_key
+    ; token_id = Token_id.default
+    ; update = Update.noop
+    ; balance_change =
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
+    ; increment_nonce = true
+    ; events = []
+    ; sequence_events = []
+    ; call_data = Field.zero
+    ; preconditions =
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
+        ; account = Account_precondition.Nonce t.nonce
+        }
+    ; use_full_commitment = true
+    ; caller = Call
+    ; call_depth = 0
     ; authorization_kind = Signature
     }
 
@@ -1534,6 +1564,10 @@ include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
+
+let verification_key_update_to_option (t : t) :
+    Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
+  Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
