@@ -54,6 +54,7 @@ let verify_heterogenous (ts : Instance.t list) =
                       ; prev_x_hat = (x_hat1, _) as prev_x_hat
                    *)
                  ; prev_evals = evals
+                 ; proof = _
                  } ) )
          ->
         Timer.start __LOC__ ;
