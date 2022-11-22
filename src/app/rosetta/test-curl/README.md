@@ -8,7 +8,7 @@ Using the `mina.ros` file from the parent folder, in the local sandbox:
 - [x] some funds need to be added to them manually, to make the `request_funds` step pass.
 - [x] the `transfer` test now works with some manual funding of some account.
 - [x] this tests all the endpoints of the construction api.
-- [ ] the manual funding of the accounts may be replaced by the use of rosetta `prefunded_accounts` which should simplify the test setup.
+- [x] the manual funding of the accounts may be replaced by the use of rosetta `prefunded_accounts` which should simplify the test setup.
 - [ ] testing transactions representing `delegations` remains to be done.
 - [ ] The following issue should be fixed on the rosetta-cli side:
   The default value for the `validUntil` field (present in the signed payload) seems different on the two sides.
