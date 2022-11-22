@@ -159,6 +159,8 @@ module Legacy = struct
     module Field = Field
     include Rounds
 
+    let alpha = 5
+
     (* Computes x^5 *)
     let to_the_alpha x =
       let open Field in
@@ -198,6 +200,8 @@ module Legacy = struct
       module Impl = Pickles.Impls.Step
       open Impl
       module Field = Field
+
+      let alpha = 5
 
       (* Computes x^5 *)
       let to_the_alpha x =

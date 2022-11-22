@@ -2,7 +2,13 @@ open Kimchi_backend_common
 open Kimchi_pasta_basic
 
 include
-  Plonk_constraint_system.Make (Fq) (Kimchi_bindings.Protocol.Gates.Vector.Fq)
+  Plonk_constraint_system.Make
+    (Fq)
+    (struct
+      include Kimchi_bindings.Protocol.Gates.Vector.Fq
+
+      let get_asm _ _ = failwith "cannot call get_asm on this curve"
+    end)
     (struct
       let params =
         Sponge.Params.(

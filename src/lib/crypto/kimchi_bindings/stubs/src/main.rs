@@ -5,6 +5,7 @@ use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
+    asm::*,
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -451,5 +452,9 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
             });
         });
+    });
+
+    decl_module!(w, env, "Utils", {
+        decl_func!(w, env, gate_to_asm);
     });
 }

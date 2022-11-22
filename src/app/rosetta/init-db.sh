@@ -26,8 +26,24 @@ sudo -u postgres psql --command "SHOW ALL;"
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 
-DATE="$(date -Idate)_${DUMP_TIME}"
-curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+MAX_DAYS_LOOKBACK=5
+TODAY=`date`
+i=0
+while [ $i -lt $MAX_DAYS_LOOKBACK ]
+do
+    DATE=$(date -d "$TODAY- $i days" +%G-%m-%d)_${DUMP_TIME}
+    STATUS_CODE=$(curl -s -o /dev/null --head -w "%{http_code}" "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz")
+    if [[ ! $STATUS_CODE =~ 2[0-9]{2} ]]; then
+        i=$((i+1))
+    else
+        echo "Download ${MINA_NETWORK}-archive-dump-${DATE}"
+        curl "https://storage.googleapis.com/mina-archive-dumps/${MINA_NETWORK}-archive-dump-${DATE}.sql.tar.gz" -o o1labs-archive-dump.tar.gz
+        break;
+    fi
+done
+
+[[ $STATUS_CODE =~ 2[0-9]{2} ]] || echo "[WARN] Unable to find archive dump for ${MINA_NETWORK}"
+
 tar -xvf o1labs-archive-dump.tar.gz
 # It would help to know the block height of this dump in addition to the date
 psql -f "${MINA_NETWORK}-archive-dump-${DATE}.sql" "${PG_CONN}"

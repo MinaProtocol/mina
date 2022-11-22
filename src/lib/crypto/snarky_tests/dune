@@ -1,0 +1,65 @@
+(test
+ (name snarky_tests)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_mina
+   ppx_jane
+   ppx_compare
+   ppx_deriving_yojson
+   h_list.ppx))
+ (libraries
+  ;; opam libraries
+  alcotest
+  stdio
+  integers
+  result
+  base.caml
+  bignum.bigint
+  core_kernel
+  base64
+  digestif
+  ppx_inline_test.config
+  sexplib0
+  base
+  async_kernel
+  bin_prot.shape
+  ;; local libraries
+  mina_wire_types
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  kimchi_backend
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_pasta_constraint_system
+  bitstring_lib
+  snarky.intf
+  pickles.backend
+  pickles_types
+  snarky.backendless
+  snarky_group_map
+  sponge
+  pickles
+  pickles.pseudo
+  pickles.precomputed
+  pickles.limb_vector
+  pickles_base
+  mina_version
+  base58_check
+  codable
+  random_oracle_input
+  pickles.composition_types
+  pickles.plonk_checks
+  pickles.one_hot_vector
+  snarky_log
+  group_map
+  snarky_curve
+  key_cache
+  snark_keys_header
+  tuple_lib
+  promise
+  kimchi_backend.common
+  ppx_version.runtime))

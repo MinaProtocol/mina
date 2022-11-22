@@ -45,6 +45,8 @@ module type Full = sig
 
   val digest : t -> Md5.t
 
+  val get_asm : t -> string
+
   val to_json :
        t
     -> ([ `Null
