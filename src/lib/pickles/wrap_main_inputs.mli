@@ -153,14 +153,15 @@ module Inner_curve : sig
      end)
     ()
     -> Shifted_intf
+  [@@warning "-67"]
 
   val shifted : unit -> (module Shifted_intf)
 
-  val scale :
-       ?init:Inputs.F.t * Inputs.F.t
-    -> t
-    -> Inputs.Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-    -> Inputs.F.t * Inputs.F.t
+  (* val scale :
+        ?init:Inputs.F.t * Inputs.F.t
+     -> t
+     -> Inputs.Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+     -> Inputs.F.t * Inputs.F.t *)
 
   module Window_table : sig
     type t = Inputs.Constant.t Tuple_lib.Quadruple.t array

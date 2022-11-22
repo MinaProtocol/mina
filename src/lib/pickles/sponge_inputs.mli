@@ -11,3 +11,4 @@ module Make
           -> Impl.field array
       end
     end) : Sponge.Intf.Permutation with module Field = Impl.Field
+[@@warning "-67"]

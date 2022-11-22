@@ -61,3 +61,4 @@ module Make : functor
 
   val endo_inv : Impl.Field.t * Impl.Field.t -> t -> G.t
 end
+[@@warning "-67"]

@@ -100,3 +100,4 @@ module Test
                     and type digest := Impl.Field.t) : sig
   val test : Impl.Field.Constant.t Sponge.Params.t -> unit
 end
+[@@warning "-67"]
