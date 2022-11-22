@@ -51,7 +51,7 @@ let shifts ~log2_size = Common.tock_shifts ~log2_size
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
 
-let split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
+let _split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
   Typ.transport
     Typ.(field * Boolean.typ)
     ~there:(fun (x : Field.Constant.t) ->
@@ -131,7 +131,7 @@ let wrap_main
       (create () : (max_proofs_verified, max_local_max_proofs_verifieds) t))
   in
   Timer.clock __LOC__ ;
-  let { Full_signature.padded; maxes = (module Max_widths_by_slot) } =
+  let { Full_signature.padded = _; maxes = (module Max_widths_by_slot) } =
     full_signature
   in
   Timer.clock __LOC__ ;
@@ -148,7 +148,7 @@ let wrap_main
            ; sponge_digest_before_evaluations
            ; messages_for_next_wrap_proof = messages_for_next_wrap_proof_digest
            }
-       ; messages_for_next_step_proof
+       ; messages_for_next_step_proof = _
        } :
         ( _
         , _
@@ -344,7 +344,7 @@ let wrap_main
                        Need to compute this value from the which_branch.
                     *)
                     let (T
-                          ( max_local_max_proofs_verified
+                          ( _max_local_max_proofs_verified
                           , old_bulletproof_challenges ) ) =
                       old_bulletproof_challenges
                     in

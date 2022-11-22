@@ -146,7 +146,7 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~feature_flags : (t, Constant.t) Typ.t =
+let typ ~wrap_rounds:_ ~feature_flags : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.typ ~feature_flags
     (module Impl)
     (Shifted_value.typ Other_field.typ)

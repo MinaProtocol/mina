@@ -129,7 +129,7 @@ end
 module Domains = struct
   include V.Domains
 
-  let typ =
+  let _typ =
     let open Impls.Step in
     let dom =
       Typ.transport Typ.field
@@ -150,17 +150,7 @@ let max_domains =
 module Vk = struct
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
 
-  let to_yojson _ = `String "opaque"
-
-  let of_yojson _ = Error "Vk: yojson not supported"
-
-  let hash _ = Unit.hash ()
-
   let hash_fold_t s _ = Unit.hash_fold_t s ()
-
-  let equal _ _ = true
-
-  let compare _ _ = 0
 end
 
 module R = struct
@@ -217,7 +207,7 @@ module Stable = struct
         in
         let log2_size = Import.Domain.log2_size d in
         let public =
-          let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in
@@ -267,9 +257,9 @@ module Stable = struct
 
       let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
 
-      let to_yojson t = R.to_yojson (to_repr t)
+      let _to_yojson t = R.to_yojson (to_repr t)
 
-      let of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
+      let _of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
 
       let equal x y = R.equal (to_repr x) (to_repr y)
 
@@ -343,7 +333,7 @@ module Checked = struct
   [@@deriving hlist, fields]
 
   (** [log_2] of the width. *)
-  let width_size = Nat.to_int Width.Length.n
+  let _width_size = Nat.to_int Width.Length.n
 
   let to_input =
     let open Random_oracle_input.Chunked in

@@ -19,7 +19,7 @@ module Make
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
-  let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
+  let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
@@ -84,6 +84,8 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
+    let _ = auxiliary_typ in
+    (* TODO: remove from function signature?*)
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -274,7 +276,7 @@ struct
                     ; gamma = plonk0.gamma
                     ; lookup =
                         Option.map (Opt.to_option_unsafe plonk.lookup)
-                          ~f:(fun l ->
+                          ~f:(fun _l ->
                             { Composition_types.Wrap.Proof_state.Deferred_values
                               .Plonk
                               .In_circuit
@@ -320,7 +322,7 @@ struct
           |> Wrap_hack.pad_accumulator )
           public_input t.proof
       in
-      let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+      let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in
@@ -522,7 +524,7 @@ struct
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
                 ; lookup =
-                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun l ->
+                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun _l ->
                         { Composition_types.Wrap.Proof_state.Deferred_values
                           .Plonk
                           .In_circuit
@@ -709,11 +711,11 @@ struct
         match (xs, maxes, l) with
         | [], [], Z ->
             []
-        | x :: xs, [], Z ->
+        | _ :: _, [], Z ->
             assert false
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
-        | [], m :: ms, S n ->
+        | [], _ :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
@@ -796,7 +798,7 @@ struct
                } )
            |> to_list) )
     in
-    let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
+    let%map.Promise (next_proof : Tick.Proof.t), _next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n ~feature_flags

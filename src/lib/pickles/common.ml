@@ -10,7 +10,7 @@ module Max_degree = struct
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
 
-  let wrap = 1 lsl wrap_log2
+  let _wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
@@ -89,17 +89,11 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tock.Field)
+  let tock2 : Backend.Tock.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Backend.Tock.Field)
 
-  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tock.Field)
-
-  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Tick.Field)
-
-  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Tick.Field)
+  let tick1 : Backend.Tick.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Backend.Tick.Field)
 end
 
 module Lookup_parameters = struct
@@ -148,9 +142,7 @@ module Ipa = struct
 
   (* TODO: Make all this completely generic over backend *)
 
-  let compute_challenge (type f) ~endo_to_field
-      (module Field : Kimchi_backend.Field.S with type t = f) c =
-    endo_to_field c
+  let compute_challenge ~endo_to_field _ c = endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun prechallenge ->

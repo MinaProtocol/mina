@@ -144,7 +144,7 @@ end
 
 let typ (type n avar aval m) ~feature_flags
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
-    (branches : m Nat.t) :
+    (_branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let module Sc = Scalar_challenge in
   let open Impls.Step in

@@ -25,7 +25,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-let vector_of_list (type a t)
+let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -271,7 +271,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
           ; lookup =
-              Opt.map plonk.lookup ~f:(fun l ->
+              Opt.map plonk.lookup ~f:(fun _ ->
                   { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                     .In_circuit
                     .Lookup
@@ -652,7 +652,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
+    ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
     ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _

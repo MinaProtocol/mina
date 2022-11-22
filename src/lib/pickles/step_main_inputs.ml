@@ -5,7 +5,7 @@ open Pickles_types
 module Impl = Impls.Step
 open Import
 
-let high_entropy_bits = 128
+let _high_entropy_bits = 128
 
 let sponge_params_constant =
   Sponge.Params.(map pasta_p_kimchi ~f:Impl.Field.Constant.of_string)
@@ -13,7 +13,7 @@ let sponge_params_constant =
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let unrelated_g =
+let _unrelated_g =
   let group_map =
     unstage
       (group_map
@@ -42,7 +42,7 @@ let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
 module Unsafe = struct
-  let unpack_unboolean ?(length = Field.size_in_bits) x =
+  let _unpack_unboolean ?(length = Field.size_in_bits) x =
     let res =
       exists
         (Typ.list Boolean.typ_unchecked ~length)

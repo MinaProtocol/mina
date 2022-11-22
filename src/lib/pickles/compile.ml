@@ -22,34 +22,6 @@ let profile_constraints = false
 
 let verify_promise = Verify.verify
 
-let pad_local_max_proofs_verifieds
-    (type prev_varss prev_valuess env max_proofs_verified branches)
-    (max_proofs_verified : max_proofs_verified Nat.t)
-    (length : (prev_varss, branches) Hlist.Length.t)
-    (local_max_proofs_verifieds :
-      (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t ) :
-    ((int, max_proofs_verified) Vector.t, branches) Vector.t =
-  let module Vec = struct
-    type t = (int, max_proofs_verified) Vector.t
-  end in
-  let module M =
-    H2_1.Map
-      (H2_1.T
-         (E03 (Int))) (E03 (Vec))
-         (struct
-           module HI = H2_1.T (E03 (Int))
-
-           let f : type a b e. (a, b, e) H2_1.T(E03(Int)).t -> Vec.t =
-            fun xs ->
-             let (T (_proofs_verified, pi)) = HI.length xs in
-             let module V = H2_1.To_vector (Int) in
-             let v = V.f pi xs in
-             Vector.extend_front_exn v max_proofs_verified 0
-         end)
-  in
-  let module V = H2_1.To_vector (Vec) in
-  V.f length (M.f local_max_proofs_verifieds)
-
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
@@ -1130,8 +1102,6 @@ let compile_with_wrap_main_override_promise :
         ts
 
     let verify ts = verify_promise ts |> Promise.to_deferred
-
-    let statement (T p : t) = p.statement.messages_for_next_step_proof.app_state
   end in
   (self, cache_handle, (module P), provers)
 
@@ -1357,8 +1327,6 @@ struct
   module Recurse_on_bad_proof = struct
     open Impls.Step
 
-    let dummy_proof = P.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-
     type _ Snarky_backendless.Request.t +=
       | Proof : Proof.t Snarky_backendless.Request.t
 
@@ -1370,7 +1338,7 @@ struct
       | _ ->
           respond Unhandled
 
-    let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
+    let _tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
       Common.time "compile" (fun () ->
           compile_with_wrap_main_override_promise ()
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit

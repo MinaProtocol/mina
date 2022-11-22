@@ -45,7 +45,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks, computed_bp_chals =
+  let in_circuit_plonks, _computed_bp_chals =
     List.map ts
       ~f:(fun
            (T
@@ -176,7 +176,7 @@ let verify_heterogenous (ts : Instance.t list) =
           ; gamma = plonk0.gamma
           ; lookup =
               Option.map (Plonk_types.Opt.to_option_unsafe p.lookup)
-                ~f:(fun l ->
+                ~f:(fun _l ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
                     .joint_combiner = Option.value_exn plonk0.joint_combiner

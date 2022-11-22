@@ -1474,19 +1474,19 @@ module Step = struct
     include struct
       open Hlist.HlistId
 
-      let to_data { unfinalized_proofs; messages_for_next_step_proof } =
+      let _to_data { unfinalized_proofs; messages_for_next_step_proof } =
         [ Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.to_data
         ; messages_for_next_step_proof
         ]
 
-      let of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
+      let _of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
         { unfinalized_proofs =
             Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
         ; messages_for_next_step_proof
         }
     end
 
-    let typ (type n f)
+    let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
         (proofs_verified :

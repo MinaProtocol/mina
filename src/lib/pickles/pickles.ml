@@ -2441,6 +2441,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         module Constant = struct
           type t = Field.Constant.t [@@deriving bin_io]
 
+          [@@@warning "-32"]
+
           let to_field_elements x = [| x |]
         end
       end
