@@ -443,6 +443,7 @@ struct
                 `Add_with_correction
                   ((x, n), lagrange_with_correction ~input_length:n i) )
       in
+      let f = Ops.add_fast ?check_finite:None in
       let correction =
         List.reduce_exn
           (List.filter_map terms ~f:(function
@@ -450,12 +451,10 @@ struct
                 None
             | `Add_with_correction (_, [ _; corr ]) ->
                 Some corr ) )
-          ~f:Ops.add_fast
+          ~f
       in
       let init =
-        List.fold
-          (List.filter_map constant_part ~f:Fn.id)
-          ~init:correction ~f:Ops.add_fast
+        List.fold (List.filter_map constant_part ~f:Fn.id) ~init:correction ~f
       in
       List.fold terms ~init ~f:(fun acc term ->
           match term with
@@ -560,8 +559,10 @@ struct
         in
         let ft_comm =
           with_label __LOC__ (fun () ->
-              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast2
-                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+              Common.ft_comm
+                ~add:(Ops.add_fast ?check_finite:None)
+                ~scale:scale_fast2 ~negate:Inner_curve.negate
+                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
                 ~verification_key:m ~plonk ~alpha ~t_comm )
         in
         let bulletproof_challenges =
