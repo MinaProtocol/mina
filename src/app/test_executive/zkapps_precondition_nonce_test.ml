@@ -244,6 +244,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          transition frontier"
         (wait_for_zkapp ~has_failures:false t1)
     in
+    let%bind () =
+      section_hard "wait for 1 block to be produced"
+        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+    in
     (* End test *)
     section_hard "Running replayer"
       (let%bind logs =
