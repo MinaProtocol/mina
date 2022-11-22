@@ -116,6 +116,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 end
+[@@warning "-67"]
 
 (** [Domain] is re-exported from library Pickles_base *)
 module Domain = Pickles_base.Domain
