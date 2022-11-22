@@ -20,8 +20,6 @@ module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
 end
 
 let verify_heterogenous (ts : Instance.t list) =
