@@ -77,7 +77,7 @@ struct
         , (_, prevs_length) Vector.t
         , _
         , (_, Max_proofs_verified.n) Vector.t )
-        P.Base.Step.t
+        Proof.Base.Step.t
       * ret_value
       * auxiliary_value
       * (int, prevs_length) Vector.t )

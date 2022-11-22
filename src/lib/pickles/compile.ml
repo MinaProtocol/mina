@@ -707,7 +707,6 @@ struct
           Impls.Step.Typ.(input_typ * output_typ)
     in
     let provers =
-      let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
       let f :
           type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
@@ -721,7 +720,6 @@ struct
              * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
-        let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
@@ -1074,10 +1072,6 @@ let compile_with_wrap_main_override_promise :
 
     module Max_local_max_proofs_verified = Max_proofs_verified
 
-    module Max_proofs_verified_vec = Nvector (struct
-      include Max_proofs_verified
-    end)
-
     include
       Proof.Make
         (struct
@@ -1227,20 +1221,6 @@ module Make_adversarial_test (M : sig
 end) =
 struct
   open Impls.Step
-
-  module Statement = struct
-    type t = unit
-
-    let to_field_elements () = [||]
-  end
-
-  module A = Statement
-  module A_value = Statement
-
-  let typ = Typ.unit
-
-  module Branches = Nat.N1
-  module Max_proofs_verified = Nat.N2
 
   let constraint_constants : Snark_keys_header.Constraint_constants.t =
     { sub_windows_per_window = 0

@@ -2007,6 +2007,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let%test_module "adversarial_tests" =
     ( module struct
+      [@@@warning "-60"]
+
       let () = Backtrace.elide := false
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
@@ -2432,7 +2434,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
     ( module struct
       open Impls.Step
 
+      [@@@warning "-60"]
+
       module Statement = struct
+        [@@@warning "-32-34"]
+
         type t = Field.t
 
         let to_field_elements x = [| x |]
@@ -2632,9 +2638,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let example_input, example_proof = example
       end
 
-      module Simple_chain = struct
-        module Statement = Statement
+      [@@@warning "-60"]
 
+      module Simple_chain = struct
         type _ Snarky_backendless.Request.t +=
           | Prev_input : Field.Constant.t Snarky_backendless.Request.t
           | Proof : Side_loaded.Proof.t Snarky_backendless.Request.t

@@ -4,6 +4,9 @@ open Import
 open Poly_types
 
 (* Compute the domains corresponding to wrap_main *)
+
+(* TODO: this functor does not depend on any of its argument why? *)
+
 module Make
     (A : T0)
     (A_value : T0)
@@ -58,3 +61,4 @@ struct
       [%test_eq: Domains.t] res res' ) ;
     res
 end
+[@@warning "-60"]
