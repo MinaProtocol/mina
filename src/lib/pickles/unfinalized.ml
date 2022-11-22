@@ -100,7 +100,7 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
+let typ ~wrap_rounds:_ ~uses_lookup : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.typ
     (module Impl)
     (Shifted_value.typ Other_field.typ)

@@ -123,7 +123,7 @@ module Stable = struct
         let d = Domain.Pow_2_roots_of_unity log2_size in
         let max_quot_size = Common.max_quot_size_int (Domain.size d) in
         let public =
-          let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in

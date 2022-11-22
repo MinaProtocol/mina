@@ -25,7 +25,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
     end)
 
-let vector_of_list (type a t)
+let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -386,7 +386,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices pk
+    ~actual_wrap_domains ~step_plonk_indices:_ pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
