@@ -1,4 +1,4 @@
-(executable
+(test
  (name snarky_tests)
  (instrumentation
   (backend bisect_ppx))
@@ -31,7 +31,10 @@
   kimchi_bindings
   kimchi_types
   pasta_bindings
+  kimchi_backend
   kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_pasta_constraint_system
   bitstring_lib
   snarky.intf
   pickles.backend
@@ -44,7 +47,6 @@
   pickles.precomputed
   pickles.limb_vector
   pickles_base
-  kimchi_backend
   mina_version
   base58_check
   codable
@@ -61,11 +63,3 @@
   promise
   kimchi_backend.common
   ppx_version.runtime))
-
-(rule
- (alias runtest)
- (package snarky_tests)
- (deps
-  (source_tree examples))
- (action
-  (run %{dep:snarky_tests.exe})))
