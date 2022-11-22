@@ -101,8 +101,6 @@ module No_app_state = struct
 end
 
 module Constant = struct
-  open Kimchi_backend
-
   type challenge = Challenge.Constant.t
 
   type scalar_challenge = challenge Scalar_challenge.t

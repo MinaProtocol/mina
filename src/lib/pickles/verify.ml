@@ -1,11 +1,8 @@
 module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
 open Backend
-open Tuple_lib
 
 module Instance = struct
   type t =
@@ -28,7 +25,6 @@ module Plonk_checks = struct
 end
 
 let verify_heterogenous (ts : Instance.t list) =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
