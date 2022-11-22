@@ -10,5 +10,8 @@ brew uninstall python@2 || true
 
 brew bundle install --file=scripts/Brewfile
 
-echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> $HOME/.bash_profile
-echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"' >> $HOME/.bash_profile
+echo 'you need to export the following environment variables in your shell configuration file (e.g. `.bashrc`, `.zshrc`, etc.)'
+
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig'
+echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"'
+echo 'export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"'
