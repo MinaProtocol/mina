@@ -26,3 +26,4 @@ module Make
 
   val squeeze : t -> Impl.Field.t
 end
+[@@warning "-67"]
