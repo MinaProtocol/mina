@@ -12,11 +12,13 @@ open Mina_base
          [ fee_pay2; update2]
          - fee_pay2 has the precondition of 1, otherwise it should fail
          - update2 should have precondition after fee_pay2 is applied, so 2
-
+        3. Create a transaction that looks like the following:
+          [ fee_pay3; update3]
       Outcome:
         - Both transactions included in a block
         - transaction1 should have Failed status
         - transaction2 should have Applied status
+        - transaction3 should have Applied status
         - Application order fee_pay1, fee_pay2, update1, update2
 
     *)
@@ -169,14 +171,59 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         }
     in
+    let t1 =
+      Zkapp_command.of_simple
+        { fee_payer =
+            { body =
+                { public_key = fee_payer_pk
+                ; fee
+                ; valid_until = None
+                ; nonce = Account.Nonce.of_int 3
+                }
+            ; authorization = Signature.dummy
+            }
+        ; account_updates =
+            [ { body =
+                  { public_key = fee_payer_pk
+                  ; update = Account_update.Update.noop
+                  ; token_id = Token_id.default
+                  ; balance_change = Currency.Amount.Signed.zero
+                  ; increment_nonce = true
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Snark_params.Tick.Field.zero
+                  ; call_depth = 0
+                  ; preconditions =
+                      { Account_update.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Nonce (Account.Nonce.of_int 4)
+                      }
+                  ; use_full_commitment = false
+                  ; caller = Call
+                  ; authorization_kind = Signature
+                  }
+              ; authorization = Signature Signature.dummy
+              }
+            ]
+        ; memo
+        }
+    in
     let%bind () =
       section "Send a zkApp transaction with an invalid account_update nonce"
         (send_zkapp ~logger node invalid_nonce_transaction)
     in
     (* Submit transactions*)
     let%bind () =
-      section "Send a zkApp transaction with an valid account_update nonce"
+      section
+        "Send a zkApp transaction that has it's nonce properly incremented \
+         after the first transaction"
         (send_zkapp ~logger node valid_nonce_transaction)
+    in
+    let%bind () =
+      section
+        "Send a zkApp transaction that has it's nonce properly incremented \
+         after the second transaction"
+        (send_zkapp ~logger node t1)
     in
     (* Check transactions*)
     let%bind () =
@@ -187,9 +234,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Wait for zkApp transaction with invalid nonce to be accepted by \
+        "Wait for first zkApp transaction with valid nonce to be accepted by \
          transition frontier"
         (wait_for_zkapp ~has_failures:false valid_nonce_transaction)
+    in
+    let%bind () =
+      section
+        "Wait for second zkApp transaction with valid nonce to be accepted by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false t1)
     in
     (* End test *)
     section_hard "Running replayer"
