@@ -108,9 +108,9 @@ module Compiled = struct
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches
+      { branches = _
       ; max_proofs_verified
-      ; proofs_verifieds
+      ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
       ; wrap_domains
@@ -178,6 +178,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        ; step_uses_lookup
+       ; wrap_vk = _
        } :
         _ Compiled.t ) =
     { branches
@@ -259,13 +260,13 @@ let uses_lookup :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.step_uses_lookup
 
-let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+let _value_to_field_elements :
+    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)
 
-let lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
+let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
     ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t

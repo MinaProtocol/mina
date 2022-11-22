@@ -28,31 +28,10 @@ struct
   module Other_field = struct
     let size_in_bits = Field.size_in_bits
 
-    module Constant = Other_field
-
     type t = Impls.Step.Other_field.t
 
     let typ = Impls.Step.Other_field.typ
   end
-
-  let print_g lab (x, y) =
-    if debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"%s: %{sexp:Backend.Tick.Field.t}, %{sexp:Backend.Tick.Field.t}\n\
-                %!"
-              lab (read_var x) (read_var y))
-
-  let print_chal lab chal =
-    if debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"%s: %{sexp:Challenge.Constant.t}\n%!"
-              lab (read Challenge.typ chal))
 
   let print_fp lab x =
     if debug then
@@ -83,7 +62,7 @@ struct
         Field.((b :> t) * x, (b :> t) * y) )
       ty t
 
-  let scalar_to_field s =
+  let _scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Wrap_inner_curve.scalar
 
   let assert_n_bits ~n a =
@@ -158,7 +137,7 @@ struct
           |> List.fold ~init:None ~f:(fun acc x -> Some (add_opt acc x))
         in
         let correction, acc =
-          List.mapi non_constant_part ~f:(fun i (s, x) ->
+          List.map non_constant_part ~f:(fun (s, x) ->
               let rr, n =
                 match s with
                 | `Packed_bits (s, n) ->
@@ -195,7 +174,7 @@ struct
     with_label __LOC__ (fun () ->
         let absorb t = absorb sponge t in
         let prechallenges =
-          Array.mapi gammas ~f:(fun i gammas_i ->
+          Array.map gammas ~f:(fun gammas_i ->
               absorb (PC :: PC) gammas_i ;
               squeeze_scalar sponge )
         in
@@ -236,7 +215,7 @@ struct
     in
     fun x -> Lazy.force f x
 
-  let scale_fast p s =
+  let _scale_fast p s =
     with_label __LOC__ (fun () ->
         Ops.scale_fast p s ~num_bits:Field.size_in_bits )
 
@@ -648,14 +627,14 @@ struct
 
   module Pseudo = Pseudo.Make (Impl)
 
-  module Bounded = struct
-    type t = { max : int; actual : Field.t }
+  (* module Bounded = struct
+       type t = { max : int; actual : Field.t }
 
-    let of_pseudo ((_, ns) as p : _ Pseudo.t) =
-      { max = Vector.reduce_exn ~f:Int.max ns
-      ; actual = Pseudo.choose p ~f:Field.of_int
-      }
-  end
+       let _of_pseudo ((_, ns) as p : _ Pseudo.t) =
+         { max = Vector.reduce_exn ~f:Int.max ns
+         ; actual = Pseudo.choose p ~f:Field.of_int
+         }
+     end *)
 
   let vanishing_polynomial mask =
     with_label "vanishing_polynomial" (fun () ->
@@ -714,11 +693,10 @@ struct
         y
 
       let%test_unit "side loaded domains" =
-        let module O = One_hot_vector.Make (Impl) in
         let open Side_loaded_verification_key in
         let domains = [ { Domains.h = 10 }; { h = 15 } ] in
         let pt = Field.Constant.random () in
-        List.iteri domains ~f:(fun i ds ->
+        List.iter domains ~f:(fun ds ->
             let d_unchecked =
               Plonk_checks.domain
                 (module Field.Constant)
@@ -807,7 +785,7 @@ struct
   module Opt_sponge = struct
     include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
 
-    let squeeze_challenge sponge : Field.t =
+    let _squeeze_challenge sponge : Field.t =
       lowest_128_bits (squeeze sponge) ~constrain_low_bits:true
   end
 
@@ -815,7 +793,7 @@ struct
     Shifted_value.Type1.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let shift2 =
+  let _shift2 =
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
@@ -1121,8 +1099,7 @@ struct
     let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
-    , stage (fun t ~widths ~max_width ~proofs_verified_mask ->
-          (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
+    , stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
           let sponge = Sponge.copy after_index in
           let t =
             { t with
@@ -1164,9 +1141,9 @@ struct
           | `Opt sponge ->
               Opt_sponge.squeeze sponge ) )
 
-  let accumulation_verifier
-      (accumulator_verification_key : _ Types_map.For_step.t) prev_accumulators
-      proof new_accumulator : Boolean.var =
+  let _accumulation_verifier
+      (_accumulator_verification_key : _ Types_map.For_step.t)
+      _prev_accumulators _proof _new_accumulator : Boolean.var =
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index

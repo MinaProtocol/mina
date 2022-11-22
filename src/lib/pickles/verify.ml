@@ -44,7 +44,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks, computed_bp_chals =
+  let in_circuit_plonks, _computed_bp_chals =
     List.map ts
       ~f:(fun
            (T

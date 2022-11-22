@@ -109,7 +109,7 @@ module Inner_curve : sig
 
   type t = Inputs.F.t * Inputs.F.t
 
-  val double : t -> t
+  (* val double : t -> t *)
 
   val add' :
        div:(Inputs.F.t -> Inputs.F.t -> Inputs.F.t)
@@ -123,9 +123,9 @@ module Inner_curve : sig
 
   val constant : Inputs.Constant.t -> t
 
-  val negate : t -> t
+  (* val negate : t -> t *)
 
-  val one : t
+  (* val one : t *)
 
   val assert_on_curve : t -> unit
 
@@ -133,7 +133,7 @@ module Inner_curve : sig
 
   val typ : (t, Inputs.Constant.t) Inputs.Impl.Typ.t
 
-  val if_ : Inputs.Impl.Boolean.var -> then_:t -> else_:t -> t
+  (* val if_ : Inputs.Impl.Boolean.var -> then_:t -> else_:t -> t *)
 
   module Scalar : sig
     type t = Inputs.Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t

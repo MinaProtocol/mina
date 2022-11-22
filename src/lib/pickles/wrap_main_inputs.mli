@@ -103,8 +103,6 @@ module Inner_curve : sig
 
   type t = Inputs.F.t * Inputs.F.t
 
-  val double : t -> t
-
   val add' : div:(Inputs.F.t -> Inputs.F.t -> Inputs.F.t) -> t -> t -> t
 
   val add_exn : t -> t -> t
