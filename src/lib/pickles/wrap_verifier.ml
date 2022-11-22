@@ -184,8 +184,6 @@ struct
 
   type 'a index' = 'a Plonk_verification_key_evals.t
 
-  type 'a index = 'a Plonk_verification_key_evals.t
-
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
       type n.

@@ -69,10 +69,9 @@ type ( 'a_var
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_proofs_verified local_signature local_branches var value
-    a_var a_value ret_var ret_value prev_vars prev_values ) ~index
-    ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
-    ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
+    (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
+    ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
+    ~wrap_domains ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :

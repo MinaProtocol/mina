@@ -151,7 +151,7 @@ module Step = struct
   end
 
   let create :
-      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
+      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
