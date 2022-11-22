@@ -1438,7 +1438,6 @@ module Step = struct
       end
 
       let typ impl fq ~assert_16_bits ~zero ~feature_flags =
-        let open Deferred_values.Plonk.In_circuit.Lookup in
         let lookup_config =
           { Wrap.Lookup_parameters.use =
               feature_flags.Plonk_types.Features.lookup

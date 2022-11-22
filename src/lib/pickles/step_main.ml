@@ -1,12 +1,7 @@
-module S = Sponge
-open Core_kernel
 open Pickles_types
-open Common
-open Poly_types
 open Hlist
 open Import
 open Impls.Step
-open Step_main_inputs
 open Step_verifier
 module B = Inductive_rule.B
 
@@ -183,11 +178,6 @@ let step_main :
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
      ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
-  let module T (F : T4) = struct
-    type ('a, 'b, 'n, 'm) t =
-      | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_proofs_verified, self_branches) t
-  end in
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -274,7 +264,6 @@ let step_main :
         (input_typ, output_typ)
   in
   let main () : _ Types.Step.Statement.t =
-    let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf

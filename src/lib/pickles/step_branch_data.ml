@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Hlist
-open Common
 open Import
 
 (* The data obtained from "compiling" an inductive rule into a circuit. *)

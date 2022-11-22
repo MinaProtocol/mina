@@ -2,10 +2,7 @@ module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
-open Tuple_lib
 open Common
-open Core_kernel
-open Async_kernel
 open Import
 open Types
 open Backend
@@ -780,7 +777,7 @@ let wrap
     | _ ->
         Snarky_backendless.Request.unhandled
   in
-  let module O = Tick.Oracles in
+
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
       prev_statement_with_hashes ~feature_flags

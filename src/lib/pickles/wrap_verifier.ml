@@ -1,5 +1,4 @@
 module S = Sponge
-open Backend
 open Core_kernel
 open Util
 module SC = Scalar_challenge

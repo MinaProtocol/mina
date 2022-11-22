@@ -28,7 +28,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   open Async_kernel
   open Import
   open Pickles_types
-  open Poly_types
   open Hlist
   open Common
   open Backend

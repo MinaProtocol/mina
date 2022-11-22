@@ -7,7 +7,6 @@ module type Statement_var_intf = Intf.Statement_var
 module type Statement_value_intf = Intf.Statement_value
 
 module SC = Scalar_challenge
-open Tuple_lib
 open Core_kernel
 open Async_kernel
 open Import
@@ -1122,7 +1121,6 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
     let module SC' = SC in
     let open Impls.Wrap in
     let open Wrap_main_inputs in
-    let open Wrap_main in
     (* Create some variables to be used in constraints below. *)
     let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
     let y = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0) in

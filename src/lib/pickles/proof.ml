@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Common
 open Backend
 
 let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
@@ -29,14 +28,14 @@ module Base = struct
       }
   end
 
-  module Double = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
-      end
-    end]
-  end
+  (* module Double = struct
+       [%%versioned
+       module Stable = struct
+         module V1 = struct
+           type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
+         end
+       end]
+     end *)
 
   module Wrap = struct
     [%%versioned

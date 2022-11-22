@@ -1,10 +1,8 @@
-open Core_kernel
 open Import
 open Types
 open Pickles_types
 open Hlist
 open Snarky_backendless.Request
-open Common
 open Backend
 
 module Wrap = struct
@@ -14,7 +12,6 @@ module Wrap = struct
     type max_local_max_proofs_verifieds
 
     open Impls.Wrap
-    open Wrap_main_inputs
     open Snarky_backendless.Request
 
     type _ t +=
