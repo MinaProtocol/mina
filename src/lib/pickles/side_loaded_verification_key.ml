@@ -25,7 +25,6 @@
 
 open Core_kernel
 open Pickles_types
-open Common
 open Import
 module V = Pickles_base.Side_loaded_verification_key
 
@@ -38,7 +37,6 @@ include (
 let bits = V.bits
 
 let input_size ~of_int ~add ~mul w =
-  let open Composition_types in
   (* This should be an affine function in [a]. *)
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
@@ -59,14 +57,6 @@ module Width : sig
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
-
-  val of_int_exn : int -> t
-
-  val to_int : t -> int
-
-  val to_bits : t -> bool list
-
-  val zero : t
 
   open Impls.Step
 

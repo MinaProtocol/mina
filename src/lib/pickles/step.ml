@@ -1,7 +1,5 @@
 module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
-module P = Proof
+module Proof = Proof
 open Pickles_types
 open Poly_types
 open Hlist

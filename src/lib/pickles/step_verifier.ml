@@ -5,9 +5,6 @@ open Import
 open Util
 open Types.Step
 open Pickles_types
-open Common
-open Import
-module S = Sponge
 
 let lookup_verification_enabled = false
 
@@ -18,8 +15,6 @@ module Make
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
-  open Impl
-  module PC = Inner_curve
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
   module Number = Snarky_backendless.Number.Run.Make (Impl)
@@ -874,7 +869,6 @@ struct
         , Field.Constant.t Branch_data.Checked.t )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
-    let open Vector in
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
