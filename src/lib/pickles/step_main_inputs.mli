@@ -158,7 +158,7 @@ module Inner_curve : sig
   end
 
   module Shifted : functor
-    (M : sig
+    (_ : sig
        val shift : t
      end)
     ()
@@ -166,7 +166,7 @@ module Inner_curve : sig
 
   val shifted : unit -> (module Shifted_intf)
 
-  val scale : ?init:t -> t -> Scalar.t -> t
+  (* val scale : ?init:t -> t -> Scalar.t -> t *)
 
   module Window_table : sig
     type t = Inputs.Constant.t Tuple_lib.Quadruple.t array

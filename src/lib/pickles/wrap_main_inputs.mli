@@ -148,7 +148,7 @@ module Inner_curve : sig
   end
 
   module Shifted : functor
-    (M : sig
+    (_ : sig
        val shift : t
      end)
     ()
