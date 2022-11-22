@@ -717,56 +717,58 @@ struct
               ) )
     end )
 
-  module Split_evaluations = struct
-    open Plonk_types
+  (* module Split_evaluations = struct
+       open Plonk_types
 
-    let mask' { Bounded.max; actual } : Boolean.var array =
-      let (T max) = Nat.of_int max in
-      Vector.to_array (ones_vector (module Impl) ~first_zero:actual max)
+       let mask' { Bounded.max; actual } : Boolean.var array =
+         let (T max) = Nat.of_int max in
+         Vector.to_array (ones_vector (module Impl) ~first_zero:actual max)
 
-    let mask (type n) ~(lengths : (int, n) Vector.t)
-        (choice : n One_hot_vector.T(Impl).t) : Boolean.var array =
-      let max =
-        Option.value_exn
-          (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
-      in
-      let actual = Pseudo.choose (choice, lengths) ~f:Field.of_int in
-      mask' { max; actual }
+       let mask (type n) ~(lengths : (int, n) Vector.t)
+           (choice : n One_hot_vector.T(Impl).t) : Boolean.var array =
+         let max =
+           Option.value_exn
+             (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
+         in
+         let actual = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+         mask' { max; actual }
 
-    let last =
-      Array.reduce_exn ~f:(fun (b_acc, x_acc) (b, x) ->
-          (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc) )
+       let _last =
+         Array.reduce_exn ~f:(fun (b_acc, x_acc) (b, x) ->
+             (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc) )
 
-    let rec pow x bits_lsb =
-      with_label "pow" (fun () ->
-          let rec go acc bs =
-            match bs with
-            | [] ->
-                acc
-            | b :: bs ->
-                let acc = Field.square acc in
-                let acc = Field.if_ b ~then_:Field.(x * acc) ~else_:acc in
-                go acc bs
-          in
-          go Field.one (List.rev bits_lsb) )
+       let pow x bits_lsb =
+         with_label "pow" (fun () ->
+             let rec go acc bs =
+               match bs with
+               | [] ->
+                   acc
+               | b :: bs ->
+                   let acc = Field.square acc in
+                   let acc = Field.if_ b ~then_:Field.(x * acc) ~else_:acc in
+                   go acc bs
+             in
+             go Field.one (List.rev bits_lsb) )
 
-    let mod_max_degree =
-      let k = Nat.to_int Backend.Tick.Rounds.n in
-      fun d ->
-        let d =
-          Number.of_bits
-            (Field.unpack ~length:Side_loaded_verification_key.max_log2_degree d)
-        in
-        Number.mod_pow_2 d (`Two_to_the k)
+       let _mod_max_degree =
+         let k = Nat.to_int Backend.Tick.Rounds.n in
+         fun d ->
+           let d =
+             Number.of_bits
+               (Field.unpack
+                  ~length:Pickles_base.Side_loaded_verification_key.max_log2_degree
+                  d )
+           in
+           Number.mod_pow_2 d (`Two_to_the k)
 
-    let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
-        (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
-        (Boolean.var * Field.t) array Evals.t =
-      Evals.map2 lengths e ~f:(fun lengths e ->
-          Array.zip_exn (mask ~lengths choice) e )
-  end
+       let _mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
+           (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
+           (Boolean.var * Field.t) array Evals.t =
+         Evals.map2 lengths e ~f:(fun lengths e ->
+             Array.zip_exn (mask ~lengths choice) e )
+     end *)
 
-  let absorb_field sponge x = Sponge.absorb sponge (`Field x)
+  let _absorb_field sponge x = Sponge.absorb sponge (`Field x)
 
   (* pt^{2^n} *)
   let pow2_pow (pt : Field.t) (n : int) : Field.t =
@@ -1187,8 +1189,11 @@ struct
                `Packed_bits (x, n) )
     in
     let sponge = Sponge.create sponge_params in
-    let { Types.Step.Proof_state.Deferred_values.xi; combined_inner_product; b }
-        =
+    let { Types.Step.Proof_state.Deferred_values.xi
+        ; combined_inner_product
+        ; b
+        ; _
+        } =
       unfinalized.deferred_values
     in
     let ( sponge_digest_before_evaluations_actual

@@ -479,12 +479,14 @@ struct
       ; gamma = gamma_0
       ; zeta = zeta_0
       ; joint_combiner = _
+      ; feature_flags = _
       }
       { Plonk.Minimal.alpha = alpha_1
       ; beta = beta_1
       ; gamma = gamma_1
       ; zeta = zeta_1
       ; joint_combiner = _
+      ; feature_flags = _
       } =
     if G.lookup_verification_enabled then failwith "Wrap_verifier.iter2:TODO" ;
     with_label __LOC__ (fun () -> chal beta_0 beta_1) ;

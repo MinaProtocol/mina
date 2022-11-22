@@ -45,7 +45,7 @@ struct
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let of_sponge { Sponge.state; params; sponge_state } =
+  let of_sponge { Sponge.state; params; sponge_state; id = _ } =
     match sponge_state with
     | Squeezed n ->
         { sponge_state = Squeezed n
