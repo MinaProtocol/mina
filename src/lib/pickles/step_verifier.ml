@@ -2,6 +2,7 @@
 open Core_kernel
 module SC = Scalar_challenge
 open Import
+open Common
 open Util
 open Types.Step
 open Pickles_types
@@ -15,9 +16,9 @@ module Make
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
+  open Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Number = Snarky_backendless.Number.Run.Make (Impl)
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
@@ -395,7 +396,7 @@ struct
           [ lagrange_commitment d i ] )
       |> Vector.unsingleton
     in
-    let lagrange_with_correction (type n) ~input_length i :
+    let lagrange_with_correction ~input_length i :
         (Inner_curve.t, Nat.N2.n) Vector.t =
       let actual_shift =
         (* TODO: num_bits should maybe be input_length - 1. *)
@@ -661,7 +662,7 @@ struct
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
 
-  let side_loaded_domain (type branches) =
+  let side_loaded_domain =
     let open Side_loaded_verification_key in
     fun ~(log2_size : Field.t) ->
       let domain ~max =
@@ -1112,7 +1113,8 @@ struct
     let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
-    , stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
+    , (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
+      stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
           let sponge = Sponge.copy after_index in
           let t =
             { t with

@@ -80,7 +80,7 @@ module Wrap = struct
             let map ~f { joint_combiner } =
               { joint_combiner = f joint_combiner }
 
-            let typ (type f fp) scalar_challenge =
+            let typ scalar_challenge =
               Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
                 ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
                 ~value_of_hlist:of_hlist [ scalar_challenge ]

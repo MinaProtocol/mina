@@ -110,8 +110,6 @@ module Constant = struct
        let plonk =
          let module Field = struct
            include Tock.Field
-
-           type nonrec bool = bool
          end in
          Plonk_checks.derive_plonk
            (module Field) (* Wrap proof, no features needed *)

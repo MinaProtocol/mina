@@ -76,8 +76,6 @@ module Side_loaded = struct
 end
 
 module Compiled = struct
-  type f = Impls.Wrap.field
-
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
@@ -145,7 +143,7 @@ module For_step = struct
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 
-  let of_side_loaded (type a b c d e f)
+  let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent =
            { branches; max_proofs_verified; public_input; feature_flags }

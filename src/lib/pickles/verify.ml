@@ -156,8 +156,6 @@ let verify_heterogenous (ts : Instance.t list) =
           let p =
             let module Field = struct
               include Tick.Field
-
-              type nonrec bool = bool
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
@@ -362,8 +360,7 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a return_typ n)
-    (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous

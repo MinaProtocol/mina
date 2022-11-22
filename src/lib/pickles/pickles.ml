@@ -1714,8 +1714,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       let plonk =
                         let module Field = struct
                           include Tick.Field
-
-                          type nonrec bool = bool
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)

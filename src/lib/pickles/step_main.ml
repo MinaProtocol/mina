@@ -115,11 +115,9 @@ let verify_one ~srs
           printf "should_verify: %b\n\n%!" should_verify) ;
   (chals, Boolean.(verified &&& finalized ||| not should_verify))
 
-let finalize_previous_and_verify = ()
-
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values prev_ret_vars var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
@@ -196,7 +194,7 @@ let step_main :
   in
   let feature_flags =
     let rec go :
-        type e pvars pvals ns1 ns2 br.
+        type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
@@ -215,7 +213,7 @@ let step_main :
   in
   let prev_proof_typs =
     let rec join :
-        type e pvars pvals ns1 ns2 br.
+        type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> ns1 H1.T(Nat).t
         -> ns2 H1.T(Nat).t
@@ -378,7 +376,7 @@ let step_main :
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
-                  type vars vals prev_vals ns1 ns2 n.
+                  type vars vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t

@@ -206,8 +206,6 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let plonk =
     let module Field = struct
       include Tick.Field
-
-      type nonrec bool = bool
     end in
     Type1.derive_plonk
       (module Field)

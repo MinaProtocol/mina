@@ -283,10 +283,6 @@ struct
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
-  module Lazy_ (A : T0) = struct
-    type t = A.t Lazy.t
-  end
-
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
@@ -789,7 +785,7 @@ struct
         wrap
       in
       let rec go :
-          type xs1 xs2 xs3 xs4 xs5 xs6.
+          type xs1 xs2 xs3 xs4.
              (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
           -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
           -> ( xs2
@@ -918,7 +914,7 @@ module Side_loaded = struct
 end
 
 let compile_with_wrap_main_override_promise :
-    type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+    type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:
@@ -1022,7 +1018,7 @@ let compile_with_wrap_main_override_promise :
       (Auxiliary_value)
   in
   let rec conv_irs :
-      type v1ss v2ss v3ss v4ss wss hss.
+      type v1ss v2ss wss hss.
          ( v1ss
          , v2ss
          , wss
@@ -1067,8 +1063,6 @@ let compile_with_wrap_main_override_promise :
   end in
   let module P = struct
     type statement = value
-
-    type return_type = ret_value
 
     module Max_local_max_proofs_verified = Max_proofs_verified
 

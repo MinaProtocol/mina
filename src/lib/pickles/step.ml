@@ -125,7 +125,7 @@ struct
            Impls.Wrap.Verification_key.t
         -> 'a
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) P.t
+        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -221,8 +221,6 @@ struct
         time "plonk_checks" (fun () ->
             let module Field = struct
               include Tick.Field
-
-              type nonrec bool = bool
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
@@ -501,8 +499,6 @@ struct
       let plonk =
         let module Field = struct
           include Tock.Field
-
-          type nonrec bool = bool
         end in
         (* Wrap proof, no features *)
         Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
@@ -639,14 +635,14 @@ struct
       module type S = sig
         type res
 
-        val f : _ P.t -> res
+        val f : _ Proof.t -> res
       end
     end in
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(P).t
+             (ns, ns) H2.T(Proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -671,7 +667,7 @@ struct
                  Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                  Step_bp_vec.t
 
-               let f (T t : _ P.t) =
+               let f (T t : _ Proof.t) =
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
@@ -700,7 +696,7 @@ struct
     in
     let messages_for_next_wrap_proof_padded =
       let rec pad :
-          type n k maxes pvals lws lhs.
+          type n k maxes.
              (Digest.Constant.t, k) Vector.t
           -> maxes H1.T(Nat).t
           -> (maxes, n) Hlist.Length.t
@@ -781,7 +777,7 @@ struct
              ( module struct
                type res = Tick.Curve.Affine.t
 
-               let f (T t : _ P.t) =
+               let f (T t : _ Proof.t) =
                  t.statement.proof_state.messages_for_next_wrap_proof
                    .challenge_polynomial_commitment
              end )
@@ -843,15 +839,15 @@ struct
         ( module struct
           type res = E.t
 
-          let f (T t : _ P.t) =
+          let f (T t : _ Proof.t) =
             (t.proof.openings.evals, t.proof.openings.ft_eval1)
         end )
     in
     let messages_for_next_wrap_proof =
       let rec go :
-          type a a.
-             (a, a) H2.T(P).t
-          -> a H1.T(P.Base.Messages_for_next_proof_over_same_field.Wrap).t =
+          type a.
+             (a, a) H2.T(Proof).t
+          -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->
             []
@@ -869,7 +865,7 @@ struct
       ; messages_for_next_wrap_proof
       }
     in
-    ( { P.Base.Step.proof = next_proof
+    ( { Proof.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =

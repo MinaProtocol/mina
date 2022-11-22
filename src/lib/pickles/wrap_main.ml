@@ -90,8 +90,8 @@ let lookup_config_for_pack =
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
-    (type max_proofs_verified branches prev_varss prev_valuess env
-    max_local_max_proofs_verifieds ) ~feature_flags
+    (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
+    ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
