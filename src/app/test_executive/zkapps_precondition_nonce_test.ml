@@ -1,7 +1,25 @@
 open Core
-open Async
 open Integration_test_lib
 open Mina_base
+
+(*
+       Test plan:
+       1. Create a transaction that looks like the following:
+         [ fee_pay1; update1]
+         - fee_pay1 updates it's nonce to 1
+         - update1 should be the nonce after fee_pay1, so 1
+       2. Create a transaction that looks like the following:
+         [ fee_pay2; update2]
+         - fee_pay2 has the precondition of 1, otherwise it should fail
+         - update2 should have precondition after fee_pay2 is applied, so 2
+
+      Outcome:
+        - Both transactions included in a block
+        - transaction1 should have Failed status
+        - transaction2 should have Applied status
+        - Application order fee_pay1, fee_pay2, update1, update2
+
+    *)
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -45,29 +63,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     incr transactions_sent ;
     send_zkapp ~logger node zkapp_command
 
-  (*
-       Test plan:
-       1. Create a transaction that looks like the following:
-         [ fee_pay1; update1]
-         - fee_pay1 updates it's nonce to 1
-         - update1 should be the nonce after fee_pay1, so 1
-       2. Create a transaction that looks like the following:
-         [ fee_pay2; update2]
-         - fee_pay2 has the precondition of 1, otherwise it should fail
-         - update2 should have precondition after fee_pay2 is applied, so 2
-        
-      Outcome: 
-        - Both transactions included in a block
-        - transaction1 should have Failed status
-        - transaction2 should have Applied status
-        - Application order fee_pay1, fee_pay2, update1, update2
-
-    *)
-
   let run network t =
     let open Malleable_error.Let_syntax in
+    (* Setup *)
     let logger = Logger.create () in
     let block_producer_nodes = Network.block_producers network in
+    let node = List.hd_exn block_producer_nodes in
+    let%bind fee_payer_pk = Util.pub_key_of_node node in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+    let memo = Signed_command_memo.create_from_string_exn "Zkapp update all" in
+    let with_timeout =
+      let soft_slots = 3 in
+      let soft_timeout = Network_time_span.Slots soft_slots in
+      let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+      Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+    in
+    let wait_for_zkapp ~has_failures zkapp_command =
+      let%map () =
+        wait_for t @@ with_timeout
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
+             ~zkapp_command
+      in
+      [%log info] "zkApp transaction included in transition frontier"
+    in
+    (* Initialize *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
@@ -75,11 +94,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ( Network.seeds network @ block_producer_nodes
               @ Network.snark_coordinators network ) ) )
     in
-    let node = List.hd_exn block_producer_nodes in
-    let%bind fee_payer_pk = Util.pub_key_of_node node in
-    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
-    let memo = Signed_command_memo.create_from_string_exn "Zkapp update all" in
-    let t1 =
+    (* Setup transactions*)
+    let invalid_nonce_transaction =
       Zkapp_command.of_simple
         { fee_payer =
             { body =
@@ -116,7 +132,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo
         }
     in
-    let t2 =
+    let valid_nonce_transaction =
       Zkapp_command.of_simple
         { fee_payer =
             { body =
@@ -154,18 +170,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     in
     let%bind () =
-      section "Wait for transaction1 to be included in  transition frontier"
-        (send_zkapp ~logger node t1)
+      section "Send a zkApp transaction with an invalid account_update nonce"
+        (send_zkapp ~logger node invalid_nonce_transaction)
+    in
+    (* Submit transactions*)
+    let%bind () =
+      section "Send a zkApp transaction with an valid account_update nonce"
+        (send_zkapp ~logger node valid_nonce_transaction)
+    in
+    (* Check transactions*)
+    let%bind () =
+      section
+        "Wait for zkApp transaction with invalid nonce to be rejected by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:true invalid_nonce_transaction)
     in
     let%bind () =
-      section "Wait for transaction2 to be included in  transition frontier"
-        (send_zkapp ~logger node t2)
+      section
+        "Wait for zkApp transaction with invalid nonce to be accepted by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false valid_nonce_transaction)
     in
-    (* Get transaction status to see that the transaction failed. *)
-    let%bind status2 =
-      section "Get transaction status" (get_transaction_status ~logger node t2)
-    in
-
+    (* End test *)
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
