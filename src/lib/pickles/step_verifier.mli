@@ -36,12 +36,6 @@ end
 val assert_n_bits :
   n:int -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t -> unit
 
-type field := Step_main_inputs.Impl.Field.t
-
-type snark_field := field Snarky_backendless.Cvar.t
-
-type ('a, 'b) vector := ('a, 'b) Pickles_types.Vector.t
-
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
   -> step_uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
