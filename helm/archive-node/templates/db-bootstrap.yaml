@@ -27,8 +27,8 @@ spec:
         --host {{ tpl .Values.archive.postgresHost . }}
         --port {{ .Values.archive.ports.postgres }}
         --dbname {{ .Values.postgresql.auth.database }}
-        -f /tmp/{{ .Values.testnetName }}-archive-dump.sql
-        && rm -f /tmp/{{ .Values.testnetName }}-archive-dump.*'
+        -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
+        && rm -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql'
       {{- else }}
       - name: import-schema
         image: gcr.io/o1labs-192920/postgresql-curl:latest
