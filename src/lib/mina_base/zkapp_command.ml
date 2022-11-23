@@ -1443,7 +1443,7 @@ module type Valid_intf = sig
     -> location_of_account:('a -> Account_id.t -> 'b option)
     -> t option
 
-  val of_verifiable : Verifiable.t -> t option
+  val of_verifiable : Verifiable.t -> t Or_error.t
 
   val forget : t -> T.t
 end
@@ -1483,11 +1483,11 @@ struct
   let create ~verification_keys zkapp_command : t =
     { zkapp_command; verification_keys }
 
-  let of_verifiable (t : Verifiable.t) : t option =
-    let open Option.Let_syntax in
+  let of_verifiable (t : Verifiable.t) : t Or_error.t =
+    let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.account_updates ~init:(Some ())
+      Call_forest.fold t.account_updates ~init:(Ok ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
@@ -1495,12 +1495,30 @@ struct
             match (p.authorization, p.body.authorization_kind) with
             | None_given, None_given | Proof _, Proof | Signature _, Signature
               ->
-                Some ()
+                Ok ()
             | _ ->
-                None
+                let err =
+                  Error.createf
+                    "Authorization kind does not match the authorization"
+                  |> (fun err ->
+                       Error.tag_arg err "expected" p.body.authorization_kind
+                         Account_update.Authorization_kind.sexp_of_t )
+                  |> fun err ->
+                  Error.tag_arg err "got"
+                    (Control.tag p.authorization)
+                    Account_update.Authorization_kind.sexp_of_t
+                in
+                Error err
           in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } = vk_opt in
+            let%map { With_hash.hash; _ } =
+              match vk_opt with
+              | Some vk ->
+                  Ok vk
+              | None ->
+                  Or_error.errorf
+                    "Verification key required for proof, but was not given"
+            in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
           else acc )
     in
