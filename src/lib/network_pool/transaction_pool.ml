@@ -1615,10 +1615,12 @@ let%test_module _ =
                   Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account
                     zkapp_command
                 with
-                | Some ps ->
+                | Ok ps ->
                     ps
-                | None ->
-                    failwith "Could not create Zkapp_command.Valid.t"
+                | Error err ->
+                    Error.raise
+                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
+                         err
               in
               User_command.Zkapp_command valid_zkapp_command
           | Signed_command _ ->
@@ -1797,7 +1799,7 @@ let%test_module _ =
         Transaction_snark.For_tests.multiple_transfers test_spec
       in
       let zkapp_command =
-        Option.value_exn
+        Or_error.ok_exn
           (Zkapp_command.Valid.to_valid ~ledger:()
              ~get:(fun _ _ -> failwith "Not expecting proof zkapp_command")
              ~location_of_account:(fun _ _ ->
@@ -1884,7 +1886,7 @@ let%test_module _ =
               }
             in
             let zkapp_command =
-              Option.value_exn
+              Or_error.ok_exn
                 (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
                    ~get:Mina_ledger.Ledger.get
                    ~location_of_account:Mina_ledger.Ledger.location_of_account

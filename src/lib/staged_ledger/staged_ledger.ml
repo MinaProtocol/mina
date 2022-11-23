@@ -2545,10 +2545,12 @@ let%test_module "staged ledger tests" =
                     ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
-                | Some ps ->
+                | Ok ps ->
                     ps
-                | None ->
-                    failwith "Could not create Zkapp_command.Valid.t"
+                | Error err ->
+                    Error.raise
+                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
+                         err
               in
               User_command.Zkapp_command valid_zkapp_command_with_auths
           | Signed_command _, _, _ ->
@@ -3860,7 +3862,7 @@ let%test_module "staged ledger tests" =
                       ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
-                    Option.value_exn
+                    Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
                          ~get:Ledger.get
                          ~location_of_account:Ledger.location_of_account

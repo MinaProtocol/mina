@@ -265,12 +265,16 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t Or_error.t =
   match t with
-  | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Signed_command x -> (
+      match Signed_command.check x with
+      | Some c ->
+          Ok (Signed_command c)
+      | None ->
+          Or_error.error_string "Invalid signature" )
   | Zkapp_command p ->
-      Option.map
+      Or_error.map
         (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
         ~f:(fun p -> Zkapp_command p)
 
