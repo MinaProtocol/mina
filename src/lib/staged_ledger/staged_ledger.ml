@@ -1018,13 +1018,15 @@ module T = struct
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
-    let cs =
-      List.map cs
-        ~f:
-          (let open Ledger in
-          User_command.to_verifiable ~ledger ~get ~location_of_account)
-    in
     let open Deferred.Or_error.Let_syntax in
+    let%bind cs =
+      Or_error.try_with (fun () ->
+          List.map cs ~f:(fun cmd ->
+              let open Ledger in
+              User_command.to_verifiable ~ledger ~get ~location_of_account cmd
+              |> Or_error.ok_exn ) )
+      |> Deferred.return
+    in
     let%map xs = Verifier.verify_commands verifier cs in
     Result.all
       (List.map xs ~f:(function
@@ -2545,10 +2547,12 @@ let%test_module "staged ledger tests" =
                     ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
-                | Some ps ->
+                | Ok ps ->
                     ps
-                | None ->
-                    failwith "Could not create Zkapp_command.Valid.t"
+                | Error err ->
+                    Error.raise
+                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
+                         err
               in
               User_command.Zkapp_command valid_zkapp_command_with_auths
           | Signed_command _, _, _ ->
@@ -3860,7 +3864,7 @@ let%test_module "staged ledger tests" =
                       ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
-                    Option.value_exn
+                    Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
                          ~get:Ledger.get
                          ~location_of_account:Ledger.location_of_account
