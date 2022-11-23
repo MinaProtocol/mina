@@ -1021,9 +1021,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self =
       match self with
       | None ->
-          { Tag.id = Type_equal.Id.create ~name sexp_of_opaque
-          ; kind = Compiled
-          }
+          Tag.(create ~kind:Compiled name)
       | Some self ->
           self
     in
@@ -1924,9 +1922,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -2156,7 +2153,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 64000 do
@@ -2532,13 +2529,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               assert false
                         in
                         let overwritten_prechals =
-                          Array.map overwritten_prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map overwritten_prechals
+                            ~f:Bulletproof_challenge.unpack
                         in
+
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
@@ -2849,9 +2847,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -3081,7 +3078,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 61000 do
@@ -3422,13 +3419,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let b = Tick.Field.random () in
                         let prechals =
-                          Array.map prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map prechals ~f:Bulletproof_challenge.unpack
                         in
+
                         (prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals

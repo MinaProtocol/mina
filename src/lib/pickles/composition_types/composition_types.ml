@@ -567,11 +567,17 @@ module Wrap = struct
 
     let opt_spec (type f) ((module Impl) : f impl)
         { zero = { value; var }; use } =
-      Spec.Opt
+      Spec.T.Opt
         { inner = Struct [ Scalar Challenge; B Field ]
         ; flag = use
-        ; dummy1 = [ Spec.Sc.create value.challenge; value.scalar ]
-        ; dummy2 = [ Spec.Sc.create var.challenge; var.scalar ]
+        ; dummy1 =
+            [ Kimchi_backend_common.Scalar_challenge.create value.challenge
+            ; value.scalar
+            ]
+        ; dummy2 =
+            [ Kimchi_backend_common.Scalar_challenge.create var.challenge
+            ; var.scalar
+            ]
         ; bool = (module Impl.Boolean)
         }
   end
@@ -676,8 +682,7 @@ module Wrap = struct
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       let spec impl lookup =
-        let open Spec in
-        Struct
+        Spec.T.Struct
           [ Vector (B Field, Nat.N19.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
@@ -978,8 +983,7 @@ module Step = struct
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         let spec impl bp_log2 lookup =
-          let open Spec in
-          Struct
+          Spec.T.Struct
             [ Vector (B Field, Nat.N19.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
@@ -1123,8 +1127,7 @@ module Step = struct
     [@@deriving sexp, compare, yojson, hlist]
 
     let spec unfinalized_proofs messages_for_next_step_proof =
-      let open Spec in
-      Struct [ unfinalized_proofs; messages_for_next_step_proof ]
+      Spec.T.Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
     include struct
       open Hlist.HlistId
@@ -1205,11 +1208,10 @@ module Step = struct
       }
 
     let spec impl proofs_verified bp_log2 lookup =
-      let open Spec in
       let per_proof =
         Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup
       in
-      Struct
+      Spec.T.Struct
         [ Vector (per_proof, proofs_verified)
         ; B Digest
         ; Vector (B Digest, proofs_verified)
