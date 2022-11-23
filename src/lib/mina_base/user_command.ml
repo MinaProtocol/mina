@@ -159,13 +159,14 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
+let to_verifiable (t : t) ~ledger ~get ~location_of_account :
+    Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
-      Signed_command c
+      Ok (Signed_command c)
   | Zkapp_command cmd ->
-      Zkapp_command
-        (Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd)
+      Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd
+      |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with

@@ -1059,14 +1059,19 @@ struct
                 "We don't have a transition frontier at the moment, so we're \
                  unable to verify any transactions."
         in
-        let diff' =
+        let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              Envelope.Incoming.map diff
-                ~f:
-                  (List.map
-                     ~f:
-                       (User_command.to_verifiable ~ledger ~get:Base_ledger.get
-                          ~location_of_account:Base_ledger.location_of_account ) ) )
+              Or_error.try_with (fun () ->
+                  Envelope.Incoming.map diff
+                    ~f:
+                      (List.map ~f:(fun cmd ->
+                           User_command.to_verifiable ~ledger
+                             ~get:Base_ledger.get
+                             ~location_of_account:
+                               Base_ledger.location_of_account cmd
+                           |> Or_error.ok_exn ) ) ) )
+          |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
+          |> Deferred.return
         in
         match%bind.Deferred
           O1trace.thread "batching_transaction_verification" (fun () ->
