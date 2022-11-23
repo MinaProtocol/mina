@@ -49,9 +49,7 @@ module Side_loaded = struct
     }
 
   type packed =
-    | T :
-        ('var, 'value, 'n1, 'n2) Tag.tag * ('var, 'value, 'n1, 'n2) t
-        -> packed
+    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
       { permanent =
@@ -107,9 +105,7 @@ module Compiled = struct
     }
 
   type packed =
-    | T :
-        ('var, 'value, 'n1, 'n2) Tag.tag * ('var, 'value, 'n1, 'n2) t
-        -> packed
+    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
       { branches
@@ -213,7 +209,7 @@ let find t k =
 
 let lookup_compiled :
     type var value n m.
-    (var, value, n, m) Tag.tag -> (var, value, n, m) Compiled.t =
+    (var, value, n, m) Tag.id -> (var, value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -221,7 +217,7 @@ let lookup_compiled :
 
 let lookup_side_loaded :
     type var value n m.
-    (var, value, n, m) Tag.tag -> (var, value, n, m) Side_loaded.t =
+    (var, value, n, m) Tag.id -> (var, value, n, m) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -292,10 +288,10 @@ let lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
           f (`Side_loaded d) )
 
 let add_side_loaded ~name permanent =
-  let id = Type_equal.Id.create ~name sexp_of_opaque in
+  let (Tag.{ id; _ } as tag) = Tag.(create ~kind:Side_loaded name) in
   Hashtbl.add_exn univ.side_loaded ~key:(Type_equal.Id.uid id)
     ~data:(T (id, { ephemeral = None; permanent })) ;
-  { Tag.kind = Side_loaded; id }
+  tag
 
 let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
   (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
