@@ -183,7 +183,7 @@ We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code
 
 ## Steps for adding a new OCaml dependency
 
-Our OCaml dependencies live in the [`ocaml.export`](./ocaml.export) file. This file should not be modified manually as it is machine generated.
+Our OCaml dependencies live in the [`opam.export`](./opam.export) file. This file should not be modified manually as it is machine generated.
 
 To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). Here we assume that the version of the OCaml compiler currently used in the codebase is 4.14.0.
 
