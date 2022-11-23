@@ -15,7 +15,6 @@ spec:
         app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
-        version: {{ trunc 6 (split ":" .Values.mina.image)._1 | trimSuffix "-" }}
         {{- if .Values.archive.enableLocalDaemon }}
         syncStatus: INIT
         {{- end }}
@@ -24,8 +23,8 @@ spec:
         prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if .Values.archive.enableLocalDaemon }}
       initContainers:
-{{- if .Values.archive.enableLocalDaemon }}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -38,7 +37,9 @@ spec:
         env:
           - name: MINA_LIBP2P_PASS
             value: {{ $.Values.mina.privkeyPass | quote }}
+      {{- end}}
       containers:
+      {{- if .Values.archive.enableLocalDaemon }}
       - name: mina
         resources:
           limits:
