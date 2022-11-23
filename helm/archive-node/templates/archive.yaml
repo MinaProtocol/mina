@@ -5,7 +5,7 @@ metadata:
   labels:
     app: {{ template "archive-node.fullname" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.archive.replicas }}
   selector:
     matchLabels:
       app: {{ template "archive-node.fullname" . }}
