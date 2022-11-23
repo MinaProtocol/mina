@@ -104,23 +104,23 @@ spec:
           value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.p2p }}
           hostPort: {{ .Values.mina.ports.p2p }}
 {{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-        volumeMounts: 
+        volumeMounts:
         - name: config-dir
           mountPath: /root/.mina-config
         {{- if .Values.mina.runtimeConfig }}
@@ -133,7 +133,7 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ 
+        args: [
           "mina-archive",
           "run",
           "-metrics-port", "{{ .Values.archive.ports.metrics }}",
@@ -158,7 +158,7 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.archive.ports.metrics }}
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
