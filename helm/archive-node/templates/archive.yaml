@@ -25,6 +25,7 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       initContainers:
+{{- if .Values.archive.enableLocalDaemon }}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -38,7 +39,6 @@ spec:
           - name: MINA_LIBP2P_PASS
             value: {{ $.Values.mina.privkeyPass | quote }}
       containers:
-{{- if .Values.archive.enableLocalDaemon }}
       - name: mina
         resources:
           limits:
