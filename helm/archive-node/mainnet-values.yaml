@@ -15,6 +15,8 @@ archive:
     metrics: "10002"
   enableLocalDaemon: false
   enablePostgresDB: true
+  enableDumpCronjob: true
+  initFromDump: true
 
 postgresql:
   primary:
