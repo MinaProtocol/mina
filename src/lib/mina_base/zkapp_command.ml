@@ -1322,7 +1322,33 @@ module Virtual = struct
   end
 end
 
-module Verifiable = struct
+module Verifiable : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = private
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      val to_latest : t -> t
+    end
+  end]
+
+  val create :
+       T.t
+    -> ledger:'a
+    -> get:('a -> 'b -> Account.t option)
+    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> t
+end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1341,6 +1367,25 @@ module Verifiable = struct
       let to_latest = Fn.id
     end
   end]
+
+  let create (t : T.t) ~ledger ~get ~location_of_account : t =
+    let find_vk (p : Account_update.t) =
+      let ( ! ) x = Option.value_exn x in
+      let id = Account_update.account_id p in
+      Option.try_with (fun () ->
+          let account : Account.t =
+            !(get ledger !(location_of_account ledger id))
+          in
+          !(!(account.zkapp).verification_key) )
+    in
+    let ({ fee_payer; account_updates; memo } : T.t) = t in
+    { fee_payer
+    ; account_updates =
+        account_updates
+        |> Call_forest.map ~f:(fun account_update ->
+               (account_update, find_vk account_update) )
+    ; memo
+    }
 end
 
 let of_verifiable (t : Verifiable.t) : t =

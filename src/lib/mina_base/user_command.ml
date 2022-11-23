@@ -160,27 +160,12 @@ module Verifiable = struct
 end
 
 let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Account_update.t) =
-    let ( ! ) x = Option.value_exn x in
-    let id = Account_update.account_id p in
-    Option.try_with (fun () ->
-        let account : Account.t =
-          !(get ledger !(location_of_account ledger id))
-        in
-        !(!(account.zkapp).verification_key) )
-  in
   match t with
   | Signed_command c ->
       Signed_command c
-  | Zkapp_command { fee_payer; account_updates; memo } ->
+  | Zkapp_command cmd ->
       Zkapp_command
-        { fee_payer
-        ; account_updates =
-            account_updates
-            |> Zkapp_command.Call_forest.map ~f:(fun account_update ->
-                   (account_update, find_vk account_update) )
-        ; memo
-        }
+        (Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd)
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with
