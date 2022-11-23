@@ -100,10 +100,11 @@ module Call_forest = struct
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
     let rec mapi_with_trees' ~i (t : _ t) ~f =
+      let account_update = f i t.account_update t in
       let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
       ( l
       , { calls
-        ; account_update = f i t.account_update t
+        ; account_update
         ; account_update_digest = t.account_update_digest
         } )
 
