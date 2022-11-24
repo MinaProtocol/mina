@@ -100,10 +100,11 @@ module Call_forest = struct
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
     let rec mapi_with_trees' ~i (t : _ t) ~f =
+      let account_update = f i t.account_update t in
       let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
       ( l
       , { calls
-        ; account_update = f i t.account_update t
+        ; account_update
         ; account_update_digest = t.account_update_digest
         } )
 
@@ -1322,7 +1323,47 @@ module Virtual = struct
   end
 end
 
-module Verifiable = struct
+let check_authorization (p : Account_update.t) : unit Or_error.t =
+  match (p.authorization, p.body.authorization_kind) with
+  | None_given, None_given | Proof _, Proof | Signature _, Signature ->
+      Ok ()
+  | _ ->
+      let err =
+        Error.create "Authorization kind does not match the authorization"
+          [ ("expected", p.body.authorization_kind)
+          ; ("got", Control.tag p.authorization)
+          ]
+          [%sexp_of: (string * Account_update.Authorization_kind.t) list]
+      in
+      Error err
+
+module Verifiable : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = private
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      val to_latest : t -> t
+    end
+  end]
+
+  val create :
+       T.t
+    -> ledger:'a
+    -> get:('a -> 'b -> Account.t option)
+    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> t Or_error.t
+end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1341,6 +1382,95 @@ module Verifiable = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* Ensures that there's a verification_key available for all account_updates
+   * and creates a valid command associating the correct keys with each
+   * account_id.
+   *
+   * If an account_update replaces the verification_key (or deletes it),
+   * subsequent account_updates use the replaced key instead of looking in the
+   * ledger for the key (ie set by a previous transaction).
+   *)
+  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
+      ~location_of_account : t Or_error.t =
+    With_return.with_return (fun { return } ->
+        let find_vk account_id =
+          match
+            let open Option.Let_syntax in
+            let%bind location = location_of_account ledger account_id in
+            let%bind (account : Account.t) = get ledger location in
+            let%bind zkapp = account.zkapp in
+            zkapp.verification_key
+          with
+          | Some vk ->
+              vk
+          | None ->
+              let err =
+                Error.create
+                  "No verification key found for proved account update"
+                  ("account_id", account_id) [%sexp_of: string * Account_id.t]
+              in
+              return (Error err)
+        in
+        let tbl = Account_id.Table.create () in
+        let vks_overridden =
+          (* Keep track of the verification keys that have been set so far
+             during this transaction.
+          *)
+          ref Account_id.Map.empty
+        in
+        let account_updates =
+          Call_forest.map account_updates ~f:(fun p ->
+              let account_id = Account_update.account_id p in
+              let vks_overriden' =
+                match Account_update.verification_key_update_to_option p with
+                | Zkapp_basic.Set_or_keep.Set vk_next ->
+                    Account_id.Map.set !vks_overridden ~key:account_id
+                      ~data:vk_next
+                | Zkapp_basic.Set_or_keep.Keep ->
+                    !vks_overridden
+              in
+              let () =
+                match check_authorization p with
+                | Ok () ->
+                    ()
+                | Error _ as err ->
+                    return err
+              in
+              if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
+              then (
+                let prioritized_vk =
+                  (* only lookup _past_ vk setting, ie exclude the new one we
+                   * potentially set in this account_update (use the non-'
+                   * vks_overrided) . *)
+                  match Account_id.Map.find !vks_overridden account_id with
+                  | Some (Some vk) ->
+                      vk
+                  | Some None ->
+                      (* we explicitly have erased the key *)
+                      let err =
+                        Error.create
+                          "No verification key found for proved account \
+                           update: the verification key was removed by a \
+                           previous account update"
+                          ("account_id", account_id)
+                          [%sexp_of: string * Account_id.t]
+                      in
+                      return (Error err)
+                  | None ->
+                      (* we haven't set anything; lookup the vk in the ledger *)
+                      find_vk account_id
+                in
+                Account_id.Table.update tbl account_id ~f:(fun _ ->
+                    With_hash.hash prioritized_vk ) ;
+                (* return the updated overrides *)
+                vks_overridden := vks_overriden' ;
+                (p, Some prioritized_vk) )
+              else (
+                vks_overridden := vks_overriden' ;
+                (p, None) ) )
+        in
+        Ok { fee_payer; account_updates; memo } )
 end
 
 let of_verifiable (t : Verifiable.t) : t =
@@ -1441,9 +1571,9 @@ module type Valid_intf = sig
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
-    -> t option
+    -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t option
+  val of_verifiable : Verifiable.t -> t Or_error.t
 
   val forget : t -> T.t
 end
@@ -1483,24 +1613,24 @@ struct
   let create ~verification_keys zkapp_command : t =
     { zkapp_command; verification_keys }
 
-  let of_verifiable (t : Verifiable.t) : t option =
-    let open Option.Let_syntax in
+  let of_verifiable (t : Verifiable.t) : t Or_error.t =
+    let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.account_updates ~init:(Some ())
+      Call_forest.fold t.account_updates ~init:(Ok ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
-          let%bind () =
-            match (p.authorization, p.body.authorization_kind) with
-            | None_given, None_given | Proof _, Proof | Signature _, Signature
-              ->
-                Some ()
-            | _ ->
-                None
-          in
+          let%bind () = check_authorization p in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } = vk_opt in
+            let%map { With_hash.hash; _ } =
+              match vk_opt with
+              | Some vk ->
+                  Ok vk
+              | None ->
+                  Or_error.errorf
+                    "Verification key required for proof, but was not given"
+            in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
           else acc )
     in
@@ -1515,62 +1645,9 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  (* Ensures that there's a verification_key available for all account_updates
-   * and creates a valid command associating the correct keys with each
-   * account_id.
-   *
-   * If an account_update replaces the verification_key (or deletes it),
-   * subsequent account_updates use the replaced key instead of looking in the
-   * ledger for the key (ie set by a previous transaction).
-   *)
-  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
-    let open Option.Let_syntax in
-    let find_vk account_id =
-      let%bind location = location_of_account ledger account_id in
-      let%bind (account : Account.t) = get ledger location in
-      let%bind zkapp = account.zkapp in
-      zkapp.verification_key
-    in
-    let tbl = Account_id.Table.create () in
-    let%map (_all_succeeded : _ Account_id.Map.t) =
-      Call_forest.fold t.account_updates
-        ~init:
-          ((* keep track of the verification keys that have been set so far
-            * during this transaction -- the option tracks if we should stop
-            * early due to an error *)
-             Some
-             Account_id.Map.empty ) ~f:(fun acc p ->
-          let%bind vks_overriden = acc in
-          let account_id = Account_update.account_id p in
-          let vks_overriden' =
-            match Account_update.verification_key_update_to_option p with
-            | Zkapp_basic.Set_or_keep.Set vk_next ->
-                Account_id.Map.set vks_overriden ~key:account_id ~data:vk_next
-            | Zkapp_basic.Set_or_keep.Keep ->
-                vks_overriden
-          in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then (
-            let%map prioritized_vk =
-              (* only lookup _past_ vk setting, ie exclude the new one we
-               * potentially set in this account_update (use the non-'
-               * vks_overrided) . *)
-              match Account_id.Map.find vks_overriden account_id with
-              | Some (Some vk) ->
-                  Some vk
-              | Some None ->
-                  (* we explicitly have erased the key *)
-                  None
-              | None ->
-                  (* we haven't set anything; lookup the vk in the ledger *)
-                  find_vk account_id
-            in
-            Account_id.Table.update tbl account_id ~f:(fun _ ->
-                With_hash.hash prioritized_vk ) ;
-            (* return the updated overrides *)
-            vks_overriden' )
-          else Some vks_overriden' )
-    in
-    create ~verification_keys:(Account_id.Table.to_alist tbl) t
+  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
+    Verifiable.create t ~ledger ~get ~location_of_account
+    |> Or_error.bind ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

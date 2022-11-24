@@ -159,28 +159,14 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Account_update.t) =
-    let ( ! ) x = Option.value_exn x in
-    let id = Account_update.account_id p in
-    Option.try_with (fun () ->
-        let account : Account.t =
-          !(get ledger !(location_of_account ledger id))
-        in
-        !(!(account.zkapp).verification_key) )
-  in
+let to_verifiable (t : t) ~ledger ~get ~location_of_account :
+    Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
-      Signed_command c
-  | Zkapp_command { fee_payer; account_updates; memo } ->
-      Zkapp_command
-        { fee_payer
-        ; account_updates =
-            account_updates
-            |> Zkapp_command.Call_forest.map ~f:(fun account_update ->
-                   (account_update, find_vk account_update) )
-        ; memo
-        }
+      Ok (Signed_command c)
+  | Zkapp_command cmd ->
+      Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd
+      |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with
@@ -265,12 +251,16 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t Or_error.t =
   match t with
-  | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Signed_command x -> (
+      match Signed_command.check x with
+      | Some c ->
+          Ok (Signed_command c)
+      | None ->
+          Or_error.error_string "Invalid signature" )
   | Zkapp_command p ->
-      Option.map
+      Or_error.map
         (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
         ~f:(fun p -> Zkapp_command p)
 
