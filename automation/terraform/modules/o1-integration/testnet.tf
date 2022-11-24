@@ -36,8 +36,6 @@ module "kubernetes_testnet" {
   log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count
-  mina_archive_schema  = var.mina_archive_schema
-  mina_archive_schema_aux_files = var.mina_archive_schema_aux_files
 
   snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
     {

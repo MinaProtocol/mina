@@ -61,11 +61,6 @@ variable "mina_archive_image" {
   default = ""
 }
 
-variable "mina_archive_schema" {
-  type    = string
-  default = ""
-}
-
 variable "archive_node_count" {
   type    = number
   default = 0
@@ -324,9 +319,6 @@ variable "archive_configs" {
 
       postgresHost            = string
       postgresPort            = string
-      postgresqlUsername      = string
-      postgresqlPassword      = string
-      postgresDB              = string
       remoteSchemaFile        = string
       remoteSchemaAuxFiles        = list(string)
 
@@ -334,7 +326,7 @@ variable "archive_configs" {
       persistenceSize         = string
       persistenceStorageClass = string
       persistenceAccessModes  = list(string)
-      preemptibleAllowed     = string
+      spotAllowed     = string
     })
   )
   default = []
