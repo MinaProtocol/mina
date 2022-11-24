@@ -8,6 +8,14 @@ open Mina_base
 
 let mina_archive_container_id = "archive"
 
+let mina_archive_username = "mina"
+
+let mina_archive_pw = "zo3moong7moog4Iep7eNgo3iecaesahH"
+
+let postgres_url =
+  Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
+    mina_archive_username mina_archive_pw
+
 type config =
   { testnet_name : string
   ; cluster : string
@@ -576,7 +584,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
-    (* this function won't work if t doesn't happen to be an archive node *)
+    (* this function won't work if `t` doesn't happen to be an archive node *)
     if not t.info.has_archive_container then
       failwith
         "No archive container found.  One can only dump archive data of an \
@@ -586,12 +594,7 @@ module Node = struct
       mina_archive_container_id ;
     let%map data =
       run_in_container t ~container_id:mina_archive_container_id
-        ~cmd:
-          [ "pg_dump"
-          ; "--create"
-          ; "--no-owner"
-          ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-          ]
+        ~cmd:[ "pg_dump"; "--create"; "--no-owner"; postgres_url ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
@@ -620,7 +623,7 @@ module Node = struct
       ~cmd:
         [ "mina-replayer"
         ; "--archive-uri"
-        ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
+        ; postgres_url
         ; "--input-file"
         ; dest
         ; "--output-file"
