@@ -33,7 +33,7 @@ Read the [Contributing Guide](https://docs.minaprotocol.com/node-developers/cont
 
 ## Developers
 
-The [Developer docs](https://docs.minaprotocol.com/en/developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
+The [Developer docs](https://docs.minaprotocol.com/node-developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
 
 #### Quick Links:
 
