@@ -328,6 +328,7 @@ variable "archive_configs" {
       postgresqlPassword      = string
       postgresDB              = string
       remoteSchemaFile        = string
+      remoteSchemaAuxFiles        = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string

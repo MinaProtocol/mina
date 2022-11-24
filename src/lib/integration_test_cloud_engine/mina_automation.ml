@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -234,11 +235,14 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
+    let mina_archive_schema = "create_schema.sql" in
     let mina_archive_base_url =
       "https://raw.githubusercontent.com/MinaProtocol/mina/"
       ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
-    let mina_archive_schema = mina_archive_base_url ^ "create_schema.sql" in
+    let mina_archive_schema_aux_files =
+      [ mina_archive_base_url ^ "create_schema.sql" ]
+    in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
       let keypair =
@@ -276,6 +280,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
