@@ -19,7 +19,7 @@
  "error_stack_trace_disabled": false,
  "coin_supported": false,
  "construction": {
-   "offline_url":                "http://localhost:3087",
+   "offline_url":                "http://localhost:3088",
    "max_offline_connections":    4,
    "force_retry":                false,
    "stale_depth":                3,
