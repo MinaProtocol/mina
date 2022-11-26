@@ -1,8 +1,9 @@
 open Core_kernel
 open Mina_base
+open Bit_catchup_state
 
 module Data = struct
-  open Substate_types
+  open Substate
 
   type t = transition_meta
 

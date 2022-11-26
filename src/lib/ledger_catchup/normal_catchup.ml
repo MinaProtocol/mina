@@ -654,10 +654,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     match Transition_frontier.catchup_state frontier with
     | Hash t ->
         t
-    | Full _ ->
+    | _ ->
         failwith
-          "If normal catchup is running, the frontier should have a hash tree, \
-           got a full one."
+          "If normal catchup is running, the frontier should have a hash tree"
   in
   O1trace.background_thread "perform_normal_catchup" (fun () ->
       Strict_pipe.Reader.iter_without_pushback catchup_job_reader

@@ -1,4 +1,5 @@
 open Mina_base
+open Bit_catchup_state
 
 (** Promote a transition that is in [Verifying_blockchain_proof] state with
     [Processed] status to [Downloading_body] state.

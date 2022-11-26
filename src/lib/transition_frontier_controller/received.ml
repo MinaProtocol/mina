@@ -2,6 +2,16 @@ open Mina_base
 open Core_kernel
 open Async
 open Context
+open Bit_catchup_state
+
+let check_body_storage ~context header_with_hash =
+  let (module Context : CONTEXT) = context in
+  Context.check_body_in_storage
+    ( With_hash.data header_with_hash
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.(
+         Fn.compose Blockchain_state.body_reference
+           Protocol_state.blockchain_state) )
 
 (** [mark_done state_hash] assigns a transition corresponding to [state_hash]
   with a [Processing] or [Failed] status new status [Processing (Done ())] and
@@ -118,14 +128,16 @@ let set_processing_to_failed error = function
   | st ->
       Some st
 
-let split_retrieve_chain_element = function
+let split_retrieve_chain_element ~context = function
   | `Block bh ->
       let hh = With_hash.map ~f:Mina_block.header bh in
       ( Substate.transition_meta_of_header_with_hash hh
       , Some hh
       , Some (Mina_block.body @@ With_hash.data bh) )
   | `Header hh ->
-      (Substate.transition_meta_of_header_with_hash hh, Some hh, None)
+      ( Substate.transition_meta_of_header_with_hash hh
+      , Some hh
+      , check_body_storage ~context hh )
   | `Meta m ->
       (m, None, None)
 
@@ -178,7 +190,9 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
         :: aux.Transition_state.received
     }
   in
-  let transition_meta, hh_opt, body = split_retrieve_chain_element el in
+  let transition_meta, hh_opt, body =
+    split_retrieve_chain_element ~context el
+  in
   let state_hash = transition_meta.state_hash in
   match (Transition_states.find state.transition_states state_hash, hh_opt) with
   | Some (Transition_state.Invalid _), _ ->
@@ -194,9 +208,17 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
       handle_preserve_hint ~mark_processed_and_promote
         ~transition_states:state.transition_states ~context hint ;
       Ok ()
-  | None, Some hh ->
-      pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
-        ?body hh
+  | None, Some hh -> (
+      let relevance_status =
+        Gossip.verify_header_is_relevant ~event_recording:false ~context ~sender
+          ~transition_states:state.transition_states hh
+      in
+      match relevance_status with
+      | `Relevant ->
+          pre_validate_and_add ~context ~mark_processed_and_promote ~sender
+            ~state ?body hh
+      | _ ->
+          Ok () )
   | None, None ->
       ignore
         ( State_hash.Table.add state.parents ~key:state_hash
@@ -271,7 +293,7 @@ and upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
         ~sender el
     else
       let error = Error.of_string "parent is invalid" in
-      let transition_meta, _, _ = split_retrieve_chain_element el in
+      let transition_meta, _, _ = split_retrieve_chain_element ~context el in
       ( match
           Transition_states.find state.transition_states
             transition_meta.state_hash
@@ -457,15 +479,7 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
     ~gossip_type ?vc gossip_header =
   let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
   let body =
-    if is_some body then body
-    else
-      let (module Context : CONTEXT) = context in
-      Context.check_body_in_storage
-        ( With_hash.data header_with_hash
-        |> Mina_block.Header.protocol_state
-        |> Mina_state.(
-             Fn.compose Blockchain_state.body_reference
-               Protocol_state.blockchain_state) )
+    if is_some body then body else check_body_storage ~context header_with_hash
   in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =

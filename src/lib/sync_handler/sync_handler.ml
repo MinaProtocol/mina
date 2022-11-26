@@ -172,6 +172,9 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data @@ Mina_block.Validated.forget validated_transition
     in
     match Transition_frontier.catchup_state frontier with
+    | Bit _
+    (* TODO Consider serving blocks that are in transition_states
+       (and have body) or in block storage *)
     | Full _ ->
         (* Super catchup *)
         Option.return @@ List.filter_map hashes ~f:get

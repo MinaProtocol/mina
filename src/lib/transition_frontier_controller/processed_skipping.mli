@@ -1,4 +1,6 @@
-module Data : Dsu.Data with type t = Substate_types.transition_meta
+open Bit_catchup_state
+
+module Data : Dsu.Data with type t = Substate.transition_meta
 
 module Dsu : module type of Dsu.Make (Mina_base.State_hash) (Data)
 
@@ -20,10 +22,10 @@ module Dsu : module type of Dsu.Make (Mina_base.State_hash) (Data)
     states returned plus the number of states for which [`Take false] was returned.
 *)
 val collect_unprocessed :
-     ?predicate:([ `Take of bool ] * [ `Continue of bool ]) Substate_types.viewer
+     ?predicate:([ `Take of bool ] * [ `Continue of bool ]) Substate.viewer
   -> state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Substate_types.transition_states
+  -> transition_states:'state_t Substate.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t list
@@ -36,7 +38,7 @@ val collect_unprocessed :
 val next_unprocessed :
      state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Substate_types.transition_states
+  -> transition_states:'state_t Substate.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t option
@@ -56,7 +58,7 @@ val next_unprocessed :
 val collect_to_in_progress :
      state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
-  -> transition_states:'state_t Substate_types.transition_states
+  -> transition_states:'state_t Substate.transition_states
   -> dsu:Dsu.t
   -> 'state_t
   -> 'state_t list

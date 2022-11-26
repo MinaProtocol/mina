@@ -1,3 +1,5 @@
+open Bit_catchup_state
+
 (** Promote a transition that is in [Building_breadcrumb] state with
     [Processed] status to [Waiting_to_be_added_to_frontier] state.
 *)

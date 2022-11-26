@@ -1,6 +1,7 @@
 open Mina_base
 open Core_kernel
 open Context
+open Bit_catchup_state
 
 module F = struct
   type proceessing_result = unit

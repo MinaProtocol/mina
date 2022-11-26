@@ -1,27 +1,6 @@
 open Mina_base
 open Core_kernel
-
-(** Catchup state contains all the available information on
-    every transition that is not in frontier and:
-
-      1. was received through gossip
-      or
-      2. was fetched due to being an ancestor of a transition received through gossip.
-
-    Bit-catchup algorithm runs every transition through consequent states and eventually
-    adds it to frontier (if it's valid).
-*)
-type catchup_state =
-  { transition_states : Transition_states.t
-        (** Map from a state_hash to state of the transition corresponding to it  *)
-  ; orphans : State_hash.t list State_hash.Table.t
-        (** Map from transition's state hash to list of its children for transitions
-    that are not in the transition states *)
-  ; parents : State_hash.t State_hash.Table.t
-        (** Map from transition's state_hash to parent for transitions that are not in transition states.
-    This map is like a cache for old methods of getting transition chain.
-  *)
-  }
+open Bit_catchup_state
 
 type source_t = [ `Catchup | `Gossip | `Internal ]
 
@@ -54,13 +33,6 @@ module type CONTEXT = sig
   val frontier : Transition_frontier.t
 
   val time_controller : Block_time.Controller.t
-
-  (** Callback to write verified transitions after they're added to the frontier. *)
-  val write_verified_transition :
-    [ `Transition of Mina_block.Validated.t ] * [ `Source of source_t ] -> unit
-
-  (** Callback to write built breadcrumbs so that they can be added to frontier *)
-  val write_breadcrumb : source_t -> Frontier_base.Breadcrumb.t -> unit
 
   (** Check is the body of a transition is present in the block storage, *)
   val check_body_in_storage :

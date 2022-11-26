@@ -185,7 +185,8 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -426,7 +427,7 @@ let add_breadcrumb_impl t breadcrumb =
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
   [%log' internal t.logger] "Apply_catchup_tree_diffs" ;
-  Catchup_state.apply_diffs t.catchup_state diffs ;
+  Catchup_state.apply_diffs ~logger:t.logger t.catchup_state diffs ;
   [%log' internal t.logger] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
@@ -434,7 +435,7 @@ let add_breadcrumb_impl t breadcrumb =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
-        (Catchup_state.max_catchup_chain_length t.catchup_state > 5)
+        (lazy (Catchup_state.max_catchup_chain_length t.catchup_state > 5))
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   [%log' internal t.logger] "Apply_full_frontier_diffs_done" ;

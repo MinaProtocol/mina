@@ -94,6 +94,7 @@
    ppx_version.runtime
    mina_intf
    node_error_service
+   transition_frontier_controller
    mina_transaction_logic
    pickles.backend
    pickles

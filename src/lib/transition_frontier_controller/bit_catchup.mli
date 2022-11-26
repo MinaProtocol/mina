@@ -1,7 +1,13 @@
 open Pipe_lib
 
+val create_in_mem_transition_states :
+     trust_system:Trust_system.t
+  -> logger:Logger.t
+  -> Bit_catchup_state.Transition_states.t
+
 val run :
-     context:(module Transition_handler.Validator.CONTEXT)
+     frontier:Transition_frontier.t
+  -> context:(module Transition_handler.Validator.CONTEXT)
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
@@ -10,7 +16,6 @@ val run :
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
   -> collected_transitions:Bootstrap_controller.Transition_cache.element list
-  -> frontier:Transition_frontier.t
   -> network_transition_reader:Produced_transition.t Strict_pipe.Reader.t
   -> producer_transition_reader:Frontier_base.Breadcrumb.t Strict_pipe.Reader.t
   -> clear_reader:'a Strict_pipe.Reader.t
@@ -21,4 +26,4 @@ val run :
        , 'c
        , unit )
        Strict_pipe.Writer.t
-  -> unit Async.Deferred.t
+  -> unit

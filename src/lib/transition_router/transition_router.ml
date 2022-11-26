@@ -154,6 +154,11 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
+  ( match catchup_mode with
+  | `Bit transition_states ->
+      Bit_catchup_state.Transition_states.clear transition_states
+  | _ ->
+      () ) ;
   let transition_writer_ref =
     Option.value transition_writer_ref
       ~default:(ref bootstrap_controller_writer)

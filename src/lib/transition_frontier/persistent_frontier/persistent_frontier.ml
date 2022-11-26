@@ -270,7 +270,8 @@ module Instance = struct
     let apply_diff diff =
       [%log internal] "Apply_full_frontier_diffs" ;
       let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
-        Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
+        Full_frontier.apply_diffs frontier [ diff ]
+          ~has_long_catchup_job:(lazy false)
           ~enable_epoch_ledger_sync:
             ( if ignore_consensus_local_state then `Disabled
             else `Enabled root_ledger )

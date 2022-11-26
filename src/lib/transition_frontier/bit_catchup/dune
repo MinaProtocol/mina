@@ -1,0 +1,32 @@
+(library
+ (name bit_catchup_state)
+ (public_name transition_frontier_bit_catchup)
+ (libraries
+   ;; opam libraries
+   base
+   async_kernel
+   core_kernel
+   ;; local libraries
+   data_hash_lib
+   network_peer
+   mina_block
+   pipe_lib
+   mina_base
+   logger
+   with_hash
+   mina_net2
+   staged_ledger_diff
+   mina_state
+   interruptible
+   mina_numbers
+   transition_frontier_base
+   mina_wire_types
+   kimchi_bindings
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pickles
+   pickles.backend
+   snark_params
+   )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_mina)))

@@ -2,6 +2,16 @@ open Mina_base
 open Core_kernel
 open Async
 open Context
+open Bit_catchup_state
+
+type write_actions =
+  { write_verified_transition :
+         [ `Transition of Mina_block.Validated.t ] * [ `Source of source_t ]
+      -> unit
+        (** Callback to write verified transitions after they're added to the frontier. *)
+  ; write_breadcrumb : source_t -> Frontier_base.Breadcrumb.t -> unit
+        (** Callback to write built breadcrumbs so that they can be added to frontier *)
+  }
 
 let retrieve_hash_chain_max_jobs = 5
 
@@ -230,8 +240,8 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network ~target_hash
     Note that some other states may be restarted (transitioned from [Failed] to [In_progress])
     on the course.
     *)
-let promote_to_higher_state_impl ~mark_processed_and_promote ~context
-    ~(transition_states : Transition_states.t) state =
+let promote_to_higher_state_impl ~write_actions ~mark_processed_and_promote
+    ~context ~(transition_states : Transition_states.t) state =
   match state with
   | Transition_state.Received { header; substate; gossip_data; body_opt; aux }
     ->
@@ -258,7 +268,7 @@ let promote_to_higher_state_impl ~mark_processed_and_promote ~context
            ~aux
   | Waiting_to_be_added_to_frontier { breadcrumb; source; children = _ } ->
       let (module Context : CONTEXT) = context in
-      Context.write_verified_transition
+      write_actions.write_verified_transition
         ( `Transition (Frontier_base.Breadcrumb.validated_transition breadcrumb)
         , `Source source ) ;
       (* Just remove the state, it should be in frontier by now *)
@@ -312,17 +322,17 @@ let pre_validate_header_invalid_action ~header = function
     triggers their subsequent update (promotion).
 
     Pre-condition: state transition is in transition states and has [Processed] status.*)
-let rec promote_to_higher_state ~context:(module Context : CONTEXT)
-    ~transition_states state_hash =
+let rec promote_to_higher_state ~write_actions
+    ~context:(module Context : CONTEXT) ~transition_states state_hash =
   let context = (module Context : CONTEXT) in
   let mark_processed_and_promote =
-    mark_processed_and_promote ~context ~transition_states
+    mark_processed_and_promote ~context ~transition_states ~write_actions
   in
   let old_state =
     Option.value_exn @@ Transition_states.find transition_states state_hash
   in
   let state_opt =
-    promote_to_higher_state_impl ~context ~transition_states
+    promote_to_higher_state_impl ~context ~transition_states ~write_actions
       ~mark_processed_and_promote old_state
   in
   ( match state_opt with
@@ -330,6 +340,12 @@ let rec promote_to_higher_state ~context:(module Context : CONTEXT)
       Transition_states.remove transition_states state_hash
   | Some state ->
       Transition_states.update transition_states state ) ;
+  ( match state_opt with
+  | Some (Waiting_to_be_added_to_frontier { source; breadcrumb; _ }) ->
+      (* This needs to be done after update of the state *)
+      write_actions.write_breadcrumb source breadcrumb
+  | _ ->
+      () ) ;
   let parent_hash =
     (Transition_state.State_functions.transition_meta old_state)
       .parent_state_hash
@@ -353,8 +369,8 @@ as the result of [mark_processed].
 This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
 *)
-and mark_processed_and_promote ~context:(module Context : CONTEXT)
-    ~transition_states state_hashes =
+and mark_processed_and_promote ~write_actions
+    ~context:(module Context : CONTEXT) ~transition_states state_hashes =
   let higher_state_promotees =
     Substate.mark_processed ~logger:Context.logger ~state_functions
       ~transition_states state_hashes
@@ -374,12 +390,14 @@ and mark_processed_and_promote ~context:(module Context : CONTEXT)
   iter (diff processed promoted) ~f:(fun key ->
       Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
   List.iter
-    ~f:(promote_to_higher_state ~context:(module Context) ~transition_states)
+    ~f:
+      (promote_to_higher_state ~write_actions
+         ~context:(module Context)
+         ~transition_states )
     higher_state_promotees
 
-let make_context ~frontier ~time_controller ~get_completed_work ~verifier
-    ~trust_system ~network ~verified_transition_writer ~block_storage
-    ~breadcrumb_queue ~breadcrumb_notification_writer
+let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
+    ~block_storage ~get_completed_work
     ~context:(module Context_ : Transition_handler.Validator.CONTEXT) =
   let outdated_root_cache =
     Transition_handler.Core_extended_cache.Lru.create ~destruct:None 1000
@@ -394,15 +412,6 @@ let make_context ~frontier ~time_controller ~get_completed_work ~verifier
     let verifier = verifier
 
     let trust_system = trust_system
-
-    let write_verified_transition (`Transition t, `Source s) : unit =
-      (* TODO remove validation_callback from Transition_router and then remove the `Valid_cb argument *)
-      Pipe_lib.Strict_pipe.Writer.write verified_transition_writer
-        (`Transition t, `Source s, `Valid_cb None)
-
-    let write_breadcrumb source b =
-      Queue.enqueue breadcrumb_queue (source, b) ;
-      Pipe_lib.Strict_pipe.Writer.write breadcrumb_notification_writer ()
 
     let check_body_in_storage = Block_storage.read_body block_storage
 
@@ -563,10 +572,17 @@ struct
       Mina_metrics.Transition_frontier_controller.transitions_being_processed
 end
 
-let run ~context ~trust_system ~verifier ~network ~time_controller
-    ~get_completed_work ~collected_transitions ~frontier
-    ~network_transition_reader ~producer_transition_reader ~clear_reader
-    ~verified_transition_writer =
+let create_in_mem_transition_states ~trust_system ~logger =
+  Transition_states.create_inmem
+    ( module Transition_states_callbacks (struct
+      let trust_system = trust_system
+
+      let logger = logger
+    end) )
+
+let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
+    ~get_completed_work ~collected_transitions ~network_transition_reader
+    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
   let open Pipe_lib in
   (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)
   let breadcrumb_notification_reader, breadcrumb_notification_writer =
@@ -577,29 +593,36 @@ let run ~context ~trust_system ~verifier ~network ~time_controller
   let (module Context_ : Transition_handler.Validator.CONTEXT) = context in
   (* TODO is "block-db" the right path ? *)
   let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
+
+  let write_verified_transition (`Transition t, `Source s) : unit =
+    (* TODO remove validation_callback from Transition_router and then remove the `Valid_cb argument *)
+    Pipe_lib.Strict_pipe.Writer.write verified_transition_writer
+      (`Transition t, `Source s, `Valid_cb None)
+  in
+  let write_breadcrumb source b =
+    Queue.enqueue breadcrumb_queue (source, b) ;
+    Pipe_lib.Strict_pipe.Writer.write breadcrumb_notification_writer ()
+  in
+  let write_actions = { write_verified_transition; write_breadcrumb } in
+
   let context =
     make_context ~context ~frontier ~time_controller ~verifier ~trust_system
-      ~network ~verified_transition_writer ~block_storage ~breadcrumb_queue
-      ~breadcrumb_notification_writer ~get_completed_work
+      ~network ~block_storage ~get_completed_work
   in
   let (module Context : CONTEXT) = context in
   let logger = Context.logger in
-  let transition_states =
-    Transition_states.create_inmem
-      ( module Transition_states_callbacks (struct
-        let trust_system = trust_system
-
-        let logger = logger
-      end) )
-  in
   let state =
-    { transition_states
-    ; orphans = State_hash.Table.create ()
-    ; parents = State_hash.Table.create ()
-    }
+    match Transition_frontier.catchup_state frontier with
+    | Bit t ->
+        t
+    | _ ->
+        failwith
+          "If super catchup is running, the frontier should have a full \
+           catchup tree"
   in
+  let transition_states = state.transition_states in
   let mark_processed_and_promote =
-    mark_processed_and_promote ~context ~transition_states
+    mark_processed_and_promote ~context ~transition_states ~write_actions
   in
   List.iter collected_transitions
     ~f:
@@ -607,9 +630,10 @@ let run ~context ~trust_system ~verifier ~network ~time_controller
          ~state ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback producer_transition_reader
-       ~f:
-         (Waiting_to_be_added_to_frontier.handle_produced_transition ~context
-            ~transition_states ) ;
+       ~f:(fun b ->
+         Waiting_to_be_added_to_frontier.handle_produced_transition ~context
+           ~transition_states b ;
+         write_breadcrumb `Internal b ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback network_transition_reader
        ~f:
@@ -620,66 +644,68 @@ let run ~context ~trust_system ~verifier ~network ~time_controller
          let open Strict_pipe.Writer in
          Transition_states.shutdown_in_progress transition_states ;
          kill breadcrumb_notification_writer ) ;
-  Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
-      let f (_, b) =
-        let parent_hash = Frontier_base.Breadcrumb.parent_hash b in
-        match Transition_frontier.find frontier parent_hash with
-        | Some _ ->
-            true
-        | _ ->
-            [%log warn]
-              "When trying to add breadcrumb $state_hash, its parent had been \
-               removed from transition frontier: $parent_hash"
-              ~metadata:
-                [ ("parent_hash", State_hash.to_yojson parent_hash)
-                ; ( "state_hash"
-                  , Frontier_base.Breadcrumb.state_hash b
-                    |> State_hash.to_yojson )
-                ] ;
-            false
-      in
-      let breadcrumbs = Queue.to_list breadcrumb_queue |> List.filter ~f in
-      Queue.clear breadcrumb_queue ;
-      List.iter breadcrumbs ~f:(fun (source, b) ->
-          match source with
-          | `Gossip ->
-              Mina_metrics.Counter.inc_one
-                Mina_metrics.Transition_frontier_controller
-                .breadcrumbs_built_by_processor
-          | `Internal ->
-              let transition_time =
-                Transition_frontier.Breadcrumb.validated_transition b
-                |> Mina_block.Validated.header
-                |> Mina_block.Header.protocol_state
-                |> Mina_state.Protocol_state.blockchain_state
-                |> Mina_state.Blockchain_state.timestamp
-                |> Block_time.to_time_exn
-              in
-              Perf_histograms.add_span ~name:"accepted_transition_local_latency"
-                (Core_kernel.Time.diff
-                   Block_time.(now time_controller |> to_time_exn)
-                   transition_time )
-          | _ ->
-              () ) ;
-      let%map.Deferred () =
-        Transition_frontier.add_breadcrumbs_exn Context.frontier
-          (List.map ~f:snd breadcrumbs)
-      in
-      let promote_do =
-        promote_to_higher_state_impl ~context ~transition_states
-          ~mark_processed_and_promote
-      in
-      let promote (source, b) =
-        ( match source with
-        | `Internal ->
-            ()
-        | _ ->
-            Transition_handler.Processor.record_block_inclusion_time
-              (Frontier_base.Breadcrumb.validated_transition b)
-              ~time_controller ~consensus_constants:Context.consensus_constants
-        ) ;
-        Transition_states.update' transition_states
-          (Frontier_base.Breadcrumb.state_hash b)
-          ~f:promote_do
-      in
-      List.iter breadcrumbs ~f:promote )
+  don't_wait_for
+  @@ Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
+         let f (_, b) =
+           let parent_hash = Frontier_base.Breadcrumb.parent_hash b in
+           match Transition_frontier.find frontier parent_hash with
+           | Some _ ->
+               true
+           | _ ->
+               [%log warn]
+                 "When trying to add breadcrumb $state_hash, its parent had \
+                  been removed from transition frontier: $parent_hash"
+                 ~metadata:
+                   [ ("parent_hash", State_hash.to_yojson parent_hash)
+                   ; ( "state_hash"
+                     , Frontier_base.Breadcrumb.state_hash b
+                       |> State_hash.to_yojson )
+                   ] ;
+               false
+         in
+         let breadcrumbs = Queue.to_list breadcrumb_queue |> List.filter ~f in
+         Queue.clear breadcrumb_queue ;
+         List.iter breadcrumbs ~f:(fun (source, b) ->
+             match source with
+             | `Gossip ->
+                 Mina_metrics.Counter.inc_one
+                   Mina_metrics.Transition_frontier_controller
+                   .breadcrumbs_built_by_processor
+             | `Internal ->
+                 let transition_time =
+                   Transition_frontier.Breadcrumb.validated_transition b
+                   |> Mina_block.Validated.header
+                   |> Mina_block.Header.protocol_state
+                   |> Mina_state.Protocol_state.blockchain_state
+                   |> Mina_state.Blockchain_state.timestamp
+                   |> Block_time.to_time_exn
+                 in
+                 Perf_histograms.add_span
+                   ~name:"accepted_transition_local_latency"
+                   (Core_kernel.Time.diff
+                      Block_time.(now time_controller |> to_time_exn)
+                      transition_time )
+             | _ ->
+                 () ) ;
+         let%map.Deferred () =
+           Transition_frontier.add_breadcrumbs_exn Context.frontier
+             (List.map ~f:snd breadcrumbs)
+         in
+         let promote_do =
+           promote_to_higher_state_impl ~context ~transition_states
+             ~mark_processed_and_promote ~write_actions
+         in
+         let promote (source, b) =
+           ( match source with
+           | `Internal ->
+               ()
+           | _ ->
+               Transition_handler.Processor.record_block_inclusion_time
+                 (Frontier_base.Breadcrumb.validated_transition b)
+                 ~time_controller
+                 ~consensus_constants:Context.consensus_constants ) ;
+           Transition_states.update' transition_states
+             (Frontier_base.Breadcrumb.state_hash b)
+             ~f:promote_do
+         in
+         List.iter breadcrumbs ~f:promote )

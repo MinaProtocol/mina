@@ -1,8 +1,9 @@
 open Mina_base
 open Core_kernel
+open Bit_catchup_state
 
 (** Summary of the state relevant to verifying generic functions  *)
-type 'a data = { substate : 'a Substate_types.t; baton : bool }
+type 'a data = { substate : 'a Substate.t; baton : bool }
 
 module Make : functor
   (F : sig

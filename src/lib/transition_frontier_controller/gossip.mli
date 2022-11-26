@@ -1,4 +1,5 @@
 open Mina_base
+open Bit_catchup_state
 
 include module type of Gossip_types
 
@@ -10,7 +11,8 @@ include module type of Gossip_types
     Depending on relevance status, metrics are updated for the peer who sent the transition.
 *)
 val verify_header_is_relevant :
-     context:(module Context.CONTEXT)
+     ?event_recording:bool
+  -> context:(module Context.CONTEXT)
   -> sender:Network_peer.Peer.t
   -> transition_states:Transition_states.t
   -> Mina_block.Header.with_hash

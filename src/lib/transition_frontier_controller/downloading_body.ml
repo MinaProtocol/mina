@@ -1,5 +1,6 @@
 open Core_kernel
 open Context
+open Bit_catchup_state
 
 (** [update_status_for_unprocessed ~state_hash status] updates status of a transition
   corresponding to [state_hash] that is in [Downloading_body] state.
