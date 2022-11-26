@@ -176,6 +176,10 @@ module type Transition_states_intf = sig
 
   (** Shutdown actions that are in progress *)
   val shutdown_in_progress : t -> unit
+
+  val fold : t -> init:'a -> f:(state_t -> 'a -> 'a) -> 'a
+
+  val clear : t -> unit
 end
 
 type ('state_t, 't) transition_states_intf =

@@ -1,8 +1,9 @@
 open Core_kernel
+open Bit_catchup_state
 open Context
 
 (** Summary of the state relevant to verifying generic functions  *)
-type 'a data = { substate : 'a Substate_types.t; baton : bool }
+type 'a data = { substate : 'a Substate.t; baton : bool }
 
 module Make (F : sig
   (** Result of processing *)

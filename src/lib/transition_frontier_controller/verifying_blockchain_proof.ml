@@ -1,5 +1,6 @@
 open Mina_base
 open Core_kernel
+open Bit_catchup_state
 open Context
 
 (** Extract header from a transition in [Transition_state.Verifying_blockchain_proof] state *)

@@ -1,6 +1,7 @@
 open Core_kernel
 open Context
 open Mina_base
+open Bit_catchup_state
 
 (** [validate_frontier_dependencies] converts [Mina_block.Validation.initial_valid_with_block]
     to [Mina_block.Validation.almost_valid_with_block].

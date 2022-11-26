@@ -1,6 +1,7 @@
 open Mina_base
 open Core_kernel
 open Context
+open Bit_catchup_state
 include Gossip_types
 
 (** Determine if the header received via gossip is relevant
@@ -10,8 +11,9 @@ include Gossip_types
   
     Depending on relevance status, metrics are updated for the peer who sent the transition.
 *)
-let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
-    ~transition_states header_with_hash =
+let verify_header_is_relevant ?(event_recording = true)
+    ~context:(module Context : CONTEXT) ~sender ~transition_states
+    header_with_hash =
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_result =
     let%bind.Result () =
@@ -22,8 +24,9 @@ let verify_header_is_relevant ~context:(module Context : CONTEXT) ~sender
       ~context:(module Context)
       ~frontier:Context.frontier header_with_hash
   in
-  Context.record_event
-    (`Verified_header_relevance (relevance_result, header_with_hash, sender)) ;
+  if event_recording then
+    Context.record_event
+      (`Verified_header_relevance (relevance_result, header_with_hash, sender)) ;
   match relevance_result with
   | Ok () ->
       `Relevant

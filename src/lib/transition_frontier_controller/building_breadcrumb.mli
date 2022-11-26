@@ -1,4 +1,5 @@
 open Mina_base
+open Bit_catchup_state
 
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.

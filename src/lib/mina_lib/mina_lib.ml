@@ -1400,7 +1400,17 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
 
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
-  let catchup_mode = if config.super_catchup then `Super else `Normal in
+  let catchup_mode =
+    if config.super_catchup then `Super
+    else
+      `Bit
+        (Transition_frontier_controller.Bit_catchup
+         .create_in_mem_transition_states ~trust_system:config.trust_system
+           ~logger:config.logger )
+    (* Normal catchup is not used anywhere today,
+       so it's fine to just ignore this option *)
+    (* else `Normal *)
+  in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in

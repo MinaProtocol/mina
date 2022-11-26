@@ -52,4 +52,5 @@
    mina_base.util
    o1trace
    mina_net2
+   transition_frontier_bit_catchup
    ))
