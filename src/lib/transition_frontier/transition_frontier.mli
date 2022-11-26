@@ -55,7 +55,8 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Normal | `Super ]
+  -> catchup_mode:
+       [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
@@ -112,7 +113,8 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> unit
     -> ( t
        , [ `Failure of string

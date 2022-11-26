@@ -120,6 +120,13 @@ module Inmem (C : Inmem_context) = struct
           (Transition_state.State_functions.modify_substate
              ~f:{ modifier = shutdown_modifier }
              st ) )
+
+  let fold t ~init ~f =
+    State_hash.Table.fold ~f:(fun ~key:_ ~data -> f data) t ~init
+
+  let clear transition_states =
+    shutdown_in_progress transition_states ;
+    State_hash.Table.clear transition_states
 end
 
 type state_t = Transition_state.t
@@ -150,3 +157,7 @@ let update' (Substate.Transition_states ((module Impl), m) : t) = Impl.update' m
 
 let shutdown_in_progress (Substate.Transition_states ((module Impl), m) : t) =
   Impl.shutdown_in_progress m
+
+let fold (Substate.Transition_states ((module Impl), m) : t) = Impl.fold m
+
+let clear (Substate.Transition_states ((module Impl), m) : t) = Impl.clear m

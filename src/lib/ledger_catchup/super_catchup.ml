@@ -1037,7 +1037,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
     match Transition_frontier.catchup_state frontier with
     | Full t ->
         t
-    | Hash _ ->
+    | _ ->
         failwith
           "If super catchup is running, the frontier should have a full \
            catchup tree"
@@ -1773,11 +1773,10 @@ let%test_module "Ledger_catchup tests" =
                         with
                         | Full tr ->
                             tr
-                        | Hash _ ->
+                        | _ ->
                             failwith
                               "in super catchup unit tests, the catchup tree \
-                               should always be Full_catchup_tree, but it is \
-                               Catchup_hash_tree for some reason"
+                               should always be Full_catchup_tree"
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes

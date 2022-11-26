@@ -48,4 +48,5 @@
    ledger_catchup
    data_hash_lib
    mina_wire_types
+   transition_frontier_bit_catchup
 ))

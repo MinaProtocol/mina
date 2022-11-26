@@ -345,7 +345,8 @@ module type Transition_router_intf = sig
     -> most_recent_valid_block:
          Mina_block.initial_valid_header Broadcast_pipe.Reader.t
          * Mina_block.initial_valid_header Broadcast_pipe.Writer.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

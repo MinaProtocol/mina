@@ -25,3 +25,5 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
         ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+  | Bit _ ->
+      failwith "bit-catchup doesn't use Ledger_catchup"
