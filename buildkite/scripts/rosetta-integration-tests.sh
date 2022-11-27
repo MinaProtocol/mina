@@ -23,9 +23,11 @@ export MINA_ROSETTA_PG_DATA_INTERVAL=${MINA_ROSETTA_PG_DATA_INTERVAL:=30}
 export MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE:=80}
 
 # Mina Daemon variables
+export MINA_COMMIT="${MINA_COMMIT:=0b63498e271575dbffe2b31f3ab8be293490b1ac}"   #https://github.com/MinaProtocol/mina/discussions/12217
+export MINA_DEB_VERSION="${MINA_DEB_VERSION:=1.3.2beta2-release-2.0.0-0b63498}" #https://github.com/MinaProtocol/mina/discussions/12217
+export MINA_DEB_RELEASE="${MINA_DEB_RELEASE:=unstable}"                         #https://github.com/MinaProtocol/mina/discussions/12217
 export MINA_LIBP2P_KEYPAIR_PATH="${MINA_LIBP2P_KEYPAIR_PATH:=$HOME/libp2p-keypair}"
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
-export MINA_COMMIT="${MINA_COMMIT:=0b63498e271575dbffe2b31f3ab8be293490b1ac}" #https://github.com/MinaProtocol/mina/discussions/12217
 export MINA_LIBP2P_PASS=${MINA_LIBP2P_PASS:=''}
 export MINA_CONFIG_FILE=$HOME/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
@@ -35,6 +37,16 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 
 # Rosetta CLI variables
 export ROSETTA_CONFIGURATION_FILE=${ROSETTA_CONFIGURATION_FILE:=/rosetta/rosetta-cli-config/config.json}
+
+# Overwrite Mina Daemon version for compatibility with specific network (e.g. Berkeley)
+if [ -s /etc/os-release ]
+then
+    source /etc/os-release
+    echo "Installing mina daemon package: mina-${MINA_NETWORK}=${MINA_DEB_VERSION}"
+    echo "deb [trusted=yes] http://packages.o1test.net $VERSION_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
+    apt-get update
+    apt-get install --allow-downgrades -y "mina-${MINA_NETWORK}=${MINA_DEB_VERSION}"
+fi
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -80,6 +92,7 @@ mina$MINA_SUFFIX daemon \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --log-level ${LOG_LEVEL} \
   --config-file ${MINA_CONFIG_FILE} \
+  --demo-mode \
   --background
 
 # wait for it to settle
@@ -90,11 +103,11 @@ sleep 30
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 status="Pending"
-max_retries=10
+max_retries=15
 until [ $status == "Synced" ]
 do
   [[ $max_retries -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1  || ((max_retries--))
-  sleep 60
+  sleep 30
   status=$(mina client status --json | jq -r .sync_status 2> /dev/null || echo "Pending")
   echo "Daemon Status: ${status}"
 done
