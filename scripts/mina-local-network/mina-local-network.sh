@@ -16,6 +16,7 @@ LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+SNARK_WORKER_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk+nO9hW3wne6Ky2Om+fetaH3917/iEHnt+UQzH4A=,CAESIAvm5PpzvYVt8J3uistjpvn3rWh9/de/4hB57flEMx+A,12D3KooWAcprha9pvfdwz52F4RuBYjr2HenzLRNt4W9zWXugN1Z9"
 
 # ================================================
 # Inputs (set to default values)
@@ -38,6 +39,7 @@ ARCHIVE_SERVER_PORT=3086
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
+SNARK_WORKER_START_PORT=7000
 
 PG_HOST="localhost"
 PG_PORT="5432"
@@ -64,49 +66,51 @@ NODE_PIDS=()
 # Helper functions
 
 help() {
-  echo "-w  |--whales <#>                 | Number of BP Whale Nodes (bigger stake) to spin-up"
-  echo "                                  |   Default: ${WHALES}"
-  echo "-f  |--fish <#>                   | Number of BP Fish Nodes (less stake) to spin-up"
-  echo "                                  |   Default: ${FISH}"
-  echo "-n  |--nodes <#>                  | Nimber of non block-producing nodes to spin-up"
-  echo "                                  |   Default: ${NODES}"
-  echo "-a  |--archive                    | Whether to run the Archive Node (presence of argument)"
-  echo "                                  |   Default: ${ARCHIVE}"
-  echo "-sp |--seed-start-port <#>        | Seed Node range start port"
-  echo "                                  |   Default: ${SEED_START_PORT}"
-  echo "-wp |--whale-start-port <#>       | Whale Nodes range start port"
-  echo "                                  |   Default: ${WHALE_START_PORT}"
-  echo "-fp |--fish-start-port <#>        | Fish Nodes range start port"
-  echo "                                  |   Default: ${FISH_START_PORT}"
-  echo "-np |--node-start-port <#>        | Non block-producing Nodes range start port"
-  echo "                                  |   Default: ${NODE_START_PORT}"
-  echo "-ap |--archive-server-port <#>    | Archive Node server port"
-  echo "                                  |   Default: ${ARCHIVE_SERVER_PORT}"
-  echo "-ll |--log-level <level>          | Console output logging level"
-  echo "                                  |   Default: ${LOG_LEVEL}"
-  echo "-fll|--file-log-level <level>     | File output logging level"
-  echo "                                  |   Default: ${FILE_LOG_LEVEL}"
-  echo "-ph |--pg-host <host>             | PostgreSQL host"
-  echo "                                  |   Default: ${PG_HOST}"
-  echo "-pp |--pg-port <#>                | PostgreSQL port"
-  echo "                                  |   Default: ${PG_PORT}"
-  echo "-pu |--pg-user <user>             | PostgreSQL user"
-  echo "                                  |   Default: ${PG_USER}"
-  echo "-ppw|--pg-passwd <password>       | PostgreSQL password"
-  echo "                                  |   Default: <empty_string>"
-  echo "-pd |--pg-db <db>                 | PostgreSQL database name"
-  echo "                                  |   Default: ${PG_DB}"
-  echo "-vt |--value-transfer-txns        | Whether to execute periodic value transfer transactions (presence of argument)"
-  echo "                                  |   Default: ${VALUE_TRANSFERS}"
-  echo "-tf |--transactions-frequency <#> | Frequency of periodic transactions execution (in seconds)"
-  echo "                                  |   Default: ${TRANSACTION_FREQUENCY}"
-  echo "-sf |--snark-worker-fee <#>       | SNARK Worker fee"
-  echo "                                  |   Default: ${SNARK_WORKER_FEE}"
-  echo "-r  |--reset                      | Whether to reset the Mina Local Network storage file-system (presence of argument)"
-  echo "                                  |   Default: ${RESET}"
-  echo "-u  |--update-genesis-timestamp   | Whether to update the Genesis Ledger timestamp (presence of argument)"
-  echo "                                  |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
-  echo "-h  |--help                       | Displays this help message"
+  echo "-w   |--whales <#>                  | Number of BP Whale Nodes (bigger stake) to spin-up"
+  echo "                                    |   Default: ${WHALES}"
+  echo "-f   |--fish <#>                    | Number of BP Fish Nodes (less stake) to spin-up"
+  echo "                                    |   Default: ${FISH}"
+  echo "-n   |--nodes <#>                   | Nimber of non block-producing nodes to spin-up"
+  echo "                                    |   Default: ${NODES}"
+  echo "-a   |--archive                     | Whether to run the Archive Node (presence of argument)"
+  echo "                                    |   Default: ${ARCHIVE}"
+  echo "-sp  |--seed-start-port <#>         | Seed Node range start port"
+  echo "                                    |   Default: ${SEED_START_PORT}"
+  echo "-swp |--snark-worker-start-port <#> | Snark Worker Node range start port"
+  echo "                                    |   Default: ${SNARK_WORKER_START_PORT}"
+  echo "-wp  |--whale-start-port <#>        | Whale Nodes range start port"
+  echo "                                    |   Default: ${WHALE_START_PORT}"
+  echo "-fp  |--fish-start-port <#>         | Fish Nodes range start port"
+  echo "                                    |   Default: ${FISH_START_PORT}"
+  echo "-np  |--node-start-port <#>         | Non block-producing Nodes range start port"
+  echo "                                    |   Default: ${NODE_START_PORT}"
+  echo "-ap  |--archive-server-port <#>     | Archive Node server port"
+  echo "                                    |   Default: ${ARCHIVE_SERVER_PORT}"
+  echo "-ll  |--log-level <level>           | Console output logging level"
+  echo "                                    |   Default: ${LOG_LEVEL}"
+  echo "-fll |--file-log-level <level>      | File output logging level"
+  echo "                                    |   Default: ${FILE_LOG_LEVEL}"
+  echo "-ph  |--pg-host <host>              | PostgreSQL host"
+  echo "                                    |   Default: ${PG_HOST}"
+  echo "-pp  |--pg-port <#>                 | PostgreSQL port"
+  echo "                                    |   Default: ${PG_PORT}"
+  echo "-pu  |--pg-user <user>              | PostgreSQL user"
+  echo "                                    |   Default: ${PG_USER}"
+  echo "-ppw |--pg-passwd <password>        | PostgreSQL password"
+  echo "                                    |   Default: <empty_string>"
+  echo "-pd  |--pg-db <db>                  | PostgreSQL database name"
+  echo "                                    |   Default: ${PG_DB}"
+  echo "-vt  |--value-transfer-txns         | Whether to execute periodic value transfer transactions (presence of argument)"
+  echo "                                    |   Default: ${VALUE_TRANSFERS}"
+  echo "-tf  |--transactions-frequency <#>  | Frequency of periodic transactions execution (in seconds)"
+  echo "                                    |   Default: ${TRANSACTION_FREQUENCY}"
+  echo "-sf  |--snark-worker-fee <#>        | SNARK Worker fee"
+  echo "                                    |   Default: ${SNARK_WORKER_FEE}"
+  echo "-r   |--reset                       | Whether to reset the Mina Local Network storage file-system (presence of argument)"
+  echo "                                    |   Default: ${RESET}"
+  echo "-u   |--update-genesis-timestamp    | Whether to update the Genesis Ledger timestamp (presence of argument)"
+  echo "                                    |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
+  echo "-h   |--help                        | Displays this help message"
   printf "\n"
   echo "Available logging levels:"
   echo "  Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal"
@@ -203,6 +207,10 @@ while [[ "$#" -gt 0 ]]; do
   -a | --archive) ARCHIVE=true ;;
   -sp | --seed-start-port)
     SEED_START_PORT="${2}"
+    shift
+    ;;
+  -swp | --snark-worker-start-port)
+    SNARK_WORKER_START_PORT="${2}"
     shift
     ;;
   -wp | --whale-start-port)
@@ -324,6 +332,7 @@ fi
 
 echo "Starting the Network with:"
 echo -e "\t1 seed"
+echo -e "\t1 snark worker"
 
 if ${ARCHIVE}; then
   echo -e "\t1 archive"
@@ -356,8 +365,9 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir ${LEDGER_FOLDER}/offline_fish_keys
   clean-dir ${LEDGER_FOLDER}/online_whale_keys
   clean-dir ${LEDGER_FOLDER}/online_fish_keys
-  clean-dir ${LEDGER_FOLDER}/libp2p_keys
+  clean-dir ${LEDGER_FOLDER}/snark_worker_keys
   clean-dir ${LEDGER_FOLDER}/service-keys
+  clean-dir ${LEDGER_FOLDER}/libp2p_keys
 
   generate-keypair ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account
   for ((i = 0; i < ${FISH}; i++)); do
@@ -385,6 +395,8 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_whale_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_whale_keys
+      sudo chown -R ${USER} ${LEDGER_FOLDER}/snark_worker_keys
+      sudo chown -R ${USER} ${LEDGER_FOLDER}/service-keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/libp2p_keys
     fi
   fi
@@ -393,6 +405,8 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   chmod -R 0700 ${LEDGER_FOLDER}/online_fish_keys
   chmod -R 0700 ${LEDGER_FOLDER}/offline_whale_keys
   chmod -R 0700 ${LEDGER_FOLDER}/online_whale_keys
+  chmod -R 0700 ${LEDGER_FOLDER}/snark_worker_keys
+  chmod -R 0700 ${LEDGER_FOLDER}/service-keys
   chmod -R 0700 ${LEDGER_FOLDER}/libp2p_keys
 
   python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
@@ -401,7 +415,8 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     --offline-whale-accounts-directory ${LEDGER_FOLDER}/offline_whale_keys \
     --offline-fish-accounts-directory ${LEDGER_FOLDER}/offline_fish_keys \
     --online-whale-accounts-directory ${LEDGER_FOLDER}/online_whale_keys \
-    --online-fish-accounts-directory ${LEDGER_FOLDER}/online_fish_keys
+    --online-fish-accounts-directory ${LEDGER_FOLDER}/online_fish_keys \
+    --snark-worker-accounts-directory ${LEDGER_FOLDER}/snark_worker_keys
 
   mv -f scripts/mina-local-network/genesis_ledger.json ${LEDGER_FOLDER}/genesis_ledger.json
 
@@ -431,10 +446,12 @@ fi
 
 NODES_FOLDER=${LEDGER_FOLDER}/nodes
 mkdir -p ${NODES_FOLDER}/seed
+mkdir -p ${NODES_FOLDER}/snark_worker
 
 if ${RESET}; then
   clean-dir ${NODES_FOLDER}
   mkdir -p ${NODES_FOLDER}/seed
+  mkdir -p ${NODES_FOLDER}/snark_worker
 fi
 
 # ----------
@@ -464,13 +481,17 @@ done
 # ----------
 
 SNARK_WORKER_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-worker ${SNARK_WORKER_PUBKEY} -work-selection seq"
+spawn-node ${NODES_FOLDER}/snark_worker ${SNARK_WORKER_START_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_WORKER_PEER_KEY} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
+SNARK_WORKER_PID=$!
+
+# ----------
 
 for ((i = 0; i < ${WHALES}; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
   mkdir -p ${FOLDER}
   spawn-node ${FOLDER} $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
+    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
   WHALE_PIDS[${i}]=$!
 done
 
@@ -481,7 +502,7 @@ for ((i = 0; i < ${FISH}; i++)); do
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
   mkdir -p ${FOLDER}
   spawn-node ${FOLDER} $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
+    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
   FISH_PIDS[${i}]=$!
 done
 
@@ -506,6 +527,12 @@ echo -e "\t\tInstance #0:"
 echo -e "\t\t  pid ${SEED_PID}"
 echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}"
 echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
+
+echo -e "\tSnark Worker:"
+echo -e "\t\tInstance #0:"
+echo -e "\t\t  pid ${SNARK_WORKER_PID}"
+echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_WORKER_START_PORT}"
+echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_worker/log.txt | ${LOGPROC_EXE}"
 
 if ${ARCHIVE}; then
   echo -e "\tArchive:"
