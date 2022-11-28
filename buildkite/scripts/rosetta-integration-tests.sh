@@ -140,10 +140,10 @@ echo "========================= ROSETTA CLI: CHECK:SPEC ========================
 rosetta-cli check:spec --all
 
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-echo "rosetta-cli check:construction" # Will run this command when tests are fully implemented
+rosetta-cli check:construction
 
 echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
-echo "rosetta-cli check:data" # Will run this command when tests are fully implemented
+rosetta-cli check:data
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
