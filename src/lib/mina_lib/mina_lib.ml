@@ -8,7 +8,8 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open Network_peer
-open Inline_test_quiet_logs
+
+(* open Inline_test_quiet_logs *)
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -2186,6 +2187,8 @@ let verifier { processes = { verifier; _ }; _ } = verifier
 
 let%test_module "Epoch ledger sync tests" =
   ( module struct
+    [@@@warning "-32"]
+
     module type CONTEXT = sig
       include CONTEXT
 
@@ -2201,7 +2204,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 5.0
+    let test_timeout_min = 15.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2655,13 +2658,6 @@ let%test_module "Epoch ledger sync tests" =
 
     let%test_unit "Sync current, next staking ledgers to empty ledgers" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Format.eprintf "DF 1@." ;
-          let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
-          ( match res with
-          | Ok s ->
-              Format.eprintf "DF1 RESULT : %s@." s
-          | Error err ->
-              Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 10)
@@ -2672,16 +2668,9 @@ let%test_module "Epoch ledger sync tests" =
           run_test ~test_number:1
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts:[] )
-
+    (*
     let%test_unit "Sync current, next staking ledgers to nonempty ledgers" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Format.eprintf "DF 2@." ;
-          let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
-          ( match res with
-          | Ok s ->
-              Format.eprintf "DF2 RESULT: %s@." s
-          | Error err ->
-              Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 10)
@@ -2714,13 +2703,6 @@ let%test_module "Epoch ledger sync tests" =
     let%test_unit "Sync genesis ledgers to empty ledgers, should fail" =
       let f () =
         Monitor.try_with (fun () ->
-            Format.eprintf "DF 3@." ;
-            let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
-            ( match res with
-            | Ok s ->
-                Format.eprintf "DF3 RESULT: %s@." s
-            | Error err ->
-                Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
             let%bind (module Context) = make_context () in
             let staking_epoch_ledger =
               make_genesis_ledger (module Context) (List.take test_accounts 10)
@@ -2739,5 +2721,5 @@ let%test_module "Epoch ledger sync tests" =
               [%log debug] "Did not sync to genesis ledger, sync test succeeded" ;
               ()
           | exn' ->
-              failwithf "Unexpected exception: %s" (Exn.to_string exn') () )
+              failwithf "Unexpected exception: %s" (Exn.to_string exn') () ) *)
   end )
