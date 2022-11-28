@@ -16,6 +16,9 @@ Using the `mina.ros` file from the parent folder, in the local sandbox:
   - https://github.com/MinaProtocol/mina/blob/develop/src/lib/mina_base/signed_command_payload.ml#L310
 
 - [x] in the meantime it may be possible to only generate tests where this field is present to work around this problem.
+- [x] Run the construction test on the berkeley testnet, manually setting up the prefunded account using https://faucet.minaprotocol.com/
+- [ ] Is it possible to avoid this manual step ?
+- [ ] add a script to easily run the construction tests for the current branch using a sandbox network, which should be in particular useful for the CI.
 
 # tmp
 
