@@ -100,27 +100,27 @@ module Make (Foreign_implementation : S) = struct
     List.iter ~f:actual_range_check !range_checks ;
     (x, y)
 
-      let pt_typ = Typ.tuple2 foreign_typ foreign_typ
+  let pt_typ = Typ.tuple2 foreign_typ foreign_typ
 
-      let circuit a pt scalar_bits =
-        let res, _is_zero, _pt =
-          Array.fold
-            ~init:((zero, zero), Boolean.true_, pt)
-            scalar_bits
-            ~f:(fun (acc, is_zero, pt) bit ->
-              let still_zero = Boolean.(is_zero &&& not bit) in
-              let acc_base = if_ is_zero ~typ:pt_typ ~then_:pt ~else_:acc in
-              let acc_res = ec_add pt acc_base in
-              let acc =
-                if_ bit ~typ:pt_typ
-                  ~then_:(if_ is_zero ~typ:pt_typ ~then_:pt ~else_:acc_res)
-                  ~else_:acc
-              in
-              (* NB: We do an unnecessary final double. Optimise before using anywhere. *)
-              let double_pt = ec_double a pt in
-              (acc, still_zero, double_pt) )
-        in
-        ignore (res : foreign * foreign)
+  let circuit a pt scalar_bits =
+    let res, _is_zero, _pt =
+      Array.fold
+        ~init:((zero, zero), Boolean.true_, pt)
+        scalar_bits
+        ~f:(fun (acc, is_zero, pt) bit ->
+          let still_zero = Boolean.(is_zero &&& not bit) in
+          let acc_base = if_ is_zero ~typ:pt_typ ~then_:pt ~else_:acc in
+          let acc_res = ec_add pt acc_base in
+          let acc =
+            if_ bit ~typ:pt_typ
+              ~then_:(if_ is_zero ~typ:pt_typ ~then_:pt ~else_:acc_res)
+              ~else_:acc
+          in
+          (* NB: We do an unnecessary final double. Optimise before using anywhere. *)
+          let double_pt = ec_double a pt in
+          (acc, still_zero, double_pt) )
+    in
+    ignore (res : foreign * foreign)
 end
 
 module Foreign_base = struct
@@ -261,4 +261,88 @@ let%test_module "number of constraints" =
       let num_constraints = count_constraints Test.unit_circuit in
       [%test_eq: int] num_constraints 29928 ;
       [%test_eq: int] num_constraints 0x74E8
+  end )
+
+let%test_module "pickles" =
+  ( module struct
+    (* Currently, a circuit must have at least 1 of every type of constraint. *)
+    let dummy_constraints () =
+      let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
+      let g =
+        exists (Typ.tuple2 Field.typ Field.typ) ~compute:(fun _ ->
+            Pickles.Backend.Tick.Inner_curve.(to_affine_exn one) )
+      in
+      ignore
+        ( Pickles.Scalar_challenge.to_field_checked'
+            (module Impl)
+            ~num_bits:16
+            (Kimchi_backend_common.Scalar_challenge.create x)
+          : Field.t * Field.t * Field.t ) ;
+      ignore
+        ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+          : Pickles.Step_main_inputs.Inner_curve.t ) ;
+      ignore
+        ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+          : Pickles.Step_main_inputs.Inner_curve.t ) ;
+      ignore
+        ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
+            (Kimchi_backend_common.Scalar_challenge.create x)
+          : Field.t * Field.t )
+
+    module Make_test (Foreign : S) = struct
+      include Make (Foreign)
+
+      let tag, _, p, Pickles.Provers.[ step ] =
+        Pickles.compile_promise ()
+          ~public_input:
+            (Input
+               (Typ.tuple3 foreign_typ
+                  (Typ.tuple2 foreign_typ foreign_typ)
+                  (Typ.array ~length:258 Boolean.typ) ) )
+          ~auxiliary_typ:Typ.unit
+          ~branches:(module Pickles_types.Nat.N1)
+          ~max_proofs_verified:(module Pickles_types.Nat.N0)
+          ~name:"blockchain-snark"
+          ~constraint_constants:
+            (* Dummy values *)
+            { sub_windows_per_window = 0
+            ; ledger_depth = 0
+            ; work_delay = 0
+            ; block_window_duration_ms = 0
+            ; transaction_capacity = Log_2 0
+            ; pending_coinbase_depth = 0
+            ; coinbase_amount = Unsigned.UInt64.of_int 0
+            ; supercharged_coinbase_factor = 0
+            ; account_creation_fee = Unsigned.UInt64.of_int 0
+            ; fork = None
+            }
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; prevs = []
+              ; uses_lookup = false
+              ; main =
+                  (fun { public_input = a, pt, scalar } ->
+                    dummy_constraints () ;
+                    circuit a pt scalar ;
+                    { previous_proof_statements = []
+                    ; public_output = ()
+                    ; auxiliary_output = ()
+                    } )
+              }
+            ] )
+    end
+
+    let () = Pickles.Backend.Tick.Keypair.set_urs_info []
+
+    let () = Pickles.Backend.Tock.Keypair.set_urs_info []
+
+    let%test_unit "crt compiles" =
+      let module Test = Make_test (Foreign_using_chinese_remainder_theorem) in
+      let (_ : _) = (Test.tag, Test.p, Test.step) in
+      ()
+
+    let%test_unit "naive compiles" =
+      let module Test = Make_test (Foreign_using_naive) in
+      let (_ : _) = (Test.tag, Test.p, Test.step) in
+      ()
   end )
