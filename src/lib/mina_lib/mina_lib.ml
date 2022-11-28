@@ -2204,7 +2204,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 15.0
+    let test_timeout_min = 5.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2227,6 +2227,7 @@ let%test_module "Epoch ledger sync tests" =
     let make_mina_network ~context:(module Context : CONTEXT) ~instance
         ~test_number ~libp2p_keypair_str ~initial_peers ~genesis_ledger_hashes =
       let open Context in
+      [%log debug] "DEBUG MAKING NETWORK %d" instance ;
       let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
         Broadcast_pipe.create None
       in
@@ -2252,11 +2253,13 @@ let%test_module "Epoch ledger sync tests" =
           }
       in
       let pids = Child_processes.Termination.create_pid_table () in
+      [%log debug] "DEBUG CREATING VERIFIER %d" instance ;
       let%bind verifier =
         Verifier.create ~logger ~proof_level:precomputed_values.proof_level
           ~constraint_constants:precomputed_values.constraint_constants ~pids
           ~conf_dir:(Some (make_dirname "verifier"))
       in
+      [%log debug] "DEBUG CREATING TXN POOL %d" instance ;
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
@@ -2273,6 +2276,7 @@ let%test_module "Epoch ledger sync tests" =
                   precomputed_values.genesis_constants.transaction_expiry_hr ) )
           ~on_remote_push ~log_gossip_heard:false
       in
+      [%log debug] "DEBUG CREATING SNARK REM SINK %d" instance ;
       let%bind snark_remote_sink =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -2300,6 +2304,7 @@ let%test_module "Epoch ledger sync tests" =
       in
       let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
       let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
+      [%log debug] "DEBUG CREATING LOCAL STATE %d" instance ;
       let consensus_local_state =
         Consensus.Data.Local_state.create
           ~context:(module Context)
@@ -2418,6 +2423,7 @@ let%test_module "Epoch ledger sync tests" =
         return
         @@ Or_error.error_string (sprintf "Error for unimplemented RPC %s" name)
       in
+      [%log debug] "DEBUG CREATING NETWORKING %d" instance ;
       let%bind (mina_networking : Mina_networking.t) =
         Mina_networking.create config ~sinks ~answer_sync_ledger_query
           ~get_best_tip
@@ -2431,6 +2437,7 @@ let%test_module "Epoch ledger sync tests" =
           ~get_transition_chain:(unimplemented "get_transition_chain")
           ~get_transition_knowledge:(unimplemented "get_transition_knowledge")
       in
+      [%log debug] "DEBUG CREATING FRONTIER %d" instance ;
       (* create transition frontier *)
       let _valid_transitions, _initialization_finish_signal =
         let notify_online () = Deferred.unit in
@@ -2461,6 +2468,7 @@ let%test_module "Epoch ledger sync tests" =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
+      [%log debug] "DEBUG DONE MAKING NETWORK %d" instance ;
       return
         (mina_networking, network_peer, consensus_local_state, no_answer_ivar)
 
