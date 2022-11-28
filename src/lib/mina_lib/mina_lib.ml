@@ -2221,6 +2221,13 @@ let%test_module "Epoch ledger sync tests" =
       let uuid = Uuid_unix.create () |> Uuid.to_string in
       dir_prefix ^/ sprintf "%s_%s" s uuid
 
+    type network_info =
+      { networking : Mina_networking.t
+      ; network_peer : Network_peer.Peer.t
+      ; consensus_local_state : Consensus.Data.Local_state.t
+      ; no_answer_ivar : unit Ivar.t
+      }
+
     (* [instance] and [test_number] are used to make ports distinct
        among tests
     *)
@@ -2439,7 +2446,7 @@ let%test_module "Epoch ledger sync tests" =
       in
       [%log debug] "DEBUG CREATING FRONTIER %d" instance ;
       (* create transition frontier *)
-      let _valid_transitions, _initialization_finish_signal =
+      let _valid_transitions, initialization_finish_signal =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block =
           Broadcast_pipe.create
@@ -2464,13 +2471,18 @@ let%test_module "Epoch ledger sync tests" =
           ~catchup_mode:`Normal ~network_transition_reader:block_reader
           ~producer_transition_reader ~most_recent_valid_block ~notify_online ()
       in
+      let%bind () = Ivar.read initialization_finish_signal in
       let network_peer =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
         Peer.create Unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
       [%log debug] "DEBUG DONE MAKING NETWORK %d" instance ;
       return
-        (mina_networking, network_peer, consensus_local_state, no_answer_ivar)
+        { networking = mina_networking
+        ; network_peer
+        ; consensus_local_state
+        ; no_answer_ivar
+        }
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
@@ -2545,10 +2557,7 @@ let%test_module "Epoch ledger sync tests" =
         | Ledger_db _, Ledger_db _ ->
             []
       in
-      let%bind ( _mina_network1
-               , network_peer1
-               , consensus_local_state1
-               , no_answer_ivar1 ) =
+      let%bind network_info1 =
         make_mina_network
           ~context:(module Context)
           ~instance:0 ~test_number
@@ -2565,19 +2574,19 @@ let%test_module "Epoch ledger sync tests" =
           next_epoch_ledger
       in
       (* store snapshots in local state *)
-      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
-        Staking_epoch_snapshot staking_epoch_snapshot ;
-      Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state1
-        Next_epoch_snapshot next_epoch_snapshot ;
-      let%bind ( mina_network2
-               , _network_peer2
-               , _consensus_local_state2
-               , _no_answer_ivar2 ) =
+      Consensus.Data.Local_state.For_tests.set_snapshot
+        network_info1.consensus_local_state Staking_epoch_snapshot
+        staking_epoch_snapshot ;
+      Consensus.Data.Local_state.For_tests.set_snapshot
+        network_info1.consensus_local_state Next_epoch_snapshot
+        next_epoch_snapshot ;
+      let%bind network_info2 =
         make_mina_network ~instance:1 ~test_number
           ~context:(module Context2)
           ~libp2p_keypair_str:
             "CAESQMHCQMQDqPKTFLAjZWwA3vvbkzMJZiVrjvte+bDfUvEeRhjvhsa9IfuFDEmJ721drMJ5cEWAmVmrQYfretz9MUQ=,CAESIEYY74bGvSH7hQxJie9tXazCeXBFgJlZq0GH63rc/TFE,12D3KooWEXzm5pMj1DQqNz6bpMRdJa55bytbawkuHVNhGR3XuTpw"
-          ~initial_peers:[ Mina_net2.Multiaddr.of_peer network_peer1 ]
+          ~initial_peers:
+            [ Mina_net2.Multiaddr.of_peer network_info1.network_peer ]
           ~genesis_ledger_hashes
       in
       let make_sync_ledger () =
@@ -2599,13 +2608,14 @@ let%test_module "Epoch ledger sync tests" =
         let response_writer =
           Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
         in
-        Mina_networking.glue_sync_ledger mina_network2
-          ~preferred:[ network_peer1 ] query_reader response_writer ;
+        Mina_networking.glue_sync_ledger network_info2.networking
+          ~preferred:[ network_info1.network_peer ]
+          query_reader response_writer ;
         sync_ledger
       in
       (* should only happen when syncing to a genesis ledger *)
       don't_wait_for
-        (let%bind () = Ivar.read no_answer_ivar1 in
+        (let%bind () = Ivar.read network_info1.no_answer_ivar in
          cleanup () ; raise No_sync_answer ) ;
       (* sync current staking ledger *)
       let sync_ledger1 = make_sync_ledger () in
