@@ -123,7 +123,7 @@ let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Finite (x, y) ->
       (x, y)
   | Infinity ->
-      failwith "finite_exn"
+      invalid_arg "finite_exn"
 
 let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
   function
@@ -142,8 +142,9 @@ module Ipa = struct
     endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
-    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        compute_challenge field ~endo_to_field prechallenge )
+    Vector.map chals ~f:(fun prechallenge ->
+        Bulletproof_challenge.pack prechallenge
+        |> compute_challenge field ~endo_to_field )
 
   module Wrap = struct
     let field =
@@ -222,8 +223,6 @@ let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
   List.init
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
-
-let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
 
 let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
   of_int 5 * (domain_size - of_int 1)

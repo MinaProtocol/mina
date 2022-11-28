@@ -37,7 +37,7 @@
    trust_system
    network_pool
    merkle_list_verifier
-   non_empty_list
+   mina_stdlib
    genesis_constants
    block_time
    mina_block

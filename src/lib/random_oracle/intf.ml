@@ -19,6 +19,10 @@ module type S = sig
     val to_bits : ?length:int -> t -> bool list
   end
 
+  val state_size : int
+
+  val rate : int
+
   val initial_state : field State.t
 
   val update : state:field State.t -> field array -> field State.t

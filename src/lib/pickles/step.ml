@@ -116,7 +116,8 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+      let open Backend.Tock.Field in
+      Wrap_verifier.challenge_polynomial ~add ~mul ~one
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
@@ -333,9 +334,7 @@ struct
         in
         let prechals =
           Vector.of_list_and_length_exn
-            ( Array.map prechals ~f:(fun x ->
-                  { Bulletproof_challenge.prechallenge = x } )
-            |> Array.to_list )
+            (Array.map prechals ~f:Bulletproof_challenge.unpack |> Array.to_list)
             Tock.Rounds.n
         in
         (prechals, b)

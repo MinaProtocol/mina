@@ -133,18 +133,20 @@ val extract_delta_block_chain_witness :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
      t
-  -> State_hash.t Non_empty_list.t
+  -> State_hash.t Mina_stdlib.Nonempty_list.t
 
 val validate_delta_block_chain :
      ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -152,7 +154,8 @@ val validate_delta_block_chain :
   -> ( ( 'a
        , 'b
        , 'c
-       , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+       , [ `Delta_block_chain ]
+         * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
        , 'd
        , 'e
        , 'f )
@@ -165,7 +168,8 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
      , 'd
      , 'e
      , 'f )
@@ -173,7 +177,8 @@ val skip_delta_block_chain_validation :
   -> ( 'a
      , 'b
      , 'c
-     , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
      , 'd
      , 'e
      , 'f )
