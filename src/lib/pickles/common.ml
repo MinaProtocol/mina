@@ -30,6 +30,20 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
+let actual_wrap_domain_size ~log_2_domain_size =
+  let d =
+    match log_2_domain_size with
+    | 13 ->
+        0
+    | 14 ->
+        1
+    | 15 ->
+        2
+    | _ ->
+        assert false
+  in
+  Pickles_base.Proofs_verified.of_int d
+
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in

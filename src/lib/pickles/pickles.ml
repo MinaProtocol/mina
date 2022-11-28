@@ -895,11 +895,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let of_compiled tag : t =
         let d = Types_map.lookup_compiled tag.Tag.id in
+        let actual_wrap_domain_size =
+          Common.actual_wrap_domain_size
+            ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
+        in
         { wrap_vk = Some (Lazy.force d.wrap_vk)
         ; wrap_index = Lazy.force d.wrap_key
         ; max_proofs_verified =
             Pickles_base.Proofs_verified.of_nat
               (Nat.Add.n d.max_proofs_verified)
+        ; actual_wrap_domain_size
         }
 
       module Max_width = Width.Max
