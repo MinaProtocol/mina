@@ -196,17 +196,34 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-nix build mina#mina-docker
+$(nix build mina#mina-image-full) | docker load
+# Also available: mina-image-slim, mina-archive-image-full
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
-result to produce other useful artifacts with Nix. For example, you can build a
-slim docker image. Run `nix build mina#mina-docker` if you're using flakes (or
-`nix-build packages.x86_64-linux.mina-docker` otherwise). You will get a
-`result` symlink in the current directory, which links to a tarball containing
-the docker image. You can load the image using `docker load -i result`, then
-note the tag it outputs. You can then run Mina from this docker image with
-`docker run mina:<tag> mina.exe <args>`.
+result to produce other useful artifacts with Nix. For example, we can build
+docker images. Due to /nix/store space usage concerns, instead of building the
+image itself Nix produces a script which, when executed, outputs a tarball of a
+docker image, suitable for consumption with `docker load`. After loading the
+image, it can be used as any other docker image would be (e.g. with `docker
+run`). The images for branches available on github can also be obtained from the
+registry at
+`us-west2-docker.pkg.dev/o1labs-192920/nix-containers/$IMAGE:$BRANCH`, e.g.
+`docker run --rm -it
+us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
+
+The `slim` image only has the Mina daemon itself, whereas `full` images also
+contain many useful tools, such as coreutils, fake init, jq, etc.
+
+### Debian package
+
+TL;DR:
+```
+nix build mina#mina-deb
+```
+
+The Debian package is for installing on .deb-based systems which don't have Nix
+installed. **Installing it if you have Nix already won't work.**
 
 ### Demo nixos-container
 
