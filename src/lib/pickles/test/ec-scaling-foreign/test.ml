@@ -282,9 +282,6 @@ let%test_module "pickles" =
         ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
           : Pickles.Step_main_inputs.Inner_curve.t ) ;
       ignore
-        ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
-          : Pickles.Step_main_inputs.Inner_curve.t ) ;
-      ignore
         ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
             (Kimchi_backend_common.Scalar_challenge.create x)
           : Field.t * Field.t )
