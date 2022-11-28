@@ -27,11 +27,11 @@ module Make (Foreign_implementation : S) = struct
   include Foreign_implementation
 
   (*
-   x = s^2 - A_x - B_x
-   y = s * (B_x - x) - B_y
+     x = s^2 - A_x - B_x
+     y = s * (B_x - x) - B_y
 
-   s = (A_y - B_y) / (A_x - B_x)
-*)
+     s = (A_y - B_y) / (A_x - B_x)
+  *)
   let ec_add (a_x, a_y) (b_x, b_y) =
     let actual_range_check = range_check in
     let range_checks = ref [] in
@@ -64,11 +64,11 @@ module Make (Foreign_implementation : S) = struct
     (x, y)
 
   (*
-   x = s^2 - 2 A_x
-   y = - A_y + s (A_x - x)
+     x = s^2 - 2 A_x
+     y = - A_y + s (A_x - x)
 
-   s = (3 A_x^2 + a) / (2 A_y)
-*)
+     s = (3 A_x^2 + a) / (2 A_y)
+  *)
   let ec_double a (a_x, a_y) =
     let actual_range_check = range_check in
     let range_checks = ref [] in
@@ -289,8 +289,8 @@ let%test_module "pickles" =
     module Make_test (Foreign : S) = struct
       include Make (Foreign)
 
-      let tag, _, p, Pickles.Provers.[ step ] =
-        Pickles.compile_promise ()
+      let compile () =
+        Pickles.compile ()
           ~public_input:
             (Input
                (Typ.tuple3 foreign_typ
@@ -335,11 +335,11 @@ let%test_module "pickles" =
 
     let%test_unit "crt compiles" =
       let module Test = Make_test (Foreign_using_chinese_remainder_theorem) in
-      let (_ : _) = (Test.tag, Test.p, Test.step) in
+      let (_ : _) = Test.compile () in
       ()
 
     let%test_unit "naive compiles" =
       let module Test = Make_test (Foreign_using_naive) in
-      let (_ : _) = (Test.tag, Test.p, Test.step) in
+      let (_ : _) = Test.compile () in
       ()
   end )
