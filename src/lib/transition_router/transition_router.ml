@@ -305,7 +305,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
       Mina_networking.peers network
       >>| fun peers ->
       if not @@ Deferred.is_determined high_connectivity then
-        if List.length peers = 0 then
+        if List.is_empty peers then
           if is_seed then
             [%log info]
               ~metadata:

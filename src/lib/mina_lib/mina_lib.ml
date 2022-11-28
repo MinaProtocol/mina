@@ -2201,7 +2201,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let logger = Logger.create ()
 
-    let test_timeout_min = 10.0
+    let test_timeout_min = 5.0
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -2655,6 +2655,13 @@ let%test_module "Epoch ledger sync tests" =
 
     let%test_unit "Sync current, next staking ledgers to empty ledgers" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          Format.eprintf "DF 1@." ;
+          let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
+          ( match res with
+          | Ok s ->
+              Format.eprintf "DF1 RESULT : %s@." s
+          | Error err ->
+              Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 10)
@@ -2668,6 +2675,13 @@ let%test_module "Epoch ledger sync tests" =
 
     let%test_unit "Sync current, next staking ledgers to nonempty ledgers" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          Format.eprintf "DF 2@." ;
+          let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
+          ( match res with
+          | Ok s ->
+              Format.eprintf "DF2 RESULT: %s@." s
+          | Error err ->
+              Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
             make_db_ledger (module Context) (List.take test_accounts 10)
@@ -2700,6 +2714,13 @@ let%test_module "Epoch ledger sync tests" =
     let%test_unit "Sync genesis ledgers to empty ledgers, should fail" =
       let f () =
         Monitor.try_with (fun () ->
+            Format.eprintf "DF 3@." ;
+            let%bind res = Process.run ~prog:"df" ~args:[ "." ] () in
+            ( match res with
+            | Ok s ->
+                Format.eprintf "DF3 RESULT: %s@." s
+            | Error err ->
+                Format.eprintf "ERROR ON df: %s@." (Error.to_string_hum err) ) ;
             let%bind (module Context) = make_context () in
             let staking_epoch_ledger =
               make_genesis_ledger (module Context) (List.take test_accounts 10)
