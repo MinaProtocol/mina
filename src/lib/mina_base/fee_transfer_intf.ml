@@ -44,9 +44,9 @@ module type Full = sig
     module Gen : sig
       val with_random_receivers :
            ?min_fee:int
-        -> keys:Signature_keypair.t array
         -> max_fee:int
         -> token:Token_id.t Quickcheck.Generator.t
+        -> Signature_keypair.t array
         -> t Quickcheck.Generator.t
     end
   end
