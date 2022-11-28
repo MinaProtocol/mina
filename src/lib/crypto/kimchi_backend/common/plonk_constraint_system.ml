@@ -140,6 +140,7 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Zero of { vars : 'v array }
     [@@deriving sexp]
 
     (** map t *)
@@ -177,6 +178,8 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
+      | Zero { vars } ->
+          Zero { vars = Array.map ~f vars }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -1245,6 +1248,12 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Zero { vars : 'v array }) ->
+        let row =
+          Array.init 15 ~f:(fun i ->
+              try Some (reduce_to_v vars.(i)) with _ -> None )
+        in
+        add_row sys row Kimchi_types.Zero [||]
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
