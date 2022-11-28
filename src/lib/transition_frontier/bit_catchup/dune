@@ -20,6 +20,7 @@
    interruptible
    mina_numbers
    transition_frontier_base
+   consensus
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina)))

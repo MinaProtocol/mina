@@ -6,7 +6,7 @@ open Bit_catchup_state
 *)
 val promote_to :
      context:(module Context.CONTEXT)
-  -> mark_processed_and_promote:(State_hash.t list -> unit)
+  -> actions:Misc.actions
   -> transition_states:Transition_states.t
   -> substate:Mina_block.Validation.initial_valid_with_header Substate.t
   -> gossip_data:Gossip.transition_gossip_t
@@ -20,6 +20,6 @@ val promote_to :
 val pass_the_baton :
      transition_states:Transition_states.t
   -> context:(module Context.CONTEXT)
-  -> mark_processed_and_promote:(State_body_hash.t list -> unit)
+  -> actions:Misc.actions
   -> State_hash.t
   -> unit

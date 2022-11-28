@@ -9,8 +9,8 @@ open Bit_catchup_state
   
   Pre-condition: new [status] is either [Failed] or [Processing].
 *)
-let rec update_status_for_unprocessed ~context ~transition_states
-    ~mark_processed_and_promote ~state_hash status =
+let rec update_status_for_unprocessed ~context ~transition_states ~actions
+    ~state_hash status =
   let (module Context : CONTEXT) = context in
   let f = function
     | Transition_state.Downloading_body
@@ -35,8 +35,7 @@ let rec update_status_for_unprocessed ~context ~transition_states
           |> Mina_state.Protocol_state.previous_state_hash
         in
         if r.baton then
-          pass_the_baton ~transition_states ~context ~mark_processed_and_promote
-            parent_hash ;
+          pass_the_baton ~transition_states ~context ~actions parent_hash ;
         let st =
           Transition_state.Downloading_body
             { r with
@@ -48,8 +47,7 @@ let rec update_status_for_unprocessed ~context ~transition_states
         Transition_states.update transition_states st ;
         match (status, r.baton) with
         | Failed _, true ->
-            restart_failed ~transition_states ~context
-              ~mark_processed_and_promote st
+            restart_failed ~transition_states ~context ~actions st
         | _ ->
             () )
     | _ ->
@@ -62,19 +60,18 @@ let rec update_status_for_unprocessed ~context ~transition_states
 (** [upon_f] is a callback to be executed upon completion of downloading
   a body (or a failure).
 *)
-and upon_f ~context ~transition_states ~state_hash ~mark_processed_and_promote =
-  function
+and upon_f ~context ~transition_states ~state_hash ~actions = function
   | Result.Error () ->
-      update_status_for_unprocessed ~context ~mark_processed_and_promote
-        ~transition_states ~state_hash
+      update_status_for_unprocessed ~context ~actions ~transition_states
+        ~state_hash
         (Failed (Error.of_string "interrupted"))
   | Result.Ok (Result.Ok body) ->
-      update_status_for_unprocessed ~context ~mark_processed_and_promote
-        ~transition_states ~state_hash (Processing (Done body)) ;
-      mark_processed_and_promote [ state_hash ]
+      update_status_for_unprocessed ~context ~actions ~transition_states
+        ~state_hash (Processing (Done body)) ;
+      actions.Misc.mark_processed_and_promote [ state_hash ]
   | Result.Ok (Result.Error e) ->
-      update_status_for_unprocessed ~context ~mark_processed_and_promote
-        ~transition_states ~state_hash (Failed e)
+      update_status_for_unprocessed ~context ~actions ~transition_states
+        ~state_hash (Failed e)
 
 (** Creates a [Substate.processing_context] for a transition.
 
@@ -84,7 +81,7 @@ and upon_f ~context ~transition_states ~state_hash ~mark_processed_and_promote =
   [Substate.In_progress] context.
 *)
 and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
-    ~context ~mark_processed_and_promote =
+    ~context ~actions =
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_header_with_validation header in
   match body_opt with
@@ -100,8 +97,7 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
           (module I)
       in
       Async_kernel.Deferred.upon (I.force action)
-        (upon_f ~context ~transition_states ~state_hash
-           ~mark_processed_and_promote ) ;
+        (upon_f ~context ~transition_states ~state_hash ~actions) ;
       let span = Time.Span.(bitwap_download_timeout + peer_download_timeout) in
       let timeout = Time.(add @@ now ()) span in
       let downto_ =
@@ -118,8 +114,7 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
 
 (** Restart a failed ancestor. This function takes a transition state of ancestor and
     restarts the downloading process for it. *)
-and restart_failed ~transition_states ~mark_processed_and_promote ~context =
-  function
+and restart_failed ~transition_states ~actions ~context = function
   | Transition_state.Downloading_body
       ( { header
         ; substate = { status = Failed _; _ } as s
@@ -131,7 +126,7 @@ and restart_failed ~transition_states ~mark_processed_and_promote ~context =
       in
       let ctx =
         make_download_body_ctx ~preferred_peers ~body_opt:None ~header
-          ~transition_states ~mark_processed_and_promote ~context
+          ~transition_states ~actions ~context
       in
       Transition_states.update transition_states
         (Transition_state.Downloading_body
@@ -145,11 +140,8 @@ and restart_failed ~transition_states ~mark_processed_and_promote ~context =
 (** Set [baton] of the next ancestor in [Transition_state.Downloading_body]
     and [Substate.Processing (Substate.In_progress _)] status to [true]
     and restart all the failed ancestors before the next ancestors. *)
-and pass_the_baton ~transition_states ~context ~mark_processed_and_promote
-    state_hash =
-  let restart_f =
-    restart_failed ~transition_states ~mark_processed_and_promote ~context
-  in
+and pass_the_baton ~transition_states ~context ~actions state_hash =
+  let restart_f = restart_failed ~transition_states ~actions ~context in
   let (module Context : CONTEXT) = context in
   match Transition_states.find transition_states state_hash with
   | Some (Transition_state.Downloading_body _ as st) -> (
@@ -171,8 +163,8 @@ and pass_the_baton ~transition_states ~context ~mark_processed_and_promote
 (** Promote a transition that is in [Transition_state.Verifying_blockchain_proof] state with
     [Substate.Processed] status to [Transition_state.Downloading_body] state.
 *)
-let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
-    ~gossip_data ~body_opt ~aux =
+let promote_to ~context ~actions ~transition_states ~substate ~gossip_data
+    ~body_opt ~aux =
   let header =
     match substate.Substate.status with
     | Processed h ->
@@ -190,7 +182,7 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
   let preferred_peers = List.map received ~f:(fun { sender; _ } -> sender) in
   let ctx =
     make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
-      ~mark_processed_and_promote ~context
+      ~actions ~context
   in
   let substate = { substate with status = Processing ctx } in
   let block_vc =
@@ -207,7 +199,7 @@ let promote_to ~context ~mark_processed_and_promote ~transition_states ~substate
         Some block_vc
   in
   if aux.Transition_state.received_via_gossip then
-    pass_the_baton ~transition_states ~context ~mark_processed_and_promote
+    pass_the_baton ~transition_states ~context ~actions
       (Mina_state.Protocol_state.previous_state_hash protocol_state) ;
   Transition_state.Downloading_body
     { header; substate; block_vc; baton = false; aux }

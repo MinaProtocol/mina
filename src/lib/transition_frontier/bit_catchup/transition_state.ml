@@ -207,3 +207,15 @@ let aux_data = function
       Some aux
   | _ ->
       None
+
+let shutdown_modifier = function
+  | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
+    ->
+      Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
+      ({ r with status = Failed (Error.of_string "shut down") }, ())
+  | s ->
+      (s, ())
+
+let shutdown_in_progress st =
+  Option.value_map ~default:st ~f:fst
+    (State_functions.modify_substate ~f:{ modifier = shutdown_modifier } st)

@@ -1,11 +1,10 @@
-open Mina_base
 open Bit_catchup_state
 
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.
 *)
 val promote_to :
-     mark_processed_and_promote:(State_hash.t list -> unit)
+     actions:Misc.actions
   -> context:(module Context.CONTEXT)
   -> transition_states:Transition_states.t
   -> block:Mina_block.Validation.initial_valid_with_block

@@ -93,3 +93,5 @@ val modify_aux_data : f:(aux_data -> aux_data) -> t -> t
 
 (** Auxiliary data stored in the transition state. *)
 val aux_data : t -> aux_data option
+
+val shutdown_in_progress : t -> t

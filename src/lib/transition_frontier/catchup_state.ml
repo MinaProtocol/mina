@@ -30,11 +30,11 @@ let apply_diffs ~logger (t : t) (ds : Frontier_base.Diff.Full.E.t list) : unit =
   | Bit t ->
       Bit_catchup_state.apply_diffs ~logger t ds
 
-let create t ~root =
+let create t ~root ~is_in_frontier =
   match t with
   | `Normal ->
       Hash (Catchup_hash_tree.create ~root)
   | `Super ->
       Full (Full_catchup_tree.create ~root)
   | `Bit transition_states ->
-      Bit (Bit_catchup_state.create transition_states)
+      Bit (Bit_catchup_state.create ~root ~is_in_frontier transition_states)
