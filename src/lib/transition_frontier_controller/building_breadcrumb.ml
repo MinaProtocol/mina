@@ -75,20 +75,16 @@ let update_status_for_unprocessed ~transition_states ~state_hash status =
 (** [upon_f] is a callback to be executed upon completion of building
   a breadcrumb (or a failure).
 *)
-let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
-  let mark_invalid ?reason error =
-    Transition_states.mark_invalid ?reason transition_states ~error ~state_hash
-  in
-  function
+let upon_f ~state_hash ~actions ~transition_states = function
   | Result.Error () ->
       update_status_for_unprocessed ~transition_states ~state_hash
         (Failed (Error.of_string "interrupted"))
   | Result.Ok (Result.Ok breadcrumb) ->
       update_status_for_unprocessed ~transition_states ~state_hash
         (Processing (Done breadcrumb)) ;
-      mark_processed_and_promote [ state_hash ]
-  | Result.Ok (Result.Error (`Invalid (e, reason))) ->
-      mark_invalid ~reason e
+      actions.Misc.mark_processed_and_promote [ state_hash ]
+  | Result.Ok (Result.Error (`Invalid (error, reason))) ->
+      actions.Misc.mark_invalid ~reason ~error state_hash
   | Result.Ok (Result.Error (`Verifier_error e)) ->
       update_status_for_unprocessed ~transition_states ~state_hash @@ Failed e
 
@@ -98,8 +94,8 @@ let upon_f ~state_hash ~mark_processed_and_promote ~transition_states =
   This function validates frontier dependencies and if validation is successful,
   returns a [Processing (In_progress _)] status and [Failed] otherwise.  
 *)
-let building_breadcrumb_status ~context ~mark_processed_and_promote
-    ~transition_states ~received ~parent block =
+let building_breadcrumb_status ~context ~actions ~transition_states ~received
+    ~parent block =
   let (module Context : CONTEXT) = context in
   let state_hash =
     State_hash.With_state_hashes.state_hash
@@ -119,7 +115,7 @@ let building_breadcrumb_status ~context ~mark_processed_and_promote
     in
     let timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout in
     Async_kernel.Deferred.upon (I.force action)
-      (upon_f ~transition_states ~state_hash ~mark_processed_and_promote) ;
+      (upon_f ~transition_states ~state_hash ~actions) ;
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
     Substate.In_progress
       { interrupt_ivar = I.interrupt_ivar
@@ -245,16 +241,16 @@ let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.
 *)
-let promote_to ~mark_processed_and_promote ~context ~transition_states ~block
-    ~substate ~block_vc ~aux =
+let promote_to ~actions ~context ~transition_states ~block ~substate ~block_vc
+    ~aux =
   let meta =
     Substate.transition_meta_of_header_with_hash
       (With_hash.map ~f:Mina_block.header
          (Mina_block.Validation.block_with_hash block) )
   in
   let build parent =
-    building_breadcrumb_status ~context ~mark_processed_and_promote
-      ~transition_states ~received:aux.Transition_state.received ~parent block
+    building_breadcrumb_status ~context ~actions ~transition_states
+      ~received:aux.Transition_state.received ~parent block
   in
   let mk_status () =
     (Option.value_map ~f:build

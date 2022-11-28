@@ -240,28 +240,27 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network ~target_hash
     Note that some other states may be restarted (transitioned from [Failed] to [In_progress])
     on the course.
     *)
-let promote_to_higher_state_impl ~write_actions ~mark_processed_and_promote
-    ~context ~(transition_states : Transition_states.t) state =
+let promote_to_higher_state_impl ~write_actions ~actions ~context
+    ~(transition_states : Transition_states.t) state =
   match state with
   | Transition_state.Received { header; substate; gossip_data; body_opt; aux }
     ->
       Option.some
-      @@ Verifying_blockchain_proof.promote_to ~mark_processed_and_promote
-           ~context ~transition_states ~header ~substate ~gossip_data ~body_opt
-           ~aux
+      @@ Verifying_blockchain_proof.promote_to ~actions ~context
+           ~transition_states ~header ~substate ~gossip_data ~body_opt ~aux
   | Verifying_blockchain_proof
       { header = _; substate; gossip_data; body_opt; aux; baton = _ } ->
       Option.some
-      @@ Downloading_body.promote_to ~mark_processed_and_promote ~context
-           ~transition_states ~substate ~gossip_data ~body_opt ~aux
+      @@ Downloading_body.promote_to ~actions ~context ~transition_states
+           ~substate ~gossip_data ~body_opt ~aux
   | Downloading_body { header; substate; block_vc; baton = _; aux } ->
       Option.some
-      @@ Verifying_complete_works.promote_to ~mark_processed_and_promote
-           ~context ~transition_states ~header ~substate ~block_vc ~aux
+      @@ Verifying_complete_works.promote_to ~actions ~context
+           ~transition_states ~header ~substate ~block_vc ~aux
   | Verifying_complete_works { block; substate; block_vc; aux; baton = _ } ->
       Option.some
-      @@ Building_breadcrumb.promote_to ~mark_processed_and_promote ~context
-           ~transition_states ~block ~substate ~block_vc ~aux
+      @@ Building_breadcrumb.promote_to ~actions ~context ~transition_states
+           ~block ~substate ~block_vc ~aux
   | Building_breadcrumb { block = _; substate; block_vc; aux; ancestors = _ } ->
       Option.some
       @@ Waiting_to_be_added_to_frontier.promote_to ~context ~substate ~block_vc
@@ -310,6 +309,20 @@ let pre_validate_header_invalid_action ~header = function
               , `String Protocol_version.(current |> to_string) )
             ] ) )
 
+let handle_invalid ~children =
+  List.iter ~f:(fun meta ->
+      State_hash.Table.change children meta.Substate.parent_state_hash
+        ~f:(function
+        | Some (`Invalid_children, lst) ->
+            Some (`Invalid_children, meta.state_hash :: lst)
+        | other ->
+            other ) )
+
+let mark_invalid ~state ?reason ~error state_hash =
+  Transition_states.mark_invalid ?reason ~error ~state_hash
+    state.transition_states
+  |> handle_invalid ~children:state.children
+
 (** [promote_to_higher_state] takes state hash of a transition with [Processed] status
     and updates it.
     
@@ -323,25 +336,28 @@ let pre_validate_header_invalid_action ~header = function
 
     Pre-condition: state transition is in transition states and has [Processed] status.*)
 let rec promote_to_higher_state ~write_actions
-    ~context:(module Context : CONTEXT) ~transition_states state_hash =
+    ~context:(module Context : CONTEXT) ~state state_hash =
   let context = (module Context : CONTEXT) in
-  let mark_processed_and_promote =
-    mark_processed_and_promote ~context ~transition_states ~write_actions
-  in
+  let transition_states = state.transition_states in
   let old_state =
     Option.value_exn @@ Transition_states.find transition_states state_hash
   in
+  let actions = actions ~context ~state ~write_actions in
   let state_opt =
     promote_to_higher_state_impl ~context ~transition_states ~write_actions
-      ~mark_processed_and_promote old_state
+      ~actions old_state
   in
   ( match state_opt with
   | None ->
+      State_hash.Table.change state.children state_hash
+        ~f:(Option.map ~f:(Tuple2.map_fst ~f:(const `Parent_in_frontier))) ;
       Transition_states.remove transition_states state_hash
-  | Some state ->
-      Transition_states.update transition_states state ) ;
+  | Some st ->
+      Transition_states.update transition_states st ) ;
   ( match state_opt with
-  | Some (Waiting_to_be_added_to_frontier { source; breadcrumb; _ }) ->
+  | Some (Waiting_to_be_added_to_frontier { source; breadcrumb; _ } as st) ->
+      Misc.add_to_children_of_parent_in_frontier ~state
+        (Transition_state.State_functions.transition_meta st) ;
       (* This needs to be done after update of the state *)
       write_actions.write_breadcrumb source breadcrumb
   | _ ->
@@ -354,7 +370,13 @@ let rec promote_to_higher_state ~write_actions
     ~parent_hash ~state_hash state_opt ;
   Option.iter state_opt ~f:(fun state ->
       if Substate.is_processing_done ~state_functions state then
-        mark_processed_and_promote [ state_hash ] )
+        actions.mark_processed_and_promote [ state_hash ] )
+
+and actions ~context ~state ~write_actions =
+  { Misc.mark_processed_and_promote =
+      mark_processed_and_promote ~context ~state ~write_actions
+  ; mark_invalid = mark_invalid ~state
+  }
 
 (** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
 transitions processed. Then it promotes all of the transitions that can be promoted
@@ -370,7 +392,8 @@ This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
 *)
 and mark_processed_and_promote ~write_actions
-    ~context:(module Context : CONTEXT) ~transition_states state_hashes =
+    ~context:(module Context : CONTEXT) ~state state_hashes =
+  let transition_states = state.transition_states in
   let higher_state_promotees =
     Substate.mark_processed ~logger:Context.logger ~state_functions
       ~transition_states state_hashes
@@ -390,10 +413,7 @@ and mark_processed_and_promote ~write_actions
   iter (diff processed promoted) ~f:(fun key ->
       Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
   List.iter
-    ~f:
-      (promote_to_higher_state ~write_actions
-         ~context:(module Context)
-         ~transition_states )
+    ~f:(promote_to_higher_state ~write_actions ~context:(module Context) ~state)
     higher_state_promotees
 
 let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
@@ -589,7 +609,15 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name:"frontier-notifier"
       (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
   in
-  let breadcrumb_queue = Queue.create () in
+  let state =
+    match Transition_frontier.catchup_state frontier with
+    | Bit t ->
+        t
+    | _ ->
+        failwith
+          "If super catchup is running, the frontier should have a full \
+           catchup tree"
+  in
   let (module Context_ : Transition_handler.Validator.CONTEXT) = context in
   (* TODO is "block-db" the right path ? *)
   let block_storage = Block_storage.open_ ~logger:Context_.logger "block-db" in
@@ -600,7 +628,7 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
       (`Transition t, `Source s, `Valid_cb None)
   in
   let write_breadcrumb source b =
-    Queue.enqueue breadcrumb_queue (source, b) ;
+    Queue.enqueue state.breadcrumb_queue (source, b) ;
     Pipe_lib.Strict_pipe.Writer.write breadcrumb_notification_writer ()
   in
   let write_actions = { write_verified_transition; write_breadcrumb } in
@@ -611,34 +639,26 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
   in
   let (module Context : CONTEXT) = context in
   let logger = Context.logger in
-  let state =
-    match Transition_frontier.catchup_state frontier with
-    | Bit t ->
-        t
-    | _ ->
-        failwith
-          "If super catchup is running, the frontier should have a full \
-           catchup tree"
-  in
   let transition_states = state.transition_states in
-  let mark_processed_and_promote =
-    mark_processed_and_promote ~context ~transition_states ~write_actions
-  in
+  let actions = actions ~context ~state ~write_actions in
   List.iter collected_transitions
-    ~f:
-      (Received.handle_collected_transition ~context ~mark_processed_and_promote
-         ~state ) ;
+    ~f:(Received.handle_collected_transition ~context ~actions ~state) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback producer_transition_reader
        ~f:(fun b ->
-         Waiting_to_be_added_to_frontier.handle_produced_transition ~context
-           ~transition_states b ;
+         let st_opt =
+           Waiting_to_be_added_to_frontier.handle_produced_transition ~context
+             ~transition_states b
+         in
+         Option.iter st_opt
+           ~f:
+             (Fn.compose
+                (Misc.add_to_children_of_parent_in_frontier ~state)
+                Transition_state.State_functions.transition_meta ) ;
          write_breadcrumb `Internal b ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback network_transition_reader
-       ~f:
-         (Received.handle_network_transition ~context
-            ~mark_processed_and_promote ~state ) ;
+       ~f:(Received.handle_network_transition ~context ~actions ~state) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
          let open Strict_pipe.Writer in
@@ -663,8 +683,10 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
                    ] ;
                false
          in
-         let breadcrumbs = Queue.to_list breadcrumb_queue |> List.filter ~f in
-         Queue.clear breadcrumb_queue ;
+         let breadcrumbs =
+           Queue.to_list state.breadcrumb_queue |> List.filter ~f
+         in
+         Queue.clear state.breadcrumb_queue ;
          List.iter breadcrumbs ~f:(fun (source, b) ->
              match source with
              | `Gossip ->
@@ -692,8 +714,8 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
              (List.map ~f:snd breadcrumbs)
          in
          let promote_do =
-           promote_to_higher_state_impl ~context ~transition_states
-             ~mark_processed_and_promote ~write_actions
+           promote_to_higher_state_impl ~context ~transition_states ~actions
+             ~write_actions
          in
          let promote (source, b) =
            ( match source with
@@ -709,3 +731,5 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
              ~f:promote_do
          in
          List.iter breadcrumbs ~f:promote )
+(* TODO handle case when transition states were recovered from persistence and some transitions
+   were marked `Processing Done` or `Processed` but were not promoted *)

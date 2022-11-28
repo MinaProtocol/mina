@@ -25,3 +25,5 @@ include
   Substate_types.Transition_states_intf
     with type state_t = Transition_state.t
      and type t := t
+
+val iter : f:(state_t -> unit) -> t -> unit

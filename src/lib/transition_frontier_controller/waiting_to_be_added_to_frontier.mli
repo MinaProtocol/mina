@@ -15,4 +15,4 @@ val handle_produced_transition :
      context:(module Context.CONTEXT)
   -> transition_states:Transition_states.t
   -> Frontier_base.Breadcrumb.t
-  -> unit
+  -> Transition_state.t option

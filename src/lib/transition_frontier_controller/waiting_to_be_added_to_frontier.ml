@@ -30,15 +30,21 @@ let promote_to ~context:(module Context : CONTEXT) ~block_vc ~aux
 let handle_produced_transition ~context:(module Context : CONTEXT)
     ~transition_states breadcrumb =
   let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
-  match Transition_states.find transition_states state_hash with
-  | None ->
-      Transition_states.add_new transition_states
-        (Transition_state.Waiting_to_be_added_to_frontier
-           { breadcrumb
-           ; source = `Internal
-           ; children = Substate.empty_children_sets
-           } )
-  | Some _ ->
-      [%log' warn Context.logger]
-        "Produced breadcrumb $state_hash is already in bit-catchup state"
-        ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
+  let st_opt =
+    match Transition_states.find transition_states state_hash with
+    | None ->
+        Some
+          (Transition_state.Waiting_to_be_added_to_frontier
+             { breadcrumb
+             ; source = `Internal
+             ; children = Substate.empty_children_sets
+             } )
+    | Some _ ->
+        [%log' warn Context.logger]
+          "Produced breadcrumb $state_hash is already in bit-catchup state"
+          ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+        None
+  in
+
+  Option.iter st_opt ~f:(Transition_states.add_new transition_states) ;
+  st_opt

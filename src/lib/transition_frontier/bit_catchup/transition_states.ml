@@ -1,14 +1,6 @@
 open Core_kernel
 open Mina_base
 
-let shutdown_modifier = function
-  | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
-    ->
-      Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
-      ({ r with status = Failed (Error.of_string "shut down") }, ())
-  | s ->
-      (s, ())
-
 module type Inmem_context = sig
   val on_invalid :
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
@@ -44,12 +36,14 @@ module Inmem (C : Inmem_context) = struct
         (State_hash.to_base58_check top_state_hash)
     in
     let error = Error.tag ~tag err in
+    let res = ref [] in
     let rec go = State_hash.Table.change transition_states ~f
     and f st_opt =
       let%bind.Option state = st_opt in
       let%map.Option aux = Transition_state.aux_data state in
       let transition_meta = State_functions.transition_meta state in
       C.on_invalid ?reason ~error ~aux transition_meta ;
+      res := transition_meta :: !res ;
       ( match state with
       | Received { gossip_data; _ }
       | Verifying_blockchain_proof { gossip_data; _ } ->
@@ -70,7 +64,7 @@ module Inmem (C : Inmem_context) = struct
       State_hash.Set.iter children.waiting_for_parent ~f:go ;
       Invalid { transition_meta; error }
     in
-    go top_state_hash
+    go top_state_hash ; !res
 
   let find = State_hash.Table.find
 
@@ -114,12 +108,8 @@ module Inmem (C : Inmem_context) = struct
         | Some st' ->
             update transition_states st' )
 
-  let shutdown_in_progress transition_states =
-    State_hash.Table.map_inplace transition_states ~f:(fun st ->
-        Option.value_map ~default:st ~f:fst
-          (Transition_state.State_functions.modify_substate
-             ~f:{ modifier = shutdown_modifier }
-             st ) )
+  let shutdown_in_progress =
+    State_hash.Table.map_inplace ~f:Transition_state.shutdown_in_progress
 
   let fold t ~init ~f =
     State_hash.Table.fold ~f:(fun ~key:_ ~data -> f data) t ~init
@@ -161,3 +151,5 @@ let shutdown_in_progress (Substate.Transition_states ((module Impl), m) : t) =
 let fold (Substate.Transition_states ((module Impl), m) : t) = Impl.fold m
 
 let clear (Substate.Transition_states ((module Impl), m) : t) = Impl.clear m
+
+let iter ~f m = fold m ~init:() ~f:(fun st () -> f st)

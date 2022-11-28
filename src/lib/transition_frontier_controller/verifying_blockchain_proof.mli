@@ -1,4 +1,3 @@
-open Mina_base
 open Bit_catchup_state
 
 (** Promote a transition that is in [Received] state with
@@ -6,7 +5,7 @@ open Bit_catchup_state
 *)
 val promote_to :
      context:(module Context.CONTEXT)
-  -> mark_processed_and_promote:(State_hash.t list -> unit)
+  -> actions:Misc.actions
   -> header:Gossip.received_header
   -> transition_states:Transition_states.t
   -> substate:unit Substate.t
@@ -28,7 +27,7 @@ val promote_to :
 *)
 val make_processed :
      context:(module Context.CONTEXT)
-  -> mark_processed_and_promote:(State_hash.t list -> unit)
+  -> actions:Misc.actions
   -> transition_states:Transition_states.t
   -> Mina_block.Validation.initial_valid_with_header
   -> unit

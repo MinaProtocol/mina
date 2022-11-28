@@ -40,8 +40,7 @@ include Verifying_generic.Make (F)
 (** [upon_f] is a callback to be executed upon completion of
   blockchain proof verification (or a failure).
 *)
-let rec upon_f ~holder ~context ~mark_processed_and_promote ~transition_states
-    res =
+let rec upon_f ~holder ~context ~actions ~transition_states res =
   let (module Context : CONTEXT) = context in
   let top_state_hash = !holder in
   match res with
@@ -53,7 +52,7 @@ let rec upon_f ~holder ~context ~mark_processed_and_promote ~transition_states
           (Error.of_string "interrupted")
       in
       Option.iter for_restart_opt
-        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+        ~f:(start ~context ~actions ~transition_states)
   | Result.Ok (Result.Ok lst) ->
       List.iter lst ~f:(fun header ->
           let state_hash = state_hash_of_header_with_validation header in
@@ -64,15 +63,14 @@ let rec upon_f ~holder ~context ~mark_processed_and_promote ~transition_states
               header
           in
           Option.iter for_restart_opt ~f:(fun for_restart ->
-              start ~context ~mark_processed_and_promote ~transition_states
-                for_restart ;
-              mark_processed_and_promote [ state_hash ] ) )
+              start ~context ~actions ~transition_states for_restart ;
+              actions.Misc.mark_processed_and_promote [ state_hash ] ) )
   | Result.Ok (Result.Error (`Invalid_proof e)) ->
       (* We mark invalid only the top header because it is the only one for which
          we can be sure it's invalid. *)
-      Transition_states.mark_invalid transition_states
+      actions.Misc.mark_invalid
         ~error:(Error.tag e ~tag:"invalid blockchain proof")
-        ~state_hash:top_state_hash
+        top_state_hash
   | Result.Ok (Result.Error (`Verifier_error e)) ->
       (* Top state hash will be set to Failed only if it was Processing before this point *)
       let for_restart_opt =
@@ -80,15 +78,15 @@ let rec upon_f ~holder ~context ~mark_processed_and_promote ~transition_states
           ~state_hash:top_state_hash e
       in
       Option.iter for_restart_opt
-        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+        ~f:(start ~context ~actions ~transition_states)
 
 (** Launch blockchain proof verification and return the processing context
     for the deferred action launched.
 
     Pre-condition: function takes list of headers in child-first order.
 *)
-and launch_in_progress ~context:(module Context : CONTEXT)
-    ~mark_processed_and_promote ~transition_states ~top_state_hash headers =
+and launch_in_progress ~context:(module Context : CONTEXT) ~actions
+    ~transition_states ~top_state_hash headers =
   let module I = Interruptible.Make () in
   let downto_ =
     List.hd_exn headers |> Mina_block.Validation.header
@@ -99,13 +97,11 @@ and launch_in_progress ~context:(module Context : CONTEXT)
   interrupt_after_timeout ~timeout I.interrupt_ivar ;
   let holder = ref top_state_hash in
   Async_kernel.Deferred.upon (I.force action)
-  @@ upon_f ~mark_processed_and_promote ~transition_states
-       ~context:(module Context)
-       ~holder ;
+  @@ upon_f ~actions ~transition_states ~context:(module Context) ~holder ;
   Substate.In_progress
     { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
 
-and start ~context ~mark_processed_and_promote ~transition_states states =
+and start ~context ~actions ~transition_states states =
   Option.value ~default:()
   @@ let%map.Option top_state = List.last states in
      let headers = List.map ~f:to_header_exn states in
@@ -113,8 +109,8 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
        (Transition_state.State_functions.transition_meta top_state).state_hash
      in
      let ctx =
-       launch_in_progress ~context ~mark_processed_and_promote
-         ~transition_states ~top_state_hash headers
+       launch_in_progress ~context ~actions ~transition_states ~top_state_hash
+         headers
      in
      match top_state with
      | Transition_state.Verifying_blockchain_proof ({ substate; _ } as r) ->
@@ -127,8 +123,8 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
 (** Promote a transition that is in [Received] state with
     [Processed] status to [Verifying_blockchain_proof] state.
 *)
-let promote_to ~context ~mark_processed_and_promote ~header ~transition_states
-    ~substate:s ~gossip_data ~body_opt ~aux =
+let promote_to ~context ~actions ~header ~transition_states ~substate:s
+    ~gossip_data ~body_opt ~aux =
   let (module Context : CONTEXT) = context in
   let ctx =
     match header with
@@ -147,7 +143,7 @@ let promote_to ~context ~mark_processed_and_promote ~header ~transition_states
       collect_dependent_and_pass_the_baton_by_hash ~transition_states
         ~dsu:Context.processed_dsu parent_hash
     in
-    start ~context ~mark_processed_and_promote ~transition_states for_start ) ;
+    start ~context ~actions ~transition_states for_start ) ;
   Transition_state.Verifying_blockchain_proof
     { header = Gossip.pre_initial_valid_of_received_header header
     ; gossip_data
@@ -168,8 +164,7 @@ let promote_to ~context ~mark_processed_and_promote ~header ~transition_states
    context is not discarded but passed to the next ancestor that is in 
    [Verifying_blockchain_proof] and isn't [Processed].
 *)
-let make_processed ~context ~mark_processed_and_promote ~transition_states
-    header =
+let make_processed ~context ~actions ~transition_states header =
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_header_with_validation header in
   Option.value ~default:()
@@ -177,5 +172,5 @@ let make_processed ~context ~mark_processed_and_promote ~transition_states
        update_to_processing_done ~transition_states ~state_hash
          ~dsu:Context.processed_dsu ~reuse_ctx:true header
      in
-     start ~context ~mark_processed_and_promote ~transition_states for_restart ;
-     mark_processed_and_promote [ state_hash ]
+     start ~context ~actions ~transition_states for_restart ;
+     actions.Misc.mark_processed_and_promote [ state_hash ]

@@ -20,6 +20,7 @@
    interruptible
    mina_numbers
    transition_frontier_base
+   consensus
    mina_wire_types
    kimchi_bindings
    kimchi_backend.pasta

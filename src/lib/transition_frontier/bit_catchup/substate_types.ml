@@ -126,7 +126,7 @@ let transition_meta_of_header_with_hash hh =
   { state_hash = State_hash.With_state_hashes.state_hash hh
   ; parent_state_hash =
       Mina_state.Protocol_state.previous_state_hash
-      @@ Mina_block.Header.protocol_state h
+        (Mina_block.Header.protocol_state h)
   ; blockchain_length = Mina_block.Header.blockchain_length h
   }
 
@@ -144,13 +144,15 @@ module type Transition_states_intf = sig
       Raises exception when the state already exists. *)
   val add_new : t -> state_t -> unit
 
-  (** Mark transition and all its descedandants invalid. *)
+  (** Mark transition and all its descedandants invalid and return
+      transition metas of all transitions marked invalid
+      (that were not in [Invalid] state before the call). *)
   val mark_invalid :
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
     -> t
     -> error:Error.t
     -> state_hash:State_hash.t
-    -> unit
+    -> transition_meta list
 
   (** Find state in transition states *)
   val find : t -> State_hash.t -> state_t option

@@ -163,7 +163,10 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   in
   { logger
   ; catchup_state =
-      Catchup_state.create catchup_mode ~root:(Full_frontier.root full_frontier)
+      Catchup_state.create catchup_mode
+        ~root:(Full_frontier.root full_frontier)
+        ~is_in_frontier:
+          (Fn.compose Option.is_some @@ Full_frontier.find full_frontier)
   ; verifier
   ; consensus_local_state
   ; full_frontier

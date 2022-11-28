@@ -5,7 +5,7 @@ open Bit_catchup_state
     [Processed] status to [Verifying_complete_works] state.
 *)
 val promote_to :
-     mark_processed_and_promote:(State_hash.t list -> unit)
+     actions:Misc.actions
   -> context:(module Context.CONTEXT)
   -> transition_states:Transition_states.t
   -> header:Mina_block.Validation.initial_valid_with_header
@@ -25,7 +25,7 @@ val promote_to :
    *)
 val make_independent :
      context:(module Context.CONTEXT)
-  -> mark_processed_and_promote:(State_hash.t list -> unit)
+  -> actions:Misc.actions
   -> transition_states:Transition_states.t
   -> State_hash.t
   -> unit

@@ -46,8 +46,7 @@ let get_state_hash = function
 (** [upon_f] is a callback to be executed upon completion of
   transaction snark verification for a transition (or a failure).
 *)
-let rec upon_f ~context ~mark_processed_and_promote ~transition_states
-    ~state_hashes ~holder res =
+let rec upon_f ~context ~actions ~transition_states ~state_hashes ~holder res =
   let (module Context : CONTEXT) = context in
   let top_state_hash = !holder in
   match res with
@@ -59,13 +58,13 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
           (Error.of_string "interrupted")
       in
       Option.iter for_restart_opt
-        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+        ~f:(start ~context ~actions ~transition_states)
   | Ok (Ok (Error e)) ->
       (* We mark invalid only the first header because it is the only one for which
          we can be sure it's invalid *)
-      Transition_states.mark_invalid transition_states
+      actions.Misc.mark_invalid
         ~error:(Error.tag e ~tag:"wrong transaction proof")
-        ~state_hash:top_state_hash
+        top_state_hash
   | Ok (Ok (Ok ())) ->
       List.iter state_hashes ~f:(fun state_hash ->
           let for_restart_opt =
@@ -75,24 +74,20 @@ let rec upon_f ~context ~mark_processed_and_promote ~transition_states
               ()
           in
           Option.iter for_restart_opt ~f:(fun for_restart ->
-              start ~context ~mark_processed_and_promote ~transition_states
-                for_restart ;
-              mark_processed_and_promote [ state_hash ] ) )
+              start ~context ~actions ~transition_states for_restart ;
+              actions.Misc.mark_processed_and_promote [ state_hash ] ) )
   | Ok (Error e) ->
       let for_restart_opt =
         update_to_failed ~dsu:Context.processed_dsu ~transition_states
           ~state_hash:top_state_hash e
       in
       Option.iter for_restart_opt
-        ~f:(start ~context ~mark_processed_and_promote ~transition_states)
+        ~f:(start ~context ~actions ~transition_states)
 
-and start ~context ~mark_processed_and_promote ~transition_states states =
+and start ~context ~actions ~transition_states states =
   Option.value ~default:()
   @@ let%map.Option top_state = List.last states in
-     let ctx =
-       launch_in_progress ~context ~mark_processed_and_promote
-         ~transition_states states
-     in
+     let ctx = launch_in_progress ~context ~actions ~transition_states states in
      match top_state with
      | Transition_state.Verifying_complete_works ({ substate; _ } as r) ->
          Transition_states.update transition_states
@@ -108,8 +103,8 @@ and start ~context ~mark_processed_and_promote ~transition_states states =
     ancestors that are neither in [Substate.Processed] status nor has an
     verification action already launched for it and its ancestors.
     *)
-and launch_in_progress ~mark_processed_and_promote
-    ~context:(module Context : CONTEXT) ~transition_states states =
+and launch_in_progress ~actions ~context:(module Context : CONTEXT)
+    ~transition_states states =
   let bottom_state = List.hd_exn states in
   let downto_ =
     (Transition_state.State_functions.transition_meta bottom_state)
@@ -132,7 +127,7 @@ and launch_in_progress ~mark_processed_and_promote
   Async_kernel.Deferred.upon (I.force action)
     (upon_f
        ~context:(module Context)
-       ~mark_processed_and_promote ~transition_states ~state_hashes ~holder ) ;
+       ~actions ~transition_states ~state_hashes ~holder ) ;
   let timeout =
     Time.add (Time.now ()) Context.transaction_snark_verification_timeout
   in
@@ -143,8 +138,8 @@ and launch_in_progress ~mark_processed_and_promote
 (** Promote a transition that is in [Downloading_body] state with
     [Processed] status to [Verifying_complete_works] state.
 *)
-let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
-    ~substate ~block_vc ~aux =
+let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
+    ~aux =
   let (module Context : CONTEXT) = context in
   let body =
     match substate.Substate.status with
@@ -169,8 +164,7 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
         ~dsu:Context.processed_dsu pre_st
     in
     let ctx =
-      launch_in_progress ~context ~mark_processed_and_promote ~transition_states
-        for_start
+      launch_in_progress ~context ~actions ~transition_states for_start
     in
     Transition_state.Verifying_complete_works
       { block
@@ -190,11 +184,10 @@ let promote_to ~mark_processed_and_promote ~context ~transition_states ~header
     Pre-condition: transition corresponding to [state_hash] has
     [Substate.Processing Dependent] status and was just received through gossip.
    *)
-let make_independent ~context ~mark_processed_and_promote ~transition_states
-    state_hash =
+let make_independent ~context ~actions ~transition_states state_hash =
   let (module Context : CONTEXT) = context in
   let for_start =
     collect_dependent_and_pass_the_baton_by_hash ~transition_states
       ~dsu:Context.processed_dsu state_hash
   in
-  start ~context ~mark_processed_and_promote ~transition_states for_start
+  start ~context ~actions ~transition_states for_start

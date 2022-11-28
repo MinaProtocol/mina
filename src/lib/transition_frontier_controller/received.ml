@@ -43,28 +43,27 @@ let mark_done ~transition_states state_hash =
     When state is [Transition_state.Downloading_body], pass the baton
     to ancestor (and restart failed) if [baton] is [true]. 
 *)
-let handle_preserve_hint ~mark_processed_and_promote ~transition_states ~context
-    (st, hint) =
+let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
   Transition_states.update transition_states st ;
   match hint with
   | `Nop ->
       ()
   | `Mark_verifying_blockchain_proof_processed iv_header ->
-      Verifying_blockchain_proof.make_processed ~context
-        ~mark_processed_and_promote ~transition_states iv_header
+      Verifying_blockchain_proof.make_processed ~context ~actions
+        ~transition_states iv_header
   | `Start_processing_verifying_complete_works state_hash ->
-      Verifying_complete_works.make_independent ~context
-        ~mark_processed_and_promote ~transition_states state_hash
+      Verifying_complete_works.make_independent ~context ~actions
+        ~transition_states state_hash
   | `Mark_downloading_body_processed ivar_opt ->
       let meta = Transition_state.State_functions.transition_meta st in
       ( match st with
       | Downloading_body { baton = true; _ } ->
-          Downloading_body.pass_the_baton ~transition_states ~context
-            ~mark_processed_and_promote meta.parent_state_hash
+          Downloading_body.pass_the_baton ~transition_states ~context ~actions
+            meta.parent_state_hash
       | _ ->
           () ) ;
       Option.iter ivar_opt ~f:(Fn.flip Ivar.fill_if_empty ()) ;
-      mark_processed_and_promote [ meta.state_hash ]
+      actions.Misc.mark_processed_and_promote [ meta.state_hash ]
 
 let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in
@@ -76,6 +75,9 @@ let pre_validate_header ~context:(module Context : CONTEXT) hh =
   >>| skip_time_received_validation_header
         `This_block_was_not_received_via_gossip
 
+let is_in_frontier frontier =
+  Fn.compose Option.is_some (Transition_frontier.find frontier)
+
 (** Check transition's status in catchup state and frontier *)
 let lookup_transition ~transition_states ~frontier state_hash =
   match Transition_states.find transition_states state_hash with
@@ -84,34 +86,37 @@ let lookup_transition ~transition_states ~frontier state_hash =
   | Some _ ->
       `Present
   | None ->
-      if Option.is_some (Transition_frontier.find frontier state_hash) then
-        `Present
-      else `Not_present
+      if is_in_frontier frontier state_hash then `Present else `Not_present
 
 (** Insert invalid transition to transition states and mark
     children of the transition invalid.
     
     Pre-condition: transition doesn't exist in transition states.
 *)
-let insert_invalid_state_impl ~transition_states ~transition_meta ~children_list
-    error =
-  Transition_states.add_new transition_states
+let insert_invalid_state_impl ~is_parent_in_frontier ~state ~actions
+    ~transition_meta ~children_list error =
+  Transition_states.add_new state.transition_states
     (Transition_state.Invalid { transition_meta; error }) ;
+  Misc.handle_non_regular_child ~state ~is_parent_in_frontier ~is_invalid:true
+    transition_meta ;
   List.iter children_list ~f:(fun state_hash ->
-      Transition_states.mark_invalid ~state_hash transition_states ~error )
+      actions.Misc.mark_invalid state_hash ~error )
 
 (** Insert invalid transition to transition states and remove
     corresponding record from orphans.
     
     Pre-condition: transition doesn't exist in transition states.
 *)
-let insert_invalid_state ~state ~transition_meta error =
-  let children_list =
-    Option.value ~default:[]
-    @@ Hashtbl.find state.orphans transition_meta.Substate.state_hash
+let insert_invalid_state ~actions ~is_parent_in_frontier ~state ~transition_meta
+    error =
+  let children_list_opt =
+    State_hash.Table.find state.children transition_meta.Substate.state_hash
   in
-  Hashtbl.remove state.orphans transition_meta.state_hash ;
-  insert_invalid_state_impl ~transition_states:state.transition_states
+  Option.iter children_list_opt ~f:(fun (_tag, children_list) ->
+      State_hash.Table.set state.children ~key:transition_meta.state_hash
+        ~data:(`Invalid_children, children_list) ) ;
+  let children_list = Option.value_map children_list_opt ~f:snd ~default:[] in
+  insert_invalid_state_impl ~actions ~state ~is_parent_in_frontier
     ~transition_meta ~children_list error
 
 let set_processing_to_failed error = function
@@ -143,11 +148,10 @@ let split_retrieve_chain_element ~context = function
 
 let is_received = function Transition_state.Received _ -> true | _ -> false
 
-let rec pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
-    ?body hh =
+let rec pre_validate_and_add ~context ~actions ~sender ~state ?body hh =
   match pre_validate_header ~context hh with
   | Ok vh ->
-      add_received ~context ~mark_processed_and_promote ~sender ~state ?body
+      add_received ~context ~actions ~sender ~state ?body
         (Gossip.Pre_initial_valid vh) ;
       Ok ()
   | Error e ->
@@ -168,7 +172,13 @@ let rec pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
             "invalid protocol version"
       in
       let transition_meta = Substate.transition_meta_of_header_with_hash hh in
-      insert_invalid_state ~state ~transition_meta e' ;
+      let is_parent_in_frontier =
+        Option.is_some
+        @@ Transition_frontier.find Context.frontier
+             transition_meta.parent_state_hash
+      in
+      insert_invalid_state ~actions ~state ~transition_meta
+        ~is_parent_in_frontier e' ;
       Error e'
 
 (** Handle an ancestor returned by [retrieve_chain] function.
@@ -180,8 +190,7 @@ let rec pre_validate_and_add ~context ~mark_processed_and_promote ~sender ~state
     from.
 
     Returns error iff the ancestor is invalid. *)
-and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
-    ~sender el =
+and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
   let (module Context : CONTEXT) = context in
   let extend_aux aux =
     { aux with
@@ -196,7 +205,7 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
   let state_hash = transition_meta.state_hash in
   match (Transition_states.find state.transition_states state_hash, hh_opt) with
   | Some (Transition_state.Invalid _), _ ->
-      Error (Error.of_string "parent is invalid")
+      Error (Error.of_string "invalid")
   | Some st, _ ->
       let st' = Transition_state.modify_aux_data ~f:extend_aux st in
       let hint =
@@ -205,8 +214,8 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
           ~default:(st', `Nop)
           body
       in
-      handle_preserve_hint ~mark_processed_and_promote
-        ~transition_states:state.transition_states ~context hint ;
+      handle_preserve_hint ~actions ~transition_states:state.transition_states
+        ~context hint ;
       Ok ()
   | None, Some hh -> (
       let relevance_status =
@@ -215,8 +224,7 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
       in
       match relevance_status with
       | `Relevant ->
-          pre_validate_and_add ~context ~mark_processed_and_promote ~sender
-            ~state ?body hh
+          pre_validate_and_add ~context ~actions ~sender ~state ?body hh
       | _ ->
           Ok () )
   | None, None ->
@@ -230,9 +238,8 @@ and handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
 
 Pre-condition: header's parent is neither present in transition states nor in transition frontier.
 *)
-and launch_ancestry_retrieval ~context ~mark_processed_and_promote
-    ~retrieve_immediately ~cancel_child_contexts ~timeout ~preferred_peers
-    ~state header_with_hash =
+and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
+    ~cancel_child_contexts ~timeout ~preferred_peers ~state header_with_hash =
   let (module Context : CONTEXT) = context in
   let parent_hash =
     With_hash.data header_with_hash
@@ -278,19 +285,16 @@ and launch_ancestry_retrieval ~context ~mark_processed_and_promote
     State_hash.With_state_hashes.state_hash header_with_hash
   in
   upon (I.force ancestry)
-    (upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
-       ~cancel_child_contexts ) ;
+    (upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts) ;
   interrupt_after_timeout ~timeout I.interrupt_ivar ;
   I.interrupt_ivar
 
 (** [upon_f] is a callback to be executed upon completion of retrieving ancestry
     (or a failure). *)
-and upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
-    ~cancel_child_contexts =
+and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
   let f res (el, sender) =
     if Result.is_ok res then
-      handle_retrieved_ancestor ~context ~mark_processed_and_promote ~state
-        ~sender el
+      handle_retrieved_ancestor ~context ~actions ~state ~sender el
     else
       let error = Error.of_string "parent is invalid" in
       let transition_meta, _, _ = split_retrieve_chain_element ~context el in
@@ -301,10 +305,10 @@ and upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
       | Some (Transition_state.Invalid _) ->
           ()
       | Some _ ->
-          Transition_states.mark_invalid state.transition_states ~error
-            ~state_hash:transition_meta.state_hash
+          actions.Misc.mark_invalid ~error transition_meta.state_hash
       | None ->
-          insert_invalid_state ~state ~transition_meta error ) ;
+          insert_invalid_state ~is_parent_in_frontier:false ~actions ~state
+            ~transition_meta error ) ;
       res
   in
   let on_error e =
@@ -327,17 +331,15 @@ and upon_f ~top_state_hash ~mark_processed_and_promote ~context ~state
   | Ok (Error e) ->
       on_error e
 
-and restart_failed_ancestor ~state ~mark_processed_and_promote ~context
-    top_state_hash =
+and restart_failed_ancestor ~state ~actions ~context top_state_hash =
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let handle_unprocessed ~preferred_peers header =
     let timeout = Time.add (Time.now ()) Context.ancestry_download_timeout in
     let hh = Gossip.header_with_hash_of_received_header header in
     let interrupt_ivar =
-      launch_ancestry_retrieval ~mark_processed_and_promote ~context
-        ~cancel_child_contexts:Fn.id ~retrieve_immediately:true ~preferred_peers
-        ~timeout ~state hh
+      launch_ancestry_retrieval ~actions ~context ~cancel_child_contexts:Fn.id
+        ~retrieve_immediately:true ~preferred_peers ~timeout ~state hh
     in
     let state_hash = State_hash.With_state_hashes.state_hash hh in
     let downto_ = Mina_numbers.Length.zero in
@@ -377,8 +379,8 @@ and restart_failed_ancestor ~state ~mark_processed_and_promote ~context
   * transition is neither in frontier nor in catchup state
   * [verify_header_is_relevant] returns [`Relevant] for the gossip
 *)
-and add_received ~context ~mark_processed_and_promote ~sender ~state
-    ?gossip_type ?vc ?body:body_opt received_header =
+and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
+    ?body:body_opt received_header =
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let header_with_hash =
@@ -391,25 +393,41 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_presence =
-    lookup_transition ~transition_states:state.transition_states
-      ~frontier:Context.frontier parent_hash
+    match Transition_states.find transition_states state_hash with
+    | Some (Transition_state.Invalid _) ->
+        `Invalid
+    | Some _ ->
+        `In_process
+    | None ->
+        if is_in_frontier Context.frontier state_hash then `In_frontier
+        else `Not_present
   in
-  let children_list =
-    Option.value ~default:[] @@ Hashtbl.find state.orphans state_hash
+  let all_children =
+    Option.value_map ~f:snd ~default:[]
+    @@ State_hash.Table.find state.children state_hash
   in
-  Hashtbl.remove state.orphans state_hash ;
-  Hashtbl.remove state.parents state_hash ;
+  let invalid_children, non_invalid_children =
+    List.partition_tf all_children ~f:(fun child ->
+        match Transition_states.find transition_states child with
+        | Some (Invalid _) ->
+            true
+        | _ ->
+            false )
+  in
+  State_hash.Table.set state.children ~key:state_hash
+    ~data:(`Invalid_children, invalid_children) ;
+  State_hash.Table.remove state.parents state_hash ;
   let received_at = Time.now () in
   (* [invariant] children.processed = children.waiting_for_parent = empty *)
   let children =
     { Substate.empty_children_sets with
-      processing_or_failed = State_hash.Set.of_list children_list
+      processing_or_failed = State_hash.Set.of_list non_invalid_children
     }
   in
   (* descendants are marked as Done and responsibility to fetch ancestry is moved to
      the freshly received transition or its ancestors *)
   let child_contexts =
-    List.filter_map children_list ~f:(mark_done ~transition_states)
+    List.filter_map non_invalid_children ~f:(mark_done ~transition_states)
   in
   let gossip = Option.is_some gossip_type in
   let add_to_state status =
@@ -429,23 +447,28 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
     List.iter child_contexts ~f:(fun (_, interrupt_ivar) ->
         Ivar.fill_if_empty interrupt_ivar () )
   in
+  let transition_meta =
+    Substate.transition_meta_of_header_with_hash header_with_hash
+  in
+  let is_parent_in_frontier =
+    match parent_presence with `In_frontier -> true | _ -> false
+  in
   match parent_presence with
   | `Invalid ->
       cancel_child_contexts () ;
-      let transition_meta =
-        Substate.transition_meta_of_header_with_hash header_with_hash
-      in
-      insert_invalid_state_impl ~transition_states:state.transition_states
-        ~transition_meta ~children_list
+      insert_invalid_state_impl ~actions ~state ~transition_meta
+        ~children_list:non_invalid_children ~is_parent_in_frontier:false
         (Error.of_string "parent is invalid")
-  | `Present ->
+  | `In_frontier | `In_process ->
       cancel_child_contexts () ;
       (* Children sets of parent are not updated explicitly because [mark_processed_and_promote] call
          will perform the update *)
       add_to_state @@ Substate.Processing (Done ()) ;
-      mark_processed_and_promote (state_hash :: children_list) ;
-      restart_failed_ancestor ~state ~mark_processed_and_promote ~context
-        parent_hash
+      Misc.handle_non_regular_child ~state ~is_parent_in_frontier
+        ~is_invalid:false transition_meta ;
+      actions.Misc.mark_processed_and_promote
+        (state_hash :: non_invalid_children) ;
+      restart_failed_ancestor ~state ~actions ~context parent_hash
   | `Not_present ->
       let max_timeout =
         Time.add
@@ -459,8 +482,7 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
       in
       (* Children sets of parent are not updated because parent is not present *)
       let interrupt_ivar =
-        launch_ancestry_retrieval ~mark_processed_and_promote ~context
-          ~cancel_child_contexts
+        launch_ancestry_retrieval ~actions ~context ~cancel_child_contexts
           ~retrieve_immediately:(List.is_empty child_contexts)
           ~preferred_peers:[ sender ] ~timeout ~state header_with_hash
       in
@@ -472,11 +494,12 @@ and add_received ~context ~mark_processed_and_promote ~sender ~state
               ; downto_ = Mina_numbers.Length.zero
               ; holder = ref state_hash
               } ) ;
-      mark_processed_and_promote children_list
+      Misc.add_orphan ~state transition_meta ;
+      actions.Misc.mark_processed_and_promote non_invalid_children
 
 (** Add a gossip to catchup state *)
-let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
-    ~gossip_type ?vc gossip_header =
+let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
+    gossip_header =
   let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
   let body =
     if is_some body then body else check_body_storage ~context header_with_hash
@@ -490,12 +513,12 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
   | `Irrelevant ->
       ()
   | `Relevant ->
-      add_received ~mark_processed_and_promote ~context ~sender ~state
-        ~gossip_type ?vc ?body (Initial_valid gossip_header)
+      add_received ~actions ~context ~sender ~state ~gossip_type ?vc ?body
+        (Initial_valid gossip_header)
   | `Preserve_gossip_data ->
       let f =
         Fn.compose
-          (handle_preserve_hint ~mark_processed_and_promote
+          (handle_preserve_hint ~actions
              ~transition_states:state.transition_states ~context )
           (Gossip.preserve_relevant_gossip ?body ?vc ~context ~gossip_type
              ~gossip_header ~sender )
@@ -504,8 +527,8 @@ let handle_gossip ~context ~mark_processed_and_promote ~state ~sender ?body
 
 (** [handle_collected_transition] adds a transition that was collected during bootstrap
     to the catchup state. *)
-let handle_collected_transition ~context:(module Context : CONTEXT)
-    ~mark_processed_and_promote ~state (b_or_h_env, vc) =
+let handle_collected_transition ~context:(module Context : CONTEXT) ~actions
+    ~state (b_or_h_env, vc) =
   let header_with_validation, body, gossip_type =
     match Network_peer.Envelope.Incoming.data b_or_h_env with
     | Bootstrap_controller.Transition_cache.Block block ->
@@ -531,13 +554,12 @@ let handle_collected_transition ~context:(module Context : CONTEXT)
          Hence maybe it's worth leaving it as non-gossip, a dependent transition. *)
       handle_gossip
         ~context:(module Context)
-        ~mark_processed_and_promote ~state ~sender ?vc ?body ~gossip_type
-        header_with_validation
+        ~actions ~state ~sender ?vc ?body ~gossip_type header_with_validation
 
 (** [handle_network_transition] adds a transition that was received through gossip
     to the catchup state. *)
-let handle_network_transition ~context:(module Context : CONTEXT)
-    ~mark_processed_and_promote ~state (b_or_h, `Valid_cb vc) =
+let handle_network_transition ~context:(module Context : CONTEXT) ~actions
+    ~state (b_or_h, `Valid_cb vc) =
   Option.value ~default:()
   @@ let%map.Option sender, header_with_validation, body, gossip_type =
        let log_local_header hh =
@@ -571,5 +593,4 @@ let handle_network_transition ~context:(module Context : CONTEXT)
      in
      handle_gossip
        ~context:(module Context)
-       ~mark_processed_and_promote ~state ~sender ?body ?vc ~gossip_type
-       header_with_validation
+       ~actions ~state ~sender ?body ?vc ~gossip_type header_with_validation
