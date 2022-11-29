@@ -272,7 +272,7 @@ let fill_in_user_commands pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.User_command.Signed_command.load db ~id:user_command_id )
       in
-      let typ = user_cmd.typ in
+      let command_type = user_cmd.command_type in
       let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
       let%bind source = account_identifier_of_id user_cmd.source_id in
       let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
@@ -304,7 +304,7 @@ let fill_in_user_commands pool block_state_hash =
       in
       return
         { Extensional.User_command.sequence_no
-        ; typ
+        ; command_type
         ; fee_payer
         ; source
         ; receiver
@@ -335,7 +335,7 @@ let fill_in_internal_commands pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.Internal_command.load db ~id:internal_command_id )
       in
-      let typ = internal_cmd.typ in
+      let command_type = internal_cmd.command_type in
       let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
       let fee = Currency.Fee.of_string internal_cmd.fee in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
@@ -357,7 +357,7 @@ let fill_in_internal_commands pool block_state_hash =
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
-        ; typ
+        ; command_type
         ; receiver
         ; fee
         ; hash

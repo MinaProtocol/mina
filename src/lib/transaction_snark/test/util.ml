@@ -124,7 +124,7 @@ let trivial_zkapp =
 let check_zkapp_command_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
-  (*TODO: merge multiple snapp transactions*)
+  (*TODO: merge multiple zkApp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
@@ -477,7 +477,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     in
     match txn_unchecked with
     | Command (Signed_command uc) ->
-        ( Signed_command.accounts_accessed (uc :> Signed_command.t)
+        ( Signed_command.accounts_referenced (uc :> Signed_command.t)
         , pending_coinbase_stack )
     | Command (Zkapp_command _) ->
         failwith "Zkapp_command commands not supported here"

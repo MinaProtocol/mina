@@ -19,6 +19,30 @@ module Make () = struct
     let of_string = of_raw_string
 
     let to_string = to_raw_string
+
+    let gen =
+      let char_generator =
+        Base_quickcheck.Generator.of_list
+          [ '0'
+          ; '1'
+          ; '2'
+          ; '3'
+          ; '4'
+          ; '5'
+          ; '6'
+          ; '7'
+          ; '8'
+          ; '9'
+          ; 'A'
+          ; 'B'
+          ; 'C'
+          ; 'D'
+          ; 'E'
+          ; 'F'
+          ]
+      in
+      String.gen_with_length (digest_size_in_bytes * 2) char_generator
+      |> Quickcheck.Generator.map ~f:of_hex
   end
 
   module T1 = struct
@@ -66,7 +90,8 @@ module Make () = struct
     , digest_string
     , digest_bigstring
     , to_hex
-    , of_hex )]
+    , of_hex
+    , gen )]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)

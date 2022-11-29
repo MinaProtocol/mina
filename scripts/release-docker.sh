@@ -110,7 +110,12 @@ if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
-TAG="minaprotocol/$SERVICE:$VERSION"
+MINAPROTOCOL="minaprotocol"
+TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
+
+# friendly, predictable tag
+GITHASH=$(git rev-parse --short=7 HEAD)
+HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -122,11 +127,12 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
+  docker tag "${TAG}" "${HASHTAG}"
   docker push "$1"
+  docker push "${HASHTAG}"
 }
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
   docker push "${TAG}"
   tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
 fi
-

@@ -465,7 +465,7 @@ module For_tests = struct
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
   let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
-      ~accounts_with_secret_keys =
+      ~accounts_with_secret_keys () =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ~verifier ~precomputed_values ?trust_system

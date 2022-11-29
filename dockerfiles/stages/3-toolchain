@@ -20,7 +20,7 @@ ARG MINA_DIR=mina
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
 # Rust nightly toolchain for WebAssembly builds
-ARG RUST_NIGHTLY=2021-11-16
+ARG RUST_NIGHTLY=2022-09-12
 
 ENV PATH "$PATH:$HOME/.cargo/bin"
 
@@ -33,7 +33,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # OS package dependencies
 RUN sudo apt-get update -y \
-  && sudo apt-get install -y \
+    && sudo apt-get install -y \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -67,15 +67,15 @@ RUN sudo apt-get update -y \
 # Buster images are used in our migrated integration tests which reqiure python2 jinja2
 # Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
 RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
-          python \
-          python-pip \
-          python-jinja2 \
-          python-flake8 \
-          python-sexpdata \
-          python3-sexpdata \
-      && sudo pip install readchar \
-      || exit 0
+    && sudo apt-get install -y \
+    python \
+    python-pip \
+    python-jinja2 \
+    python-flake8 \
+    python-sexpdata \
+    python3-sexpdata \
+    && sudo pip install readchar \
+    || exit 0
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload

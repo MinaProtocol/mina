@@ -19,7 +19,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t = A.Single.V2.t =
           { receiver_pk : Public_key.Compressed.Stable.V1.t
           ; fee : Currency.Fee.Stable.V1.t
-          ; fee_token : Token_id.Stable.V1.t
+          ; fee_token : Token_id.Stable.V2.t
           }
         [@@deriving sexp, compare, equal, yojson, hash]
 

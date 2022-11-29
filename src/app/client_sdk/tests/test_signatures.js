@@ -1,4 +1,4 @@
-var mina = require("./client_sdk.js").minaSDK;
+var mina = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").minaSDK;
 
 var keypair = {
   privateKey:
@@ -72,5 +72,3 @@ for (let i = 0; i < networks.length; i++) {
     string_signatures.forEach(t => printSignature (t.signature))
     console.log("]")
 }
-
-mina.shutdown();

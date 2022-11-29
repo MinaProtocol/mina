@@ -134,7 +134,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          let%bind () =
            ok_if_true "not enough blocks"
-             (List.length blocks >= min_resulting_blocks)
+             Mina_stdlib.List.Length.Compare.(blocks >= min_resulting_blocks)
          in
          let tx_counts =
            Array.of_list

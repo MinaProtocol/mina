@@ -1,12 +1,8 @@
 (library
  (name js_backend)
  (js_of_ocaml
-  (javascript_files
-    finite_field.js
-    elliptic_curve.js
-    bigint256.js
-    bigint_helpers.js
-    vector.js
-  ))
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version js_of_ocaml-ppx)))
+  (javascript_files finite_field.js elliptic_curve.js bigint256.js vector.js))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))

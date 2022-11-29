@@ -118,7 +118,7 @@ let account_ids_accessed t =
     transactions
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled t
   in
-  List.map transactions ~f:(fun { data = txn; _ } ->
-      Mina_transaction.Transaction.accounts_accessed txn )
+  List.map transactions ~f:(fun { data = txn; status } ->
+      Mina_transaction.Transaction.accounts_accessed txn status )
   |> List.concat
   |> List.dedup_and_sort ~compare:Account_id.compare

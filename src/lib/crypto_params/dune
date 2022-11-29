@@ -11,6 +11,7 @@
    sexplib0
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles.backend
    snarky.backendless
    cache_dir

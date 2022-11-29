@@ -3,7 +3,7 @@ open Mina_ledger
 open Currency
 open Signature_lib
 module U = Util
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
 module type Input_intf = sig

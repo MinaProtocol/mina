@@ -607,13 +607,16 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Block_gossip, Block_gossip ->
       h e
+  | Snark_work_gossip, Snark_work_gossip ->
+      h e
   | Transactions_gossip, Transactions_gossip ->
       h e
-  | Snark_work_gossip, Snark_work_gossip ->
+  | Snark_work_failed, Snark_work_failed ->
       h e
   | Persisted_frontier_loaded, Persisted_frontier_loaded ->
       h e
   | _ ->
-      failwith "TODO: better error message :)"
+      failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
+        ()
 
 (* TODO: tests on sexp and dispatch (etc) against all_event_types *)

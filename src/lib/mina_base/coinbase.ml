@@ -116,7 +116,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let min_fee = constraint_constants.account_creation_fee in
       let%map fee_transfer =
-        Option.quickcheck_generator (Fee_transfer.Gen.gen ~min_fee ~max_fee)
+        Option.quickcheck_generator (Fee_transfer.Gen.gen ~min_fee max_fee)
       in
       let fee_transfer =
         match fee_transfer with

@@ -114,9 +114,10 @@ module Step = struct
         Boolean.( && ) x_eq b_eq
       in
       let (Typ typ_unchecked) = typ_unchecked in
-      let%bind () = typ_unchecked.check t in
-      Checked.List.map forbidden_shifted_values ~f:(equal t)
-      >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+      make_checked_ast
+      @@ let%bind () = run_checked_ast @@ typ_unchecked.check t in
+         Checked.List.map forbidden_shifted_values ~f:(equal t)
+         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
     let typ : _ Snarky_backendless.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
@@ -156,7 +157,7 @@ module Step = struct
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
+               Impl.run_checked_ast (Other_field.check x) ;
                t )
            , Fn.id ) )
         spec
@@ -238,9 +239,10 @@ module Wrap = struct
         let open Internal_Basic in
         let open Let_syntax in
         let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
-        let%bind () = t0.check t in
-        Checked.List.map forbidden_shifted_values ~f:(equal t)
-        >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+        make_checked_ast
+        @@ let%bind () = run_checked_ast @@ t0.check t in
+           Checked.List.map forbidden_shifted_values ~f:(equal t)
+           >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
       (typ_unchecked, check)
 
@@ -277,7 +279,7 @@ module Wrap = struct
         (T
            ( Shifted_value.Type1.typ fp
            , (fun (Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
+               Impl.run_checked_ast (Other_field.check x) ;
                t )
            , Fn.id ) )
         (In_circuit.spec (module Impl) lookup)
