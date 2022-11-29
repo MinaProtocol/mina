@@ -4271,7 +4271,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
         ; receivers :
-            (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+            ( ( Signature_lib.Keypair.t
+              , Signature_lib.Public_key.Compressed.t )
+              Either.t
+            * Currency.Amount.t )
+            list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -4286,7 +4290,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let create_trivial_snapp ~constraint_constants () =
-      let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
+      let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
           let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
               unit Checked.t =
@@ -4309,57 +4313,26 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Pickles.compile () ~cache:Cache_dir.cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N2)
-          ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
+          ~branches:(module Nat.N1)
+          ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
           ~constraint_constants:
             (Genesis_constants.Constraint_constants.to_snark_keys_header
                constraint_constants )
-          ~choices:(fun ~self ->
-            [ trivial_rule
-            ; { identifier = "dummy"
-              ; prevs = [ self; self ]
-              ; main =
-                  (fun { public_input = _ } ->
-                    let s =
-                      Run.exists Field.typ ~compute:(fun () ->
-                          Run.Field.Constant.zero )
-                    in
-                    let public_input =
-                      Run.exists Zkapp_statement.typ ~compute:(fun () ->
-                          assert false )
-                    in
-                    let proof =
-                      Run.exists (Typ.Internal.ref ()) ~compute:(fun () ->
-                          assert false )
-                    in
-                    Impl.run_checked (dummy_constraints ()) ;
-                    (* Unsatisfiable. *)
-                    Run.Field.(Assert.equal s (s + one)) ;
-                    { previous_proof_statements =
-                        [ { public_input
-                          ; proof
-                          ; proof_must_verify = Boolean.true_
-                          }
-                        ; { public_input
-                          ; proof
-                          ; proof_must_verify = Boolean.true_
-                          }
-                        ]
-                    ; public_output = ()
-                    ; auxiliary_output = ()
-                    } )
-              ; uses_lookup = false
-              }
-            ] )
+          ~choices:(fun ~self:_ -> [ trivial_rule ])
+      in
+      let trivial_prover ?handler stmt =
+        let open Async.Deferred.Let_syntax in
+        let%map (), (), proof = trivial_prover ?handler stmt in
+        ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
 
-    let create_zkapp_command
+    let create_zkapp_command ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
-        ~update =
+        ~update ~receiver_update =
       let { Spec.fee
           ; sender = sender, sender_nonce
           ; fee_payer = fee_payer_opt
@@ -4415,11 +4388,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
 
       let sender_account_update : Account_update.Simple.t option =
+        let empty_sender = Option.value ~default:false empty_sender in
+        if empty_sender then assert (List.is_empty receivers) ;
+        let balance_change =
+          if empty_sender then Amount.Signed.zero
+          else Amount.(Signed.(negate (of_unsigned amount)))
+        in
         let sender_account_update_body : Account_update.Body.Simple.t =
           { public_key = sender_pk
           ; update = Account_update.Update.noop
           ; token_id = Token_id.default
-          ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
+          ; balance_change
           ; increment_nonce = true
           ; events = []
           ; sequence_events = []
@@ -4432,7 +4411,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
         in
         Option.some_if
-          ((not (List.is_empty receivers)) || new_zkapp_account)
+          ((not (List.is_empty receivers)) || new_zkapp_account || empty_sender)
           ( { body = sender_account_update_body
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
@@ -4503,9 +4482,29 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let other_receivers =
         List.map receivers ~f:(fun (receiver, amt) : Account_update.Simple.t ->
+            let receiver =
+              match receiver with
+              | First receiver_kp ->
+                  Signature_lib.Public_key.compress receiver_kp.public_key
+              | Second receiver ->
+                  receiver
+            in
+            let receiver_auth, authorization_kind, use_full_commitment =
+              match receiver_auth with
+              | Some Control.Tag.Signature ->
+                  ( Control.Signature Signature.dummy
+                  , Account_update.Authorization_kind.Signature
+                  , true )
+              | Some Proof ->
+                  failwith
+                    "Not implemented. Pickles_types.Nat.N2.n \
+                     Pickles_types.Nat.N2.n ~domain_log2:15)"
+              | Some None_given | None ->
+                  (None_given, None_given, false)
+            in
             { body =
                 { public_key = receiver
-                ; update
+                ; update = receiver_update
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amt
                 ; increment_nonce = false
@@ -4514,11 +4513,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; preconditions = { preconditions' with account = Accept }
-                ; use_full_commitment = false
+                ; use_full_commitment
                 ; caller = Call
-                ; authorization_kind = None_given
+                ; authorization_kind
                 }
-            ; authorization = Control.None_given
+            ; authorization = receiver_auth
             } )
       in
       let account_updates_data =
@@ -4562,6 +4561,35 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (Random_oracle.Input.Chunked.field commitment)
             in
             { body = s.body; authorization = Signature sender_signature_auth } )
+      in
+      let other_receivers =
+        List.map2_exn other_receivers receivers ~f:(fun s (receiver, _amt) ->
+            match s.authorization with
+            | Control.Signature _ ->
+                let commitment =
+                  if s.body.use_full_commitment then full_commitment
+                  else commitment
+                in
+                let receiver_kp =
+                  match receiver with
+                  | First receiver_kp ->
+                      receiver_kp
+                  | Second _ ->
+                      failwith
+                        "Receiver authorization is signature, expecting \
+                         receiver keypair but got receiver public key"
+                in
+                let receiver_signature_auth =
+                  Signature_lib.Schnorr.Chunked.sign receiver_kp.private_key
+                    (Random_oracle.Input.Chunked.field commitment)
+                in
+                { Account_update.Simple.body = s.body
+                ; authorization = Signature receiver_signature_auth
+                }
+            | Control.Proof _ ->
+                failwith ""
+            | Control.None_given ->
+                s )
       in
       ( `Zkapp_command
           (Zkapp_command.of_simple
@@ -4650,6 +4678,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         create_zkapp_command ~constraint_constants
           (Deploy_snapp_spec.spec_of_t spec)
           ~update:update_vk
+          ~receiver_update:Mina_base.Account_update.Update.noop
       in
       assert (List.is_empty account_updates) ;
       (* invariant: same number of keypairs, snapp_zkapp_command *)
@@ -4708,8 +4737,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers :
-            (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+        ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -4743,7 +4771,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { fee
         ; sender
         ; fee_payer
-        ; receivers
+        ; receivers = List.map receivers ~f:(fun (r, amt) -> (First r, amt))
         ; amount
         ; zkapp_account_keypairs
         ; memo
@@ -4765,9 +4793,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let update_states ?zkapp_prover ~constraint_constants
-        (spec : Update_states_spec.t) =
-      let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+    let update_states ?receiver_auth ?zkapp_prover ?empty_sender
+        ~constraint_constants (spec : Update_states_spec.t) =
+      let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4775,10 +4803,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         create_zkapp_command ~constraint_constants
           (Update_states_spec.spec_of_t spec)
           ~update:spec.snapp_update
+          ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
+          ?empty_sender
       in
-      assert (List.is_empty account_updates) ;
-      assert (Option.is_none sender_account_update) ;
-      assert (not @@ List.is_empty snapp_zkapp_command) ;
+      let receivers = (Zkapp_command.to_simple p).account_updates in
       let snapp_zkapp_command =
         snapp_zkapp_command
         |> List.map ~f:(fun p -> (p, p))
@@ -4846,7 +4874,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 failwith
                   "Current authorization not Proof or Signature or None_given" )
       in
-      let account_updates = snapp_zkapp_command in
+      let account_updates =
+        Option.value_map ~default:[] ~f:(fun p -> [ p ]) sender_account_update
+        @ snapp_zkapp_command @ receivers
+      in
       let zkapp_command : Zkapp_command.t =
         Zkapp_command.of_simple { fee_payer; account_updates; memo }
       in
@@ -4891,7 +4922,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { fee
         ; sender
         ; fee_payer
-        ; receivers
+        ; receivers = List.map receivers ~f:(fun (r, amt) -> (Second r, amt))
         ; amount
         ; zkapp_account_keypairs
         ; memo
@@ -4913,7 +4944,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         create_zkapp_command
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           (Multiple_transfers_spec.spec_of_t spec)
-          ~update:spec.snapp_update
+          ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in
       assert (Option.is_some sender_account_update) ;
       assert (List.is_empty snapp_zkapp_command) ;

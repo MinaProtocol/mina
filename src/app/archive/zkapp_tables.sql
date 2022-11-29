@@ -179,8 +179,6 @@ CREATE TABLE zkapp_accounts
 , zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
 );
 
-CREATE TYPE zkapp_authorization_kind_type AS ENUM ('proof','signature','none_given');
-
 CREATE TABLE zkapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
 , token_id_lower_bound     text             NOT NULL
@@ -278,10 +276,10 @@ CREATE TABLE zkapp_account_update_body
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 
+/* possible future enhancement: add NULLable authorization column for proofs and signatures */
 CREATE TABLE zkapp_account_update
 ( id                       serial                          PRIMARY KEY
 , body_id                  int                             NOT NULL REFERENCES zkapp_account_update_body(id)
-, authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
 
 /* a list of of failures for an account update in a zkApp

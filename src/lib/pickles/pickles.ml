@@ -194,46 +194,56 @@ module Make_str (_ : Wire_types.Concrete) = struct
         local_max_proofs_verifieds
         H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
     let dummy_chals = Dummy.Ipa.Wrap.challenges in
-    let rev_magic :
-        type ms.
-           (* This type is wrong actually, the "ms" type-level list should be
-              reversed but there's no way to do that. *)
-           ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
-        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
-     fun xs -> Obj.magic (List.rev (Obj.magic xs))
+    let module Messages =
+      H1.T (Proof_.Messages_for_next_proof_over_same_field.Wrap) in
+    let module Maxes = H1.T (Nat) in
+    let (T (messages_len, _)) = Messages.length messages_for_next_wrap_proofs in
+    let (T (maxes_len, _)) = Maxes.length M.maxes in
+    let (T difference) =
+      let rec sub : type n m. n Nat.t -> m Nat.t -> Nat.e =
+       fun x y ->
+        let open Nat in
+        match (x, y) with
+        | _, Z ->
+            T x
+        | Z, S _ ->
+            assert false
+        | S x, S y ->
+            sub x y
+      in
+      sub maxes_len messages_len
     in
     let rec go :
         type len ms ns.
-           ms H1.T(Nat).t
-        -> ns H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
-        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
-     fun maxes messages_for_next_wrap_proofs ->
-      match (maxes, messages_for_next_wrap_proofs) with
-      | [], _ :: _ ->
-          assert false
-      | [], [] ->
-          []
-      | m :: maxes, [] ->
+        len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t =
+     fun pad maxes messages_for_next_wrap_proofs ->
+      match (pad, maxes, messages_for_next_wrap_proofs) with
+      | S pad, m :: maxes, _ ->
           { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
           ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
           }
-          :: go maxes []
-      | ( m :: maxes
+          :: go pad maxes messages_for_next_wrap_proofs
+      | S _, [], _ ->
+          assert false
+      | Z, [], [] ->
+          []
+      | ( Z
+        , m :: maxes
         , messages_for_next_wrap_proof :: messages_for_next_wrap_proofs ) ->
           let messages_for_next_wrap_proof =
             { messages_for_next_wrap_proof with
               old_bulletproof_challenges =
-                Vector.extend_front_exn
+                Vector.extend_exn
                   messages_for_next_wrap_proof.old_bulletproof_challenges m
                   dummy_chals
             }
           in
-          messages_for_next_wrap_proof :: go maxes messages_for_next_wrap_proofs
+          messages_for_next_wrap_proof
+          :: go Z maxes messages_for_next_wrap_proofs
+      | Z, [], _ :: _ | Z, _ :: _, [] ->
+          assert false
     in
-    rev_magic
-      (go
-         (Obj.magic (List.rev (Obj.magic M.maxes)))
-         (rev_magic messages_for_next_wrap_proofs) )
+    go difference M.maxes messages_for_next_wrap_proofs
 
   module Verification_key = struct
     include Verification_key
@@ -1011,9 +1021,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self =
       match self with
       | None ->
-          { Tag.id = Type_equal.Id.create ~name sexp_of_opaque
-          ; kind = Compiled
-          }
+          Tag.(create ~kind:Compiled name)
       | Some self ->
           self
     in
@@ -1914,9 +1922,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -2146,7 +2153,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 64000 do
@@ -2522,13 +2529,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               assert false
                         in
                         let overwritten_prechals =
-                          Array.map overwritten_prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map overwritten_prechals
+                            ~f:Bulletproof_challenge.unpack
                         in
+
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
@@ -2839,9 +2847,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -3071,7 +3078,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 61000 do
@@ -3412,13 +3419,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let b = Tick.Field.random () in
                         let prechals =
-                          Array.map prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map prechals ~f:Bulletproof_challenge.unpack
                         in
+
                         (prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals

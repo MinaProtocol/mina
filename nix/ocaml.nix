@@ -8,8 +8,8 @@ let
   inherit (builtins) filterSource path;
 
   inherit (pkgs.lib)
-    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
-    optionalString escapeShellArg;
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
+    escapeShellArg;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
@@ -44,8 +44,9 @@ let
 
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays (opam-nix.defsToScope pkgs
-    ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
+  scope = opam-nix.applyOverlays opam-nix.__overlays
+    (opam-nix.defsToScope pkgs { }
+      ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
@@ -126,6 +127,8 @@ let
         # Prevent unnecessary rebuilds on non-source changes
         src = filtered-src;
 
+        withFakeOpam = false;
+
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "<unknown>";
         MINA_COMMIT_SHA1 = "<unknown>";
@@ -194,8 +197,16 @@ let
           dune build @doc || true
         '';
 
-        outputs =
-          [ "out" "archive" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
+        outputs = [
+          "out"
+          "archive"
+          "generate_keypair"
+          "mainnet"
+          "testnet"
+          "genesis"
+          "sample"
+          "batch_txn_tool"
+        ];
 
         installPhase = ''
           mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin

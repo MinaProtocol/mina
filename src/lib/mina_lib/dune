@@ -83,7 +83,6 @@
    timeout_lib
    prover
    verifier
-   non_empty_list
    snark_work_lib
    truth
    ledger_catchup
