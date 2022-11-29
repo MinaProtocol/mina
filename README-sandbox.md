@@ -133,8 +133,9 @@ environment variable, as it might be required in some setups:
 $ export MINA_ROSETTA_MAX_DB_POOL_SIZE=128
 ```
 
-Assuming `mina` CLI is in you path, run the following command 
-from the mina directory and ensure the config-directory is an absolute-path:
+Assuming `mina` CLI is in you path, run the following command, 
+making sure that required environment variables are properly set
+(by Nix shell or otherwise):
 
 ```shell
 $ mina daemon \
