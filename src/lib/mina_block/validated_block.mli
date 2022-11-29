@@ -17,12 +17,12 @@ val forget : t -> Block.with_hash
 
 val remember : t -> Validation.fully_valid_with_block
 
-val delta_block_chain_proof : t -> State_hash.t Non_empty_list.t
+val delta_block_chain_proof : t -> State_hash.t Mina_stdlib.Nonempty_list.t
 
 val valid_commands : t -> User_command.Valid.t With_status.t list
 
 val unsafe_of_trusted_block :
-     delta_block_chain_proof:State_hash.t Non_empty_list.t
+     delta_block_chain_proof:State_hash.t Mina_stdlib.Nonempty_list.t
   -> [ `This_block_is_trusted_to_be_safe of Block.with_hash ]
   -> t
 

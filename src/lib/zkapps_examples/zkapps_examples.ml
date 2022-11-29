@@ -181,6 +181,7 @@ module Account_update_under_construction = struct
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
+      ; caller : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
       ; rev_calls :
@@ -192,10 +193,11 @@ module Account_update_under_construction = struct
       ; sequence_events : Sequence_events.t
       }
 
-    let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
-        =
+    let create ~public_key ?(token_id = Token_id.(Checked.constant default))
+        ?(caller = token_id) () =
       { public_key
       ; token_id
+      ; caller
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
       ; rev_calls = []
@@ -261,7 +263,7 @@ module Account_update_under_construction = struct
             ; account = Account_condition.to_predicate t.account_condition
             }
         ; use_full_commitment = Boolean.false_
-        ; caller = t.token_id
+        ; caller = t.caller
         ; authorization_kind =
             { is_signed = Boolean.false_; is_proved = Boolean.true_ }
         }
@@ -307,11 +309,11 @@ module Account_update_under_construction = struct
   end
 end
 
-class account_update ~public_key ?token_id =
+class account_update ~public_key ?token_id ?caller =
   object
     val mutable account_update =
       Account_update_under_construction.In_circuit.create ~public_key ?token_id
-        ()
+        ?caller ()
 
     method assert_state_proved =
       account_update <-
@@ -423,9 +425,9 @@ let to_account_update (account_update : account_update) :
 open Pickles_types
 open Hlist
 
-let wrap_main ~public_key ?token_id f
+let wrap_main ~public_key ?token_id ?caller f
     { Pickles.Inductive_rule.public_input = () } =
-  let account_update = new account_update ~public_key ?token_id in
+  let account_update = new account_update ~public_key ?token_id ?caller in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
   ; public_output = account_update

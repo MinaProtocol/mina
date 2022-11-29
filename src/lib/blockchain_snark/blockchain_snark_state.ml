@@ -109,27 +109,27 @@ let%snarkydef_ step ~(logger : Logger.t)
     State_hash.var_of_hash_packed (Data_as_hash.hash new_state)
   in
   let%bind transition =
-    with_label __LOC__
-      (exists Snark_transition.typ ~request:(As_prover.return Transition))
+    with_label __LOC__ (fun () ->
+        exists Snark_transition.typ ~request:(As_prover.return Transition) )
   in
   let%bind txn_snark =
-    with_label __LOC__
-      (exists Transaction_snark.Statement.With_sok.typ
-         ~request:(As_prover.return Txn_snark) )
+    with_label __LOC__ (fun () ->
+        exists Transaction_snark.Statement.With_sok.typ
+          ~request:(As_prover.return Txn_snark) )
   in
   let%bind ( previous_state
            , previous_state_hash
            , previous_blockchain_proof_input
            , previous_state_body_hash ) =
     let%bind prev_state_ref =
-      with_label __LOC__
-        (exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state))
+      with_label __LOC__ (fun () ->
+          exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state) )
     in
     let%bind t =
-      with_label __LOC__
-        (exists
-           (Protocol_state.typ ~constraint_constants)
-           ~compute:(As_prover.Ref.get prev_state_ref) )
+      with_label __LOC__ (fun () ->
+          exists
+            (Protocol_state.typ ~constraint_constants)
+            ~compute:(As_prover.Ref.get prev_state_ref) )
     in
     let%map previous_state_hash, body = Protocol_state.hash_checked t in
     let previous_blockchain_proof_input =
@@ -140,10 +140,10 @@ let%snarkydef_ step ~(logger : Logger.t)
     (t, previous_state_hash, previous_blockchain_proof_input, body)
   in
   let%bind `Success updated_consensus_state, consensus_state =
-    with_label __LOC__
-      (Consensus_state_hooks.next_state_checked ~constraint_constants
-         ~prev_state:previous_state ~prev_state_hash:previous_state_hash
-         transition txn_snark.supply_increase )
+    with_label __LOC__ (fun () ->
+        Consensus_state_hooks.next_state_checked ~constraint_constants
+          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
+          transition txn_snark.supply_increase )
   in
   let supercharge_coinbase =
     Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
@@ -181,7 +181,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     let t = { t with previous_state_hash } in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in
-      with_label __LOC__ (State_hash.assert_equal h new_state_hash)
+      with_label __LOC__ (fun () -> State_hash.assert_equal h new_state_hash)
     in
     (t, is_base_case)
   in
@@ -211,11 +211,11 @@ let%snarkydef_ step ~(logger : Logger.t)
       in
       (*new stack or update one*)
       let%map new_root =
-        with_label __LOC__
-          (Pending_coinbase.Checked.add_coinbase ~constraint_constants
-             root_after_delete
-             (Snark_transition.pending_coinbase_update transition)
-             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash )
+        with_label __LOC__ (fun () ->
+            Pending_coinbase.Checked.add_coinbase ~constraint_constants
+              root_after_delete
+              (Snark_transition.pending_coinbase_update transition)
+              ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash )
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
@@ -261,8 +261,8 @@ let%snarkydef_ step ~(logger : Logger.t)
       Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
     in
     let%bind () =
-      with_label __LOC__
-        (Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ])
+      with_label __LOC__ (fun () ->
+          Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ] )
     in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
@@ -315,7 +315,7 @@ let%snarkydef_ step ~(logger : Logger.t)
         Boolean.not is_base_case
   in
   let%bind () =
-    with_label __LOC__ (Boolean.Assert.any [ is_base_case; success ])
+    with_label __LOC__ (fun () -> Boolean.Assert.any [ is_base_case; success ])
   in
   let%bind previous_blockchain_proof =
     exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state_proof)
@@ -352,10 +352,12 @@ let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
   let open Tick in
   check
-    (Fn.flip handle (wrap_handler handler w)
-       (let%bind curr = exists typ ~compute:(As_prover.return new_state_hash) in
-        step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr
-       ) )
+    (Fn.flip handle (wrap_handler handler w) (fun () ->
+         let%bind curr =
+           exists typ ~compute:(As_prover.return new_state_hash)
+         in
+         step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr )
+    )
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =

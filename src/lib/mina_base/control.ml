@@ -69,7 +69,11 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+  type t = Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
+    | Signature
+    | Proof
+    | None_given
+  [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
 end
@@ -111,8 +115,8 @@ module As_record = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~proof:!.(option ~js_type:`Or_undefined @@ proof @@ o ())
-      ~signature:!.(option ~js_type:`Or_undefined @@ signature_deriver @@ o ())
+      ~proof:!.(option ~js_type:Or_undefined @@ proof @@ o ())
+      ~signature:!.(option ~js_type:Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 

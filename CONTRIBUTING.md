@@ -80,8 +80,7 @@ for common troubleshooting steps.
 
 There are three main pieces of Mina documentation:
 
-1. The [`docs`](docs/) directory, which has prose documentation of various sorts. This
-   doesn't exist yet, but it should by the time this repo is made public!
+1. The [`docs`](docs/) directory, which has prose documentation of various sorts.
 2. The `README.md` files in various directories. These explain the contents of that
    directory at a high level: the purpose of the library, design constraints, anything else
    specific to that directory.
@@ -132,9 +131,13 @@ git tag testnet-v0.$WHATEVER_IS_NEXT
 git push testnet-v0.$WHATEVER_IS_NEXT
 ```
 
-Eventually, we will have a "stable" or "mainnet" branch. Once we do, the process will look like:
+Previously we used `stable` branch and after that a couple `release/mainnet-X.X.X`
+branches, but currently we just create a branch `release/X.X.X` for each new release
+and all the changes that go into that release should be merged into the appropriate
+release branch.
 
-Create a PR to merge testnet into stable. Once that is approved by CI and checked in...
+Create a PR to merge testnet into the current release branch. Once that is
+approved by CI and checked in...
 
 ```
 git checkout stable

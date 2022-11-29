@@ -75,7 +75,9 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match%map.Async.Deferred k () with
+            match%map.Async.Deferred
+              Monitor.try_with_join_or_error ~here:[%here] k
+            with
             | Error e ->
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
@@ -86,7 +88,7 @@ module Inputs = struct
                         *)
                       , `String (Sexp.to_string (sexp_of_single_spec single)) )
                     ] ;
-                Error.raise e
+                Error e
             | Ok res ->
                 Cache.add cache ~statement ~proof:res ;
                 let total = Time.abs_diff (Time.now ()) start in
@@ -194,7 +196,7 @@ module Inputs = struct
                                   (M.of_zkapp_command_segment_exn ~witness)
                               in
 
-                              let%map (p : Ledger_proof.t) =
+                              let%bind (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
                                   ~f:(fun acc (witness, spec, stmt) ->
                                     let%bind (prev : Ledger_proof.t) =
@@ -212,7 +214,7 @@ module Inputs = struct
                               if
                                 Transaction_snark.Statement.equal
                                   (Ledger_proof.statement p) input
-                              then p
+                              then Deferred.return (Ok p)
                               else (
                                 [%log fatal]
                                   "Zkapp_command transaction final statement \
@@ -228,9 +230,10 @@ module Inputs = struct
                                     ; ( "inputs"
                                       , zkapp_command_inputs_to_yojson inputs )
                                     ] ;
-                                failwith
-                                  "Zkapp_command transaction final statement \
-                                   mismatch" ) )
+                                Deferred.return
+                                  (Or_error.error_string
+                                     "Zkapp_command transaction final \
+                                      statement mismatch" ) ) )
                       | _ ->
                           let%bind t =
                             Deferred.return

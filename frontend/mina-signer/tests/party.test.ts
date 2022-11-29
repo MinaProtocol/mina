@@ -95,7 +95,7 @@ let mockedZkappCommand = {
       authorization: {
         proof: null,
         signature:
-          "2Xvuve2hGHS8UTZSKJrqqkySBvsM4gLz3cJns3BoYo3vtEbfKnfZqG3SHU9gLSBpjV3H7Sho3sha7wDUvqvk88wVp6mdLMt",
+          "7mX5N5V5mW1HtH6X2bVNadxkqQLtSyDDsp8RSgWxCwweAy2mjjuifxRMcpFNnyru2LerpNtkxrHmHCczyS8uqHpQQXQUzgNF",
       },
     },
   ],

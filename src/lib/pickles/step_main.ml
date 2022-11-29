@@ -67,7 +67,7 @@ let verify_one
           hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
-              (Vector.trim branch_data.proofs_verified_mask
+              (Vector.trim_front branch_data.proofs_verified_mask
                  (Nat.lte_exn
                     (Vector.length prev_challenge_polynomial_commitments)
                     Nat.N2.n ) )
@@ -130,6 +130,7 @@ let step_main :
            and type statement = a_value
            and type prev_values = prev_values
            and type max_proofs_verified = max_proofs_verified
+           and type proofs_verified = proofs_verified
            and type return_value = ret_value
            and type auxiliary_value = auxiliary_value )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -345,14 +346,14 @@ let step_main :
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
-        and unfinalized_proofs =
+        and unfinalized_proofs_unextended =
           exists
             (Vector.typ'
                (Vector.map
                   ~f:(fun uses_lookup ->
                     Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
                       ~uses_lookup )
-                  (Vector.extend lookup_usage lte Max_proofs_verified.n No) ) )
+                  lookup_usage ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
@@ -419,10 +420,10 @@ let step_main :
                   with_label "messages_for_next_wrap_proofs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
                       V.f proofs_verified
-                        (Vector.trim messages_for_next_wrap_proof lte) )
+                        (Vector.trim_front messages_for_next_wrap_proof lte) )
                 and unfinalized_proofs =
                   let module H = H1.Of_vector (Unfinalized) in
-                  H.f proofs_verified (Vector.trim unfinalized_proofs lte)
+                  H.f proofs_verified unfinalized_proofs_unextended
                 and datas =
                   let self_data :
                       ( var
@@ -512,6 +513,10 @@ let step_main :
                     (* Note: the bulletproof_challenges here are unpadded! *)
                     bulletproof_challenges
                 } )
+        in
+        let unfinalized_proofs =
+          Vector.extend_front unfinalized_proofs_unextended lte
+            Max_proofs_verified.n (Unfinalized.dummy ())
         in
         ( { Types.Step.Statement.proof_state =
               { unfinalized_proofs; messages_for_next_step_proof }

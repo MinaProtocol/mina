@@ -44,7 +44,7 @@ let base_snark = create "MinaBaseSnark"
 
 let transition_system_snark = create "MinaTransitionSnark"
 
-let signature_testnet = create "MinaSignature"
+let signature_testnet = create "CodaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
 

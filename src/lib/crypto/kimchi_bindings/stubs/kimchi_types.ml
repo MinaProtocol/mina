@@ -43,6 +43,22 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array
       * 'caml_f array
       * 'caml_f array
+  ; coefficients :
+      'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
   ; z : 'caml_f array
   ; s :
       'caml_f array
@@ -131,6 +147,7 @@ type nonrec gate_type =
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd
+  | Xor16
 
 type nonrec 'f circuit_gate =
   { typ : gate_type

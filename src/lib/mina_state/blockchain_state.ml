@@ -12,6 +12,12 @@ module Poly = struct
            , 'time
            , 'body_reference )
            t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; registers :

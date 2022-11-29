@@ -4,21 +4,21 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Deploy_snapp_spec
 open Mina_base
 
-let%test_module "Snapp deploy tests" =
+let%test_module "zkApp deploy tests" =
   ( module struct
-    let memo = Signed_command_memo.create_from_string_exn "Snapp deploy tests"
+    let memo = Signed_command_memo.create_from_string_exn "zkApp deploy tests"
 
     let constraint_constants = U.constraint_constants
 
-    let%test_unit "create a new snapp account/deploy a smart contract" =
+    let%test_unit "create a new zkAapp account/deploy a smart contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let spec = List.hd_exn specs in
-                  let fee = Currency.Fee.of_int 1_000_000 in
-                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+                  let amount = Currency.Amount.of_mina_int_exn 10 in
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
@@ -55,8 +55,8 @@ let%test_module "Snapp deploy tests" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let spec = List.hd_exn specs in
-                  let fee = Currency.Fee.of_int 1_000_000 in
-                  let amount = Currency.Amount.of_int 7_000_000_000 in
+                  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+                  let amount = Currency.Amount.of_mina_int_exn 7 in
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
@@ -79,7 +79,7 @@ let%test_module "Snapp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to snapp account/deploy a smart \
+    let%test_unit "change a non-snapp account to zkApp account/deploy a smart \
                    contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -87,8 +87,8 @@ let%test_module "Snapp deploy tests" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let spec = List.hd_exn specs in
-                  let fee = Currency.Fee.of_int 1_000_000 in
-                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+                  let amount = Currency.Amount.of_mina_int_exn 10 in
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
@@ -111,7 +111,7 @@ let%test_module "Snapp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to snapp account/deploy a smart \
+    let%test_unit "change a non-zkApp account to zkApp account/deploy a smart \
                    contract- different fee payer" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -120,8 +120,8 @@ let%test_module "Snapp deploy tests" =
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let spec0 = List.nth_exn specs 0 in
                   let spec1 = List.nth_exn specs 1 in
-                  let fee = Currency.Fee.of_int 1_000_000 in
-                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+                  let amount = Currency.Amount.of_mina_int_exn 10 in
                   let test_spec : Spec.t =
                     { sender = spec0.sender
                     ; fee
@@ -152,7 +152,7 @@ let%test_module "Snapp deploy tests" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let spec = List.hd_exn specs in
-                  let fee = Currency.Fee.of_int 1_000_000 in
+                  let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
                   (*transfering zero should cause the transaction to fail if the account is not already created*)
                   let amount = Currency.Amount.zero in
                   let test_spec : Spec.t =
