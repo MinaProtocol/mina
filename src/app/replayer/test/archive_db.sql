@@ -39,6 +39,16 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: authorization_kind_type; Type: TYPE; Schema: public;
+--
+
+CREATE TYPE public.authorization_kind_type AS ENUM (
+    'None_given',
+    'Signature',
+    'Proof'
+);
+
+--
 -- Name: call_type; Type: TYPE; Schema: public;
 --
 
@@ -353,7 +363,7 @@ ALTER SEQUENCE public.epoch_data_id_seq OWNED BY public.epoch_data.id;
 
 CREATE TABLE public.internal_commands (
     id integer NOT NULL,
-    typ public.internal_command_type NOT NULL,
+    command_type public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
     fee text NOT NULL,
     hash text NOT NULL
@@ -567,7 +577,7 @@ ALTER SEQUENCE public.tokens_id_seq OWNED BY public.tokens.id;
 
 CREATE TABLE public.user_commands (
     id integer NOT NULL,
-    typ public.user_command_type NOT NULL,
+    command_type public.user_command_type NOT NULL,
     fee_payer_id integer NOT NULL,
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
@@ -1142,7 +1152,8 @@ CREATE TABLE public.zkapp_account_update_body (
     zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
-    caller public.call_type NOT NULL
+    caller public.call_type NOT NULL,
+    authorization_kind public.authorization_kind_type NOT NULL
 );
 
 
@@ -2063,11 +2074,11 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 --
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, "timestamp", chain_status) FROM stdin;
-1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	\N	3NLeQxhRU3qHv34vHNUwD2ht9gzW3ioAGqBmVwXjYhsSDHPuBDQn	1	1	1	1	2	77	3100000000000000000	jwS4u5UYaySzEDNDhCT4HnWBcUvARBYjWLGKArheFrzRbvhr8Pd	1	0	0	1659993000000	canonical
-2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jxoAHY24uyTC9qSVBwSh9vtFcJkRroXpQjtvQJr4p3D1T8xRrV6	2	22	22	1659993660000	pending
-3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	3	3	1	1	4	77	3100000000000000000	jwR1YaaEjgdegXHuX9mAiFPcAUJD8aWPDbZJcyV2WTEkCHJ3G2W	3	24	24	1659993720000	pending
-4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	3	3	1	1	5	77	3100000000000000000	jwVvbHXxwuBXNVzwoz8YJoo9DvEoRJCsYS1f5tosoJyvkWxjEAM	4	26	26	1659993780000	pending
-5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3	1	1	6	77	3100000000000000000	jxWhYJGQ1jzvyUJ2h5X6y8r1avFiEnPyeCr7qAdGxEGjCJDuWug	5	28	28	1659993840000	pending
+1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	\N	3NLeQxhRU3qHv34vHNUwD2ht9gzW3ioAGqBmVwXjYhsSDHPuBDQn	1	1	1	1	2	77	3100000000000000000	jxH2eGKbuJ1TZApcnBjxQnz86Bm3GzBqLmsb1NQ7qGvbc54nrwR	1	0	0	1659993000000	canonical
+2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jwHPh9uRv5yj7jCvNAoqfA4vAt4WjvcJsiofnuucd8qtfxS1gky	2	22	22	1659993660000	pending
+3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	3	3	1	1	4	77	3100000000000000000	jxTXkxTG8B8Y2N46T3GJLrT7cKVBdKZFt1FHdtqTtmwkQpuzBqb	3	24	24	1659993720000	pending
+4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	3	3	1	1	5	77	3100000000000000000	jxrx7tmPvsTeopt1rnnFykEfTVvxH1vTX2iz5gCnD9gcnnSE4yY	4	26	26	1659993780000	pending
+5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3	1	1	6	77	3100000000000000000	jy2yDdVb7kcD3axFLRBoT62wQyj66fAW2ufAsTWZZBQtvKT4XVh	5	28	28	1659993840000	pending
 6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	3	3	1	1	7	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	6	31	31	1659993930000	pending
 7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	3	3	1	1	8	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	7	33	33	1659993990000	pending
 8	3NLAtWGLyAsD9biM2tx6djxKGaUR8FwWm3VCFSmSZNxej2mWu4ck	7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	3	3	1	1	9	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	8	36	36	1659994080000	pending
@@ -2079,11 +2090,11 @@ COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_wi
 14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	3	3	1	1	15	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	14	48	48	1659994440000	pending
 15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	3	3	1	1	16	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	15	49	49	1659994470000	pending
 16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	3	3	1	1	17	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	16	50	50	1659994500000	pending
-17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jwVkVSdQTtSNRi698eFeiDeJJrAY1MeW4ZZxadpXEbLtNzRyDb6	17	56	56	1659994680000	pending
-18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jx2K8PqoKxRSsTqhpAkeAgJ1dxBuYfGvHF2t4qbv6BwyYhFoc9K	18	57	57	1659994710000	pending
-19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jx2K8PqoKxRSsTqhpAkeAgJ1dxBuYfGvHF2t4qbv6BwyYhFoc9K	19	60	60	1659994800000	pending
-20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jwedHhoVL6VZfty46JNEqwupysxuA2mL425c9d9JQr4kWsar8Ch	20	65	65	1659994950000	pending
-21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jwwBNTMAo3n4A8kL88FTp2vxh4VqEV1owT3Cyx1jek9YdAqC1Qw	21	68	68	1659995040000	pending
+17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jxkzgEktJZGkXuWvBfAVWkeYZRs17s1M2rDPBx5ymovS3inFKsG	17	56	56	1659994680000	pending
+18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jxF8cFJazX4YgCGHquL1i2DMxHUeo19fuw75XyDSgRes7VmwGe7	18	57	57	1659994710000	pending
+19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jxF8cFJazX4YgCGHquL1i2DMxHUeo19fuw75XyDSgRes7VmwGe7	19	60	60	1659994800000	pending
+20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jxJ5pxUYZ1NYHh5Wi7EGz5ufRoxsXo3WerATFr6fBoYYhHicGMi	20	65	65	1659994950000	pending
+21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jxSPqQatMxxoZEcYDP5K7kSqX4yw6vsWyY1BpjCHg1Bkcui71Br	21	68	68	1659995040000	pending
 \.
 
 
@@ -2265,7 +2276,7 @@ COPY public.epoch_data (id, seed, ledger_hash_id, total_currency, start_checkpoi
 -- Data for Name: internal_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.internal_commands (id, typ, receiver_id, fee, hash) FROM stdin;
+COPY public.internal_commands (id, command_type, receiver_id, fee, hash) FROM stdin;
 1	coinbase	2	1440000000000	CkpZPC8P5wJ5zoMsUnwQ4yzMggpeifgXEtKG8L1qmsSZqAUaTGyHj
 2	fee_transfer	2	3500000000	CkpaKi6CtGXrNuB8NgSpH3wFkqeUNadD1BiXk41PpdGcHUnsRLYV7
 3	fee_transfer	2	1500000000	CkpZGU5BN9RcNywUqbNQ6ZUDmWM4MAAK9PcnTYASi7LXuKAbfMYQQ
@@ -2344,7 +2355,7 @@ COPY public.tokens (id, value, owner_public_key_id, owner_token_id) FROM stdin;
 -- Data for Name: user_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.user_commands (id, typ, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
+COPY public.user_commands (id, command_type, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
 1	payment	2	2	1	30	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZcwMTKuth1tPqomkFeYmsSkbqXNvzr9PsZKs6yTZDpvn7BwJpR
 2	payment	2	2	1	31	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZgMW3vCgskUnMLzLUngHKADPw72bWYWEeeCYmBsd9be1Nwtmzq
 3	payment	2	2	1	32	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZm3VfGE7AU8mMo2YZosE1VodqQYzZHzNc61xJvFTbhXbASbWUC
@@ -2580,10 +2591,10 @@ COPY public.zkapp_account_update (id, body_id, authorization_kind) FROM stdin;
 -- Data for Name: zkapp_account_update_body; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
-1	5	1	-10000000000	t	1	1	1	0	1	1	f	call
-2	7	2	9000000000	f	1	1	1	0	1	2	t	call
-3	7	3	0	f	1	1	1	0	1	2	t	call
+COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller, authorization_kind) FROM stdin;
+1	5	1	-10000000000	t	1	1	1	0	1	1	f	call	Signature
+2	7	2	9000000000	f	1	1	1	0	1	2	t	call	Signature
+3	7	3	0	f	1	1	1	0	1	2	t	call	Proof
 \.
 
 

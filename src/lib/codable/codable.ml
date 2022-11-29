@@ -137,8 +137,10 @@ struct
 
   let of_base64 b64 : T.t Or_error.t =
     match Base64.decode b64 with
-    | Ok s ->
-        Ok (Binable.of_string (module T) s)
+    | Ok s -> (
+        try Ok (Binable.of_string (module T) s)
+        with Bin_prot.Common.Read_error _ as e ->
+          Error (Error.of_exn ~backtrace:`Get e) )
     | Error (`Msg msg) ->
         Error (Error.of_string msg)
 end

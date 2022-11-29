@@ -16,6 +16,8 @@ module Make (Field : Kimchi_backend.Field.S) = struct
     include Rounds
     module Field = Field
 
+    let alpha = 7
+
     (* x^7 *)
     let to_the_alpha x =
       (* square |> mul x |> square |> mul x *)

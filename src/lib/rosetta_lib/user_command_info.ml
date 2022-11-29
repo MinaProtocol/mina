@@ -227,7 +227,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let payment =
     let%map () =
-      if Int.equal (List.length ops) 3 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 3) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
@@ -316,7 +316,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let delegation =
     let%map () =
-      if Int.equal (List.length ops) 2 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 2) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in

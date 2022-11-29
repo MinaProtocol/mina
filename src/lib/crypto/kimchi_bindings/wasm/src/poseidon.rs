@@ -1,4 +1,4 @@
-use mina_curves::pasta::{fp::Fp, fq::Fq};
+use mina_curves::pasta::{Fp, Fq};
 use oracle::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
 use wasm_bindgen::prelude::*;
 

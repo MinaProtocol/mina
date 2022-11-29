@@ -1,5 +1,5 @@
 use crate::field_vector::fq::CamlFqVector;
-use mina_curves::pasta::fq::Fq;
+use mina_curves::pasta::Fq;
 use oracle::{
     constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher,
     poseidon::ArithmeticSpongeParams,

@@ -21,6 +21,7 @@
    mina_base.import
    mina_signature_kind
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
  )
  (preprocessor_deps ../../../config.mlh)
@@ -49,6 +50,10 @@
    signature_lib_nonconsensus
    currency_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))

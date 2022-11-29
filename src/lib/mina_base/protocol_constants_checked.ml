@@ -79,19 +79,16 @@ let to_input (t : value) =
 
 type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
-let data_spec =
-  Data_spec.
+let typ =
+  Typ.of_hlistable
     [ T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
     ; Block_time.Checked.typ
     ]
-
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input (var : var) =
   let k = T.Checked.to_input var.k

@@ -17,7 +17,7 @@ end
 module V1 = struct
   type t =
     ( Public_key.Compressed.V1.t
-    , Mina_base_token_id.V1.t
+    , Mina_base_token_id.V2.t
     , Currency.Amount.V1.t )
     Poly.V1.t
 end

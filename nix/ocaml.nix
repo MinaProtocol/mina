@@ -9,7 +9,7 @@ let
 
   inherit (pkgs.lib)
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
-    optionalString;
+    optionalString escapeShellArg;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
@@ -25,17 +25,18 @@ let
   export-installed = opam-nix.opamListToQuery export.installed;
 
   extra-packages = with implicit-deps; {
-    dune-rpc = dune;
-    dyn = dune;
-    fiber = dune;
-    ocaml-lsp-server = "1.11.6";
+    dune-rpc = "3.5.0";
+    dyn = "3.5.0";
+    fiber = "3.5.0";
+    chrome-trace = "3.5.0";
+    ocaml-lsp-server = "1.14.1";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
-    omd = "1.3.1";
-    ordering = dune;
+    omd = "1.3.2";
+    ordering = "3.5.0";
     pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
-    stdune = dune;
+    stdune = "3.5.0";
     xdg = dune;
   };
 
@@ -62,12 +63,6 @@ let
         [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
     };
 
-  dockerfiles-scripts = with inputs.nix-filter.lib;
-    filter {
-      root = ../.;
-      include = [ (inDirectory "dockerfiles") ];
-    };
-
   overlay = self: super:
     let
       ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
@@ -77,6 +72,27 @@ let
       # - bintools package also includes as which is incompatible with gcc
       lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
         ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
+
+      wrapMina = let
+        commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
+        commit_date = inputs.self.sourceInfo.lastModifiedDate or "<unknown>";
+      in package:
+      { deps ? [ pkgs.gnutar pkgs.gzip ], }:
+      pkgs.runCommand "${package.name}-release" {
+        buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
+        outputs = package.outputs;
+      } (map (output: ''
+        mkdir -p ${placeholder output}
+        lndir -silent ${package.${output}} ${placeholder output}
+        for i in $(find -L "${placeholder output}/bin" -type f); do
+          wrapProgram "$i" \
+            --prefix PATH : ${makeBinPath deps} \
+            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
+            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
+            --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
+            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+        done
+      '') package.outputs);
 
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
@@ -90,9 +106,8 @@ let
           } // extraArgs);
     in {
       # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs (oa: {
-        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
-      });
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
@@ -113,11 +128,8 @@ let
 
         # TODO, get this from somewhere
         MARLIN_REPO_SHA = "<unknown>";
-        #MINA_COMMIT_DATE =
-        #  if sourceInfo ? rev then sourceInfo.lastModifiedDate else "<unknown>";
-        #MINA_COMMIT_SHA1 = sourceInfo.rev or "DIRTY";
-        MINA_COMMIT_DATE = "__commit_date_";
-        MINA_COMMIT_SHA1 = "__commit_sha1___________________________";
+        MINA_COMMIT_SHA1 = "<unknown>";
+        MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
         NIX_LDFLAGS =
@@ -146,6 +158,8 @@ let
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
+        MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
+
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
 
@@ -154,41 +168,57 @@ let
           export -f patchShebangs stopNest isScript
           fd . --type executable -x bash -c "patchShebangs {}"
           export -n patchShebangs stopNest isScript
+          # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
+          sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
         '';
 
         buildPhase = ''
           dune build --display=short \
             src/app/logproc/logproc.exe \
             src/app/cli/src/mina.exe \
+            src/app/batch_txn_tool/batch_txn_tool.exe \
             src/app/cli/src/mina_testnet_signatures.exe \
             src/app/cli/src/mina_mainnet_signatures.exe \
             src/app/rosetta/rosetta.exe \
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
-            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-            -j$NIX_BUILD_CORES
+            src/app/archive/archive.exe \
+            src/app/archive_blocks/archive_blocks.exe \
+            src/app/extract_blocks/extract_blocks.exe \
+            src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+            src/app/replayer/replayer.exe \
+            src/app/swap_bad_balances/swap_bad_balances.exe \
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           dune build @doc || true
         '';
 
         outputs =
-          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
+          [ "out" "archive" "generate_keypair" "mainnet" "testnet" "genesis" "sample" "batch_txn_tool"];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
-          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
-          mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
-          mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
-          mv _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
-          mv _build/default/src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
-          mv _build/default/src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
-          mv _build/default/src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
-          mv _build/default/src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
-          #mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
-          mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
-          mv _build/default/_doc/_html $out/share/doc/html
+          pushd _build/default
+          cp src/app/cli/src/mina.exe $out/bin/mina
+          cp src/app/logproc/logproc.exe $out/bin/logproc
+          cp src/app/rosetta/rosetta.exe $out/bin/rosetta
+          cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
+          cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
+          cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
+          cp src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
+          cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
+          cp src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
+          cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          cp src/app/archive/archive.exe $archive/bin/mina-archive
+          cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
+          cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
+          cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
+          cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
+          cp -R _doc/_html $out/share/doc/html
+          # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
+          popd
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
@@ -197,25 +227,7 @@ let
         OCAMLPARAM = "_,cclib=-lc++";
       });
 
-      mina = let
-        commit_sha1 =
-          inputs.self.sourceInfo.rev or "<unknown>                               ";
-        commit_date =
-          inputs.self.sourceInfo.lastModifiedDate or "<unknown>     ";
-      in pkgs.runCommand "mina-release" {
-        buildInputs = [ pkgs.makeWrapper ];
-        outputs = self.mina-dev.outputs;
-      } (map (output: ''
-        cp -R ${self.mina-dev.${output}} ${placeholder output}
-        chmod 700 ${placeholder output} -R
-        for i in $(find "${placeholder output}/bin" -type f); do
-          sed 's/__commit_sha1___________________________/${commit_sha1}/' -i "$i"
-          sed 's/__commit_date_/${commit_date}/' -i "$i"
-          wrapProgram "$i" \
-            --prefix PATH : ${makeBinPath [ pkgs.gnutar pkgs.gzip ]} \
-            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper
-        done
-      '') self.mina-dev.outputs);
+      mina = wrapMina self.mina-dev { };
 
       mina_tests = runMinaCheck {
         name = "tests";
@@ -236,7 +248,7 @@ let
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
-      mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
+      mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
 
@@ -248,6 +260,8 @@ let
         outputs = [ "out" ];
 
         checkInputs = [ pkgs.nodejs-16_x ];
+
+        MINA_VERSION_IMPLEMENTATION = "mina_version.dummy";
 
         buildPhase = ''
           dune build --display=short \
@@ -277,36 +291,8 @@ let
         '';
       });
 
-      mina_build_config = pkgs.stdenv.mkDerivation {
-        pname = "mina_build_config";
-        version = "dev";
-        src = filtered-src;
-        nativeBuildInputs = [ pkgs.rsync ];
-
-        installPhase = ''
-          mkdir -p $out/etc/coda/build_config
-          cp src/config/mainnet.mlh $out/etc/coda/build_config/BUILD.mlh
-          rsync -Huav src/config/* $out/etc/coda/build_config/.
-        '';
-      };
-
-      mina_daemon_scripts = pkgs.stdenv.mkDerivation {
-        pname = "mina_daemon_scripts";
-        version = "dev";
-        src = dockerfiles-scripts;
-        buildInputs = [ pkgs.bash pkgs.python3 ];
-        installPhase = ''
-          mkdir -p $out/healthcheck $out/entrypoint.d
-          mv dockerfiles/scripts/healthcheck-utilities.sh $out/healthcheck/utilities.sh
-          mv dockerfiles/scripts/cron_job_dump_ledger.sh $out/cron_job_dump_ledger.sh
-          mv dockerfiles/scripts/daemon-entrypoint.sh $out/entrypoint.sh
-          mv dockerfiles/puppeteer-context/* $out/
-        '';
-      };
-
-      mina_integration_tests = self.mina-dev.overrideAttrs (oa: {
-        pname = "mina_integration_tests";
-        src = filtered-src;
+      test_executive-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "mina-test_executive";
         outputs = [ "out" ];
 
         buildPhase = ''
@@ -318,5 +304,7 @@ let
           mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
         '';
       });
+
+      test_executive = wrapMina self.test_executive-dev { };
     };
 in scope.overrideScope' overlay

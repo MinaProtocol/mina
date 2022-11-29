@@ -26,7 +26,7 @@ module Common = struct
     type t =
       ( Currency.Fee.V1.t
       , Public_key.Compressed.V1.t
-      , Mina_base_token_id.V1.t
+      , Mina_base_token_id.V2.t
       , Mina_numbers.Account_nonce.V1.t
       , Mina_numbers.Global_slot.V1.t
       , Mina_base_signed_command_memo.V1.t )

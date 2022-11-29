@@ -212,7 +212,7 @@ let erase_stable_versions =
   end
 
 let mk_all_version_tags_type_decl =
-  object
+  object (self)
     inherit Ast_traverse.map as super
 
     method! core_type typ =
@@ -273,7 +273,8 @@ let mk_all_version_tags_type_decl =
                                 , "t" )
                           ; loc
                           }
-                        , params )
+                        , List.map params ~f:(fun param -> self#core_type param)
+                        )
                   }
             | Some m ->
                 Some m
@@ -298,8 +299,9 @@ let mk_all_version_tags_type_decl =
   end
 
 let version_type ~version_option ~all_version_tagged ~top_version_tag
-    ~json_version_tag version stri =
+    ~json_version_tag ~modl_stri version stri =
   let loc = stri.pstr_loc in
+  let (module Ast_builder) = Ast_builder.make loc in
   let find_t_stri stri =
     let is_t_stri stri =
       match stri.pstr_desc with
@@ -326,6 +328,75 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
             "Expected a module containing a type t."
   in
   let t_stri = find_t_stri stri in
+  let find_include_binable_stri stri =
+    let is_include_binable_stri stri =
+      match stri.pstr_desc with
+      | Pstr_include
+          { pincl_mod =
+              { pmod_desc =
+                  Pmod_apply
+                    ( { pmod_desc =
+                          Pmod_apply
+                            ( { pmod_desc =
+                                  Pmod_ident
+                                    { txt = Ldot (Lident "Binable", of_binable)
+                                    ; _
+                                    }
+                              ; _
+                              }
+                            , { pmod_desc = Pmod_ident _; _ } )
+                      ; _
+                      }
+                    , _ )
+              ; _
+              }
+          ; _
+          }
+        when List.mem
+               [ "Of_binable"
+               ; "Of_binable_without_uuid"
+               ; "Of_binable1"
+               ; "Of_binable1_without_uuid"
+               ; "Of_binable2"
+               ; "Of_binable2_without_uuid"
+               ; "Of_binable3"
+               ; "Of_binable3_without_uuid"
+               ]
+               of_binable ~equal:String.equal ->
+          true
+      | _ ->
+          false
+    in
+    if is_include_binable_stri stri then stri
+    else
+      match stri.pstr_desc with
+      | Pstr_module { pmb_expr = { pmod_desc = Pmod_structure str; _ }; _ } -> (
+          match List.find str ~f:is_include_binable_stri with
+          | Some stri ->
+              stri
+          | None ->
+              Location.raise_errorf ~loc:stri.pstr_loc
+                "Expected module to include a Binable functor application." )
+      | _ ->
+          Location.raise_errorf ~loc:stri.pstr_loc
+            "Expected a module including a Binable functor application."
+  in
+  let make_all_tags_binable_include =
+    object
+      inherit Ast_traverse.map
+
+      method! longident longident =
+        match longident with
+        | Ldot (Ldot (lid, "Stable"), vn)
+          when try
+                 validate_module_version vn loc ;
+                 true
+               with _ -> false ->
+            Ldot (Ldot (Ldot (lid, "Stable"), vn), with_all_version_tags_module)
+        | _ ->
+            longident
+    end
+  in
   let t, params =
     let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
@@ -356,7 +427,6 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     subst_type t_stri
   in
   let empty_params = List.is_empty params in
-  let (module Ast_builder) = Ast_builder.make loc in
   let extra_stris =
     let arg_names = List.mapi params ~f:(fun i _ -> sprintf "x%i" i) in
     let apply_args =
@@ -413,7 +483,10 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     let deriving_bin_io =
       lazy (create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ]))
     in
-    let make_tag_module typ_decl mod_name =
+    let make_tag_module ?bin_io_include typ_decl mod_name =
+      (* if bin_io_include is given, then we use that to generate the
+         bin_io functions, instead of using `deriving bin_io` on `typ`
+      *)
       let t_tagged =
         (* type `t_tagged` is a record containing a version and an instance of `typ`,
            when serializing, take a `typ`, add the version number
@@ -551,25 +624,99 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
               , bin_t )]
         ]
       in
+      let include_str =
+        match bin_io_include with
+        | Some stri ->
+            (* the include generates bin_io functions for `t`, but we need them
+               for `typ`
+            *)
+            stri
+            :: [%str
+                 let bin_read_typ = bin_read_t
+
+                 let __bin_read_typ__ = __bin_read_t__
+
+                 let bin_reader_typ = bin_reader_t
+
+                 let bin_size_typ = bin_size_t
+
+                 let bin_shape_typ = bin_shape_t
+
+                 let bin_write_typ = bin_write_t
+
+                 let bin_writer_typ = bin_writer_t
+
+                 let bin_typ = bin_t
+
+                 let (_ : _) =
+                   ( bin_read_typ
+                   , __bin_read_typ__
+                   , bin_reader_typ
+                   , bin_size_typ
+                   , bin_shape_typ
+                   , bin_write_typ
+                   , bin_writer_typ
+                   , bin_typ )]
+        | None ->
+            []
+      in
       [ pstr_module
           (module_binding
              ~name:(some_loc (Located.mk mod_name))
              ~expr:
                (pmod_structure
-                  ( [ pstr_type Recursive [ typ_decl ]
-                    ; pstr_type Recursive [ t_tagged ]
-                    ; pstr_type Recursive [ t ]
-                    ; create
-                    ]
-                  @ bin_io_t ) ) )
+                  ( pstr_type Recursive [ typ_decl ]
+                  :: ( include_str
+                     @ [ pstr_type Recursive [ t_tagged ]
+                       ; pstr_type Recursive [ t ]
+                       ]
+                     @ (create :: bin_io_t) ) ) ) )
       ]
     in
     let all_version_tag_modules =
       if not all_version_tagged then []
-      else (
-        if equal_version_option version_option Binable then
-          Location.raise_errorf ~loc
-            "Cannot all-tag types in %%versioned_binable modules" ;
+      else if equal_version_option version_option Binable then
+        (* the With_all_version_tags module contains the same Binable functor invocation,
+           except the serializing argument is itself an With_all_version_tags module
+
+           if we had
+
+           include Binable.Of_binable_without_uuid
+             (M.Stable.V1)
+             (struct ... end)
+
+           we generate
+
+           include Binable.Of_binable_without_uuid
+             (M.Stable.V1.With_all_version_tags)
+             (struct ... end)
+
+           and we add the tag for the current version by
+           shadowing the the bin_io functions from that include
+
+           that way, the serialized data gets all version tags
+
+           the type t is the same as in the surrounding module
+
+           we don't add an additional version tag for the original module
+           (because we didn't do so for %%versioned_binable, when we
+           had all version tags by default)
+        *)
+        let include_binable_stri = find_include_binable_stri modl_stri in
+        let typ_decl =
+          (* type `typ` is equal to the type `t` from the surrounding module *)
+          type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
+            ~private_:Public
+            ~manifest:
+              (Some (ptyp_constr (Located.lident "t") (List.map ~f:fst params)))
+            ~kind:Ptype_abstract
+        in
+        let include_binable_all_version_tags =
+          make_all_tags_binable_include#structure_item include_binable_stri
+        in
+        make_tag_module ~bin_io_include:include_binable_all_version_tags
+          typ_decl with_all_version_tags_module
+      else
         let typ_decl =
           (* type `typ` is equal to `t` from the surrounding versioned type; but all contained
              occurrences of the form `M.Stable.Vn.t` become `M.Stable.Vn.With_all_version_tags.t`, so
@@ -583,7 +730,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
               Location.raise_errorf ~loc
                 "Expected type declaration for type `typ`"
         in
-        make_tag_module typ_decl with_all_version_tags_module )
+        make_tag_module typ_decl with_all_version_tags_module
     in
     let top_version_tag_modules =
       if not top_version_tag then []
@@ -678,14 +825,14 @@ let is_attr_sigitem_with_name name = function
       false
 
 let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
-    last_version stri =
+    last_version modl_stri =
   let module_pattern =
     Ast_pattern.(
       pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')))
   in
-  let loc = stri.pstr_loc in
+  let loc = modl_stri.pstr_loc in
   let name, str =
-    Ast_pattern.parse module_pattern loc stri
+    Ast_pattern.parse module_pattern loc modl_stri
       ~on_error:(fun () ->
         Location.raise_errorf ~loc
           "Expected a statement of the form `module Vn = struct ... end`." )
@@ -732,8 +879,8 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
         (type_stri, type_stri, str)
   in
   let should_convert, type_str, extra_stris =
-    version_type ~version_option version stri ~all_version_tagged
-      ~top_version_tag ~json_version_tag
+    version_type ~version_option version ~modl_stri ~all_version_tagged
+      ~top_version_tag ~json_version_tag stri
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
   let open Ast_builder.Default in

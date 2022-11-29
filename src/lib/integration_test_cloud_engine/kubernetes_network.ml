@@ -645,11 +645,8 @@ module Node = struct
     ; nonce : Mina_numbers.Account_nonce.t
     }
 
-  let transaction_id_to_string = function
-    | `String s ->
-        s
-    | _ ->
-        failwith "Unexpected JSON for transaction ID"
+  let transaction_id_to_string id =
+    Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -885,7 +882,7 @@ module Node = struct
           [ "pg_dump"
           ; "--create"
           ; "--no-owner"
-          ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+          ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
           ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
@@ -915,7 +912,7 @@ module Node = struct
       ~cmd:
         [ "mina-replayer"
         ; "--archive-uri"
-        ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
         ; "--input-file"
         ; dest
         ; "--output-file"
@@ -1074,7 +1071,7 @@ module Workload = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if List.length t.node_info <> List.length pod_ids then
+    if Stdlib.List.compare_lengths t.node_info pod_ids <> 0 then
       failwithf
         "Unexpected number of replicas in kubernetes deployment for workload \
          %s: expected %d, got %d"
@@ -1172,7 +1169,7 @@ let initialize_infra ~logger network =
     result_str |> String.split_lines
     |> List.map ~f:(fun line ->
            let parts = String.split line ~on:':' in
-           assert (List.length parts = 2) ;
+           assert (Mina_stdlib.List.Length.Compare.(parts = 2)) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
     |> List.filter ~f:(fun (pod_name, _) ->
            String.Set.mem all_pods_set pod_name )

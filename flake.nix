@@ -36,9 +36,11 @@
 
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
+  inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
-    }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
+    , nix-utils, ... }:
     {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -115,19 +117,32 @@
       };
       pipeline = with flake-buildkite-pipeline.lib;
         let
+          inherit (nixpkgs) lib;
+          dockerUrl = package: tag:
+            "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
           pushToRegistry = package: {
             command = runInEnv self.devShells.x86_64-linux.operations ''
-              skopeo \
-              copy \
-              --insecure-policy \
-              --dest-registry-token $(gcloud auth application-default print-access-token) \
-              docker-archive:${self.packages.x86_64-linux.${package}} \
-              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+              ${self.packages.x86_64-linux.${package}} | gzip --fast | \
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker-archive:/dev/stdin \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"}
+              if [[ develop == "$BUILDKITE_BRANCH" ]]; then
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"} \
+                  docker://${dockerUrl package "$BUILDKITE_BRANCH"}
+              fi
             '';
-            label = "Upload ${package} to Google Artifact Registry";
+            label =
+              "Assemble and upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            branches = [ "compatible" "develop" ];
+            key = "push_${package}";
           };
           publishDocs = {
             command = runInEnv self.devShells.x86_64-linux.operations ''
@@ -141,14 +156,16 @@
           };
         in {
           steps = flakeSteps {
+            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
               agents = [ "nix" ];
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
           } self ++ [
-            (pushToRegistry "mina-docker")
-            (pushToRegistry "mina-daemon-docker")
+            (pushToRegistry "mina-image-slim")
+            (pushToRegistry "mina-image-full")
+            (pushToRegistry "mina-archive-image-full")
             publishDocs
           ];
         };
@@ -160,6 +177,8 @@
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
+
+              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
             })
           ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
@@ -172,18 +191,29 @@
           (map (builtins.match "	path = (.*)")
             (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
 
-        requireSubmodules = lib.warnIf (!builtins.all builtins.pathExists
-          (map (x: ./. + "/${x}") submodules)) ''
+        requireSubmodules = let 
+          ref = r: "[34;1m${r}[31;1m";
+          command = c: "[37;1m${c}[31;1m";
+        in lib.warnIf (!builtins.all (x: x)
+          (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
             Some submodules are missing, you may get errors. Consider one of the following:
-            - run nix/pin.sh and use "mina" flake ref;
-            - use "git+file://$PWD?submodules=1";
-            - use "git+https://github.com/minaprotocol/mina?submodules=1";
-            - use non-flake commands like nix-build and nix-shell.
+            - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
+            - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
           '';
 
         checks = import ./nix/checks.nix inputs pkgs;
 
+        dockerImages = pkgs.callPackage ./nix/docker.nix { };
+
         ocamlPackages = pkgs.ocamlPackages_mina;
+
+        debianPackages = pkgs.callPackage ./nix/debian.nix { };
+
+        # Packages for the development environment that are not needed to build mina-dev.
+        # For instance dependencies for tests.
+        devShellPackages = [ pkgs.rosetta-cli ];
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -289,52 +319,20 @@
             cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
             chmod 0666 src/plonk_wasm{.js,_bg.wasm}
           '';
-          npmBuild = "npm run build";
+          npmBuild = "npm run minify && npm run build";
           doCheck = true;
           checkPhase = "npm test";
         };
 
         inherit ocamlPackages;
-        packages.mina = ocamlPackages.mina;
-        packages.mina_tests = ocamlPackages.mina_tests;
-        packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
-        packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
-        packages.mina-docker = pkgs.dockerTools.buildImage {
-          name = "mina";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-image-root";
-            paths = [ ocamlPackages.mina.out ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
+
+        packages = {
+          inherit (ocamlPackages)
+            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+          inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
+          inherit (dockerImages)
+            mina-image-slim mina-image-full mina-archive-image-full;
         };
-        packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
-          name = "mina-daemon";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-daemon-image-root";
-            paths = [
-              pkgs.dumb-init
-              pkgs.coreutils
-              pkgs.bashInteractive
-              pkgs.python3
-              pkgs.libp2p_helper
-              ocamlPackages.mina.out
-              ocamlPackages.mina.mainnet
-              ocamlPackages.mina.genesis
-              ocamlPackages.mina_build_config
-              ocamlPackages.mina_daemon_scripts
-            ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
-          config = {
-            env = [ "MINA_TIME_OFFSET=0" ];
-            cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-          };
-        };
-        # packages.mina_static = ocamlPackages_static.mina;
-        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
-        packages.go-capnproto2 = pkgs.go-capnproto2;
-        packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
         legacyPackages.regular = pkgs;
@@ -342,7 +340,10 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
+        packages.mina-deb = debianPackages.mina;
+
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          buildInputs = oa.buildInputs ++ devShellPackages;
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
@@ -351,22 +352,22 @@
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
-          buildInputs = oa.buildInputs
-            ++ [ pkgs.go_1_18 ];
+          name = "mina-with-lsp";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
-            pushd src/app/cli
-            dune build @check
-            popd
           '';
         });
 
-        devShells.operations =
-          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+        devShells.operations = pkgs.mkShell {
+          name = "mina-operations";
+          packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
+        };
+
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
@@ -375,6 +376,7 @@
         # However, this is a useful balance between purity and convenience for Rust development.
         devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-rust-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep

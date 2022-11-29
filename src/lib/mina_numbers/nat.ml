@@ -23,9 +23,8 @@ struct
 
   let to_input_legacy (t : var) =
     let to_bits (t : var) =
-      with_label
-        (sprintf "to_bits: %s" __LOC__)
-        (Field.Checked.choose_preimage_var t ~length:N.length_in_bits)
+      with_label (sprintf "to_bits: %s" __LOC__) (fun () ->
+          Field.Checked.choose_preimage_var t ~length:N.length_in_bits )
     in
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.Legacy.bitstring bits )
@@ -65,7 +64,9 @@ struct
   let typ : (var, N.t) Typ.t =
     let (Typ field_typ) = Field.typ in
     Typ.transport
-      (Typ { field_typ with check = range_check })
+      (Typ
+         { field_typ with check = (fun x -> make_checked_ast @@ range_check x) }
+      )
       ~there:to_field ~back:of_field
 
   let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
@@ -255,6 +256,8 @@ module Make32 () : UInt32 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt32.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -289,6 +292,8 @@ module Make64 () : UInt64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt64.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 

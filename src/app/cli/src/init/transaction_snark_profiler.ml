@@ -434,7 +434,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
       Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
         (List.fold ~init:[] transactions ~f:(fun participants t ->
              List.rev_append
-               (Transaction.accounts_accessed (Transaction.forget t))
+               (Transaction.accounts_referenced (Transaction.forget t))
                participants ) )
     in
     let rec go n =
