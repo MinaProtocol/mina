@@ -48,6 +48,8 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
+  val snark_job_list_compact_yojson : t -> Yojson.Safe.t
+
   (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
   val staged_transactions_with_state_hash :
        t
@@ -68,7 +70,7 @@ module Scan_state : sig
     -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
        Or_error.t
 
-  (** Apply transactions corresponding to the last emitted proof based on the 
+  (** Apply transactions corresponding to the last emitted proof based on the
     two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_sync :
@@ -95,7 +97,7 @@ module Scan_state : sig
     -> t
     -> unit Or_error.t
 
-  (** Apply transactions corresponding to the last emitted proof based on the 
+  (** Apply transactions corresponding to the last emitted proof based on the
     two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_async :

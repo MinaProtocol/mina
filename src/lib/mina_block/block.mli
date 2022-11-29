@@ -35,6 +35,11 @@ val transactions :
   -> t
   -> Transaction.t With_status.t list
 
+val completed_works :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Transaction_snark_work.t list
+
 val payments : t -> Signed_command.t With_status.t list
 
 val account_ids_accessed :
