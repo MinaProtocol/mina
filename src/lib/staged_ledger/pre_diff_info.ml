@@ -36,6 +36,13 @@ module type S = sig
     -> supercharge_coinbase:bool
     -> Staged_ledger_diff.t
     -> (Transaction.t With_status.t list, Error.t) result
+
+  val get_completed_works :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> coinbase_receiver:Public_key.Compressed.t
+    -> supercharge_coinbase:bool
+    -> Staged_ledger_diff.t
+    -> (Transaction_snark_work.t list, Error.t) result
 end
 
 module Error = struct
@@ -491,3 +498,15 @@ let get_transactions ~constraint_constants ~coinbase_receiver
            sl_diff )
   in
   transactions
+
+let get_completed_works ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase (sl_diff : t) =
+  let open Result.Let_syntax in
+  let%map _, completed_works, _, _ =
+    get' ~constraint_constants ~to_user_command:With_status.data
+      ~diff:sl_diff.diff ~coinbase_receiver
+      ~coinbase_amount:
+        (Staged_ledger_diff.coinbase ~constraint_constants ~supercharge_coinbase
+           sl_diff )
+  in
+  completed_works
