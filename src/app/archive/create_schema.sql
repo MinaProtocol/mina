@@ -63,6 +63,7 @@ CREATE TABLE epoch_data
 ( id             serial PRIMARY KEY
 , seed           text   NOT NULL
 , ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+, UNIQUE (seed,ledger_hash_id)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
