@@ -1,0 +1,10 @@
+(library
+ (name mina_stdlib)
+ (public_name mina_stdlib)
+ (modules_without_implementation
+  sigs)
+ (libraries base.caml)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
+

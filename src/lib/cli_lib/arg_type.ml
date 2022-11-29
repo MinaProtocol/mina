@@ -111,10 +111,11 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Mina_base.Signed_command.of_base58_check_exn s
-      with e ->
-        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise )
+      match Mina_base.Signed_command.of_base64 s with
+      | Ok s ->
+          s
+      | Error err ->
+          Error.tag err ~tag:"Couldn't decode transaction id" |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

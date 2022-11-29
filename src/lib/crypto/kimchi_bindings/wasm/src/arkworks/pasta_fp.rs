@@ -5,7 +5,7 @@ use ark_ff::{
 };
 use ark_ff::{FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
+use mina_curves::pasta::{fields::fp::FpParameters as Fp_params, Fp};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};

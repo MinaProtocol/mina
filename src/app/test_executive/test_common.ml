@@ -7,15 +7,16 @@ open Integration_test_lib
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs.Engine
 
-  let send_zkapp ~logger node parties =
+  let send_zkapp ~logger node zkapp_command =
     [%log info] "Sending zkApp"
       ~metadata:
-        [ ("parties", Mina_base.Parties.to_yojson parties)
+        [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
         ; ( "memo"
-          , `String (Mina_base.Signed_command_memo.to_string_hum parties.memo)
+          , `String
+              (Mina_base.Signed_command_memo.to_string_hum zkapp_command.memo)
           )
         ] ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
     | Ok _zkapp_id ->
         [%log info] "ZkApp transaction sent" ;
         Malleable_error.return ()
@@ -25,9 +26,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error_format "Error sending zkApp: %s" err_str
 
-  let send_invalid_zkapp ~logger node parties substring =
+  let send_invalid_zkapp ~logger node zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
     | Ok _zkapp_id ->
         [%log error] "ZkApp transaction succeeded, expected error \"%s\""
           substring ;
@@ -115,8 +116,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | Set _, Keep ->
         false
 
-  let compatible_updates ~(ledger_update : Mina_base.Party.Update.t)
-      ~(requested_update : Mina_base.Party.Update.t) : bool =
+  let compatible_updates ~(ledger_update : Mina_base.Account_update.Update.t)
+      ~(requested_update : Mina_base.Account_update.Update.t) : bool =
     (* the "update" in the ledger is derived from the account
 
        if the requested update has `Set` for a field, we
@@ -164,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let timings_compat =
       compatible_item requested_update.timing ledger_update.timing
-        ~equal:Mina_base.Party.Update.Timing_info.equal
+        ~equal:Mina_base.Account_update.Update.Timing_info.equal
     in
     let voting_fors_compat =
       compatible_item requested_update.voting_for ledger_update.voting_for
@@ -200,11 +201,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> List.filter ~f:(fun log ->
              String.is_substring log ~substring:info_log_substring )
     in
-    let num_info_logs = List.length info_logs in
-    if num_info_logs < 25 then
+    if Mina_stdlib.List.Length.Compare.(info_logs < 25) then
       Malleable_error.hard_error_string
         (sprintf "Replayer output contains suspiciously few (%d) Info logs"
-           num_info_logs )
+           (List.length info_logs) )
     else if List.is_empty error_logs then (
       [%log info] "The replayer encountered no errors" ;
       Malleable_error.return () )

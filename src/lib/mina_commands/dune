@@ -46,6 +46,7 @@
    data_hash_lib
    mina_ledger
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    protocol_version
    random_oracle

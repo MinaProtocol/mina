@@ -69,8 +69,8 @@ let forget : Valid.t -> t = function
 let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Command (Signed_command t) ->
       Ok (Signed_command.fee_excess t)
-  | Command (Parties ps) ->
-      Ok (Parties.fee_excess ps)
+  | Command (Zkapp_command ps) ->
+      Ok (Zkapp_command.fee_excess ps)
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->
@@ -88,29 +88,33 @@ let public_keys : t -> _ = function
       ; Signed_command.source_pk cmd
       ; Signed_command.receiver_pk cmd
       ]
-  | Command (Parties t) ->
-      Parties.accounts_accessed t |> List.map ~f:Account_id.public_key
+  | Command (Zkapp_command t) ->
+      Zkapp_command.accounts_referenced t |> List.map ~f:Account_id.public_key
   | Fee_transfer ft ->
       Fee_transfer.receiver_pks ft
   | Coinbase cb ->
       Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
 
-let accounts_accessed : t -> _ = function
+let accounts_accessed (t : t) (status : Transaction_status.t) =
+  match t with
   | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed cmd
-  | Command (Parties t) ->
-      Parties.accounts_accessed t
+      Signed_command.accounts_accessed cmd status
+  | Command (Zkapp_command t) ->
+      Zkapp_command.accounts_accessed t status
   | Fee_transfer ft ->
+      assert (Transaction_status.equal Applied status) ;
       Fee_transfer.receivers ft
   | Coinbase cb ->
       Coinbase.accounts_accessed cb
+
+let accounts_referenced (t : t) = accounts_accessed t Applied
 
 let fee_payer_pk (t : t) =
   match t with
   | Command (Signed_command cmd) ->
       Signed_command.fee_payer_pk cmd
-  | Command (Parties t) ->
-      Parties.fee_payer_pk t
+  | Command (Zkapp_command t) ->
+      Zkapp_command.fee_payer_pk t
   | Fee_transfer ft ->
       Fee_transfer.fee_payer_pk ft
   | Coinbase cb ->

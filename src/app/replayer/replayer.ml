@@ -627,23 +627,24 @@ module Zkapp_helpers = struct
         return state_view
 end
 
-let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
-    Parties.t Deferred.t =
+let zkapp_command_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
+    Zkapp_command.t Deferred.t =
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
-  let%bind (fee_payer : Party.Fee_payer.t) =
-    let%map (body : Party.Body.Fee_payer.t) =
+  let%bind (fee_payer : Account_update.Fee_payer.t) =
+    let%map (body : Account_update.Body.Fee_payer.t) =
       Archive_lib.Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
-    ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
+    ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
   in
-  let%bind (other_parties : Party.Simple.t list) =
-    Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
+  let%bind (account_updates : Account_update.Simple.t list) =
+    Deferred.List.map (Array.to_list cmd.zkapp_account_updates_ids)
+      ~f:(fun id ->
         let%bind { body_id; authorization_kind } =
-          query_db ~f:(fun db -> Processor.Zkapp_other_party.load db id)
+          query_db ~f:(fun db -> Processor.Zkapp_account_update.load db id)
         in
         let%map body =
-          Archive_lib.Load_data.get_other_party_body ~pool body_id
+          Archive_lib.Load_data.get_account_update_body ~pool body_id
         in
         let (authorization : Control.t) =
           match authorization_kind with
@@ -654,11 +655,13 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
           | None_given ->
               None_given
         in
-        ({ body; authorization } : Party.Simple.t) )
+        ({ body; authorization } : Account_update.Simple.t) )
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
-  let parties = Parties.of_simple { fee_payer; other_parties; memo } in
-  return (parties : Parties.t)
+  let zkapp_command =
+    Zkapp_command.of_simple { fee_payer; account_updates; memo }
+  in
+  return (zkapp_command : Zkapp_command.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
   [%log info]
@@ -668,10 +671,10 @@ let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
   let%bind state_view =
     Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
-  let%bind parties = parties_of_zkapp_command ~pool cmd in
+  let%bind zkapp_command = zkapp_command_of_zkapp_command ~pool cmd in
   match
-    Ledger.apply_parties_unchecked ~constraint_constants ~state_view ledger
-      parties
+    Ledger.apply_zkapp_command_unchecked ~constraint_constants ~state_view
+      ledger zkapp_command
   with
   | Ok _ ->
       Deferred.unit

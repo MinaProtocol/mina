@@ -57,4 +57,11 @@
    transition_chain_verifier
    async_unix
    transition_frontier_bit_catchup
+   mina_wire_types
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
 ))

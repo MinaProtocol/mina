@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_ledger
 open Signature_lib
 open Mina_base
-module Spec = Transaction_snark.For_tests.Spec
+module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 module U = Transaction_snark_tests.Util
 
@@ -86,148 +86,152 @@ let%test_module "Zkapp tokens tests" =
                     in
                     nonce
                   in
-                  let%bind create_token_parties =
-                    let open Parties_builder in
+                  let%bind create_token_zkapp_command =
+                    let open Zkapp_command_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_party_body Call token_funder Token_id.default
+                            (mk_account_update_body Signature Call token_funder
+                               Token_id.default
                                (-(11 * account_creation_fee)) )
                             []
                         ; mk_node
-                            (mk_party_body Call token_owner Token_id.default
+                            (mk_account_update_body Signature Call token_owner
+                               Token_id.default
                                (10 * account_creation_fee) )
                             []
                         ]
-                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
-                    U.check_parties_with_merges_exn ledger
-                      [ create_token_parties ]
+                    U.check_zkapp_command_with_merges_exn ledger
+                      [ create_token_zkapp_command ]
                   in
                   ignore
                     ( ledger_get_exn ledger
                         (Public_key.compress token_owner.public_key)
                         Token_id.default
                       : Account.t ) ;
-                  let%bind mint_token_parties =
-                    let open Parties_builder in
+                  let%bind mint_token_zkapp_command =
+                    let open Zkapp_command_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_party_body Call token_owner Token_id.default
-                               (-account_creation_fee) )
+                            (mk_account_update_body Signature Call token_owner
+                               Token_id.default (-account_creation_fee) )
                             [ mk_node
-                                (mk_party_body Call token_accounts.(0)
-                                   custom_token_id 100 )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(0) custom_token_id 100 )
                                 []
                             ]
                         ]
-                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
-                    U.check_parties_with_merges_exn ledger
-                      [ mint_token_parties ]
+                    U.check_zkapp_command_with_merges_exn ledger
+                      [ mint_token_zkapp_command ]
                   in
                   check_token_balance token_accounts.(0) custom_token_id 100 ;
-                  let%bind mint_token2_parties =
-                    let open Parties_builder in
+                  let%bind mint_token2_zkapp_command =
+                    let open Zkapp_command_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_party_body Call token_owner Token_id.default
+                            (mk_account_update_body Signature Call token_owner
+                               Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_party_body Call token_owner custom_token_id
-                                   0 )
+                                (mk_account_update_body Signature Call
+                                   token_owner custom_token_id 0 )
                                 [ mk_node
-                                    (mk_party_body Call token_accounts.(2)
-                                       custom_token_id2 500 )
+                                    (mk_account_update_body Signature Call
+                                       token_accounts.(2) custom_token_id2 500 )
                                     []
                                 ]
                             ]
                         ]
-                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
-                    U.check_parties_with_merges_exn ledger
-                      [ mint_token2_parties ]
+                    U.check_zkapp_command_with_merges_exn ledger
+                      [ mint_token2_zkapp_command ]
                   in
                   check_token_balance token_accounts.(2) custom_token_id2 500 ;
-                  let%bind token_transfer_parties =
-                    let open Parties_builder in
+                  let%bind token_transfer_zkapp_command =
+                    let open Zkapp_command_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_party_body Call token_owner Token_id.default
+                            (mk_account_update_body Signature Call token_owner
+                               Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_party_body Call token_accounts.(0)
-                                   custom_token_id (-30) )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(0) custom_token_id (-30) )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_accounts.(1)
-                                   custom_token_id 30 )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(1) custom_token_id 30 )
                                 []
                             ; mk_node
-                                (mk_party_body Call fee_payer_keypair
-                                   Token_id.default (-50) )
+                                (mk_account_update_body Signature Call
+                                   fee_payer_keypair Token_id.default (-50) )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_funder
-                                   Token_id.default 50 )
+                                (mk_account_update_body Signature Call
+                                   token_funder Token_id.default 50 )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_accounts.(0)
-                                   custom_token_id (-10) )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(0) custom_token_id (-10) )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_accounts.(1)
-                                   custom_token_id 10 )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(1) custom_token_id 10 )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_accounts.(1)
-                                   custom_token_id (-5) )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(1) custom_token_id (-5) )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_accounts.(0)
-                                   custom_token_id 5 )
+                                (mk_account_update_body Signature Call
+                                   token_accounts.(0) custom_token_id 5 )
                                 []
                             ; mk_node
-                                (mk_party_body Call token_owner custom_token_id
-                                   0 )
+                                (mk_account_update_body Signature Call
+                                   token_owner custom_token_id 0 )
                                 [ mk_node
-                                    (mk_party_body Call token_accounts.(2)
-                                       custom_token_id2 (-210) )
+                                    (mk_account_update_body Signature Call
+                                       token_accounts.(2) custom_token_id2 (-210) )
                                     []
                                 ; mk_node
-                                    (mk_party_body Call token_accounts.(3)
-                                       custom_token_id2 210 )
+                                    (mk_account_update_body Signature Call
+                                       token_accounts.(3) custom_token_id2 210 )
                                     []
                                 ]
                             ]
                         ]
-                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
-                    U.check_parties_with_merges_exn ledger
-                      [ token_transfer_parties ]
+                    U.check_zkapp_command_with_merges_exn ledger
+                      [ token_transfer_zkapp_command ]
                   in
                   check_token_balance token_accounts.(0) custom_token_id 65 ;
                   check_token_balance token_accounts.(1) custom_token_id 35 ;

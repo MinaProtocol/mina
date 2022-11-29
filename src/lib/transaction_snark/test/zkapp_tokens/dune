@@ -17,7 +17,7 @@
    currency
    pickles
    mina_numbers
-   parties_builder
+   zkapp_command_builder
    signature_lib
    genesis_constants
    sgn

@@ -283,11 +283,9 @@ module type S = sig
         end
       end]
 
-      val to_base58_check : t -> string
+      include Codable.Base58_check_intf with type t := t
 
-      val of_base58_check : string -> t Or_error.t
-
-      val of_base58_check_exn : string -> t
+      include Codable.Base64_intf with type t := t
 
       val dummy : t
 

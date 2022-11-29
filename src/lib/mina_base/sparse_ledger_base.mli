@@ -21,6 +21,7 @@ module Global_state : sig
   type t =
     { ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
+    ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     }
   [@@deriving sexp, to_yojson]

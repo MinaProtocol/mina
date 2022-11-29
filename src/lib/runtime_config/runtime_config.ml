@@ -163,12 +163,12 @@ module Json_layout = struct
           let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
-            `String (Pickles.Side_loaded.Verification_key.to_base58_check t)
+            `String (Pickles.Side_loaded.Verification_key.to_base64 t)
 
           let of_yojson = function
             | `String s ->
                 let vk_or_err =
-                  Pickles.Side_loaded.Verification_key.of_base58_check s
+                  Pickles.Side_loaded.Verification_key.of_base64 s
                 in
                 Result.map_error vk_or_err ~f:Error.to_string_hum
             | _ ->
@@ -193,6 +193,7 @@ module Json_layout = struct
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
+          ; zkapp_uri : string
           }
         [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
 
@@ -216,7 +217,6 @@ module Json_layout = struct
         ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
-        ; zkapp_uri : string option [@default None]
         }
       [@@deriving sexp, fields, yojson, dhall_type]
 
@@ -238,7 +238,6 @@ module Json_layout = struct
         ; zkapp = None
         ; permissions = None
         ; token_symbol = None
-        ; zkapp_uri = None
         }
     end
 
@@ -328,8 +327,10 @@ module Json_layout = struct
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
       ; transaction_expiry_hr : int option [@default None]
-      ; max_proof_parties : int option [@default None]
-      ; max_parties : int option [@default None]
+      ; zkapp_proof_update_cost : float option [@default None]
+      ; zkapp_signed_single_update_cost : float option [@default None]
+      ; zkapp_signed_pair_update_cost : float option [@default None]
+      ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_sequence_event_elements : int option [@default None]
       }
@@ -443,7 +444,6 @@ module Accounts = struct
       ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
-      ; zkapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -474,7 +474,6 @@ module Accounts = struct
     ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
-    ; zkapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
@@ -785,8 +784,10 @@ module Daemon = struct
     { txpool_max_size : int option
     ; peer_list_url : string option
     ; transaction_expiry_hr : int option
-    ; max_proof_parties : int option [@default None]
-    ; max_parties : int option [@default None]
+    ; zkapp_proof_update_cost : float option [@default None]
+    ; zkapp_signed_single_update_cost : float option [@default None]
+    ; zkapp_signed_pair_update_cost : float option [@default None]
+    ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_sequence_event_elements : int option [@default None]
     }
@@ -809,9 +810,18 @@ module Daemon = struct
     ; transaction_expiry_hr =
         opt_fallthrough ~default:t1.transaction_expiry_hr
           t2.transaction_expiry_hr
-    ; max_proof_parties =
-        opt_fallthrough ~default:t1.max_proof_parties t2.max_proof_parties
-    ; max_parties = opt_fallthrough ~default:t1.max_parties t2.max_parties
+    ; zkapp_proof_update_cost =
+        opt_fallthrough ~default:t1.zkapp_proof_update_cost
+          t2.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
+          t2.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
+          t2.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit =
+        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
+          t2.zkapp_transaction_cost_limit
     ; max_event_elements =
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_sequence_event_elements =

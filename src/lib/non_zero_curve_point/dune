@@ -26,6 +26,7 @@
    random_oracle
    bitstring_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    test_util
    ppx_version.runtime
  )

@@ -298,7 +298,7 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef verifier (type s) ~equal ~final_check
+    let%snarkydef_ verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
@@ -553,7 +553,7 @@ module Message = struct
 
     type var = (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    let%snarkydef hash_checked t ~public_key ~r =
+    let%snarkydef_ hash_checked t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Legacy.append t
@@ -621,7 +621,7 @@ module Message = struct
 
     type var = Field.Var.t Random_oracle.Input.Chunked.t
 
-    let%snarkydef hash_checked t ~public_key ~r =
+    let%snarkydef_ hash_checked t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Chunked.append t
@@ -674,7 +674,7 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
   let open Tick.Typ in
   let const_typ =
     Typ
-      { check = (fun _ -> Tick.Checked.return ())
+      { check = (fun _ -> Tick.make_checked_ast @@ Tick.Checked.return ())
       ; var_to_fields = (fun t -> ([||], t))
       ; var_of_fields = (fun (_, t) -> t)
       ; value_to_fields = (fun t -> ([||], t))

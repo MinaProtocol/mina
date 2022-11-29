@@ -106,7 +106,7 @@ val add_full_transactions :
 
 val add_zkapp_transactions :
      t
-  -> Parties.t list
+  -> Zkapp_command.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )

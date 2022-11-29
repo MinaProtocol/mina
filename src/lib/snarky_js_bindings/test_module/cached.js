@@ -1,7 +1,7 @@
-import path from "node:path";
-import fs from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import crypto from "node:crypto";
+import path from "path";
+import fs from "fs/promises";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
 
 let selfDir = path.dirname(fileURLToPath(import.meta.url));
 let cacheDir = path.resolve(selfDir, "node_modules/.cache/snarkyjs-test");

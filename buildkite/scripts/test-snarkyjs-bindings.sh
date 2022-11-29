@@ -12,6 +12,11 @@ make snarkyjs
 echo "Run SnarkyJS bindings unit tests..."
 node src/lib/snarky_js_bindings/tests/run-tests.mjs
 
+echo "Run SnarkyJS unit tests..."
+cd src/lib/snarky_js_bindings/snarkyjs
+npm run test:unit
+cd ../../../..
+
 echo "Build MinaSigner..."
 make mina_signer
 
@@ -27,4 +32,3 @@ echo "Run SnarkyJS + MinaSigner tests..."
 node src/lib/snarky_js_bindings/test_module/simple-zkapp-mina-signer.js
 node src/lib/snarky_js_bindings/test_module/simple-zkapp-mock-apply.js
 node src/lib/snarky_js_bindings/test_module/inductive-proofs.js
-node src/lib/snarky_js_bindings/test_module/to-hash-input.js

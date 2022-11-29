@@ -11,7 +11,9 @@ struct
     let pk =
       Async.Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
     in
-    { Party.Update.dummy with delegate = Zkapp_basic.Set_or_keep.Set pk }
+    { Account_update.Update.dummy with
+      delegate = Zkapp_basic.Set_or_keep.Set pk
+    }
 end
 
 let%test_module "Update account delegate" =

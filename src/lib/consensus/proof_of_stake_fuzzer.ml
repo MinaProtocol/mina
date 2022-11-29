@@ -137,7 +137,8 @@ module Vrf_distribution = struct
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
-        window_depth >= default_window_size && List.length acc_proposals > 0
+        window_depth >= default_window_size
+        && Mina_stdlib.List.Length.(acc_proposals > 0)
       in
       if (not slot_in_dist_range) || window_expired then acc_proposals
       else
@@ -152,14 +153,16 @@ module Vrf_distribution = struct
     in
     let rec extend_proposal_chain acc_chain slot =
       let potential_proposals = find_potential_proposals [] 0 slot in
-      if List.length potential_proposals = 0 then acc_chain
-      else
-        let ((_, proposal_data) as proposal) =
-          List.random_element_exn potential_proposals
-        in
-        extend_proposal_chain (proposal :: acc_chain)
-          (Global_slot.of_slot_number ~constants
-             (UInt32.succ @@ Block_data.global_slot proposal_data) )
+      match potential_proposals with
+      | [] ->
+          acc_chain
+      | _ :: _ ->
+          let ((_, proposal_data) as proposal) =
+            List.random_element_exn potential_proposals
+          in
+          extend_proposal_chain (proposal :: acc_chain)
+            (Global_slot.of_slot_number ~constants
+               (UInt32.succ @@ Block_data.global_slot proposal_data) )
     in
     extend_proposal_chain [] dist.start_slot |> List.rev
 

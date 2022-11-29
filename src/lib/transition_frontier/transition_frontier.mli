@@ -36,6 +36,9 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event]
 
+type Structured_log_events.t += Persisted_frontier_loaded
+  [@@deriving register_event]
+
 val max_catchup_chunk_length : int
 
 val catchup_state : t -> Catchup_state.t
@@ -56,7 +59,7 @@ val load :
        [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
   -> unit
   -> ( t
-     , [> `Failure of string
+     , [ `Failure of string
        | `Bootstrap_required
        | `Persistent_frontier_malformed
        | `Snarked_ledger_mismatch ] )
@@ -114,7 +117,7 @@ module For_tests : sig
          [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> unit
     -> ( t
-       , [> `Failure of string
+       , [ `Failure of string
          | `Bootstrap_required
          | `Persistent_frontier_malformed
          | `Snarked_ledger_mismatch ] )

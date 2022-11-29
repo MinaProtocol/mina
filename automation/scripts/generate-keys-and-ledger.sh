@@ -110,7 +110,7 @@ function generate_key_files {
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
-      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
+      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina libp2p generate-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container

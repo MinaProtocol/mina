@@ -125,8 +125,8 @@ let transition_meta_of_header_with_hash hh =
   let h = With_hash.data hh in
   { state_hash = State_hash.With_state_hashes.state_hash hh
   ; parent_state_hash =
-      Mina_state.Protocol_state.previous_state_hash
-      @@ Mina_block.Header.protocol_state h
+      Mina_block.Header.protocol_state h
+      |> Mina_state.Protocol_state.previous_state_hash
   ; blockchain_length = Mina_block.Header.blockchain_length h
   }
 

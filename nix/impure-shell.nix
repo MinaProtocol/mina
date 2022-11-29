@@ -20,6 +20,7 @@ pkgs.mkShell {
     rustup
     wasm-pack
     lmdb
+    rosetta-cli
   ];
   OPAMSWITCH = "mina";
   shellHook = ''

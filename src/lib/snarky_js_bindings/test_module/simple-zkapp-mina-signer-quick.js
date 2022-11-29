@@ -47,13 +47,13 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  async () => (await SimpleZkapp.compile(zkappAddress)).verificationKey
+  async () => (await SimpleZkapp.compile()).verificationKey
 );
 toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, {
+let zkappCommandJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
 });
@@ -71,7 +71,7 @@ tic("sign deploy transaction");
 let feePayerNonce = 0;
 let signedDeploy = client.signTransaction(
   {
-    parties: JSON.parse(partiesJsonDeploy),
+    zkappCommand: JSON.parse(zkappCommandJsonDeploy),
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
@@ -84,13 +84,13 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(zkappCommandJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
 if (
   JSON.parse(signedDeploySnarkyJs).feePayer.authorization !==
-  JSON.parse(signedDeploy.data.parties).feePayer.authorization
+  JSON.parse(signedDeploy.data.zkappCommand).feePayer.authorization
 )
   throw Error("Inconsistent fee payer signature");
 toc();

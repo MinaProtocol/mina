@@ -35,12 +35,11 @@ let to_input ({ hash; total_currency } : Value.t) =
 
 type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
 
-let data_spec = Data_spec.[ Frozen_ledger_hash0.typ; Amount.typ ]
-
 let typ : (var, Value.t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Frozen_ledger_hash0.typ; Amount.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input ({ Poly.hash; total_currency } : var) =
   let total_currency = Amount.var_to_input total_currency in

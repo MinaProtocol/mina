@@ -7,8 +7,8 @@ struct
   let failure_expected =
     Mina_base.Transaction_status.Failure.Update_not_permitted_voting_for
 
-  let snapp_update : Party.Update.t =
-    { Party.Update.dummy with
+  let snapp_update : Account_update.Update.t =
+    { Account_update.Update.dummy with
       voting_for =
         Zkapp_basic.Set_or_keep.Set
           (Async.Quickcheck.random_value State_hash.gen)
