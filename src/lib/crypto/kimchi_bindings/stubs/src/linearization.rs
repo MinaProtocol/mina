@@ -23,7 +23,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
             lookup_configuration: Some(lookup_configuration),
         }),
     };
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(feature_flags.as_ref(), false);
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(feature_flags.as_ref(), true);
 
     let Linearization {
         constant_term,

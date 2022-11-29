@@ -49,7 +49,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let fee_token { fee_token; _ } = fee_token
 
     module Gen = struct
-      let with_random_receivers ?(min_fee = 0) ~keys ~max_fee ~token :
+      let with_random_receivers ?(min_fee = 0) ~max_fee ~token keys :
           t Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
         let%map receiver_pk =
