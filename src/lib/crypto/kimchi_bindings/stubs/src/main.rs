@@ -1,5 +1,5 @@
-use kimchi::proof::caml::CamlRecursionChallenge;
 use kimchi::circuits::expr::FeatureFlag;
+use kimchi::proof::caml::CamlRecursionChallenge;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;

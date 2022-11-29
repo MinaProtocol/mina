@@ -4,7 +4,6 @@ type curr_or_next = Curr | Next [@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
   module T = struct
-<<<<<<< HEAD
     type t = Kimchi_types.gate_type =
       | Zero
       | Generic
@@ -26,15 +25,6 @@ module Gate_type = struct
       | RangeCheck1
       | ForeignFieldAdd
       | Xor16
-=======
-    type t =
-      | Generic
-      | Poseidon
-      | VarBaseMul
-      | EndoMul
-      | CompleteAdd
-      | EndoMulScalar
->>>>>>> upstream/develop
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -1050,7 +1040,6 @@ module Tick : S = struct
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-<<<<<<< HEAD
       ; ( Index ChaCha0
         , lazy
             (enabled_if
@@ -2725,112 +2714,6 @@ module Tick : S = struct
                            , 16 )
                          * cell (var (Witness 2, Next))
                        - cell (var (Witness 2, Curr)) ) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-=======
->>>>>>> upstream/develop
       ]
 end
 
@@ -3774,7 +3657,6 @@ module Tock : S = struct
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-<<<<<<< HEAD
       ; ( Index ChaCha0
         , lazy
             (enabled_if
@@ -5449,112 +5331,6 @@ module Tock : S = struct
                            , 16 )
                          * cell (var (Witness 2, Next))
                        - cell (var (Witness 2, Curr)) ) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-=======
->>>>>>> upstream/develop
       ]
 end
 
