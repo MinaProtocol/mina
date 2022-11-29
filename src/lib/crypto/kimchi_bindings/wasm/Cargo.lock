@@ -195,15 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
-name = "cairo"
-version = "0.1.0"
-dependencies = [
- "ark-ff",
- "hex",
- "o1-utils",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -221,9 +212,9 @@ dependencies = [
  "groupmap",
  "itertools",
  "mina-curves",
+ "mina-poseidon",
  "o1-utils",
  "once_cell",
- "oracle",
  "rand",
  "rand_core",
  "rayon",
@@ -491,19 +482,18 @@ dependencies = [
  "ark-poly",
  "ark-serialize",
  "blake2",
- "cairo",
  "commitment_dlog",
  "disjoint-set",
  "groupmap",
  "hex",
  "itertools",
  "mina-curves",
+ "mina-poseidon",
  "num-bigint",
  "num-derive",
  "num-traits",
  "o1-utils",
  "once_cell",
- "oracle",
  "rand",
  "rand_core",
  "rayon",
@@ -513,6 +503,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "thiserror",
+ "turshi",
  "wasm-bindgen",
 ]
 
@@ -561,6 +552,22 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
+]
+
+[[package]]
+name = "mina-poseidon"
+version = "0.1.0"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "mina-curves",
+ "o1-utils",
+ "once_cell",
+ "rand",
+ "rayon",
+ "serde",
+ "serde_with",
 ]
 
 [[package]]
@@ -673,22 +680,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
 
 [[package]]
-name = "oracle"
-version = "0.1.0"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "mina-curves",
- "o1-utils",
- "once_cell",
- "rand",
- "rayon",
- "serde",
- "serde_with",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -721,10 +712,10 @@ dependencies = [
  "kimchi",
  "libc",
  "mina-curves",
+ "mina-poseidon",
  "num-bigint",
  "o1-utils",
  "once_cell",
- "oracle",
  "paste",
  "rand",
  "rayon",
@@ -1058,6 +1049,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "turshi"
+version = "0.1.0"
+dependencies = [
+ "ark-ff",
+ "hex",
+ "o1-utils",
 ]
 
 [[package]]
