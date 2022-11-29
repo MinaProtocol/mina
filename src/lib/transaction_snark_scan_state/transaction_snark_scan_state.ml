@@ -147,6 +147,42 @@ module Job_view = struct
             ]
     in
     `List [ `Int position; job_to_yojson ]
+
+  let to_compact_yojson ({ value; position } : t) : Yojson.Safe.t =
+    let module R = struct
+      type t =
+        ( Frozen_ledger_hash.t
+        , Pending_coinbase.Stack_versioned.t
+        , Mina_state.Local_state.t )
+        Mina_state.Registers.t
+      [@@deriving to_yojson]
+    end in
+    let statement_to_yojson (s : Transaction_snark.Statement.t) =
+      `Int (Transaction_snark.Statement.hash s)
+    in
+    match value with
+    | BEmpty ->
+        `List [ `Int position; `String "B" ]
+    | MEmpty ->
+        `List [ `Int position; `String "M" ]
+    | MPart x ->
+        `List [ `Int position; `String "M"; `List [ statement_to_yojson x ] ]
+    | MFull (x, y, { seq_no; status }) ->
+        `List
+          [ `Int position
+          ; `String "M"
+          ; `List [ statement_to_yojson x; statement_to_yojson y ]
+          ; `Int seq_no
+          ; `String (Parallel_scan.Job_status.to_string status)
+          ]
+    | BFull (x, { seq_no; status }) ->
+        `List
+          [ `Int position
+          ; `String "B"
+          ; statement_to_yojson x
+          ; `Int seq_no
+          ; `String (Parallel_scan.Job_status.to_string status)
+          ]
 end
 
 type job = Available_job.t [@@deriving sexp]
@@ -1231,6 +1267,18 @@ let snark_job_list_json t =
     (`List
       (List.map all_jobs ~f:(fun tree ->
            `List (List.map tree ~f:Job_view.to_yojson) ) ) )
+
+let snark_job_list_compact_yojson t =
+  let all_jobs : Job_view.t list list =
+    let fa (a : Ledger_proof_with_sok_message.t) =
+      Ledger_proof.statement (fst a)
+    in
+    let fd (d : Transaction_with_witness.t) = d.statement in
+    Parallel_scan.view_jobs_with_position t.scan_state fa fd
+  in
+  `List
+    (List.map all_jobs ~f:(fun tree ->
+         `List (List.map tree ~f:Job_view.to_compact_yojson) ) )
 
 (*Always the same pairing of jobs*)
 let all_work_statements_exn t : Transaction_snark_work.Statement.t list =

@@ -231,6 +231,8 @@ val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
 
 val snark_job_list_json : t -> string
 
+val snark_job_list_compact_yojson : t -> Yojson.Safe.t
+
 (** All the proof bundles *)
 val all_work_statements_exn :
   t -> Transaction_snark.Statement.t One_or_two.t list

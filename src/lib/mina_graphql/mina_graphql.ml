@@ -5945,6 +5945,195 @@ module Queries = struct
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
+  module Scan_state_helpers = struct
+    open Deferred.Result.Let_syntax
+
+    let get_transition_frontier mina =
+      let transition_frontier_pipe = Mina_lib.transition_frontier mina in
+      Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
+      |> Result.of_option ~error:"Could not obtain transition frontier"
+      |> Deferred.return
+
+    let block_from_state_hash transition_frontier state_hash =
+      let%map breadcrumb =
+        Transition_frontier.find transition_frontier state_hash
+        |> Result.of_option
+             ~error:
+               (sprintf
+                  "Block with state hash %s not found in transition frontier"
+                  (State_hash.to_base58_check state_hash) )
+        |> Deferred.return
+      in
+      breadcrumb
+
+    let block_from_state_hash_string transition_frontier state_hash_base58 =
+      let%bind state_hash =
+        State_hash.of_base58_check state_hash_base58
+        |> Result.map_error ~f:Error.to_string_hum
+        |> Deferred.return
+      in
+      block_from_state_hash transition_frontier state_hash
+
+    let block_from_height transition_frontier height =
+      let height_uint32 = Unsigned.UInt32.of_int height in
+      let best_chain_breadcrumbs =
+        Transition_frontier.best_tip_path transition_frontier
+      in
+      let%map desired_breadcrumb =
+        List.find best_chain_breadcrumbs ~f:(fun bc ->
+            let block = Transition_frontier.Breadcrumb.block bc in
+            let block_height = Mina_block.(blockchain_length block) in
+            Unsigned.UInt32.equal block_height height_uint32 )
+        |> Result.of_option
+             ~error:
+               (sprintf
+                  "Could not find block in transition frontier with height %d"
+                  height )
+        |> Deferred.return
+      in
+      desired_breadcrumb
+
+    let get_target_block transition_frontier state_hash_base58_opt height_opt =
+      match (state_hash_base58_opt, height_opt) with
+      | Some state_hash_base58, None ->
+          block_from_state_hash_string transition_frontier state_hash_base58
+      | None, Some height ->
+          block_from_height transition_frontier height
+      | None, None ->
+          return @@ Transition_frontier.best_tip transition_frontier
+      | Some _, Some _ ->
+          Deferred.Result.fail
+            "Must provide only one of state hash, heigh, or none."
+
+    let transaction_to_compact_yojson txn =
+      let status_yojson =
+        match With_status.status txn with
+        | Applied ->
+            `String "Applied"
+        | Failed _ ->
+            `String "Failed"
+      in
+      let txn_yojson =
+        match With_status.data txn with
+        | Transaction.Command _ ->
+            `String "Command"
+        | Fee_transfer _ ->
+            `String "Fee_transfer"
+        | Coinbase _ ->
+            `String "Coinbase"
+      in
+      `List [ txn_yojson; status_yojson ]
+
+    (* Returns [None] if [before] and [after] are equal or [after] otherwise
+       The position in [before] and [after] must match, otherwise this will fail. *)
+    let diff_scan_state_tree_slots (before : Yojson.Basic.t)
+        (after : Yojson.Basic.t) =
+      match (before, after) with
+      | `List (`Int bpos :: _), `List (`Int apos :: _) when bpos = apos ->
+          if Yojson.Basic.equal before after then Ok None else Ok (Some after)
+      | `List (`Int bpos :: _), `List (`Int apos :: _) ->
+          Result.failf "Got non-matching positions %d != %d" bpos apos
+      | _ ->
+          Result.failf "Unexpected JSON structures: '%s' and '%s'"
+            (Yojson.Basic.to_string before)
+            (Yojson.Basic.to_string after)
+
+    let assert_condition c error = if c then Ok () else Result.fail error
+
+    (* Returns the list of all element in [after] that changed compared to [before] *)
+    let diff_scan_state_tree before after =
+      let open Result.Let_syntax in
+      try
+        let%map diffs =
+          List.fold2_exn before after ~init:(Ok []) ~f:(fun acc b a ->
+              let%bind acc = acc in
+              let%map diff = diff_scan_state_tree_slots b a in
+              Option.value_map diff ~default:acc ~f:(fun diff -> diff :: acc) )
+        in
+        List.rev diffs
+      with exn -> Result.failf "diff_scan_state_tree: %s" (Exn.to_string exn)
+
+    (* TODO: find first job and compare work ids *)
+    let is_same_tree _before _after = true
+  end
+
+  let get_block_scan_state =
+    io_field "blockScanState" ~doc:"Block scan state" ~typ:(non_null Types.json)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the target desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the target desired block in the best chain"
+              ~typ:int
+          ; arg "distance"
+              ~doc:
+                "Distance to the ancestor that will provide the initial scan \
+                 state"
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option)
+                    (height_opt : int option) (distance : int option) ->
+        let open Deferred.Result.Let_syntax in
+        let distance = Option.value ~default:0 distance in
+        let%bind transition_frontier =
+          Scan_state_helpers.get_transition_frontier mina
+        in
+        let%bind target_block =
+          Scan_state_helpers.get_target_block transition_frontier
+            state_hash_base58_opt height_opt
+        in
+        let breadcrumbs =
+          Transition_frontier.path_map ~max_length:(distance + 1)
+            transition_frontier target_block ~f:Fn.id
+        in
+        let earliest_block = List.hd_exn breadcrumbs in
+        (* TODO: obtain each next scan state and diff it *)
+        let base_scan_state =
+          Staged_ledger.scan_state
+            (Transition_frontier.Breadcrumb.staged_ledger earliest_block)
+        in
+        let base_scan_state_json =
+          Staged_ledger.Scan_state.snark_job_list_compact_yojson base_scan_state
+        in
+        (* fold over all blocks, passing the previous scan state
+           for the current block, obtain the scan state json
+           diff it with the previous scan state
+           accumulate it (+ transactions and completed works) and use the current scan state json as base for next *)
+        (* TODO
+           - compare first base job to make sure the trees are the same
+           - iterate over list of slots in tree and yield anything different
+           - diff is just the list of fields that changed
+        *)
+        let transactions =
+          Mina_block.transactions
+            ~constraint_constants:
+              (Mina_lib.config mina).precomputed_values.constraint_constants
+            (Transition_frontier.Breadcrumb.block earliest_block)
+        in
+        let get_work_ids t = (Transaction_snark_work.info t).work_ids in
+        let completed_works_work_ids =
+          List.map ~f:get_work_ids
+          @@ Mina_block.completed_works
+               ~constraint_constants:
+                 (Mina_lib.config mina).precomputed_values.constraint_constants
+               (Transition_frontier.Breadcrumb.block earliest_block)
+        in
+        let transactions_json =
+          `List
+            (List.map ~f:Scan_state_helpers.transaction_to_compact_yojson
+               transactions )
+        in
+        let completed_works_json =
+          [%to_yojson: int One_or_two.t list] completed_works_work_ids
+        in
+        return @@ Yojson.Safe.to_basic
+        @@ `Assoc
+             [ ("transactions", transactions_json)
+             ; ("completed_works", completed_works_json)
+             ; ("scan_state", base_scan_state_json)
+             ] )
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -5978,6 +6167,7 @@ module Queries = struct
     ; runtime_config
     ; thread_graph
     ; blockchain_verification_key
+    ; get_block_scan_state
     ]
 
   module Itn = struct
