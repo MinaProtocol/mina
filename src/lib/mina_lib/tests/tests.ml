@@ -21,9 +21,9 @@ let%test_module "Epoch ledger sync tests" =
       ; no_answer_ivar : unit Ivar.t
       }
 
-    type exn += No_sync_answer
+    exception No_sync_answer
 
-    type exn += Sync_timeout
+    exception Sync_timeout
 
     let () =
       Protocol_version.(set_current @@ create_exn ~major:2 ~minor:0 ~patch:0)
