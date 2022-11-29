@@ -205,6 +205,7 @@ let
             src/app/swap_bad_balances/swap_bad_balances.exe \
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
           dune build @doc || true
         '';
 
@@ -317,6 +318,7 @@ let
         '';
       });
 
+      # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
         outputs = [ "out" ];

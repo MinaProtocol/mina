@@ -49,11 +49,12 @@
         (map (builtins.match "	path = (.*)")
           (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
 
+      # Warn about missing submodules
       requireSubmodules = let
         ref = r: "[34;1m${r}[31;1m";
         command = c: "[37;1m${c}[31;1m";
       in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) (map (x: ./. + "/${x}") submodules))) ''
+        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
           Some submodules are missing, you may get errors. Consider one of the following:
           - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
           - use "${ref "git+file://$PWD?submodules=1"}";

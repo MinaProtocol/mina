@@ -84,14 +84,16 @@ If you wish to build Mina yourself, or work on some changes incrementally, run
 otherwise). This will drop you in a shell with all dependencies, including
 OCaml, Rust and Go ones available, so the only thing you have to do is run `dune
 build src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to
-run the same command as would be run inside the nix sandbox. The produced
-executable can be found in `_build/default/src/app/cli/src/mina.exe`. You most
-likely want to run it from the same shell you've built it in, since the
-executable looks for certain dependencies at runtime via environment variables,
-meaning you either have to set those variables yourself or rely on the ones set
-by the `devShell`. The executable produced by `nix build mina` (see ["Pure"
-build section](#pure-build)) doesn't suffer from this limitation, since it is
-wrapped with all the necessary environment variables.
+run the same command as would be run inside the nix sandbox. Running `make
+build` will **not** work due to it trying to build the already-built go
+dependencies. The produced executable can be found in
+`_build/default/src/app/cli/src/mina.exe`. You most likely want to **run it from
+the same shell you've built it in**, since the executable looks for certain
+dependencies at runtime via environment variables, meaning you either have to
+set those variables yourself or rely on the ones set by the `devShell`. The
+executable produced by `nix build mina` (see ["Pure" build
+section](#pure-build)) doesn't suffer from this limitation, since it is wrapped
+with all the necessary environment variables.
 
 Note that `opam` will **not** be available in that shell, since Nix takes over
 the job of computing and installing dependencies. If you need to modify the opam
