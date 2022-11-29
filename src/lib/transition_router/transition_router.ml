@@ -335,6 +335,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
     ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
+  [%log info] "Initializing transition router" ;
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -420,8 +421,9 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             Broadcast_pipe.Writer.write frontier_w (Some frontier)
           in
           let%map () =
-            if not sync_local_state then (* for tests *)
-              Deferred.unit
+            if not sync_local_state then (
+              [%log info] "Not syncing local state, should only occur in tests" ;
+              Deferred.unit )
             else
               match
                 Consensus.Hooks.required_local_state_sync
@@ -509,6 +511,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
     ~catchup_mode ~notify_online () =
   let open Context in
+  [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
