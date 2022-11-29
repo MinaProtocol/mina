@@ -149,6 +149,8 @@ type nonrec gate_type =
   | ForeignFieldAdd
   | Xor16
 
+type nonrec feature_flag = ChaCha | RangeCheck | ForeignFieldAdd | Xor
+
 type nonrec 'f circuit_gate =
   { typ : gate_type
   ; wires : wire * wire * wire * wire * wire * wire * wire

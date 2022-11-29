@@ -83,6 +83,13 @@ module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 
 let%test_unit "scalars consistency" =
   let module E = struct
+    type feature_flag = Kimchi_types.feature_flag =
+      | ChaCha
+      | RangeCheck
+      | ForeignFieldAdd
+      | Xor
+    [@@deriving sexp, compare]
+
     type t =
       | Add of t * t
       | Mul of t * t
@@ -96,6 +103,8 @@ let%test_unit "scalars consistency" =
       | Cell of t
       | Alpha_pow of int
       | Unnormalized_lagrange_basis of int
+      | Enabled_if of (feature_flag * t)
+      | Foreign_field_modulus of int
     [@@deriving sexp, compare]
   end in
   let open E in
@@ -121,6 +130,8 @@ let%test_unit "scalars consistency" =
     ; endo_coefficient = Constant "endo_coefficient"
     ; srs_length_log2 = Nat.to_int Backend.Tick.Rounds.n
     ; unnormalized_lagrange_basis = (fun x -> Unnormalized_lagrange_basis x)
+    ; enabled_if = (fun (feature, f) -> Enabled_if (feature, f ()))
+    ; foreign_field_modulus = (fun i -> Foreign_field_modulus i)
     }
   in
   let lookup_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms env in
