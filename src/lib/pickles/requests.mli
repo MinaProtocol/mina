@@ -1,4 +1,4 @@
-(* Requests *)
+open Pickles_types
 
 module Step : sig
   module type S = sig
@@ -22,30 +22,28 @@ module Step : sig
       | Compute_prev_proof_parts :
           ( prev_values
           , local_signature )
-          Pickles_types.Hlist.H2.T
-            (Inductive_rule.Previous_proof_statement.Constant)
-          .t
+          Hlist.H2.T(Inductive_rule.Previous_proof_statement.Constant).t
           -> unit Snarky_backendless.Request.t
       | Proof_with_datas :
           ( prev_values
           , local_signature
           , local_branches )
-          Pickles_types.Hlist.H3.T(Per_proof_witness.Constant.No_app_state).t
+          Hlist.H3.T(Per_proof_witness.Constant.No_app_state).t
           Snarky_backendless.Request.t
       | Wrap_index :
-          Backend.Tock.Curve.Affine.t
-          Pickles_types.Plonk_verification_key_evals.t
+          Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
           Snarky_backendless.Request.t
       | App_state : statement Snarky_backendless.Request.t
       | Return_value : return_value -> unit Snarky_backendless.Request.t
       | Auxiliary_value : auxiliary_value -> unit Snarky_backendless.Request.t
       | Unfinalized_proofs :
-          (Unfinalized.Constant.t, proofs_verified) Pickles_types.Vector.t
+          (Unfinalized.Constant.t, proofs_verified) Vector.t
           Snarky_backendless.Request.t
       | Messages_for_next_wrap_proof :
-          ( Import.Types.Digest.Constant.t
-          , max_proofs_verified )
-          Pickles_types.Vector.t
+          (Import.Types.Digest.Constant.t, max_proofs_verified) Vector.t
+          Snarky_backendless.Request.t
+      | Wrap_domain_indices :
+          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t
           Snarky_backendless.Request.t
   end
 
@@ -74,27 +72,24 @@ module Wrap : sig
       | Evals :
           ( ( Impls.Wrap.Field.Constant.t
             , Impls.Wrap.Field.Constant.t array )
-            Pickles_types.Plonk_types.All_evals.t
+            Plonk_types.All_evals.t
           , max_proofs_verified )
-          Pickles_types.Vector.t
+          Vector.t
           Snarky_backendless.Request.t
       | Which_branch : int Snarky_backendless.Request.t
       | Step_accs :
-          ( Backend.Tock.Inner_curve.Affine.t
-          , max_proofs_verified )
-          Pickles_types.Vector.t
+          (Backend.Tock.Inner_curve.Affine.t, max_proofs_verified) Vector.t
           Snarky_backendless.Request.t
       | Old_bulletproof_challenges :
           max_local_max_proofs_verifieds
-          Pickles_types.Hlist.H1.T(Import.Types.Challenges_vector.Constant).t
+          Hlist.H1.T(Import.Types.Challenges_vector.Constant).t
           Snarky_backendless.Request.t
       | Proof_state :
           ( ( ( Impls.Wrap.Challenge.Constant.t
               , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-              , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
+              , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t
               , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-                , Impls.Wrap.Field.Constant.t
-                  Pickles_types.Shifted_value.Type2.t )
+                , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t )
                 Import.Types.Step.Proof_state.Deferred_values.Plonk.In_circuit
                 .Lookup
                 .t
@@ -102,27 +97,25 @@ module Wrap : sig
               , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
                   Import.Types.Bulletproof_challenge.t
                 , Backend.Tock.Rounds.n )
-                Pickles_types.Vector.t
+                Vector.t
               , Impls.Wrap.Digest.Constant.t
               , bool )
               Import.Types.Step.Proof_state.Per_proof.In_circuit.t
             , max_proofs_verified )
-            Pickles_types.Vector.t
+            Vector.t
           , Impls.Wrap.Digest.Constant.t )
           Import.Types.Step.Proof_state.t
           Snarky_backendless.Request.t
       | Messages :
-          Backend.Tock.Inner_curve.Affine.t Pickles_types.Plonk_types.Messages.t
+          Backend.Tock.Inner_curve.Affine.t Plonk_types.Messages.t
           Snarky_backendless.Request.t
       | Openings_proof :
           ( Backend.Tock.Inner_curve.Affine.t
           , Backend.Tick.Field.t )
-          Pickles_types.Plonk_types.Openings.Bulletproof.t
+          Plonk_types.Openings.Bulletproof.t
           Snarky_backendless.Request.t
       | Wrap_domain_indices :
-          ( Impls.Wrap.Field.Constant.t
-          , max_proofs_verified )
-          Pickles_types.Vector.t
+          (Impls.Wrap.Field.Constant.t, max_proofs_verified) Vector.t
           Snarky_backendless.Request.t
   end
 
