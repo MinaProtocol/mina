@@ -155,7 +155,9 @@ blockchain.
 
 `--config-directoy` can be omitted, in which case it defaults to
 `~/.mina-config`. You should pass it if you already have another
-blockchain's data stored in there.
+blockchain's data stored in there. In case the daemon fails, 
+complaining about write access to this directory, try providing an
+absolute path rather than relative one.
 
 If the block producer's key wasn't copied over to the wallet
 previously. The following error will appear:
