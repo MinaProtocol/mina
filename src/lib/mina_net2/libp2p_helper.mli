@@ -23,7 +23,24 @@ val do_rpc :
   -> 'response Deferred.Or_error.t
 
 val send_validation :
-     t
-  -> validation_id:Libp2p_ipc.validation_id
+     validation_id:Libp2p_ipc.validation_id
   -> validation_result:Libp2p_ipc.validation_result
+  -> t
   -> unit
+
+val send_add_resource :
+     tag:Staged_ledger_diff.Body.Tag.t
+  -> body:Staged_ledger_diff.Body.t
+  -> t
+  -> unit
+
+val send_heartbeat : peer_id:Network_peer.Peer.Id.t -> t -> unit
+
+val test_with_libp2p_helper :
+     ?logger:Logger.t
+  -> ?handle_push_message:
+       (   t
+        -> Libp2p_ipc.Reader.DaemonInterface.PushMessage.unnamed_union_t
+        -> unit Deferred.t )
+  -> (string -> t -> 'a Deferred.t)
+  -> 'a

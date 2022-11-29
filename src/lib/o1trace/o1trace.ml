@@ -95,7 +95,7 @@ let sync_thread name f =
       on_job_exit' fiber elapsed_time ;
       result )
 
-let () = Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }
+let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
 
 (*
 let () =

@@ -18,13 +18,17 @@
    bin_prot.shape
    async_unix
    ;; local libraries
+   mina_base.import
    data_hash_lib
    mina_state
    transaction_witness
    transaction_snark
    mina_base
+   mina_transaction
+   mina_transaction_logic
    snark_work_lib
    one_or_two
+   mina_ledger
    currency
    logger
    transaction_snark_work
@@ -34,10 +38,12 @@
    genesis_constants
    o1trace
    with_hash
-   )
+   ppx_version.runtime
+   mina_wire_types
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_base ppx_coda ppx_version ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf
+  (pps ppx_base ppx_mina ppx_version ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf
        ppx_compare ppx_deriving_yojson ppx_optcomp))
  (instrumentation (backend bisect_ppx))
  (synopsis "Transaction-snark specialization of the parallel scan state"))

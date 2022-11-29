@@ -27,11 +27,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-        { initial_minimum_balance = Balance.of_int min_balance
+        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
         ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount = Amount.of_int cliff_amount
+        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
         ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment = Amount.of_int vesting_increment
+        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
         }
     in
     { default with
@@ -91,8 +91,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.extra_genesis_keypairs network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_formatted_string "10" in
-    let fee = Currency.Fee.of_formatted_string "1" in
+    let amount = Currency.Amount.of_mina_string_exn "10" in
+    let fee = Currency.Fee.of_mina_string_exn "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
       fish1.public_key |> Signature_lib.Public_key.compress
@@ -102,25 +102,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
     (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
-    let receiver_original_balance =
-      Currency.Amount.of_formatted_string "1000"
+    let receiver_original_balance = Currency.Amount.of_mina_string_exn "1000" in
+    let sender_original_balance = Currency.Amount.of_mina_string_exn "1000" in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
+    let receiver_account_id =
+      Account_id.create receiver_pub_key Token_id.default
     in
-    let sender_original_balance = Currency.Amount.of_formatted_string "1000" in
     let txn_body =
       Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key
-        ; receiver_pk = receiver_pub_key
-        ; token_id = Token_id.default
-        ; amount
-        }
+        { source_pk = sender_pub_key; receiver_pk = receiver_pub_key; amount }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger untimed_node_b
-        ~public_key:sender_pub_key
+        ~account_id:sender_account_id
     in
     let user_command_input =
       User_command_input.create ~fee ~nonce:sender_current_nonce
-        ~fee_token:(Signed_command_payload.Body.token txn_body)
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
@@ -136,17 +133,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
         ~nonce_map:
           (Account_id.Map.of_alist_exn
-             [ ( Account_id.create sender_pub_key
-                   (Signed_command_payload.Body.token txn_body)
+             [ ( Account_id.create sender_pub_key Account_id.Digest.default
                , (sender_current_nonce, sender_current_nonce) )
              ] )
-        ~get_account:(fun _ -> `Bootstrapping)
+        ~get_account:(fun _ : Account.t option Participating_state.t ->
+          `Bootstrapping )
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
     let (signed_cmmd, _)
           : Signed_command.t
-            * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
+            * (Mina_numbers.Account_nonce.t * Mina_numbers.Account_nonce.t)
+              Account_id.Map.t =
       txn_signed
     in
     (* setup complete *)
@@ -166,7 +164,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~memo:
                (Signed_command_memo.to_raw_bytes_exn
                   signed_cmmd.payload.common.memo )
-             ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -181,11 +178,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          txn"
         (let%bind { total_balance = receiver_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:receiver_pub_key
+             ~account_id:receiver_account_id
          in
          let%bind { total_balance = sender_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let receiver_expected =
@@ -200,17 +197,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Option.value_exn
          in
          (* [%log info] "coinbase_amount: %s"
-            (Currency.Amount.to_formatted_string coinbase_reward) ; *)
-         [%log info] "txn_amount: %s"
-           (Currency.Amount.to_formatted_string amount) ;
+            (Currency.Amount.to_mina_string coinbase_reward) ; *)
+         [%log info] "txn_amount: %s" (Currency.Amount.to_mina_string amount) ;
          [%log info] "receiver_expected: %s"
-           (Currency.Amount.to_formatted_string receiver_expected) ;
+           (Currency.Amount.to_mina_string receiver_expected) ;
          [%log info] "receiver_balance: %s"
-           (Currency.Balance.to_formatted_string receiver_balance) ;
+           (Currency.Balance.to_mina_string receiver_balance) ;
          [%log info] "sender_expected: %s"
-           (Currency.Amount.to_formatted_string sender_expected) ;
+           (Currency.Amount.to_mina_string sender_expected) ;
          [%log info] "sender_balance: %s"
-           (Currency.Balance.to_formatted_string sender_balance) ;
+           (Currency.Balance.to_mina_string sender_balance) ;
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
@@ -231,11 +227,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with account balances.  receiver balance is %d and should \
               be %d, sender balance is %d and should be %d.  and txn_amount is \
               %d"
-             (Currency.Balance.to_int receiver_balance)
-             (Currency.Amount.to_int receiver_expected)
-             (Currency.Balance.to_int sender_balance)
-             (Currency.Amount.to_int sender_expected)
-             (Currency.Amount.to_int amount) )
+             (Currency.Balance.to_nanomina_int receiver_balance)
+             (Currency.Amount.to_nanomina_int receiver_expected)
+             (Currency.Balance.to_nanomina_int sender_balance)
+             (Currency.Amount.to_nanomina_int sender_expected)
+             (Currency.Amount.to_nanomina_int amount) )
     in
     let%bind () =
       section
@@ -256,7 +252,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
                  signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -265,7 +260,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the nonce \
                is old.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
+              (Mina_numbers.Account_nonce.to_int nonce)
         | Error error ->
             (* expect GraphQL error due to bad nonce *)
             let err_str = Error.to_string_mach error in
@@ -287,7 +282,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section
         "attempt to send again the same signed transaction command as before, \
-         but changing the nonce, to conduct a replay attack.  expecting an \
+         but changing the nonce, to conduct a replay attack.  expecting a \
          Invalid_signature"
         (let open Deferred.Let_syntax in
         match%bind
@@ -305,7 +300,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
                  signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -314,7 +308,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the \
                signature is wrong.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
+              (Mina_numbers.Account_nonce.to_int nonce)
         | Error error ->
             (* expect GraphQL error due to invalid signature *)
             let err_str = Error.to_string_mach error in
@@ -334,11 +328,36 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+        (let amount = Currency.Amount.of_mina_int_exn 1_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let receiver_account_id =
+           Account_id.create receiver_pub_key Token_id.default
+         in
+         let%bind { total_balance = timed_node_c_total
+                  ; liquid_balance_opt = timed_node_c_liquid_opt
+                  ; locked_balance_opt = timed_node_c_locked_opt
+                  ; _
+                  } =
+           Network.Node.must_get_account_data ~logger timed_node_c
+             ~account_id:receiver_account_id
+         in
+         [%log info] "timed_node_c total balance: %s"
+           (Currency.Balance.to_mina_string timed_node_c_total) ;
+         [%log info] "timed_node_c liquid balance: %s"
+           (Currency.Balance.to_mina_string
+              ( timed_node_c_liquid_opt
+              |> Option.value ~default:Currency.Balance.zero ) ) ;
+         [%log info] "timed_node_c liquid locked: %s"
+           (Currency.Balance.to_mina_string
+              ( timed_node_c_locked_opt
+              |> Option.value ~default:Currency.Balance.zero ) ) ;
+         [%log info]
+           "Attempting to send txn from timed_node_c to untimed_node_a for \
+            amount of %s"
+           (Currency.Amount.to_mina_string amount) ;
          let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
@@ -349,21 +368,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
-        (let amount = Currency.Amount.of_int 25_000_000_000_000 in
+        (let amount = Currency.Amount.of_mina_int_exn 25_000 in
          let receiver = untimed_node_b in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let sender_account_id =
+           Account_id.create sender_pub_key Token_id.default
+         in
          let%bind { total_balance = timed_node_c_total; _ } =
            Network.Node.must_get_account_data ~logger timed_node_c
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+           (Currency.Balance.to_mina_string timed_node_c_total) ;
          [%log info]
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
+           (Currency.Amount.to_mina_string amount) ;
          (* TODO: refactor this using new [expect] dsl when it's available *)
          let open Deferred.Let_syntax in
          match%bind

@@ -11,6 +11,8 @@
    core
    async_unix
    stdio
+   ;; mina libraries
+   init
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))

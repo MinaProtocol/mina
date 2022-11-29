@@ -57,6 +57,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update \
+  || sleep 10s && apt-get update \
+  || sleep 10s && apt-get update \
+  || sleep 10s && apt-get update \
   && apt-get install -y --allow-downgrades "mina-$network=$deb_version"
 
 

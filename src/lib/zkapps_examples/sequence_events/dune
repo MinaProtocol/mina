@@ -1,0 +1,19 @@
+(library
+ (name zkapps_sequence_events)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   ;; local libraries
+   crypto_params
+   currency
+   mina_base
+   pickles
+   pickles_types
+   snarky.backendless
+   snark_params
+   signature_lib
+   zkapps_examples)
+ (instrumentation (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

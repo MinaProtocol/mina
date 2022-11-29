@@ -1,6 +1,6 @@
 open Pickles_types
 
-type 'f t = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
+type 'f t = 'f Snarky_backendless.Cvar.t
 
 module Constant = Constant.Make (Nat.N2)
 
@@ -21,13 +21,7 @@ module type S = sig
     val dummy : t
   end
 
-  val typ' : [ `Constrained | `Unconstrained ] -> (t, Constant.t) Typ.t
-
-  val typ_unchecked : (t, Constant.t) Typ.t
-
-  val packed_typ : (Field.t, Constant.t) Typ.t
-
-  val to_bits : t -> Boolean.var list
+  val typ : (t, Constant.t) Typ.t
 
   val length : int
 end

@@ -46,7 +46,7 @@ let%test_module "coda network tests" =
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
         configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[] ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
           ~validation_queue_size:150
@@ -67,7 +67,7 @@ let%test_module "coda network tests" =
         "Seed_peer: $peer" ;
       let%bind () =
         configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~min_connections:20 ~metrics_port:None ~unsafe_no_trust_ip:true
           ~max_connections:50 ~validation_queue_size:150
@@ -77,7 +77,7 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       and () =
         configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
           ~min_connections:20 ~validation_queue_size:150
