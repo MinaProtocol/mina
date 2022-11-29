@@ -135,7 +135,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
       ?vk ?failure ()
   in
   let zkapp_command =
-    Option.value_exn
+    Or_error.ok_exn
       (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
          ~location_of_account:Ledger.location_of_account zkapp_command )
   in
@@ -181,7 +181,7 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
           ~account_state_tbl ?vk ?failure ()
       in
       let valid_zkapp_command =
-        Option.value_exn
+        Or_error.ok_exn
           (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
              ~location_of_account:Ledger.location_of_account zkapp_command )
       in

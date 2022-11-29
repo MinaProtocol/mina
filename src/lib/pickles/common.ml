@@ -30,6 +30,20 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
+let actual_wrap_domain_size ~log_2_domain_size =
+  let d =
+    match log_2_domain_size with
+    | 13 ->
+        0
+    | 14 ->
+        1
+    | 15 ->
+        2
+    | _ ->
+        assert false
+  in
+  Pickles_base.Proofs_verified.of_int d
+
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
@@ -123,7 +137,7 @@ let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Finite (x, y) ->
       (x, y)
   | Infinity ->
-      failwith "finite_exn"
+      invalid_arg "finite_exn"
 
 let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
   function
@@ -142,8 +156,9 @@ module Ipa = struct
     endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
-    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        compute_challenge field ~endo_to_field prechallenge )
+    Vector.map chals ~f:(fun prechallenge ->
+        Bulletproof_challenge.pack prechallenge
+        |> compute_challenge field ~endo_to_field )
 
   module Wrap = struct
     let field =
@@ -223,8 +238,6 @@ let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
-
 let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
   of_int 5 * (domain_size - of_int 1)
 
@@ -239,50 +252,8 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
-    (* The poseidon and generic gates are special cases,
-       as they use coefficient commitments from the verifier index.
-       Note that for all gates, powers of alpha start at a^0 = 1.
-    *)
-    let poseidon =
-      let (pn :: ps) = Vector.rev m.coefficients_comm in
-      let res =
-        Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha)
-      in
-      scale res plonk.poseidon_selector |> negate
-    in
-
-    (*
-    Remember, the layout of the generic gate:
-    | 0  |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 |
-    | l1 | r1 | o1 | m1 | c1 | l2 | r2 | o2 | m2 | c2 |
-    *)
-    let generic =
-      let coeffs = Vector.to_array m.coefficients_comm in
-      let (generic_selector :: l1 :: r1 :: o1 :: m1 :: l2 :: r2 :: o2 :: m2 :: _)
-          =
-        plonk.generic
-      in
-      (* Second gate first, to multiply with a power of alpha. *)
-      let snd_gate = l2 * coeffs.(5) in
-      let snd_gate = snd_gate + (r2 * coeffs.(6)) in
-      let snd_gate = snd_gate + (o2 * coeffs.(7)) in
-      let snd_gate = snd_gate + (m2 * coeffs.(8)) in
-      let snd_gate = snd_gate + coeffs.(9) in
-      let snd_gate = endoscale snd_gate alpha in
-      (* And then the first gate. *)
-      let generic_gate = snd_gate + (l1 * coeffs.(0)) in
-      let generic_gate = generic_gate + (r1 * coeffs.(1)) in
-      let generic_gate = generic_gate + (o1 * coeffs.(2)) in
-      let generic_gate = generic_gate + (m1 * coeffs.(3)) in
-      let generic_gate = generic_gate + coeffs.(4) in
-      (* generic_selector * (fst_gate + snd_gate * alpha) *)
-      generic_selector * generic_gate
-    in
-
     List.reduce_exn ~f:( + )
       [ plonk.perm * sigma_comm_last
-      ; generic
-      ; poseidon
       ; plonk.vbmul * m.mul_comm
       ; plonk.complete_add * m.complete_add_comm
       ; plonk.endomul * m.emul_comm

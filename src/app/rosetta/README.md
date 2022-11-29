@@ -218,7 +218,7 @@ which should take a different value depending on which network you
 want to connect to. Complete list of predefined `dune` profiles can be
 found in `src/config` directory in the main repository.
 
-Alternatively, you could use the official image `minaprotocol/mina-rosetta-ubuntu:1.3.0beta1-087f715-stretch` which is built in exactly this way by buildkite CI/CD.
+Alternatively, you could use the official image `minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye-mainnet` which is built in exactly this way by buildkite CI/CD.
 
 ## How to Run
 
