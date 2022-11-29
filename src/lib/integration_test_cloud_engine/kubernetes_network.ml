@@ -16,6 +16,8 @@ let postgres_url =
   Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
     mina_archive_username mina_archive_pw
 
+let node_password = "naughty blue worm"
+
 type config =
   { testnet_name : string
   ; cluster : string
@@ -427,8 +429,7 @@ module Node = struct
       let unlock_account_obj =
         Graphql.Unlock_account.(
           make
-          @@ makeVariables ~password:"naughty blue worm"
-               ~public_key:sender_pub_key ())
+          @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -818,7 +819,7 @@ module Workload_to_deploy = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if List.length t.pod_info <> List.length pod_ids then
+    if Stdlib.List.compare_lengths t.pod_info pod_ids <> 0 then
       failwithf
         "Unexpected number of replicas in kubernetes deployment for workload \
          %s: expected %d, got %d"
