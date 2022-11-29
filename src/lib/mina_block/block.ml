@@ -102,6 +102,24 @@ let transactions ~constraint_constants block =
   |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
   |> Or_error.ok_exn
 
+let completed_works ~constraint_constants block =
+  let consensus_state =
+    block |> header |> Header.protocol_state |> Protocol_state.consensus_state
+  in
+  let staged_ledger_diff =
+    block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
+  in
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
+  in
+  Staged_ledger.Pre_diff_info.get_completed_works ~constraint_constants
+    ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
+  |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
+  |> Or_error.ok_exn
+
 let payments block =
   block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
   |> Staged_ledger_diff.commands
