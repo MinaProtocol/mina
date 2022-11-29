@@ -47,8 +47,8 @@ security of mainnet nodes, though, and that's why they're mandatory.
 $ mina libp2p generate-keypair --privkey-path keys/node.key
 ```
 
-This command (which needs to be run from the mina repo) creates a key
-for the node operator. This is a key to use
+This command (which depends on environment variables set up by Nix)
+creates a key for the node operator. This is a key to use
 to identify the node in the p2p network. In a single-network setup it
 might not be the most relevant, but it's required nonetheless.
 
