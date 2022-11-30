@@ -226,13 +226,6 @@ module Typ = Impl.Typ
 external prover_to_json :
   Kimchi_bindings.Protocol.Index.Fp.t -> Js.js_string Js.t = "prover_to_json"
 
-let keypair_to_json (keypair : Keypair.t) : Js.js_string Js.t =
-  let wrapper_prover_index : Backend.Keypair.t = Keypair.pk keypair in
-  let prover_index : Kimchi_bindings.Protocol.Index.Fp.t =
-    wrapper_prover_index.index
-  in
-  prover_to_json prover_index
-
 let singleton_array (type a) (x : a) : a Js.js_array Js.t =
   let arr = new%js Js.array_empty in
   arr##push x |> ignore ;
@@ -1235,6 +1228,8 @@ and proof_class =
 class type keypair_class =
   object
     method value : Keypair.t Js.prop
+
+    method constraintSystemJSON : unit -> Js.js_string Js.t Js.meth
   end
 
 let keypair_class : < .. > Js.t =
@@ -1640,7 +1635,14 @@ let () =
   in
   method_ "verificationKey"
     (fun (this : keypair_class Js.t) : verification_key_class Js.t ->
-      new%js verification_key_constr (Keypair.vk this##.value) )
+      new%js verification_key_constr (Keypair.vk this##.value) ) ;
+  method_ "_constraintSystemJSON"
+    (fun (this : keypair_class Js.t) : Js.js_string Js.t ->
+      let wrapper_prover_index : Backend.Keypair.t = Keypair.pk this##.value in
+      let prover_index : Kimchi_bindings.Protocol.Index.Fp.t =
+        wrapper_prover_index.index
+      in
+      prover_to_json prover_index )
 
 (* TODO: add verificationKey.toString / fromString *)
 let () =
@@ -3240,8 +3242,6 @@ module Ledger = struct
     static_method "customTokenIdChecked" custom_token_id_checked ;
     static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
-
-    static_method "keypairToJson" keypair_to_json ;
 
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
