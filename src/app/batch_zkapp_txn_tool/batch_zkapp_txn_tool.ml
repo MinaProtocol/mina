@@ -99,21 +99,17 @@ let deploy_test_zkapps ~ledger ~port
       if not (is_zkapp_deployed kp ledger) then (
         (*deploy zkapp*)
         let spec =
-          { Transaction_snark.For_tests.Spec.sender =
+          { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
               (account_creator_keypair, !account_creator_nonce)
           ; fee = Currency.Fee.of_formatted_string "1.0"
           ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
-          ; receivers = []
           ; amount = Currency.Amount.of_formatted_string "2000.0"
           ; zkapp_account_keypairs = [ kp ]
           ; memo = Signed_command_memo.empty
           ; new_zkapp_account = true
           ; snapp_update = Account_update.Update.dummy
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; sequence_events = []
           ; preconditions = None
+          ; authorization_kind = Account_update.Authorization_kind.Signature
           }
         in
         let zkapp_command =
@@ -195,8 +191,9 @@ let generate_random_zkapps ~ledger ~vk ~prover
     if n > 0 then
       let%bind parties =
         Mina_generators.Zkapp_command_generators
-        .gen_zkapp_commands_with_limited_keys ~ledger ~keymap ~account_state_tbl
-          ?num_account_updates:parties_size ~vk ~fee_payer_keypair ()
+        .gen_zkapp_commands_with_limited_keys_testnet ~ledger ~keymap
+          ~account_state_tbl ?num_account_updates:parties_size ~vk
+          ~fee_payer_keypair ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)

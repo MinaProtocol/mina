@@ -20,8 +20,8 @@ type failure =
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
-let gen_account_precondition_from_account ?failure ~first_use_of_account account
-    =
+let gen_account_precondition_from_account ?failure
+    ?(ignore_sequence_events_precond = false) ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
     account
@@ -107,12 +107,16 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
                   Quickcheck.random_value (Or_ignore.gen (return field)) )
             in
             let%bind sequence_state =
-              (* choose a value from account sequence state *)
-              let fields =
-                Pickles_types.Vector.Vector_5.to_list sequence_state
-              in
-              let%bind ndx = Int.gen_uniform_incl 0 (List.length fields - 1) in
-              return (Or_ignore.Check (List.nth_exn fields ndx))
+              if ignore_sequence_events_precond then return Or_ignore.Ignore
+              else
+                (* choose a value from account sequence state *)
+                let fields =
+                  Pickles_types.Vector.Vector_5.to_list sequence_state
+                in
+                let%bind ndx =
+                  Int.gen_uniform_incl 0 (List.length fields - 1)
+                in
+                return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
             let is_new =
@@ -1019,7 +1023,8 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
 let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?token_id ?caller ?permissions_auth
     ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
-    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
+    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
+    ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1046,7 +1051,8 @@ let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
         (gen_balance_change ?permissions_auth ~new_account ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
-        gen_account_precondition_from_account ~first_use_of_account acct )
+        gen_account_precondition_from_account ~ignore_sequence_events_precond
+          ~first_use_of_account acct )
       ~f_account_update_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1120,8 +1126,8 @@ let gen_zkapp_command_from' ?failure
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?balancing_account_id
-    ?limited_zkapp_accounts () =
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?limited_zkapp_accounts
+    ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   (* at least 1 account_update *)
   let%bind num_account_updates =
@@ -1341,7 +1347,8 @@ let gen_zkapp_command_from' ?failure
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen ~update
             ?failure ~authorization ~new_account:new_zkapp_account
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~account_state_tbl ?protocol_state_view ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk
+            ~ignore_sequence_events_precond ()
         in
         let%bind account_update =
           (* authorization according to chosen permissions auth *)
@@ -1415,7 +1422,7 @@ let gen_zkapp_command_from' ?failure
           gen_account_update_from ~update ?failure ~zkapp_account_ids
             ~account_ids_seen ~account_id ~authorization ~permissions_auth
             ~zkapp_account ~available_public_keys ~account_state_tbl
-            ?protocol_state_view ?vk ()
+            ?protocol_state_view ?vk ~ignore_sequence_events_precond ()
         in
         (* this list will be reversed, so `account_update0` will execute before `account_update` *)
         go
@@ -1468,8 +1475,9 @@ let gen_zkapp_command_from' ?failure
     let authorization = Control.Signature Signature.dummy in
     gen_account_update_from ?failure ~permissions_auth:Control.Tag.Signature
       ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
-      ~available_public_keys ~account_state_tbl ?account_id:balancing_account_id
-      ~required_balance_change:balance_change ?protocol_state_view ?vk ()
+      ~available_public_keys ~account_state_tbl
+      ~required_balance_change:balance_change ?protocol_state_view ?vk
+      ~ignore_sequence_events_precond ()
   in
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
     let authorization = Control.Signature Signature.dummy in
@@ -1490,7 +1498,7 @@ let gen_zkapp_command_from' ?failure
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
             ~authorization ~permissions_auth ~available_public_keys ~caller
             ~account_state_tbl ~required_balance_change ?protocol_state_view ?vk
-            ()
+            ~ignore_sequence_events_precond ()
         in
         let token_id =
           Account_id.derive_token_id
@@ -1501,7 +1509,7 @@ let gen_zkapp_command_from' ?failure
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
             ~new_account:true ~token_id ~caller ~authorization ~permissions_auth
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
-            ()
+            ~ignore_sequence_events_precond ()
         in
         gen_tree (mk_node parent [ mk_node child [] ] :: acc) (n - 1)
     in
@@ -1585,7 +1593,7 @@ let gen_zkapp_command_from ?failure ?max_account_updates ?max_token_updates
   in
   gen_zkapp_command_from' ?failure ?num_account_updates ?max_token_updates
     ~create_new_accounts ~fee_payer_keypair ~keymap ?account_state_tbl ~ledger
-    ?protocol_state_view ?vk ()
+    ?protocol_state_view ?vk ~ignore_sequence_events_precond:false ()
 
 let gen_list_of_zkapp_command_from ?failure ?max_account_updates
     ?max_token_updates ~(fee_payer_keypairs : Signature_lib.Keypair.t list)
@@ -1640,21 +1648,18 @@ let gen_list_of_zkapp_command_from ?failure ?max_account_updates
   in
   go length []
 
-let gen_zkapp_commands_with_limited_keys ~keymap ?account_state_tbl ~ledger
-    ?protocol_state_view ?vk ?num_account_updates
+let gen_zkapp_commands_with_limited_keys_testnet ~keymap ?account_state_tbl
+    ~ledger ?protocol_state_view ?vk ?num_account_updates
     ~(fee_payer_keypair : Signature_lib.Keypair.t) () =
-  let open Quickcheck.Generator.Let_syntax in
   let pks = Signature_lib.Public_key.Compressed.Map.keys keymap in
-  let%bind balancing_account_id =
-    let%map index = Int.gen_uniform_incl 0 (List.length pks - 1) in
-    Account_id.create (List.nth_exn pks index) Token_id.default
-  in
   let num_account_updates =
     Option.map num_account_updates ~f:(fun n -> `Fixed n)
   in
   let limited_zkapp_accounts =
     List.map pks ~f:(fun k -> Account_id.create k Token_id.default)
   in
+  (*Ignore sequence events in the preconditions because it depends on the    global slot a txn with sequence events is included in*)
   gen_zkapp_command_from' ?failure:None ~create_new_accounts:false
     ~fee_payer_keypair ~keymap ?account_state_tbl ~ledger ?protocol_state_view
-    ?vk ?num_account_updates ~balancing_account_id ~limited_zkapp_accounts ()
+    ?vk ?num_account_updates ~max_token_updates:0 ~limited_zkapp_accounts
+    ~ignore_sequence_events_precond:true ()

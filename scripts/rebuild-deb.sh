@@ -85,7 +85,7 @@ ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
-##################################### SNAPP TEST TXN #######################################
+##################################### ZKAPP TEST TXN #######################################
 
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
@@ -123,7 +123,47 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-zkapp-test-transaction_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
-##################################### END SNAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE #######################################
+
+##################################### BATCH ZKAPP TEST TXNS #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-batch-zkapp-test-txns
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: O(1)Labs <build@o1labs.org>
+Installed-Size:
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Tool to generate and send batches of test zkApp transactions with random account updates
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/batch_zkapp_txn_tool/batch_zkapp_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-zkapp-test-txns"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-batch-zkapp-test-txns_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END BATCH ZKAPP TEST TXNS PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
 echo "------------------------------------------------------------"
