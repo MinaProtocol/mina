@@ -5,19 +5,6 @@ open Impls.Step
 open Step_verifier
 module B = Inductive_rule.B
 
-(* Converts from the one hot vector representation of a number
-   0 <= i < n
-
-     0  1  ... i-1  i  i+1       n-1
-   [ 0; 0; ... 0;   1; 0;   ...; 0 ]
-
-   to the numeric representation i. *)
-
-let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
-    Field.t =
-  let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
-  Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
-
 let verify_one
     ({ app_state
      ; wrap_proof
