@@ -561,9 +561,11 @@ struct
           with_label __LOC__ (fun () ->
               Common.ft_comm
                 ~add:(Ops.add_fast ?check_finite:None)
-                ~scale:scale_fast2 ~negate:Inner_curve.negate
-                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~scale:scale_fast2
+                ~negate:Inner_curve.negate
+                  (* ~endoscale:(Scalar_challenge.endo ?num_bits:None) *)
+                ~verification_key:m ~plonk (* ~alpha *)
+                ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
