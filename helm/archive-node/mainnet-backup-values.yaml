@@ -13,7 +13,10 @@ archive:
   enableLocalDaemon: false
   enablePostgresDB: true
   enableDumpCronjob: true
-  initFromDump: true
+  bootstrap:
+    fromDump: true
+    suffix: ""
+    dumpTime: "0000"
 
 postgresql:
   primary:

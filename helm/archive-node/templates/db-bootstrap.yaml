@@ -7,7 +7,8 @@ spec:
   template:
     spec:
       containers:
-      {{- if .Values.archive.initFromDump }}
+      {{- if .Values.archive.bootstrap.fromDump }}
+      {{- $filename := printf "%s%s-archive-dump-$(date -Idate)_%s.sql" .Values.testnetName .Values.archive.bootstrap.suffix .Values.archive.bootstrap.dumpTime }}
       - name: import-dump
         image: gcr.io/o1labs-192920/postgresql-curl:latest
         env:
@@ -20,15 +21,15 @@ spec:
         args:
         - 'sleep 30
         && cd /tmp
-        && curl https://storage.googleapis.com/mina-archive-dumps/{{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql.tar.gz -o {{ .Values.testnetName }}-archive-dump.tar.gz
-        && tar -xvf {{ .Values.testnetName }}-archive-dump.tar.gz
+        && curl https://storage.googleapis.com/mina-archive-dumps/{{ $filename }}.tar.gz -o {{ $filename }}.tar.gz
+        && tar -xvf {{ $filename }}.tar.gz
         && psql
         --username {{ .Values.postgresql.auth.username }}
         --host {{ tpl .Values.archive.postgresHost . }}
         --port {{ .Values.archive.ports.postgres }}
         --dbname {{ .Values.postgresql.auth.database }}
-        -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
-        && rm -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
+        -f {{ $filename }}
+        && rm -f {{ $filename }}
         && psql
         --username {{ .Values.postgresql.auth.username }}
         --host {{ tpl .Values.archive.postgresHost . }}
