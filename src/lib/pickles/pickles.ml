@@ -139,34 +139,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         and use *that* in the "verifies" computation.
   *)
 
-  let _pad_local_max_proofs_verifieds
-      (type prev_varss prev_valuess env max_proofs_verified branches)
-      (max_proofs_verified : max_proofs_verified Nat.t)
-      (length : (prev_varss, branches) Hlist.Length.t)
-      (local_max_proofs_verifieds :
-        (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t ) :
-      ((int, max_proofs_verified) Vector.t, branches) Vector.t =
-    let module Vec = struct
-      type t = (int, max_proofs_verified) Vector.t
-    end in
-    let module M =
-      H2_1.Map
-        (H2_1.T
-           (E03 (Int))) (E03 (Vec))
-           (struct
-             module HI = H2_1.T (E03 (Int))
-
-             let f : type a b e. (a, b, e) H2_1.T(E03(Int)).t -> Vec.t =
-              fun xs ->
-               let (T (_proofs_verified, pi)) = HI.length xs in
-               let module V = H2_1.To_vector (Int) in
-               let v = V.f pi xs in
-               Vector.extend_front_exn v max_proofs_verified 0
-           end)
-    in
-    let module V = H2_1.To_vector (Vec) in
-    V.f length (M.f local_max_proofs_verifieds)
-
   open Kimchi_backend
   module Proof_ = P.Base
   module Proof = P
@@ -1134,9 +1106,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ts
 
       let verify ts = verify_promise ts |> Promise.to_deferred
-
-      let _statement (T p : t) =
-        p.statement.messages_for_next_step_proof.app_state
     end in
     (self, cache_handle, (module P), provers)
 
@@ -2646,13 +2615,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (prover, wrap_vk, disk_key)
       end
 
-      let step, wrap_vk, wrap_disk_key = M.compile
+      let step, wrap_vk, _wrap_disk_key = M.compile
 
       module Proof = struct
         module Max_local_max_proofs_verified = Max_proofs_verified
         include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
-
-        let _id = wrap_disk_key
 
         let verification_key = wrap_vk
 
@@ -2662,9 +2629,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (module A_value)
             (Lazy.force verification_key)
             ts
-
-        let _statement (T p : t) =
-          p.statement.messages_for_next_step_proof.app_state
       end
 
       let proof_with_stmt =
@@ -3522,13 +3486,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (prover, wrap_vk, disk_key)
       end
 
-      let step, wrap_vk, wrap_disk_key = M.compile
+      let step, wrap_vk, _wrap_disk_key = M.compile
 
       module Proof = struct
         module Max_local_max_proofs_verified = Max_proofs_verified
         include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
-
-        let _id = wrap_disk_key
 
         let verification_key = wrap_vk
 
@@ -3538,9 +3500,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (module A_value)
             (Lazy.force verification_key)
             ts
-
-        let _statement (T p : t) =
-          p.statement.messages_for_next_step_proof.app_state
       end
 
       let proof_with_stmt =
