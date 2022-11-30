@@ -149,3 +149,15 @@ The tests can be run with the following command:
 ```shell
 $ rosetta-cli --configuration-file config.json check:data
 ```
+
+This command investigates block after block checks:
+1. whether Rosetta returns well formed information about
+   each block;
+2. tracks balances of all the accounts it can discover
+   and compares them to the balances returned by Rosetta;
+   fails in case of finding a discrepancy.
+   
+**NOTE**: this check will never stop unless `"end_conditions"` field
+is specified in the `config.json`, in `data` section (see the
+example mentioned above). For example an end condition:
+`"index": 50` will make `rosetta-cli to check first 50 blocks. 

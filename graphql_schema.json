@@ -11659,6 +11659,15 @@
               "deprecationReason": null
             },
             {
+              "name": "provedState",
+              "description":
+                "Boolean indicating whether all 8 fields on zkAppState were last set by a proof-authorized account update",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "permissions",
               "description":
                 "Permissions for updating certain fields of this account",
