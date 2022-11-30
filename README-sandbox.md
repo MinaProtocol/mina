@@ -8,6 +8,9 @@ run tests in to testing the capabilities of the system in the privacy
 of one's own house. Most of these steps need to be done just once and
 then many blockchains can be created using the same input data.
 
+Note that before you begin ensure you have the `mina.exe` set up as an alias
+or a PATH variable.
+
 Generating keys
 ---------------
 
@@ -44,7 +47,8 @@ security of mainnet nodes, though, and that's why they're mandatory.
 $ mina libp2p generate-keypair --privkey-path keys/node.key
 ```
 
-This command creates a key for the node operator. This is a key to use
+This command (which depends on environment variables set up by Nix)
+creates a key for the node operator. This is a key to use
 to identify the node in the p2p network. In a single-network setup it
 might not be the most relevant, but it's required nonetheless.
 
@@ -66,8 +70,7 @@ set up the config directory. The filename should be identical to the
 block producer's public key.
 
 ```shell
-$ mkdir -p .mina-config/wallets/store
-$ cp keys/block-producer.key .mina-config/wallets/store/$(cat keys/block-producer.key.pub)
+$ mina accounts import --privkey-path keys/block-producer.key --config-directory .mina-config
 ```
 
 Of course we are free to produce more keys for regular users of the
@@ -117,6 +120,9 @@ In particular it's possible to override the defaults compiled into the
 binary using the `dune` profiles. Explaining these options is, however,
 outside the scope of this instruction.
 
+The `genesis_state_timestamp` should be within a few minutes of when you intend
+to start the node.
+
 Starting the node
 -----------------
 
@@ -127,7 +133,9 @@ environment variable, as it might be required in some setups:
 $ export MINA_ROSETTA_MAX_DB_POOL_SIZE=128
 ```
 
-Assuming `mina` CLI is in you path, run the following command:
+Assuming `mina` CLI is in your path, run the following command, 
+making sure that required environment variables are properly set
+(by Nix shell or otherwise):
 
 ```shell
 $ mina daemon \
@@ -147,7 +155,9 @@ blockchain.
 
 `--config-directoy` can be omitted, in which case it defaults to
 `~/.mina-config`. You should pass it if you already have another
-blockchain's data stored in there.
+blockchain's data stored in there. In case the daemon fails, 
+complaining about write access to this directory, try providing an
+absolute path rather than relative one.
 
 If the block producer's key wasn't copied over to the wallet
 previously. The following error will appear:
