@@ -329,8 +329,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
     ]
 
 let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
-    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
-    ~frontier_broadcast_pipe:(frontier_r, frontier_w)
+    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
     ~producer_transition_reader_ref ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~transition_reader_ref
     ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
@@ -418,18 +417,11 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
               "Successfully loaded frontier, but failed downloaded best tip \
                from network" ;
           let curr_best_tip = Transition_frontier.best_tip frontier in
-          let%bind () =
-            (* writing to the pipe hangs if it's been filled *)
-            match Broadcast_pipe.Reader.peek frontier_r with
-            | None ->
-                Broadcast_pipe.Writer.write frontier_w (Some frontier)
-            | Some _ ->
-                Deferred.unit
-          in
           let%map () =
             if not sync_local_state then (
               [%log info] "Not syncing local state, should only occur in tests" ;
-              Deferred.unit )
+              (* make frontier available for tests *)
+              Broadcast_pipe.Writer.write frontier_w (Some frontier) )
             else
               match
                 Consensus.Hooks.required_local_state_sync
@@ -590,8 +582,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
         initialize ~sync_local_state
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-          ~persistent_frontier ~persistent_root ~time_controller
-          ~frontier_broadcast_pipe:(frontier_r, frontier_w)
+          ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
           ~producer_transition_reader_ref ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
