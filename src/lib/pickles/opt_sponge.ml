@@ -34,15 +34,6 @@ struct
 
   type nonrec t = Field.t t
 
-  let _state { state; _ } = Array.copy state
-
-  let _copy { state; params; sponge_state; needs_final_permute_if_empty } =
-    { state = Array.copy state
-    ; params
-    ; sponge_state
-    ; needs_final_permute_if_empty
-    }
-
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
   let of_sponge { Sponge.state; params; sponge_state } =

@@ -9,8 +9,6 @@ module Max_degree = struct
   let step = 1 lsl step_log2
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
-
-  let _wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
@@ -123,9 +121,6 @@ module Lookup_parameters = struct
           ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
           }
       }
-
-  let _tick ~lookup:_ : _ Composition_types.Wrap.Lookup_parameters.t =
-    Composition_types.Wrap.Lookup_parameters.{ use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
