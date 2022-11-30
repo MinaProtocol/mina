@@ -329,7 +329,8 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
     ]
 
 let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
-    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
+    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
+    ~frontier_broadcast_pipe:(frontier_r, frontier_w)
     ~producer_transition_reader_ref ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~transition_reader_ref
     ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
@@ -416,19 +417,20 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             [%log info]
               "Successfully loaded frontier, but failed downloaded best tip \
                from network" ;
-          [%log info] "TEMP GETTING BEST TIP" ;
           let curr_best_tip = Transition_frontier.best_tip frontier in
-          [%log info] "TEMP WRITING FRONTIER" ;
           let%bind () =
-            Broadcast_pipe.Writer.write frontier_w (Some frontier)
+            (* writing to the pipe hangs if it's been filled *)
+            match Broadcast_pipe.Reader.peek frontier_r with
+            | None ->
+                Broadcast_pipe.Writer.write frontier_w (Some frontier)
+            | Some _ ->
+                Deferred.unit
           in
-          [%log info] "TEMP WROTE FRONTIER" ;
           let%map () =
             if not sync_local_state then (
               [%log info] "Not syncing local state, should only occur in tests" ;
               Deferred.unit )
-            else (
-              [%log info] "TEMP CHECKING FOR REQUIRED LOCAL STATE SYNC" ;
+            else
               match
                 Consensus.Hooks.required_local_state_sync
                   ~constants:precomputed_values.consensus_constants
@@ -453,7 +455,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                   | Error e ->
                       Error.tag e ~tag:"Local state sync failed" |> Error.raise
                   | Ok () ->
-                      () ) )
+                      () )
           in
           let collected_transitions = Option.to_list best_tip in
           start_transition_frontier_controller
@@ -588,7 +590,8 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
         initialize ~sync_local_state
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-          ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
+          ~persistent_frontier ~persistent_root ~time_controller
+          ~frontier_broadcast_pipe:(frontier_r, frontier_w)
           ~producer_transition_reader_ref ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
