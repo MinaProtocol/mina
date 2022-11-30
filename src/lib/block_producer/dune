@@ -64,6 +64,7 @@
    snark_params
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))

@@ -14,6 +14,7 @@
    async.async_command
    ;;local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
    rosetta_coding
    rosetta_lib

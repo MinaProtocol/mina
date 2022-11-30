@@ -19,6 +19,7 @@
    base.base_internalhash_types
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    random_oracle_input
    mina_base.import
    mina_ledger

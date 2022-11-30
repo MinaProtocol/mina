@@ -57,6 +57,7 @@
    consensus
    mina_base.import
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_wire_types
  )
  (instrumentation (backend bisect_ppx))

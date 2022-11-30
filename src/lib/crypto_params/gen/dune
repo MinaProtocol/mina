@@ -19,6 +19,7 @@
    ocaml-compiler-libs.common
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    group_map
    tuple_lib
    snarky.backendless

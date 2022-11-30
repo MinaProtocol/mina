@@ -33,6 +33,7 @@
    mina_numbers
    block_time
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

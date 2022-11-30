@@ -1,6 +1,6 @@
 open Core_kernel
 open Kimchi_backend_common
-open Basic
+open Kimchi_pasta_basic
 module Field = Fq
 module Curve = Pallas
 
@@ -32,15 +32,7 @@ end
 
 (* TODO: change name *)
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make
-    (Field)
-    (Kimchi_bindings.Protocol.Gates.Vector.Fq)
-    (struct
-      let params =
-        Sponge.Params.(
-          map pasta_q_kimchi ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x) ))
-    end)
+  Kimchi_pasta_constraint_system.Pallas_constraint_system
 
 let lagrange : int -> _ Kimchi_types.poly_comm array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->
