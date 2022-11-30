@@ -2312,6 +2312,4 @@ function caml_pasta_fp_plonk_proof_example_with_lookup() {
 
 // Provides: prover_to_json
 // Requires: plonk_wasm
-var prover_to_json = function (prover_index) {
-    return plonk_wasm.prover_to_json(prover_index);
-};
+var prover_to_json = plonk_wasm.prover_to_json;

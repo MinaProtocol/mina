@@ -134,33 +134,6 @@ pub mod to_move {
 
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
 
-    /*
-    #[serde_as]
-    #[derive(Serialize)]
-    struct Gates<F>
-    where
-        F: PrimeField,
-    {
-        pub typ: GateType,
-        pub wires: GateWires,
-        #[serde_as(as = "Vec<o1_utils::serialization::SerdeAs>")]
-        pub coeffs: Vec<F>,
-    }
-
-    impl<F> From<&CircuitGate<F>> for Gates<F>
-    where
-        F: PrimeField,
-    {
-        fn from(gate: &CircuitGate<F>) -> Self {
-            Self {
-                typ: gate.typ,
-                wires: gate.wires,
-                coeffs: gate.coeffs.clone(),
-            }
-        }
-    }
-    */
-
     #[derive(Serialize)]
     struct Circuit<F>
     where
