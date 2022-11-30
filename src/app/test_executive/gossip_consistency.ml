@@ -1,6 +1,5 @@
 open Core
 open Integration_test_lib
-(* open Mina_base *)
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
