@@ -2,7 +2,6 @@
  (name mina_lib)
  (public_name mina_lib)
  (library_flags -linkall)
- (inline_tests)
  (libraries
    ;; opam libraries
    integers
@@ -24,7 +23,6 @@
    stdio
    result
    bin_prot.shape
-   ppx_inline_test.config
    ;; local libraries
    transition_chain_prover
    best_tip_prover
@@ -99,7 +97,13 @@
    ppx_version.runtime
    mina_intf
    node_error_service
-   inline_test_quiet_logs
+   mina_transaction_logic
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
