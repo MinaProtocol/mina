@@ -127,7 +127,7 @@ module Opt = struct
         (* No need to boolean constrain in the No or Yes case *)
         match flag with
         | No | Yes ->
-            fun _ -> Checked.return ()
+            fun _ -> Checked_ast.return ()
         | Maybe ->
             bool_typ.check
       in

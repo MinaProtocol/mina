@@ -31,8 +31,8 @@
    graphql-cohttp
    cohttp-async
    graphql-async
-   archive_lib
    ;;local libraries
+   archive_lib
    mina_wire_types
    perf_histograms
    one_or_two

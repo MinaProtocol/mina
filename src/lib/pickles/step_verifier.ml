@@ -549,6 +549,11 @@ struct
                        [ 0; 1; 2 ] )
                     ~public_input )
         in
+        let x_hat =
+          with_label "x_hat blinding" (fun () ->
+              Ops.add_fast x_hat
+                (Inner_curve.constant (Lazy.force Generators.h)) )
+        in
         absorb sponge PC x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;

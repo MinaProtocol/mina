@@ -1,3 +1,9 @@
+module Authorization_kind = struct
+  module V1 = struct
+    type t = None_given | Signature | Proof
+  end
+end
+
 module Update = struct
   module Timing_info = struct
     module V1 = struct
@@ -73,7 +79,7 @@ module Body = struct
   module V1 = struct
     type t =
       { public_key : Public_key.Compressed.V1.t
-      ; token_id : Mina_base_token_id.V1.t
+      ; token_id : Mina_base_token_id.V2.t
       ; update : Update.V1.t
       ; balance_change :
           (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
@@ -83,7 +89,8 @@ module Body = struct
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
-      ; caller : Mina_base_token_id.V1.t
+      ; caller : Mina_base_token_id.V2.t
+      ; authorization_kind : Authorization_kind.V1.t
       }
   end
 end

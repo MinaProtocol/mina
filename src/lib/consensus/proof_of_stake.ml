@@ -688,7 +688,7 @@ module Data = struct
       | Producer_private_key : Scalar.value Snarky_backendless.Request.t
       | Producer_public_key : Public_key.t Snarky_backendless.Request.t
 
-    let%snarkydef get_vrf_evaluation
+    let%snarkydef.Snark_params.Tick get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         shifted ~block_stake_winner ~block_creator ~ledger ~message =
       let open Mina_base in
@@ -698,40 +698,40 @@ module Data = struct
       in
       let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__
-          (Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth
-             ledger staker_addr )
+        with_label __LOC__ (fun () ->
+            Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth
+              ledger staker_addr )
       in
       let%bind () =
-        [%with_label "Account is for the default token"]
-          (make_checked (fun () ->
-               Token_id.(
-                 Checked.Assert.equal account.token_id
-                   (Checked.constant default)) ) )
+        [%with_label_ "Account is for the default token"] (fun () ->
+            make_checked (fun () ->
+                Token_id.(
+                  Checked.Assert.equal account.token_id
+                    (Checked.constant default)) ) )
       in
       let%bind () =
-        [%with_label "Block stake winner matches account pk"]
-          (Public_key.Compressed.Checked.Assert.equal block_stake_winner
-             account.public_key )
+        [%with_label_ "Block stake winner matches account pk"] (fun () ->
+            Public_key.Compressed.Checked.Assert.equal block_stake_winner
+              account.public_key )
       in
       let%bind () =
-        [%with_label "Block creator matches delegate pk"]
-          (Public_key.Compressed.Checked.Assert.equal block_creator
-             account.delegate )
+        [%with_label_ "Block creator matches delegate pk"] (fun () ->
+            Public_key.Compressed.Checked.Assert.equal block_creator
+              account.delegate )
       in
       let%bind delegate =
-        [%with_label "Decompress delegate pk"]
-          (Public_key.decompress_var account.delegate)
+        [%with_label_ "Decompress delegate pk"] (fun () ->
+            Public_key.decompress_var account.delegate )
       in
       let%map evaluation =
-        with_label __LOC__
-          (T.Checked.eval_and_check_public_key shifted ~private_key
-             ~public_key:delegate message )
+        with_label __LOC__ (fun () ->
+            T.Checked.eval_and_check_public_key shifted ~private_key
+              ~public_key:delegate message )
       in
       (evaluation, account)
 
     module Checked = struct
-      let%snarkydef check
+      let%snarkydef.Tick check
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
           ~block_creator ~global_slot ~seed =
@@ -943,19 +943,16 @@ module Data = struct
         [@@deriving sexp, compare, hash, to_yojson]
       end
 
-      let data_spec =
-        let open Tick.Data_spec in
-        [ Epoch_ledger.typ
-        ; Epoch_seed.typ
-        ; Mina_base.State_hash.typ
-        ; Lock_checkpoint.typ
-        ; Length.typ
-        ]
-
       let typ : (var, Value.t) Typ.t =
-        Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-          ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-          ~value_of_hlist:Poly.of_hlist
+        Typ.of_hlistable
+          [ Epoch_ledger.typ
+          ; Epoch_seed.typ
+          ; Mina_base.State_hash.typ
+          ; Lock_checkpoint.typ
+          ; Length.typ
+          ]
+          ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+          ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
       let graphql_type name =
         let open Graphql_async in
@@ -1311,7 +1308,7 @@ module Data = struct
       (min_window_density, next_sub_window_densities)
 
     module Checked = struct
-      let%snarkydef update_min_window_density ~(constants : Constants.var)
+      let%snarkydef.Tick update_min_window_density ~(constants : Constants.var)
           ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
           ~prev_min_window_density =
         (* Please see Min_window_density.update_min_window_density for documentation *)
@@ -1760,32 +1757,28 @@ module Data = struct
       , Public_key.Compressed.var )
       Poly.t
 
-    let data_spec
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-      let open Snark_params.Tick.Data_spec in
+    let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
+        (var, Value.t) Typ.t =
       let sub_windows_per_window =
         constraint_constants.sub_windows_per_window
       in
-      [ Length.typ
-      ; Length.typ
-      ; Length.typ
-      ; Typ.list ~length:sub_windows_per_window Length.typ
-      ; Vrf.Output.Truncated.typ
-      ; Amount.typ
-      ; Global_slot.typ
-      ; Mina_numbers.Global_slot.typ
-      ; Epoch_data.Staking.typ
-      ; Epoch_data.Next.typ
-      ; Boolean.typ
-      ; Public_key.Compressed.typ
-      ; Public_key.Compressed.typ
-      ; Public_key.Compressed.typ
-      ; Boolean.typ
-      ]
-
-    let typ ~constraint_constants : (var, Value.t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable
-        (data_spec ~constraint_constants)
+        [ Length.typ
+        ; Length.typ
+        ; Length.typ
+        ; Typ.list ~length:sub_windows_per_window Length.typ
+        ; Vrf.Output.Truncated.typ
+        ; Amount.typ
+        ; Global_slot.typ
+        ; Mina_numbers.Global_slot.typ
+        ; Epoch_data.Staking.typ
+        ; Epoch_data.Next.typ
+        ; Boolean.typ
+        ; Public_key.Compressed.typ
+        ; Public_key.Compressed.typ
+        ; Public_key.Compressed.typ
+        ; Boolean.typ
+        ]
         ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
         ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
@@ -2119,7 +2112,7 @@ module Data = struct
       in
       Boolean.not winner_locked
 
-    let%snarkydef update_var (previous_state : var)
+    let%snarkydef_ update_var (previous_state : var)
         (transition_data : Consensus_transition.var)
         (previous_protocol_state_hash : Mina_base.State_hash.var)
         ~(supply_increase : Currency.Amount.Signed.var)
@@ -2136,8 +2129,8 @@ module Data = struct
         Global_slot.Checked.of_slot_number ~constants transition_data
       in
       let%bind slot_diff =
-        [%with_label "Next global slot is less that previous global slot"]
-          (Global_slot.Checked.sub next_global_slot prev_global_slot)
+        [%with_label_ "Next global slot is less that previous global slot"]
+          (fun () -> Global_slot.Checked.sub next_global_slot prev_global_slot)
       in
       let%bind () =
         let%bind global_slot_increased =
@@ -2195,8 +2188,8 @@ module Data = struct
           supply_increase
       in
       let%bind () =
-        [%with_label "Total currency is greater than or equal to zero"]
-          (Boolean.Assert.is_true (Boolean.not overflow))
+        [%with_label_ "Total currency is greater than or equal to zero"]
+          (fun () -> Boolean.Assert.is_true (Boolean.not overflow))
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window ~constants ~prev:prev_global_slot
@@ -3496,7 +3489,7 @@ module Hooks = struct
       (protocol_state, consensus_transition)
 
     include struct
-      let%snarkydef next_state_checked ~constraint_constants
+      let%snarkydef.Tick next_state_checked ~constraint_constants
           ~(prev_state : Protocol_state.var)
           ~(prev_state_hash : Mina_base.State_hash.var) transition
           supply_increase =
@@ -3796,7 +3789,9 @@ let%test_module "Proof of stake tests" =
               ; is_new_stack = true
               }
         in
-        let%map `Success _, var = Snark_params.Tick.handle result handler in
+        let%map `Success _, var =
+          Snark_params.Tick.handle (fun () -> result) handler
+        in
         As_prover.read (typ ~constraint_constants) var
       in
       let checked_value =

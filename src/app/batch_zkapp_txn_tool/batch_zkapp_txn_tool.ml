@@ -99,20 +99,16 @@ let deploy_test_zkapps ~ledger ~port
       if not (is_zkapp_deployed kp ledger) then (
         (*deploy zkapp*)
         let spec =
-          { Transaction_snark.For_tests.Spec.sender =
+          { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
               (account_creator_keypair, !account_creator_nonce)
           ; fee = Currency.Fee.of_formatted_string "1.0"
           ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
-          ; receivers = []
           ; amount = Currency.Amount.of_formatted_string "2000.0"
           ; zkapp_account_keypairs = [ kp ]
           ; memo = Signed_command_memo.empty
           ; new_zkapp_account = true
           ; snapp_update = Account_update.Update.dummy
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; sequence_events = []
+          ; authorization_kind = Account_update.Authorization_kind.Signature
           ; preconditions = None
           }
         in

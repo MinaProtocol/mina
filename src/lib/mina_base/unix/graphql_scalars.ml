@@ -63,6 +63,15 @@ module PendingCoinbaseHash =
       let doc = "Base58Check-encoded hash of a pending coinbase hash"
     end)
 
+module PendingCoinbaseAuxHash =
+  Make_scalar_using_base58_check
+    (Mina_base.Staged_ledger_hash.Pending_coinbase_aux)
+    (struct
+      let name = "PendingCoinbaseAuxHash"
+
+      let doc = "Base58Check-encoded hash of a pending coinbase auxiliary hash"
+    end)
+
 module FieldElem =
   Make_scalar_using_to_string
     (Mina_base.Zkapp_basic.F)
@@ -88,12 +97,3 @@ module TransactionStatusFailure :
     Graphql_async.Schema.scalar "TransactionStatusFailure"
       ~doc:"transaction status failure" ~coerce:serialize
 end
-
-module ZkappCommandBase58 =
-  Make_scalar_using_base58_check
-    (Mina_base.Zkapp_command)
-    (struct
-      let name = "ZkappCommandBase58"
-
-      let doc = "A Base58Check string representing the command"
-    end)

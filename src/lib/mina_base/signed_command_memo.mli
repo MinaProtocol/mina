@@ -1,4 +1,4 @@
-(* user_command_memo.ml *)
+(* signed_command_memo.mli *)
 
 include
   Signed_command_memo_intf.S

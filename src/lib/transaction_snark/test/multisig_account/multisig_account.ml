@@ -6,7 +6,6 @@ open Snark_params
 open Tick
 open Pickles_types
 module U = Transaction_snark_tests.Util
-module Spec = Transaction_snark.For_tests.Spec
 module Impl = Pickles.Impls.Step
 
 let%test_module "multisig_account" =
@@ -34,12 +33,12 @@ let%test_module "multisig_account" =
             let open Checked in
             Checked.List.map ~f:(fun (_, pk') -> neq_pk pk pk') xs
             >>= fun bs ->
-            [%with_label __LOC__]
-              (Boolean.Assert.all bs >>= fun () -> distinct_public_keys xs)
+            [%with_label_ __LOC__] (fun () ->
+                Boolean.Assert.all bs >>= fun () -> distinct_public_keys xs )
         | [] ->
             Checked.return ()
 
-      let%snarkydef distinct_public_keys x = distinct_public_keys x
+      let%snarkydef_ distinct_public_keys x = distinct_public_keys x
 
       (* check a signature on msg against a public key *)
       let check_sig pk msg sigma : Boolean.var Checked.t =
@@ -47,7 +46,7 @@ let%test_module "multisig_account" =
         Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
       (* verify witness signatures against public keys *)
-      let%snarkydef verify_sigs pubkeys commitment witness =
+      let%snarkydef_ verify_sigs pubkeys commitment witness =
         let%bind pubkeys =
           exists
             (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
@@ -60,7 +59,7 @@ let%test_module "multisig_account" =
               |> Checked.List.all >>= Boolean.all )
         in
         Checked.List.map witness ~f:verify_sig
-        >>= fun bs -> [%with_label __LOC__] (Boolean.Assert.all bs)
+        >>= fun bs -> [%with_label_ __LOC__] (fun () -> Boolean.Assert.all bs)
 
       let check_witness m pubkeys commitment witness =
         if List.length witness <> m then
@@ -343,6 +342,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
+                    ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
                 }
@@ -366,6 +366,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
+                    ; authorization_kind = Proof
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }

@@ -446,7 +446,30 @@ module Base : sig
 end
 
 module For_tests : sig
-  module Spec : sig
+  module Deploy_snapp_spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; preconditions : Account_update.Preconditions.t option
+      ; authorization_kind : Account_update.Authorization_kind.t
+      }
+    [@@deriving sexp]
+  end
+
+  val deploy_snapp :
+       ?no_auth:bool
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Deploy_snapp_spec.t
+    -> Zkapp_command.t
+
+  module Update_states_spec : sig
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
@@ -458,6 +481,7 @@ module For_tests : sig
       ; memo : Signed_command_memo.t
       ; new_zkapp_account : bool
       ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
@@ -466,12 +490,6 @@ module For_tests : sig
       }
     [@@deriving sexp]
   end
-
-  val deploy_snapp :
-       ?no_auth:bool
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Spec.t
-    -> Zkapp_command.t
 
   val update_states :
        ?zkapp_prover:
@@ -483,7 +501,7 @@ module For_tests : sig
          )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Spec.t
+    -> Update_states_spec.t
     -> Zkapp_command.t Async.Deferred.t
 
   val create_trivial_predicate_snapp :
@@ -520,5 +538,26 @@ module For_tests : sig
               Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Zkapp_command.t
+  module Multiple_transfers_spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+      ; memo : Signed_command_memo.t
+      ; new_zkapp_account : bool
+      ; snapp_update : Account_update.Update.t
+            (* Authorization for the update being performed *)
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      ; preconditions : Account_update.Preconditions.t option
+      }
+    [@@deriving sexp]
+  end
+
+  val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
 end

@@ -385,7 +385,7 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
+                let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false);
 
                 let index =
                     DlogVerifierIndex {
@@ -405,6 +405,9 @@ macro_rules! impl_verification_key {
                         // TODO
                         chacha_comm: None,
                         range_check_comm: None,
+                        foreign_field_add_comm: None,
+
+                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();
@@ -627,7 +630,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use crate::srs::fp::WasmFpSrs;
-    use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine};
 
     impl_verification_key!(
         caml_pasta_fp_plonk_verifier_index,
@@ -651,7 +654,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use crate::srs::fq::WasmFqSrs;
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
+    use mina_curves::pasta::{Fq, Pallas as GAffine, Vesta as GAffineOther};
 
     impl_verification_key!(
         caml_pasta_fq_plonk_verifier_index,

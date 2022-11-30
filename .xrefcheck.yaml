@@ -14,6 +14,8 @@ traversal:
     - src/lib/crypto/proof-systems
     - src/lib/snarky
     - frontend/wallet/tablecloth
+    # Unsure of the relevance anymore
+    - frontend/wallet/README.md
 
 # Verification parameters.
 verification:

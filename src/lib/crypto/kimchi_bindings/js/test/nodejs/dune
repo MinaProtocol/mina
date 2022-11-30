@@ -10,7 +10,7 @@
    js_of_ocaml
    bindings_js
    node_backend)
- (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm.wasm)
+ (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm_bg.wasm)
  (instrumentation (backend bisect_ppx))
  (forbidden_libraries core async)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))

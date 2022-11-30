@@ -6,6 +6,8 @@ open Snark_params.Tick
 [%%versioned:
 module Stable : sig
   module V1 : sig
+    [@@@with_all_version_tags]
+
     type t = Field.t * Inner_curve.Scalar.t
     [@@deriving sexp, equal, compare, hash]
 

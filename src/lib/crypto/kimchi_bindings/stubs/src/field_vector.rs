@@ -123,7 +123,7 @@ macro_rules! impl_vector {
 pub mod fp {
     use super::*;
     use crate::arkworks::CamlFp;
-    use mina_curves::pasta::fp::Fp;
+    use mina_curves::pasta::Fp;
 
     impl_vector_old!(CamlFpVector, CamlFp, Fp);
 }
@@ -131,7 +131,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::CamlFq;
-    use mina_curves::pasta::fq::Fq;
+    use mina_curves::pasta::Fq;
 
     impl_vector_old!(CamlFqVector, CamlFq, Fq);
 }

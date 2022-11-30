@@ -645,11 +645,8 @@ module Node = struct
     ; nonce : Mina_numbers.Account_nonce.t
     }
 
-  let transaction_id_to_string = function
-    | `String s ->
-        s
-    | _ ->
-        failwith "Unexpected JSON for transaction ID"
+  let transaction_id_to_string id =
+    Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =

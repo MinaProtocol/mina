@@ -163,7 +163,7 @@ macro_rules! impl_gate_vector {
 pub mod fp {
     use super::*;
     use crate::arkworks::WasmPastaFp as WasmF;
-    use mina_curves::pasta::fp::Fp as F;
+    use mina_curves::pasta::Fp as F;
 
     impl_gate_vector!(fp, WasmF, F, Fp);
 }
@@ -175,7 +175,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::WasmPastaFq as WasmF;
-    use mina_curves::pasta::fq::Fq as F;
+    use mina_curves::pasta::Fq as F;
 
     impl_gate_vector!(fq, WasmF, F, Fq);
 }

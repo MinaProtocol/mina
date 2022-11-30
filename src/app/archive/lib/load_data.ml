@@ -160,18 +160,16 @@ let update_of_id pool update_id =
     in
     Set_or_keep.of_option
       (Option.map vk_opt ~f:(fun { verification_key; hash } ->
-           match Base64.decode verification_key with
-           | Ok s ->
-               let data =
-                 Binable.of_string
-                   (module Pickles.Side_loaded.Verification_key.Stable.Latest)
-                   s
-               in
+           match
+             Pickles.Side_loaded.Verification_key.of_base64 verification_key
+           with
+           | Ok vk ->
+               let data = vk in
                let hash = Pickles.Backend.Tick.Field.of_string hash in
                { With_hash.data; hash }
-           | Error (`Msg err) ->
-               failwithf "Could not Base64-decode verification key: %s" err () )
-      )
+           | Error err ->
+               failwithf "Could not Base64-decode verification key: %s"
+                 (Error.to_string_hum err) () ) )
   in
   let%bind permissions =
     let%map perms_opt =
@@ -445,6 +443,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_account_precondition_id
            ; use_full_commitment
            ; caller
+           ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
   in
@@ -612,6 +611,9 @@ let get_account_update_body ~pool body_id =
              } )
   in
   let caller = Account_update.Call_type.of_string caller in
+  let authorization_kind =
+    Account_update.Authorization_kind.of_string_exn authorization_kind
+  in
   return
     ( { public_key
       ; token_id
@@ -628,6 +630,7 @@ let get_account_update_body ~pool body_id =
           }
       ; use_full_commitment
       ; caller
+      ; authorization_kind
       }
       : Account_update.Body.Simple.t )
 

@@ -39,6 +39,16 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: authorization_kind_type; Type: TYPE; Schema: public;
+--
+
+CREATE TYPE public.authorization_kind_type AS ENUM (
+    'None_given',
+    'Signature',
+    'Proof'
+);
+
+--
 -- Name: call_type; Type: TYPE; Schema: public;
 --
 
@@ -353,7 +363,7 @@ ALTER SEQUENCE public.epoch_data_id_seq OWNED BY public.epoch_data.id;
 
 CREATE TABLE public.internal_commands (
     id integer NOT NULL,
-    typ public.internal_command_type NOT NULL,
+    command_type public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
     fee text NOT NULL,
     hash text NOT NULL
@@ -567,7 +577,7 @@ ALTER SEQUENCE public.tokens_id_seq OWNED BY public.tokens.id;
 
 CREATE TABLE public.user_commands (
     id integer NOT NULL,
-    typ public.user_command_type NOT NULL,
+    command_type public.user_command_type NOT NULL,
     fee_payer_id integer NOT NULL,
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
@@ -1142,7 +1152,8 @@ CREATE TABLE public.zkapp_account_update_body (
     zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
-    caller public.call_type NOT NULL
+    caller public.call_type NOT NULL,
+    authorization_kind public.authorization_kind_type NOT NULL
 );
 
 
@@ -2079,11 +2090,11 @@ COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_wi
 14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	3	3	1	1	15	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	14	48	48	1659994440000	pending
 15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	3	3	1	1	16	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	15	49	49	1659994470000	pending
 16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	3	3	1	1	17	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	16	50	50	1659994500000	pending
-17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jwVkVSdQTtSNRi698eFeiDeJJrAY1MeW4ZZxadpXEbLtNzRyDb6	17	56	56	1659994680000	pending
-18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jx2K8PqoKxRSsTqhpAkeAgJ1dxBuYfGvHF2t4qbv6BwyYhFoc9K	18	57	57	1659994710000	pending
-19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jx2K8PqoKxRSsTqhpAkeAgJ1dxBuYfGvHF2t4qbv6BwyYhFoc9K	19	60	60	1659994800000	pending
-20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jwedHhoVL6VZfty46JNEqwupysxuA2mL425c9d9JQr4kWsar8Ch	20	65	65	1659994950000	pending
-21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jwwBNTMAo3n4A8kL88FTp2vxh4VqEV1owT3Cyx1jek9YdAqC1Qw	21	68	68	1659995040000	pending
+17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jxtPUm7BGbv2Px4ZRdBzwQx2Hoc3dFyxzpKPKMtnYGwoUtvvRKz	17	56	56	1659994680000	pending
+18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jwtjm22NpfhLDDgFUKKabn9PrVbTgRLzNh3JZxK6b1AM9v5G5ur	18	57	57	1659994710000	pending
+19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jwtjm22NpfhLDDgFUKKabn9PrVbTgRLzNh3JZxK6b1AM9v5G5ur	19	60	60	1659994800000	pending
+20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jxf5BSTGv7SyqPPx5q6936WSurZhjUo3rVZd2gGppNKsfgL8WUY	20	65	65	1659994950000	pending
+21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jxKbMV92wzA9tWV5BVSZWqzLFkE8TM27VHM7f1fcSWwsf6kGVBh	21	68	68	1659995040000	pending
 \.
 
 
@@ -2265,7 +2276,7 @@ COPY public.epoch_data (id, seed, ledger_hash_id, total_currency, start_checkpoi
 -- Data for Name: internal_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.internal_commands (id, typ, receiver_id, fee, hash) FROM stdin;
+COPY public.internal_commands (id, command_type, receiver_id, fee, hash) FROM stdin;
 1	coinbase	2	1440000000000	CkpZPC8P5wJ5zoMsUnwQ4yzMggpeifgXEtKG8L1qmsSZqAUaTGyHj
 2	fee_transfer	2	3500000000	CkpaKi6CtGXrNuB8NgSpH3wFkqeUNadD1BiXk41PpdGcHUnsRLYV7
 3	fee_transfer	2	1500000000	CkpZGU5BN9RcNywUqbNQ6ZUDmWM4MAAK9PcnTYASi7LXuKAbfMYQQ
@@ -2344,7 +2355,7 @@ COPY public.tokens (id, value, owner_public_key_id, owner_token_id) FROM stdin;
 -- Data for Name: user_commands; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.user_commands (id, typ, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
+COPY public.user_commands (id, command_type, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
 1	payment	2	2	1	30	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZcwMTKuth1tPqomkFeYmsSkbqXNvzr9PsZKs6yTZDpvn7BwJpR
 2	payment	2	2	1	31	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZgMW3vCgskUnMLzLUngHKADPw72bWYWEeeCYmBsd9be1Nwtmzq
 3	payment	2	2	1	32	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZm3VfGE7AU8mMo2YZosE1VodqQYzZHzNc61xJvFTbhXbASbWUC
@@ -2580,10 +2591,10 @@ COPY public.zkapp_account_update (id, body_id, authorization_kind) FROM stdin;
 -- Data for Name: zkapp_account_update_body; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
-1	5	1	-10000000000	t	1	1	1	0	1	1	f	call
-2	7	2	9000000000	f	1	1	1	0	1	2	t	call
-3	7	3	0	f	1	1	1	0	1	2	t	call
+COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller, authorization_kind) FROM stdin;
+1	5	1	-10000000000	t	1	1	1	0	1	1	f	call	Signature
+2	7	2	9000000000	f	1	1	1	0	1	2	t	call	Signature
+3	7	3	0	f	1	1	1	0	1	2	t	call	Proof
 \.
 
 
