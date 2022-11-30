@@ -83,8 +83,6 @@ module Width : sig
       end
     end]
   end
-
-  module Length : Nat.Add.Intf_transparent
 end = struct
   include V.Width
   open Impls.Step
@@ -235,10 +233,6 @@ module Stable = struct
 
       let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
 
-      let _to_yojson t = R.to_yojson (to_repr t)
-
-      let _of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
-
       let equal x y = R.equal (to_repr x) (to_repr y)
 
       let compare x y = R.compare (to_repr x) (to_repr y)
@@ -309,9 +303,6 @@ module Checked = struct
           *)
     }
   [@@deriving hlist, fields]
-
-  (** [log_2] of the width. *)
-  let _width_size = Nat.to_int Width.Length.n
 
   let to_input =
     let open Random_oracle_input.Chunked in
