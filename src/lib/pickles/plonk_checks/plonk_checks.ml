@@ -367,7 +367,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
-    let _ = with_label in
     let open F in
     fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
