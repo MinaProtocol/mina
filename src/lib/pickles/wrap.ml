@@ -22,13 +22,6 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
     end)
 
-let _vector_of_list (type a t)
-    (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
-    (xs : a list) : t =
-  let r = V.create () in
-  List.iter xs ~f:(V.emplace_back r) ;
-  r
-
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
