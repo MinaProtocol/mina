@@ -2694,7 +2694,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     let required_local_state_sync ~constants
         ~(consensus_state : Consensus_state.Value.t) ~local_state =
       let open Mina_base in
+      (* TEMP!!!! *)
+      let logger = Logger.create () in
+      [%log info] "TEMP RUNNING REQUIRED LOCAL STATE SYNC" ;
+      [%log info] "TEMP GETTING EPOCH" ;
       let epoch = Consensus_state.curr_epoch consensus_state in
+      [%log info] "TEMP GETTING SOURCE, SNAPSHOT" ;
       let source, _snapshot =
         select_epoch_snapshot ~constants ~consensus_state ~local_state ~epoch
       in
@@ -2709,27 +2714,37 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       match source with
       | `Curr ->
-          Option.map
-            (required_snapshot_sync Next_epoch_snapshot
-               consensus_state.staking_epoch_data.ledger.hash ) ~f:(fun s ->
-              One s )
-      | `Last -> (
-          match
-            ( required_snapshot_sync Next_epoch_snapshot
-                consensus_state.next_epoch_data.ledger.hash
-            , required_snapshot_sync Staking_epoch_snapshot
-                consensus_state.staking_epoch_data.ledger.hash )
-          with
-          | None, None ->
-              None
-          | Some x, None | None, Some x ->
-              Some (One x)
-          | Some next, Some staking ->
-              Some
-                (Both
-                   { next = next.expected_root
-                   ; staking = staking.expected_root
-                   } ) )
+          [%log info] "TEMP SOURCE IS CURR" ;
+          let res =
+            Option.map
+              (required_snapshot_sync Next_epoch_snapshot
+                 consensus_state.staking_epoch_data.ledger.hash ) ~f:(fun s ->
+                One s )
+          in
+          [%log info] "TEMP GOT CURR RESULT" ;
+          res
+      | `Last ->
+          [%log info] "TEMP SOURCE IS LAST" ;
+          let res =
+            match
+              ( required_snapshot_sync Next_epoch_snapshot
+                  consensus_state.next_epoch_data.ledger.hash
+              , required_snapshot_sync Staking_epoch_snapshot
+                  consensus_state.staking_epoch_data.ledger.hash )
+            with
+            | None, None ->
+                None
+            | Some x, None | None, Some x ->
+                Some (One x)
+            | Some next, Some staking ->
+                Some
+                  (Both
+                     { next = next.expected_root
+                     ; staking = staking.expected_root
+                     } )
+          in
+          [%log info] "TEMP GOT LAST RESULT" ;
+          res
 
     let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
         ~local_state ~glue_sync_ledger requested_syncs =

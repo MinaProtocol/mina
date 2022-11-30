@@ -424,7 +424,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             if not sync_local_state then (
               [%log info] "Not syncing local state, should only occur in tests" ;
               Deferred.unit )
-            else
+            else (
+              [%log info] "TEMP CHECKING FOR REQUIRED LOCAL STATE SYNC" ;
               match
                 Consensus.Hooks.required_local_state_sync
                   ~constants:precomputed_values.consensus_constants
@@ -449,7 +450,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                   | Error e ->
                       Error.tag e ~tag:"Local state sync failed" |> Error.raise
                   | Ok () ->
-                      () )
+                      () ) )
           in
           let collected_transitions = Option.to_list best_tip in
           start_transition_frontier_controller
