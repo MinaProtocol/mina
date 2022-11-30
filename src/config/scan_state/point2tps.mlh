@@ -1,4 +1,4 @@
 [%%define scan_state_with_tps_goal true]
 (* 0.2TPS * 10 *)
 [%%define scan_state_tps_goal_x10 2]
-[%%define scan_state_work_delay 2]
+[%%define scan_state_work_delay 3]
