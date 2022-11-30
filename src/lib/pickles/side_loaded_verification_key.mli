@@ -43,6 +43,10 @@ module Checked : sig
         Step_main_inputs.Impl.field
         Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
+    ; actual_wrap_domain_size :
+        Step_main_inputs.Impl.field
+        Pickles_base.Proofs_verified.One_hot.Checked.t
+          (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
         Step_main_inputs.Inner_curve.t
         Pickles_types.Plonk_verification_key_evals.t

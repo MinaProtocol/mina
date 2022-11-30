@@ -164,7 +164,7 @@ module For_step = struct
     ; public_input
     ; proofs_verifieds = `Side_loaded
     ; wrap_key = index.wrap_index
-    ; wrap_domain = `Side_loaded index.max_proofs_verified
+    ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
     ; step_uses_lookup
     }
