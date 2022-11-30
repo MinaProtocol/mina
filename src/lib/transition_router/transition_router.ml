@@ -416,10 +416,13 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             [%log info]
               "Successfully loaded frontier, but failed downloaded best tip \
                from network" ;
+          [%log info] "TEMP GETTING BEST TIP" ;
           let curr_best_tip = Transition_frontier.best_tip frontier in
+          [%log info] "TEMP WRITING FRONTIER" ;
           let%bind () =
             Broadcast_pipe.Writer.write frontier_w (Some frontier)
           in
+          [%log info] "TEMP WROTE FRONTIER" ;
           let%map () =
             if not sync_local_state then (
               [%log info] "Not syncing local state, should only occur in tests" ;
