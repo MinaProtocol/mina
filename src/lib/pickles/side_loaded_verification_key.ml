@@ -117,23 +117,7 @@ module Domain = struct
 end
 [@@warning "-4"]
 
-module Domains = struct
-  include V.Domains
-
-  let _typ =
-    let open Impls.Step in
-    let dom =
-      Typ.transport Typ.field
-        ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
-          Field.Constant.of_int n )
-        ~back:(fun _ -> assert false)
-      |> Typ.transport_var
-           ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
-           ~back:(fun n -> Domain.Pow_2_roots_of_unity n)
-    in
-    Typ.of_hlistable [ dom ] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_of_hlist:of_hlist
-end
+module Domains = V.Domains
 
 let max_domains =
   { Domains.h = Domain.Pow_2_roots_of_unity (Nat.to_int Backend.Tick.Rounds.n) }
