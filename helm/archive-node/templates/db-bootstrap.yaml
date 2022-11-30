@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       {{- if .Values.archive.bootstrap.fromDump }}
-      {{- $filename := printf "%s%s-archive-dump-$(date -Idate)_%s.sql" .Values.testnetName .Values.archive.bootstrap.suffix .Values.archive.bootstrap.dumpTime }}
+      {{- $filename := printf "%s%s-archive-dump-$(date -Idate)_%d.sql" .Values.testnetName .Values.archive.bootstrap.suffix .Values.archive.bootstrap.dumpTime }}
       - name: import-dump
         image: gcr.io/o1labs-192920/postgresql-curl:latest
         env:
