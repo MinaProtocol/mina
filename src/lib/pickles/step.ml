@@ -16,8 +16,6 @@ module Make
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
-  let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
-
   module E = struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
   end
