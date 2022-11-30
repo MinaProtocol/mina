@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -234,11 +235,14 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
+    let mina_archive_schema = "create_schema.sql" in
     let mina_archive_base_url =
       "https://raw.githubusercontent.com/MinaProtocol/mina/"
       ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
-    let mina_archive_schema = mina_archive_base_url ^ "create_schema.sql" in
+    let mina_archive_schema_aux_files =
+      [ mina_archive_base_url ^ "create_schema.sql" ]
+    in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
       let keypair =
@@ -276,6 +280,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
@@ -346,12 +351,12 @@ module Network_manager = struct
     ; testnet_dir : string
     ; testnet_log_filter : string
     ; constants : Test_config.constants
-    ; seed_workloads : Kubernetes_network.Workload.t list
-    ; block_producer_workloads : Kubernetes_network.Workload.t list
-    ; snark_coordinator_workloads : Kubernetes_network.Workload.t list
-    ; snark_worker_workloads : Kubernetes_network.Workload.t list
-    ; archive_workloads : Kubernetes_network.Workload.t list
-    ; workloads_by_id : Kubernetes_network.Workload.t String.Map.t
+    ; seed_workloads : Kubernetes_network.Workload_to_deploy.t list
+    ; block_producer_workloads : Kubernetes_network.Workload_to_deploy.t list
+    ; snark_coordinator_workloads : Kubernetes_network.Workload_to_deploy.t list
+    ; snark_worker_workloads : Kubernetes_network.Workload_to_deploy.t list
+    ; archive_workloads : Kubernetes_network.Workload_to_deploy.t list
+    ; workloads_by_id : Kubernetes_network.Workload_to_deploy.t String.Map.t
     ; mutable deployed : bool (* ; keypairs : Keypair.t list *)
     ; block_producer_keypairs : Keypair.t list
     ; extra_genesis_keypairs : Keypair.t list
@@ -501,15 +506,12 @@ module Network_manager = struct
     in
     *)
     let testnet_log_filter = Network_config.testnet_log_filter network_config in
-    let cons_workload workload_id node_info : Kubernetes_network.Workload.t =
-      { workload_id; node_info }
-    in
-    let cons_node_info ?network_keypair ?(has_archive_container = false)
-        primary_container_id : Kubernetes_network.Node.info =
-      { network_keypair; has_archive_container; primary_container_id }
-    in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_workloads = [ cons_workload "seed" [ cons_node_info "mina" ] ] in
+    let seed_workloads =
+      [ Kubernetes_network.Workload_to_deploy.construct_workload "seed"
+          [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
+      ]
+    in
     let snark_coordinator_id =
       String.lowercase
         (String.sub network_config.terraform.snark_worker_public_key
@@ -519,32 +521,39 @@ module Network_manager = struct
     in
     let snark_coordinator_workloads =
       if network_config.terraform.snark_worker_replicas > 0 then
-        [ cons_workload
+        [ Kubernetes_network.Workload_to_deploy.construct_workload
             ("snark-coordinator-" ^ snark_coordinator_id)
-            [ cons_node_info "mina" ]
+            [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
         ]
       else []
     in
     let snark_worker_workloads =
       if network_config.terraform.snark_worker_replicas > 0 then
-        [ cons_workload
+        [ Kubernetes_network.Workload_to_deploy.construct_workload
             ("snark-worker-" ^ snark_coordinator_id)
             (List.init network_config.terraform.snark_worker_replicas
-               ~f:(fun _i -> cons_node_info "worker") )
+               ~f:(fun _i ->
+                 Kubernetes_network.Workload_to_deploy.cons_pod_info "worker" )
+            )
         ]
       else []
     in
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
-          cons_workload bp_config.name
-            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ] )
+          Kubernetes_network.Workload_to_deploy.construct_workload
+            bp_config.name
+            [ Kubernetes_network.Workload_to_deploy.cons_pod_info
+                ~network_keypair:bp_config.keypair "mina"
+            ] )
     in
     let archive_workloads =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
-          cons_workload
+          Kubernetes_network.Workload_to_deploy.construct_workload
             (sprintf "archive-%d" (i + 1))
-            [ cons_node_info ~has_archive_container:true "mina" ] )
+            [ Kubernetes_network.Workload_to_deploy.cons_pod_info
+                ~has_archive_container:true "mina"
+            ] )
     in
     let workloads_by_id =
       let all_workloads =
@@ -631,23 +640,28 @@ module Network_manager = struct
     in
     let%map seeds =
       Malleable_error.List.map t.seed_workloads
-        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+        ~f:
+          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
       >>| List.concat
     and block_producers =
       Malleable_error.List.map t.block_producer_workloads
-        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+        ~f:
+          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
       >>| List.concat
     and snark_coordinators =
       Malleable_error.List.map t.snark_coordinator_workloads
-        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+        ~f:
+          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
       >>| List.concat
     and snark_workers =
       Malleable_error.List.map t.snark_worker_workloads
-        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+        ~f:
+          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
       >>| List.concat
     and archive_nodes =
       Malleable_error.List.map t.archive_workloads
-        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+        ~f:
+          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
       >>| List.concat
     in
     let all_nodes =

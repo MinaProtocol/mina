@@ -7,18 +7,62 @@ spec:
   template:
     spec:
       containers:
-      - name: create-db
-        image: bitnami/postgresql
+      {{- if .Values.archive.initFromDump }}
+      - name: import-dump
+        image: gcr.io/o1labs-192920/postgresql-curl:latest
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: "{{ template "archive-node.fullname" . }}-postgresql"
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} createdb --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --echo {{ .Values.archive.postgresDB}}"]
+        args:
+        - 'sleep 30
+        && cd /tmp
+        && curl https://storage.googleapis.com/mina-archive-dumps/{{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql.tar.gz -o {{ .Values.testnetName }}-archive-dump.tar.gz
+        && tar -xvf {{ .Values.testnetName }}-archive-dump.tar.gz
+        && psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
+        && rm -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
+        && psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
+      {{- else }}
       - name: import-schema
-        image: bitnami/postgresql
+        image: gcr.io/o1labs-192920/postgresql-curl:latest
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: "{{ template "archive-node.fullname" . }}-postgresql"
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f <(curl -Ls {{ .Values.archive.remoteSchemaFile }})"]
-      - name: update-transaction-isolation-level
-        image: bitnami/postgresql
-        command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB }} -c 'ALTER DATABASE {{ .Values.archive.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;'"]
+        args:
+        - 'sleep 30
+        && cd /tmp
+        && {{ range .Values.archive.remoteSchemaAuxFiles }} curl -O {{.}} && {{ end }}
+        psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -f /tmp/{{ .Values.archive.remoteSchemaFile }}
+        && rm -f /tmp/*.sql
+        && psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
+      {{- end }}
       restartPolicy: Never
   backoffLimit: 10
 {{- end }}
