@@ -277,6 +277,7 @@ module Metadata = struct
     val ( / ) : t -> t -> t
   end
 
+  (* Invariant: fees is not empty *)
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
     let med = fees.(len / 2) in
@@ -344,13 +345,16 @@ module Metadata = struct
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        Amount_of.mina
-          (suggest_fee
-             ( module struct
-               include Unsigned_extended.UInt64
-               include Infix
-             end )
-             fees)
+        if Array.is_empty fees then
+          Amount_of.mina (Mina_currency.Fee.to_uint64 Signed_command.minimum_fee)
+        else
+          Amount_of.mina
+            (suggest_fee
+               ( module struct
+                   include Unsigned_extended.UInt64
+                   include Infix
+                 end )
+               fees)
       in
       (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =

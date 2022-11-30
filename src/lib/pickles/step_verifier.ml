@@ -92,7 +92,8 @@ struct
     ignore
       ( SC.to_field_checked
           (module Impl)
-          (SC.SC.create a) ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
         : Field.t )
 
   let lowest_128_bits ~constrain_low_bits x =
@@ -185,9 +186,9 @@ struct
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
 
-  let squeeze_scalar sponge : Field.t SC.SC.t =
+  let squeeze_scalar sponge : Field.t Import.Scalar_challenge.t =
     (* No need to boolean constrain scalar challenges. *)
-    SC.SC.create
+    Import.Scalar_challenge.create
       (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
@@ -202,7 +203,7 @@ struct
           let left_term = Scalar_challenge.endo_inv l pre in
           let right_term = Scalar_challenge.endo r pre in
           ( Inner_curve.(left_term + right_term)
-          , { Bulletproof_challenge.prechallenge = pre } )
+          , Bulletproof_challenge.unpack pre )
         in
         let terms, challenges =
           Array.map2_exn gammas prechallenges ~f:term_and_challenge
@@ -349,8 +350,9 @@ struct
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
-    let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
-        ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
+    let scalar_chal
+        ({ Import.Scalar_challenge.inner = t1 } : _ Import.Scalar_challenge.t)
+        ({ Import.Scalar_challenge.inner = t2 } : _ Import.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
@@ -638,11 +640,11 @@ struct
 
   let compute_challenges ~scalar chals =
     with_label "compute_challenges" (fun () ->
-        Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-            scalar prechallenge ) )
+        Vector.map chals ~f:(fun b -> Bulletproof_challenge.pack b |> scalar) )
 
   let challenge_polynomial =
-    Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+    let open Field in
+    Wrap_verifier.challenge_polynomial ~add ~mul ~one
 
   module Pseudo = Pseudo.Make (Impl)
 
@@ -769,7 +771,10 @@ struct
     let mod_max_degree =
       let k = Nat.to_int Backend.Tick.Rounds.n in
       fun d ->
-        let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
+        let d =
+          Number.of_bits
+            (Field.unpack ~length:Side_loaded_verification_key.max_log2_degree d)
+        in
         Number.mod_pow_2 d (`Two_to_the k)
 
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -956,10 +961,11 @@ struct
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
     let xi_correct =
-      Field.equal xi_actual (match xi with { SC.SC.inner = xi } -> xi)
+      Field.equal xi_actual
+        (match xi with { Import.Scalar_challenge.inner = xi } -> xi)
     in
     let xi = scalar xi in
-    let r = scalar (SC.SC.create r_actual) in
+    let r = scalar (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
     let combined_evals =
       let n = Int.ceil_log2 Max_degree.step in
@@ -1213,7 +1219,7 @@ struct
           ~f:(fun i c1 ->
             let c2 = bulletproof_challenges_actual.(i) in
             let { Import.Scalar_challenge.inner = c1 } =
-              c1.Bulletproof_challenge.prechallenge
+              Bulletproof_challenge.pack c1
             in
             let c2 =
               Field.if_ is_base_case ~then_:c1

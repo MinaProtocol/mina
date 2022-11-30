@@ -39,8 +39,9 @@ Refer to [/dev](/dev).
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
+  - You will be prompted to add a number of `export`s in your shell config file. Do so.
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup toolchain install 1.63.0`
+- Install [rustup](https://rustup.rs/).
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
 - Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
@@ -183,7 +184,7 @@ We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code
 
 ## Steps for adding a new OCaml dependency
 
-Our OCaml dependencies live in the [`ocaml.export`](./ocaml.export) file. This file should not be modified manually as it is machine generated.
+Our OCaml dependencies live in the [`opam.export`](./opam.export) file. This file should not be modified manually as it is machine generated.
 
 To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). Here we assume that the version of the OCaml compiler currently used in the codebase is 4.14.0.
 

@@ -1,6 +1,9 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
-use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
+use kimchi::circuits::{
+    constraints::{ConstraintSystem, FeatureFlags},
+    gate::CircuitGate,
+};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
@@ -146,8 +149,15 @@ pub fn caml_pasta_fq_plonk_index_read(
     let mut t = ProverIndex::<Pallas>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) =
-        expr_linearization(false, false, None, false, false, true);
+    let feature_flags = FeatureFlags {
+        chacha: false,
+        range_check: false,
+        foreign_field_add: false,
+        xor: false,
+        lookup_configuration: None,
+    };
+
+    let (linearization, powers_of_alpha) = expr_linearization(&feature_flags, true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

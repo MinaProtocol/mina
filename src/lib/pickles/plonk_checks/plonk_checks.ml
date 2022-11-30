@@ -15,8 +15,6 @@ type 'field plonk_domain =
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
-let debug = false
-
 module type Field_intf = sig
   type t
 
@@ -41,8 +39,6 @@ end
 
 type 'f field = (module Field_intf with type t = 'f)
 
-let map_reduce reduce xs map = List.reduce_exn (List.map xs ~f:map) ~f:reduce
-
 let pow2pow (type t) ((module F) : t field) (x : t) n : t =
   let rec go acc i = if i = 0 then acc else go F.(acc * acc) (i - 1) in
   go x n
@@ -64,9 +60,6 @@ let domain (type t) ((module F) : t field) ~shifts ~domain_generator
 
     method generator = generator
   end
-
-let all_but m =
-  List.filter Abc.Label.all ~f:(fun label -> not (Abc.Label.equal label m))
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
     (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
@@ -91,31 +84,26 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
-  let ww = Vector.to_array e.w in
-  let w0 = Array.map ww ~f:fst in
-  let w1 = Array.map ww ~f:snd in
+  let witness = Vector.to_array e.w in
+  let coefficients = Vector.to_array e.coefficients in
   let var (col, row) =
-    let get_eval, w =
-      match (row : Scalars.curr_or_next) with
-      | Curr ->
-          (fst, w0)
-      | Next ->
-          (snd, w1)
+    let get_eval =
+      match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
     in
     match (col : Scalars.Column.t) with
     | Witness i ->
-        w.(i)
+        get_eval witness.(i)
     | Index Poseidon ->
         get_eval e.poseidon_selector
+    | Index Generic ->
+        get_eval e.generic_selector
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
             %! should have been linearized away"
           i ()
     | Coefficient i ->
-        failwithf
-          !"Coefficient index %d\n%! should have been linearized away"
-          i ()
+        get_eval coefficients.(i)
     | LookupTable ->
         get_eval (Opt.value_exn e.lookup).table
     | LookupSorted i ->
@@ -385,7 +373,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in
-      let e0 field = fst (field e) in
       let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
@@ -399,13 +386,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
       in
-      let generic =
-        let open Vector in
-        let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = w0 in
-        let m1 = l1 * r1 in
-        let m2 = l2 * r2 in
-        [ e0 generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
-      in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
         { alpha
@@ -414,7 +394,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
-        ; poseidon_selector = e0 poseidon_selector
         ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index VarBaseMul))
         ; complete_add =
             Lazy.force (Hashtbl.find_exn index_terms (Index CompleteAdd))
@@ -422,7 +401,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; endomul_scalar =
             Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
-        ; generic
         ; lookup =
             ( match joint_combiner with
             | None ->
@@ -468,15 +446,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let open Impl in
     let open In_circuit in
     with_label __LOC__ (fun () ->
-        ( Vector.to_list
-            (with_label __LOC__ (fun () ->
-                 Vector.map2 plonk.generic actual.generic
-                   ~f:(Shifted_value.equal Field.equal) ) )
-        @ with_label __LOC__ (fun () ->
+        ( with_label __LOC__ (fun () ->
               List.map
                 ~f:(fun f ->
                   Shifted_value.equal Field.equal (f plonk) (f actual) )
-                [ poseidon_selector; vbmul; complete_add; endomul; perm ] )
+                [ vbmul; complete_add; endomul; perm ] )
         @
         match (plonk.lookup, actual.lookup) with
         | None, None ->
