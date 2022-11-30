@@ -260,8 +260,8 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&ProverCommitments<GAffine>> for WasmProverCommitments {
-                fn from(x: &ProverCommitments<GAffine>) -> Self {
+            impl From<&ProverCommitments<$G>> for WasmProverCommitments {
+                fn from(x: &ProverCommitments<$G>) -> Self {
                     WasmProverCommitments {
                         w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.clone().into(),
@@ -270,8 +270,8 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<ProverCommitments<GAffine>> for WasmProverCommitments {
-                fn from(x: ProverCommitments<GAffine>) -> Self {
+            impl From<ProverCommitments<$G>> for WasmProverCommitments {
+                fn from(x: ProverCommitments<$G>) -> Self {
                     WasmProverCommitments {
                         w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.into(),
@@ -280,7 +280,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&WasmProverCommitments> for ProverCommitments<GAffine> {
+            impl From<&WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: &WasmProverCommitments) -> Self {
                     ProverCommitments {
                         w_comm: array_init(|i| x.w_comm[i].clone().into()),
@@ -292,7 +292,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<WasmProverCommitments> for ProverCommitments<GAffine> {
+            impl From<WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: WasmProverCommitments) -> Self {
                     ProverCommitments {
                         w_comm: array_init(|i| (&x.w_comm[i]).into()),
@@ -630,18 +630,18 @@ macro_rules! impl_proof {
             ) -> WasmProverProof {
                 console_error_panic_hook::set_once();
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    let ptr: &mut commitment_dlog::srs::SRS<$G> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
-                let prev: Vec<RecursionChallenge<GAffine>> = {
+                let prev: Vec<RecursionChallenge<$G>> = {
                     if prev_challenges.is_empty() {
                         Vec::new()
                     } else {
                         let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
                         prev_sgs
                             .into_iter()
-                            .map(Into::<GAffine>::into)
+                            .map(Into::<$G>::into)
                             .enumerate()
                             .map(|(i, sg)| {
                                 let chals =
@@ -649,7 +649,7 @@ macro_rules! impl_proof {
                                         .iter()
                                         .map(|a| a.clone().into())
                                         .collect();
-                                let comm = PolyComm::<GAffine> {
+                                let comm = PolyComm::<$G> {
                                     unshifted: vec![sg],
                                     shifted: None,
                                 };
@@ -817,7 +817,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Vesta as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -842,7 +842,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
+    use mina_curves::pasta::{Fq, Pallas as GAffine};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,

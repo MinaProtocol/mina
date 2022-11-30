@@ -701,7 +701,7 @@ module For_tests = struct
              (Quickcheck.Generator.return root)
              (Breadcrumb.For_tests.gen_non_deferred ~logger ~precomputed_values
                 ~verifier ~trust_system
-                ~accounts_with_secret_keys:root_ledger_accounts ) )
+                ~accounts_with_secret_keys:root_ledger_accounts () ) )
       in
       (root, branches, protocol_states)
     in

@@ -102,18 +102,14 @@ module Message = struct
            ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
 
-  let data_spec
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-    let open Tick.Data_spec in
-    [ Global_slot.typ
-    ; Mina_base.Epoch_seed.typ
-    ; Mina_base.Account.Index.Unpacked.typ
-        ~ledger_depth:constraint_constants.ledger_depth
-    ]
-
-  let typ ~constraint_constants : (var, value) Tick.Typ.t =
+  let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
+      (var, value) Tick.Typ.t =
     Tick.Typ.of_hlistable
-      (data_spec ~constraint_constants)
+      [ Global_slot.typ
+      ; Mina_base.Epoch_seed.typ
+      ; Mina_base.Account.Index.Unpacked.typ
+          ~ledger_depth:constraint_constants.ledger_depth
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 

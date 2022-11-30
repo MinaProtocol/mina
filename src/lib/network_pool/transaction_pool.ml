@@ -554,7 +554,7 @@ struct
             ~f:(fun set cmd ->
               let set' =
                 With_status.data cmd |> User_command.forget_check
-                |> User_command.accounts_accessed |> Account_id.Set.of_list
+                |> User_command.accounts_referenced |> Account_id.Set.of_list
               in
               Set.union set set' )
         in
@@ -1767,7 +1767,7 @@ let%test_module _ =
         | Some time ->
             Zkapp_precondition.Protocol_state.valid_until time
       in
-      let test_spec : Transaction_snark.For_tests.Spec.t =
+      let test_spec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
         { sender
         ; fee_payer
         ; fee
@@ -1777,7 +1777,6 @@ let%test_module _ =
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
         ; new_zkapp_account = false
         ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
@@ -1849,8 +1848,8 @@ let%test_module _ =
             let fee_payer_keypair = test_keys.(n) in
             let%map (zkapp_command : Zkapp_command.t) =
               Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-                ~keymap ~account_state_tbl ~fee_payer_keypair
-                ~ledger:best_tip_ledger ()
+                ~max_token_updates:1 ~keymap ~account_state_tbl
+                ~fee_payer_keypair ~ledger:best_tip_ledger ()
             in
             let zkapp_command =
               { zkapp_command with

@@ -1,6 +1,3 @@
-open Core_kernel
-open Mina_base_import
-
 include
   Signed_command_intf.Full
     with type With_valid_signature.Stable.Latest.t =

@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 #wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
-wasm-bindgen-rayon = { git = "https://github.com/o1-labs/wasm-bindgen-rayon", branch = "feature/nodejs-support", features = ["no-bundler"]}
+wasm-bindgen-rayon = { git = "https://github.com/o1-labs/wasm-bindgen-rayon", rev = "68303317c96549feae6b7dcc72d891afbfbda070", features = ["no-bundler"]}
 wasm-bindgen = { version = "0.2.78" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }

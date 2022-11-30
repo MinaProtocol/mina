@@ -496,11 +496,8 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main )
 
-let transaction_id_to_string = function
-  | `String s ->
-      s
-  | _ ->
-      "Unexpected JSON for transaction id"
+let transaction_id_to_string id =
+  Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
 let send_payment_graphql =
   let open Command.Param in
@@ -636,8 +633,9 @@ let send_rosetta_transactions_graphql =
          | Ok () ->
              Deferred.return ()
          | Error err ->
-             Format.eprintf "Error:@.%s@.@."
-               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+             Format.eprintf "@[<v>Error:@,%a@,@]@."
+               (Yojson.Safe.pretty_print ?std:None)
+               (Error_json.error_to_yojson err) ;
              Core_kernel.exit 1 ) )
 
 module Export_logs = struct
@@ -2001,7 +1999,9 @@ let archive_blocks =
                  add_to_success_file path
              | Error err ->
                  Format.eprintf
-                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   "@[<v>Failed to send block to archive node from %s.@,\
+                    Error:@,\
+                    %s@]@."
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ) )
 
@@ -2051,23 +2051,26 @@ let chain_id_inputs =
              , snark_keys
              , protocol_major_version ) ->
              let open Format in
-             printf "Genesis state hash: %s@."
-               (State_hash.to_base58_check genesis_state_hash) ;
-             printf "Genesis_constants:@." ;
-             printf "  Protocol:          %s@."
-               ( Genesis_constants.Protocol.to_yojson genesis_constants.protocol
-               |> Yojson.Safe.to_string ) ;
-             printf "  Txn pool max size: %d@."
-               genesis_constants.txpool_max_size ;
-             printf "  Num accounts:      %s@."
-               ( match genesis_constants.num_accounts with
-               | Some n ->
-                   Int.to_string n
-               | None ->
-                   "None" ) ;
-             printf "Snark keys:@." ;
-             List.iter snark_keys ~f:(printf "  %s@.") ;
-             printf "Protocol major version: %d@." protocol_major_version
+             printf
+               "@[<v>Genesis state hash: %s@,\
+                @[<v 2>Genesis_constants:@,\
+                Protocol:          %a@,\
+                Txn pool max size: %d@,\
+                Num accounts:      %a@,\
+                @]@,\
+                @[<v 2>Snark keys:@,\
+                %a@]@,\
+                Protocol major version: %d@]@."
+               (State_hash.to_base58_check genesis_state_hash)
+               Yojson.Safe.pp
+               (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
+               genesis_constants.txpool_max_size
+               (pp_print_option
+                  ~none:(fun ppf () -> pp_print_string ppf "None")
+                  pp_print_int )
+               genesis_constants.num_accounts
+               (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
+               snark_keys protocol_major_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )
@@ -2076,18 +2079,17 @@ let hash_transaction =
   let open Command.Let_syntax in
   Command.basic
     ~summary:"Compute the hash of a transaction from its transaction ID"
-    (let%map_open transaction =
+    (let%map_open transaction_id =
        flag "--transaction-id" ~doc:"ID ID of the transaction to hash"
          (required string)
      in
      fun () ->
-       let signed_command =
-         Signed_command.of_base64 transaction |> Or_error.ok_exn
-       in
-       let hash =
-         Transaction_hash.hash_command (Signed_command signed_command)
-       in
-       printf "%s\n" (Transaction_hash.to_base58_check hash) )
+       match Transaction_hash.hash_of_transaction_id transaction_id with
+       | Ok hash ->
+           printf "%s\n" (Transaction_hash.to_base58_check hash)
+       | Error err ->
+           Format.eprintf "Could not hash transaction: %s@."
+             (Error.to_string_hum err) )
 
 let humanize_graphql_error
     ~(graphql_endpoint : Uri.t Cli_lib.Flag.Types.with_name) = function
@@ -2117,7 +2119,7 @@ let runtime_config =
              return ()
          | Error err ->
              Format.eprintf
-               "Failed to retrieve runtime configuration. Error:@.%s@."
+               "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint err) ) ;
              exit 1 ) )
@@ -2139,7 +2141,7 @@ let thread_graph =
              return ()
          | Error e ->
              Format.eprintf
-               "Failed to retrieve runtime configuration. Error:@.%s@."
+               "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )

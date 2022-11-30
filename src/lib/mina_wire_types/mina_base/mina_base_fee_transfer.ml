@@ -7,7 +7,7 @@ module Types = struct
         type t = private
           { receiver_pk : Public_key.Compressed.V1.t
           ; fee : Currency.Fee.V1.t
-          ; fee_token : Mina_base_token_id.V1.t
+          ; fee_token : Mina_base_token_id.V2.t
           }
       end
     end
@@ -24,7 +24,7 @@ module M = struct
       type t =
         { receiver_pk : Public_key.Compressed.V1.t
         ; fee : Currency.Fee.V1.t
-        ; fee_token : Mina_base_token_id.V1.t
+        ; fee_token : Mina_base_token_id.V2.t
         }
     end
   end
@@ -40,7 +40,7 @@ module type Concrete = sig
       type t =
         { receiver_pk : Public_key.Compressed.V1.t
         ; fee : Currency.Fee.V1.t
-        ; fee_token : Mina_base_token_id.V1.t
+        ; fee_token : Mina_base_token_id.V2.t
         }
     end
   end

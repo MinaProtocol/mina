@@ -14,7 +14,6 @@ module Permissions = Permissions
 module Receipt = Receipt
 module Side_loaded_verification_key = Side_loaded_verification_key
 module Signature = Signature
-module Signature_poly = Signature_poly
 module Signed_command = Signed_command
 module Signed_command_intf = Signed_command_intf
 module Signed_command_memo = Signed_command_memo

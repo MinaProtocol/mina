@@ -36,16 +36,19 @@
    coda_genesis_ledger
    pickles_types
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    cache_dir
    data_hash_lib
    mina_numbers
    random_oracle
    sgn
+   sgn_type
    sexplib0
    test_util
    transaction_witness
    staged_ledger_diff
    mina_wire_types
+   block_time
    )
   (library_flags -linkall)
   (inline_tests)

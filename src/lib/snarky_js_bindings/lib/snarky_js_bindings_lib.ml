@@ -19,6 +19,19 @@ let raise_error s =
 
 let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 
+let log_and_raise_error_with_message ~exn ~msg =
+  match Js.Optdef.to_option msg with
+  | None ->
+      raise_error (Core_kernel.Exn.to_string exn)
+  | Some msg ->
+      let stack = Printexc.get_backtrace () in
+      let msg =
+        Printf.sprintf "%s\n%s%s" (Js.to_string msg)
+          (Core_kernel.Exn.to_string exn)
+          stack
+      in
+      raise_error msg
+
 class type field_class =
   object
     method value : Impl.Field.t Js.prop
@@ -247,6 +260,23 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+let arg_optdef_arg_method (type a b) class_ (name : string)
+    (f : _ Js.t -> b -> a Js.Optdef.t -> _) =
+  let prototype = Js.Unsafe.get class_ (Js.string "prototype") in
+  let meth =
+    let wrapper =
+      Js.Unsafe.eval_string
+        {js|
+        (function(f) {
+          return function(argVal, xOptdef) {
+            return f(this, argVal, xOptdef);
+          };
+        })|js}
+    in
+    Js.Unsafe.(fun_call wrapper [| inject (Js.wrap_callback f) |])
+  in
+  Js.Unsafe.set prototype (Js.string name) meth
+
 let to_js_bigint =
   let bigint_constr = Js.Unsafe.eval_string {js|BigInt|js} in
   fun (s : Js.js_string Js.t) ->
@@ -314,8 +344,11 @@ let () =
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
    let cmp_method (name, f) =
-     method_ name (fun this (y : As_field.t) : unit ->
-         f ~bit_length this##.value (As_field.value y) )
+     arg_optdef_arg_method field_class name
+       (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit
+       ->
+         try f ~bit_length this##.value (As_field.value y)
+         with exn -> log_and_raise_error_with_message ~exn ~msg )
    in
    let bool_cmp_method (name, f) =
      method_ name (fun this (y : As_field.t) : bool_class Js.t ->
@@ -335,11 +368,15 @@ let () =
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
-  method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      Field.Assert.equal this##.value (As_field.value y) ) ;
 
-  method_ "assertBoolean" (fun this : unit ->
-      Impl.assert_ (Constraint.boolean this##.value) ) ;
+  arg_optdef_arg_method field_class "assertEquals"
+    (fun this (y : As_field.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Field.Assert.equal this##.value (As_field.value y)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero)) ) ;
@@ -403,7 +440,7 @@ let () =
     Js.wrap_callback
       (fun (x : As_field.t) : field_class Js.t Js.js_array Js.t ->
         (As_field.to_field_obj x)##toFields ) ;
-  field_class##.ofFields :=
+  field_class##.fromFields :=
     Js.wrap_callback
       (fun (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t ->
         array_check_length xs 1 ; array_get_exn xs 0 ) ;
@@ -417,7 +454,7 @@ let () =
     Js.wrap_callback (fun (x : As_field.t) : bool_class Js.t ->
         new%js bool_constr
           (As_bool.of_boolean (Field.equal (As_field.value x) Field.zero)) ) ;
-  field_class##.ofBits :=
+  field_class##.fromBits :=
     Js.wrap_callback
       (fun (bs : As_bool.t Js.js_array Js.t) : field_class Js.t ->
         try
@@ -492,39 +529,36 @@ let () =
       this##toString ) ;
   static_method "toJSON" (fun (this : field_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : field_class Js.t Js.Opt.t ->
-      let return x =
-        Js.Opt.return (new%js field_constr (As_field.of_field x))
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : field_class Js.t ->
+      let return x = Some (new%js field_constr (As_field.of_field x)) in
+      let result : field_class Js.t option =
+        match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
+        | "number" ->
+            let value = Js.float_of_number (Obj.magic value) in
+            if Caml.Float.is_integer value then
+              return (Field.of_int (Float.to_int value))
+            else None
+        | "boolean" ->
+            let value = Js.to_bool (Obj.magic value) in
+            return (if value then Field.one else Field.zero)
+        | "string" -> (
+            let value : Js.js_string Js.t = Obj.magic value in
+            let s = Js.to_string value in
+            try
+              return
+                (Field.constant
+                   ( if
+                     String.length s > 1
+                     && Char.equal s.[0] '0'
+                     && Char.equal (Char.lowercase s.[1]) 'x'
+                   then
+                     Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+                   else Field.Constant.of_string s ) )
+            with Failure _ -> None )
+        | _ ->
+            None
       in
-      match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
-      | "number" ->
-          let value = Js.float_of_number (Obj.magic value) in
-          if Caml.Float.is_integer value then
-            return (Field.of_int (Float.to_int value))
-          else Js.Opt.empty
-      | "boolean" ->
-          let value = Js.to_bool (Obj.magic value) in
-          return (if value then Field.one else Field.zero)
-      | "string" -> (
-          let value : Js.js_string Js.t = Obj.magic value in
-          let s = Js.to_string value in
-          try
-            return
-              (Field.constant
-                 ( if
-                   String.length s > 1
-                   && Char.equal s.[0] '0'
-                   && Char.equal (Char.lowercase s.[1]) 'x'
-                 then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
-                 else Field.Constant.of_string s ) )
-          with Failure _ -> Js.Opt.empty )
-      | _ ->
-          Js.Opt.empty ) ;
-  let from f x = new%js field_constr (As_field.of_field (f x)) in
-  static_method "fromNumber" (from As_field.of_number_exn) ;
-  static_method "fromString" (from As_field.of_string_exn) ;
-  static_method "fromBigInt" (from As_field.of_bigint_exn) ;
+      Option.value_exn ~message:"Field.fromJSON failed" result ) ;
   static_method "check" (fun _x -> ())
 
 let () =
@@ -555,11 +589,18 @@ let () =
   add_op1 "not" Boolean.not ;
   add_op2 "and" Boolean.( &&& ) ;
   add_op2 "or" Boolean.( ||| ) ;
-  method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
-      Boolean.Assert.( = ) this##.value (As_bool.value y) ) ;
-  method_ "assertTrue" (fun this : unit -> Boolean.Assert.is_true this##.value) ;
-  method_ "assertFalse" (fun this : unit ->
-      Boolean.Assert.( = ) this##.value Boolean.false_ ) ;
+  arg_optdef_arg_method bool_class "assertEquals"
+    (fun this (y : As_bool.t) (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value (As_bool.value y)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method bool_class "assertTrue"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.is_true this##.value
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method bool_class "assertFalse"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Boolean.Assert.( = ) this##.value Boolean.false_
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   add_op2 "equals" equal ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
@@ -624,7 +665,7 @@ let () =
     (fun (x : As_bool.t) : field_class Js.t Js.js_array Js.t ->
       singleton_array
         (new%js field_constr (As_field.of_field (As_bool.value x :> Field.t))) ) ;
-  static_method "ofFields"
+  static_method "fromFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : bool_class Js.t ->
       if xs##.length = 1 then
         Js.Optdef.case (Js.array_get xs 0)
@@ -637,14 +678,12 @@ let () =
       Js.Unsafe.coerce this##toBoolean ) ;
   static_method "toJSON" (fun (this : bool_class Js.t) : < .. > Js.t ->
       this##toJSON ) ;
-  static_method "fromJSON"
-    (fun (value : Js.Unsafe.any) : bool_class Js.t Js.Opt.t ->
+  static_method "fromJSON" (fun (value : Js.Unsafe.any) : bool_class Js.t ->
       match Js.to_string (Js.typeof (Js.Unsafe.coerce value)) with
       | "boolean" ->
-          Js.Opt.return
-            (new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value)))
-      | _ ->
-          Js.Opt.empty )
+          new%js bool_constr (As_bool.of_js_bool (Js.Unsafe.coerce value))
+      | s ->
+          failwith ("Bool.fromJSON: expected boolean, got " ^ s) )
 
 type coords = < x : As_field.t Js.prop ; y : As_field.t Js.prop > Js.t
 
@@ -863,7 +902,7 @@ let () =
     (fun (x : scalar_class Js.t) : field_class Js.t Js.js_array Js.t ->
       (Js.Unsafe.coerce x)##toFields ) ;
   static_method "sizeInFields" (fun () : int -> num_bits) ;
-  static_method "ofFields"
+  static_method "fromFields"
     (fun (xs : field_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array xs) ~f:(fun x ->
@@ -871,7 +910,7 @@ let () =
   static_method "random" (fun () : scalar_class Js.t ->
       let x = Other_backend.Field.random () in
       new%js scalar_constr_const (bits x) x ) ;
-  static_method "ofBits"
+  static_method "fromBits"
     (fun (bits : bool_class Js.t Js.js_array Js.t) : scalar_class Js.t ->
       new%js scalar_constr
         (Array.map (Js.to_array bits) ~f:(fun b ->
@@ -965,11 +1004,22 @@ let () =
            (As_group.value (As_group.of_group_obj p1))
            (Scalar_challenge s##.value)
          |> mk) ; *)
-  method_ "assertEquals"
-    (fun (p1 : group_class Js.t) (p2 : As_group.t) : unit ->
+  arg_optdef_arg_method group_class "assertEquals"
+    (fun
+      (p1 : group_class Js.t)
+      (p2 : As_group.t)
+      (msg : Js.js_string Js.t Js.Optdef.t)
+      :
+      unit
+    ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
       let x2, y2 = As_group.value p2 in
-      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2 ) ;
+      try Field.Assert.equal x1 x2
+      with exn -> (
+        ignore (log_and_raise_error_with_message ~exn ~msg) ;
+        try Field.Assert.equal y1 y2
+        with exn -> log_and_raise_error_with_message ~exn ~msg ) ) ;
+
   method_ "equals"
     (fun (p1 : group_class Js.t) (p2 : As_group.t) : bool_class Js.t ->
       let x1, y1 = As_group.value (As_group.of_group_obj p1) in
@@ -1004,7 +1054,7 @@ let () =
       arr##push p1##.y |> ignore ;
       arr ) ;
   static_method "toFields" (fun (p1 : group_class Js.t) -> p1##toFields) ;
-  static_method "ofFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
+  static_method "fromFields" (fun (xs : field_class Js.t Js.js_array Js.t) ->
       array_check_length xs 2 ;
       new%js group_constr
         (As_field.of_field_obj (array_get_exn xs 0))
@@ -1037,7 +1087,14 @@ class type ['a] as_field_elements =
   object
     method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
 
-    method ofFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
+    method fromFields : field_class Js.t Js.js_array Js.t -> 'a Js.meth
+
+    method sizeInFields : int Js.meth
+  end
+
+class type ['a] as_field_elements_minimal =
+  object
+    method toFields : 'a -> field_class Js.t Js.js_array Js.t Js.meth
 
     method sizeInFields : int Js.meth
   end
@@ -1145,6 +1202,8 @@ let poseidon =
         val accountUpdateCons = Js.string (account_update_cons :> string)
 
         val accountUpdateNode = Js.string (account_update_node :> string)
+
+        val zkappMemo = Js.string (zkapp_memo :> string)
       end
   end
 
@@ -1282,7 +1341,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let has_methods ctor =
            let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
-           has "toFields" && has "ofFields"
+           has "toFields" && has "fromFields"
          in
          match Js.Optdef.(to_option ctor1) with
          | Some ctor1 when has_methods ctor1 ->
@@ -1360,7 +1419,7 @@ module Circuit = struct
         let t1 = ctor##toFields x1 in
         let t2 = ctor##toFields x2 in
         let arr = if_array b t1 t2 in
-        ctor##ofFields arr
+        ctor##fromFields arr
 
   let rec if_magic : type a. As_bool.t -> a Js.t -> a Js.t -> a Js.t =
     fun (type a) (b : As_bool.t) (t1 : a Js.t) (t2 : a Js.t) : a Js.t ->
@@ -1380,7 +1439,7 @@ module Circuit = struct
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
            let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
-           has "toFields" && has "ofFields"
+           has "toFields" && has "fromFields"
          in
          if not (js_equal ctor1 ctor2) then
            raise_error "if: Mismatched argument types" ;
@@ -1421,7 +1480,7 @@ module Circuit = struct
       Js.to_array (typ##toFields a) |> Array.map ~f:(fun x -> conv x##.value)
     in
     let of_array conv xs =
-      typ##ofFields
+      typ##fromFields
         (Js.array
            (Array.map xs ~f:(fun x ->
                 new%js field_constr (As_field.of_field (conv x)) ) ) )
@@ -1443,6 +1502,17 @@ module Circuit = struct
     else failwith "Circuit.witness: input does not have a `check` method" ;
     a
 
+  let typ_minimal (type a) (typ : a as_field_elements_minimal Js.t) =
+    Typ.array ~length:typ##sizeInFields Field.typ
+
+  let witness_minimal (type a) (typ : a as_field_elements_minimal Js.t)
+      (f : (unit -> field_class Js.t Js.js_array Js.t) Js.callback) =
+    Impl.exists (typ_minimal typ) ~compute:(fun () ->
+        Js.Unsafe.fun_call f [||]
+        |> Js.to_array
+        |> Array.map ~f:of_js_field_unchecked )
+    |> Array.map ~f:to_js_field |> Js.array
+
   module Circuit_main = struct
     type ('w, 'p) t =
       < snarkyMain : ('w -> 'p -> unit) Js.callback Js.prop
@@ -1459,25 +1529,26 @@ module Circuit = struct
       in
       Js.Unsafe.(fun_call c##.snarkyMain [| inject w; inject public |])
     in
-    (main, Impl.Data_spec.[ typ_ c##.snarkyPublicTyp ])
+    (main, typ_ c##.snarkyPublicTyp)
 
   let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
       keypair_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let cs =
-      Impl.constraint_system ~exposing:spec
-        ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
+      Impl.constraint_system ~input_typ ~return_typ:Snark_params.Tick.Typ.unit
+        (fun x -> main x)
     in
     let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
 
   let constraint_system (main : unit -> unit) =
     let cs =
-      Impl.constraint_system
-        ~exposing:Impl.Data_spec.[]
-        ~return_typ:Snark_params.Tick.Typ.unit main
+      Impl.constraint_system ~input_typ:Impl.Typ.unit
+        ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
-    let rows = List.length cs.rows_rev in
+    let rows =
+      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len
+    in
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
@@ -1501,14 +1572,14 @@ module Circuit = struct
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
-    let main, spec = main_and_input c in
+    let main, input_typ = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
       Impl.generate_witness_conv ~return_typ:Snark_params.Tick.Typ.unit
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } () ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs )
-        spec (main ~w:priv) pub
+        ~input_typ (main ~w:priv) pub
     in
     new%js proof_constr p
 
@@ -1522,7 +1593,6 @@ module Circuit = struct
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
-    circuit##.witness := Js.wrap_callback witness ;
     circuit##.generateKeypair :=
       Js.wrap_meth_callback
         (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
@@ -1546,6 +1616,8 @@ module Circuit = struct
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
     Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
+    Js.Unsafe.set circuit (Js.string "_witness")
+      (Js.wrap_callback witness_minimal) ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
@@ -2223,7 +2295,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
         let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
         object%js
           val data =
-            Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
+            Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
 
           val hash =
             Mina_base.Zkapp_account.digest_vk vk
@@ -2269,10 +2341,20 @@ let verify (public_input : public_input_js) (proof : proof)
   let typ = public_input_typ (Array.length public_input) in
   let proof = Pickles.Side_loaded.Proof.of_proof proof in
   let vk =
-    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+    match Pickles.Side_loaded.Verification_key.of_base64 (Js.to_string vk) with
+    | Ok vk_ ->
+        vk_
+    | Error err ->
+        failwithf "Could not decode base64 verification key: %s"
+          (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
   |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+
+let dummy_base64_proof () =
+  let n2 = Pickles_types.Nat.N2.n in
+  let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+  Proof2.to_base64 proof |> Js.string
 
 let pickles =
   object%js
@@ -2281,6 +2363,8 @@ let pickles =
     val circuitDigest = pickles_digest
 
     val verify = verify
+
+    val dummyBase64Proof = dummy_base64_proof
 
     val proofToBase64 = proof_to_base64
 
@@ -2307,8 +2391,8 @@ module Ledger = struct
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
     ; verificationKey :
-        < hash : field_class Js.t Js.readonly_prop
-        ; data : Mina_base.Side_loaded_verification_key.t Js.readonly_prop >
+        < hash : Js.js_string Js.t Js.readonly_prop
+        ; data : Js.js_string Js.t Js.readonly_prop >
         Js.t
         Js.optdef
         Js.readonly_prop
@@ -2332,8 +2416,16 @@ module Ledger = struct
     ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
+  type timing =
+    < isTimed : bool_class Js.t Js.readonly_prop
+    ; initialMinimumBalance : js_uint64 Js.readonly_prop
+    ; cliffTime : js_uint32 Js.readonly_prop
+    ; cliffAmount : js_uint64 Js.readonly_prop
+    ; vestingPeriod : js_uint32 Js.readonly_prop
+    ; vestingIncrement : js_uint64 Js.readonly_prop >
+    Js.t
+
   type account =
-    (* TODO: timing *)
     < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
@@ -2343,7 +2435,8 @@ module Ledger = struct
     ; delegate : public_key Js.optdef Js.readonly_prop
     ; votingFor : field_class Js.t Js.readonly_prop
     ; zkapp : zkapp_account Js.optdef Js.readonly_prop
-    ; permissions : permissions Js.readonly_prop >
+    ; permissions : permissions Js.readonly_prop
+    ; timing : timing Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2536,6 +2629,8 @@ module Ledger = struct
   module To_js = struct
     let field x = to_js_field @@ Field.constant x
 
+    let boolean b = new%js bool_constr (As_bool.of_js_bool @@ Js.bool b)
+
     let uint32 n =
       object%js
         val value =
@@ -2578,13 +2673,12 @@ module Ledger = struct
       Pickles_types.Vector.iter s ~f:(fun x -> ignore (xs##push (field x))) ;
       xs
 
-    let verification_key
-        (vk : (Mina_base.Side_loaded_verification_key.t, Impl.field) With_hash.t)
-        =
+    let verification_key (vk : Mina_base__Verification_key_wire.Stable.V1.t) =
       object%js
-        val hash = field (With_hash.hash vk)
+        val data =
+          Js.string (Pickles.Side_loaded.Verification_key.to_base64 vk.data)
 
-        val data = With_hash.data vk
+        val hash = vk.hash |> Field.Constant.to_string |> Js.string
       end
 
     let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
@@ -2600,8 +2694,7 @@ module Ledger = struct
         val lastSequenceSlot =
           Mina_numbers.Global_slot.to_int a.last_sequence_slot
 
-        val provedState =
-          new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
+        val provedState = boolean a.proved_state
       end
 
     let permissions (p : Mina_base.Permissions.t) : permissions =
@@ -2649,6 +2742,24 @@ module Ledger = struct
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
       end
 
+    let timing (t : Mina_base.Account_timing.t) : timing =
+      let t = Mina_base.Account_timing.to_record t in
+      object%js
+        val isTimed = boolean t.is_timed
+
+        val initialMinimumBalance =
+          uint64 @@ Currency.Balance.to_uint64 t.initial_minimum_balance
+
+        val cliffTime = uint32 t.cliff_time
+
+        val cliffAmount = uint64 @@ Currency.Amount.to_uint64 t.cliff_amount
+
+        val vestingPeriod = uint32 t.vesting_period
+
+        val vestingIncrement =
+          uint64 @@ Currency.Amount.to_uint64 t.vesting_increment
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2670,13 +2781,15 @@ module Ledger = struct
         val zkapp = option zkapp_account a.zkapp
 
         val permissions = permissions a.permissions
+
+        val timing = timing a.timing
       end
   end
 
   module Account_update = Mina_base.Account_update
   module Zkapp_command = Mina_base.Zkapp_command
 
-  let account_update_of_json =
+  let account_update_of_json, account_update_to_json =
     let deriver =
       Account_update.Graphql_repr.deriver
       @@ Fields_derivers_zkapps.Derivers.o ()
@@ -2687,13 +2800,17 @@ module Ledger = struct
         (account_update |> Js.to_string |> Yojson.Safe.from_string)
       |> Account_update.of_graphql_repr
     in
-    account_update_of_json
-
-  (* TODO hash two zkapp_command together in the correct way *)
+    let account_update_to_json (account_update : Account_update.t) :
+        Js.js_string Js.t =
+      Fields_derivers_zkapps.to_json deriver
+        (Account_update.to_graphql_repr account_update ~call_depth:0)
+      |> Yojson.Safe.to_string |> Js.string
+    in
+    (account_update_of_json, account_update_to_json)
 
   let hash_account_update (p : Js.js_string Js.t) =
-    Account_update.digest (p |> account_update_of_json)
-    |> Field.constant |> to_js_field
+    p |> account_update_of_json |> Account_update.digest |> Field.constant
+    |> to_js_field
 
   let forest_digest_of_field : Field.Constant.t -> Zkapp_command.Digest.Forest.t
       =
@@ -2749,17 +2866,20 @@ module Ledger = struct
       Zkapp_command.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let commitment = Zkapp_command.commitment tx in
+    let fee_payer = Account_update.of_fee_payer tx.fee_payer in
+    let fee_payer_hash = Zkapp_command.Digest.Account_update.create fee_payer in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
-        ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
-             (Account_update.of_fee_payer tx.fee_payer) )
+        ~fee_payer_hash
     in
     object%js
       val commitment = to_js_field_unchecked commitment
 
       val fullCommitment = to_js_field_unchecked full_commitment
+
+      (* for testing *)
+      val feePayerHash = to_js_field_unchecked (fee_payer_hash :> Impl.field)
     end
 
   let zkapp_public_input (tx_json : Js.js_string Js.t)
@@ -2891,6 +3011,11 @@ module Ledger = struct
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
+  let memo_hash_base58 (memo_base58 : Js.js_string Js.t) : field_class Js.t =
+    memo_base58 |> Js.to_string
+    |> Mina_base.Signed_command_memo.of_base58_check_exn
+    |> Mina_base.Signed_command_memo.hash |> to_js_field_unchecked
+
   (* low-level building blocks for encoding *)
   let binary_string_to_base58_check bin_string (version_byte : int) :
       Js.js_string Js.t =
@@ -2958,7 +3083,7 @@ module Ledger = struct
       (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_account_update_signatures txn ;
     let ledger = l##.value in
-    let applied_exn =
+    let application_result =
       T.apply_zkapp_command_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
@@ -2966,7 +3091,13 @@ module Ledger = struct
           }
         ledger txn
     in
-    let applied, _ = Or_error.ok_exn applied_exn in
+    let applied, _ =
+      match application_result with
+      | Ok res ->
+          res
+      | Error err ->
+          raise_error (Error.to_string_hum err)
+    in
     let T.Transaction_applied.Zkapp_command_applied.{ accounts; command; _ } =
       applied
     in
@@ -2994,6 +3125,29 @@ module Ledger = struct
     apply_zkapp_command_transaction l txn
       (Js.to_string account_creation_fee)
       network_state
+
+  let check_account_update_signature (account_update_json : Js.js_string Js.t)
+      (x : field_class Js.t) =
+    let account_update = account_update_of_json account_update_json in
+    let check_signature s pk msg =
+      match Signature_lib.Public_key.decompress pk with
+      | None ->
+          false
+      | Some pk_ ->
+          Signature_lib.Schnorr.Chunked.verify s
+            (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+            (Random_oracle_input.Chunked.field msg)
+    in
+
+    let isValid =
+      match account_update.authorization with
+      | Signature s ->
+          check_signature s account_update.body.public_key
+            (x |> of_js_field |> to_unchecked)
+      | Proof _ | None_given ->
+          false
+    in
+    Js.bool isValid
 
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key
@@ -3090,6 +3244,9 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
 
     static_method "memoToBase58" memo_to_base58 ;
+    static_method "memoHashBase58" memo_hash_base58 ;
+
+    static_method "checkAccountUpdateSignature" check_account_update_signature ;
 
     let version_bytes =
       let open Base58_check.Version_bytes in
@@ -3103,6 +3260,10 @@ module Ledger = struct
         val epochSeed = Char.to_int epoch_seed
 
         val stateHash = Char.to_int state_hash
+
+        val publicKey = Char.to_int non_zero_curve_point_compressed
+
+        val userCommandMemo = Char.to_int user_command_memo
       end
     in
     static "encoding"

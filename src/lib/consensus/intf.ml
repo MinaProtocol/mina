@@ -341,20 +341,6 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
         -> unit
-
-      module For_tests : sig
-        type snapshot_identifier =
-          | Staking_epoch_snapshot
-          | Next_epoch_snapshot
-
-        (* set epoch ledgers in local state for testing
-           relies on persnickety imperative code that should not be exposed more generally
-        *)
-        val set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit
-
-        (* snapshot with empty delegatee table *)
-        val snapshot_of_ledger : Snapshot.Ledger_snapshot.t -> Snapshot.t
-      end
     end
 
     module Vrf : sig
