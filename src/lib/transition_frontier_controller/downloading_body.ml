@@ -68,7 +68,8 @@ and upon_f ~context ~transition_states ~state_hash ~actions = function
   | Result.Ok (Result.Ok body) ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash (Processing (Done body)) ;
-      actions.Misc.mark_processed_and_promote [ state_hash ]
+      actions.Misc.mark_processed_and_promote ~reason:"downloaded body"
+        [ state_hash ]
   | Result.Ok (Result.Error e) ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash (Failed e)

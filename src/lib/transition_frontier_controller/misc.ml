@@ -14,7 +14,7 @@ type actions =
       
       Parent's children list if the parent is in transition states is also updated.
       *)
-  ; mark_processed_and_promote : State_hash.t list -> unit
+  ; mark_processed_and_promote : ?reason:string -> State_hash.t list -> unit
         (** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
 transitions processed. Then it promotes all of the transitions that can be promoted
 as the result of [mark_processed].

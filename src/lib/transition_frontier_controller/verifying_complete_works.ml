@@ -3,8 +3,23 @@ open Core_kernel
 open Context
 open Bit_catchup_state
 
+(** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
+let body_exn = function
+  | Transition_state.Verifying_complete_works { block; _ } ->
+      Mina_block.Validation.block block |> Mina_block.body
+  | _ ->
+      failwith "unexpected collected ancestor for Verifying_complete_works"
+
+(** Extract complete works from a block body *)
+let works body =
+  Mina_block.Body.staged_ledger_diff body
+  |> Staged_ledger_diff.completed_works
+  |> List.concat_map ~f:(fun { Transaction_snark_work.fee; prover; proofs } ->
+         let msg = Sok_message.create ~fee ~prover in
+         One_or_two.to_list (One_or_two.map proofs ~f:(fun p -> (p, msg))) )
+
 module F = struct
-  type proceessing_result = unit
+  type processing_result = unit
 
   let ignore_gossip = function
     | Transition_state.Verifying_complete_works ({ block_vc = Some vc; _ } as r)
@@ -25,115 +40,39 @@ module F = struct
         Transition_state.Verifying_complete_works { r with substate; baton }
     | st ->
         st
+
+  let create_in_progress_context ~context:(module Context : CONTEXT) ~holder
+      states =
+    let bottom_state = List.hd_exn states in
+    let downto_ =
+      (Transition_state.State_functions.transition_meta bottom_state)
+        .blockchain_length
+    in
+    let module I = Interruptible.Make () in
+    let timeout =
+      Time.add (Time.now ()) Context.transaction_snark_verification_timeout
+    in
+    interrupt_after_timeout ~timeout I.interrupt_ivar ;
+    let f = function
+      | Ok (Ok ()) ->
+          Ok (List.map states ~f:(const ()))
+      | Ok (Error e) ->
+          Error (`Invalid_proof e)
+      | Error e ->
+          Error (`Verifier_error e)
+    in
+    let works = List.concat_map states ~f:(Fn.compose works body_exn) in
+    let action =
+      I.map ~f (Context.verify_transaction_proofs (module I) works)
+    in
+    ( Substate.In_progress
+        { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
+    , I.force action )
+
+  let data_name = "complete work(s)"
 end
 
 include Verifying_generic.Make (F)
-
-(** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
-let get_body = function
-  | Transition_state.Verifying_complete_works { block; _ } ->
-      Mina_block.Validation.block block |> Mina_block.body
-  | _ ->
-      failwith "unexpected collected ancestor for Verifying_complete_works"
-
-(** Extract state hash from a transition in [Transition_state.Verifying_complete_works] state *)
-let get_state_hash = function
-  | Transition_state.Verifying_complete_works { block; _ } ->
-      state_hash_of_block_with_validation block
-  | _ ->
-      failwith "unexpected collected ancestor for Verifying_complete_works"
-
-(** [upon_f] is a callback to be executed upon completion of
-  transaction snark verification for a transition (or a failure).
-*)
-let rec upon_f ~context ~actions ~transition_states ~state_hashes ~holder res =
-  let (module Context : CONTEXT) = context in
-  let top_state_hash = !holder in
-  match res with
-  | Error () ->
-      (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
-      let for_restart_opt =
-        update_to_failed ~dsu:Context.processed_dsu ~transition_states
-          ~state_hash:top_state_hash
-          (Error.of_string "interrupted")
-      in
-      Option.iter for_restart_opt
-        ~f:(start ~context ~actions ~transition_states)
-  | Ok (Ok (Error e)) ->
-      (* We mark invalid only the first header because it is the only one for which
-         we can be sure it's invalid *)
-      actions.Misc.mark_invalid
-        ~error:(Error.tag e ~tag:"wrong transaction proof")
-        top_state_hash
-  | Ok (Ok (Ok ())) ->
-      List.iter state_hashes ~f:(fun state_hash ->
-          let for_restart_opt =
-            update_to_processing_done ~transition_states ~state_hash
-              ~dsu:Context.processed_dsu
-              ~reuse_ctx:State_hash.(state_hash <> top_state_hash)
-              ()
-          in
-          Option.iter for_restart_opt ~f:(fun for_restart ->
-              start ~context ~actions ~transition_states for_restart ;
-              actions.Misc.mark_processed_and_promote [ state_hash ] ) )
-  | Ok (Error e) ->
-      let for_restart_opt =
-        update_to_failed ~dsu:Context.processed_dsu ~transition_states
-          ~state_hash:top_state_hash e
-      in
-      Option.iter for_restart_opt
-        ~f:(start ~context ~actions ~transition_states)
-
-and start ~context ~actions ~transition_states states =
-  Option.value ~default:()
-  @@ let%map.Option top_state = List.last states in
-     let ctx = launch_in_progress ~context ~actions ~transition_states states in
-     match top_state with
-     | Transition_state.Verifying_complete_works ({ substate; _ } as r) ->
-         Transition_states.update transition_states
-           (Transition_state.Verifying_complete_works
-              { r with substate = { substate with status = Processing ctx } } )
-     | _ ->
-         ()
-
-(** Launch transaction snark (complete work) verification
-    and return the processing context for the deferred action launched.
-    
-    Batch-verification is launched for the block provided and for all of its
-    ancestors that are neither in [Substate.Processed] status nor has an
-    verification action already launched for it and its ancestors.
-    *)
-and launch_in_progress ~actions ~context:(module Context : CONTEXT)
-    ~transition_states states =
-  let bottom_state = List.hd_exn states in
-  let downto_ =
-    (Transition_state.State_functions.transition_meta bottom_state)
-      .blockchain_length
-  in
-  let bodies = List.map ~f:get_body states in
-  let works =
-    List.concat_map bodies
-      ~f:
-        (Fn.compose Staged_ledger_diff.completed_works
-           Mina_block.Body.staged_ledger_diff )
-    |> List.concat_map ~f:(fun { Transaction_snark_work.fee; prover; proofs } ->
-           let msg = Sok_message.create ~fee ~prover in
-           One_or_two.to_list (One_or_two.map proofs ~f:(fun p -> (p, msg))) )
-  in
-  let state_hashes = List.map ~f:get_state_hash states in
-  let module I = Interruptible.Make () in
-  let action = Context.verify_transaction_proofs (module I) works in
-  let holder = ref (List.last_exn state_hashes) in
-  Async_kernel.Deferred.upon (I.force action)
-    (upon_f
-       ~context:(module Context)
-       ~actions ~transition_states ~state_hashes ~holder ) ;
-  let timeout =
-    Time.add (Time.now ()) Context.transaction_snark_verification_timeout
-  in
-  interrupt_after_timeout ~timeout I.interrupt_ivar ;
-  Substate.In_progress
-    { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
 
 (** Promote a transition that is in [Downloading_body] state with
     [Processed] status to [Verifying_complete_works] state.
@@ -149,23 +88,8 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
         failwith "promote_downloading_body: expected processed"
   in
   let block = Mina_block.Validation.with_body header body in
-  let pre_st =
-    Transition_state.Verifying_complete_works
-      { block
-      ; substate = { substate with status = Processing Dependent }
-      ; block_vc
-      ; aux
-      ; baton = false
-      }
-  in
-  if aux.Transition_state.received_via_gossip then
-    let for_start =
-      collect_dependent_and_pass_the_baton ~transition_states
-        ~dsu:Context.processed_dsu pre_st
-    in
-    let ctx =
-      launch_in_progress ~context ~actions ~transition_states for_start
-    in
+  let works = works body in
+  let mk_state ctx =
     Transition_state.Verifying_complete_works
       { block
       ; substate = { substate with status = Processing ctx }
@@ -173,7 +97,34 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
       ; aux
       ; baton = false
       }
-  else pre_st
+  in
+  let start_parent () =
+    let parent_hash =
+      Mina_block.Validation.header header
+      |> Mina_block.Header.protocol_state
+      |> Mina_state.Protocol_state.previous_state_hash
+    in
+    let%map.Option parent =
+      Transition_states.find transition_states parent_hash
+    in
+    collect_dependent_and_pass_the_baton ~transition_states
+      ~dsu:Context.processed_dsu parent
+    |> start ~context ~actions ~transition_states
+  in
+  let handle_done () =
+    if aux.Transition_state.received_via_gossip then
+      ignore (start_parent () : unit option) ;
+    mk_state (Done ())
+  in
+  let handle_processing () =
+    collect_dependent_and_pass_the_baton ~transition_states
+      ~dsu:Context.processed_dsu (mk_state Dependent)
+    |> launch_in_progress ~context ~actions ~transition_states
+    |> mk_state
+  in
+  if List.is_empty works then handle_done ()
+  else if aux.Transition_state.received_via_gossip then handle_processing ()
+  else mk_state Dependent
 
 (** [make_independent state_hash] starts verification of complete works for
        a transition corresponding to the [block].

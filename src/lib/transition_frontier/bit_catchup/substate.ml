@@ -187,6 +187,7 @@ let update_children_on_processed (type state_t)
   Pre-conditions:
    1. Order of [processed] respects parent-child relationship and parent always comes first
    2. Respective substates for states from [processed] are in [Processing (Done _)] status
+   3. Parents of all transitions from [processed] are in transition states or in frontier
 
   Post-condition: list returned respects parent-child relationship and parent always comes first *)
 let mark_processed (type state_t) ~logger ~state_functions

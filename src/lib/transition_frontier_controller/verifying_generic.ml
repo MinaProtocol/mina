@@ -1,25 +1,13 @@
 open Core_kernel
+open Mina_base
 open Bit_catchup_state
 open Context
+include Verifying_generic_types
 
-(** Summary of the state relevant to verifying generic functions  *)
-type 'a data = { substate : 'a Substate.t; baton : bool }
+let get_state_hash st =
+  (Transition_state.State_functions.transition_meta st).state_hash
 
-module Make (F : sig
-  (** Result of processing *)
-  type proceessing_result
-
-  (** Resolve all gossips held in the state to [`Ignore] *)
-  val ignore_gossip : Transition_state.t -> Transition_state.t
-
-  (** Extract data from the state *)
-  val to_data : Transition_state.t -> proceessing_result data option
-
-  (** Update state witht the given data *)
-  val update :
-    proceessing_result data -> Transition_state.t -> Transition_state.t
-end) =
-struct
+module Make (F : F) = struct
   (** Collect transitions that are either in [Substate.Processing Substate.Dependent]
       or in [Substate.Failed] statuses and set [baton] to [true] for the next
       ancestor in [Substate.Processing (Substate.In_progress _)] status.
@@ -199,4 +187,94 @@ struct
     if baton then
       collect_dependent_and_pass_the_baton ~dsu ~transition_states st
     else []
+
+  (** [upon_f] is a callback to be executed upon completion of
+  blockchain proof verification (or a failure).
+*)
+  let rec upon_f ~context ~actions ~transition_states ~state_hashes ~holder res
+      =
+    let (module Context : CONTEXT) = context in
+    let top_state_hash = !holder in
+    let fail e =
+      (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
+      update_to_failed ~dsu:Context.processed_dsu ~transition_states
+        ~state_hash:top_state_hash e
+      |> Option.iter ~f:(start ~context ~actions ~transition_states)
+    in
+    let fail_if_unequal_lengths = function
+      | List.Or_unequal_lengths.Ok a ->
+          a
+      | Unequal_lengths ->
+          fail
+            (Error.of_string "result length is unequal to state hashes length")
+    in
+    match res with
+    | Result.Error () ->
+        fail (Error.of_string "interrupted")
+    | Result.Ok (Result.Ok lst) ->
+        List.iter2 state_hashes lst ~f:(fun state_hash res ->
+            let for_restart_opt =
+              update_to_processing_done ~transition_states ~state_hash
+                ~dsu:Context.processed_dsu
+                ~reuse_ctx:State_hash.(state_hash <> top_state_hash)
+                res
+            in
+            Option.iter for_restart_opt ~f:(fun for_restart ->
+                start ~context ~actions ~transition_states for_restart ;
+                actions.Misc.mark_processed_and_promote [ state_hash ]
+                  ~reason:("verified " ^ F.data_name) ) )
+        |> fail_if_unequal_lengths
+    | Result.Ok (Result.Error (`Invalid_proof e)) ->
+        (* We mark invalid only the top header because it is the only one for which
+           we can be sure it's invalid. *)
+        actions.Misc.mark_invalid
+          ~error:(Error.tag ~tag:("invalid " ^ F.data_name) e)
+          top_state_hash
+    | Result.Ok (Result.Error (`Verifier_error e)) ->
+        fail e
+
+  and launch_in_progress ~context ~actions ~transition_states states =
+    let top_state = List.last_exn states in
+    let top_state_hash =
+      (Transition_state.State_functions.transition_meta top_state).state_hash
+    in
+    let holder = ref top_state_hash in
+    let state_hashes = List.map ~f:get_state_hash states in
+    let ctx, action = F.create_in_progress_context ~context ~holder states in
+    Async_kernel.Deferred.upon action
+    @@ upon_f ~context ~actions ~transition_states ~state_hashes ~holder ;
+    ctx
+
+  and start ~context ~actions ~transition_states states =
+    Option.value ~default:()
+    @@ let%map.Option top_state = List.last states in
+       let top_state_hash =
+         (Transition_state.State_functions.transition_meta top_state).state_hash
+       in
+       match F.to_data top_state with
+       | Some
+           ( { substate = { status = Processing Dependent; _ } as substate; _ }
+           as r )
+       | Some ({ substate = { status = Failed _; _ } as substate; _ } as r) ->
+           let ctx =
+             launch_in_progress ~context ~actions ~transition_states states
+           in
+           Transition_states.update transition_states
+             (F.update
+                { r with substate = { substate with status = Processing ctx } }
+                top_state )
+       | Some { substate = { status; _ }; _ } ->
+           let (module Context : CONTEXT) = context in
+           [%log' error Context.logger]
+             "Unexpected status %s (Verifying_blockchain_proof) for \
+              $state_hash in Verifying_blockchain_proof.start"
+             (Substate.name_of_status status)
+             ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
+       | None ->
+           let (module Context : CONTEXT) = context in
+           [%log' error Context.logger]
+             "Unexpected state %s for $state_hash in \
+              Verifying_blockchain_proof.start"
+             (Transition_state.name top_state)
+             ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
 end

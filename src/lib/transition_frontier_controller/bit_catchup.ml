@@ -318,6 +318,11 @@ let handle_invalid ~children =
         | other ->
             other ) )
 
+let get_status_name =
+  Substate.view
+    ~f:{ viewer = (fun { status; _ } -> Substate.name_of_status status) }
+    ~state_functions
+
 let mark_invalid ~state ?reason ~error state_hash =
   Transition_states.mark_invalid ?reason ~error ~state_hash
     state.transition_states
@@ -347,6 +352,11 @@ let rec promote_to_higher_state ~write_actions
     promote_to_higher_state_impl ~context ~transition_states ~write_actions
       ~actions old_state
   in
+  [%log' info Context.logger]
+    "Promoting transition from state %s to state %s, status %s"
+    (Transition_state.name old_state)
+    (Option.value_map ~default:"(none)" ~f:Transition_state.name state_opt)
+    Option.(value ~default:"(none)" @@ bind ~f:get_status_name state_opt) ;
   ( match state_opt with
   | None ->
       State_hash.Table.change state.children state_hash
@@ -370,11 +380,16 @@ let rec promote_to_higher_state ~write_actions
     ~parent_hash ~state_hash state_opt ;
   Option.iter state_opt ~f:(fun state ->
       if Substate.is_processing_done ~state_functions state then
-        actions.mark_processed_and_promote [ state_hash ] )
+        actions.mark_processed_and_promote ~reason:"promoted to Processing Done"
+          [ state_hash ] )
 
 and actions ~context ~state ~write_actions =
   { Misc.mark_processed_and_promote =
-      mark_processed_and_promote ~context ~state ~write_actions
+      (fun ?reason hashes ->
+        if List.is_empty hashes then ()
+        else
+          mark_processed_and_promote ?reason ~context ~state ~write_actions
+            hashes )
   ; mark_invalid = mark_invalid ~state
   }
 
@@ -391,13 +406,26 @@ as the result of [mark_processed].
 This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
 *)
-and mark_processed_and_promote ~write_actions
-    ~context:(module Context : CONTEXT) ~state state_hashes =
+and mark_processed_and_promote ?(reason = "(reason not specified)")
+    ~write_actions ~context:(module Context : CONTEXT) ~state state_hashes =
   let transition_states = state.transition_states in
   let higher_state_promotees =
     Substate.mark_processed ~logger:Context.logger ~state_functions
       ~transition_states state_hashes
   in
+  let transition_json h =
+    let h_json = State_hash.to_yojson h in
+    Option.value ~default:h_json
+    @@ let%map.Option s = Transition_states.find state.transition_states h in
+       `Tuple
+         [ h_json
+         ; `String (Transition_state.name s)
+         ; `String (Option.value ~default:"" @@ get_status_name s)
+         ]
+  in
+  [%log' info Context.logger] "Marking $transitions processed: %s" reason
+    ~metadata:
+      [ ("transitions", `List (List.map ~f:transition_json state_hashes)) ] ;
   let open State_hash.Set in
   let processed = of_list state_hashes in
   let promoted = of_list higher_state_promotees in
@@ -410,7 +438,7 @@ and mark_processed_and_promote ~write_actions
           let children = Transition_state.children st in
           iter children.processed ~f:(fun b ->
               union ~a:key ~b Context.processed_dsu ) ) ) ;
-  iter (diff processed promoted) ~f:(fun key ->
+  iter (diff promoted processed) ~f:(fun key ->
       Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
   List.iter
     ~f:(promote_to_higher_state ~write_actions ~context:(module Context) ~state)
@@ -563,7 +591,6 @@ module Transition_states_callbacks (Context : sig
   val logger : Logger.t
 end) =
 struct
-  (* TODO add logging *)
   let on_invalid ?(reason = `Other) ~error ~aux _meta =
     let f { Transition_state.sender; gossip; _ } =
       let action =
@@ -583,11 +610,17 @@ struct
     in
     don't_wait_for (Deferred.List.iter ~f aux.Transition_state.received)
 
-  let on_add_new _ =
+  let on_add_new state_hash =
+    [%log' info Context.logger]
+      "Adding transition $state_hash to bit-catchup state"
+      ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
     Mina_metrics.Gauge.inc_one
       Mina_metrics.Transition_frontier_controller.transitions_being_processed
 
-  let on_remove _ =
+  let on_remove state_hash =
+    [%log' info Context.logger]
+      "Removing transition $state_hash from bit-catchup state"
+      ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
     Mina_metrics.Gauge.dec_one
       Mina_metrics.Transition_frontier_controller.transitions_being_processed
 end
@@ -672,14 +705,13 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
            | Some _ ->
                true
            | _ ->
+               let state_hash = Frontier_base.Breadcrumb.state_hash b in
                [%log warn]
                  "When trying to add breadcrumb $state_hash, its parent had \
                   been removed from transition frontier: $parent_hash"
                  ~metadata:
                    [ ("parent_hash", State_hash.to_yojson parent_hash)
-                   ; ( "state_hash"
-                     , Frontier_base.Breadcrumb.state_hash b
-                       |> State_hash.to_yojson )
+                   ; ("state_hash", State_hash.to_yojson state_hash)
                    ] ;
                false
          in
@@ -726,9 +758,8 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
                  (Frontier_base.Breadcrumb.validated_transition b)
                  ~time_controller
                  ~consensus_constants:Context.consensus_constants ) ;
-           Transition_states.update' transition_states
-             (Frontier_base.Breadcrumb.state_hash b)
-             ~f:promote_do
+           let state_hash = Frontier_base.Breadcrumb.state_hash b in
+           Transition_states.update' transition_states state_hash ~f:promote_do
          in
          List.iter breadcrumbs ~f:promote )
 (* TODO handle case when transition states were recovered from persistence and some transitions
