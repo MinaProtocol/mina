@@ -74,8 +74,8 @@ let verify_heterogenous (ts : Instance.t list) =
             ; bulletproof_challenges
             ; b
             } =
-          Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
-            ~scalar:sc statement.proof_state.deferred_values
+          Deferred_values.map_challenges ~scalar:sc
+            statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in

@@ -258,10 +258,7 @@ module Wrap : sig
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       val map_challenges :
-           ('a, 'b, 'fp, 'c, 'd) t
-        -> f:'e
-        -> scalar:('b -> 'f)
-        -> ('a, 'f, 'fp, 'c, 'd) t
+        ('a, 'b, 'fp, 'c, 'd) t -> scalar:('b -> 'f) -> ('a, 'f, 'fp, 'c, 'd) t
 
       module Minimal : sig
         type ( 'challenge
