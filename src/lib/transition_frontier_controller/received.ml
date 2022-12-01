@@ -63,7 +63,8 @@ let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
       | _ ->
           () ) ;
       Option.iter ivar_opt ~f:(Fn.flip Ivar.fill_if_empty ()) ;
-      actions.Misc.mark_processed_and_promote [ meta.state_hash ]
+      actions.Misc.mark_processed_and_promote
+        ~reason:"received gossip with body" [ meta.state_hash ]
 
 let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in
@@ -467,6 +468,9 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
       Misc.handle_non_regular_child ~state ~is_parent_in_frontier
         ~is_invalid:false transition_meta ;
       actions.Misc.mark_processed_and_promote
+        ~reason:
+          ( if is_parent_in_frontier then "parent in frontier"
+          else "parent in transition states" )
         (state_hash :: non_invalid_children) ;
       restart_failed_ancestor ~state ~actions ~context parent_hash
   | `Not_present ->
@@ -496,6 +500,7 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
               } ) ;
       Misc.add_orphan ~state transition_meta ;
       actions.Misc.mark_processed_and_promote non_invalid_children
+        ~reason:"parent just added to transition states"
 
 (** Add a gossip to catchup state *)
 let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc

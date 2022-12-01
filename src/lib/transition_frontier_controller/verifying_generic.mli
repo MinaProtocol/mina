@@ -2,25 +2,9 @@ open Mina_base
 open Core_kernel
 open Bit_catchup_state
 
-(** Summary of the state relevant to verifying generic functions  *)
-type 'a data = { substate : 'a Substate.t; baton : bool }
+include module type of Verifying_generic_types
 
-module Make : functor
-  (F : sig
-     (** Result of processing *)
-     type proceessing_result
-
-     (** Resolve all gossips held in the state to [`Ignore] *)
-     val ignore_gossip : Transition_state.t -> Transition_state.t
-
-     (** Extract data from the state *)
-     val to_data : Transition_state.t -> proceessing_result data option
-
-     (** Update state witht the given data *)
-     val update :
-       proceessing_result data -> Transition_state.t -> Transition_state.t
-   end)
-  -> sig
+module Make : functor (F : F) -> sig
   (** Collect transitions that are either in [Substate.Processing Substate.Dependent]
       or in [Substate.Failed] statuses and set [baton] to [true] for the next
       ancestor in [Substate.Processing (Substate.In_progress _)] status.
@@ -65,7 +49,7 @@ module Make : functor
     -> state_hash:State_hash.t
     -> dsu:Processed_skipping.Dsu.t
     -> ?reuse_ctx:bool
-    -> F.proceessing_result
+    -> F.processing_result
     -> Transition_state.t list option
 
   (** Update status to [Substate.Failed].
@@ -80,4 +64,18 @@ module Make : functor
     -> dsu:Processed_skipping.Dsu.t
     -> Error.t
     -> Transition_state.t list option
+
+  val start :
+       context:(module Context.CONTEXT)
+    -> actions:Misc.actions
+    -> transition_states:Transition_states.t
+    -> Transition_state.t list
+    -> unit
+
+  val launch_in_progress :
+       context:(module Context.CONTEXT)
+    -> actions:Misc.actions
+    -> transition_states:Transition_states.t
+    -> Transition_state.t list
+    -> F.processing_result Substate.processing_context
 end
