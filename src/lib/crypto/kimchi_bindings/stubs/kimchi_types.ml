@@ -43,6 +43,22 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array
       * 'caml_f array
       * 'caml_f array
+  ; coefficients :
+      'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
   ; z : 'caml_f array
   ; s :
       'caml_f array

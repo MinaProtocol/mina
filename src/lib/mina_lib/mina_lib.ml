@@ -645,7 +645,7 @@ let get_snarked_ledger t state_hash_opt =
               | Some txns -> (
                   match
                     List.fold_until ~init:(Ok ())
-                      (Non_empty_list.to_list txns)
+                      (Mina_stdlib.Nonempty_list.to_list txns)
                       ~f:(fun _acc (txn, state_hash) ->
                         (*Validate transactions against the protocol state associated with the transaction*)
                         match
@@ -1729,7 +1729,7 @@ let create ?wallets (config : Config.t) =
                         .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
-                config.net_config.log_gossip_heard.snark_pool_diff
+                config.net_config.log_gossip_heard.snark_pool_diff ()
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -1915,7 +1915,7 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
-              ~notify_online
+              ~notify_online ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

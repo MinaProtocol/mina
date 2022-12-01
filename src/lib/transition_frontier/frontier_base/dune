@@ -46,7 +46,7 @@
    protocol_version
    mina_net2
    transaction_snark
-   non_empty_list
+   mina_stdlib
    coda_genesis_proof
    ppx_version.runtime
    pickles.backend

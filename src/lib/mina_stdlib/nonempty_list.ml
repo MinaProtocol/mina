@@ -42,9 +42,7 @@ module C = Container.Make (struct
   let length = `Define_using_fold
 end)
 
-[%%define_locally C.(find, find_map, iter, length)]
-
-let fold (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
+[%%define_locally C.(find, find_map, iter, length, fold)]
 
 let to_list (x, xs) = x :: xs
 

@@ -28,6 +28,7 @@
    async.async_command
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    graphql-cohttp
    cohttp-async
    graphql-async

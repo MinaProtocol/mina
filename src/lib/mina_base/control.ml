@@ -69,7 +69,11 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+  type t = Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
+    | Signature
+    | Proof
+    | None_given
+  [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
 end

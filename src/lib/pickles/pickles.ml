@@ -162,7 +162,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                let (T (_proofs_verified, pi)) = HI.length xs in
                let module V = H2_1.To_vector (Int) in
                let v = V.f pi xs in
-               Vector.extend_exn v max_proofs_verified 0
+               Vector.extend_front_exn v max_proofs_verified 0
            end)
     in
     let module V = H2_1.To_vector (Vec) in
@@ -194,23 +194,41 @@ module Make_str (_ : Wire_types.Concrete) = struct
         local_max_proofs_verifieds
         H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
     let dummy_chals = Dummy.Ipa.Wrap.challenges in
+    let module Messages =
+      H1.T (Proof_.Messages_for_next_proof_over_same_field.Wrap) in
+    let module Maxes = H1.T (Nat) in
+    let (T (messages_len, _)) = Messages.length messages_for_next_wrap_proofs in
+    let (T (maxes_len, _)) = Maxes.length M.maxes in
+    let (T difference) =
+      let rec sub : type n m. n Nat.t -> m Nat.t -> Nat.e =
+       fun x y ->
+        let open Nat in
+        match (x, y) with
+        | _, Z ->
+            T x
+        | Z, S _ ->
+            assert false
+        | S x, S y ->
+            sub x y
+      in
+      sub maxes_len messages_len
+    in
     let rec go :
         type len ms ns.
-           ms H1.T(Nat).t
-        -> ns H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t
-        -> ms H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t =
-     fun maxes messages_for_next_wrap_proofs ->
-      match (maxes, messages_for_next_wrap_proofs) with
-      | [], _ :: _ ->
-          assert false
-      | [], [] ->
-          []
-      | m :: maxes, [] ->
+        len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t =
+     fun pad maxes messages_for_next_wrap_proofs ->
+      match (pad, maxes, messages_for_next_wrap_proofs) with
+      | S pad, m :: maxes, _ ->
           { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
           ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
           }
-          :: go maxes []
-      | ( m :: maxes
+          :: go pad maxes messages_for_next_wrap_proofs
+      | S _, [], _ ->
+          assert false
+      | Z, [], [] ->
+          []
+      | ( Z
+        , m :: maxes
         , messages_for_next_wrap_proof :: messages_for_next_wrap_proofs ) ->
           let messages_for_next_wrap_proof =
             { messages_for_next_wrap_proof with
@@ -220,9 +238,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   dummy_chals
             }
           in
-          messages_for_next_wrap_proof :: go maxes messages_for_next_wrap_proofs
+          messages_for_next_wrap_proof
+          :: go Z maxes messages_for_next_wrap_proofs
+      | Z, [], _ :: _ | Z, _ :: _, [] ->
+          assert false
     in
-    go M.maxes messages_for_next_wrap_proofs
+    go difference M.maxes messages_for_next_wrap_proofs
 
   module Verification_key = struct
     include Verification_key
@@ -333,7 +354,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 =
              fun rule ->
               let (T (_, l)) = HT.length rule.prevs in
-              Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
+              Vector.extend_front_exn
+                (V.f l (M.f rule.prevs))
+                Max_proofs_verified.n 0
           end)
       in
       let module V = H4.To_vector (Local_max_proofs_verifieds) in
@@ -415,6 +438,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              (Cache.Step.Key.Verification.t, branches) Vector.t
              * Cache.Wrap.Key.Verification.t
         -> ?return_early_digest_exception:bool
+        -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
         -> branches:(module Nat.Intf with type n = branches)
         -> max_proofs_verified:
              (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -446,8 +470,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
            * _
            * _ =
      fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-         ~branches:(module Branches) ~max_proofs_verified ~name
-         ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+         ?override_wrap_domain ~branches:(module Branches) ~max_proofs_verified
+         ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
       let snark_keys_header kind constraint_system_hash =
         { Snark_keys_header.header_version = Snark_keys_header.header_version
         ; kind
@@ -482,21 +506,26 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
       Timer.clock __LOC__ ;
       let wrap_domains =
-        let module M =
-          Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
-            (Auxiliary_var)
-            (Auxiliary_value)
-        in
-        let rec f :
-            type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
-          function
-          | [] ->
-              []
-          | x :: xs ->
-              x :: f xs
-        in
-        M.f full_signature prev_varss_n prev_varss_length ~self
-          ~choices:(f choices) ~max_proofs_verified
+        match override_wrap_domain with
+        | None ->
+            let module M =
+              Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+                (Auxiliary_var)
+                (Auxiliary_value)
+            in
+            let rec f :
+                type a b c d.
+                (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t = function
+              | [] ->
+                  []
+              | x :: xs ->
+                  x :: f xs
+            in
+            M.f full_signature prev_varss_n prev_varss_length ~self
+              ~choices:(f choices) ~max_proofs_verified
+        | Some override ->
+            Common.wrap_domains
+              ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
       in
       Timer.clock __LOC__ ;
       let module Branch_data = struct
@@ -866,11 +895,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let of_compiled tag : t =
         let d = Types_map.lookup_compiled tag.Tag.id in
+        let actual_wrap_domain_size =
+          Common.actual_wrap_domain_size
+            ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
+        in
         { wrap_vk = Some (Lazy.force d.wrap_vk)
         ; wrap_index = Lazy.force d.wrap_key
         ; max_proofs_verified =
             Pickles_base.Proofs_verified.of_nat
               (Nat.Add.n d.max_proofs_verified)
+        ; actual_wrap_domain_size
         }
 
       module Max_width = Width.Max
@@ -947,6 +981,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
       -> ?return_early_digest_exception:bool
+      -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> public_input:
            ( var
            , value
@@ -993,14 +1028,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
       and the underlying Make(_).compile function which builds the circuits.
    *)
    fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-       ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-       ~constraint_constants ~choices () ->
+       ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+       ~max_proofs_verified ~name ~constraint_constants ~choices () ->
     let self =
       match self with
       | None ->
-          { Tag.id = Type_equal.Id.create ~name sexp_of_opaque
-          ; kind = Compiled
-          }
+          Tag.(create ~kind:Compiled name)
       | Some self ->
           self
     in
@@ -1062,9 +1095,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           r :: conv_irs rs
     in
     let provers, wrap_vk, wrap_disk_key, cache_handle =
-      M.compile ~return_early_digest_exception ~self ~cache ?disk_keys ~branches
-        ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-        ~constraint_constants
+      M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
+        ?override_wrap_domain ~branches ~max_proofs_verified ~name ~public_input
+        ~auxiliary_typ ~constraint_constants
         ~choices:(fun ~self -> conv_irs (choices ~self))
         ()
     in
@@ -1126,11 +1159,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end in
     (self, cache_handle, (module P), provers)
 
-  let compile ?self ?cache ?disk_keys ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+  let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?disk_keys ~public_input ~auxiliary_typ
-        ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ()
+      compile_promise ?self ?cache ?disk_keys ?override_wrap_domain
+        ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+        ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 a4 s1 s2_inner.
@@ -1153,6 +1188,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let () = Tock.Keypair.set_urs_info []
 
       let () = Tick.Keypair.set_urs_info []
+
+      let () = Backtrace.elide := false
 
       (*
     let%test_unit "test deserialization and verification for side-loaded keys" =
@@ -1478,6 +1515,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
+                ~override_wrap_domain:N1 (* Inferred domain size is too large *)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1611,6 +1649,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
+                ~override_wrap_domain:N1 (* Inferred domain size is too large *)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1899,9 +1938,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -1961,7 +1999,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
-                  Vector.extend_exn
+                  Vector.extend_front_exn
                     (V.f l (M.f rule.prevs))
                     Max_proofs_verified.n 0
               end)
@@ -2131,7 +2169,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 64000 do
@@ -2352,7 +2390,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       O.create pairing_vk
                         Vector.(
-                          map2 (Vector.trim sgs lte) prev_challenges
+                          map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
@@ -2507,13 +2545,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               assert false
                         in
                         let overwritten_prechals =
-                          Array.map overwritten_prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map overwritten_prechals
+                            ~f:Bulletproof_challenge.unpack
                         in
+
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
@@ -2597,7 +2636,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
                                   ( Vector.map2
-                                      (Vector.extend_exn
+                                      (Vector.extend_front_exn
                                          prev_statement.proof_state
                                            .messages_for_next_step_proof
                                            .challenge_polynomial_commitments
@@ -2824,9 +2863,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       let tag =
-        { Tag.id = Type_equal.Id.create ~name:"" sexp_of_opaque
-        ; kind = Compiled
-        }
+        let tagname = "" in
+        Tag.create ~kind:Compiled tagname
 
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
@@ -2886,7 +2924,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
-                  Vector.extend_exn
+                  Vector.extend_front_exn
                     (V.f l (M.f rule.prevs))
                     Max_proofs_verified.n 0
               end)
@@ -3056,7 +3094,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ignore
               (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
             ignore
-              ( Scalar_challenge.endo g ~num_bits:4
+              ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                   (Kimchi_backend_common.Scalar_challenge.create x)
                 : Field.t * Field.t ) ;
             for i = 0 to 61000 do
@@ -3277,7 +3315,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       O.create pairing_vk
                         Vector.(
-                          map2 (Vector.trim sgs lte) prev_challenges
+                          map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
@@ -3397,13 +3435,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         in
                         let b = Tick.Field.random () in
                         let prechals =
-                          Array.map prechals ~f:(fun x ->
-                              { Bulletproof_challenge.prechallenge = x } )
+                          Array.map prechals ~f:Bulletproof_challenge.unpack
                         in
+
                         (prechals, b)
                       in
                       let plonk =
-                        Wrap.Plonk_checks.Type1.derive_plonk
+                        Wrap.Type1.derive_plonk
                           (module Tick.Field)
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
@@ -3488,7 +3526,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 ~auxiliary:auxiliary_inputs pk
                                 ~message:
                                   ( Vector.map2
-                                      (Vector.extend_exn
+                                      (Vector.extend_front_exn
                                          prev_statement.proof_state
                                            .messages_for_next_step_proof
                                            .challenge_polynomial_commitments
