@@ -1554,7 +1554,7 @@ module Circuit = struct
         ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
     let rows =
-      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len
+      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len cs
     in
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
