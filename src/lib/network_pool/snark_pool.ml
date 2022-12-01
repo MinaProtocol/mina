@@ -98,7 +98,8 @@ module type S = sig
     -> Transaction_snark_work.Checked.t option
 
   val load :
-       config:Resource_pool.Config.t
+       ?allow_multiple_instances_for_tests:bool
+    -> config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
@@ -108,6 +109,7 @@ module type S = sig
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> unit
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
@@ -671,10 +673,10 @@ struct
 
   let loaded = ref false
 
-  let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
-      ~on_remote_push =
-    if !loaded then
+  let load ?(allow_multiple_instances_for_tests = false) ~config ~logger
+      ~constraint_constants ~consensus_constants ~time_controller ~expiry_ns
+      ~frontier_broadcast_pipe ~log_gossip_heard ~on_remote_push () =
+    if (not allow_multiple_instances_for_tests) && !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
     loaded := true ;
