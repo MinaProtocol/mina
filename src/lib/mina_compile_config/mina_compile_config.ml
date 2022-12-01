@@ -29,13 +29,13 @@ let compaction_interval_ms = Some compaction_interval
 [%%endif]
 
 let minimum_user_command_fee =
-  Currency.Fee.of_formatted_string minimum_user_command_fee_string
+  Currency.Fee.of_mina_string_exn minimum_user_command_fee_string
 
 let default_transaction_fee =
-  Currency.Fee.of_formatted_string default_transaction_fee_string
+  Currency.Fee.of_mina_string_exn default_transaction_fee_string
 
 let default_snark_worker_fee =
-  Currency.Fee.of_formatted_string default_snark_worker_fee_string
+  Currency.Fee.of_mina_string_exn default_snark_worker_fee_string
 
 [%%inject "block_window_duration_ms", block_window_duration]
 
@@ -51,11 +51,26 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 let transaction_expiry_hr = 2
 
-(* limits on Parties.t size *)
+(** limits on Zkapp_command.t size
+    10.26*np + 10.08*n2 + 9.14*n1 < 69.45
+    where np: number of single proof updates
+    n2: number of pairs of signed/no-auth update
+    n1: number of single signed/no-auth update
+    and their coefficients representing the cost
+  The formula was generated based on benchmarking data conducted on bare 
+  metal i9 processor with room to include lower spec.
+  69.45 was the total time for a combination of updates that was considered 
+  acceptable.
+  The method used to estimate the cost was linear least squares.
+*)
 
-let max_proof_parties = 4
+let zkapp_proof_update_cost = 10.26
 
-let max_parties = 8
+let zkapp_signed_pair_update_cost = 10.08
+
+let zkapp_signed_single_update_cost = 9.14
+
+let zkapp_transaction_cost_limit = 69.45
 
 let max_event_elements = 16
 

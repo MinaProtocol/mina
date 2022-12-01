@@ -10,13 +10,11 @@ module FieldVectors = struct
 
     external length : t -> int = "caml_fp_vector_length"
 
-    external emplace_back : t -> Pasta_bindings.Fp.t -> unit
-      = "caml_fp_vector_emplace_back"
+    external emplace_back : t -> elt -> unit = "caml_fp_vector_emplace_back"
 
-    external get : t -> int -> Pasta_bindings.Fp.t = "caml_fp_vector_get"
+    external get : t -> int -> elt = "caml_fp_vector_get"
 
-    external set : t -> int -> Pasta_bindings.Fp.t -> unit
-      = "caml_fp_vector_set"
+    external set : t -> int -> elt -> unit = "caml_fp_vector_set"
   end
 
   module Fq = struct
@@ -28,13 +26,11 @@ module FieldVectors = struct
 
     external length : t -> int = "caml_fq_vector_length"
 
-    external emplace_back : t -> Pasta_bindings.Fq.t -> unit
-      = "caml_fq_vector_emplace_back"
+    external emplace_back : t -> elt -> unit = "caml_fq_vector_emplace_back"
 
-    external get : t -> int -> Pasta_bindings.Fq.t = "caml_fq_vector_get"
+    external get : t -> int -> elt = "caml_fq_vector_get"
 
-    external set : t -> int -> Pasta_bindings.Fq.t -> unit
-      = "caml_fq_vector_set"
+    external set : t -> int -> elt -> unit = "caml_fq_vector_set"
   end
 end
 
@@ -48,17 +44,15 @@ module Protocol = struct
 
         external create : unit -> t = "caml_pasta_fp_plonk_gate_vector_create"
 
-        external add :
-          t -> Pasta_bindings.Fp.t Kimchi_types.circuit_gate -> unit
-          = "caml_pasta_fp_plonk_gate_vector_add"
+        external add : t -> elt -> unit = "caml_pasta_fp_plonk_gate_vector_add"
 
-        external get : t -> int -> Pasta_bindings.Fp.t Kimchi_types.circuit_gate
-          = "caml_pasta_fp_plonk_gate_vector_get"
+        external get : t -> int -> elt = "caml_pasta_fp_plonk_gate_vector_get"
 
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fp_plonk_gate_vector_wrap"
 
-        external digest : t -> bytes = "caml_pasta_fp_plonk_gate_vector_digest"
+        external digest : int -> t -> bytes
+          = "caml_pasta_fp_plonk_gate_vector_digest"
       end
 
       module Fq = struct
@@ -68,17 +62,15 @@ module Protocol = struct
 
         external create : unit -> t = "caml_pasta_fq_plonk_gate_vector_create"
 
-        external add :
-          t -> Pasta_bindings.Fq.t Kimchi_types.circuit_gate -> unit
-          = "caml_pasta_fq_plonk_gate_vector_add"
+        external add : t -> elt -> unit = "caml_pasta_fq_plonk_gate_vector_add"
 
-        external get : t -> int -> Pasta_bindings.Fq.t Kimchi_types.circuit_gate
-          = "caml_pasta_fq_plonk_gate_vector_get"
+        external get : t -> int -> elt = "caml_pasta_fq_plonk_gate_vector_get"
 
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fq_plonk_gate_vector_wrap"
 
-        external digest : t -> bytes = "caml_pasta_fq_plonk_gate_vector_digest"
+        external digest : int -> t -> bytes
+          = "caml_pasta_fq_plonk_gate_vector_digest"
       end
     end
   end
@@ -253,59 +245,21 @@ module Protocol = struct
         )
         Kimchi_types.VerifierIndex.verifier_index
 
-      external create :
-           Index.Fp.t
-        -> ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external create : Index.Fp.t -> t
         = "caml_pasta_fp_plonk_verifier_index_create"
 
-      external read :
-           int option
-        -> SRS.Fp.t
-        -> string
-        -> ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external read : int option -> SRS.Fp.t -> string -> t
         = "caml_pasta_fp_plonk_verifier_index_read"
 
-      external write :
-           bool option
-        -> ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        -> string
-        -> unit = "caml_pasta_fp_plonk_verifier_index_write"
+      external write : bool option -> t -> string -> unit
+        = "caml_pasta_fp_plonk_verifier_index_write"
 
       external shifts : int -> Pasta_bindings.Fp.t array
         = "caml_pasta_fp_plonk_verifier_index_shifts"
 
-      external dummy :
-           unit
-        -> ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        = "caml_pasta_fp_plonk_verifier_index_dummy"
+      external dummy : unit -> t = "caml_pasta_fp_plonk_verifier_index_dummy"
 
-      external deep_copy :
-           ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        -> ( Pasta_bindings.Fp.t
-           , SRS.Fp.t
-           , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external deep_copy : t -> t
         = "caml_pasta_fp_plonk_verifier_index_deep_copy"
     end
 
@@ -317,59 +271,21 @@ module Protocol = struct
         )
         Kimchi_types.VerifierIndex.verifier_index
 
-      external create :
-           Index.Fq.t
-        -> ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external create : Index.Fq.t -> t
         = "caml_pasta_fq_plonk_verifier_index_create"
 
-      external read :
-           int option
-        -> SRS.Fq.t
-        -> string
-        -> ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external read : int option -> SRS.Fq.t -> string -> t
         = "caml_pasta_fq_plonk_verifier_index_read"
 
-      external write :
-           bool option
-        -> ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        -> string
-        -> unit = "caml_pasta_fq_plonk_verifier_index_write"
+      external write : bool option -> t -> string -> unit
+        = "caml_pasta_fq_plonk_verifier_index_write"
 
       external shifts : int -> Pasta_bindings.Fq.t array
         = "caml_pasta_fq_plonk_verifier_index_shifts"
 
-      external dummy :
-           unit
-        -> ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        = "caml_pasta_fq_plonk_verifier_index_dummy"
+      external dummy : unit -> t = "caml_pasta_fq_plonk_verifier_index_dummy"
 
-      external deep_copy :
-           ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
-        -> ( Pasta_bindings.Fq.t
-           , SRS.Fq.t
-           , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-           )
-           Kimchi_types.VerifierIndex.verifier_index
+      external deep_copy : t -> t
         = "caml_pasta_fq_plonk_verifier_index_deep_copy"
     end
   end
@@ -389,7 +305,7 @@ module Protocol = struct
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
            Kimchi_types.prover_proof
-        -> Pasta_bindings.Fp.t Kimchi_types.oracles = "fp_oracles_create"
+        -> t = "fp_oracles_create"
 
       external dummy : unit -> Pasta_bindings.Fp.t Kimchi_types.random_oracles
         = "fp_oracles_dummy"
@@ -414,7 +330,7 @@ module Protocol = struct
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
            , Pasta_bindings.Fq.t )
            Kimchi_types.prover_proof
-        -> Pasta_bindings.Fq.t Kimchi_types.oracles = "fq_oracles_create"
+        -> t = "fq_oracles_create"
 
       external dummy : unit -> Pasta_bindings.Fq.t Kimchi_types.random_oracles
         = "fq_oracles_dummy"

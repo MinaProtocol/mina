@@ -40,6 +40,14 @@
    data_hash_lib
    staged_ledger_diff
    ppx_version.runtime
+   mina_transaction_logic
+   pickles.backend
+   sgn_type
+   kimchi_backend
+   mina_numbers
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

@@ -112,7 +112,9 @@ val of_scan_state_and_ledger_unchecked :
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
-  t -> (Transaction.t With_status.t * State_hash.t) Non_empty_list.t option
+     t
+  -> (Transaction.t With_status.t * State_hash.t) Mina_stdlib.Nonempty_list.t
+     option
 
 val copy : t -> t
 

@@ -129,16 +129,18 @@ module Unsafe = struct
          ( 'time_received
          , 'genesis_state
          , 'proof
-         , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+         , [ `Delta_block_chain ]
+           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
          t
-      -> State_hash.t Non_empty_list.t
+      -> State_hash.t Mina_stdlib.Nonempty_list.t
       -> ( 'time_received
          , 'genesis_state
          , 'proof
-         , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+         , [ `Delta_block_chain ]
+           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
@@ -385,7 +387,7 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   in
   ( t
   , Unsafe.set_valid_delta_block_chain validation
-      (Non_empty_list.singleton previous_protocol_state_hash) )
+      (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
 let validate_frontier_dependencies ~context:(module Context : CONTEXT)
     ~root_block ~get_block_by_hash (t, validation) =

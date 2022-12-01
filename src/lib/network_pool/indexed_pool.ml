@@ -6,7 +6,7 @@ open Mina_numbers
 open Signature_lib
 
 (* Fee increase required to replace a transaction. *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 1
+let replace_fee : Currency.Fee.t = Currency.Fee.of_nanomina_int_exn 1
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
@@ -125,7 +125,7 @@ let currency_consumed_unchecked :
             amount
         | Stake_delegation _ ->
             zero )
-    | Parties _ ->
+    | Zkapp_command _ ->
         (*TODO: document- txns succeeds with source amount insufficient in the case of zkapps*)
         zero
   in
@@ -512,13 +512,38 @@ module Update = struct
           Transaction_hash.User_command_with_valid_signature.hash cmd
         in
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
-        | Parties p ->
-            let p = Parties.Valid.forget p in
-            Mina_metrics.Gauge.set
-              Mina_metrics.Transaction_pool.parties_transaction_size
-              (Parties.Stable.Latest.bin_size_t p |> Float.of_int) ;
-            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.parties_count
-              (List.length (Parties.to_simple p).other_parties |> Float.of_int)
+        | Zkapp_command p ->
+            let p = Zkapp_command.Valid.forget p in
+            let updates, proof_updates =
+              let init =
+                match
+                  (Account_update.of_fee_payer p.fee_payer).authorization
+                with
+                | Proof _ ->
+                    (1, 1)
+                | _ ->
+                    (1, 0)
+              in
+              Zkapp_command.Call_forest.fold p.account_updates ~init
+                ~f:(fun (count, proof_updates_count) account_update ->
+                  ( count + 1
+                  , if
+                      Control.(
+                        Tag.equal Proof
+                          (tag (Account_update.authorization account_update)))
+                    then proof_updates_count + 1
+                    else proof_updates_count ) )
+            in
+            Mina_metrics.Counter.inc_one
+              Mina_metrics.Transaction_pool.zkapp_transactions_added_to_pool ;
+            Mina_metrics.Counter.inc
+              Mina_metrics.Transaction_pool.zkapp_transaction_size
+              (Zkapp_command.Stable.Latest.bin_size_t p |> Float.of_int) ;
+            Mina_metrics.Counter.inc Mina_metrics.Transaction_pool.zkapp_updates
+              (Float.of_int updates) ;
+            Mina_metrics.Counter.inc
+              Mina_metrics.Transaction_pool.zkapp_proof_updates
+              (Float.of_int proof_updates)
         | Signed_command _ ->
             () ) ;
         { acc with
@@ -784,7 +809,7 @@ let revalidate :
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
             ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
             ; ( "account_balance"
-              , `String (Currency.Amount.to_formatted_string current_balance) )
+              , `String (Currency.Amount.to_mina_string current_balance) )
             ] ;
         let first_cmd = F_sequence.head_exn queue in
         let first_nonce =
@@ -881,14 +906,16 @@ let expired_by_predicate (t : t) :
   |> Sequence.filter_map ~f:(fun (cmd_hash, cmd) ->
          Transaction_hash.User_command_with_valid_signature.data cmd
          |> function
-         | User_command.Parties (ps : Parties.Valid.t) ->
-             Some (cmd_hash, ps.parties)
+         | User_command.Zkapp_command (ps : Zkapp_command.Valid.t) ->
+             Some (cmd_hash, ps.zkapp_command)
          | User_command.Signed_command _ ->
              None )
   |> Sequence.filter ~f:(fun (_, ps) ->
-         ps.other_parties
-         |> Parties.Call_forest.exists ~f:(fun party ->
-                let predicate = Party.protocol_state_precondition party in
+         ps.account_updates
+         |> Zkapp_command.Call_forest.exists ~f:(fun account_update ->
+                let predicate =
+                  Account_update.protocol_state_precondition account_update
+                in
                 match predicate.timestamp with
                 | Check { upper; _ } ->
                     Block_time.(upper < of_time_ns expiry_time)
@@ -978,10 +1005,12 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     match user_command with
     | User_command.Signed_command _ ->
         true
-    | User_command.Parties ps ->
-        ps.other_parties
-        |> Parties.Call_forest.exists ~f:(fun party ->
-               let predicate = Party.protocol_state_precondition party in
+    | User_command.Zkapp_command ps ->
+        ps.account_updates
+        |> Zkapp_command.Call_forest.exists ~f:(fun account_update ->
+               let predicate =
+                 Account_update.protocol_state_precondition account_update
+               in
                match predicate.timestamp with
                | Check { lower; upper } ->
                    (*Timestamp bounds are compared against slot start time of
@@ -1383,11 +1412,11 @@ let%test_module _ =
           let pool = empty in
           let add_res =
             add_from_gossip_exn pool cmd Account_nonce.zero
-              (Currency.Amount.of_int 500)
+              (Currency.Amount.of_nanomina_int_exn 500)
           in
           if
             Option.value_exn (currency_consumed ~constraint_constants cmd)
-            |> Currency.Amount.to_int > 500
+            |> Currency.Amount.to_nanomina_int > 500
           then
             match add_res with
             | Error (Insufficient_funds _) ->
@@ -1413,7 +1442,7 @@ let%test_module _ =
 
     let%test_unit "age-based expiry" =
       Quickcheck.test ~trials:1
-        (Mina_generators.User_command_generators.parties_with_ledger ())
+        (Mina_generators.User_command_generators.zkapp_command_with_ledger ())
         ~f:(fun (cmd, _, _, _) ->
           let cmd =
             Transaction_hash.User_command_with_valid_signature.create cmd
@@ -1424,7 +1453,7 @@ let%test_module _ =
             }
           in
           add_from_gossip_exn pool cmd Account_nonce.zero
-            (Currency.Amount.of_int 3000_000_000_000_000)
+            (Currency.Amount.of_mina_int_exn 3_000_000)
           |> function
           | Ok (_, pool', dropped) ->
               assert (Sequence.is_empty dropped) ;
@@ -1577,7 +1606,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
+        let init_balance = Currency.Amount.of_mina_int_exn 100_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -1595,7 +1624,8 @@ let%test_module _ =
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
-              Currency.Amount.(gen_incl zero (min (of_int 10) cmd_currency))
+              Currency.Amount.(
+                gen_incl zero (min (of_nanomina_int_exn 10) cmd_currency))
             in
             let amount =
               Option.value_exn Currency.Amount.(cmd_currency - fee)
@@ -1631,15 +1661,14 @@ let%test_module _ =
           Mina_generators.User_command_generators.payment ~sign_type:`Fake
             ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
-            ~max_amount:(Currency.Amount.to_int init_balance)
+            ~max_amount:(Currency.Amount.to_nanomina_int init_balance)
             ~fee_range:0 ()
         in
         let replace_cmd =
           modify_payment replace_cmd_skeleton ~sender ~body:Fn.id
             ~common:(fun c ->
               { c with
-                fee =
-                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+                fee = Currency.Fee.of_mina_int_exn (10 + (5 * (size + 1)))
               } )
         in
         (init_nonce, init_balance, setup_cmds, replace_cmd)
@@ -1748,7 +1777,7 @@ let%test_module _ =
       in
       let insert_cmd pool cmd =
         add_from_gossip_exn pool cmd Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
+          (Currency.Amount.of_mina_int_exn 5)
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
@@ -1789,7 +1818,7 @@ let%test_module _ =
       let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
       let insert_cmd pool cmd =
         add_from_gossip_exn pool cmd Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
+          (Currency.Amount.of_mina_int_exn 5)
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
       in
@@ -1841,7 +1870,9 @@ let%test_module _ =
           let account_id =
             Account_id.create (Public_key.compress public_key) Token_id.default
           in
-          let balance = Balance.of_int @@ Amount.to_int amount in
+          let balance =
+            Balance.of_nanomina_int_exn @@ Amount.to_nanomina_int amount
+          in
           let _tag, account, location =
             Or_error.ok_exn (get_or_create ledger account_id)
           in
@@ -1861,17 +1892,18 @@ let%test_module _ =
               : Mina_transaction_logic.Transaction_applied
                 .Signed_command_applied
                 .t )
-      | User_command.Parties p -> (
+      | User_command.Zkapp_command p -> (
           let applied, _ =
-            Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
-              ~state_view:dummy_state_view ledger p
+            Mina_ledger.Ledger.apply_zkapp_command_unchecked
+              ~constraint_constants ~state_view:dummy_state_view ledger p
             |> Or_error.ok_exn
           in
           match With_status.status applied.command with
           | Transaction_status.Applied ->
               ()
           | Transaction_status.Failed failure ->
-              failwithf "failed to apply parties transaction to ledger: [%s]"
+              failwithf
+                "failed to apply zkapp_command transaction to ledger: [%s]"
                 ( String.concat ~sep:", "
                 @@ List.bind
                      ~f:(List.map ~f:Transaction_status.Failure.to_string)
@@ -1882,7 +1914,7 @@ let%test_module _ =
       apply_to_ledger ledger cmd ;
       let accounts_to_check =
         Transaction_hash.User_command_with_valid_signature.command cmd
-        |> User_command.accounts_accessed |> Account_id.Set.of_list
+        |> User_command.accounts_referenced |> Account_id.Set.of_list
       in
       let pool, dropped =
         revalidate pool ~logger (`Subset accounts_to_check) (fun sender ->
@@ -1910,24 +1942,25 @@ let%test_module _ =
       assert_invariants pool ;
       pool
 
-    let make_parties_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
+    let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
         ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
       let open Currency in
       let nonce = Account.Nonce.of_int nonce_int in
       let sender_pk = Public_key.compress sender.public_key in
       let receiver_pk = Public_key.compress receiver.public_key in
-      let parties_wire : Parties.Stable.Latest.Wire.t =
+      let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
         { fee_payer =
-            { Party.Fee_payer.body =
+            { Account_update.Fee_payer.body =
                 { public_key = sender_pk; fee; nonce; valid_until = None }
                 (* Real signature added in below *)
             ; authorization = Signature Signature.dummy
             }
-        ; other_parties =
-            Parties.Call_forest.of_parties_list ~party_depth:(Fn.const 0)
-              [ { Party.Wire.body =
+        ; account_updates =
+            Zkapp_command.Call_forest.of_account_updates
+              ~account_update_depth:(Fn.const 0)
+              [ { Account_update.Wire.body =
                     { public_key = sender_pk
-                    ; update = Party.Update.noop
+                    ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
                         Amount.Signed.(negate @@ of_unsigned amount)
@@ -1936,20 +1969,21 @@ let%test_module _ =
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
-                        { Party.Preconditions.network =
+                        { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account =
-                            Party.Account_precondition.Nonce
+                            Account_update.Account_precondition.Nonce
                               (Account.Nonce.succ nonce)
                         }
                     ; caller = Call
                     ; use_full_commitment = not double_increment_sender
+                    ; authorization_kind = None_given
                     }
                 ; authorization = None_given
                 }
-              ; { Party.Wire.body =
+              ; { Account_update.Wire.body =
                     { public_key = receiver_pk
-                    ; update = Party.Update.noop
+                    ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change = Amount.Signed.of_unsigned amount
                     ; increment_nonce = increment_receiver
@@ -1957,12 +1991,13 @@ let%test_module _ =
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
-                        { Party.Preconditions.network =
+                        { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Party.Account_precondition.Accept
+                        ; account = Account_update.Account_precondition.Accept
                         }
                     ; caller = Call
                     ; use_full_commitment = not increment_receiver
+                    ; authorization_kind = None_given
                     }
                 ; authorization = None_given
                 }
@@ -1970,18 +2005,18 @@ let%test_module _ =
         ; memo = Signed_command_memo.empty
         }
       in
-      let parties = Parties.of_wire parties_wire in
+      let zkapp_command = Zkapp_command.of_wire zkapp_command_wire in
       (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
       let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
-        User_command.to_valid_unsafe (User_command.Parties parties)
+        User_command.to_valid_unsafe (User_command.Zkapp_command zkapp_command)
       in
       Transaction_hash.User_command_with_valid_signature.create cmd
 
-    let%test_unit "support for parties commands" =
+    let%test_unit "support for zkapp_command commands" =
       let open Currency in
       (* let open Mina_transaction_logic.For_tests in *)
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
@@ -1991,8 +2026,8 @@ let%test_module _ =
       in
       let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
       let make_cmd =
-        make_parties_payment ~sender:kp1 ~receiver:kp2 ~increment_receiver:false
-          ~amount ~fee
+        make_zkapp_command_payment ~sender:kp1 ~receiver:kp2
+          ~increment_receiver:false ~amount ~fee
       in
       Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
           init_permissionless_ledger ledger
@@ -2012,11 +2047,11 @@ let%test_module _ =
           let _pool = commit pool cmd3' [ cmd3; cmd4 ] in
           () )
 
-    let%test_unit "nonce increment side effects from other parties are handled \
-                   properly" =
+    let%test_unit "nonce increment side effects from other zkapp_command are \
+                   handled properly" =
       let open Currency in
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
@@ -2025,7 +2060,7 @@ let%test_module _ =
         Quickcheck.random_value ~seed:(`Deterministic "orange") Keypair.gen
       in
       let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
-      let make_cmd = make_parties_payment ~amount ~fee in
+      let make_cmd = make_zkapp_command_payment ~amount ~fee in
       Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
           init_permissionless_ledger ledger
             [ (kp1.public_key, balance); (kp2.public_key, balance) ] ;
@@ -2055,7 +2090,7 @@ let%test_module _ =
                    not trigger a crash" =
       let open Currency in
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Amount.of_int @@ Fee.to_int fee in
+      let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
@@ -2065,7 +2100,7 @@ let%test_module _ =
       in
       let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
       let make_cmd =
-        make_parties_payment ~sender:kp1 ~receiver:kp2
+        make_zkapp_command_payment ~sender:kp1 ~receiver:kp2
           ~double_increment_sender:false ~increment_receiver:false ~amount ~fee
       in
       Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->

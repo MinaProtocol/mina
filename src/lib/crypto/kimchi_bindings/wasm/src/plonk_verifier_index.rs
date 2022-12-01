@@ -5,6 +5,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
+    constraints::FeatureFlags,
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
@@ -385,7 +386,16 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
+                let feature_flags =
+                    FeatureFlags {
+                        chacha: false,
+                        range_check: false,
+                        foreign_field_add: false,
+                        xor: false,
+                        lookup_configuration: None,
+                    };
+
+                let (linearization, powers_of_alpha) = expr_linearization(&feature_flags, true);
 
                 let index =
                     DlogVerifierIndex {
@@ -405,6 +415,10 @@ macro_rules! impl_verification_key {
                         // TODO
                         chacha_comm: None,
                         range_check_comm: None,
+                        foreign_field_add_comm: None,
+                        xor_comm: None,
+
+                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();
@@ -627,7 +641,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use crate::srs::fp::WasmFpSrs;
-    use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine};
 
     impl_verification_key!(
         caml_pasta_fp_plonk_verifier_index,
@@ -638,8 +652,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -651,7 +665,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use crate::srs::fq::WasmFqSrs;
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
+    use mina_curves::pasta::{Fq, Pallas as GAffine, Vesta as GAffineOther};
 
     impl_verification_key!(
         caml_pasta_fq_plonk_verifier_index,
@@ -662,8 +676,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );

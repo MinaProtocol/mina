@@ -49,7 +49,7 @@ module Config = struct
     ; pubsub_v1 : pubsub_topic_mode_t
     ; pubsub_v0 : pubsub_topic_mode_t
     ; validation_queue_size : int
-    ; mutable keypair : Mina_net2.Keypair.t option
+    ; mutable keypair : Mina_net2.Keypair.t
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
@@ -60,7 +60,8 @@ module type S = sig
   include Intf.Gossip_net_intf
 
   val create :
-       Config.t
+       ?allow_multiple_instances:bool
+    -> Config.t
     -> pids:Child_processes.Termination.t
     -> Rpc_intf.rpc_handler list
     -> Message.sinks
@@ -198,8 +199,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
-    let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
+    let create_libp2p ?(allow_multiple_instances = false) (config : Config.t)
+        rpc_handlers first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+        ~on_unexpected_termination
         ~sinks:
           (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
       let module Sinks = (val sinksM) in
@@ -234,22 +236,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
           (fun () ->
             O1trace.thread "mina_net2" (fun () ->
-                Mina_net2.create
+                Mina_net2.create ~allow_multiple_instances
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids ) )
+                  ~pids () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-          let%bind me =
-            match config.keypair with
-            | Some kp ->
-                return kp
-            | None ->
-                Mina_net2.generate_random_keypair net2
-          in
+          let me = config.keypair in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
             [ ("peer_id", `String my_peer_id)
@@ -532,7 +527,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           in
           match%map initializing_libp2p_result with
           | Ok pfs ->
-              (net2, pfs, me)
+              (net2, pfs)
           | Error e ->
               fail e )
       | Ok (Error e) ->
@@ -544,7 +539,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
 
-    let create (config : Config.t) ~pids rpc_handlers (sinks : Message.sinks) =
+    let create ?(allow_multiple_instances = false) (config : Config.t) ~pids
+        rpc_handlers (sinks : Message.sinks) =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let net2_ref = ref (Deferred.never ()) in
@@ -558,7 +554,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
-            Deferred.map res ~f:(fun (n, _, _) ->
+            Deferred.map res ~f:(fun (n, _) ->
                 ( match
                     Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE"
                   with
@@ -584,7 +580,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     () ) ;
                 n ) ;
           let pf_impl f msg =
-            let%bind _, pf, _ = res in
+            let%bind _, pf = res in
             f pf msg
           in
           pfs_ref :=
@@ -594,15 +590,13 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             ; publish_v1_snark_work =
                 pf_impl (fun pf -> pf.publish_v1_snark_work)
             } ;
-          upon res (fun (_, _, me) ->
-              (* This is a hack so that we keep the same keypair across restarts. *)
-              config.keypair <- Some me ;
-              let logger = config.logger in
-              [%log trace] ~metadata:[] "Successfully restarted libp2p" )
+          upon res (fun _ ->
+              [%log' trace config.logger] ~metadata:[]
+                "Successfully restarted libp2p" )
         and start_libp2p () =
           let libp2p =
-            create_libp2p config rpc_handlers first_peer_ivar
-              high_connectivity_ivar ~added_seeds ~pids
+            create_libp2p ~allow_multiple_instances config rpc_handlers
+              first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p

@@ -1,9 +1,9 @@
-import { SelfProof, Field, ZkProgram, isReady, shutdown } from "snarkyjs";
+import { SelfProof, Field, Experimental, isReady, shutdown } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
 await isReady;
 
-let MyProgram = ZkProgram({
+let MyProgram = Experimental.ZkProgram({
   publicInput: Field,
 
   methods: {

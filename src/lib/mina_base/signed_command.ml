@@ -22,6 +22,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type ('payload, 'pk, 'signature) t =
               ( 'payload
               , 'pk
@@ -35,6 +37,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@with_top_version_tag]
+
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_signed_command_vn for that version
+    *)
+
     module V2 = struct
       type t =
         ( Payload.Stable.V2.t
@@ -44,10 +57,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       [@@deriving compare, sexp, hash, yojson]
 
       let to_latest = Fn.id
-
-      let description = "User command"
-
-      let version_byte = Base58_check.Version_bytes.user_command
 
       module T = struct
         (* can't use nonrec + deriving *)
@@ -59,10 +68,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Comparable.Make (T)
       include Hashable.Make (T)
 
-      let accounts_accessed ({ payload; _ } : t) =
-        Payload.accounts_accessed payload
+      let accounts_accessed ({ payload; _ } : t) status =
+        Payload.accounts_accessed payload status
+
+      let accounts_referenced (t : t) = accounts_accessed t Applied
+    end
+
+    module V1 = struct
+      [@@@with_all_version_tags]
+
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, sexp, hash, yojson]
+
+      (* don't need to coerce old commands to new ones *)
+      let to_latest _ = failwith "Not implemented"
     end
   end]
+
+  (* type of signed commands, pre-Berkeley hard fork *)
+  type t_v1 = Stable.V1.t
 
   type _unused = unit
     constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -142,12 +170,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
         ?(nonce = Account_nonce.zero) ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee = Fee.to_int Mina_compile_config.minimum_user_command_fee in
+      let min_fee =
+        Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
+      in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
         key_gen
-      and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
+      and fee =
+        Int.gen_incl min_fee max_fee >>| Currency.Fee.of_nanomina_int_exn
       and memo = String.quickcheck_generator in
       let%map body = create_body signer receiver in
       let payload : Payload.t =
@@ -170,7 +201,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
-          Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+          Int.gen_incl min_amount max_amount
+          >>| Currency.Amount.of_nanomina_int_exn
         in
         Signed_command_payload.Body.Payment
           { receiver_pk = Public_key.compress receiver
@@ -255,7 +287,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  let amount_to_spend =
                    if spend_all then balance
                    else
-                     Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+                     Currency.Amount.of_nanomina_int_exn
+                       (Currency.Amount.to_nanomina_int balance / 2)
                  in
                  Quickcheck_lib.gen_division_currency amount_to_spend
                    command_splits'.(i) )
@@ -271,7 +304,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Quickcheck.Generator.filter ~f:(fun (_, splits) ->
               Array.for_all splits ~f:(fun split ->
                   List.for_all split ~f:(fun amt ->
-                      Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
+                      Currency.Amount.(amt >= of_mina_int_exn 2) ) ) )
         in
         let account_nonces =
           Array.map ~f:(fun (_, _, nonce, _) -> nonce) account_info
@@ -349,10 +382,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let to_valid_unsafe t =
     `If_this_is_used_it_should_have_a_comment_justifying_it t
 
-  module Base58_check = Codable.Make_base58_check (Stable.Latest)
+  (* so we can deserialize Base58Check transaction ids created before Berkeley hard fork *)
+  module V1_all_tagged = struct
+    include Stable.V1.With_all_version_tags
 
-  [%%define_locally
-  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+    let description = "Signed command"
+
+    let version_byte = Base58_check.Version_bytes.signed_command_v1
+  end
+
+  module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged)
+
+  let of_base58_check_exn_v1 = Base58_check_v1.of_base58_check
+
+  (* give transaction ids have version tag *)
+  include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
   let check_signature ?signature_kind ({ payload; signer; signature } : t) =
     Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
@@ -401,11 +445,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let filter_by_participant user_commands public_key =
     List.filter user_commands ~f:(fun user_command ->
         Core_kernel.List.exists
-          (accounts_accessed user_command)
+          (accounts_referenced user_command)
           ~f:
             (Fn.compose
                (Public_key.Compressed.equal public_key)
                Account_id.public_key ) )
+
+  let%test "latest signed command version" =
+    (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+       for latest version, then update this test
+    *)
+    Int.equal Stable.Latest.version 2
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

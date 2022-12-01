@@ -224,19 +224,19 @@ let fill_in_tokens_used pool block_state_hash =
       in
       query_db ~f:(fun db -> Processor.Token.find_by_id db default_id)
     in
-    let%map other_parties_tokenss =
-      Deferred.List.map zkapp_cmds ~f:(fun { zkapp_other_parties_ids; _ } ->
-          let%bind other_party_bodies =
-            Deferred.List.map (Array.to_list zkapp_other_parties_ids)
-              ~f:(fun other_party_id ->
+    let%map account_updates_tokenss =
+      Deferred.List.map zkapp_cmds ~f:(fun { zkapp_account_updates_ids; _ } ->
+          let%bind account_update_bodies =
+            Deferred.List.map (Array.to_list zkapp_account_updates_ids)
+              ~f:(fun account_update_id ->
                 let%bind { body_id; _ } =
                   query_db ~f:(fun db ->
-                      Processor.Zkapp_other_party.load db other_party_id )
+                      Processor.Zkapp_account_update.load db account_update_id )
                 in
                 query_db ~f:(fun db ->
-                    Processor.Zkapp_other_party_body.load db body_id ) )
+                    Processor.Zkapp_account_update_body.load db body_id ) )
           in
-          Deferred.List.map other_party_bodies
+          Deferred.List.map account_update_bodies
             ~f:(fun { account_identifier_id; _ } ->
               let%bind { token_id; _ } =
                 query_db ~f:(fun db ->
@@ -244,7 +244,7 @@ let fill_in_tokens_used pool block_state_hash =
               in
               query_db ~f:(fun db -> Processor.Token.find_by_id db token_id) ) )
     in
-    fee_payer_token :: List.concat other_parties_tokenss
+    fee_payer_token :: List.concat account_updates_tokenss
   in
   let%bind zkapp_cmd_tokens_used =
     Deferred.List.map zkapp_cmd_tokens ~f:get_token_owner
@@ -272,7 +272,7 @@ let fill_in_user_commands pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.User_command.Signed_command.load db ~id:user_command_id )
       in
-      let typ = user_cmd.typ in
+      let command_type = user_cmd.command_type in
       let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
       let%bind source = account_identifier_of_id user_cmd.source_id in
       let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
@@ -304,7 +304,7 @@ let fill_in_user_commands pool block_state_hash =
       in
       return
         { Extensional.User_command.sequence_no
-        ; typ
+        ; command_type
         ; fee_payer
         ; source
         ; receiver
@@ -335,7 +335,7 @@ let fill_in_internal_commands pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.Internal_command.load db ~id:internal_command_id )
       in
-      let typ = internal_cmd.typ in
+      let command_type = internal_cmd.command_type in
       let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
       let fee = Currency.Fee.of_string internal_cmd.fee in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
@@ -357,7 +357,7 @@ let fill_in_internal_commands pool block_state_hash =
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
-        ; typ
+        ; command_type
         ; receiver
         ; fee
         ; hash
@@ -386,10 +386,10 @@ let fill_in_zkapp_commands pool block_state_hash =
       let%bind fee_payer =
         Load_data.get_fee_payer_body ~pool zkapp_cmd.zkapp_fee_payer_body_id
       in
-      let%bind other_parties =
+      let%bind account_updates =
         Deferred.List.map
-          (Array.to_list zkapp_cmd.zkapp_other_parties_ids)
-          ~f:(Load_data.get_other_party_body ~pool)
+          (Array.to_list zkapp_cmd.zkapp_account_updates_ids)
+          ~f:(Load_data.get_account_update_body ~pool)
       in
       let memo = zkapp_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = zkapp_cmd.hash |> Transaction_hash.of_base58_check_exn in
@@ -407,7 +407,7 @@ let fill_in_zkapp_commands pool block_state_hash =
               Deferred.List.map (Array.to_list ids) ~f:(fun id ->
                   let%map { index; failures } =
                     query_db ~f:(fun db ->
-                        Processor.Zkapp_party_failures.load db id )
+                        Processor.Zkapp_account_update_failures.load db id )
                   in
                   ( index
                   , List.map (Array.to_list failures) ~f:(fun s ->
@@ -416,8 +416,9 @@ let fill_in_zkapp_commands pool block_state_hash =
                             failure
                         | Error err ->
                             failwithf
-                              "Invalid party transaction status, error: %s" err
-                              () ) ) )
+                              "Invalid account update transaction status, \
+                               error: %s"
+                              err () ) ) )
             in
             Some display )
       in
@@ -425,7 +426,7 @@ let fill_in_zkapp_commands pool block_state_hash =
       return
         { Extensional.Zkapp_command.sequence_no
         ; fee_payer
-        ; other_parties
+        ; account_updates
         ; memo
         ; hash
         ; status

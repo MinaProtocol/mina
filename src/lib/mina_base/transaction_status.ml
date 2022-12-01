@@ -6,7 +6,7 @@ module Failure = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -19,6 +19,8 @@ module Failure = struct
         | Overflow
         | Global_excess_overflow
         | Local_excess_overflow
+        | Local_supply_increase_overflow
+        | Global_supply_increase_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -32,7 +34,7 @@ module Failure = struct
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
         | Update_not_permitted_voting_for
-        | Parties_replay_check_failed
+        | Zkapp_command_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
         | Account_balance_precondition_unsatisfied
@@ -46,6 +48,7 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -77,7 +80,7 @@ module Failure = struct
 
     let to_display t : Display.t =
       let _, display =
-        List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
+        List.fold_left t ~init:(0, []) ~f:(fun (index, acc) bucket ->
             if List.is_empty bucket then (index + 1, acc)
             else (index + 1, (index, bucket) :: acc) )
       in
@@ -103,7 +106,8 @@ module Failure = struct
       ~cannot_pay_creation_fee_in_token:add ~source_insufficient_balance:add
       ~source_minimum_balance_violation:add ~receiver_already_exists:add
       ~token_owner_not_caller:add ~overflow:add ~global_excess_overflow:add
-      ~local_excess_overflow:add ~signed_command_on_zkapp_account:add
+      ~local_excess_overflow:add ~local_supply_increase_overflow:add
+      ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
       ~zkapp_account_not_present:add ~update_not_permitted_balance:add
       ~update_not_permitted_timing_existing_account:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
@@ -111,8 +115,9 @@ module Failure = struct
       ~update_not_permitted_sequence_state:add
       ~update_not_permitted_zkapp_uri:add ~update_not_permitted_token_symbol:add
       ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
-      ~update_not_permitted_voting_for:add ~parties_replay_check_failed:add
-      ~fee_payer_nonce_must_increase:add ~fee_payer_must_be_signed:add
+      ~update_not_permitted_voting_for:add
+      ~zkapp_command_replay_check_failed:add ~fee_payer_nonce_must_increase:add
+      ~fee_payer_must_be_signed:add
       ~account_balance_precondition_unsatisfied:add
       ~account_nonce_precondition_unsatisfied:add
       ~account_receipt_chain_hash_precondition_unsatisfied:add
@@ -123,7 +128,7 @@ module Failure = struct
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
-      ~invalid_fee_excess:add
+      ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -152,6 +157,10 @@ module Failure = struct
         "Global_excess_overflow"
     | Local_excess_overflow ->
         "Local_excess_overflow"
+    | Local_supply_increase_overflow ->
+        "Local_supply_increase_overflow"
+    | Global_supply_increase_overflow ->
+        "Global_supply_increase_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -178,8 +187,8 @@ module Failure = struct
         "Update_not_permitted_nonce"
     | Update_not_permitted_voting_for ->
         "Update_not_permitted_voting_for"
-    | Parties_replay_check_failed ->
-        "Parties_replay_check_failed"
+    | Zkapp_command_replay_check_failed ->
+        "Zkapp_command_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
     | Fee_payer_must_be_signed ->
@@ -206,6 +215,8 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Cancelled ->
+        "Cancelled"
 
   let of_string = function
     | "Predicate" ->
@@ -232,6 +243,10 @@ module Failure = struct
         Ok Global_excess_overflow
     | "Local_excess_overflow" ->
         Ok Local_excess_overflow
+    | "Local_supply_increase_overflow" ->
+        Ok Local_supply_increase_overflow
+    | "Global_supply_increase_overflow" ->
+        Ok Global_supply_increase_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -258,8 +273,8 @@ module Failure = struct
         Ok Update_not_permitted_nonce
     | "Update_not_permitted_voting_for" ->
         Ok Update_not_permitted_voting_for
-    | "Parties_replay_check_failed" ->
-        Ok Parties_replay_check_failed
+    | "Zkapp_command_replay_check_failed" ->
+        Ok Zkapp_command_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
     | "Fee_payer_must_be_signed" ->
@@ -284,6 +299,8 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
+    | "Cancelled" ->
+        Ok Cancelled
     | str -> (
         let res =
           List.find_map
@@ -341,18 +358,22 @@ module Failure = struct
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
     | Token_owner_not_caller ->
-        "A party used a non-default token but its caller was not the token \
-         owner"
+        "An account update used a non-default token but its caller was not the \
+         token owner"
     | Overflow ->
         "The resulting balance is too large to store"
     | Global_excess_overflow ->
         "The resulting global fee excess is too large to store"
     | Local_excess_overflow ->
         "The resulting local fee excess is too large to store"
+    | Local_supply_increase_overflow ->
+        "The resulting local supply increase is too large to store"
+    | Global_supply_increase_overflow ->
+        "The resulting global supply increase is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
-        "A snapp account does not exist"
+        "A zkApp account does not exist"
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
          to its balance"
@@ -385,42 +406,52 @@ module Failure = struct
     | Update_not_permitted_voting_for ->
         "The authentication for an account didn't allow the requested update \
          to its voted-for state hash"
-    | Parties_replay_check_failed ->
-        "Check to avoid replays failed. The party must increment nonce or use \
-         full commitment if the authorization is a signature"
+    | Zkapp_command_replay_check_failed ->
+        "Check to avoid replays failed. The account update must increment \
+         nonce or use full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
-        "Fee payer party must increment its nonce"
+        "Fee payer account update must increment its nonce"
     | Fee_payer_must_be_signed ->
-        "Fee payer party must have a valid signature"
+        "Fee payer account update must have a valid signature"
     | Account_balance_precondition_unsatisfied ->
-        "The party's account balance precondition was unsatisfied"
+        "The account update's account balance precondition was unsatisfied"
     | Account_nonce_precondition_unsatisfied ->
-        "The party's account nonce precondition was unsatisfied"
+        "The account update's account nonce precondition was unsatisfied"
     | Account_receipt_chain_hash_precondition_unsatisfied ->
-        "The party's account receipt-chain hash precondition was unsatisfied"
+        "The account update's account receipt-chain hash precondition was \
+         unsatisfied"
     | Account_delegate_precondition_unsatisfied ->
-        "The party's account delegate precondition was unsatisfied"
+        "The account update's account delegate precondition was unsatisfied"
     | Account_sequence_state_precondition_unsatisfied ->
-        "The party's account sequence state precondition was unsatisfied"
+        "The account update's account sequence state precondition was \
+         unsatisfied"
     | Account_app_state_precondition_unsatisfied i ->
         sprintf
-          "The party's account app state (%i) precondition was unsatisfied" i
+          "The account update's account app state (%i) precondition was \
+           unsatisfied"
+          i
     | Account_proved_state_precondition_unsatisfied ->
-        "The party's account proved state precondition was unsatisfied"
+        "The account update's account proved state precondition was unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
-        "The party's account is-new state precondition was unsatisfied"
+        "The account update's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
-        "The party's protocol state precondition unsatisfied"
+        "The account update's protocol state precondition unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
-        "Fee excess from parties transaction more than the transaction fees"
+        "Fee excess from zkapp_command transaction more than the transaction \
+         fees"
+    | Cancelled ->
+        "The account update is cancelled because there's a failure in the \
+         zkApp transaction"
 end
 
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = Applied | Failed of Failure.Collection.Stable.V1.t
+    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+      | Applied
+      | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

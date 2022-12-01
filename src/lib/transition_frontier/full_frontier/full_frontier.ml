@@ -475,7 +475,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
       (* STEP 5 *)
-      Non_empty_list.iter
+      Mina_stdlib.Nonempty_list.iter
         (Option.value_exn
            (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
@@ -789,7 +789,7 @@ let update_metrics_with_diff (type mutant)
                (List.fold ~init:0
                   ~f:(fun c cmd ->
                     match cmd.data with
-                    | Mina_base.User_command.Poly.Parties _ ->
+                    | Mina_base.User_command.Poly.Zkapp_command _ ->
                         c + 1
                     | _ ->
                         c )

@@ -283,11 +283,9 @@ module type S = sig
         end
       end]
 
-      val to_base58_check : t -> string
+      include Codable.Base58_check_intf with type t := t
 
-      val of_base58_check : string -> t Or_error.t
-
-      val of_base58_check_exn : string -> t
+      include Codable.Base64_intf with type t := t
 
       val dummy : t
 
@@ -371,6 +369,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?return_early_digest_exception:bool
+    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> public_input:
          ( 'var
          , 'value
@@ -423,6 +422,7 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
+    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> public_input:
          ( 'var
          , 'value

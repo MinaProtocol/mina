@@ -554,7 +554,7 @@ struct
             ~f:(fun set cmd ->
               let set' =
                 With_status.data cmd |> User_command.forget_check
-                |> User_command.accounts_accessed |> Account_id.Set.of_list
+                |> User_command.accounts_referenced |> Account_id.Set.of_list
               in
               Set.union set set' )
         in
@@ -1059,14 +1059,19 @@ struct
                 "We don't have a transition frontier at the moment, so we're \
                  unable to verify any transactions."
         in
-        let diff' =
+        let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              Envelope.Incoming.map diff
-                ~f:
-                  (List.map
-                     ~f:
-                       (User_command.to_verifiable ~ledger ~get:Base_ledger.get
-                          ~location_of_account:Base_ledger.location_of_account ) ) )
+              Or_error.try_with (fun () ->
+                  Envelope.Incoming.map diff
+                    ~f:
+                      (List.map ~f:(fun cmd ->
+                           User_command.to_verifiable ~ledger
+                             ~get:Base_ledger.get
+                             ~location_of_account:
+                               Base_ledger.location_of_account cmd
+                           |> Or_error.ok_exn ) ) ) )
+          |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
+          |> Deferred.return
         in
         match%bind.Deferred
           O1trace.thread "batching_transaction_verification" (fun () ->
@@ -1175,10 +1180,11 @@ struct
                   with
                   | Signed_command _ ->
                       Control.Tag.Signature
-                  | Parties
+                  | Zkapp_command
                       { fee_payer = { authorization = Signature _; _ }; _ } ->
                       Control.Tag.Signature
-                  | Parties { fee_payer = { authorization = Proof _; _ }; _ } ->
+                  | Zkapp_command
+                      { fee_payer = { authorization = Proof _; _ }; _ } ->
                       Control.Tag.Proof
                 in
                 if not (Account.has_permission ~using:auth ~to_:`Send account)
@@ -1468,7 +1474,7 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let minimum_fee =
-      Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1536,7 +1542,7 @@ let%test_module _ =
             { new_commands = []; removed_commands = []; reorg_best_tip = false }
         in
         let initial_balance =
-          Currency.Balance.of_formatted_string "900000000.0"
+          Currency.Balance.of_mina_string_exn "900000000.0"
         in
         let ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 () in
         Array.iteri test_keys ~f:(fun i kp ->
@@ -1611,30 +1617,32 @@ let%test_module _ =
           report_additional additional2 "expected" "actual" ) ;
       [%test_eq: Transaction_hash.Set.t] set1 set2
 
-    let replace_valid_parties_authorizations ~keymap ~ledger valid_cmds :
+    let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
       Deferred.List.map
         (valid_cmds : User_command.Valid.t list)
         ~f:(function
-          | Parties parties_dummy_auths ->
-              let%map parties =
-                Parties_builder.replace_authorizations ~keymap ~prover
-                  (Parties.Valid.forget parties_dummy_auths)
+          | Zkapp_command zkapp_command_dummy_auths ->
+              let%map zkapp_command =
+                Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
               in
-              let valid_parties =
+              let valid_zkapp_command =
                 let open Mina_ledger.Ledger in
                 match
-                  Parties.Valid.to_valid ~ledger ~get ~location_of_account
-                    parties
+                  Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account
+                    zkapp_command
                 with
-                | Some ps ->
+                | Ok ps ->
                     ps
-                | None ->
-                    failwith "Could not create Parties.Valid.t"
+                | Error err ->
+                    Error.raise
+                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
+                         err
               in
-              User_command.Parties valid_parties
+              User_command.Zkapp_command valid_zkapp_command
           | Signed_command _ ->
-              failwith "Expected Parties valid user command" )
+              failwith "Expected Zkapp_command valid user command" )
 
     (** Assert the invariants of the locally generated command tracking system. *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
@@ -1741,7 +1749,8 @@ let%test_module _ =
         () =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
-        (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
+        (Signed_command_payload.create
+           ~fee:(Currency.Fee.of_nanomina_int_exn fee)
            ~fee_payer_pk:(get_pk sender_idx) ~valid_until
            ~nonce:(Account.Nonce.of_int nonce)
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
@@ -1749,15 +1758,15 @@ let%test_module _ =
              (Signed_command_payload.Body.Payment
                 { source_pk = get_pk sender_idx
                 ; receiver_pk = get_pk receiver_idx
-                ; amount = Currency.Amount.of_int amount
+                ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_transfer_parties ?valid_period ?fee_payer_idx ~sender_idx
+    let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
-      let amount = Currency.Amount.of_int amount in
+      let amount = Currency.Amount.of_nanomina_int_exn amount in
       let receiver_kp = test_keys.(receiver_idx) in
       let receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
@@ -1771,7 +1780,7 @@ let%test_module _ =
             let fee_payer_nonce = Account.Nonce.of_int nonce in
             Some (fee_payer_kp, fee_payer_nonce)
       in
-      let fee = Currency.Fee.of_int fee in
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
       let protocol_state_precondition =
         match valid_period with
         | None ->
@@ -1779,7 +1788,7 @@ let%test_module _ =
         | Some time ->
             Zkapp_precondition.Protocol_state.valid_until time
       in
-      let test_spec : Transaction_snark.For_tests.Spec.t =
+      let test_spec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
         { sender
         ; fee_payer
         ; fee
@@ -1788,32 +1797,34 @@ let%test_module _ =
         ; zkapp_account_keypairs = []
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
         ; new_zkapp_account = false
-        ; snapp_update = Party.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
+        ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
         ; preconditions =
             Some
-              { Party.Preconditions.network = protocol_state_precondition
+              { Account_update.Preconditions.network =
+                  protocol_state_precondition
               ; account =
-                  Party.Account_precondition.Nonce
+                  Account_update.Account_precondition.Nonce
                     ( if Option.is_none fee_payer then
                       Account.Nonce.succ sender_nonce
                     else sender_nonce )
               }
         }
       in
-      let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
-      let parties =
-        Option.value_exn
-          (Parties.Valid.to_valid ~ledger:()
-             ~get:(fun _ _ -> failwith "Not expecting proof parties")
-             ~location_of_account:(fun _ _ ->
-               failwith "Not expecting proof parties" )
-             parties )
+      let zkapp_command =
+        Transaction_snark.For_tests.multiple_transfers test_spec
       in
-      User_command.Parties parties
+      let zkapp_command =
+        Or_error.ok_exn
+          (Zkapp_command.Valid.to_valid ~ledger:()
+             ~get:(fun _ _ -> failwith "Not expecting proof zkapp_command")
+             ~location_of_account:(fun _ _ ->
+               failwith "Not expecting proof zkapp_command" )
+             zkapp_command )
+      in
+      User_command.Zkapp_command zkapp_command
 
     let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
         =
@@ -1821,7 +1832,7 @@ let%test_module _ =
         (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
            () )
 
-    let mk_parties_cmds (pool : Test.Resource_pool.t) :
+    let mk_zkapp_command_cmds (pool : Test.Resource_pool.t) :
         User_command.Valid.t list Deferred.t =
       let num_cmds = 7 in
       assert (num_cmds < Array.length test_keys - 1) ;
@@ -1856,15 +1867,16 @@ let%test_module _ =
         if n < num_cmds then
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
-            let%map (parties : Parties.t) =
-              Mina_generators.Parties_generators.gen_parties_from ~keymap
-                ~account_state_tbl ~fee_payer_keypair ~ledger:best_tip_ledger ()
+            let%map (zkapp_command : Zkapp_command.t) =
+              Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
+                ~max_token_updates:1 ~keymap ~account_state_tbl
+                ~fee_payer_keypair ~ledger:best_tip_ledger ()
             in
-            let parties =
-              { parties with
-                other_parties =
-                  Parties.Call_forest.map parties.other_parties
-                    ~f:(fun (p : Party.t) ->
+            let zkapp_command =
+              { zkapp_command with
+                account_updates =
+                  Zkapp_command.Call_forest.map zkapp_command.account_updates
+                    ~f:(fun (p : Account_update.t) ->
                       { p with
                         body =
                           { p.body with
@@ -1872,16 +1884,18 @@ let%test_module _ =
                               { p.body.preconditions with
                                 account =
                                   ( match p.body.preconditions.account with
-                                  | Party.Account_precondition.Full
+                                  | Account_update.Account_precondition.Full
                                       { nonce =
                                           Zkapp_basic.Or_ignore.Check n as c
                                       ; _
                                       }
                                     when Zkapp_precondition.Numeric.(
                                            is_constant Tc.nonce c) ->
-                                      Party.Account_precondition.Nonce n.lower
-                                  | Party.Account_precondition.Full _ ->
-                                      Party.Account_precondition.Accept
+                                      Account_update.Account_precondition.Nonce
+                                        n.lower
+                                  | Account_update.Account_precondition.Full _
+                                    ->
+                                      Account_update.Account_precondition.Accept
                                   | pre ->
                                       pre )
                               }
@@ -1889,22 +1903,22 @@ let%test_module _ =
                       } )
               }
             in
-            let parties =
-              Option.value_exn
-                (Parties.Valid.to_valid ~ledger:best_tip_ledger
+            let zkapp_command =
+              Or_error.ok_exn
+                (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
                    ~get:Mina_ledger.Ledger.get
                    ~location_of_account:Mina_ledger.Ledger.location_of_account
-                   parties )
+                   zkapp_command )
             in
-            User_command.Parties parties
+            User_command.Zkapp_command zkapp_command
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
       in
       let result =
-        Quickcheck.random_value ~seed:(`Deterministic "parties") (go 0 [])
+        Quickcheck.random_value ~seed:(`Deterministic "zkapp_command") (go 0 [])
       in
-      replace_valid_parties_authorizations ~keymap ~ledger:best_tip_ledger
+      replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
         result
 
     type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
@@ -1999,16 +2013,16 @@ let%test_module _ =
                   failwith "failed to apply user command to ledger"
               | _ ->
                   () )
-          | User_command.Parties p -> (
+          | User_command.Zkapp_command p -> (
               let applied, _ =
                 Or_error.ok_exn
-                @@ Mina_ledger.Ledger.apply_parties_unchecked
+                @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
                      ~constraint_constants ~state_view:dummy_state_view ledger p
               in
               match With_status.status applied.command with
               | Failed failures ->
                   failwithf
-                    "failed to apply parties transaction to ledger: [%s]"
+                    "failed to apply zkapp_command transaction to ledger: [%s]"
                     ( String.concat ~sep:", "
                     @@ List.bind
                          ~f:(List.map ~f:Transaction_status.Failure.to_string)
@@ -2042,7 +2056,7 @@ let%test_module _ =
       let account = Option.value_exn @@ Mina_ledger.Ledger.get ledger loc in
       Mina_ledger.Ledger.set ledger loc
         { account with
-          balance = Currency.Balance.of_int balance
+          balance = Currency.Balance.of_nanomina_int_exn balance
         ; nonce = Account.Nonce.of_int nonce
         }
 
@@ -2065,7 +2079,7 @@ let%test_module _ =
     let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool >>= mk_linear_case_test test )
+          mk_zkapp_command_cmds test.txn_pool >>= mk_linear_case_test test )
 
     let mk_remove_and_add_test t cmds =
       assert_pool_txs t [] ;
@@ -2086,7 +2100,7 @@ let%test_module _ =
                    (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool >>= mk_remove_and_add_test test )
+          mk_zkapp_command_cmds test.txn_pool >>= mk_remove_and_add_test test )
 
     let mk_invalid_test t cmds =
       assert_pool_txs t [] ;
@@ -2105,7 +2119,7 @@ let%test_module _ =
     let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool >>= mk_invalid_test test )
+          mk_zkapp_command_cmds test.txn_pool >>= mk_invalid_test test )
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -2139,10 +2153,11 @@ let%test_module _ =
                    changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool
+          mk_zkapp_command_cmds test.txn_pool
           >>= mk_now_invalid_test test
                 ~mk_command:
-                  (mk_transfer_parties ?valid_period:None ?fee_payer_idx:None) )
+                  (mk_transfer_zkapp_command ?valid_period:None
+                     ?fee_payer_idx:None ) )
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
@@ -2195,7 +2210,7 @@ let%test_module _ =
     let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool
+          mk_zkapp_command_cmds test.txn_pool
           >>= mk_expired_not_accepted_test test ~padding:55 )
 
     let%test_unit "Expired transactions that are already in the pool are \
@@ -2311,13 +2326,13 @@ let%test_module _ =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_transfer_parties
+            mk_transfer_zkapp_command
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
-            mk_transfer_parties
+            mk_transfer_zkapp_command
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:2 ()
@@ -2335,13 +2350,13 @@ let%test_module _ =
           assert_pool_txs t (expires_later2 :: List.drop few_now 2) ;
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_zkapp =
-            mk_transfer_parties
+            mk_transfer_zkapp_command
               ~valid_period:{ lower = curr_time; upper = curr_time }
               ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:3
               ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_zkapp =
-            mk_transfer_parties
+            mk_transfer_zkapp_command
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:4
               ~receiver_idx:9 ~amount:1_000_000_000 ()
@@ -2383,12 +2398,12 @@ let%test_module _ =
           let expiry = Time_ns.Span.of_sec 1. in
           let%bind t = setup_test ~expiry () in
           assert_pool_txs t [] ;
-          let party_transfer =
-            mk_transfer_parties ~fee_payer_idx:(0, 0) ~sender_idx:1
+          let account_update_transfer =
+            mk_transfer_zkapp_command ~fee_payer_idx:(0, 0) ~sender_idx:1
               ~receiver_idx:9 ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:0
               ()
           in
-          let valid_commands = [ party_transfer ] in
+          let valid_commands = [ account_update_transfer ] in
           let%bind () = add_commands' t valid_commands in
           assert_pool_txs t valid_commands ;
           let%bind () = after (Time.Span.of_sec 2.) in
@@ -2464,14 +2479,18 @@ let%test_module _ =
       let replace_txs =
         [ (* sufficient fee *)
           mk_payment ~sender_idx:0
-            ~fee:(minimum_fee + Currency.Fee.to_int Indexed_pool.replace_fee)
+            ~fee:
+              ( minimum_fee
+              + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
             ~nonce:0 ~receiver_idx:1 ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
           mk_payment ~sender_idx:1 ~fee:minimum_fee ~nonce:0 ~receiver_idx:1
             ~amount:788_000_000_000 ()
         ; (* sufficient *)
           mk_payment ~sender_idx:2
-            ~fee:(minimum_fee + Currency.Fee.to_int Indexed_pool.replace_fee)
+            ~fee:
+              ( minimum_fee
+              + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
             ~nonce:1 ~receiver_idx:4 ~amount:721_000_000_000 ()
         ; (* insufficient *)
           (let amount = 927_000_000_000 in
@@ -2490,7 +2509,7 @@ let%test_module _ =
              let account =
                Mock_base_ledger.get ledger location |> Option.value_exn
              in
-             Currency.Balance.to_int account.balance - amount
+             Currency.Balance.to_nanomina_int account.balance - amount
            in
            mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount () )
         ]
@@ -2638,7 +2657,7 @@ let%test_module _ =
     let%test_unit "rebroadcastable transaction behavior (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_parties_cmds test.txn_pool >>= mk_rebroadcastable_test test )
+          mk_zkapp_command_cmds test.txn_pool >>= mk_rebroadcastable_test test )
 
     let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -2651,7 +2670,7 @@ let%test_module _ =
           *)
           let take_len = num_cmds / 2 in
           let%bind snapp_cmds =
-            let%map cmds = mk_parties_cmds t.txn_pool in
+            let%map cmds = mk_zkapp_command_cmds t.txn_pool in
             List.take cmds take_len
           in
           let user_cmds = List.drop independent_cmds take_len in

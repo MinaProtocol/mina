@@ -4,7 +4,13 @@ type curr_or_next = Curr | Next [@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
+    type t =
+      | Generic
+      | Poseidon
+      | VarBaseMul
+      | EndoMul
+      | CompleteAdd
+      | EndoMulScalar
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -120,50 +126,110 @@ module Tick : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -374,7 +440,7 @@ module Tick : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
+               * ( square (cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -397,7 +463,7 @@ module Tick : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
+               * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -420,7 +486,7 @@ module Tick : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
+               * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -444,7 +510,7 @@ module Tick : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
+               * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -469,7 +535,7 @@ module Tick : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
+               * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -954,110 +1020,6 @@ module Tick : S = struct
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
       ]
 end
 
@@ -1103,50 +1065,110 @@ module Tock : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -1357,7 +1379,7 @@ module Tock : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
+               * ( square (cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -1380,7 +1402,7 @@ module Tock : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
+               * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -1403,7 +1425,7 @@ module Tock : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
+               * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -1427,7 +1449,7 @@ module Tock : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
+               * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -1452,7 +1474,7 @@ module Tock : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
+               * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -1937,110 +1959,6 @@ module Tock : S = struct
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
       ]
 end
 
@@ -2086,50 +2004,110 @@ module Tick_with_lookup : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
     + ( alpha_pow 24
         * ( vanishes_on_last_4_rows
           * ( cell (var (LookupAggreg, Next))
@@ -2481,7 +2459,7 @@ module Tick_with_lookup : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
+               * ( square (cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -2504,7 +2482,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
+               * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -2527,7 +2505,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
+               * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -2551,7 +2529,7 @@ module Tick_with_lookup : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
+               * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -2576,7 +2554,7 @@ module Tick_with_lookup : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
+               * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -3061,110 +3039,6 @@ module Tick_with_lookup : S = struct
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
       ]
 end
 
@@ -3210,50 +3084,110 @@ module Tock_with_lookup : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
     + ( alpha_pow 24
         * ( vanishes_on_last_4_rows
           * ( cell (var (LookupAggreg, Next))
@@ -3605,7 +3539,7 @@ module Tock_with_lookup : S = struct
                                + double (cell (var (Witness 4, Curr))) ) ) ) )
                )
              + alpha_pow 1
-               * ( (cell (var (Witness 2, Next)) * cell (var (Witness 2, Next)))
+               * ( square (cell (var (Witness 2, Next)))
                  - cell (var (Witness 2, Next)) )
              + alpha_pow 2
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
@@ -3628,7 +3562,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
                    * x_2 )
              + alpha_pow 5
-               * ( (cell (var (Witness 3, Next)) * cell (var (Witness 3, Next)))
+               * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
              + alpha_pow 6
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
@@ -3651,7 +3585,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
                    * x_5 )
              + alpha_pow 9
-               * ( (cell (var (Witness 4, Next)) * cell (var (Witness 4, Next)))
+               * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
              + alpha_pow 10
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
@@ -3675,7 +3609,7 @@ module Tock_with_lookup : S = struct
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
                    * x_8 )
              + alpha_pow 13
-               * ( (cell (var (Witness 5, Next)) * cell (var (Witness 5, Next)))
+               * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
              + alpha_pow 14
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
@@ -3700,7 +3634,7 @@ module Tock_with_lookup : S = struct
                    - cell (var (Witness 13, Curr)) )
                    * x_11 )
              + alpha_pow 17
-               * ( (cell (var (Witness 6, Next)) * cell (var (Witness 6, Next)))
+               * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
              + alpha_pow 18
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
@@ -4185,109 +4119,5 @@ module Tock_with_lookup : S = struct
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
       ]
 end

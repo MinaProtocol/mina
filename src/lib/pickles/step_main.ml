@@ -67,7 +67,7 @@ let verify_one
           hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
-              (Vector.trim branch_data.proofs_verified_mask
+              (Vector.trim_front branch_data.proofs_verified_mask
                  (Nat.lte_exn
                     (Vector.length prev_challenge_polynomial_commitments)
                     Nat.N2.n ) )
@@ -130,6 +130,7 @@ let step_main :
            and type statement = a_value
            and type prev_values = prev_values
            and type max_proofs_verified = max_proofs_verified
+           and type proofs_verified = proofs_verified
            and type return_value = ret_value
            and type auxiliary_value = auxiliary_value )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -345,18 +346,22 @@ let step_main :
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
-        and unfinalized_proofs =
+        and unfinalized_proofs_unextended =
           exists
             (Vector.typ'
                (Vector.map
                   ~f:(fun uses_lookup ->
                     Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
                       ~uses_lookup )
-                  (Vector.extend lookup_usage lte Max_proofs_verified.n No) ) )
+                  lookup_usage ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
             ~request:(fun () -> Req.Messages_for_next_wrap_proof)
+        and actual_wrap_domains =
+          exists
+            (Vector.typ (Typ.Internal.ref ()) (Length.to_nat proofs_verified))
+            ~request:(fun () -> Req.Wrap_domain_indices)
         in
         let prevs =
           (* Inject the app-state values into the per-proof witnesses. *)
@@ -384,18 +389,23 @@ let step_main :
                   -> vars H1.T(E01(Unfinalized)).t
                   -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
+                  -> actual_wrap_domains:
+                       ( Pickles_base.Proofs_verified.t As_prover.Ref.t
+                       , n )
+                       Vector.t
                   -> (_, n) Vector.t * B.t list =
                fun proofs datas messages_for_next_wrap_proofs unfinalizeds stmts
-                   pi ->
+                   pi ~actual_wrap_domains ->
                 match
                   ( proofs
                   , datas
                   , messages_for_next_wrap_proofs
                   , unfinalizeds
                   , stmts
-                  , pi )
+                  , pi
+                  , actual_wrap_domains )
                 with
-                | [], [], [], [], [], Z ->
+                | [], [], [], [], [], Z, [] ->
                     ([], [])
                 | ( p :: proofs
                   , d :: datas
@@ -403,14 +413,47 @@ let step_main :
                     :: messages_for_next_wrap_proofs
                   , unfinalized :: unfinalizeds
                   , { proof_must_verify = should_verify; _ } :: stmts
-                  , S pi ) ->
+                  , S pi
+                  , actual_wrap_domain :: actual_wrap_domains ) ->
+                    let () =
+                      (* Fail with an error if the proof's domain differs from
+                         the hard-coded one otherwise.
+                      *)
+                      match d.wrap_domain with
+                      | `Known wrap_domain ->
+                          as_prover (fun () ->
+                              let actual_wrap_domain =
+                                As_prover.Ref.get actual_wrap_domain
+                                |> Pickles_base.Proofs_verified.to_int
+                              in
+                              let actual_wrap_domain =
+                                Common.wrap_domains
+                                  ~proofs_verified:actual_wrap_domain
+                              in
+                              match (wrap_domain, actual_wrap_domain.h) with
+                              | ( Pow_2_roots_of_unity expected
+                                , Pow_2_roots_of_unity actual )
+                                when expected <> actual ->
+                                  failwithf
+                                    "This circuit was compiled for proofs \
+                                     using the wrap domain of size %d, but a \
+                                     proof was given with size %d. You should \
+                                     pass the ~override_wrap_domain argument \
+                                     to set the correct domain size."
+                                    expected actual ()
+                              | Pow_2_roots_of_unity _, Pow_2_roots_of_unity _
+                                ->
+                                  () )
+                      | `Side_loaded _ ->
+                          ()
+                    in
                     let chals, v =
                       verify_one p d messages_for_next_wrap_proof unfinalized
                         should_verify
                     in
                     let chalss, vs =
                       go proofs datas messages_for_next_wrap_proofs unfinalizeds
-                        stmts pi
+                        stmts pi ~actual_wrap_domains
                     in
                     (chals :: chalss, v :: vs)
               in
@@ -419,10 +462,10 @@ let step_main :
                   with_label "messages_for_next_wrap_proofs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
                       V.f proofs_verified
-                        (Vector.trim messages_for_next_wrap_proof lte) )
+                        (Vector.trim_front messages_for_next_wrap_proof lte) )
                 and unfinalized_proofs =
                   let module H = H1.Of_vector (Unfinalized) in
-                  H.f proofs_verified (Vector.trim unfinalized_proofs lte)
+                  H.f proofs_verified unfinalized_proofs_unextended
                 and datas =
                   let self_data :
                       ( var
@@ -466,7 +509,7 @@ let step_main :
                   M.f rule.prevs
                 in
                 go prevs datas messages_for_next_wrap_proofs unfinalized_proofs
-                  previous_proof_statements proofs_verified
+                  previous_proof_statements proofs_verified ~actual_wrap_domains
               in
               Boolean.Assert.all vs ; chalss )
         in
@@ -512,6 +555,10 @@ let step_main :
                     (* Note: the bulletproof_challenges here are unpadded! *)
                     bulletproof_challenges
                 } )
+        in
+        let unfinalized_proofs =
+          Vector.extend_front unfinalized_proofs_unextended lte
+            Max_proofs_verified.n (Unfinalized.dummy ())
         in
         ( { Types.Step.Statement.proof_state =
               { unfinalized_proofs; messages_for_next_step_proof }

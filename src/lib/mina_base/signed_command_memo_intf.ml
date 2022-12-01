@@ -14,6 +14,8 @@ module type S = sig
     module V1 : sig
       type nonrec t = t
       [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+
+      module With_all_version_tags : Bin_prot.Binable.S with type t = t
     end
 
     module Latest = V1

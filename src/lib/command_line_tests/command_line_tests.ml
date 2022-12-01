@@ -21,7 +21,8 @@ let%test_module "Command line tests" =
     *)
     let coda_exe = "../../app/cli/src/mina.exe"
 
-    let create_daemon_process config_dir genesis_ledger_dir port =
+    let create_daemon_process config_dir genesis_ledger_dir libp2p_keypair_path
+        port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
       Process.create ~prog:coda_exe
@@ -40,10 +41,12 @@ let%test_module "Command line tests" =
           ; "0.0.0"
           ; "-external-ip"
           ; "0.0.0.0"
+          ; "-libp2p-keypair"
+          ; libp2p_keypair_path
           ]
         ()
 
-    let start_daemon config_dir genesis_ledger_dir port =
+    let start_daemon config_dir genesis_ledger_dir libp2p_keypair_path port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
       let%map _ =
@@ -65,6 +68,8 @@ let%test_module "Command line tests" =
               ; "0.0.0"
               ; "-external-ip"
               ; "0.0.0.0"
+              ; "-libp2p-keypair"
+              ; libp2p_keypair_path
               ]
             ()
         with
@@ -84,16 +89,25 @@ let%test_module "Command line tests" =
         ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" port ]
         ()
 
-    let create_config_directories () =
+    let libp2p_keypath dir = String.concat [ dir; "/privkey" ]
+
+    let create_config_files_and_dirs () =
       (* create empty config dir to avoid any issues with the default config dir *)
       let conf = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
       let genesis = Filename.temp_dir ~in_dir:"/tmp" "coda_genesis_state" "" in
-      (conf, genesis)
+      let libp2p_keypair_dir =
+        Filename.temp_dir ~in_dir:"/tmp" "mina_test_libp2p_keypair" ""
+      in
+      let libp2p_keypair_path = libp2p_keypath libp2p_keypair_dir in
+      let%map () =
+        Init.Client.generate_libp2p_keypair_do libp2p_keypair_path ()
+      in
+      (conf, genesis, libp2p_keypair_dir)
 
-    let remove_config_directory config_dir genesis_dir =
-      let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; config_dir ] () in
-      Process.run_exn ~prog:"rm" ~args:[ "-rf"; genesis_dir ] ()
-      |> Deferred.ignore_m
+    let remove_config_dirs dirs =
+      Deferred.List.iter dirs ~f:(fun dir ->
+          Deferred.ignore_m
+          @@ Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
 
     let test_background_daemon () =
       let test_failed = ref false in
@@ -101,7 +115,9 @@ let%test_module "Command line tests" =
       let client_delay = 40. in
       let retry_delay = 30. in
       let retry_attempts = 30 in
-      let config_dir, genesis_ledger_dir = create_config_directories () in
+      let%bind config_dir, genesis_ledger_dir, libp2p_keypair_dir =
+        create_config_files_and_dirs ()
+      in
       Monitor.protect
         ~finally:(fun () ->
           ( if !test_failed then
@@ -112,11 +128,16 @@ let%test_module "Command line tests" =
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
               contents ) ;
-          remove_config_directory config_dir genesis_ledger_dir )
+          remove_config_dirs
+            [ config_dir; genesis_ledger_dir; libp2p_keypair_dir ] )
         (fun () ->
           match%map
             let open Deferred.Or_error.Let_syntax in
-            let%bind _ = start_daemon config_dir genesis_ledger_dir port in
+            let%bind _ =
+              start_daemon config_dir genesis_ledger_dir
+                (libp2p_keypath libp2p_keypair_dir)
+                port
+            in
             (* It takes a while for the daemon to become available. *)
             let%bind () =
               Deferred.map
@@ -154,7 +175,9 @@ let%test_module "Command line tests" =
       let client_delay = 40. in
       let retry_delay = 30. in
       let retry_attempts = 5 in
-      let config_dir, genesis_ledger_dir = create_config_directories () in
+      let%bind config_dir, genesis_ledger_dir, libp2p_keypair_dir =
+        create_config_files_and_dirs ()
+      in
       Monitor.protect
         ~finally:(fun () ->
           ( if !test_failed then
@@ -165,12 +188,15 @@ let%test_module "Command line tests" =
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
               contents ) ;
-          remove_config_directory config_dir genesis_ledger_dir )
+          remove_config_dirs
+            [ config_dir; genesis_ledger_dir; libp2p_keypair_dir ] )
         (fun () ->
           match%map
             let open Deferred.Or_error.Let_syntax in
+            let libp2p_keypair_path = libp2p_keypath libp2p_keypair_dir in
             let%bind p =
-              create_daemon_process config_dir genesis_ledger_dir port
+              create_daemon_process config_dir genesis_ledger_dir
+                libp2p_keypair_path port
             in
             let%bind () =
               Deferred.map
@@ -195,7 +221,10 @@ let%test_module "Command line tests" =
             let%bind (_ : Unix.Exit_or_signal.t) =
               Deferred.map (Process.wait p) ~f:Or_error.return
             in
-            let%bind _ = start_daemon config_dir genesis_ledger_dir port in
+            let%bind _ =
+              start_daemon config_dir genesis_ledger_dir libp2p_keypair_path
+                port
+            in
             let%bind () =
               Deferred.map
                 (after @@ Time.Span.of_sec client_delay)

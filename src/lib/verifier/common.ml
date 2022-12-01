@@ -40,19 +40,22 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties
-      ( { fee_payer = fee_payer, _fee_payer_vk; other_parties; memo } as
-      parties_with_vk ) ->
+  | Zkapp_command
+      ( { fee_payer = fee_payer, _fee_payer_vk; account_updates; memo } as
+      zkapp_command_with_vk ) ->
       with_return (fun { return } ->
-          let other_parties_hash = Parties.Call_forest.hash other_parties in
+          let account_updates_hash =
+            Zkapp_command.Call_forest.hash account_updates
+          in
           let tx_commitment =
-            Parties.Transaction_commitment.create ~other_parties_hash
+            Zkapp_command.Transaction_commitment.create ~account_updates_hash
           in
           let full_tx_commitment =
-            Parties.Transaction_commitment.create_complete tx_commitment
+            Zkapp_command.Transaction_commitment.create_complete tx_commitment
               ~memo_hash:(Signed_command_memo.hash memo)
               ~fee_payer_hash:
-                (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+                (Zkapp_command.Digest.Account_update.create
+                   (Account_update.of_fee_payer fee_payer) )
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -69,15 +72,16 @@ let check :
                     (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          let parties_with_hashes_list =
-            parties_with_vk |> Parties.Verifiable.all_parties
+          let zkapp_command_with_hashes_list =
+            zkapp_command_with_vk
+            |> Zkapp_command.Verifiable.all_account_updates
             |> Zkapp_statement.zkapp_statements_of_forest'
-            |> Parties.Call_forest.With_hashes_and_data
-               .to_parties_with_hashes_list
+            |> Zkapp_command.Call_forest.With_hashes_and_data
+               .to_zkapp_command_with_hashes_list
           in
           let valid_assuming =
-            List.filter_map parties_with_hashes_list
-              ~f:(fun ((p, (vk_opt, stmt)), _at_party) ->
+            List.filter_map zkapp_command_with_hashes_list
+              ~f:(fun ((p, (vk_opt, stmt)), _at_account_update) ->
                 let commitment =
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
@@ -93,16 +97,19 @@ let check :
                     | None ->
                         return
                           (`Missing_verification_key
-                            [ Account_id.public_key @@ Party.account_id p ] )
+                            [ Account_id.public_key
+                              @@ Account_update.account_id p
+                            ] )
                     | Some (vk : _ With_hash.t) ->
                         Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
             (*Verification keys should be present if it reaches here*)
-            let parties =
-              Option.value_exn (Parties.Valid.of_verifiable parties_with_vk)
+            let zkapp_command =
+              Or_error.ok_exn
+                (Zkapp_command.Valid.of_verifiable zkapp_command_with_vk)
             in
-            User_command.Poly.Parties parties
+            User_command.Poly.Zkapp_command zkapp_command
           in
           match valid_assuming with
           | [] ->

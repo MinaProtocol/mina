@@ -33,9 +33,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; snark_worker_fee = "0.0001"
     }
 
-  let fee = Currency.Fee.of_int 10_000_000
+  let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
-  let amount = Currency.Amount.of_int 10_000_000
+  let amount = Currency.Amount.of_nanomina_int_exn 10_000_000
 
   let tx_delay_ms = 500
 
@@ -134,7 +134,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          let%bind () =
            ok_if_true "not enough blocks"
-             (List.length blocks >= min_resulting_blocks)
+             Mina_stdlib.List.Length.Compare.(blocks >= min_resulting_blocks)
          in
          let tx_counts =
            Array.of_list

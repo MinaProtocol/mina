@@ -46,17 +46,17 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-await SimpleZkapp.compile(zkappAddress);
+await SimpleZkapp.compile();
 toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, { zkappKey });
+let zkappCommandJsonDeploy = await deploy(SimpleZkapp, { zkappKey });
 toc();
 
 // update transaction
 tic("create update transaction (with proof)");
-let partiesJsonUpdate = await Mina.transaction(() =>
+let zkappCommandJsonUpdate = await Mina.transaction(() =>
   new SimpleZkapp(zkappAddress).update(Field(3))
 )
   .then(async (tx) => {
@@ -75,7 +75,7 @@ tic("sign deploy transaction");
 let feePayerNonce = 0;
 let signedDeploy = client.signTransaction(
   {
-    parties: JSON.parse(partiesJsonDeploy),
+    zkappCommand: JSON.parse(zkappCommandJsonDeploy),
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
@@ -88,11 +88,11 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(zkappCommandJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
-checkSignatureConsistency(signedDeploySnarkyJs, signedDeploy.data.parties);
+checkSignatureConsistency(signedDeploySnarkyJs, signedDeploy.data.zkappCommand);
 toc();
 
 feePayerNonce++;
@@ -101,7 +101,7 @@ feePayerNonce++;
 tic("sign update transaction");
 let signedUpdate = client.signTransaction(
   {
-    parties: JSON.parse(partiesJsonUpdate),
+    zkappCommand: JSON.parse(zkappCommandJsonUpdate),
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
@@ -114,11 +114,11 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign update transaction (snarkyjs, for consistency check)");
-let signedUpdateSnarkyJs = signFeePayer(partiesJsonUpdate, feePayerKey, {
+let signedUpdateSnarkyJs = signFeePayer(zkappCommandJsonUpdate, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
-checkSignatureConsistency(signedUpdateSnarkyJs, signedUpdate.data.parties);
+checkSignatureConsistency(signedUpdateSnarkyJs, signedUpdate.data.zkappCommand);
 toc();
 
 console.log("success! created and signed two transactions.");

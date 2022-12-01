@@ -51,7 +51,6 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
-    libp2pSecret: "libp2pYolo"
     enableArchive: true
     archiveAddress: archive-1:3086
   - name: "test-2"
@@ -61,7 +60,6 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
-    libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
   - name: "test-3"

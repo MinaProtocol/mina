@@ -79,6 +79,12 @@ module Breadcrumb_added : sig
   include Event_type_intf with type t := t
 end
 
+module Persisted_frontier_loaded : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
 module Gossip : sig
   module Direction : sig
     type t = Sent | Received [@@deriving yojson]
@@ -133,6 +139,7 @@ type 'a t =
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
+  | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
 
 val to_string : 'a t -> string
 

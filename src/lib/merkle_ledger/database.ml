@@ -532,7 +532,9 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
-      let key_to_location_list = Non_empty_list.to_list key_to_location_list in
+      let key_to_location_list =
+        Mina_stdlib.Nonempty_list.to_list key_to_location_list
+      in
       let account_tokens =
         List.fold ~init:Key.Map.empty key_to_location_list
           ~f:(fun map (aid, _) ->

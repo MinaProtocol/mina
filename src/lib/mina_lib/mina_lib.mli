@@ -20,6 +20,16 @@ type Structured_log_events.t +=
   | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -106,7 +116,7 @@ val add_full_transactions :
 
 val add_zkapp_transactions :
      t
-  -> Parties.t list
+  -> Zkapp_command.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
