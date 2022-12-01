@@ -149,6 +149,8 @@ module Step = struct
           (Unfinalized.Constant.t, proofs_verified) Vector.t t
       | Messages_for_next_wrap_proof :
           (Digest.Constant.t, max_proofs_verified) Vector.t t
+      | Wrap_domain_indices :
+          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
   end
 
   let create :
@@ -201,6 +203,8 @@ module Step = struct
             (Unfinalized.Constant.t, proofs_verified) Vector.t t
         | Messages_for_next_wrap_proof :
             (Digest.Constant.t, max_proofs_verified) Vector.t t
+        | Wrap_domain_indices :
+            (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
     end in
     (module R)
 end
