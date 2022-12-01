@@ -402,7 +402,6 @@ module Wrap = struct
     module Minimal = struct
       type ( 'challenge
            , 'scalar_challenge
-           , _
            , 'fp
            , 'messages_for_next_wrap_proof
            , 'digest

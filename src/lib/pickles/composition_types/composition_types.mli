@@ -463,8 +463,6 @@ module Wrap : sig
     module Minimal : sig
       type ( 'challenge
            , 'scalar_challenge
-           , _
-           (* TODO: fix this unused polymorphic parameter *)
            , 'fp
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -566,7 +564,7 @@ module Wrap : sig
          ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) In_circuit.t
       -> to_option:
            ('d -> ('b, 'c) Deferred_values.Plonk.In_circuit.Lookup.t option)
-      -> ('a, 'b, 'i, 'c, 'e, 'f, 'g, 'h) Minimal.t
+      -> ('a, 'b, 'c, 'e, 'f, 'g, 'h) Minimal.t
   end
 
   (** The component of the proof accumulation state that is only computed on by
