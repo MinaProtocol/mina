@@ -740,7 +740,7 @@ dependencies = [
  "rand",
  "rayon",
  "serde",
- "serde_with",
+ "serde_with 1.14.0",
 ]
 
 [[package]]
