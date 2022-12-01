@@ -16,10 +16,7 @@ describe("Rosetta", () => {
       "amount": "1000000000",
       "valid_until": "4294967295"
     },
-    "stake_delegation": null,
-    "create_token": null,
-    "create_token_account": null,
-    "mint_tokens": null
+    "stake_delegation": null
   }`;
 
   beforeAll(async () => {

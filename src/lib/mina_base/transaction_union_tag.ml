@@ -10,7 +10,7 @@ open Snark_params.Tick
 
 [%%else]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 
@@ -64,7 +64,7 @@ module Bits = struct
 
   let to_bits (b1, b2, b3) = [ b1; b2; b3 ]
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%ifdef consensus_mechanism]
 
@@ -206,34 +206,36 @@ module Unpacked = struct
     Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
   let typ : (var, t) Typ.t =
-    let base_typ = Poly.typ Boolean.typ in
-    { base_typ with
-      check =
-        (fun ( { is_payment
-               ; is_stake_delegation
-               ; is_create_account
-               ; is_mint_tokens
-               ; is_fee_transfer
-               ; is_coinbase
-               ; is_user_command
-               } as t ) ->
-          let open Checked.Let_syntax in
-          let%bind () = base_typ.check t in
-          let%bind () =
-            [%with_label "Only one tag is set"]
-              (Boolean.Assert.exactly_one
-                 [ is_payment
+    let (Typ base_typ) = Poly.typ Boolean.typ in
+    Typ
+      { base_typ with
+        check =
+          (fun ( { is_payment
                  ; is_stake_delegation
                  ; is_create_account
                  ; is_mint_tokens
                  ; is_fee_transfer
                  ; is_coinbase
-                 ] )
-          in
-          [%with_label "User command flag is correctly set"]
-            (Boolean.Assert.exactly_one
-               [ is_user_command; is_fee_transfer; is_coinbase ] ) )
-    }
+                 ; is_user_command
+                 } as t ) ->
+            let open Checked.Let_syntax in
+            make_checked_ast
+            @@ let%bind () = run_checked_ast @@ base_typ.check t in
+               let%bind () =
+                 [%with_label_ "Only one tag is set"] (fun () ->
+                     Boolean.Assert.exactly_one
+                       [ is_payment
+                       ; is_stake_delegation
+                       ; is_create_account
+                       ; is_mint_tokens
+                       ; is_fee_transfer
+                       ; is_coinbase
+                       ] )
+               in
+               [%with_label_ "User command flag is correctly set"] (fun () ->
+                   Boolean.Assert.exactly_one
+                     [ is_user_command; is_fee_transfer; is_coinbase ] ) )
+      }
 
   let constant
       ({ is_payment
@@ -271,7 +273,7 @@ module Unpacked = struct
 
   let to_bits t = Bits.to_bits (to_bits_var t)
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%endif]
 end
@@ -292,7 +294,7 @@ let unpacked_t_of_t = function
 
 let to_bits tag = Bits.to_bits (Unpacked.to_bits_t (unpacked_t_of_t tag))
 
-let to_input tag = Random_oracle.Input.bitstring (to_bits tag)
+let to_input_legacy tag = Random_oracle.Input.Legacy.bitstring (to_bits tag)
 
 [%%ifdef consensus_mechanism]
 

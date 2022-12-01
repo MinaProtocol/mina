@@ -1,9 +1,0 @@
-(library
- (name allocation_stress_test)
- (libraries
-   base
-   core_kernel
-   splittable_random
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))

@@ -2,7 +2,7 @@
  (name plonk_checks)
  (public_name pickles.plonk_checks)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
    ;; opam libraries
    sexplib0
@@ -14,9 +14,15 @@
    pickles_types
    pickles_base
    pickles.composition_types
+   kimchi_backend
    snarky.backendless
    tuple_lib
-   zexe_backend
-   marlin_plonk_bindings
-   marlin_plonk_bindings_types
  ))
+
+(rule
+ (targets scalars.ml)
+ (mode promote)
+ (action
+  (progn
+   (run gen_scalars/gen_scalars.exe scalars.ml)
+   (run ocamlformat -i scalars.ml))))

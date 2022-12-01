@@ -12,6 +12,14 @@ open Mina_state
 open Consensus.Data
 include Validation_types
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 let validation (_, v) = v
 
 let block_with_hash (b, _) = b
@@ -121,16 +129,18 @@ module Unsafe = struct
          ( 'time_received
          , 'genesis_state
          , 'proof
-         , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+         , [ `Delta_block_chain ]
+           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
          t
-      -> State_hash.t Non_empty_list.t
+      -> State_hash.t Mina_stdlib.Nonempty_list.t
       -> ( 'time_received
          , 'genesis_state
          , 'proof
-         , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+         , [ `Delta_block_chain ]
+           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
@@ -306,7 +316,6 @@ let reset_genesis_protocol_state_validation (block_with_hash, validation) =
       failwith "why can't this be refuted?"
 
 let validate_proofs ~verifier ~genesis_state_hash tvs =
-  let open Deferred.Let_syntax in
   let to_verify =
     List.filter_map tvs ~f:(fun (t, _validation) ->
         if
@@ -325,7 +334,7 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
                ~state:(Header.protocol_state header)
                ~proof:(Header.protocol_state_proof header) ) )
   in
-  match%map
+  match%map.Deferred
     match to_verify with
     | [] ->
         (* Skip calling the verifier, nothing here to verify. *)
@@ -378,10 +387,19 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   in
   ( t
   , Unsafe.set_valid_delta_block_chain validation
-      (Non_empty_list.singleton previous_protocol_state_hash) )
+      (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
-let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
-    ~get_block_by_hash (t, validation) =
+let validate_frontier_dependencies ~context:(module Context : CONTEXT)
+    ~root_block ~get_block_by_hash (t, validation) =
+  let module Context = struct
+    include Context
+
+    let logger =
+      Logger.extend logger
+        [ ( "selection_context"
+          , `String "Mina_block.Validation.validate_frontier_dependencies" )
+        ]
+  end in
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
   let protocol_state = Fn.compose Header.protocol_state Block.header in
@@ -401,13 +419,8 @@ let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
     let ( = ) = Stdlib.( = ) in
     Result.ok_if_true
       ( `Take
-      = Consensus.Hooks.select ~constants:consensus_constants
-          ~logger:
-            (Logger.extend logger
-               [ ( "selection_context"
-                 , `String
-                     "Mina_block.Validation.validate_frontier_dependencies" )
-               ] )
+      = Consensus.Hooks.select
+          ~context:(module Context)
           ~existing:(With_hash.map ~f:consensus_state root_block)
           ~candidate:(With_hash.map ~f:consensus_state t) )
       ~error:`Not_selected_over_frontier_root
@@ -448,24 +461,33 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~precomputed_values ~verifier ~parent_staged_ledger ~parent_protocol_state
     (t, validation) =
-  let open Deferred.Result.Let_syntax in
   let target_hash_of_ledger_proof =
-    Fn.compose Ledger_proof.statement_target Ledger_proof.statement
+    Fn.compose Registers.ledger
+    @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
   in
   let block = With_hash.data t in
-  let protocol_state = block |> Block.header |> Header.protocol_state in
+  let header = Block.header block in
+  let protocol_state = Header.protocol_state header in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let consensus_state = Protocol_state.consensus_state protocol_state in
-  let staged_ledger_diff = block |> Block.body |> Body.staged_ledger_diff in
+  let body = Block.body block in
   let apply_start_time = Core.Time.now () in
-  let%bind ( `Hash_after_applying staged_ledger_hash
-           , `Ledger_proof proof_opt
-           , `Staged_ledger transitioned_staged_ledger
-           , `Pending_coinbase_update _ ) =
+  let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
+  let body_ref_computed = Staged_ledger_diff.Body.compute_reference body in
+  let%bind.Deferred.Result () =
+    if Blake2.equal body_ref_computed body_ref_from_header then
+      Deferred.Result.return ()
+    else Deferred.Result.fail `Invalid_body_reference
+  in
+  let%bind.Deferred.Result ( `Hash_after_applying staged_ledger_hash
+                           , `Ledger_proof proof_opt
+                           , `Staged_ledger transitioned_staged_ledger
+                           , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~logger
-      ~verifier parent_staged_ledger staged_ledger_diff
+      ~verifier parent_staged_ledger
+      (Staged_ledger_diff.Body.staged_ledger_diff body)
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
       ~state_and_body_hash:
@@ -495,7 +517,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           ~f:target_hash_of_ledger_proof
           ~default:
             ( Precomputed_values.genesis_ledger precomputed_values
-            |> Lazy.force |> Ledger.merkle_root
+            |> Lazy.force |> Mina_ledger.Ledger.merkle_root
             |> Frozen_ledger_hash.of_ledger_hash )
     | Some (proof, _) ->
         target_hash_of_ledger_proof proof

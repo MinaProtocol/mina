@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 2 in
+    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
@@ -43,8 +43,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
-    let fee = Currency.Fee.of_int 10_000_000 in
-    let amount = Currency.Amount.of_int 10_000_000 in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
     let%bind hashlist =
