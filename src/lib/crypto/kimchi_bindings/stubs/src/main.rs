@@ -1,3 +1,4 @@
+use kimchi::circuits::expr::FeatureFlag;
 use kimchi::proof::caml::CamlRecursionChallenge;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
@@ -102,6 +103,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
+    decl_type!(w, env, FeatureFlag => "feature_flag");
     decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
     decl_type!(w, env, CurrOrNext => "curr_or_next");
