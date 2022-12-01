@@ -20,6 +20,8 @@ module type Field_intf = sig
 
   val size_in_bits : int
 
+  val zero : t
+
   val one : t
 
   val of_int : int -> t
@@ -197,6 +199,12 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
               failwith "TODO"
         in
         Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
+  ; enabled_if =
+      (fun (_feature, _f) ->
+        (* TODO *)
+        F.zero )
+  ; foreign_field_modulus = (fun _ -> failwith "TODO")
+  ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")
   }
 
 (* TODO: not true anymore if lookup is used *)
@@ -227,6 +235,9 @@ let tick_lookup_constant_term_part (type a)
      ; beta
      ; gamma
      ; unnormalized_lagrange_basis
+     ; enabled_if = _
+     ; foreign_field_modulus = _
+     ; neg_foreign_field_modulus = _
      } :
       a Scalars.Env.t ) =
   alpha_pow 24

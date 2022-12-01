@@ -45,6 +45,7 @@ where
             chacha_final: _,
             lookup_gate,
             range_check_gate: _,
+            ffmul_gate: _,
         } = val;
         CamlLookupSelectors {
             lookup_gate: lookup_gate.map(From::from),
@@ -64,6 +65,7 @@ where
             chacha_final: None,
             lookup_gate: lookup_gate.map(From::from),
             range_check_gate: None,
+            ffmul_gate: None,
         }
     }
 }
