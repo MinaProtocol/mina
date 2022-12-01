@@ -82,7 +82,8 @@ let upon_f ~state_hash ~actions ~transition_states = function
   | Result.Ok (Result.Ok breadcrumb) ->
       update_status_for_unprocessed ~transition_states ~state_hash
         (Processing (Done breadcrumb)) ;
-      actions.Misc.mark_processed_and_promote [ state_hash ]
+      actions.Misc.mark_processed_and_promote ~reason:"built breadcrumb"
+        [ state_hash ]
   | Result.Ok (Result.Error (`Invalid (error, reason))) ->
       actions.Misc.mark_invalid ~reason ~error state_hash
   | Result.Ok (Result.Error (`Verifier_error e)) ->
@@ -165,11 +166,11 @@ let get_parent ~transition_states ~context meta =
   | Some st ->
       [%log' warn Context.logger]
         "Parent $parent_hash of transition $state_hash in Building_breadcrumb \
-         status hash unexpected state $state"
+         status has unexpected state %s"
+        (Transition_state.name st)
         ~metadata:
           [ ("parent_hash", State_hash.to_yojson parent_hash)
           ; ("state_hash", State_hash.to_yojson meta.state_hash)
-          ; ("state", `String (Transition_state.name st))
           ] ;
       (* It's only possible to be invalid and then this function shouldn't
          have been called *)

@@ -45,6 +45,20 @@ type 'a status =
       (** State is processed and ready to be transitioned to higher state after
      ancestry is also processed *)
 
+let name_of_status = function
+  | Waiting_for_parent _ ->
+      "waiting for parent"
+  | Processing Dependent ->
+      "processing (dependent)"
+  | Processing (In_progress _) ->
+      "processing (in progress)"
+  | Processing (Done _) ->
+      "processing (done)"
+  | Failed _ ->
+      "failed"
+  | Processed _ ->
+      "processed"
+
 (** Container for children of a transition.
 
     Children are separated based on their status into three
