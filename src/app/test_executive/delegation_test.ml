@@ -5,6 +5,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -36,11 +38,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "delegate all mina currency from node_b to node_a"
         (let delegation_receiver = node_a in
          let%bind delegation_receiver_pub_key =
-           Util.pub_key_of_node delegation_receiver
+           pub_key_of_node delegation_receiver
          in
          let delegation_sender = node_b in
          let%bind delegation_sender_pub_key =
-           Util.pub_key_of_node delegation_sender
+           pub_key_of_node delegation_sender
          in
          let%bind { hash; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender

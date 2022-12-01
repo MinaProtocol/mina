@@ -6,6 +6,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -63,6 +65,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let chain_str = String.concat ~sep:"\n" chain in
           [%log info] "\nchain of %s:\n %s" label chain_str )
     in
+    let%bind () =
+      section
+        "set up for checking for shared state, send a several payments and \
+         wait for them to be added to chain"
+        (let receiver_bp = node_a in
+         let%bind receiver_pub_key = pub_key_of_node receiver_bp in
+         let sender_bp = node_b in
+         let%bind sender_pub_key = pub_key_of_node sender_bp in
+         let num_payments = 3 in
+         let amount = Currency.Amount.of_formatted_string "10" in
+         let fee = Currency.Fee.of_formatted_string "1" in
+         [%log info] "chain_reliability_test: will now send %d payments"
+           num_payments ;
+         let%bind hashlist =
+           send_payments ~logger ~sender_pub_key ~receiver_pub_key
+             ~node:sender_bp ~fee ~amount num_payments
+         in
+         [%log info]
+           "chain_reliability_test: sending payments done. will now wait for \
+            payments" ;
+         let%map () = wait_for_payments ~logger ~dsl:t ~hashlist num_payments in
+         [%log info] "chain_reliability_test: finished waiting for payments" ;
+         () )
+    in
     section "common prefix of all nodes is no farther back than 1 block"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
@@ -74,5 +100,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       Util.check_common_prefixes chains ~tolerance:1 ~logger )
+       check_common_prefixes chains ~tolerance:1 ~logger )
 end
