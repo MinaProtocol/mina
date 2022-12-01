@@ -130,7 +130,9 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey
+          account {
+            public_key: publicKey
+          }
         }
       }
     |}

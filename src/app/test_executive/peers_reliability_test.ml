@@ -46,24 +46,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let%bind initial_connectivity_data =
-      Util.fetch_connectivity_data ~logger all_nodes
+      fetch_connectivity_data ~logger all_nodes
     in
     let%bind () =
       section "network is fully connected upon initialization"
-        (Util.assert_peers_completely_connected initial_connectivity_data)
+        (assert_peers_completely_connected initial_connectivity_data)
     in
     let%bind () =
       section
         "network can't be partitioned if 2 nodes are hypothetically taken \
          offline"
-        (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
+        (assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
     in
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
     let%bind () =
       section_hard "send a payment"
-        (let%bind sender_pub_key = Util.pub_key_of_node node_c in
-         let%bind receiver_pub_key = Util.pub_key_of_node node_b in
+        (let%bind sender_pub_key = pub_key_of_node node_c in
+         let%bind receiver_pub_key = pub_key_of_node node_b in
          let%bind { hash = txn_hash; _ } =
            Node.must_send_payment ~logger node_c ~sender_pub_key
              ~receiver_pub_key
@@ -170,7 +170,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         Util.fetch_connectivity_data ~logger all_nodes
+         fetch_connectivity_data ~logger all_nodes
        in
-       Util.assert_peers_completely_connected final_connectivity_data )
+       assert_peers_completely_connected final_connectivity_data )
 end

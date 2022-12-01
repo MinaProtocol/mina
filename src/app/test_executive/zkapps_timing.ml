@@ -40,8 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
-    let%bind fee_payer_pk = Util.pub_key_of_node node in
-    let%bind fee_payer_sk = Util.priv_key_of_node node in
+    let%bind fee_payer_pk = pub_key_of_node node in
+    let%bind fee_payer_sk = priv_key_of_node node in
     let (keypair : Signature_lib.Keypair.t) =
       { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
       ; private_key = fee_payer_sk
