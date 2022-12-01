@@ -391,6 +391,7 @@ macro_rules! impl_verification_key {
                         chacha: false,
                         range_check: false,
                         foreign_field_add: false,
+                        foreign_field_mul: false,
                         xor: false,
                         lookup_configuration: None,
                     };
@@ -416,6 +417,7 @@ macro_rules! impl_verification_key {
                         chacha_comm: None,
                         range_check_comm: None,
                         foreign_field_add_comm: None,
+                        foreign_field_mul_comm: None,
                         xor_comm: None,
 
                         foreign_field_modulus: None,
