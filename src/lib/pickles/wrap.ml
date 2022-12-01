@@ -87,6 +87,7 @@ let%test_unit "scalars consistency" =
       | ChaCha
       | RangeCheck
       | ForeignFieldAdd
+      | ForeignFieldMul
       | Xor
     [@@deriving sexp, compare]
 
@@ -105,6 +106,7 @@ let%test_unit "scalars consistency" =
       | Unnormalized_lagrange_basis of int
       | Enabled_if of (feature_flag * t)
       | Foreign_field_modulus of int
+      | Neg_foreign_field_modulus of int
     [@@deriving sexp, compare]
   end in
   let open E in
@@ -132,6 +134,7 @@ let%test_unit "scalars consistency" =
     ; unnormalized_lagrange_basis = (fun x -> Unnormalized_lagrange_basis x)
     ; enabled_if = (fun (feature, f) -> Enabled_if (feature, f ()))
     ; foreign_field_modulus = (fun i -> Foreign_field_modulus i)
+    ; neg_foreign_field_modulus = (fun i -> Neg_foreign_field_modulus i)
     }
   in
   let lookup_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms env in

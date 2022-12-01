@@ -204,6 +204,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
         (* TODO *)
         F.zero )
   ; foreign_field_modulus = (fun _ -> failwith "TODO")
+  ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")
   }
 
 (* TODO: not true anymore if lookup is used *)
@@ -236,6 +237,7 @@ let tick_lookup_constant_term_part (type a)
      ; unnormalized_lagrange_basis
      ; enabled_if = _
      ; foreign_field_modulus = _
+     ; neg_foreign_field_modulus = _
      } :
       a Scalars.Env.t ) =
   alpha_pow 24

@@ -24,6 +24,7 @@ module Gate_type = struct
       | RangeCheck0
       | RangeCheck1
       | ForeignFieldAdd
+      | ForeignFieldMul
       | Xor16
     [@@deriving hash, eq, compare, sexp]
   end
@@ -90,6 +91,7 @@ module Env = struct
     ; unnormalized_lagrange_basis : int -> 'a
     ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
     ; foreign_field_modulus : int -> 'a
+    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -125,6 +127,7 @@ module Tick : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -273,6 +276,7 @@ module Tick : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if
        ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -2641,6 +2645,162 @@ module Tick : S = struct
                          - cell (var (Witness 7, Curr))
                            * foreign_field_modulus 2
                          + cell (var (Witness 9, Curr)) ) ) ) ) )
+      ; ( Index ForeignFieldMul
+        , lazy
+            (enabled_if
+               ( ForeignFieldMul
+               , fun () ->
+                   cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 0, Curr))
+                         * cell (var (Witness 4, Curr))
+                       + cell (var (Witness 1, Curr))
+                         * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 10, Curr))
+                         * neg_foreign_field_modulus 1
+                       + cell (var (Witness 11, Curr))
+                         * neg_foreign_field_modulus 0
+                       - ( field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * ( field
+                                 "0x0000000000000000000000000000000000000000010000000000000000000000"
+                               * cell (var (Witness 7, Next))
+                             + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 5, Next)) ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 9, Curr))
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 0
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 5, Next))
+                         - cell (var (Witness 0, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next)) ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 8, Curr))
+                       - field
+                           "0x0000000000000000000000000000000000000000000000000000000000000200"
+                         * cell (var (Witness 7, Curr)) )
+                   + alpha_pow 5
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Curr))
+                           + cell (var (Witness 6, Curr)) )
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 5, Curr))
+                         + cell (var (Witness 2, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 1, Curr))
+                           * cell (var (Witness 4, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 2
+                         + cell (var (Witness 12, Curr))
+                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 11, Curr))
+                           * neg_foreign_field_modulus 1
+                         + ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Next))
+                           + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 9, Curr))
+                         - cell (var (Witness 2, Next)) ) )
+                   + alpha_pow 6
+                     * ( ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Curr))
+                         + cell (var (Witness 0, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 4, Curr))
+                           + cell (var (Witness 3, Curr)) )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 12, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + cell (var (Witness 10, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * foreign_field_modulus 2
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * foreign_field_modulus 1
+                           + foreign_field_modulus 0 )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Next))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next))
+                         + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 13, Curr)))
+                       - cell (var (Witness 13, Curr)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 13, Curr))
+                       - ( cell (var (Witness 10, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + ( neg_foreign_field_modulus 0
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * neg_foreign_field_modulus 1 ) )
+                       + cell (var (Witness 3, Next)) )
+                   + alpha_pow 9
+                     * ( square (cell (var (Witness 14, Curr)))
+                       - cell (var (Witness 14, Curr)) )
+                   + alpha_pow 10
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * cell (var (Witness 14, Curr))
+                       - ( cell (var (Witness 12, Curr))
+                         + neg_foreign_field_modulus 2 )
+                       - cell (var (Witness 13, Curr))
+                       + cell (var (Witness 4, Next)) ) ) ) )
       ; ( Index Xor16
         , lazy
             (enabled_if
@@ -2742,6 +2902,7 @@ module Tock : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -2890,6 +3051,7 @@ module Tock : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if
        ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -5258,6 +5420,162 @@ module Tock : S = struct
                          - cell (var (Witness 7, Curr))
                            * foreign_field_modulus 2
                          + cell (var (Witness 9, Curr)) ) ) ) ) )
+      ; ( Index ForeignFieldMul
+        , lazy
+            (enabled_if
+               ( ForeignFieldMul
+               , fun () ->
+                   cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 0, Curr))
+                         * cell (var (Witness 4, Curr))
+                       + cell (var (Witness 1, Curr))
+                         * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 10, Curr))
+                         * neg_foreign_field_modulus 1
+                       + cell (var (Witness 11, Curr))
+                         * neg_foreign_field_modulus 0
+                       - ( field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * ( field
+                                 "0x0000000000000000000000000000000000000000010000000000000000000000"
+                               * cell (var (Witness 7, Next))
+                             + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 5, Next)) ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 9, Curr))
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 0
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 5, Next))
+                         - cell (var (Witness 0, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next)) ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 8, Curr))
+                       - field
+                           "0x0000000000000000000000000000000000000000000000000000000000000200"
+                         * cell (var (Witness 7, Curr)) )
+                   + alpha_pow 5
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Curr))
+                           + cell (var (Witness 6, Curr)) )
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 5, Curr))
+                         + cell (var (Witness 2, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 1, Curr))
+                           * cell (var (Witness 4, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 2
+                         + cell (var (Witness 12, Curr))
+                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 11, Curr))
+                           * neg_foreign_field_modulus 1
+                         + ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Next))
+                           + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 9, Curr))
+                         - cell (var (Witness 2, Next)) ) )
+                   + alpha_pow 6
+                     * ( ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Curr))
+                         + cell (var (Witness 0, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 4, Curr))
+                           + cell (var (Witness 3, Curr)) )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 12, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + cell (var (Witness 10, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * foreign_field_modulus 2
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * foreign_field_modulus 1
+                           + foreign_field_modulus 0 )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Next))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next))
+                         + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 13, Curr)))
+                       - cell (var (Witness 13, Curr)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 13, Curr))
+                       - ( cell (var (Witness 10, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + ( neg_foreign_field_modulus 0
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * neg_foreign_field_modulus 1 ) )
+                       + cell (var (Witness 3, Next)) )
+                   + alpha_pow 9
+                     * ( square (cell (var (Witness 14, Curr)))
+                       - cell (var (Witness 14, Curr)) )
+                   + alpha_pow 10
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * cell (var (Witness 14, Curr))
+                       - ( cell (var (Witness 12, Curr))
+                         + neg_foreign_field_modulus 2 )
+                       - cell (var (Witness 13, Curr))
+                       + cell (var (Witness 4, Next)) ) ) ) )
       ; ( Index Xor16
         , lazy
             (enabled_if
@@ -5359,6 +5677,7 @@ module Tick_with_lookup : S = struct
        ; unnormalized_lagrange_basis
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -5590,6 +5909,7 @@ module Tick_with_lookup : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -6443,6 +6763,7 @@ module Tock_with_lookup : S = struct
        ; unnormalized_lagrange_basis
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -6674,6 +6995,7 @@ module Tock_with_lookup : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn

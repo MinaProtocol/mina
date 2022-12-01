@@ -19,6 +19,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
             chacha: false,
             range_check: false,
             foreign_field_add: false,
+            foreign_field_mul: false,
             xor: false,
             lookup_configuration: Some(lookup_configuration),
         }),

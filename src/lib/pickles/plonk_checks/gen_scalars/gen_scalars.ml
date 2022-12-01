@@ -34,6 +34,7 @@ module Gate_type = struct
       | RangeCheck0
       | RangeCheck1
       | ForeignFieldAdd
+      | ForeignFieldMul
       | Xor16
     [@@deriving hash, eq, compare, sexp]
   end
@@ -100,6 +101,7 @@ module Env = struct
     ; unnormalized_lagrange_basis : int -> 'a
     ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
     ; foreign_field_modulus : int -> 'a
+    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -135,6 +137,7 @@ module Tick : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if =_
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -174,6 +177,7 @@ let () =
        ; unnormalized_lagrange_basis = _
        ; enabled_if
        ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -224,6 +228,7 @@ module Tock : S = struct
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -263,6 +268,7 @@ let () =
        ; unnormalized_lagrange_basis = _
        ; enabled_if
        ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -311,6 +317,7 @@ module Tick_with_lookup : S = struct
        ; unnormalized_lagrange_basis
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -350,6 +357,7 @@ let () =
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -398,6 +406,7 @@ module Tock_with_lookup : S = struct
        ; unnormalized_lagrange_basis
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -437,6 +446,7 @@ let () =
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
        ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
