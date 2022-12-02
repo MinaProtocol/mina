@@ -76,6 +76,6 @@ module Make : functor (F : F) -> sig
        context:(module Context.CONTEXT)
     -> actions:Misc.actions
     -> transition_states:Transition_states.t
-    -> Transition_state.t list
+    -> Transition_state.t Non_empty_list.t
     -> F.processing_result Substate.processing_context
 end

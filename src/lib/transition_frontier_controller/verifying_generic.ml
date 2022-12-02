@@ -212,7 +212,8 @@ module Make (F : F) = struct
     | Result.Error () ->
         fail (Error.of_string "interrupted")
     | Result.Ok (Result.Ok lst) ->
-        List.iter2 state_hashes lst ~f:(fun state_hash res ->
+        List.iter2 (Non_empty_list.to_list state_hashes) lst
+          ~f:(fun state_hash res ->
             let for_restart_opt =
               update_to_processing_done ~transition_states ~state_hash
                 ~dsu:Context.processed_dsu
@@ -234,47 +235,48 @@ module Make (F : F) = struct
         fail e
 
   and launch_in_progress ~context ~actions ~transition_states states =
-    let top_state = List.last_exn states in
+    let top_state = Non_empty_list.last states in
     let top_state_hash =
       (Transition_state.State_functions.transition_meta top_state).state_hash
     in
     let holder = ref top_state_hash in
-    let state_hashes = List.map ~f:get_state_hash states in
+    let state_hashes = Non_empty_list.map ~f:get_state_hash states in
     let ctx, action = F.create_in_progress_context ~context ~holder states in
     Async_kernel.Deferred.upon action
     @@ upon_f ~context ~actions ~transition_states ~state_hashes ~holder ;
     ctx
 
-  and start ~context ~actions ~transition_states states =
-    Option.value ~default:()
-    @@ let%map.Option top_state = List.last states in
-       let top_state_hash =
-         (Transition_state.State_functions.transition_meta top_state).state_hash
-       in
-       match F.to_data top_state with
-       | Some
-           ( { substate = { status = Processing Dependent; _ } as substate; _ }
-           as r )
-       | Some ({ substate = { status = Failed _; _ } as substate; _ } as r) ->
-           let ctx =
-             launch_in_progress ~context ~actions ~transition_states states
-           in
-           Transition_states.update transition_states
-             (F.update
-                { r with substate = { substate with status = Processing ctx } }
-                top_state )
-       | Some { substate = { status; _ }; _ } ->
-           let (module Context : CONTEXT) = context in
-           [%log' error Context.logger]
-             "Unexpected status %s (Verifying_blockchain_proof) for \
-              $state_hash in Verifying_blockchain_proof.start"
-             (Substate.name_of_status status)
-             ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
-       | None ->
-           let (module Context : CONTEXT) = context in
-           [%log' error Context.logger]
-             "Unexpected state %s for $state_hash in \
-              Verifying_blockchain_proof.start"
-             (Transition_state.name top_state)
-             ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
+  and start_impl ~context ~actions ~transition_states states =
+    let top_state = Non_empty_list.last states in
+    let top_state_hash =
+      (Transition_state.State_functions.transition_meta top_state).state_hash
+    in
+    match F.to_data top_state with
+    | Some ({ substate = { status = Processing Dependent; _ } as s; _ } as r)
+    | Some ({ substate = { status = Failed _; _ } as s; _ } as r) ->
+        let ctx =
+          launch_in_progress ~context ~actions ~transition_states states
+        in
+        let r' = { r with substate = { s with status = Processing ctx } } in
+        Transition_states.update transition_states (F.update r' top_state)
+    | Some { substate = { status; _ }; _ } ->
+        let (module Context : CONTEXT) = context in
+        [%log' error Context.logger]
+          "Unexpected status %s (Verifying_blockchain_proof) for $state_hash \
+           in Verifying_blockchain_proof.start"
+          (Substate.name_of_status status)
+          ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
+    | None ->
+        let (module Context : CONTEXT) = context in
+        [%log' error Context.logger]
+          "Unexpected state %s for $state_hash in \
+           Verifying_blockchain_proof.start"
+          (Transition_state.name top_state)
+          ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
+
+  and start ~context ~actions ~transition_states =
+    Fn.compose
+      (Option.value_map ~default:()
+         ~f:(start_impl ~context ~actions ~transition_states) )
+      Non_empty_list.of_list_opt
 end

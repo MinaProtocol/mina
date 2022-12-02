@@ -43,7 +43,7 @@ module F = struct
 
   let create_in_progress_context ~context:(module Context : CONTEXT) ~holder
       states =
-    let bottom_state = List.hd_exn states in
+    let bottom_state = Non_empty_list.head states in
     let downto_ =
       (Transition_state.State_functions.transition_meta bottom_state)
         .blockchain_length
@@ -53,6 +53,7 @@ module F = struct
       Time.add (Time.now ()) Context.transaction_snark_verification_timeout
     in
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
+    let states = Non_empty_list.to_list states in
     let f = function
       | Ok (Ok ()) ->
           Ok (List.map states ~f:(const ()))
@@ -89,15 +90,16 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
   in
   let block = Mina_block.Validation.with_body header body in
   let works = works body in
-  let mk_state ctx =
+  let mk_state status =
     Transition_state.Verifying_complete_works
       { block
-      ; substate = { substate with status = Processing ctx }
+      ; substate = { substate with status }
       ; block_vc
       ; aux
       ; baton = false
       }
   in
+  let mk_processing x = mk_state (Processing x) in
   let start_parent () =
     let parent_hash =
       Mina_block.Validation.header header
@@ -114,17 +116,33 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
   let handle_done () =
     if aux.Transition_state.received_via_gossip then
       ignore (start_parent () : unit option) ;
-    mk_state (Done ())
+    mk_processing (Done ())
   in
   let handle_processing () =
     collect_dependent_and_pass_the_baton ~transition_states
-      ~dsu:Context.processed_dsu (mk_state Dependent)
-    |> launch_in_progress ~context ~actions ~transition_states
-    |> mk_state
+      ~dsu:Context.processed_dsu (mk_processing Dependent)
+    |> Non_empty_list.of_list_opt
+    |> Option.map
+         ~f:
+           ( Fn.compose mk_processing
+           @@ launch_in_progress ~context ~actions ~transition_states )
+    |> function
+    | Some x ->
+        x
+    | None ->
+        let state_hash = state_hash_of_header_with_validation header in
+        [%log' error Context.logger]
+          "Verifying_complete_works: unexpectedly wasn't able to collect the \
+           transition itself for start of processing $state_hash"
+          ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+        let empty_collected_err =
+          Error.of_string "unable to start processing"
+        in
+        mk_state @@ Failed empty_collected_err
   in
   if List.is_empty works then handle_done ()
   else if aux.Transition_state.received_via_gossip then handle_processing ()
-  else mk_state Dependent
+  else mk_processing Dependent
 
 (** [make_independent state_hash] starts verification of complete works for
        a transition corresponding to the [block].

@@ -33,32 +33,32 @@ let collect_states (type state_t) ~predicate ~state_functions
   let open F in
   let full_predicate state =
     Option.value ~default:(`Take false, `Continue false)
-    @@
-    if equal_state_levels top_state state then None
-    else view ~state_functions ~f:predicate state
+    @@ view ~state_functions ~f:predicate state
   in
   let rec loop state res =
-    let parent_hash = (transition_meta state).parent_state_hash in
-    Option.value_map ~default:[]
-      ~f:(fun parent_state ->
-        if equal_state_levels parent_state state then
-          let `Take to_take, `Continue to_continue = full_predicate state in
-          let res' = if to_take then state :: res else res in
-          if to_continue then loop parent_state res' else []
-        else
-          (* Parent is of different state => it's of higher state => we don't need to go deeper *)
-          [] )
-      (Transition_states.find transition_states parent_hash)
+    let `Take to_take, `Continue to_continue = full_predicate state in
+    let res' = if to_take then state :: res else res in
+    Option.value ~default:res'
+    @@ let%bind.Option () = Option.some_if to_continue () in
+       let parent_hash = (transition_meta state).parent_state_hash in
+       let%bind.Option parent_state =
+         Transition_states.find transition_states parent_hash
+       in
+       (* Parent is of different state => it's of higher state => we don't need to go deeper *)
+       let%map.Option () =
+         Option.some_if (equal_state_levels parent_state state) ()
+       in
+       loop parent_state res'
   in
   loop top_state []
 
 (** Modify status of common substate to [Processed].
     
     Function returns [Result.Ok] with new modified common substate
-    and [children] of the substate when substate has [Processing (Done x)] status
+    and old [children] of the substate when substate has [Processing (Done x)] status
     and [Result.Error] otherwise.
 *)
-let mark_processed_modifier ~is_recursive_call old_st subst =
+let mark_processed_modifier old_st subst =
   let reshape res =
     match res with
     | Result.Error _ as e ->
@@ -87,8 +87,6 @@ let mark_processed_modifier ~is_recursive_call old_st subst =
       Result.Error "not started"
   | Processing (In_progress _) ->
       Result.Error "still processing"
-  | Processed _ when is_recursive_call ->
-      Result.Ok ({ subst with children }, subst.children)
   | Processed _ ->
       Result.Error "already processed"
 
@@ -97,18 +95,13 @@ let mark_processed_modifier ~is_recursive_call old_st subst =
       * Transition's parent is not in the catchup state (which means it's in frontier)
       * Transition's parent has a higher state level
     *)
-let is_parent_of_higher_state (type state_t)
+let is_parent_higher (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
-    ~(transition_states : state_t transition_states) old_state =
-  let (Transition_states ((module Transition_states), states)) =
-    transition_states
-  in
-  let parent_hash = (F.transition_meta old_state).parent_state_hash in
-  Option.value_map
-    (Transition_states.find states parent_hash)
+    state parent_opt =
+  Option.value_map parent_opt
     ~f:
       (* Parent is found and differs in state level, hence it's of higher state *)
-      (Fn.compose not (F.equal_state_levels old_state))
+      (Fn.compose not (F.equal_state_levels state))
     ~default:
       (* Parent is not found which means the parent is in frontier.
          There is an invariant is that only non-processed states may have parent neither
@@ -158,7 +151,7 @@ let kickstart_waiting_for_parent (type state_t)
       Transition_states.modify_substate_ states meta.parent_state_hash
         ~f:{ modifier = update_children_modifier }
 
-(** Update children of the parent upon transition aquiring the [Processed] status *)
+(** Update children of the parent upon transition acquiring the [Processed] status *)
 let update_children_on_processed (type state_t)
     ~(transition_states : state_t transition_states) ~parent_hash
     ~state_functions:(module F : State_functions with type state_t = state_t)
@@ -198,44 +191,50 @@ let mark_processed (type state_t) ~logger ~state_functions
   let (Transition_states ((module Transition_states), states)) =
     transition_states
   in
-  let processed_set = ref (State_hash.Set.of_list processed) in
-  let rec handle is_recursive_call hash =
-    Option.value ~default:[]
-      (let open Option.Let_syntax in
-      let%bind () =
-        Option.some_if (State_hash.Set.mem !processed_set hash) ()
-      in
-      let ext_modifier old_st subst =
-        mark_processed_modifier ~is_recursive_call old_st subst
-      in
-      let%bind res =
-        Transition_states.modify_substate states ~f:{ ext_modifier } hash
-      in
-      processed_set := State_hash.Set.remove !processed_set hash ;
-      Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
-      let%map old_state, children = Result.ok res in
-      let meta = F.transition_meta old_state in
-      let parent_hash = meta.parent_state_hash in
-      update_children_on_processed ~transition_states ~state_functions
-        ~parent_hash meta.state_hash ;
-      State_hash.Set.iter children.waiting_for_parent
-        ~f:
-          (kickstart_waiting_for_parent ~state_functions ~logger
-             ~transition_states ) ;
-      if
-        is_recursive_call
-        || is_parent_of_higher_state ~state_functions ~transition_states
-             old_state
-      then
-        let children =
-          List.append (State_hash.Set.to_list children.processed)
-          @@ State_hash.Set.to_list
-          @@ State_hash.Set.inter children.processing_or_failed !processed_set
-        in
-        hash :: List.concat (List.map children ~f:(handle true))
-      else [ hash ])
+  let kickstart_waiting =
+    kickstart_waiting_for_parent ~state_functions ~logger ~transition_states
   in
-  List.concat @@ List.map processed ~f:(handle false)
+  let rec traverse_processed hash =
+    let open Option in
+    Transition_states.find states hash
+    >>= view ~state_functions ~f:{ viewer = (fun { children; _ } -> children) }
+    >>| traverse_processed_children
+    |> value_map ~f:(List.cons hash) ~default:[]
+  and traverse_processed_children children =
+    List.concat_map ~f:traverse_processed
+      (State_hash.Set.to_list children.processed)
+  in
+  let handle hash =
+    let open Option.Let_syntax in
+    let%bind res =
+      Transition_states.modify_substate states
+        ~f:{ ext_modifier = mark_processed_modifier }
+        hash
+    in
+    Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
+    let%bind old_state, old_children = Result.ok res in
+    let meta = F.transition_meta old_state in
+    let parent_hash = meta.parent_state_hash in
+    update_children_on_processed ~transition_states ~state_functions
+      ~parent_hash meta.state_hash ;
+    State_hash.Set.iter ~f:kickstart_waiting old_children.waiting_for_parent ;
+    let parent_opt = Transition_states.find states parent_hash in
+    let%map () =
+      Option.some_if (is_parent_higher ~state_functions old_state parent_opt) ()
+    in
+    (* Parent is of higher state, hence it needs to be promoted.
+
+       We recursively traverse all of the processed ancestors because they
+       also deserve promotion once the state becomes promoted.
+
+       Note that transitions from [processed] won't be considered from
+       within [traverse_processed_children] because [processed] is sorted
+       in parent-first order and when a state from [processed] is considered,
+       its children from [processed] are not yet marked processed (and hence won't
+       be traversed). Neither can they appear in deeper layers of recursion. *)
+    hash :: traverse_processed_children old_children
+  in
+  List.concat_map processed ~f:(Fn.compose (Option.value ~default:[]) handle)
 
 (** Update children of transition's parent when the transition is promoted
     to the higher state.

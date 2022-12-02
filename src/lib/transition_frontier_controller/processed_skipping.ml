@@ -49,8 +49,7 @@ let collect_unprocessed (type state_t)
   let (module F : Substate.State_functions with type state_t = state_t) =
     state_functions
   in
-  let (Substate.Transition_states
-        ((module Transition_states_impl), transition_states_) ) =
+  let (Substate.Transition_states ((module Transition_states), states)) =
     transition_states
   in
   let viewer subst =
@@ -61,23 +60,22 @@ let collect_unprocessed (type state_t)
         predicate.Substate.viewer subst
   in
   let rec go res state =
-    let states =
+    let collected =
       Substate.collect_states ~predicate:{ viewer } ~state_functions
         ~transition_states state
     in
-    match states with
+    match collected with
     | bottom_state :: rest_states
       when is_status_processed ~state_functions bottom_state ->
         let key = (F.transition_meta bottom_state).state_hash in
         Option.value ~default:[]
         @@ let%bind.Option ancestor = Dsu.get ~key dsu in
            let%map.Option parent =
-             Transition_states_impl.find transition_states_
-               ancestor.Substate.parent_state_hash
+             Transition_states.find states ancestor.parent_state_hash
            in
            go (rest_states :: res) parent
     | _ ->
-        states :: res
+        collected :: res
   in
   List.concat @@ go [] top_state
 
