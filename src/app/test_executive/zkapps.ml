@@ -799,7 +799,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "Wait for zkApp transaction to paying fees with a proof to be included \
-         intransition frontier"
+         in transition frontier"
         (wait_for_zkapp zkapp_command_pay_with_proof)
     in
     let%bind () =
