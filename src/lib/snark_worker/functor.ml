@@ -138,14 +138,11 @@ module Make (Inputs : Intf.Inputs_intf) :
     match res with
     | Error exn ->
         if shutdown_on_disconnect then
-          failwithf
-            !"Shutting down. Error using the RPC call, %s,: %s"
+          failwithf "Shutting down. Error using the RPC call, %s,: %s"
             (Rpc.Rpc.name rpc) (Exn.to_string_mach exn) ()
         else
           Error
-            ( Error.createf
-                !"Error using the RPC call, %s: %s"
-                (Rpc.Rpc.name rpc)
+            ( Error.createf "Error using the RPC call, %s: %s" (Rpc.Rpc.name rpc)
             @@ Exn.to_string_mach exn )
     | Ok res ->
         res
@@ -247,7 +244,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         [%log error] !"Error %s: %{sexp:Error.t}" label error
       else
         let lines = String.split ~on:'\n' error_str in
-        [%log error] !"Error %s: %s" label
+        [%log error] "Error %s: %s" label
           (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
       let%bind () = wait ~sec () in
       (* FIXME: Use a backoff algo here *)
@@ -256,8 +253,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     let rec go () =
       let%bind daemon_address =
         let%bind cwd = Sys.getcwd () in
-        [%log debug]
-          !"Snark worker working directory $dir"
+        [%log debug] "SNARK worker working directory $dir"
           ~metadata:[ ("dir", `String cwd) ] ;
         let path = "snark_coordinator" in
         match%bind Sys.file_exists path with
@@ -268,8 +264,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         | `No | `Unknown ->
             return daemon_address
       in
-      [%log debug]
-        !"Snark worker using daemon $addr"
+      [%log debug] "Snark worker using daemon $addr"
         ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
@@ -309,7 +304,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                 with
                 | Error e ->
                     [%log error]
-                      "Couldn't inform the daemon about the snark work failure"
+                      "Couldn't inform the daemon about the SNARK work failure"
                       ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                 | Ok () ->
                     ()
@@ -377,7 +372,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                    ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
-              !"Received signal to terminate. Aborting snark worker process" ;
+              "Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
           Option.value ~default:Genesis_constants.Proof_level.compiled

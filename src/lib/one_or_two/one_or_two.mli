@@ -1,4 +1,4 @@
-(** Simple container of one of two values of a given type. *)
+(** Simple container of one or two values of a given type. *)
 open Core_kernel
 
 open Async_kernel

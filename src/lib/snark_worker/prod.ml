@@ -54,7 +54,7 @@ module Inputs = struct
     ( Transaction_witness.Stable.Latest.t
     , Transaction_snark.Stable.Latest.t )
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
+  [@@deriving bin_io_unversioned, sexp, to_yojson]
 
   type zkapp_command_inputs =
     ( Transaction_witness.Zkapp_command_segment_witness.t
@@ -82,11 +82,7 @@ module Inputs = struct
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
-                    ; ( "spec"
-                        (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                           so we use the less-desirable sexp here
-                        *)
-                      , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                    ; ("spec", single_spec_to_yojson single)
                     ] ;
                 Error e
             | Ok res ->
@@ -141,7 +137,7 @@ module Inputs = struct
                                 Ok p
                             | Error e ->
                                 [%log fatal]
-                                  "Transaction snark failed for input $spec \
+                                  "Transaction SNARK failed for input $spec \
                                    $statement. All inputs: $inputs. Error:  \
                                    $error"
                                   ~metadata:
@@ -168,7 +164,7 @@ module Inputs = struct
                                 Ok p
                             | Error e ->
                                 [%log fatal]
-                                  "Merge snark failed for $stmt1 $stmt2. All \
+                                  "Merge SNARK failed for $stmt1 $stmt2. All \
                                    inputs: $inputs. Error:  $error"
                                   ~metadata:
                                     [ ( "stmt1"

@@ -6,8 +6,6 @@ module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('witness, 'ledger_proof) t =
           | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -18,12 +16,6 @@ module Single = struct
         [@@deriving sexp, to_yojson]
       end
     end]
-
-    type ('witness, 'ledger_proof) t =
-          ('witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of Transaction_snark.Statement.t * 'witness
-      | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
-    [@@deriving sexp, to_yojson]
 
     let witness (t : (_, _) t) =
       match t with Transition (_, witness) -> Some witness | Merge _ -> None

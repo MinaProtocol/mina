@@ -3,19 +3,17 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t One_or_two.t
-  [@@deriving compare, sexp, yojson, equal]
-
-  include Hashable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+      type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+      [@@deriving compare, sexp, yojson, equal]
 
       include Hashable.S_binable with type t := t
     end
-  end
-  with type V2.t = t
+  end]
+
+  include Hashable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 
@@ -25,20 +23,18 @@ module Statement : sig
 end
 
 module Info : sig
-  type t =
-    { statements : Statement.Stable.V2.t
-    ; work_ids : int One_or_two.Stable.V1.t
-    ; fee : Fee.Stable.V1.t
-    ; prover : Public_key.Compressed.Stable.V1.t
-    }
-  [@@deriving to_yojson, sexp, compare]
-
+  [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving compare, to_yojson, version, sexp, bin_io]
+      type t =
+        { statements : Statement.Stable.V2.t
+        ; work_ids : int One_or_two.Stable.V1.t
+        ; fee : Fee.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving to_yojson, sexp, compare]
     end
-  end
-  with type V2.t = t
+  end]
 end
 
 (* TODO: The SOK message actually should bind the SNARK to
