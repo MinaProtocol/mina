@@ -15,13 +15,6 @@ module Instance = struct
         -> t
 end
 
-(* TODO: Just stick this in plonk_checks.ml *)
-module Plonk_checks = struct
-  include Plonk_checks
-  module Type1 =
-    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-end
-
 let verify_heterogenous (ts : Instance.t list) =
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in

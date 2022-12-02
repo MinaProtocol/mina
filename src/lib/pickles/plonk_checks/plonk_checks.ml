@@ -480,3 +480,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             assert false )
         |> Boolean.all )
 end
+
+module Type1 = Make (Shifted_value.Type1) (Scalars.Tick)
+module Type2 = Make (Shifted_value.Type2) (Scalars.Tock)

@@ -122,3 +122,117 @@ end
 module Domain = Pickles_base.Domain
 
 module Scalars = Scalars
+
+module Type1 : sig
+  val ft_eval0 :
+       't field
+    -> domain:< shifts : 't array ; .. >
+    -> env:'t Scalars.Env.t
+    -> ( 't
+       , 't )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> 't
+    -> lookup_constant_term_part:('t Scalars.Env.t -> 't) option
+    -> 't
+
+  val derive_plonk :
+       ?with_label:(string -> (unit -> 't) -> 't)
+    -> 't field
+    -> env:'t Scalars.Env.t
+    -> shift:'t Pickles_types.Shifted_value.Type1.Shift.t
+    -> ( 't
+       , 't )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> ( 't
+       , 't
+       , 't Pickles_types.Shifted_value.Type1.t
+       , ( ( 't
+           , 't Pickles_types.Shifted_value.Type1.t )
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , 'b )
+         Pickles_types.Plonk_types.Opt.t )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+
+  val checked :
+       (module Snarky_backendless.Snark_intf.Run with type field = 't)
+    -> shift:
+         't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type1.Shift.t
+    -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
+    -> ( 't Snarky_backendless.Cvar.t
+       , 't Snarky_backendless.Cvar.t
+       , 't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type1.t
+       , ( ( 't Snarky_backendless.Cvar.t
+           , 't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type1.t
+           )
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
+         Pickles_types.Plonk_types.Opt.t )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+    -> ( 't Snarky_backendless.Cvar.t * 't Snarky_backendless.Cvar.t
+       , 'a )
+       Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+end
+
+module Type2 : sig
+  val ft_eval0 :
+       (module Field_intf with type t = 't)
+    -> domain:< shifts : 't array ; .. >
+    -> env:'t Scalars.Env.t
+    -> ( 't
+       , 't )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> 't
+    -> lookup_constant_term_part:('t Scalars.Env.t -> 't) option
+    -> 't
+
+  val derive_plonk :
+       ?with_label:(string -> (unit -> 't) -> 't)
+    -> (module Field_intf with type t = 't)
+    -> env:'t Scalars.Env.t
+    -> shift:'t Pickles_types.Shifted_value.Type2.Shift.t
+    -> ( 't
+       , 't )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> ( 't
+       , 't
+       , 't Pickles_types.Shifted_value.Type2.t
+       , ( ( 't
+           , 't Pickles_types.Shifted_value.Type2.t )
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , 'b )
+         Pickles_types.Plonk_types.Opt.t )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+
+  val checked :
+       (module Snarky_backendless.Snark_intf.Run with type field = 't)
+    -> shift:
+         't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type2.Shift.t
+    -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
+    -> ( 't Snarky_backendless.Cvar.t
+       , 't Snarky_backendless.Cvar.t
+       , 't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type2.t
+       , ( ( 't Snarky_backendless.Cvar.t
+           , 't Snarky_backendless.Cvar.t Pickles_types.Shifted_value.Type2.t
+           )
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
+         Pickles_types.Plonk_types.Opt.t )
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+    -> ( 't Snarky_backendless.Cvar.t * 't Snarky_backendless.Cvar.t
+       , 'a )
+       Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+end

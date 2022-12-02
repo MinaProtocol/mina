@@ -22,12 +22,6 @@ struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
   end
 
-  module Plonk_checks = struct
-    include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
-  end
-
   (* The prover corresponding to the given inductive rule. *)
   let f
       (type (* The maximum number of proofs verified by one of the proof systems verified by this rule :)
