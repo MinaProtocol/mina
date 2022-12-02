@@ -24,8 +24,7 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t
-        | `Timestamp_predicate of string ]
+        [ `Valid_until of Mina_numbers.Global_slot.t ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Mina_base.Token_id.t
   [@@deriving sexp, to_yojson]
