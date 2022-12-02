@@ -620,17 +620,37 @@ module Checked = struct
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
 
-  let has_permission ~to_ (account : var) =
+  let has_permission ?signature_verifies ~to_ (account : var) =
+    let signature_verifies =
+      match signature_verifies with
+      | Some signature_verifies ->
+          signature_verifies
+      | None -> (
+          match to_ with
+          | `Send ->
+              Boolean.true_
+          | `Receive ->
+              Boolean.false_
+          | `Set_delegate ->
+              Boolean.true_
+          | `Access ->
+              failwith
+                "Account.Checked.has_permission: signature_verifies argument \
+                 must be given for access permission" )
+    in
     match to_ with
     | `Send ->
         Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
-          ~signature_verifies:Boolean.true_
+          ~signature_verifies
     | `Receive ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.receive ~signature_verifies:Boolean.false_
+          account.permissions.receive ~signature_verifies
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.set_delegate ~signature_verifies:Boolean.true_
+          account.permissions.set_delegate ~signature_verifies
+    | `Access ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.access ~signature_verifies
 end
 
 [%%endif]
@@ -788,17 +808,16 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
-let has_permission ~to_ (account : t) =
+let has_permission ~control ~to_ (account : t) =
   match to_ with
+  | `Access ->
+      Permissions.Auth_required.check account.permissions.send control
   | `Send ->
-      Permissions.Auth_required.check account.permissions.send
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.send control
   | `Receive ->
-      Permissions.Auth_required.check account.permissions.receive
-        Control.Tag.None_given
+      Permissions.Auth_required.check account.permissions.receive control
   | `Set_delegate ->
-      Permissions.Auth_required.check account.permissions.set_delegate
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.set_delegate control
 
 let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with
