@@ -495,7 +495,7 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
-      ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
+      ; Set_or_keep.to_input permissions ~dummy:Permissions.empty
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
