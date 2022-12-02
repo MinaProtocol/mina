@@ -1743,8 +1743,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_transfer_zkapp_command ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
-        ~nonce ~amount () =
+    let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
+        ~receiver_idx ~fee ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -1763,6 +1763,13 @@ let%test_module _ =
             Some (fee_payer_kp, fee_payer_nonce)
       in
       let fee = Currency.Fee.of_nanomina_int_exn fee in
+      let protocol_state_precondition =
+        match valid_period with
+        | None ->
+            Zkapp_precondition.Protocol_state.accept
+        | Some time ->
+            Zkapp_precondition.Protocol_state.valid_until time
+      in
       let test_spec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
         { sender
         ; fee_payer
@@ -1779,7 +1786,7 @@ let%test_module _ =
         ; preconditions =
             Some
               { Account_update.Preconditions.network =
-                  Zkapp_precondition.Protocol_state.accept
+                  protocol_state_precondition
               ; account =
                   Account_update.Account_precondition.Nonce
                     ( if Option.is_none fee_payer then
@@ -2130,7 +2137,9 @@ let%test_module _ =
           let%bind test = setup_test () in
           mk_zkapp_command_cmds test.txn_pool
           >>= mk_now_invalid_test test
-                ~mk_command:(mk_transfer_zkapp_command ?fee_payer_idx:None) )
+                ~mk_command:
+                  (mk_transfer_zkapp_command ?valid_period:None
+                     ?fee_payer_idx:None ) )
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
@@ -2264,6 +2273,54 @@ let%test_module _ =
           let%bind _ = reorg t [] [] in
           assert_pool_txs t (List.drop few_now 1) ;
           Deferred.unit )
+
+    let%test_unit "Expired transactions that are already in the pool are \
+                   removed from the pool when best tip changes (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let curr_slot = current_global_slot () in
+          let curr_slot_plus_three =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+          in
+          let curr_slot_plus_seven =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+          in
+          let few_now =
+            List.take independent_cmds (List.length independent_cmds / 2)
+          in
+          let expires_later1 =
+            mk_transfer_zkapp_command
+              ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_three }
+              ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
+              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
+          in
+          let expires_later2 =
+            mk_transfer_zkapp_command
+              ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_seven }
+              ~fee_payer_idx:(2, 1) ~sender_idx:3 ~receiver_idx:9
+              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
+          in
+          let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
+          let%bind () = add_commands' t valid_commands in
+          assert_pool_txs t valid_commands ;
+          let n_block_times n =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * n)
+            |> Block_time.Span.of_ms
+          in
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 4L))
+          in
+          let%bind () = reorg t [] [] in
+          assert_pool_txs t (expires_later2 :: few_now) ;
+          (* after 5 block times there should be no expired transactions *)
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 5L))
+          in
+          let%bind () = reorg t [] [] in
+          assert_pool_txs t few_now ; Deferred.unit )
 
     let%test_unit "Now-invalid transactions are removed from the pool when the \
                    transition frontier is recreated (user cmds)" =

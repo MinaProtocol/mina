@@ -13,14 +13,18 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     lookup_configuration: Option<LookupConfiguration<F>>,
 ) -> (String, Vec<(String, String)>) {
     let evaluated_cols = linearization_columns::<F>(lookup_configuration.as_ref());
-    let feature_flags = FeatureFlags {
-        chacha: false,
-        range_check: false,
-        foreign_field_add: false,
-        xor: false,
-        lookup_configuration,
+    let feature_flags = match lookup_configuration {
+        None => None,
+        Some(lookup_configuration) => Some(FeatureFlags {
+            chacha: false,
+            range_check: false,
+            foreign_field_add: false,
+            foreign_field_mul: false,
+            xor: false,
+            lookup_configuration: Some(lookup_configuration),
+        }),
     };
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(&feature_flags, true);
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(feature_flags.as_ref(), true);
 
     let Linearization {
         constant_term,

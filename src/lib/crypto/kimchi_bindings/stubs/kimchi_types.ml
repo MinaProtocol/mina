@@ -147,7 +147,15 @@ type nonrec gate_type =
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd
+  | ForeignFieldMul
   | Xor16
+
+type nonrec feature_flag =
+  | ChaCha
+  | RangeCheck
+  | ForeignFieldAdd
+  | ForeignFieldMul
+  | Xor
 
 type nonrec 'f circuit_gate =
   { typ : gate_type

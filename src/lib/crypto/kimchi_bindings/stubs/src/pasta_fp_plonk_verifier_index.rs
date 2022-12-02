@@ -88,12 +88,13 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             chacha: false,
             range_check: false,
             foreign_field_add: false,
+            foreign_field_mul: false,
             xor: false,
             lookup_configuration: None,
         };
 
         // TODO chacha, dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(&feature_flags, true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Vesta> {
             domain,
@@ -124,6 +125,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
 
             range_check_comm: None,
             foreign_field_add_comm: None,
+            foreign_field_mul_comm: None,
 
             foreign_field_modulus: None,
 
