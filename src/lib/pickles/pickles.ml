@@ -755,7 +755,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let wrap_vk = Lazy.force wrap_vk in
             S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
               ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
-              ~public_input ~auxiliary_typ
+              ~public_input
               ~uses_lookup:(if b.rule.uses_lookup then Yes else No)
               (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
               wrap_vk.index

@@ -65,9 +65,7 @@ struct
          , A_value.t
          , ret_var
          , ret_value )
-         Inductive_rule.public_input )
-      ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
-      self_dlog_vk :
+         Inductive_rule.public_input ) self_dlog_vk :
       ( ( value
         , (_, Max_proofs_verified.n) Vector.t
         , (_, prevs_length) Vector.t
@@ -79,7 +77,6 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
-    let _ = auxiliary_typ in
     (* unused *)
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
