@@ -28,6 +28,7 @@
    async.async_command
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    graphql-cohttp
    cohttp-async
    graphql-async
@@ -105,6 +106,7 @@
    random_oracle
    kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles_types
    pickles
    pickles.backend

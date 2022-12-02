@@ -161,6 +161,7 @@ module Evals : sig
   module In_circuit : sig
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
+      ; coefficients : 'f Columns_vec.t
       ; z : 'f
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
@@ -194,6 +195,7 @@ module Evals : sig
 
   type 'a t =
     { w : 'a Columns_vec.t
+    ; coefficients : 'a Columns_vec.t
     ; z : 'a
     ; s : 'a Permuts_minus_1_vec.t
     ; generic_selector : 'a

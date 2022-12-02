@@ -33,9 +33,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; snark_worker_fee = "0.0001"
     }
 
-  let fee = Currency.Fee.of_int 10_000_000
+  let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
-  let amount = Currency.Amount.of_int 10_000_000
+  let amount = Currency.Amount.of_nanomina_int_exn 10_000_000
 
   let tx_delay_ms = 500
 

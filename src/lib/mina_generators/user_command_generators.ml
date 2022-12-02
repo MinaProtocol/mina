@@ -63,13 +63,13 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
   let%bind balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
-      Currency.Fee.to_int min_cmd_fee
+      Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000
-      |> Currency.Balance.of_int
+      |> Currency.Balance.of_nanomina_int_exn
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "2000000000.0" in
+      let max_bal = Currency.Balance.of_mina_string_exn "2000000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)

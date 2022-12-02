@@ -181,7 +181,30 @@ These are the most important `make` targets:
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
 
-## Steps for adding a new dependency
+## Steps for adding a new OCaml dependency
+
+Our OCaml dependencies live in the [`ocaml.export`](./ocaml.export) file. This file should not be modified manually as it is machine generated.
+
+To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). Here we assume that the version of the OCaml compiler currently used in the codebase is 4.14.0.
+
+```console
+$ opam switch create mina_fresh 4.14.0
+$ opam switch import opam.export
+```
+
+After that, install your dependency. You might have to specify versions of current dependencies to avoid having to upgrade  dependencies. For example:
+
+```console
+$ opam install alcotest cmdliner=1.0.3 fmt=0.8.6
+```
+
+Then, run the following command to update the `ocaml.export` file:
+
+```console
+$ opam switch export opam.export
+```
+
+## Steps for adding a new OCaml pinned dependency
 
 Rarely, you may edit one of our forked opam-pinned packages, or add a new system
 dependency (like libsodium). Some of the pinned packages are git submodules,

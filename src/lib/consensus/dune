@@ -30,6 +30,7 @@
    mina_base.util
    unsigned_extended
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    fold_lib
    random_oracle_input
    outside_hash_image

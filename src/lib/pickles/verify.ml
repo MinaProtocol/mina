@@ -311,7 +311,7 @@ let verify_heterogenous (ts : Instance.t list) =
                            Vector.to_array (Ipa.Wrap.compute_challenges cs)
                        ; commitment = g
                        } )
-                     (Vector.extend_exn
+                     (Vector.extend_front_exn
                         t.statement.messages_for_next_step_proof
                           .challenge_polynomial_commitments
                         Max_proofs_verified.n

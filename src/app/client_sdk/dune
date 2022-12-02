@@ -36,6 +36,7 @@
   pickles.backend
   kimchi_backend
   kimchi_backend.pasta
+  kimchi_backend.pasta.basic
   snarky.backendless
   random_oracle
   random_oracle.permutation.ocaml

@@ -66,5 +66,5 @@ pub use {
     },
     kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
     kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
-    oracle::sponge::caml::CamlScalarChallenge,
+    mina_poseidon::sponge::caml::CamlScalarChallenge,
 };

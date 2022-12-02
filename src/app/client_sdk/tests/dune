@@ -21,6 +21,7 @@
    mina_base.import
    mina_signature_kind
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles
  )
  (preprocessor_deps ../../../config.mlh)

@@ -48,6 +48,7 @@ module Op = struct
               |> Option.bind ~f:(fun relate ->
                      List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
+              |> Option.value ~default:[]
             in
             let%map a =
               f ~related_operations

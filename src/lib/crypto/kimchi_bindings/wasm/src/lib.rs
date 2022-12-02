@@ -118,6 +118,6 @@ pub use {
         nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
-    oracle::sponge::caml::CamlScalarChallenge,
+    mina_poseidon::sponge::caml::CamlScalarChallenge,
 };
 */

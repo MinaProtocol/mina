@@ -31,6 +31,7 @@
    snark_params
    pickles
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_numbers
  )
  (instrumentation (backend bisect_ppx))

@@ -3,7 +3,7 @@ use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
-use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -146,7 +146,8 @@ pub fn caml_pasta_fq_plonk_index_read(
     let mut t = ProverIndex::<Pallas>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false, false);
+    let (linearization, powers_of_alpha) =
+        expr_linearization(false, false, None, false, false, true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
