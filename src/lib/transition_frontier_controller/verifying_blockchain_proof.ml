@@ -36,12 +36,16 @@ module F = struct
   let create_in_progress_context ~context ~holder states =
     let (module Context : CONTEXT) = context in
     let module I = Interruptible.Make () in
-    let headers = List.map ~f:to_header_exn states in
+    let headers = Non_empty_list.map ~f:to_header_exn states in
     let downto_ =
-      List.hd_exn headers |> Mina_block.Validation.header
-      |> Mina_block.Header.blockchain_length
+      Non_empty_list.head headers
+      |> Mina_block.Validation.header |> Mina_block.Header.blockchain_length
     in
-    let action = Context.verify_blockchain_proofs (module I) headers in
+    let action =
+      Context.verify_blockchain_proofs
+        (module I)
+        (Non_empty_list.to_list headers)
+    in
     let timeout =
       Time.add (Time.now ()) Context.ancestry_verification_timeout
     in

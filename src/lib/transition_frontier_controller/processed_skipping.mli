@@ -47,7 +47,9 @@ val next_unprocessed :
     the top state (inclusive) down the ancestry chain while:
   
     1. Transitions are not in [Substate.Processing (Substate.In_progress _)] state
+    
     and
+    
     2. Have same state level as [top_state]
 
     First encountered [Substate.Processing (Substate.In_progress _)] transition (if any)
