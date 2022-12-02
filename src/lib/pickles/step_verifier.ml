@@ -14,7 +14,7 @@ let lookup_verification_enabled = false
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
+                 and type Impl.Bigint.t = Backend.Tick.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs

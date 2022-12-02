@@ -47,7 +47,7 @@ end
        H(all_statements_in_bundle || fee || public_key)
 *)
 
-type t =
+type t = Mina_wire_types.Transaction_snark_work.V2.t =
   { fee : Fee.t
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t

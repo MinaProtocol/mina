@@ -83,7 +83,10 @@ let%test_module "Composability test" =
 
     (** The type of call to dispatch. *)
     type calls_kind =
-      | Add_and_call of Snark_params.Tick.Run.Field.Constant.t * calls_kind
+      | Add_and_call of
+          Account_update.Call_type.t
+          * Snark_params.Tick.Run.Field.Constant.t
+          * calls_kind
       | Add of Snark_params.Tick.Run.Field.Constant.t
 
     module P = (val p_module)
@@ -157,8 +160,8 @@ let%test_module "Composability test" =
           builds the handler for the add-and-call circuit, inserting the
           behaviour for [Execute_call] according to the given [calls_kind].
       *)
-      let handler (calls_kind : calls_kind) old_state =
-        let rec make_call calls_kind input :
+      let handler (calls_kind : calls_kind) call_kind old_state =
+        let rec make_call calls_kind caller input :
             Zkapps_calls.Call_data.Output.Constant.t
             * Zkapp_call_forest.account_update
             * Zkapp_call_forest.t =
@@ -166,7 +169,7 @@ let%test_module "Composability test" =
           | Add increase_amount ->
               (* Execute the 'add' rule. *)
               let handler =
-                Zkapps_calls.Rules.Add.handler pk_compressed input
+                Zkapps_calls.Rules.Add.handler pk_compressed input caller
                   increase_amount
               in
               let tree, aux =
@@ -177,7 +180,7 @@ let%test_module "Composability test" =
                 ; hash = tree.account_update_digest
                 }
               , tree.calls )
-          | Add_and_call (increase_amount, calls_kind) ->
+          | Add_and_call (call_type, increase_amount, calls_kind) ->
               (* Execute the 'add-and-call' rule *)
               let handler =
                 (* Build the handler for the call in 'add-and-call' rule by
@@ -186,7 +189,7 @@ let%test_module "Composability test" =
                 *)
                 let execute_call = make_call calls_kind in
                 Zkapps_calls.Rules.Add_and_call.handler pk_compressed input
-                  increase_amount execute_call
+                  increase_amount caller call_type execute_call
               in
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
@@ -199,11 +202,12 @@ let%test_module "Composability test" =
               , tree.calls )
         in
         Zkapps_calls.Rules.Update_state.handler pk_compressed old_state
-          (make_call calls_kind)
+          call_kind (make_call calls_kind)
 
-      let account_update calls_kind =
+      let account_update calls_kind call_kind =
         Async.Thread_safe.block_on_async_exn
-          (update_state_call_prover ~handler:(handler calls_kind old_state))
+          (update_state_call_prover
+             ~handler:(handler calls_kind call_kind old_state) )
         |> fst
     end
 
@@ -287,7 +291,7 @@ let%test_module "Composability test" =
                 [ zkapp_command ] ) ;
           Ledger.get ledger loc )
 
-    let test_recursive num_calls =
+    let test_recursive num_calls call_kind =
       let increments =
         Array.init num_calls ~f:(fun _ -> Snark_params.Tick.Field.random ())
       in
@@ -295,7 +299,7 @@ let%test_module "Composability test" =
         (* Recursively call [i+1] times. *)
         let rec go i =
           if i = 0 then Add increments.(0)
-          else Add_and_call (increments.(i), go (i - 1))
+          else Add_and_call (call_kind, increments.(i), go (i - 1))
         in
         go (num_calls - 1)
       in
@@ -305,7 +309,7 @@ let%test_module "Composability test" =
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
-             (Update_state_account_update.account_update calls_kind)
+             (Update_state_account_update.account_update calls_kind call_kind)
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -320,11 +324,26 @@ let%test_module "Composability test" =
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
-    let%test_unit "Initialize and update nonrecursive" = test_recursive 1
+    let%test_unit "Initialize and update nonrecursive" = test_recursive 1 Call
 
-    let%test_unit "Initialize and update single recursive" = test_recursive 2
+    let%test_unit "Initialize and update single recursive" =
+      test_recursive 2 Call
 
-    let%test_unit "Initialize and update double recursive" = test_recursive 3
+    let%test_unit "Initialize and update double recursive" =
+      test_recursive 3 Call
 
-    let%test_unit "Initialize and update triple recursive" = test_recursive 4
+    let%test_unit "Initialize and update triple recursive" =
+      test_recursive 4 Call
+
+    let%test_unit "Initialize and update nonrecursive" =
+      test_recursive 1 Delegate_call
+
+    let%test_unit "Initialize and update single recursive" =
+      test_recursive 2 Delegate_call
+
+    let%test_unit "Initialize and update double recursive" =
+      test_recursive 3 Delegate_call
+
+    let%test_unit "Initialize and update triple recursive" =
+      test_recursive 4 Delegate_call
   end )

@@ -445,6 +445,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Fn.compose
                (Public_key.Compressed.equal public_key)
                Account_id.public_key ) )
+
+  let%test "latest signed command version" =
+    (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+       for latest version, then update this test
+    *)
+    Int.equal Stable.Latest.version 2
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

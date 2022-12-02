@@ -632,18 +632,18 @@ let _ =
            let _ = go 1000 x in
            ()
          in
-         let () =
+         let (pk : Backend.Keypair.t) =
            time "generate_keypair" (fun () ->
                constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
-         let () =
+         let (_ : Backend.Keypair.t) =
            time "generate_keypair2" (fun () ->
                constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
                |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let (_ : Backend.Proof.t) =
+         let (pi : Backend.Proof.t) =
            time "generate witness conv" (fun () ->
                Impl.generate_witness_conv ~input_typ:Typ.field
                  ~return_typ:Typ.unit main
@@ -651,7 +651,7 @@ let _ =
                    time "create proof" (fun () ->
                        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
                          ~primary:public_inputs ) )
-                 ~return_typ:Typ.unit x )
+                 x )
          in
          let vk = Backend.Keypair.vk pk in
          let vec = Backend.Field.Vector.create () in

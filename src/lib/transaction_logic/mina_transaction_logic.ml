@@ -1359,9 +1359,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
-      let zkapp_uri (a : t) = a.zkapp_uri
+      let zkapp_uri (a : t) =
+        Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
 
-      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) : t =
+        { a with
+          zkapp = Option.map a.zkapp ~f:(fun zkapp -> { zkapp with zkapp_uri })
+        }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -2172,8 +2176,7 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Zkapp_account.t option
-      , string )
+      , Zkapp_account.t option )
       Account.Poly.t
     [@@deriving sexp, compare]
   end

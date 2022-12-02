@@ -45,7 +45,7 @@ let all_possible_domains =
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
+                 and type Impl.Bigint.t = Tock.Bigint.t
                  and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
 struct
   open Inputs

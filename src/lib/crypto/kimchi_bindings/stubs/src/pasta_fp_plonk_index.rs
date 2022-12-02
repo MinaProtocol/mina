@@ -146,7 +146,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     let mut t = ProverIndex::<Vesta>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false);
+    let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false, false);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

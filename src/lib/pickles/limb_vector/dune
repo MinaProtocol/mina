@@ -17,5 +17,6 @@
    pickles.backend
    pickles_types
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    ppx_version.runtime
 ))

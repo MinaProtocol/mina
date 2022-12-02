@@ -56,7 +56,15 @@
    genesis_constants
    data_hash_lib
    sgn
+   sgn_type
    node_error_service
+   pickles.backend
+   pasta_bindings
+   pickles
+   snark_params
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))

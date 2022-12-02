@@ -16,6 +16,7 @@
    genesis_constants
    kimchi_backend
    kimchi_pasta
+   kimchi_backend.pasta.basic
    merkle_ledger
    merkle_list_verifier
    mina_base
@@ -37,6 +38,7 @@
    zkapps_sequence_events
    zkapps_examples
    yojson
+   mina_wire_types
    )
   (inline_tests)
   (preprocess

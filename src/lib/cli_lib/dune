@@ -42,6 +42,7 @@
    consensus.vrf
    error_json
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    ppx_version.runtime
    gossip_net)
  (preprocess

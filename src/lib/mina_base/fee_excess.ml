@@ -52,6 +52,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('token, 'fee) t =
+            ('token, 'fee) Mina_wire_types.Mina_base.Fee_excess.Poly.V1.t =
         { fee_token_l : 'token
         ; fee_excess_l : 'fee
         ; fee_token_r : 'token

@@ -269,7 +269,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (1
     ((public_key B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX)
      (token_id
@@ -286,7 +286,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (14
     ((public_key B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis)
      (token_id
@@ -303,7 +303,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (3
     ((public_key B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF)
      (token_id
@@ -320,7 +320,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (15
     ((public_key B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD)
      (token_id
@@ -337,7 +337,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (6
     ((public_key B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA)
      (token_id
@@ -354,7 +354,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (7
     ((public_key B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz)
      (token_id
@@ -371,7 +371,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (5
     ((public_key B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq)
      (token_id
@@ -388,7 +388,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (11
     ((public_key B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X)
      (token_id
@@ -405,7 +405,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (0
     ((public_key B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
      (token_id
@@ -422,7 +422,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (4
     ((public_key B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7)
      (token_id
@@ -439,7 +439,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))
+     (zkapp ())))
    (8
     ((public_key B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo)
      (token_id
@@ -456,7 +456,7 @@ let sample_block_sexp =
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)))
-     (zkapp ()) (zkapp_uri "")))))
+     (zkapp ())))))
  (accounts_created ())
  (tokens_used
   ((0x0000000000000000000000000000000000000000000000000000000000000001 ()))))
@@ -845,8 +845,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -904,8 +903,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -963,8 +961,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1022,8 +1019,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1081,8 +1077,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1140,8 +1135,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1199,8 +1193,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1258,8 +1251,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1317,8 +1309,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1376,8 +1367,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1435,8 +1425,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ],
       [
@@ -1494,8 +1483,7 @@ let sample_block_json =
               "Signature"
             ]
           },
-          "zkapp": null,
-          "zkapp_uri": ""
+          "zkapp": null
         }
       ]
     ],

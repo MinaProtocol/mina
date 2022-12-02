@@ -702,19 +702,20 @@ module Balance = struct
           ~actual:
             (Result.return
                { Account_balance_response.block_identifier=
-                   { Block_identifier.index= Int64.of_int 3
-                   ; Block_identifier.hash= "STATE_HASH_TIP" }
+                   { Block_identifier.index= Int64.of_int 4
+                   ; Block_identifier.hash= "STATE_HASH_BLOCK" }
                ; balances=
-                   [ { Amount.value= "66000"
+                   [ { Amount.value= "0"
                      ; currency=
                          {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
                      ; metadata=
                          Some
                            (`Assoc
                              [ ("locked_balance", `Intlit "0")
-                             ; ("liquid_balance", `Intlit "66000")
-                             ; ("total_balance", `Intlit "66000") ]) } ]
-               ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
+                             ; ("liquid_balance", `Intlit "0")
+                             ; ("total_balance", `Intlit "0") ]) } ]
+               ; metadata= Some (`Assoc [ ("created_via_historical_lookup", `Bool true )
+                                        ; ("nonce", `String "0") ]) })
     end )
 end
 

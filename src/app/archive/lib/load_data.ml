@@ -775,8 +775,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; zkapp_version
            ; sequence_state_id
            ; last_sequence_slot
-           ; proved_state (* TODO : we'll have this at some point *)
-           ; zkapp_uri_id = _
+           ; proved_state
+           ; zkapp_uri_id
            }
          ->
         let%bind { element0
@@ -838,7 +838,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
               Processor.Zkapp_sequence_states.load db sequence_state_id )
         in
         let elements = [ element0; element1; element2; element3; element4 ] in
-        let%map sequence_state =
+        let%bind sequence_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
@@ -850,6 +850,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           last_sequence_slot |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Global_slot.of_uint32
         in
+        let%map zkapp_uri =
+          query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp_uri_id)
+        in
         Some
           ( { app_state
             ; verification_key
@@ -857,14 +860,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             }
             : Mina_base.Zkapp_account.t ) )
-  in
-  (* TODO: the URI will be moved to the zkApp, no longer in the account *)
-  let%bind zkapp_uri =
-    Option.value_map zkapp_db ~default:(return "https://dummy.com")
-      ~f:(fun zkapp ->
-        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id) )
   in
   (* TODO: token permissions is going away *)
   let account =
@@ -881,7 +879,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; timing
       ; permissions
       ; zkapp
-      ; zkapp_uri
       }
       : Mina_base.Account.t )
   in

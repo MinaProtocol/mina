@@ -13,15 +13,30 @@
     block_time
     one_or_two
     mina_transaction
+    mina_state
+    mina_transaction_logic
+    transaction_snark
+    transaction_snark_work
+    ledger_proof
+    network_pool
+    consensus
+    consensus.vrf
+    protocol_version
+    genesis_constants
+    mina_block
     ; Necessary for the type equality
     sgn
     sgn_type
     data_hash_lib
     kimchi_backend.pasta
+    kimchi_backend.pasta.basic
+    kimchi_backend
     pickles
     pickles.backend
     pickles_base
     pasta_bindings
+    blake2
+    staged_ledger_diff
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

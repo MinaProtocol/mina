@@ -135,8 +135,8 @@ $ mina daemon \
     --config-directory ./.mina-config \
     --config-file genesis-ledger.json \
     --proof-level none \
-    --block-producer-pubkey "<public key of the block producer>" \
-    --run-snark-worker "<public key of the snarker>" \
+    --block-producer-pubkey "$(cat keys/block-producer.key.pub)" \
+    --run-snark-worker "$(cat keys/snark-producer.key.pub)" \
     --seed
 ```
 
