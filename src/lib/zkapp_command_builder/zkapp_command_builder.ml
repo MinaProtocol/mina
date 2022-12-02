@@ -10,9 +10,17 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body authorization_kind caller kp token_id balance_change
-    : Account_update.Body.Simple.t =
+let mk_account_update_body ?preconditions authorization_kind caller kp token_id
+    balance_change : Account_update.Body.Simple.t =
   let open Signature_lib in
+  let preconditions =
+    Option.value preconditions
+      ~default:
+        Account_update.Preconditions.
+          { network = Zkapp_precondition.Protocol_state.accept
+          ; account = Account_update.Account_precondition.Accept
+          }
+  in
   { update = Account_update.Update.noop
   ; public_key = Public_key.compress kp.Keypair.public_key
   ; token_id
@@ -26,10 +34,7 @@ let mk_account_update_body authorization_kind caller kp token_id balance_change
   ; sequence_events = []
   ; call_data = Pickles.Impls.Step.Field.Constant.zero
   ; call_depth = 0
-  ; preconditions =
-      { network = Zkapp_precondition.Protocol_state.accept
-      ; account = Account_update.Account_precondition.Accept
-      }
+  ; preconditions
   ; use_full_commitment = true
   ; caller
   ; authorization_kind

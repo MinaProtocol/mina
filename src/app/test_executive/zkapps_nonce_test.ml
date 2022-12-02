@@ -1,4 +1,5 @@
 open Core
+open Async
 open Integration_test_lib
 open Mina_base
 
@@ -99,8 +100,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish2_pk = Signature_lib.Public_key.compress fish2_kp.public_key in
-    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
-    let memo = Signed_command_memo.create_from_string_exn "Zkapp update all" in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -124,116 +123,79 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               @ Network.snark_coordinators network ) ) )
     in
     (* Setup transactions*)
-    let invalid_nonce_transaction =
-      Zkapp_command.of_simple
-        { fee_payer =
-            { body =
-                { public_key = fish1_pk
-                ; fee
-                ; valid_until = None
-                ; nonce = Account.Nonce.of_int 0
-                }
-            ; authorization = Signature.dummy
-            }
-        ; account_updates =
-            [ { body =
-                  { public_key = fish1_pk
-                  ; update = Account_update.Update.noop
-                  ; token_id = Token_id.default
-                  ; balance_change = Currency.Amount.Signed.zero
-                  ; increment_nonce = true
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Snark_params.Tick.Field.zero
-                  ; call_depth = 0
-                  ; preconditions =
-                      { Account_update.Preconditions.network =
-                          Zkapp_precondition.Protocol_state.accept
-                      ; account = Nonce (Account.Nonce.of_int 1)
-                      }
-                  ; use_full_commitment = false
-                  ; caller = Call
-                  ; authorization_kind = Signature
-                  }
-              ; authorization = Signature Signature.dummy
-              }
-            ]
-        ; memo
-        }
+    let keymap =
+      List.fold [ fish1_kp; fish2_kp ]
+        ~init:Signature_lib.Public_key.Compressed.Map.empty
+        ~f:(fun map { private_key; public_key } ->
+          Signature_lib.Public_key.Compressed.Map.add_exn map
+            ~key:(Signature_lib.Public_key.compress public_key)
+            ~data:private_key )
     in
-    let valid_nonce_transaction =
-      Zkapp_command.of_simple
-        { fee_payer =
-            { body =
-                { public_key = fish1_pk
-                ; fee
-                ; valid_until = None
-                ; nonce = Account.Nonce.of_int 1
-                }
-            ; authorization = Signature.dummy
-            }
-        ; account_updates =
-            [ { body =
-                  { public_key = fish1_pk
-                  ; update = Account_update.Update.noop
-                  ; token_id = Token_id.default
-                  ; balance_change = Currency.Amount.Signed.zero
-                  ; increment_nonce = true
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Snark_params.Tick.Field.zero
-                  ; call_depth = 0
-                  ; preconditions =
-                      { Account_update.Preconditions.network =
-                          Zkapp_precondition.Protocol_state.accept
-                      ; account = Nonce (Account.Nonce.of_int 2)
-                      }
-                  ; use_full_commitment = false
-                  ; caller = Call
-                  ; authorization_kind = Signature
-                  }
-              ; authorization = Signature Signature.dummy
-              }
+    let%bind.Deferred invalid_nonce_transaction =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish1_kp Token_id.default
+                   0
+                   ~preconditions:
+                     { Account_update.Preconditions.network =
+                         Zkapp_precondition.Protocol_state.accept
+                     ; account = Nonce (Account.Nonce.of_int 1)
+                     } )
+                []
             ]
-        ; memo
-        }
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"invalid nonce transaction" ~fee:12_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
     in
-    let t1 =
-      Zkapp_command.of_simple
-        { fee_payer =
-            { body =
-                { public_key = fish2_pk
-                ; fee
-                ; valid_until = None
-                ; nonce = Account.Nonce.of_int 0
-                }
-            ; authorization = Signature.dummy
-            }
-        ; account_updates =
-            [ { body =
-                  { public_key = fish2_pk
-                  ; update = Account_update.Update.noop
-                  ; token_id = Token_id.default
-                  ; balance_change = Currency.Amount.Signed.zero
-                  ; increment_nonce = true
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Snark_params.Tick.Field.zero
-                  ; call_depth = 0
-                  ; preconditions =
-                      { Account_update.Preconditions.network =
-                          Zkapp_precondition.Protocol_state.accept
-                      ; account = Nonce (Account.Nonce.of_int 1)
-                      }
-                  ; use_full_commitment = false
-                  ; caller = Call
-                  ; authorization_kind = Signature
-                  }
-              ; authorization = Signature Signature.dummy
-              }
+    let%bind.Deferred valid_nonce_transaction =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish1_kp Token_id.default
+                   0
+                   ~preconditions:
+                     { Account_update.Preconditions.network =
+                         Zkapp_precondition.Protocol_state.accept
+                     ; account = Nonce (Account.Nonce.of_int 2)
+                     } )
+                []
             ]
-        ; memo
-        }
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"valid nonce transaction" ~fee:12_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
+    in
+    let%bind.Deferred t1 =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish1_kp Token_id.default
+                   0
+                   ~preconditions:
+                     { Account_update.Preconditions.network =
+                         Zkapp_precondition.Protocol_state.accept
+                     ; account = Nonce (Account.Nonce.of_int 1)
+                     } )
+                []
+            ]
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"t1" ~fee:12_000_000 ~fee_payer_pk:fish2_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 0)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
     in
     (* Submit transactions*)
     let%bind () =
@@ -247,7 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node valid_nonce_transaction)
     in
     let%bind () =
-      section "Send a zkApp transaction  " (send_zkapp ~logger node t1)
+      section "Send a zkApp transaction" (send_zkapp ~logger node t1)
     in
     (* Check transactions*)
     let%bind () =
