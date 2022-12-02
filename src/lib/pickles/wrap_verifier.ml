@@ -798,11 +798,6 @@ struct
     |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
 
-  module Plonk_checks = struct
-    include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
-  end
-
   let field_array_if b ~then_ ~else_ =
     Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
 
@@ -902,7 +897,7 @@ struct
       with_label __LOC__ (fun () ->
           let ft_eval0 : Field.t =
             with_label __LOC__ (fun () ->
-                Plonk_checks.ft_eval0
+                Plonk_checks.Type2.ft_eval0
                   (module Field)
                   ~lookup_constant_term_part:None ~env ~domain plonk_minimal
                   combined_evals evals1.public_input )
@@ -975,7 +970,7 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          Plonk_checks.checked
+          Plonk_checks.Type2.checked
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in

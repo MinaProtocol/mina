@@ -26,11 +26,6 @@ type t =
   , Boolean.var )
   Types.Step.Proof_state.Per_proof.In_circuit.t
 
-module Plonk_checks = struct
-  include Plonk_checks
-  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
-end
-
 module Constant = struct
   type t =
     ( Challenge.Constant.t
@@ -86,7 +81,9 @@ module Constant = struct
            chals evals
        in
        let plonk =
-         Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+         Plonk_checks.Type2.derive_plonk
+           (module Tock.Field)
+           ~env ~shift chals evals
        in
        { deferred_values =
            { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
