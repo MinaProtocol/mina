@@ -19,6 +19,8 @@ module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
 module Opt = struct
+  [@@@warning "-4"]
+
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]
 
@@ -36,7 +38,7 @@ module Opt = struct
     | Maybe (_, x) ->
         x
     | None ->
-        failwith "Opt.value_exn"
+        invalid_arg "Opt.value_exn"
 
   let of_option (t : 'a option) : ('a, 'bool) t =
     match t with None -> None | Some x -> Some x
@@ -53,28 +55,6 @@ module Opt = struct
         Some (f x)
     | Maybe (b, x) ->
         Maybe (b, f x)
-
-  let map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
-      ~(f : a -> b -> c) =
-    match (t1, t2) with
-    | None, None ->
-        None
-    | Some x1, Some x2 ->
-        Some (f x1 x2)
-    | Some x1, Maybe (b2, x2) ->
-        Maybe (b2, f x1 x2)
-    | Maybe (b1, x1), Some x2 ->
-        Maybe (b1, f x1 x2)
-    | Maybe (_b1, _x1), Maybe (_b2, _x2) ->
-        failwith "Opt.map2_exn: (Maybe, Maybe)"
-    | Some _, None ->
-        failwith "Opt.map2_exn: (Some, None)"
-    | None, Some _ ->
-        failwith "Opt.map2_exn: (None, Some)"
-    | Maybe _, None ->
-        failwith "Opt.map2_exn: (Maybe, None)"
-    | None, Maybe _ ->
-        failwith "Opt.map2_exn: (None, Maybe)"
 
   open Snarky_backendless
 
@@ -163,6 +143,8 @@ module Opt = struct
   module Early_stop_sequence = struct
     (* A sequence that should be considered to have stopped at
        the first No flag *)
+    (* TODO: The documentation above makes it sound like the type below is too
+       generic: we're not guaranteed to have flags in there *)
     type nonrec ('a, 'bool) t = ('a, 'bool) t list
 
     let fold (type a bool acc res)
@@ -265,6 +247,7 @@ module Evals = struct
     module V2 = struct
       type 'a t =
         { w : 'a Columns_vec.Stable.V1.t
+        ; coefficients : 'a Columns_vec.Stable.V1.t
         ; z : 'a
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
@@ -276,10 +259,13 @@ module Evals = struct
   end]
 
   let to_absorption_sequence
-      { w; z; s; generic_selector; poseidon_selector; lookup } : _ list =
+      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      _ list =
     let always_present =
       [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w @ Vector.to_list s
+      @ Vector.to_list w
+      @ Vector.to_list coefficients
+      @ Vector.to_list s
     in
     let lookup =
       match lookup with
@@ -293,6 +279,7 @@ module Evals = struct
   module In_circuit = struct
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
+      ; coefficients : 'f Columns_vec.t
       ; z : 'f
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
@@ -302,9 +289,10 @@ module Evals = struct
     [@@deriving hlist, fields]
 
     let map (type bool a b)
-        ({ w; z; s; generic_selector; poseidon_selector; lookup } : (a, bool) t)
-        ~(f : a -> b) : (b, bool) t =
+        ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+          (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
+      ; coefficients = Vector.map coefficients ~f
       ; z = f z
       ; s = Vector.map s ~f
       ; generic_selector = f generic_selector
@@ -312,12 +300,15 @@ module Evals = struct
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
       }
 
-    let to_list { w; z; s; generic_selector; poseidon_selector; lookup } =
+    let to_list
+        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
       let some x = Opt.Some x in
       let always_present =
         List.map ~f:some
           ( [ z; generic_selector; poseidon_selector ]
-          @ Vector.to_list w @ Vector.to_list s )
+          @ Vector.to_list w
+          @ Vector.to_list coefficients
+          @ Vector.to_list s )
       in
       let with_lookup ~f (lookup : _ Lookup.In_circuit.t) =
         always_present
@@ -339,11 +330,13 @@ module Evals = struct
           with_lookup ~f:(fun x -> Maybe (b, x)) lookup
 
     let to_absorption_sequence
-        { w; z; s; generic_selector; poseidon_selector; lookup } :
+        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         _ Opt.Early_stop_sequence.t =
       let always_present =
         [ z; generic_selector; poseidon_selector ]
-        @ Vector.to_list w @ Vector.to_list s
+        @ Vector.to_list w
+        @ Vector.to_list coefficients
+        @ Vector.to_list s
       in
       let some x = Opt.Some x in
       let lookup =
@@ -363,9 +356,10 @@ module Evals = struct
   end
 
   let to_in_circuit (type bool a)
-      ({ w; z; s; generic_selector; poseidon_selector; lookup } : a t) :
-      (a, bool) In_circuit.t =
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        a t ) : (a, bool) In_circuit.t =
     { w
+    ; coefficients
     ; z
     ; s
     ; generic_selector
@@ -374,9 +368,10 @@ module Evals = struct
     }
 
   let map (type a b)
-      ({ w; z; s; generic_selector; poseidon_selector; lookup } : a t)
-      ~(f : a -> b) : b t =
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
+    ; coefficients = Vector.map coefficients ~f
     ; z = f z
     ; s = Vector.map s ~f
     ; generic_selector = f generic_selector
@@ -386,14 +381,13 @@ module Evals = struct
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
     { w = Vector.map2 t1.w t2.w ~f
+    ; coefficients = Vector.map2 t1.coefficients t2.coefficients ~f
     ; z = f t1.z t2.z
     ; s = Vector.map2 t1.s t2.s ~f
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
     }
-
-  let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
 
   (*
       This is in the same order as the evaluations in the opening proof:
@@ -415,10 +409,13 @@ module Evals = struct
      - lookup runtime
   *)
 
-  let to_list { w; z; s; generic_selector; poseidon_selector; lookup } =
+  let to_list
+      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
     let always_present =
       [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w @ Vector.to_list s
+      @ Vector.to_list w
+      @ Vector.to_list coefficients
+      @ Vector.to_list s
     in
     match lookup with
     | None ->
@@ -438,6 +435,7 @@ module Evals = struct
     let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
+      ; Vector.typ e Columns.n
       ; e
       ; Vector.typ e Permuts_minus_1.n
       ; e
@@ -482,6 +480,8 @@ module All_evals = struct
         ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
+
+  [@@@warning "-4"]
 
   [%%versioned
   module Stable = struct
@@ -529,6 +529,8 @@ module All_evals = struct
 end
 
 module Openings = struct
+  [@@@warning "-4"] (* Deals with the 2 sexp-deriving types below *)
+
   module Bulletproof = struct
     [%%versioned
     module Stable = struct
@@ -575,22 +577,7 @@ module Poly_comm = struct
       end
     end]
 
-    let map { unshifted; shifted } ~f =
-      { unshifted = Array.map ~f unshifted; shifted = f shifted }
-
     let padded_array_typ0 = padded_array_typ
-
-    let padded_array_typ elt ~length ~dummy ~bool =
-      let open Snarky_backendless.Typ in
-      array ~length (tuple2 bool elt)
-      |> transport
-           ~there:(fun a ->
-             let a = Array.map a ~f:(fun x -> (true, x)) in
-             let n = Array.length a in
-             if n > length then failwithf "Expected %d <= %d" n length () ;
-             Array.append a (Array.create ~len:(length - n) (false, dummy)) )
-           ~back:(fun a ->
-             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
 
     let typ (type f g g_var bool_var)
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
@@ -619,8 +606,6 @@ module Poly_comm = struct
         type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
-
-    let typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -653,18 +638,6 @@ module Messages = struct
       { aggreg = z
       ; sorted = Array.create ~len:sorted_length z
       ; runtime = Option.some_if runtime z
-      }
-
-    let map { sorted; aggreg; runtime } ~f =
-      { sorted = Array.map ~f sorted
-      ; aggreg = f aggreg
-      ; runtime = Option.map ~f runtime
-      }
-
-    let map2 t1 t2 ~f =
-      { sorted = Array.map2_exn ~f t1.sorted t2.sorted
-      ; aggreg = f t1.aggreg t2.aggreg
-      ; runtime = Option.map2 ~f t1.runtime t2.runtime
       }
 
     let typ bool_typ e ~runtime ~dummy =
@@ -753,6 +726,4 @@ module Shifts = struct
       type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
     end
   end]
-
-  let map = Array.map
 end

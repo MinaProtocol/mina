@@ -15,7 +15,7 @@ use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -144,6 +144,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     };
     let proof_evals = ProofEvaluations {
         w: array_init(|_| vec![Fq::one()]),
+        coefficients: array_init(|_| vec![Fq::one()]),
         z: vec![Fq::one()],
         s: array_init(|_| vec![Fq::one()]),
         lookup: None,

@@ -29,6 +29,7 @@
     sgn_type
     data_hash_lib
     kimchi_backend.pasta
+    kimchi_backend.pasta.basic
     kimchi_backend
     pickles
     pickles.backend

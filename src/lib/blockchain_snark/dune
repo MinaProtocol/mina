@@ -26,12 +26,14 @@
    mina_transaction_logic
    mina_state
    pickles_types
+   pickles_base
    pickles
    genesis_constants
    currency
    sgn
    random_oracle
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    data_hash_lib
    ppx_version.runtime
  )

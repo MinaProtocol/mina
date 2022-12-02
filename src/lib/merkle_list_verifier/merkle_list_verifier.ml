@@ -14,13 +14,13 @@ module Make_intf (Input : Inputs_intf) = struct
          init:Input.hash
       -> Input.proof_elem list
       -> Input.hash
-      -> Input.hash Non_empty_list.t option
+      -> Input.hash Mina_stdlib.Nonempty_list.t option
 
     val verify_right :
          init:Input.hash
       -> Input.proof_elem list
       -> Input.hash
-      -> Input.hash Non_empty_list.t option
+      -> Input.hash Mina_stdlib.Nonempty_list.t option
   end
 end
 
@@ -35,22 +35,28 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
   *)
   let verify, verify_right =
     let conser acc proof_elem =
-      Non_empty_list.cons (hash (Non_empty_list.head acc) proof_elem) acc
+      Mina_stdlib.Nonempty_list.cons
+        (hash (Mina_stdlib.Nonempty_list.head acc) proof_elem)
+        acc
     in
     let verify ~init merkle_list target_hash =
       let hashes =
-        List.fold merkle_list ~init:(Non_empty_list.singleton init) ~f:conser
+        List.fold merkle_list
+          ~init:(Mina_stdlib.Nonempty_list.singleton init)
+          ~f:conser
       in
-      if equal_hash target_hash (Non_empty_list.head hashes) then Some hashes
+      if equal_hash target_hash (Mina_stdlib.Nonempty_list.head hashes) then
+        Some hashes
       else None
     in
     let verify_right ~init merkle_list target_hash =
       let hashes =
         List.fold_right merkle_list
-          ~init:(Non_empty_list.singleton init)
+          ~init:(Mina_stdlib.Nonempty_list.singleton init)
           ~f:(Fn.flip conser)
       in
-      if equal_hash target_hash (Non_empty_list.head hashes) then Some hashes
+      if equal_hash target_hash (Mina_stdlib.Nonempty_list.head hashes) then
+        Some hashes
       else None
     in
     (verify, verify_right)

@@ -183,7 +183,7 @@ let%test_module "all-ipc test" =
       in
       (* Get addresses of Alice *)
       let%bind lAddrs = listening_addrs a >>| Or_error.ok_exn in
-      assert (List.length lAddrs > 0) ;
+      assert (Mina_stdlib.List.Length.Compare.(lAddrs > 0)) ;
       (* Await Carol to connect *)
       (* This is done mainly to test PeerConnected upcall *)
       let%bind () =
@@ -320,7 +320,7 @@ let%test_module "all-ipc test" =
 
       (* List peers of Alice *)
       let%bind peers = peers a in
-      assert (List.length peers >= 2) ;
+      assert (Mina_stdlib.List.Length.Compare.(peers >= 2)) ;
       assert (
         List.fold [ ad.y_peerid; ad.b_peerid; ad.c_peerid ] ~init:true
           ~f:(fun b_acc pid ->
@@ -537,7 +537,7 @@ let%test_module "all-ipc test" =
       let%bind node =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String local_name) ])
-          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected
+          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a =

@@ -24,6 +24,7 @@
    network_pool
    cli_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base.util
    mina_ledger
    pickles

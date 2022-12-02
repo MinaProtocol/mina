@@ -120,45 +120,45 @@ locals {
   }
 
   archive_vars = [for item in var.archive_configs : {
-      testnetName = var.testnet_name
-      mina        = {
-        image         = var.mina_image
-        useCustomEntrypoint  = var.use_custom_entrypoint
-        customEntrypoint     = var.custom_entrypoint
-        seedPeers     = local.peers
-        runtimeConfig = local.daemon.runtimeConfig
-        seedPeersURL  = var.seed_peers_url
+    testnetName = var.testnet_name
+    mina        = {
+      image         = var.mina_image
+      useCustomEntrypoint  = var.use_custom_entrypoint
+      customEntrypoint     = var.custom_entrypoint
+      seedPeers     = local.peers
+      runtimeConfig = local.daemon.runtimeConfig
+      seedPeersURL  = var.seed_peers_url
+    }
+    healthcheck = local.healthcheck_vars
+    archive     = item
+    postgresql = {
+      persistence = {
+        enabled      = item["persistenceEnabled"]
+        size         = item["persistenceSize"]
+        storageClass = item["persistenceStorageClass"]
+        accessModes  = item["persistenceAccessModes"]
       }
-      healthcheck = local.healthcheck_vars
-      archive     = item
-      postgresql = {
-        persistence = {
-          enabled      = item["persistenceEnabled"]
-          size         = item["persistenceSize"]
-          storageClass = item["persistenceStorageClass"]
-          accessModes  = item["persistenceAccessModes"]
-        }
-        primary = {
-          affinity = {
-            nodeAffinity = {
-              requiredDuringSchedulingIgnoredDuringExecution = {
-                nodeSelectorTerms = [
-                  {
-                    matchExpressions = [
-                      {
-                        key = "cloud.google.com/gke-preemptible"
-                        operator = item["preemptibleAllowed"] ? "In" : "NotIn"
-                        values = ["true"]
-                      }
-                    ]
-                  }
-                ]
-              }
+      primary = {
+        affinity = {
+          nodeAffinity = {
+            requiredDuringSchedulingIgnoredDuringExecution = {
+              nodeSelectorTerms = [
+                {
+                  matchExpressions = [
+                    {
+                      key = "cloud.google.com/gke-spot"
+                      operator = item["spotAllowed"] ? "In" : "NotIn"
+                      values = ["true"]
+                    }
+                  ]
+                }
+              ]
             }
           }
         }
       }
-    }]
+    }
+  }]
 
   snark_vars = [
     for i, snark in var.snark_coordinators: {

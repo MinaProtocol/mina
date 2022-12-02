@@ -110,7 +110,7 @@ let%test_module "Sequence events test" =
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; fee = Currency.Fee.(of_int 50)
+            ; fee = Currency.Fee.(of_nanomina_int_exn 50)
             ; nonce = Account.Nonce.of_int fee_payer_nonce
             }
         ; authorization = Signature.dummy
@@ -163,7 +163,9 @@ let%test_module "Sequence events test" =
       let zkapp_command : Zkapp_command.t =
         sign_all { fee_payer; account_updates = zkapp_command; memo }
       in
-      let account = Account.create account_id Currency.Balance.(of_int 500) in
+      let account =
+        Account.create account_id Currency.Balance.(of_nanomina_int_exn 500)
+      in
       let _, loc =
         Ledger.get_or_create_account ledger account_id account
         |> Or_error.ok_exn

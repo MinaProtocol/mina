@@ -55,8 +55,18 @@ module User_command_type = struct
         raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
-module Fee = Make_numeric (Currency.Fee)
-module Amount = Make_numeric (Currency.Amount)
+module Fee = Make_numeric (struct
+  include Currency.Fee
+
+  let of_int = of_nanomina_int_exn
+end)
+
+module Amount = Make_numeric (struct
+  include Currency.Amount
+
+  let of_int = of_nanomina_int_exn
+end)
+
 module Nonce = Make_numeric (Account.Nonce)
 module Length = Make_numeric (Mina_numbers.Length)
 

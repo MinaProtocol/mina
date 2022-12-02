@@ -27,6 +27,7 @@
    run_in_thread
    kimchi_backend_common
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base.import
    sgn
    sgn_type

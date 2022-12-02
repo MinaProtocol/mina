@@ -18,6 +18,7 @@
    kimchi_backend
    kimchi_backend.common
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    transaction_snark
    snark_params
    mina_ledger

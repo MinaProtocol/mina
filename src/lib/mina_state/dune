@@ -40,6 +40,7 @@
    linked_tree
    mina_numbers
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    kimchi_backend
    mina_base.util
    mina_ledger
