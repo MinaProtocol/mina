@@ -1,11 +1,12 @@
 open Core
 open Integration_test_lib
-open Mina_base
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
   open Engine
   open Dsl
+
+  open Test_common.Make (Inputs)
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
@@ -26,50 +27,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             { Wallet.balance = block_producer_balance; timing = Untimed } )
     }
 
-  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
-      n =
-    let open Malleable_error.Let_syntax in
-    let rec go n hashlist =
-      if n = 0 then return hashlist
-      else
-        let%bind hash =
-          let%map { hash; _ } =
-            Network.Node.must_send_payment ~logger ~sender_pub_key
-              ~receiver_pub_key ~amount ~fee node
-          in
-          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
-            n
-            (Transaction_hash.to_base58_check hash) ;
-          hash
-        in
-        go (n - 1) (List.append hashlist [ hash ])
-    in
-    go n []
-
-  let wait_for_payments ~logger ~dsl ~hashlist n =
-    let open Malleable_error.Let_syntax in
-    let rec go n hashlist =
-      if n = 0 then return ()
-      else
-        (* confirm payment *)
-        let%bind () =
-          let hash = List.hd_exn hashlist in
-          let%map () =
-            wait_for dsl
-              (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~txn_hash:hash ~node_included_in:`Any_node )
-          in
-          [%log info]
-            "gossip_consistency test: payment #%d with hash %s successfully \
-             included in frontier."
-            n
-            (Transaction_hash.to_base58_check hash) ;
-          ()
-        in
-        go (n - 1) (List.tl_exn hashlist)
-    in
-    go n hashlist
-
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -80,11 +37,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
     let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
+    let%bind receiver_pub_key = pub_key_of_node receiver_bp in
     let sender_bp =
       Core_kernel.List.nth_exn (Network.block_producers network) 1
     in
-    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in

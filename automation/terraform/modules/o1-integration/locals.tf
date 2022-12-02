@@ -34,16 +34,15 @@ locals {
 
     postgresHost            = "archive-1-postgresql"
     postgresPort            = 5432
-    postgresDB              = "archive"
-    postgresqlUsername      = "postgres"
-    postgresqlPassword      = "foobar"
+    # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
     remoteSchemaFile        = var.mina_archive_schema
+    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
 
-    persistenceEnabled      = true
-    persistenceSize         = "8Gi"
+    persistenceEnabled      = false
+    persistenceSize         = "1Gi"
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
-    preemptibleAllowed      = "false"
+    spotAllowed             = "true"
   }
 
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
