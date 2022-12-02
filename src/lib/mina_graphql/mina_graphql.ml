@@ -1342,11 +1342,11 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool
+             ; field "isTokenOwner" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
                  ~resolve:(fun _ _ -> None)
-             ; field "isDisabled" ~typ:bool
+             ; field "isDisabled" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:
                    "True if this account has been disabled by the owner of the \
                     associated token"
