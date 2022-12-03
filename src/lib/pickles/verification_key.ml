@@ -48,7 +48,6 @@ module Verifier_index_json = struct
         ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
-    ; max_quot_size : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'sRS
@@ -121,7 +120,6 @@ module Stable = struct
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
-        let max_quot_size = Common.max_quot_size_int (Domain.size d) in
         let public =
           let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
@@ -132,7 +130,6 @@ module Stable = struct
             ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
-        ; max_quot_size
         ; public
         ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs

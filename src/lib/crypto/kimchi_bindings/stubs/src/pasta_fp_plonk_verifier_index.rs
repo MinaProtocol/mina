@@ -29,7 +29,6 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
                 group_gen: CamlFp(vi.domain.group_gen),
             },
             max_poly_size: vi.max_poly_size as isize,
-            max_quot_size: vi.max_quot_size as isize,
             public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
             srs: CamlFpSrs(vi.srs.get().expect("have an srs").clone()),
@@ -99,7 +98,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         VerifierIndex::<Vesta> {
             domain,
             max_poly_size: index.max_poly_size as usize,
-            max_quot_size: index.max_quot_size as usize,
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
@@ -237,7 +235,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             group_gen: Fp::one().into(),
         },
         max_poly_size: 0,
-        max_quot_size: 0,
         public: 0,
         prev_challenges: 0,
         srs: CamlFpSrs::new(SRS::create(0)),
