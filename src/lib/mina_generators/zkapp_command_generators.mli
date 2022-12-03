@@ -82,6 +82,7 @@ val gen_zkapp_commands_with_limited_keys_testnet :
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> ?num_account_updates:int
+  -> ?min_fee:Currency.Fee.t
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t

@@ -34,6 +34,7 @@
    transaction_snark
    with_hash
    zkapp_command_builder
+   mina_compile_config
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)

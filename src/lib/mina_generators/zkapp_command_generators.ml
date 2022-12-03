@@ -234,12 +234,13 @@ let gen_account_precondition_from_account ?failure
     | _ ->
         return (Account_update.Account_precondition.Nonce nonce)
 
-let gen_fee ~num_updates (account : Account.t) =
+let gen_fee ?min_fee ~num_updates (account : Account.t) =
   let balance = account.balance in
+  let min_fee =
+    Option.value ~default:Mina_compile_config.minimum_user_command_fee min_fee
+  in
   let lo_fee =
-    Option.value_exn
-      Currency.Fee.(
-        scale Mina_compile_config.minimum_user_command_fee (num_updates * 2))
+    Option.value_exn Currency.Fee.(scale min_fee (num_updates * 2))
   in
   let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
@@ -1068,7 +1069,7 @@ let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
-    ?protocol_state_view ~account_state_tbl ~num_account_updates () :
+    ?protocol_state_view ~account_state_tbl ?min_fee ~num_account_updates () :
     Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen (account : Account.t) =
@@ -1078,7 +1079,7 @@ let gen_account_update_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
     gen_account_update_body_components ?failure ?permissions_auth ~account_id
       ~account_state_tbl ?vk ~zkapp_account_ids:[] ~is_fee_payer:true
       ~increment_nonce:((), true)
-      ~gen_balance_change:(gen_fee ~num_updates:num_account_updates)
+      ~gen_balance_change:(gen_fee ?min_fee ~num_updates:num_account_updates)
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
@@ -1095,12 +1096,12 @@ let gen_account_update_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
   Account_update_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?failure ?permissions_auth ~account_id ?protocol_state_view
-    ?vk ~account_state_tbl ~num_account_updates () :
+    ?vk ~account_state_tbl ?min_fee ~num_account_updates () :
     Account_update.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
     gen_account_update_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
-      ?protocol_state_view ~account_state_tbl ~num_account_updates ()
+      ?protocol_state_view ~account_state_tbl ?min_fee ~num_account_updates ()
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
   let authorization = Signature.dummy in
@@ -1127,7 +1128,7 @@ let gen_zkapp_command_from' ?failure
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?limited_zkapp_accounts
-    ?balancing_account_id ~ignore_sequence_events_precond () =
+    ?balancing_account_id ?min_fee ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   (* at least 1 account_update *)
   let%bind num_account_updates =
@@ -1208,7 +1209,7 @@ let gen_zkapp_command_from' ?failure
   let account_ids_seen = Account_id.Hash_set.create () in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_acct_id ?vk ~account_state_tbl
+      ~account_id:fee_payer_acct_id ?vk ?min_fee ~account_state_tbl
       ~num_account_updates:(num_account_updates * 2) ()
   in
   let zkapp_account_ids =
@@ -1649,7 +1650,7 @@ let gen_list_of_zkapp_command_from ?failure ?max_account_updates
   go length []
 
 let gen_zkapp_commands_with_limited_keys_testnet ~keymap ?account_state_tbl
-    ~ledger ?protocol_state_view ?vk ?num_account_updates
+    ~ledger ?protocol_state_view ?vk ?num_account_updates ?min_fee
     ~(fee_payer_keypair : Signature_lib.Keypair.t) () =
   let open Quickcheck.Generator.Let_syntax in
   let pks = Signature_lib.Public_key.Compressed.Map.keys keymap in
@@ -1671,4 +1672,4 @@ let gen_zkapp_commands_with_limited_keys_testnet ~keymap ?account_state_tbl
   gen_zkapp_command_from' ?failure:None ~create_new_accounts:false
     ~fee_payer_keypair ~keymap ?account_state_tbl ~ledger ?protocol_state_view
     ?vk ?num_account_updates ~balancing_account_id ~max_token_updates:0
-    ~limited_zkapp_accounts ~ignore_sequence_events_precond:true ()
+    ~limited_zkapp_accounts ~ignore_sequence_events_precond:true ?min_fee ()

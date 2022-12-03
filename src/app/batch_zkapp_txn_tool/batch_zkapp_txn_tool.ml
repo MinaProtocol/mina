@@ -10,6 +10,7 @@ type query =
   ; fee_payer_keypair : Signature_lib.Keypair.t
   ; account_creator_keypair : Signature_lib.Keypair.t
   ; account_states : (Account_id.Stable.Latest.t * Account.t) list
+  ; min_fee : Currency.Fee.t option
   }
 
 let get_ledger (constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -166,6 +167,7 @@ let generate_random_zkapps ~ledger ~vk ~prover
      ; fee_payer_keypair
      ; account_creator_keypair = _
      ; account_states
+     ; min_fee
      } :
       query ) =
   let open Deferred.Let_syntax in
@@ -192,7 +194,7 @@ let generate_random_zkapps ~ledger ~vk ~prover
       let%bind parties =
         Mina_generators.Zkapp_command_generators
         .gen_zkapp_commands_with_limited_keys_testnet ~ledger ~keymap
-          ~account_state_tbl ?num_account_updates:parties_size ~vk
+          ~account_state_tbl ?num_account_updates:parties_size ~vk ?min_fee
           ~fee_payer_keypair ()
       in
       go (n - 1) (parties :: acc)
@@ -264,6 +266,13 @@ let batch_test_zkapps =
           "NUM Number of transactions generated at once before sending \
            (default: 10). Note: generating large zkapp transactions is slow"
         (optional_with_default 10 int)
+    and min_fee =
+      flag "--min-fee" ~aliases:[ "min-fee" ]
+        ~doc:
+          (sprintf "FEE Minimum fee per account update. Default: %s Mina"
+             (Currency.Fee.to_formatted_string
+                Mina_compile_config.minimum_user_command_fee ) )
+        (optional string)
     in
     ( keypair_path
     , fee_payer_privkey_path
@@ -273,7 +282,8 @@ let batch_test_zkapps =
     , rate_limit_level
     , rate_limit_interval
     , num_txns
-    , batch_size )
+    , batch_size
+    , min_fee )
   in
   Command.async
     ~summary:
@@ -290,7 +300,8 @@ let batch_test_zkapps =
             , rate_limit_level
             , rate_limit_interval
             , num_txns
-            , batch_size )
+            , batch_size
+            , min_fee )
           ->
          let open Deferred.Let_syntax in
          let constraint_constants =
@@ -370,6 +381,8 @@ let batch_test_zkapps =
                  ; fee_payer_keypair
                  ; account_creator_keypair
                  ; account_states
+                 ; min_fee =
+                     Option.map ~f:Currency.Fee.of_formatted_string min_fee
                  }
              in
              let%bind () =
