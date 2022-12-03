@@ -652,6 +652,7 @@ module Account_update_body_components = struct
             { Zkapp_precondition.Closed_interval.upper; _ } ->
             Some upper )
     ; nonce = t.account_precondition
+    ; authorization_kind = Signature
     }
 
   let to_typical_account_update t : Account_update.Body.Simple.t =

@@ -1614,12 +1614,13 @@ module Zkapp_fee_payer_body = struct
     ; fee : string
     ; valid_until : int64 option
     ; nonce : int64
+    ; authorization_kind : string
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; string; option int64; int64 ]
+      Caqti_type.[ int; string; option int64; int64; string ]
 
   let table_name = "zkapp_fee_payer_body"
 
@@ -1642,9 +1643,16 @@ module Zkapp_fee_payer_body = struct
       |> Unsigned.UInt32.to_int64
     in
     let fee = Currency.Fee.to_string body.fee in
-    let value = { account_identifier_id; fee; valid_until; nonce } in
+    let authorization_kind =
+      Account_update.Authorization_kind.to_string body.authorization_kind
+    in
+    let value =
+      { account_identifier_id; fee; valid_until; nonce; authorization_kind }
+    in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
+      ~tannot:(function
+        | "authorization_kind" -> Some "authorization_kind_type" | _ -> None )
       (module Conn)
       value
 
@@ -3213,7 +3221,16 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Account_update.Fee_payer.t) =
-              { body = fee_payer; authorization = Signature Signature.dummy }
+              let authorization =
+                match fee_payer.authorization_kind with
+                | None_given | Signature ->
+                    Mina_base.Account_update.Fee_payer.Authorization.Signature
+                      Signature.dummy
+                | Proof ->
+                    Mina_base.Account_update.Fee_payer.Authorization.Proof
+                      Mina_base.Proof.transaction_dummy
+              in
+              { body = fee_payer; authorization }
             in
             let (account_updates : Account_update.Simple.t list) =
               List.map account_updates

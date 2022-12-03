@@ -42,7 +42,7 @@ let payload_of_fee_payer_js (fee_payer_js : payload_fee_payer_js) :
     fee_payer_js##.nonce |> Js.to_string |> Mina_numbers.Account_nonce.of_string
   in
   { Account_update.Fee_payer.body =
-      { public_key = fee_payer_pk; fee; valid_until = None; nonce }
+      { public_key = fee_payer_pk; fee; valid_until = None; nonce; authorization_kind = Signature }
   ; authorization = Signature Signature.dummy
   }
 

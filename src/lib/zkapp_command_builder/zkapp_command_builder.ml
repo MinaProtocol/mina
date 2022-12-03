@@ -43,6 +43,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
         ; fee = Currency.Fee.of_nanomina_int_exn fee
         ; valid_until = None
         ; nonce = fee_payer_nonce
+        ; authorization_kind = Signature
         }
     ; authorization = Signature Signature.dummy
     }

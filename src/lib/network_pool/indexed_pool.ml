@@ -1951,7 +1951,12 @@ let%test_module _ =
       let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
         { fee_payer =
             { Account_update.Fee_payer.body =
-                { public_key = sender_pk; fee; nonce; valid_until = None }
+                { public_key = sender_pk
+                ; fee
+                ; nonce
+                ; valid_until = None
+                ; authorization_kind = Signature
+                }
                 (* Real signature added in below *)
             ; authorization = Signature Signature.dummy
             }

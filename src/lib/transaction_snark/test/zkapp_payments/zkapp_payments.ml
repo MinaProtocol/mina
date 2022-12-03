@@ -41,6 +41,7 @@ let%test_module "Zkapp payments tests" =
                 ; fee = Fee.of_nanomina_int_exn full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
+                ; authorization_kind = Signature
                 }
             ; authorization = Signature Signature.dummy
             }

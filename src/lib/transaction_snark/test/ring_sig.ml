@@ -181,6 +181,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; fee = Amount.to_fee fee
                 ; valid_until = None
                 ; nonce = sender_nonce
+                ; authorization_kind = Signature
                 }
                 (* Real signature added in below *)
             ; authorization = Signature Signature.dummy

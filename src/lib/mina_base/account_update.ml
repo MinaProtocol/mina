@@ -1086,6 +1086,7 @@ module Body = struct
           ; fee : Fee.Stable.V1.t
           ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
           ; nonce : Account_nonce.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
@@ -1099,13 +1100,14 @@ module Body = struct
       and fee = Currency.Fee.gen
       and valid_until = Option.quickcheck_generator Global_slot.gen
       and nonce = Account.Nonce.gen in
-      { public_key; fee; valid_until; nonce }
+      { public_key; fee; valid_until; nonce; authorization_kind = Signature }
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
       ; fee = Fee.zero
       ; valid_until = None
       ; nonce = Account_nonce.zero
+      ; authorization_kind = Signature
       }
 
     let deriver obj =
@@ -1120,6 +1122,7 @@ module Body = struct
           !.Fields_derivers_zkapps.Derivers.(
               option ~js_type:Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
+        ~authorization_kind:!.Authorization_kind.deriver
       |> finish "FeePayerBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
@@ -1152,7 +1155,7 @@ module Body = struct
         }
     ; use_full_commitment = true
     ; caller = Token_id.default
-    ; authorization_kind = Signature
+    ; authorization_kind = t.authorization_kind
     }
 
   let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
@@ -1179,7 +1182,7 @@ module Body = struct
     ; use_full_commitment = true
     ; caller = Call
     ; call_depth = 0
-    ; authorization_kind = Signature
+    ; authorization_kind = t.authorization_kind
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
@@ -1194,7 +1197,7 @@ module Body = struct
         ; preconditions
         ; use_full_commitment = _
         ; caller = _
-        ; authorization_kind = _
+        ; authorization_kind
         } =
       t
     in
@@ -1216,7 +1219,7 @@ module Body = struct
       | Check { upper; _ } ->
           Some upper
     in
-    { public_key; fee; valid_until; nonce }
+    { public_key; fee; valid_until; nonce; authorization_kind }
 
   module Checked = struct
     module Type_of_var (V : sig

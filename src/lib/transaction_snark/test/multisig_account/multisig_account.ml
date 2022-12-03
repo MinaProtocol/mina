@@ -318,6 +318,7 @@ let%test_module "multisig_account" =
                     ; fee
                     ; valid_until = None
                     ; nonce = sender_nonce
+                    ; authorization_kind = Signature
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature Signature.dummy

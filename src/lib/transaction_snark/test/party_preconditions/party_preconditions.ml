@@ -175,6 +175,7 @@ let%test_module "Protocol state precondition tests" =
                         ; fee
                         ; valid_until = None
                         ; nonce = sender_nonce
+                        ; authorization_kind = Signature
                         }
                         (*To be updated later*)
                     ; authorization = Signature Signature.dummy
@@ -587,6 +588,7 @@ let%test_module "Account precondition tests" =
                     ; fee
                     ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
+                    ; authorization_kind = Signature
                     }
                     (*To be updated later*)
                 ; authorization = Signature Signature.dummy

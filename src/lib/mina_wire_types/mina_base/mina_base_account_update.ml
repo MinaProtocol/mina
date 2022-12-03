@@ -66,6 +66,7 @@ module Body = struct
         ; fee : Currency.Fee.V1.t
         ; valid_until : Mina_numbers.Global_slot.V1.t option
         ; nonce : Mina_numbers.Account_nonce.V1.t
+        ; authorization_kind : Authorization_kind.V1.t
         }
     end
   end

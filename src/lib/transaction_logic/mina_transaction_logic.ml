@@ -2363,6 +2363,7 @@ module For_tests = struct
               ; fee
               ; valid_until = None
               ; nonce = actual_nonce
+              ; authorization_kind = Signature
               }
               (* Real signature added in below *)
           ; authorization = Signature Signature.dummy

@@ -410,7 +410,12 @@ let load_events pool id =
 
 let get_fee_payer_body ~pool body_id =
   let query_db ~f = Mina_caqti.query ~f pool in
-  let%bind { account_identifier_id; fee; valid_until; nonce } =
+  let%bind { account_identifier_id
+           ; fee
+           ; valid_until
+           ; nonce
+           ; authorization_kind
+           } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
@@ -424,8 +429,12 @@ let get_fee_payer_body ~pool body_id =
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
   in
+  let authorization_kind =
+    Account_update.Authorization_kind.of_string_exn authorization_kind
+  in
   return
-    ({ public_key; fee; valid_until; nonce } : Account_update.Body.Fee_payer.t)
+    ( { public_key; fee; valid_until; nonce; authorization_kind }
+      : Account_update.Body.Fee_payer.t )
 
 let get_account_update_body ~pool body_id =
   let open Zkapp_basic in

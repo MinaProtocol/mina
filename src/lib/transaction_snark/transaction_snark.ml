@@ -4369,6 +4369,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     | Check { upper; _ } ->
                         Some upper )
             ; nonce
+            ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
         }
@@ -5026,6 +5027,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; fee
             ; valid_until = None
             ; nonce = sender_nonce
+            ; authorization_kind = Signature
             }
             (* Real signature added in below *)
         ; authorization = Signature Signature.dummy

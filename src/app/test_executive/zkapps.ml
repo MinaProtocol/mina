@@ -296,6 +296,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; fee = Currency.Fee.of_nanomina_int_exn 100_000_000
           ; valid_until = None
           ; nonce = Account.Nonce.of_int 0
+          ; authorization_kind = Proof
           }
         in
         let { Zkapp_command.fee_payer = _; account_updates; memo } =
