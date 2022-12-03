@@ -1127,7 +1127,7 @@ let gen_zkapp_command_from' ?failure
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?limited_zkapp_accounts
-    ~ignore_sequence_events_precond () =
+    ?balancing_account_id ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   (* at least 1 account_update *)
   let%bind num_account_updates =
@@ -1475,7 +1475,7 @@ let gen_zkapp_command_from' ?failure
     let authorization = Control.Signature Signature.dummy in
     gen_account_update_from ?failure ~permissions_auth:Control.Tag.Signature
       ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
-      ~available_public_keys ~account_state_tbl
+      ~available_public_keys ~account_state_tbl ?account_id:balancing_account_id
       ~required_balance_change:balance_change ?protocol_state_view ?vk
       ~ignore_sequence_events_precond ()
   in
@@ -1651,7 +1651,16 @@ let gen_list_of_zkapp_command_from ?failure ?max_account_updates
 let gen_zkapp_commands_with_limited_keys_testnet ~keymap ?account_state_tbl
     ~ledger ?protocol_state_view ?vk ?num_account_updates
     ~(fee_payer_keypair : Signature_lib.Keypair.t) () =
+  let open Quickcheck.Generator.Let_syntax in
   let pks = Signature_lib.Public_key.Compressed.Map.keys keymap in
+  (*The account ID for balancing the excess should be from this list of
+    keypairs. If unspecified, the generator picks any ordinary account from the
+    ledger for which there might not be a private key in the keymap and
+    therefore unable to sign*)
+  let%bind balancing_account_id =
+    let%map index = Int.gen_uniform_incl 0 (List.length pks - 1) in
+    Account_id.create (List.nth_exn pks index) Token_id.default
+  in
   let num_account_updates =
     Option.map num_account_updates ~f:(fun n -> `Fixed n)
   in
@@ -1661,5 +1670,5 @@ let gen_zkapp_commands_with_limited_keys_testnet ~keymap ?account_state_tbl
   (*Ignore sequence events in the preconditions because it depends on the    global slot a txn with sequence events is included in*)
   gen_zkapp_command_from' ?failure:None ~create_new_accounts:false
     ~fee_payer_keypair ~keymap ?account_state_tbl ~ledger ?protocol_state_view
-    ?vk ?num_account_updates ~max_token_updates:0 ~limited_zkapp_accounts
-    ~ignore_sequence_events_precond:true ()
+    ?vk ?num_account_updates ~balancing_account_id ~max_token_updates:0
+    ~limited_zkapp_accounts ~ignore_sequence_events_precond:true ()
