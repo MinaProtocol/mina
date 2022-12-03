@@ -1053,7 +1053,6 @@ let verification_evals_to_list
 let eq_verifier_index ~field_equal ~other_field_equal
     { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
-    ; max_quot_size = i1_3
     ; srs = _
     ; evals = evals1
     ; shifts = shifts1
@@ -1063,7 +1062,6 @@ let eq_verifier_index ~field_equal ~other_field_equal
     }
     { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
-    ; max_quot_size = i2_3
     ; srs = _
     ; evals = evals2
     ; shifts = shifts2
@@ -1071,7 +1069,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
     ; public = public2
     ; prev_challenges = prev_challenges2
     } =
-  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
+  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
        (eq_poly_comm ~field_equal:other_field_equal)
        (verification_evals_to_list evals1)
