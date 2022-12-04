@@ -19,7 +19,7 @@ module Gossip_types = Gossip_types
 type t =
   { transition_states : Transition_states.t
         (** Map from a state_hash to state of the transition corresponding to it  *)
-  ; parents : State_hash.t State_hash.Table.t
+  ; parents : (State_hash.t * Network_peer.Peer.t) State_hash.Table.t
         (** Map from transition's state_hash to parent for transitions that are not in transition states.
     This map is like a cache for old methods of getting transition chain. *)
   ; transition_hashes_by_length : State_hash.t list Mina_numbers.Length.Table.t

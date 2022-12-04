@@ -84,7 +84,9 @@ module type CONTEXT = sig
       however it will use batching to get as much information as possible in a fixed amount
       of RPC invocations. *)
   val retrieve_chain :
-       some_ancestors:State_hash.t list
+       some_ancestors:
+         (* List of ancestors in parent-first order along with senders that shared them first *)
+         (State_hash.t * Network_peer.Peer.t) list
     -> target_hash:State_hash.t
     -> target_length:Mina_numbers.Length.t
     -> preferred_peers:Network_peer.Peer.t list
@@ -96,7 +98,7 @@ module type CONTEXT = sig
          | `Block of Mina_block.with_hash
          | `Meta of Substate.transition_meta ]
        * Network_peer.Peer.t )
-       list
+       Mina_stdlib.Nonempty_list.t
        Or_error.t
        Interruptible.t
 

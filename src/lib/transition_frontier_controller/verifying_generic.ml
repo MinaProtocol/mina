@@ -212,7 +212,7 @@ module Make (F : F) = struct
     | Result.Error () ->
         fail (Error.of_string "interrupted")
     | Result.Ok (Result.Ok lst) ->
-        List.iter2 (Non_empty_list.to_list state_hashes) lst
+        List.iter2 (Mina_stdlib.Nonempty_list.to_list state_hashes) lst
           ~f:(fun state_hash res ->
             let for_restart_opt =
               update_to_processing_done ~transition_states ~state_hash
@@ -235,19 +235,19 @@ module Make (F : F) = struct
         fail e
 
   and launch_in_progress ~context ~actions ~transition_states states =
-    let top_state = Non_empty_list.last states in
+    let top_state = Mina_stdlib.Nonempty_list.last states in
     let top_state_hash =
       (Transition_state.State_functions.transition_meta top_state).state_hash
     in
     let holder = ref top_state_hash in
-    let state_hashes = Non_empty_list.map ~f:get_state_hash states in
+    let state_hashes = Mina_stdlib.Nonempty_list.map ~f:get_state_hash states in
     let ctx, action = F.create_in_progress_context ~context ~holder states in
     Async_kernel.Deferred.upon action
     @@ upon_f ~context ~actions ~transition_states ~state_hashes ~holder ;
     ctx
 
   and start_impl ~context ~actions ~transition_states states =
-    let top_state = Non_empty_list.last states in
+    let top_state = Mina_stdlib.Nonempty_list.last states in
     let top_state_hash =
       (Transition_state.State_functions.transition_meta top_state).state_hash
     in
@@ -278,5 +278,5 @@ module Make (F : F) = struct
     Fn.compose
       (Option.value_map ~default:()
          ~f:(start_impl ~context ~actions ~transition_states) )
-      Non_empty_list.of_list_opt
+      Mina_stdlib.Nonempty_list.of_list_opt
 end

@@ -31,7 +31,7 @@ module type F = sig
   val create_in_progress_context :
        context:(module Context.CONTEXT)
     -> holder:State_hash.t ref
-    -> Transition_state.t Non_empty_list.t
+    -> Transition_state.t Mina_stdlib.Nonempty_list.t
     -> processing_result Substate.processing_context
        * ( ( processing_result list
            , [ `Invalid_proof of Error.t | `Verifier_error of Error.t ] )

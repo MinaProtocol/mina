@@ -55,6 +55,9 @@ val find_map : 'a t -> f:('a -> 'b option) -> 'b option
 
 val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 
+val fold_right :
+  'a t -> init:('a -> 'accum) -> f:('a -> 'accum -> 'accum) -> 'accum
+
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
@@ -72,3 +75,8 @@ val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
 
 val iter_deferred :
   'a t -> f:('a -> unit Async_kernel.Deferred.t) -> unit Async_kernel.Deferred.t
+
+val unzip : ('a * 'b) t -> 'a t * 'b t
+
+val map2 :
+  'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t Base.List.Or_unequal_lengths.t

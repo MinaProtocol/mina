@@ -22,6 +22,10 @@ let tail (_, xs) = xs
 
 let last (x, xs) = if List.is_empty xs then x else List.last_exn xs
 
+let prefix_and_last (x, xs) =
+  if List.is_empty xs then ([], x)
+  else (x :: List.drop_last_exn xs, List.last_exn xs)
+
 let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
 let tail_opt t = of_list_opt (tail t)
@@ -43,6 +47,10 @@ module C = Container.Make (struct
 end)
 
 [%%define_locally C.(find, find_map, iter, length, fold)]
+
+let fold_right nel ~init ~f =
+  let prefix, last = prefix_and_last nel in
+  List.fold_right prefix ~init:(init last) ~f
 
 let to_list (x, xs) = x :: xs
 
@@ -68,3 +76,14 @@ let rec iter_deferred (x, xs) ~f =
   let open Async_kernel in
   let%bind () = f x in
   match xs with [] -> return () | h :: t -> iter_deferred (h, t) ~f
+
+let unzip ((x, y), rest) =
+  let xs, ys = List.unzip rest in
+  (init x xs, init y ys)
+
+let map2 (x, xs) (y, ys) ~f =
+  match List.map2 xs ys ~f with
+  | List.Or_unequal_lengths.Ok zs ->
+      List.Or_unequal_lengths.Ok (init (f x y) zs)
+  | Unequal_lengths ->
+      Unequal_lengths

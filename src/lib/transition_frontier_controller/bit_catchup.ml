@@ -48,28 +48,38 @@ let convert_breadcrumb_error =
   | `Staged_ledger_application_failed (Unexpected _ as e) ->
       `Invalid (to_error e, `Other)
 
-let hash_chain_to_metas_impl ~target_length hashes target_hash =
+(** Take non-empty list of ancestors, target hash and target length
+    and return the non-empty list (of the same size as list of ancestors)
+    of [Substate.transition_meta] values.  *)
+let hash_chain_to_metas ~target_length ~target_hash ancestors =
+  let next_state ~to_ne_list ~state_hash ~blockchain_length parent_state_hash =
+    ( to_ne_list Substate.{ state_hash; blockchain_length; parent_state_hash }
+    , Mina_numbers.Length.pred blockchain_length
+    , parent_state_hash )
+  in
+  let step (res, blockchain_length, state_hash) =
+    next_state ~state_hash ~blockchain_length
+      ~to_ne_list:(Fn.flip Mina_stdlib.Nonempty_list.cons res)
+  in
+  let init =
+    next_state ~to_ne_list:Mina_stdlib.Nonempty_list.singleton
+      ~state_hash:target_hash ~blockchain_length:target_length
+  in
   Tuple3.get1
-  @@ List.fold_right hashes ~init:([], target_length, target_hash)
-       ~f:(fun parent_state_hash (res, blockchain_length, state_hash) ->
-         ( Substate.{ state_hash; parent_state_hash; blockchain_length } :: res
-         , Mina_numbers.Length.pred blockchain_length
-         , parent_state_hash ) )
+  @@ Mina_stdlib.Nonempty_list.fold_right ancestors ~init ~f:(Fn.flip step)
 
-let hash_chain_to_metas ~target_length hashes =
-  List.hd hashes
-  |> Option.value_map ~default:[]
-       ~f:(hash_chain_to_metas_impl ~target_length (List.drop hashes 1))
-
-let try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length
-    hashes =
+(** Tries to find an ancestor of target hash for which
+    [lookup_transition] doesn't return [`Not_present].
+    
+    Returned non-empty list is in parent-first and contains no target hash. *)
+let try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length =
+  let open Mina_numbers.Length in
   List.fold_until
-    (Mina_stdlib.Nonempty_list.to_list hashes)
-    ~init:(target_length, [])
+    ~init:(pred target_length, [])
     ~f:(fun (blockchain_length, acc) hash ->
       match lookup_transition hash with
       | `Present | `Invalid ->
-          Continue_or_stop.Stop (Ok (hash :: acc))
+          Continue_or_stop.Stop (Ok (Mina_stdlib.Nonempty_list.init hash acc))
       | `Not_present ->
           Continue (Mina_numbers.Length.pred blockchain_length, hash :: acc) )
     ~finish:(fun (blockchain_length, _) ->
@@ -138,9 +148,10 @@ let retrieve_hash_chain_from_peer ~network ~trust_system ~logger ~root_length
         in
         I.return (Result.Error `Invalid_transition_chain_proof)
   in
+  let hashes_without_target_hash = Mina_stdlib.Nonempty_list.tail hashes in
   I.return
-    (try_to_connect_hash_chain hashes ~lookup_transition ~target_length
-       ~root_length )
+    (try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length
+       hashes_without_target_hash )
 
 let remove_duplicate_peers peers =
   let open Network_peer.Peer in
@@ -167,11 +178,13 @@ let retrieve_hash_chain ~network ~trust_system ~logger ~root_length
   in
   Result.map_error ~f:of_hash_chain_error res
 
-let download_ancestors ~preferred_peers ~lookup_transition ~network ~target_hash
-    metas (module I : Interruptible.F) =
+let download_ancestors ~preferred_peers ~lookup_transition ~network metas
+    (module I : Interruptible.F) =
   let%bind.I peers = I.lift (get_peers ~preferred_peers network) in
-  let rev_metas = List.rev metas in
-  let max_ = Transition_frontier.max_catchup_chunk_length in
+  let target, rev_metas = Mina_stdlib.Nonempty_list.(uncons @@ rev metas) in
+  let target_hash = target.Substate.state_hash in
+  (* let max_ = Transition_frontier.max_catchup_chunk_length in *)
+  let max_ = 5 in
   let downloaded = State_hash.Table.create () in
   let need_transition state_hash =
     if State_hash.Table.mem downloaded state_hash then false
@@ -186,50 +199,53 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network ~target_hash
     Mina_block.(header block |> Header.protocol_state)
     |> Mina_state.Protocol_state.hashes
   in
-  let map_res ~peer =
-    Fn.compose (result_pair_both peer)
-    @@ Result.bind ~f:(fun blocks ->
-           List.iter
-             ~f:(fun b ->
-               let bh = With_hash.of_data ~hash_data b in
-               ignore
-                 ( State_hash.Table.add downloaded
-                     ~key:(State_hash.With_state_hashes.state_hash bh)
-                     ~data:bh
-                   : [ `Duplicate | `Ok ] ) )
-             blocks ;
-           match State_hash.Table.find downloaded target_hash with
-           | None ->
-               Result.fail @@ Error.of_string "target hash not retrieved"
-           | Some _ ->
-               Result.return () )
+  let map_res ~peer res =
+    let continue = need_transition target_hash in
+    match res with
+    | Result.Error _ when not continue ->
+        Result.Ok ()
+    | Error e ->
+        Error (peer, e)
+    | Ok blocks ->
+        List.iter blocks ~f:(fun b ->
+            let bh = With_hash.of_data ~hash_data b in
+            ignore
+              ( State_hash.Table.add downloaded
+                  ~key:(State_hash.With_state_hashes.state_hash bh)
+                  ~data:(peer, bh)
+                : [ `Duplicate | `Ok ] ) ) ;
+        if continue then
+          Error (peer, Error.of_string "target hash not retrieved")
+        else Ok ()
   in
-  let f peer =
+  let try_peer_iter (n, acc) { Substate.state_hash; _ } =
+    let need = need_transition state_hash in
+    if need && n + 1 = max_ then Continue_or_stop.Stop (max_, state_hash :: acc)
+    else if need then Continue (n + 1, state_hash :: acc)
+    else Continue (n, acc)
+  in
+  let try_peer peer =
     let n, request =
-      List.fold_until rev_metas ~init:(0, []) ~finish:Fn.id
-        ~f:(fun (n, acc) meta ->
-          let need = need_transition meta.Substate.state_hash in
-          if need && n = max_ - 1 then
-            Continue_or_stop.Stop (n + 1, meta.state_hash :: acc)
-          else if need then Continue (n + 1, meta.state_hash :: acc)
-          else Continue (n, acc) )
+      List.fold_until rev_metas
+        ~init:(1, [ target_hash ])
+        ~finish:Fn.id ~f:try_peer_iter
     in
-    let sec = Float.of_int n *. sec_per_block in
+    let timeout = Float.of_int n *. sec_per_block in
     I.lift
     @@ Deferred.map ~f:(map_res ~peer)
     @@ Mina_networking.get_transition_chain
-         ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-         ~timeout:(Time.Span.of_sec sec) network peer request
+         ~heartbeat_timeout:(Time_ns.Span.of_sec timeout)
+         ~timeout:(Time.Span.of_sec timeout) network peer request
   in
-  let%map.I.Result peer, () =
-    I.Result.find_map ~how:`Sequential peers ~f
+  let%map.I.Result () =
+    I.Result.find_map ~how:`Sequential peers ~f:try_peer
     |> I.map ~f:(Result.map_error ~f:of_download_error)
   in
-  List.map metas ~f:(fun meta ->
+  Mina_stdlib.Nonempty_list.map metas ~f:(fun meta ->
       Option.value_map
-        ~default:(`Meta meta, peer)
         (State_hash.Table.find downloaded meta.state_hash)
-        ~f:(fun block -> (`Block block, peer)) )
+        ~default:(`Meta meta, None)
+        ~f:(fun (peer, block) -> (`Block block, Some peer)) )
 
 (** [promote_to_higher_state_impl] takes state with [Processed] status and
     returns the next state with [Processing] status or [None] if the transition
@@ -478,16 +494,16 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
     let transaction_snark_verification_timeout = Time.Span.of_sec 30.
 
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
-      let target_hash = State_hash.With_state_hashes.state_hash header in
-      let metas = [ Substate.transition_meta_of_header_with_hash header ] in
+      let meta = Substate.transition_meta_of_header_with_hash header in
       let%bind.I.Result res =
         download_ancestors ~preferred_peers
           ~lookup_transition:(const `Not_present)
-          ~network ~target_hash metas
+          ~network
+          (Mina_stdlib.Nonempty_list.singleton meta)
           (module I)
       in
-      match res with
-      | [ (`Block bh, _) ] ->
+      match Mina_stdlib.Nonempty_list.head res with
+      | `Block bh, _ ->
           I.Result.return (With_hash.data bh |> Mina_block.body)
       | _ ->
           I.return
@@ -505,10 +521,13 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let retrieve_chain ~some_ancestors ~target_hash ~target_length
         ~preferred_peers ~lookup_transition (module I : Interruptible.F) =
-      match lookup_transition target_hash with
-      | `Invalid | `Present ->
+      match
+        ( lookup_transition target_hash
+        , Mina_stdlib.Nonempty_list.of_list_opt some_ancestors )
+      with
+      | `Invalid, _ | `Present, _ ->
           I.return (Or_error.error_string "target transition is present")
-      | `Not_present when List.is_empty some_ancestors -> (
+      | `Not_present, None -> (
           let root_length =
             Transition_frontier.root frontier
             |> Frontier_base.Breadcrumb.consensus_state
@@ -519,22 +538,43 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
               ~preferred_peers ~target_hash ~target_length ~lookup_transition
               (module I)
           in
-          let metas = hash_chain_to_metas ~target_length hashes in
-          match Option.map ~f:lookup_transition @@ List.hd hashes with
-          | Some `Invalid ->
-              I.Result.return (List.map ~f:(fun x -> (`Meta x, peer)) metas)
-          | _ ->
+          let metas = hash_chain_to_metas ~target_length ~target_hash hashes in
+          match lookup_transition (Mina_stdlib.Nonempty_list.head hashes) with
+          | `Invalid ->
+              I.Result.return
+                (Mina_stdlib.Nonempty_list.map
+                   ~f:(fun x -> (`Meta x, peer))
+                   metas )
+          | `Present ->
               (* Present *)
-              download_ancestors ~preferred_peers:(peer :: preferred_peers)
-                ~lookup_transition ~network ~target_hash metas
-                (module I) )
-      | `Not_present ->
-          let metas =
-            hash_chain_to_metas_impl ~target_length some_ancestors target_hash
+              let%map.I.Result res =
+                download_ancestors ~preferred_peers:(peer :: preferred_peers)
+                  ~lookup_transition ~network metas
+                  (module I)
+              in
+              Mina_stdlib.Nonempty_list.map res
+                ~f:(Tuple2.map_snd ~f:(Option.value ~default:peer))
+          | `Not_present ->
+              failwith "Unexpected return of retrieve_hash_chain" )
+      | `Not_present, Some ancestors_and_senders -> (
+          let ancestors, senders =
+            Mina_stdlib.Nonempty_list.unzip ancestors_and_senders
           in
-          download_ancestors ~preferred_peers ~lookup_transition ~network
-            ~target_hash metas
-            (module I)
+          let metas =
+            hash_chain_to_metas ~target_length ~target_hash ancestors
+          in
+          let%map.I.Result res =
+            download_ancestors ~preferred_peers ~lookup_transition ~network
+              metas
+              (module I)
+          in
+          (* Invariant: |metas| = |senders| = |res| *)
+          let f default = Tuple2.map_snd ~f:(Option.value ~default) in
+          match Mina_stdlib.Nonempty_list.map2 ~f senders res with
+          | List.Or_unequal_lengths.Ok a ->
+              a
+          | _ ->
+              failwith "unexpected condition in retrieve_chain" )
 
     let genesis_state_hash =
       let genesis_protocol_state =

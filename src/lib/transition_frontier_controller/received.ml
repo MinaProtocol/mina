@@ -231,7 +231,7 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
   | None, None ->
       ignore
         ( State_hash.Table.add state.parents ~key:state_hash
-            ~data:transition_meta.parent_state_hash
+            ~data:(transition_meta.parent_state_hash, sender)
           : [ `Duplicate | `Ok ] ) ;
       Ok ()
 
@@ -258,7 +258,7 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
   let some_ancestors =
     let rec impl lst h =
       Option.value_map (State_hash.Table.find state.parents h) ~default:lst
-        ~f:(fun p -> impl (p :: lst) p)
+        ~f:(fun ((p, _) as pair) -> impl (pair :: lst) p)
     in
     impl []
   in
@@ -269,6 +269,7 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
       ~target_length:parent_length ~target_hash:parent_hash ~preferred_peers
       ~lookup_transition
       (module I)
+    |> I.map ~f:(Result.map_error ~f:(fun e -> `Other e))
   in
   let ancestry =
     if retrieve_immediately then retrieve_do ()
@@ -280,7 +281,7 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
       | `Not_present ->
           retrieve_do ()
       | _ ->
-          I.return @@ Ok []
+          I.return @@ Error `Present
   in
   let top_state_hash =
     State_hash.With_state_hashes.state_hash header_with_hash
@@ -322,15 +323,19 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
       on_error (Error.of_string "interrupted")
   | Ok (Result.Ok lst) ->
       cancel_child_contexts () ;
-      ignore (List.fold lst ~init:(Ok ()) ~f : unit Or_error.t) ;
+      ignore
+        ( List.fold (Mina_stdlib.Nonempty_list.to_list lst) ~init:(Ok ()) ~f
+          : unit Or_error.t ) ;
       (* This will trigger only is the top state hash remained in Processing state
          after handling all of the fetched ancestors *)
       Transition_states.update' state.transition_states top_state_hash
         ~f:
           ( set_processing_to_failed
           @@ Error.of_string "failed to retrieve ancestors" )
-  | Ok (Error e) ->
+  | Ok (Error (`Other e)) ->
       on_error e
+  | Ok (Error `Present) ->
+      ()
 
 and restart_failed_ancestor ~state ~actions ~context top_state_hash =
   let (module Context : CONTEXT) = context in

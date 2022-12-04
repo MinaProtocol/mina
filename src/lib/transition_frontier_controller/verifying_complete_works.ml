@@ -43,7 +43,7 @@ module F = struct
 
   let create_in_progress_context ~context:(module Context : CONTEXT) ~holder
       states =
-    let bottom_state = Non_empty_list.head states in
+    let bottom_state = Mina_stdlib.Nonempty_list.head states in
     let downto_ =
       (Transition_state.State_functions.transition_meta bottom_state)
         .blockchain_length
@@ -53,7 +53,7 @@ module F = struct
       Time.add (Time.now ()) Context.transaction_snark_verification_timeout
     in
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
-    let states = Non_empty_list.to_list states in
+    let states = Mina_stdlib.Nonempty_list.to_list states in
     let f = function
       | Ok (Ok ()) ->
           Ok (List.map states ~f:(const ()))
@@ -121,7 +121,7 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
   let handle_processing () =
     collect_dependent_and_pass_the_baton ~transition_states
       ~dsu:Context.processed_dsu (mk_processing Dependent)
-    |> Non_empty_list.of_list_opt
+    |> Mina_stdlib.Nonempty_list.of_list_opt
     |> Option.map
          ~f:
            ( Fn.compose mk_processing
