@@ -46,6 +46,14 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
+  ; z : 'caml_f array point_evaluations
+  ; s :
+      'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
   ; coefficients :
       'caml_f array point_evaluations
       * 'caml_f array point_evaluations
@@ -62,17 +70,9 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
-  ; z : 'caml_f array point_evaluations
-  ; s :
-      'caml_f array point_evaluations
-      * 'caml_f array point_evaluations
-      * 'caml_f array point_evaluations
-      * 'caml_f array point_evaluations
-      * 'caml_f array point_evaluations
-      * 'caml_f array point_evaluations
+  ; lookup : 'caml_f lookup_evaluations option
   ; generic_selector : 'caml_f array point_evaluations
   ; poseidon_selector : 'caml_f array point_evaluations
-  ; lookup : 'caml_f lookup_evaluations option
   }
 [@@boxed]
 

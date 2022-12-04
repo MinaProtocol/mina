@@ -1703,49 +1703,13 @@ var PERMUTS_MINUS_1 = 6;
 // Provides: caml_pasta_fp_proof_evaluations_to_rust
 // Requires: plonk_wasm, caml_fp_vector_to_rust, PERMUTS_MINUS_1, COLUMNS
 var caml_pasta_fp_proof_evaluations_to_rust = function(x) {
-    var w = new plonk_wasm.WasmVecVecFp(COLUMNS);
-    for (var i = 0; i < COLUMNS; ++i) {
-      w.push(caml_fp_vector_to_rust(x[1][i + 1]));
-    }
-
-    var coefficients = new plonk_wasm.WasmVecVecFp(COLUMNS);
-    for (var i = 0; i < COLUMNS; ++i) {
-      coefficients.push(caml_fp_vector_to_rust(x[2][i + 1]));
-    }
-
-    var z = caml_fp_vector_to_rust(x[3]);
-
-    var s = new plonk_wasm.WasmVecVecFp(PERMUTS_MINUS_1);
-    for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fp_vector_to_rust(x[4][i + 1]));
-    }
-
-    var generic_selector = caml_fp_vector_to_rust(x[5]);
-    var poseidon_selector = caml_fp_vector_to_rust(x[6]);
-
-    return new plonk_wasm.WasmFpProofEvaluations(w, coefficients, z, s, generic_selector, poseidon_selector);
+    return x;
 };
 
 // Provides: caml_pasta_fp_proof_evaluations_of_rust
 // Requires: plonk_wasm, caml_fp_vector_of_rust, COLUMNS, PERMUTS_MINUS_1
 var caml_pasta_fp_proof_evaluations_of_rust = function(x) {
-    var convertArray = function(v, n) {
-        var res = [0];
-        for (var i = 0; i < n; ++i) {
-            res.push(caml_fp_vector_of_rust(v.get(i)));
-        }
-        return res;
-    };
-
-    var w = convertArray(x.w, COLUMNS);
-    var coefficients = convertArray(x.coefficients, COLUMNS);
-    var z = caml_fp_vector_of_rust(x.z);
-    var s = convertArray(x.s, PERMUTS_MINUS_1);
-    var generic_selector = caml_fp_vector_of_rust(x.generic_selector);
-    var poseidon_selector = caml_fp_vector_of_rust(x.poseidon_selector);
-
-    x.free();
-    return [0, w, coefficients, z, s, generic_selector, poseidon_selector];
+    return x;
 };
 
 // Provides: caml_pasta_fp_opening_proof_to_rust
@@ -1843,8 +1807,7 @@ var caml_pasta_fp_commitments_of_rust = function(x) {
 var caml_pasta_fp_proof_to_rust = function(x) {
     var commitments = caml_pasta_fp_commitments_to_rust(x[1]);
     var proof = caml_pasta_fp_opening_proof_to_rust(x[2]);
-    var evals0 = caml_pasta_fp_proof_evaluations_to_rust(x[3][1]);
-    var evals1 = caml_pasta_fp_proof_evaluations_to_rust(x[3][2]);
+    var evals = caml_pasta_fp_proof_evaluations_to_rust(x[3]);
     var ft_eval1 = x[4];
     var public_ = caml_fp_vector_to_rust(x[5]);
     var prev_challenges = x[6];
@@ -1856,7 +1819,7 @@ var caml_pasta_fp_proof_to_rust = function(x) {
         prev_challenges_comms[i-1] = caml_vesta_poly_comm_to_rust(prev_challenges[i][2]);
     }
     prev_challenges_comms = js_class_vector_to_rust_vector(prev_challenges_comms);
-    return new plonk_wasm.WasmFpProverProof(commitments, proof, evals0, evals1, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
+    return new plonk_wasm.WasmFpProverProof(commitments, proof, evals, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
 };
 
 // Provides: caml_pasta_fp_proof_of_rust
@@ -1864,8 +1827,7 @@ var caml_pasta_fp_proof_to_rust = function(x) {
 var caml_pasta_fp_proof_of_rust = function(x) {
     var messages = caml_pasta_fp_commitments_of_rust(x.commitments);
     var proof = caml_pasta_fp_opening_proof_of_rust(x.proof);
-    var evals0 = caml_pasta_fp_proof_evaluations_of_rust(x.evals0);
-    var evals1 = caml_pasta_fp_proof_evaluations_of_rust(x.evals1);
+    var evals = caml_pasta_fp_proof_evaluations_of_rust(x.evals);
     var ft_eval1 = x.ft_eval1;
     var public_ = caml_fp_vector_of_rust(x.public_);
     var prev_challenges_scalars = x.prev_challenges_scalars;
@@ -1881,7 +1843,7 @@ var caml_pasta_fp_proof_of_rust = function(x) {
         res[2] = caml_vesta_poly_comm_of_rust(prev_challenges_comms[i]);
         prev_challenges[i] = res;
     }
-    return [0, messages, proof, [0, evals0, evals1], ft_eval1, public_, prev_challenges];
+    return [0, messages, proof, evals, ft_eval1, public_, prev_challenges];
 };
 
 // Provides: caml_pasta_fp_plonk_proof_create
@@ -2073,8 +2035,7 @@ var caml_pasta_fq_commitments_of_rust = function(x) {
 var caml_pasta_fq_proof_to_rust = function(x) {
     var messages = caml_pasta_fq_commitments_to_rust(x[1]);
     var proof = caml_pasta_fq_opening_proof_to_rust(x[2]);
-    var evals0 = caml_pasta_fq_proof_evaluations_to_rust(x[3][1]);
-    var evals1 = caml_pasta_fq_proof_evaluations_to_rust(x[3][2]);
+    var evals = caml_pasta_fq_proof_evaluations_to_rust(x[3]);
     var ft_eval1 = x[4];
     var public_ = caml_fq_vector_to_rust(x[5]);
     var prev_challenges = x[6];
@@ -2086,7 +2047,7 @@ var caml_pasta_fq_proof_to_rust = function(x) {
         prev_challenges_comms[i-1] = caml_pallas_poly_comm_to_rust(prev_challenges[i][2]);
     }
     prev_challenges_comms = js_class_vector_to_rust_vector(prev_challenges_comms);
-    return new plonk_wasm.WasmFqProverProof(messages, proof, evals0, evals1, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
+    return new plonk_wasm.WasmFqProverProof(messages, proof, evals, ft_eval1, public_, prev_challenges_scalars, prev_challenges_comms);
 };
 
 // Provides: caml_pasta_fq_proof_of_rust
@@ -2094,7 +2055,7 @@ var caml_pasta_fq_proof_to_rust = function(x) {
 var caml_pasta_fq_proof_of_rust = function(x) {
     var messages = caml_pasta_fq_commitments_of_rust(x.commitments);
     var proof = caml_pasta_fq_opening_proof_of_rust(x.proof);
-    var evals0 = caml_pasta_fq_proof_evaluations_of_rust(x.evals0);
+    var evals = caml_pasta_fq_proof_evaluations_of_rust(x.evals);
     var evals1 = caml_pasta_fq_proof_evaluations_of_rust(x.evals1);
     var ft_eval1 = x.ft_eval1;
     var public_ = caml_fq_vector_of_rust(x.public_);
@@ -2110,7 +2071,7 @@ var caml_pasta_fq_proof_of_rust = function(x) {
         res[2] = caml_pallas_poly_comm_of_rust(prev_challenges_comms[i]);
         prev_challenges[i] = res;
     }
-    return [0, messages, proof, [0, evals0, evals1], ft_eval1, public_, prev_challenges];
+    return [0, messages, proof, evals, ft_eval1, public_, prev_challenges];
 };
 
 // Provides: caml_pasta_fq_plonk_proof_create
