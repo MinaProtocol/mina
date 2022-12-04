@@ -1922,23 +1922,7 @@ var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
 // Provides: caml_pasta_fq_proof_evaluations_of_rust
 // Requires: plonk_wasm, caml_fq_vector_of_rust, COLUMNS, PERMUTS_MINUS_1
 var caml_pasta_fq_proof_evaluations_of_rust = function(x) {
-    var convertArray = function(v, n) {
-        var res = [0];
-        for (var i = 0; i < n; ++i) {
-            res.push(caml_fq_vector_of_rust(v.get(i)));
-        }
-        return res;
-    };
-
-    var w = convertArray(x.w, COLUMNS);
-    var coefficients = convertArray(x.coefficients, COLUMNS);
-    var z = caml_fq_vector_of_rust(x.z);
-    var s = convertArray(x.s, PERMUTS_MINUS_1);
-    var generic_selector = caml_fq_vector_of_rust(x.generic_selector);
-    var poseidon_selector = caml_fq_vector_of_rust(x.poseidon_selector);
-
-    x.free();
-    return [0, w, coefficients, z, s, generic_selector, poseidon_selector];
+    return x;
 };
 
 // Provides: caml_pasta_fq_opening_proof_to_rust
