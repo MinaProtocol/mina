@@ -1896,27 +1896,7 @@ var caml_pasta_fp_plonk_proof_deep_copy = function(proof) {
 // Provides: caml_pasta_fq_proof_evaluations_to_rust
 // Requires: plonk_wasm, caml_fq_vector_to_rust, PERMUTS_MINUS_1, COLUMNS
 var caml_pasta_fq_proof_evaluations_to_rust = function(x) {
-    var w = new plonk_wasm.WasmVecVecFq(COLUMNS);
-    for (var i = 0; i < COLUMNS; ++i) {
-      w.push(caml_fq_vector_to_rust(x[1][i + 1]));
-    }
-
-    var coefficients = new plonk_wasm.WasmVecVecFq(COLUMNS);
-    for (var i = 0; i < COLUMNS; ++i) {
-      coefficients.push(caml_fq_vector_to_rust(x[2][i + 1]));
-    }
-
-    var z = caml_fq_vector_to_rust(x[3]);
-
-    var s = new plonk_wasm.WasmVecVecFq(PERMUTS_MINUS_1);
-    for (i = 0; i < PERMUTS_MINUS_1; ++i) {
-      s.push(caml_fq_vector_to_rust(x[4][i + 1]));
-    }
-
-    var generic_selector = caml_fq_vector_to_rust(x[5]);
-    var poseidon_selector = caml_fq_vector_to_rust(x[6]);
-
-    return new plonk_wasm.WasmFqProofEvaluations(w, coefficients, z, s, generic_selector, poseidon_selector);
+    return x;
 };
 
 // Provides: caml_pasta_fq_proof_evaluations_of_rust
