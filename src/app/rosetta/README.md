@@ -41,7 +41,7 @@ https://www.rosetta-api.org/docs/models/Operation.html
    on the ability to enable and disable staking via GrapQL.
    That feature of the daemon had been deprecated, and has been
    removed. A new test-agent may appear in the future.
-- Update for release/1.3.0 as opposed to purpose-built rosetta branches
+- Update for master as opposed to purpose-built rosetta branches
 
 2022/01/18:
 
@@ -199,32 +199,48 @@ https://www.rosetta-api.org/docs/models/Operation.html
 
 ## How to build your own docker image
 
-Checkout the "release/1.3.0" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "master" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production | docker build -t mina-rosetta-ubuntu:v1.3.0 --build-arg "MINA_BRANCH=release/1.3.0" -`
+```
+cat dockerfiles/stages/1-build-deps \
+    dockerfiles/stages/2-opam-deps \
+    dockerfiles/stages/3-builder \
+    dockerfiles/stages/4-production \
+    | docker build -t mina-rosetta-ubuntu:v1.3.0 \
+        --build-arg "DUNE_PROFILE=mainnet"
+        --build-arg "MINA_BRANCH=master" -
+```
 
-This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu 20.04 and includes the most recent release of the mina daemon along with mina-archive and mina-rosetta.
+This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu
+20.04 and includes the most recent release of the mina daemon along
+with mina-archive and mina-rosetta. Note the `DUNE_PROFILE` argument,
+which should take a different value depending on which network you
+want to connect to. Complete list of predefined `dune` profiles can be
+found in `src/config` directory in the main repository.
 
-Alternatively, you could use the official image `minaprotocol/mina-rosetta-ubuntu:1.3.0beta1-087f715-stretch` which is built in exactly this way by buildkite CI/CD.
+Alternatively, you could use the official image `minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye-mainnet` which is built in exactly this way by buildkite CI/CD.
 
 ## How to Run
 
 The container includes 4 scripts in /rosetta which run a different set of services connected to a particular network
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
-- `docker-test-start.sh` launches the same demo network as in demo-start.sh but also launches the mina-rosetta-test-agent to run a suite of tests against the rosetta API.
-- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/en/node-operators/connecting) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v16/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
-- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/en/node-operators/connecting-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
+- The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v16/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
+- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
 
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta-ubuntu:v1.3.0
+docker run -it --rm --name rosetta \
+    --entrypoint=./docker-devnet-start.sh \
+    -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
 Note: It will take 20min-1hr for your node to sync
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
+* The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * PostgreSQL runs on port 3086
 * Rosetta runs on port 3087
@@ -250,7 +266,13 @@ It might be convenient to set up the database inside a docker container anyway,
 for instance like so:
 
 ```shell
-$ docker run -d --name pg-mina-archive -p 5432:5432 -e POSTGRES_PASSWORD='*******' -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=mina_archive -e POSTGRES_USER=pguser postgres:14.5
+$ docker run -d --name pg-mina-archive \
+    -p 5432:5432 \
+    -e POSTGRES_PASSWORD='*******' \
+    -e POSTGRES_HOST_AUTH_METHOD=trust 
+    -e POSTGRES_DB=mina_archive \
+    -e POSTGRES_USER=pguser \
+    postgres:14.5
 ```
 
 The `POSTGRES_HOST_AUTH_METHOD=trust` instructs the database not to require
@@ -269,7 +291,10 @@ Once this is done, the Rosetta server can be launched with the following
 command:
 
 ```shell
-$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe --port 3087 --graphql-uri http://localhost:3085/graphql --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+$ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe \
+    --port 3087 \
+    --graphql-uri http://localhost:3085/graphql \
+    --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
 ```
 
 The `--graphql-uri` parameter gives address at which Rosetta can connect to
@@ -303,7 +328,7 @@ If the data in postgresql is really stale (>24 hours), it would likely be better
 
 ### Network names
 
-Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/en/node-operators/connecting) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/en/node-operators/connecting-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
+Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
 
 ### Operation Statuses
 
@@ -362,7 +387,10 @@ The signer library used by the test agent can be used as a reference for further
 
 ### Rosetta CLI Validation
 
-The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction. There are no reconcilliation errors. We are in the middle of verifying reconcilliation errors against devnet.
+The Data API is fully validated using the official `rosetta-cli`
+against private networks that issue every different type of
+transaction. For instructions on how to run these tests manually,
+see [README.md](rosetta-cli-config/README.md).
 
 The Construction API is _not_ validated using `rosetta-cli` as this would require an implementation of the signer in the rosetta-go-sdk.
 
@@ -374,7 +402,11 @@ using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccf
 **Create one of each transaction type using the test-agent and exit**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d minaprotocol/mina-rosetta:v16
+$ docker run -d --rm \
+    --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 \
+    --name mina-rosetta-test \
+    --entrypoint ./docker-test-start.sh \
+    minaprotocol/mina-rosetta:v16
 
 $ docker logs --follow mina-rosetta-test
 ```
@@ -382,7 +414,13 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta-ubuntu:v1.3.0
+$ docker run -d --rm \
+    --publish 3087:3087 \
+    --publish 3086:3086 \
+    --publish 3085:3085 \
+    --name mina-rosetta-demo \
+    --entrypoint ./docker-demo-start.sh \
+    minaprotocol/mina-rosetta-ubuntu:v1.3.0
 
 $ docker logs --follow mina-rosetta-demo
 
@@ -420,10 +458,11 @@ then
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-openapi-generator generate -i api.json -g ocaml
-cp -p src/models/* $MINA/src/lib/rosetta_models/
+openapi-generator generate -i api.json -g ocaml -o out
+cp -p out/src/models/* out/src/support/enums.ml $MINA/src/lib/rosetta_models/
 ```
 In the generated files, the type `deriving` clauses will need to have `eq` added manually.
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
 Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
+

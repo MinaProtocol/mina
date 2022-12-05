@@ -76,10 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -454,8 +454,8 @@ let batch_send_payments =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
           ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.of_int (Random.int 100)
-          ; fee = Currency.Fee.of_int (Random.int 100)
+          ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
+          ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
@@ -584,7 +584,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_formatted_string cancel_fee) ;
+           (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input
@@ -633,8 +633,9 @@ let send_rosetta_transactions_graphql =
          | Ok () ->
              Deferred.return ()
          | Error err ->
-             Format.eprintf "Error:@.%s@.@."
-               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+             Format.eprintf "@[<v>Error:@,%a@,@]@."
+               (Yojson.Safe.pretty_print ?std:None)
+               (Error_json.error_to_yojson err) ;
              Core_kernel.exit 1 ) )
 
 module Export_logs = struct
@@ -876,8 +877,7 @@ let currency_in_ledger =
          List.iter tokens ~f:(fun token ->
              let total =
                Token_id.Table.find_exn currency_tbl token
-               |> Currency.Balance.of_uint64
-               |> Currency.Balance.to_formatted_string
+               |> Currency.Balance.of_uint64 |> Currency.Balance.to_mina_string
              in
              if Token_id.equal token Token_id.default then
                Format.printf "MINA: %s@." total
@@ -1158,8 +1158,9 @@ let set_snark_work_fee =
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
-               (Currency.Fee.to_int fee)
-               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
+               (Currency.Fee.to_nanomina_int fee)
+               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) )
+         )
 
 let import_key =
   Command.async
@@ -1410,7 +1411,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.to_formatted_string w.balance.total)
+                       (Currency.Balance.to_mina_string w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1568,7 +1569,7 @@ let generate_libp2p_keypair_do privkey_path =
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1751,7 +1752,7 @@ let compile_time_constants =
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
-                   (Currency.Amount.to_formatted_string
+                   (Currency.Amount.to_mina_string
                       precomputed_values.constraint_constants.coinbase_amount )
                )
              ; ( "block_window_duration_ms"
@@ -2004,7 +2005,9 @@ let archive_blocks =
                  add_to_success_file path
              | Error err ->
                  Format.eprintf
-                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   "@[<v>Failed to send block to archive node from %s.@,\
+                    Error:@,\
+                    %s@]@."
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ) )
 
@@ -2054,23 +2057,26 @@ let chain_id_inputs =
              , snark_keys
              , protocol_major_version ) ->
              let open Format in
-             printf "Genesis state hash: %s@."
-               (State_hash.to_base58_check genesis_state_hash) ;
-             printf "Genesis_constants:@." ;
-             printf "  Protocol:          %s@."
-               ( Genesis_constants.Protocol.to_yojson genesis_constants.protocol
-               |> Yojson.Safe.to_string ) ;
-             printf "  Txn pool max size: %d@."
-               genesis_constants.txpool_max_size ;
-             printf "  Num accounts:      %s@."
-               ( match genesis_constants.num_accounts with
-               | Some n ->
-                   Int.to_string n
-               | None ->
-                   "None" ) ;
-             printf "Snark keys:@." ;
-             List.iter snark_keys ~f:(printf "  %s@.") ;
-             printf "Protocol major version: %d@." protocol_major_version
+             printf
+               "@[<v>Genesis state hash: %s@,\
+                @[<v 2>Genesis_constants:@,\
+                Protocol:          %a@,\
+                Txn pool max size: %d@,\
+                Num accounts:      %a@,\
+                @]@,\
+                @[<v 2>Snark keys:@,\
+                %a@]@,\
+                Protocol major version: %d@]@."
+               (State_hash.to_base58_check genesis_state_hash)
+               Yojson.Safe.pp
+               (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
+               genesis_constants.txpool_max_size
+               (pp_print_option
+                  ~none:(fun ppf () -> pp_print_string ppf "None")
+                  pp_print_int )
+               genesis_constants.num_accounts
+               (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
+               snark_keys protocol_major_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )
@@ -2079,18 +2085,17 @@ let hash_transaction =
   let open Command.Let_syntax in
   Command.basic
     ~summary:"Compute the hash of a transaction from its transaction ID"
-    (let%map_open transaction =
+    (let%map_open transaction_id =
        flag "--transaction-id" ~doc:"ID ID of the transaction to hash"
          (required string)
      in
      fun () ->
-       let signed_command =
-         Signed_command.of_base64 transaction |> Or_error.ok_exn
-       in
-       let hash =
-         Transaction_hash.hash_command (Signed_command signed_command)
-       in
-       printf "%s\n" (Transaction_hash.to_base58_check hash) )
+       match Transaction_hash.hash_of_transaction_id transaction_id with
+       | Ok hash ->
+           printf "%s\n" (Transaction_hash.to_base58_check hash)
+       | Error err ->
+           Format.eprintf "Could not hash transaction: %s@."
+             (Error.to_string_hum err) )
 
 let humanize_graphql_error
     ~(graphql_endpoint : Uri.t Cli_lib.Flag.Types.with_name) = function
@@ -2120,7 +2125,7 @@ let runtime_config =
              return ()
          | Error err ->
              Format.eprintf
-               "Failed to retrieve runtime configuration. Error:@.%s@."
+               "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint err) ) ;
              exit 1 ) )
@@ -2142,7 +2147,7 @@ let thread_graph =
              return ()
          | Error e ->
              Format.eprintf
-               "Failed to retrieve runtime configuration. Error:@.%s@."
+               "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )

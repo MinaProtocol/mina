@@ -94,7 +94,7 @@ module TextFormat_0_0_4 = struct
   let output f =
     MetricFamilyMap.iter (fun metric samples ->
         let { MetricInfo.name; metric_type; help; label_names } = metric in
-        Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
+        Fmt.pf f "@[<v>#HELP %a %a@,#TYPE %a %a@,%a@]" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
           samples )

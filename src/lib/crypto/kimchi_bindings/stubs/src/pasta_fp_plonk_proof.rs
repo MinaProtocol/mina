@@ -16,7 +16,7 @@ use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -140,7 +140,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     for row in 0..num_gates {
         gates.push(CircuitGate {
             typ: GateType::Lookup,
-            wires: Wire::new(row),
+            wires: Wire::for_row(row),
             coeffs: vec![],
         });
     }
@@ -263,6 +263,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
     };
     let proof_evals = ProofEvaluations {
         w: array_init(|_| vec![Fp::one()]),
+        coefficients: array_init(|_| vec![Fp::one()]),
         z: vec![Fp::one()],
         s: array_init(|_| vec![Fp::one()]),
         lookup: None,

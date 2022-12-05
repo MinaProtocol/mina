@@ -164,7 +164,12 @@ module type S = sig
   end
 
   module State_stack : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
   end
 
   module Update : sig

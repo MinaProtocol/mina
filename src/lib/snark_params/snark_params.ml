@@ -179,8 +179,8 @@ module Tick = struct
          and module Inner_curve := Tick0.Inner_curve )
 
   module Field = struct
-    include Tick0.Field
     include Hashable.Make (Tick0.Field)
+    include Tick0.Field
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)

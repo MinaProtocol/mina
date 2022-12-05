@@ -345,7 +345,7 @@ end
 module Snark_work_failed = struct
   type t = unit [@@deriving yojson]
 
-  let name = "Transactions_gossip"
+  let name = "Snark_work_failed"
 
   let id = Snark_worker.generating_snark_work_failed_structured_events_id
 

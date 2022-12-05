@@ -19,6 +19,7 @@
    random_oracle_input
    snarky.backendless
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    fold_lib
    random_oracle.permutation
 ))

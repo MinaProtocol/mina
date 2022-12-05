@@ -84,14 +84,16 @@ If you wish to build Mina yourself, or work on some changes incrementally, run
 otherwise). This will drop you in a shell with all dependencies, including
 OCaml, Rust and Go ones available, so the only thing you have to do is run `dune
 build src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to
-run the same command as would be run inside the nix sandbox. The produced
-executable can be found in `_build/default/src/app/cli/src/mina.exe`. You most
-likely want to run it from the same shell you've built it in, since the
-executable looks for certain dependencies at runtime via environment variables,
-meaning you either have to set those variables yourself or rely on the ones set
-by the `devShell`. The executable produced by `nix build mina` (see ["Pure"
-build section](#pure-build)) doesn't suffer from this limitation, since it is
-wrapped with all the necessary environment variables.
+run the same command as would be run inside the nix sandbox. Running `make
+build` will **not** work due to it trying to build the already-built go
+dependencies. The produced executable can be found in
+`_build/default/src/app/cli/src/mina.exe`. You most likely want to **run it from
+the same shell you've built it in**, since the executable looks for certain
+dependencies at runtime via environment variables, meaning you either have to
+set those variables yourself or rely on the ones set by the `devShell`. The
+executable produced by `nix build mina` (see ["Pure" build
+section](#pure-build)) doesn't suffer from this limitation, since it is wrapped
+with all the necessary environment variables.
 
 Note that `opam` will **not** be available in that shell, since Nix takes over
 the job of computing and installing dependencies. If you need to modify the opam
@@ -111,12 +113,52 @@ nix develop mina#with-lsp -c $EDITOR .
 if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
-This command will try to `dune build @check` in `src/app/cli`, in order to get
-type information necessary for the LSP to work. This might take a while, but
-will only happen once. After it's done, you will be dropped in your favourite editor.
+This will drop you in your favorite editor within a Nix environment containing an
+OCaml LSP server. You might need to configure your editor appropriately;
+See [Per-editor instructions](#per-editor-instructions).
+
+However, for LSP to work its magic, you will need to have to make type
+informations available. They can for example be obtained by running `dune build
+@check` in `src/app/cli`, which might take a while, or by compiling the project.
 
 Don't forget to exit and re-enter the editor using this command after switching
 branches, or otherwise changing the dependency tree of Mina.
+
+#### Per-editor instructions
+
+##### Visual Studio Code / vscodium
+
+You have to install the "OCaml Platform" extension, either from
+[official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
+or [openvsix](https://open-vsx.org/extension/ocamllabs/ocaml-platform).
+
+After installing it, run `code` (or `codium`) from within the `nix develop mina#with-lsp` shell,
+click "Select Sandbox" in the extension menu, and then pick "Global Sandbox". From then on, it should just work.
+
+##### Vim
+
+Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to its configuration (`$HOME/.config/nvim`, or just enter command `:CocConfig`):
+
+```
+{
+  "languageserver": {
+    "ocaml-lsp": {
+      "command": "ocamllsp",
+      "args": [],
+      "filetypes": [
+        "ocaml", "reason"
+      ]
+    }
+  }
+}
+```
+
+Now, whenever you start vim from `nix develop mina#with-lsp`, it should just work.
+
+##### Emacs
+
+You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
+This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
 
 ### "Pure" build
 
@@ -156,17 +198,34 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-nix build mina#mina-docker
+$(nix build mina#mina-image-full) | docker load
+# Also available: mina-image-slim, mina-archive-image-full
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
-result to produce other useful artifacts with Nix. For example, you can build a
-slim docker image. Run `nix build mina#mina-docker` if you're using flakes (or
-`nix-build packages.x86_64-linux.mina-docker` otherwise). You will get a
-`result` symlink in the current directory, which links to a tarball containing
-the docker image. You can load the image using `docker load -i result`, then
-note the tag it outputs. You can then run Mina from this docker image with
-`docker run mina:<tag> mina.exe <args>`.
+result to produce other useful artifacts with Nix. For example, we can build
+docker images. Due to /nix/store space usage concerns, instead of building the
+image itself Nix produces a script which, when executed, outputs a tarball of a
+docker image, suitable for consumption with `docker load`. After loading the
+image, it can be used as any other docker image would be (e.g. with `docker
+run`). The images for branches available on github can also be obtained from the
+registry at
+`us-west2-docker.pkg.dev/o1labs-192920/nix-containers/$IMAGE:$BRANCH`, e.g.
+`docker run --rm -it
+us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
+
+The `slim` image only has the Mina daemon itself, whereas `full` images also
+contain many useful tools, such as coreutils, fake init, jq, etc.
+
+### Debian package
+
+TL;DR:
+```
+nix build mina#mina-deb
+```
+
+The Debian package is for installing on .deb-based systems which don't have Nix
+installed. **Installing it if you have Nix already won't work.**
 
 ### Demo nixos-container
 
@@ -352,7 +411,7 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 
 ## Troubleshooting
 
-### `Error: File unavailable:`, missing dependency libraries, or incorrect dependency library versions
+### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
 If you get an error like this:
 
@@ -373,13 +432,45 @@ Error: File unavailable:
 /nix/store/2i0iqm48p20mrn69nbgr0pf76vdzjxj6-marlin_plonk_bindings_stubs-0.1.0/lib/lib/libwires_15_stubs.a
 ```
 
-It is likely that you have switched branches but didn't re-enter the development
+or like this:
+
+```
+Undefined symbols for architecture x86_64:
+  "____chkstk_darwin", referenced from:
+      __GLOBAL__sub_I_clock_cache.cc in librocksdb_stubs.a(clock_cache.o)
+      __GLOBAL__sub_I_lru_cache.cc in librocksdb_stubs.a(lru_cache.o)
+      __GLOBAL__sub_I_sharded_cache.cc in librocksdb_stubs.a(sharded_cache.o)
+      __GLOBAL__sub_I_builder.cc in librocksdb_stubs.a(builder.o)
+      __GLOBAL__sub_I_c.cc in librocksdb_stubs.a(c.o)
+      __GLOBAL__sub_I_column_family.cc in librocksdb_stubs.a(column_family.o)
+      __GLOBAL__sub_I_compacted_db_impl.cc in librocksdb_stubs.a(compacted_db_impl.o)
+      ...
+ld: symbol(s) not found for architecture x86_64
+```
+
+or like this:
+
+```
+Compiler version mismatch: this project seems to be compiled with OCaml
+compiler version 4.11, but the running OCaml LSP supports OCaml version 4.14.
+OCaml language support will not work properly until this problem is fixed.
+Hint: Make sure your editor runs OCaml LSP that supports this version of
+compiler.
+```
+
+This could be caused by having some non-Nix setup polluting the environment
+in your shell init file. Try running `nix develop mina -c bash --norc` or
+`nix develop mina -c zsh --no-rc` and see if that helps. If it does, look through
+the corresponding shell init files for anything suspicious (e.g. `eval $(opam env)`
+or `PATH` modifications).
+
+Alternatively, you might have switched branches but didn't re-enter the development
 shell. Exit the development shell (with `exit`, Ctrl+D, or however else you like
 exiting your shells) and re-enter it again with `nix develop mina`. `direnv` can
 also sometimes not reload the environment automatically, in that case, try
 `direnv reload`.
 
-Alternatively, in some circumstances, `dune` is not smart enough to rebuild
+Finally, in some circumstances, `dune` is not smart enough to rebuild
 things even if the environment changed and they should be rebuilt. Try removing
 the `_build` directory (or running `dune clean`, which does the same thing).
 
@@ -456,8 +547,8 @@ Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
 
 ```
-trusted-substituters = "https://storage.googleapis.com/mina-nix-cache"
-trusted-public-keys = "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+trusted-substituters = https://storage.googleapis.com/mina-nix-cache https://cache.nixos.org
+trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 ```
 
 And then reload your `nix-daemon` service.

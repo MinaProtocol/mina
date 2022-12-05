@@ -34,7 +34,7 @@ let get_keys_with_details t =
   let%map accounts = get_accounts t in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_int
+      , account.Account.Poly.balance |> Currency.Balance.to_nanomina_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
 let get_nonce t (addr : Account_id.t) =
@@ -217,7 +217,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
+  let%bind (_ : Receipt.Chain_hash.t Mina_stdlib.Nonempty_list.t) =
     Result.of_option
       (Receipt_chain_verifier.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
@@ -263,7 +263,9 @@ let get_status ~flag t =
       (Mina_lib.snark_worker_key t)
       ~f:Public_key.Compressed.to_base58_check
   in
-  let snark_work_fee = Currency.Fee.to_int @@ Mina_lib.snark_work_fee t in
+  let snark_work_fee =
+    Currency.Fee.to_nanomina_int @@ Mina_lib.snark_work_fee t
+  in
   let block_production_keys = Mina_lib.block_production_pubkeys t in
   let coinbase_receiver =
     match Mina_lib.coinbase_receiver t with

@@ -110,12 +110,12 @@ end = struct
         ((module Shifted) : shifted Group.Checked.Shifted.m) ~private_key
         ~public_key message =
       let%bind () =
-        with_label __LOC__
-          (let%bind public_key_shifted = Shifted.(add zero public_key) in
-           Group.Checked.scale_generator
-             (module Shifted)
-             private_key ~init:Shifted.zero
-           >>= Shifted.Assert.equal public_key_shifted )
+        with_label __LOC__ (fun () ->
+            let%bind public_key_shifted = Shifted.(add zero public_key) in
+            Group.Checked.scale_generator
+              (module Shifted)
+              private_key ~init:Shifted.zero
+            >>= Shifted.Assert.equal public_key_shifted )
       in
       eval (module Shifted) ~private_key message
   end
