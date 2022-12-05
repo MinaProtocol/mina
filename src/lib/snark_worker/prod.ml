@@ -46,12 +46,21 @@ module Inputs = struct
       in
       Deferred.return { m; cache = Cache.create (); proof_level }
 
-    let worker_wait_time = 5.
+    let worker_wait_time = 5.0
   end
 
   (* bin_io is for uptime service SNARK worker *)
+  type spec_inputs =
+    | Transaction_witness of Transaction_witness.Stable.Latest.t
+    | Zkapp_command_segment_witnesses of
+        Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
+        One_or_two.Stable.Latest.t
+    | Ledger_proofs of Ledger_proof.Stable.Latest.t One_or_two.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, to_yojson]
+
+  (* bin_io is for uptime service SNARK worker *)
   type single_spec =
-    ( Transaction_witness.Stable.Latest.t
+    ( spec_inputs
     , Transaction_snark.Stable.Latest.t )
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp, to_yojson]
@@ -95,8 +104,8 @@ module Inputs = struct
               Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
               match single with
-              | Work.Single.Spec.Transition (input, (w : Transaction_witness.t))
-                ->
+              | Work.Single.Spec.Transition (input, Transaction_witness w) ->
+                  (* process entire transaction *)
                   process (fun () ->
                       match w.transaction with
                       | Command (Zkapp_command zkapp_command) -> (
@@ -191,7 +200,6 @@ module Inputs = struct
                                   ~all_inputs:inputs
                                   (M.of_zkapp_command_segment_exn ~witness)
                               in
-
                               let%bind (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
                                   ~f:(fun acc (witness, spec, stmt) ->
@@ -261,6 +269,12 @@ module Inputs = struct
                                 ~init_stack:w.init_stack
                                 (unstage
                                    (Mina_ledger.Sparse_ledger.handler w.ledger) ) ) )
+              | Work.Single.Spec.Transition
+                  (_input, Zkapp_command_segment_witnesses _segment_witnesses)
+                ->
+                  failwith "Not implemented"
+              | Work.Single.Spec.Transition (_input, Ledger_proofs _proofs) ->
+                  failwith "Not implemented"
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->

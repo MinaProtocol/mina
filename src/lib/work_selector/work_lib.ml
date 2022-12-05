@@ -25,12 +25,20 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       include Comparable.Make (T)
     end
 
+    (* for zkApps transactions, we generate segment witnesses, then parallelize proof generation for
+       the account updates, culminating in the proof for the entire transaction
+
+       for non-zkApps transactions, we create statements, and generate the proof for the transaction
+    *)
     type t =
       { mutable available_jobs :
           (Inputs.Transaction_witness.t, Inputs.Ledger_proof.t) Work_spec.t
           One_or_two.t
           list
-      ; jobs_seen : (Seen_key.t, Job_status.t) Hashtbl.t
+      ; non_zkapps_jobs_seen : (Seen_key.t, Job_status.t) Hashtbl.t
+      ; mutable zkapp_segment_witnesses :
+          Transaction_witness.Zkapp_command_segment_witness.t list
+      ; mutable pending_proofs : Ledger_proof.t list
       ; reassignment_wait : int
       }
 
@@ -45,6 +53,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       let t =
         { available_jobs = []
         ; jobs_seen = Hashtbl.create (module Seen_key)
+        ; zkapp_segment_witnesses = []
+        ; pending_proofs = []
         ; reassignment_wait
         }
       in
