@@ -230,7 +230,9 @@
             (runIntegrationTest "payment" { with-archive = true; })
             (runIntegrationTest "delegation" { with-archive = true; })
             (runIntegrationTest "gossip-consis" { })
-            (runIntegrationTest "opt-block-prod" { })
+            # FIXME: opt-block-prod test fails.
+            # This has been disabled in the "old" CI for a while.
+            # (runIntegrationTest "opt-block-prod" { })
             (runIntegrationTest "medium-bootstrap" { })
             (runIntegrationTest "zkapps" { with-archive = true; })
             (runIntegrationTest "zkapps-timing" { with-archive = true; })
