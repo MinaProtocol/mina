@@ -497,6 +497,10 @@ module Network_manager = struct
 
   let create ~logger (network_config : Network_config.t) =
     let open Malleable_error.Let_syntax in
+    let%bind current_cluster =
+      Util.run_cmd_or_hard_error "/" "kubectl" [ "config"; "current-context" ]
+    in
+    [%log info] "Using cluster: %s" current_cluster ;
     let%bind all_namespaces_str =
       Util.run_cmd_or_hard_error "/" "kubectl"
         [ "get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}" ]
