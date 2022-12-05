@@ -82,6 +82,56 @@ let non_pc_registers_equal_var t1 t2 =
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
       |> Impl.Boolean.all )
 
+let registers_equal_var t1 t2 =
+  Impl.make_checked (fun () ->
+      let module F = Core_kernel.Field in
+      let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
+      let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
+      Registers.Fields.fold ~init:[]
+        ~first_pass_ledger:(f !Frozen_ledger_hash.equal_var)
+        ~second_pass_ledger:(f !Frozen_ledger_hash.equal_var)
+        ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
+        ~local_state:(fun acc f ->
+          Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
+      |> Impl.Boolean.all )
+
+let txn_statement_ledger_hashes_equal
+    (s1 : Transaction_snark.Statement.With_sok.Checked.t)
+    (s2 : Transaction_snark.Statement.With_sok.Checked.t) =
+  Impl.make_checked (fun () ->
+      let module F = Core_kernel.Field in
+      let ( ! ) x = Impl.run_checked x in
+      let source_eq =
+        !(non_pc_registers_equal_var
+            { s1.source with pending_coinbase_stack = () }
+            { s2.source with pending_coinbase_stack = () } )
+      in
+      let target_eq =
+        !(non_pc_registers_equal_var
+            { s1.target with pending_coinbase_stack = () }
+            { s2.target with pending_coinbase_stack = () } )
+      in
+      let left_ledger_eq =
+        !(Frozen_ledger_hash.equal_var s1.connecting_ledger_left
+            s2.connecting_ledger_left )
+      in
+      let right_ledger_eq =
+        !(Frozen_ledger_hash.equal_var s1.connecting_ledger_right
+            s2.connecting_ledger_right )
+      in
+      let supply_increase_eq =
+        !(Currency.Amount.Signed.Checked.equal s1.supply_increase
+            s2.supply_increase )
+      in
+      (*TODO: should we check sok digest as well?*)
+      Impl.Boolean.all
+        [ source_eq
+        ; target_eq
+        ; left_ledger_eq
+        ; right_ledger_eq
+        ; supply_increase_eq
+        ] )
+
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
         old : Blockchain.t
@@ -187,10 +237,10 @@ let%snarkydef_ step ~(logger : Logger.t)
     (t, is_base_case)
   in
   let%bind txn_snark_should_verify, success =
-    let%bind non_pc_registers_didn't_change =
-      non_pc_registers_equal_var
-        (previous_state |> Protocol_state.blockchain_state).registers
-        { txn_snark.target with pending_coinbase_stack = () }
+    let%bind txn_stmt_ledger_hashes_didn't_change =
+      txn_statement_ledger_hashes_equal
+        (previous_state |> Protocol_state.blockchain_state)
+          .ledger_proof_statement txn_snark
     and supply_increase_is_zero =
       Currency.Amount.(
         Signed.Checked.equal txn_snark.supply_increase
@@ -203,7 +253,7 @@ let%snarkydef_ step ~(logger : Logger.t)
       let%bind root_after_delete, deleted_stack =
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
           prev_pending_coinbase_root
-          ~proof_emitted:(Boolean.not non_pc_registers_didn't_change)
+          ~proof_emitted:(Boolean.not txn_stmt_ledger_hashes_didn't_change)
       in
       (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
       let%bind no_coinbases_popped =
@@ -220,24 +270,33 @@ let%snarkydef_ step ~(logger : Logger.t)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
+    let current_ledger_statement =
+      (Protocol_state.blockchain_state new_state).ledger_proof_statement
+    in
     let pending_coinbase_source_stack =
       Pending_coinbase.Stack.Checked.create_with deleted_stack
     in
     let%bind txn_snark_input_correct =
-      let registers (t : Protocol_state.var) =
-        (Protocol_state.blockchain_state t).registers
+      let statement (t : Protocol_state.var) =
+        (Protocol_state.blockchain_state t).ledger_proof_statement
       in
       let open Checked in
       let%bind () =
         Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
       in
+      let previous_ledger_statement =
+        (Protocol_state.blockchain_state previous_state).ledger_proof_statement
+      in
+      let ledger_statement_valid =
+        Impl.make_checked (fun () ->
+            Snarked_ledger_state.(
+              valid_ledgers_at_merge_checked
+                (Statement_ledgers.of_statement previous_ledger_statement)
+                (Statement_ledgers.of_statement current_ledger_statement)) )
+      in
       all
-        [ non_pc_registers_equal_var
-            { txn_snark.source with pending_coinbase_stack = () }
-            (registers previous_state)
-        ; non_pc_registers_equal_var
-            { txn_snark.target with pending_coinbase_stack = () }
-            (registers new_state)
+        [ registers_equal_var txn_snark.source (statement previous_state).target
+        ; ledger_statement_valid
         ; Pending_coinbase.Stack.equal_var
             txn_snark.source.pending_coinbase_stack
             pending_coinbase_source_stack
@@ -248,26 +307,10 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     let%bind nothing_changed =
       Boolean.all
-        [ non_pc_registers_didn't_change
+        [ txn_stmt_ledger_hashes_didn't_change
         ; supply_increase_is_zero
         ; no_coinbases_popped
         ]
-    in
-    let current_ledger_statement =
-      (Protocol_state.blockchain_state new_state).ledger_proof_statement
-    in
-    let%bind () =
-      let previous_ledger_statement =
-        (Protocol_state.blockchain_state previous_state).ledger_proof_statement
-      in
-      let ledger_statement_valid =
-        Snarked_ledger_state.(
-          valid_ledgers_at_merge_checked
-            (Statement_ledgers.of_statement previous_ledger_statement)
-            (Statement_ledgers.of_statement current_ledger_statement))
-      in
-      with_label __LOC__
-        (Boolean.Assert.any [ nothing_changed; ledger_statement_valid ])
     in
     let%bind correct_coinbase_status =
       let new_root =

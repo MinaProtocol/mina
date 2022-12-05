@@ -65,28 +65,13 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let ledger_proof_opt (chain : Blockchain.t) next_state = function
+  let ledger_proof_opt next_state = function
     | Some t ->
         Ledger_proof.
           ({ (statement t) with sok_digest = sok_digest t }, underlying_proof t)
     | None ->
-        let bs = Protocol_state.blockchain_state in
-        let reg x =
-          { (bs x).Blockchain_state.Poly.registers with
-            pending_coinbase_stack = Pending_coinbase.Stack.empty
-          }
-        in
-        let chain_state = Blockchain_snark.Blockchain.state chain in
-        let connecting_ledger_left = failwith "TODO" in
-        let connecting_ledger_right = failwith "TODO" in
-        ( { source = reg chain_state
-          ; target = reg next_state
-          ; connecting_ledger_left
-          ; connecting_ledger_right
-          ; supply_increase = Currency.Amount.Signed.zero
-          ; fee_excess = Fee_excess.zero
-          ; sok_digest = Sok_message.Digest.default
-          }
+        ( Blockchain_state.ledger_proof_statement
+            (Protocol_state.blockchain_state next_state)
         , Proof.transaction_dummy )
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
@@ -119,7 +104,7 @@ module Worker_state = struct
                  let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
                        let txn_snark_statement, txn_snark_proof =
-                         ledger_proof_opt chain next_state t
+                         ledger_proof_opt next_state t
                        in
                        let%map.Async.Deferred (), (), proof =
                          B.step
@@ -156,7 +141,7 @@ module Worker_state = struct
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
                    state_for_handler pending_coinbase =
-                 let t, _proof = ledger_proof_opt chain next_state t in
+                 let t, _proof = ledger_proof_opt next_state t in
                  let res =
                    Blockchain_snark.Blockchain_snark_state.check ~proof_level
                      ~constraint_constants

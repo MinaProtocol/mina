@@ -420,8 +420,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                             t.current_root |> Validation.block |> header
                             |> Header.protocol_state
                             |> Protocol_state.blockchain_state
-                            |> Blockchain_state.registers
-                            |> Registers.local_state)
+                            |> Blockchain_state.snarked_local_state)
                         ~verifier ~constraint_constants ~scan_state
                         ~snarked_ledger:temp_mask ~expected_merkle_root
                         ~pending_coinbases ~get_state
@@ -939,8 +938,8 @@ let%test_module "Bootstrap_controller tests" =
               let snarked_local_state =
                 Transition_frontier.root frontier
                 |> Transition_frontier.Breadcrumb.protocol_state
-                |> Protocol_state.blockchain_state |> Blockchain_state.registers
-                |> Registers.local_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.snarked_local_state
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let get_state hash =

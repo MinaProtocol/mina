@@ -128,7 +128,8 @@ module Body = struct
       =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.registers.second_pass_ledger
+    { snarked_ledger_hash =
+        Blockchain_state.snarked_ledger_hash t.blockchain_state
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length_var cs
     ; min_window_density = C.min_window_density_var cs
@@ -150,7 +151,8 @@ module Body = struct
   let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.registers.second_pass_ledger
+    { snarked_ledger_hash =
+        Blockchain_state.snarked_ledger_hash t.blockchain_state
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length cs
     ; min_window_density = C.min_window_density cs

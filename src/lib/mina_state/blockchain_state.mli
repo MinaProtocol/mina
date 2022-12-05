@@ -27,8 +27,6 @@ module Poly : sig
             , 'sok_digest
             , 'local_state )
             Snarked_ledger_state.Poly.Stable.V2.t
-        ; registers :
-            ('snarked_ledger_hash, unit, 'local_state) Registers.Stable.V1.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
@@ -80,12 +78,11 @@ val staged_ledger_hash :
 val snarked_ledger_hash :
   (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
 
+val snarked_local_state :
+  (_, _, 'local_state, _, _, _, _, _, _) Poly.t -> 'local_state
+
 val genesis_ledger_hash :
   (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
-
-val registers :
-     (_, 'snarked_ledger_hash, 'local_state, _, _, _, _, _, _) Poly.t
-  -> ('snarked_ledger_hash, unit, 'local_state) Registers.t
 
 val ledger_proof_statement :
      ( _
@@ -113,7 +110,6 @@ val body_reference : (_, _, _, _, 'ref, _, _, _, _) Poly.t -> 'ref
 val create_value :
      staged_ledger_hash:Staged_ledger_hash.t
   -> genesis_ledger_hash:Frozen_ledger_hash.t
-  -> registers:(Frozen_ledger_hash.t, unit, Local_state.t) Registers.Stable.V1.t
   -> timestamp:Block_time.t
   -> body_reference:Consensus.Body_reference.t
   -> ledger_proof_statement:Snarked_ledger_state.With_sok.t

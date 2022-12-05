@@ -27,8 +27,6 @@ module Poly = struct
             , 'sok_digest
             , 'local_state )
             Snarked_ledger_state.Poly.Stable.V2.t
-        ; registers :
-            ('snarked_ledger_hash, unit, 'local_state) Registers.Stable.V1.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
@@ -43,12 +41,15 @@ Poly.
   , genesis_ledger_hash
   , timestamp
   , body_reference
-  , registers
   , ledger_proof_statement
   , to_hlist
   , of_hlist )]
 
-let snarked_ledger_hash (t : _ Poly.t) = t.registers.second_pass_ledger
+let snarked_ledger_hash (t : _ Poly.t) =
+  t.ledger_proof_statement.target.first_pass_ledger
+
+let snarked_local_state (t : _ Poly.t) =
+  t.ledger_proof_statement.target.local_state
 
 module Value = struct
   [%%versioned
@@ -84,12 +85,11 @@ type var =
   , Sok_message.Digest.Checked.t )
   Poly.t
 
-let create_value ~staged_ledger_hash ~genesis_ledger_hash ~registers ~timestamp
+let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
     ~body_reference ~ledger_proof_statement =
   { Poly.staged_ledger_hash
   ; timestamp
   ; genesis_ledger_hash
-  ; registers
   ; body_reference
   ; ledger_proof_statement
   }
@@ -99,12 +99,6 @@ let typ : (var, Value.t) Typ.t =
     [ Staged_ledger_hash.typ
     ; Frozen_ledger_hash.typ
     ; Snarked_ledger_state.With_sok.typ
-    ; Registers.typ
-        [ Frozen_ledger_hash.typ
-        ; Frozen_ledger_hash.typ
-        ; Typ.unit
-        ; Local_state.typ
-        ]
     ; Block_time.Checked.typ
     ; Consensus.Body_reference.typ
     ]
@@ -116,7 +110,6 @@ module Impl = Pickles.Impls.Step
 let var_to_input
     ({ staged_ledger_hash
      ; genesis_ledger_hash
-     ; registers
      ; timestamp
      ; body_reference
      ; ledger_proof_statement
@@ -124,24 +117,6 @@ let var_to_input
       var ) : Field.Var.t Random_oracle.Input.Chunked.t Checked.t =
   let open Random_oracle.Input.Chunked in
   let open Checked.Let_syntax in
-  let registers =
-    (* TODO: If this were the actual Registers itself (without the unit arg)
-       then we could more efficiently deal with the transaction SNARK input
-       (as we could reuse the hash)
-    *)
-    let { first_pass_ledger
-        ; second_pass_ledger
-        ; pending_coinbase_stack = ()
-        ; local_state
-        } =
-      registers
-    in
-    Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.var_to_input first_pass_ledger
-       ; Frozen_ledger_hash.var_to_input second_pass_ledger
-       ; Local_state.Checked.to_input local_state
-      |]
-  in
   let%map ledger_proof_statement =
     Snarked_ledger_state.With_sok.Checked.to_input ledger_proof_statement
   in
@@ -149,7 +124,6 @@ let var_to_input
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
     ; Frozen_ledger_hash.var_to_input genesis_ledger_hash
     ; ledger_proof_statement
-    ; registers
     ; Block_time.Checked.to_input timestamp
     ; Consensus.Body_reference.var_to_input body_reference
     ]
@@ -157,36 +131,16 @@ let var_to_input
 let to_input
     ({ staged_ledger_hash
      ; genesis_ledger_hash
-     ; registers
      ; timestamp
      ; body_reference
      ; ledger_proof_statement
      } :
       Value.t ) =
   let open Random_oracle.Input.Chunked in
-  let registers =
-    (* TODO: If this were the actual Registers itself (without the unit arg)
-       then we could more efficiently deal with the transaction SNARK input
-       (as we could reuse the hash)
-    *)
-    let { first_pass_ledger
-        ; second_pass_ledger
-        ; pending_coinbase_stack = ()
-        ; local_state
-        } =
-      registers
-    in
-    Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.to_input first_pass_ledger
-       ; Frozen_ledger_hash.to_input second_pass_ledger
-       ; Local_state.to_input local_state
-      |]
-  in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; Frozen_ledger_hash.to_input genesis_ledger_hash
     ; Snarked_ledger_state.With_sok.to_input ledger_proof_statement
-    ; registers
     ; Block_time.to_input timestamp
     ; Consensus.Body_reference.to_input body_reference
     ]
@@ -202,12 +156,6 @@ let negative_one
   ; genesis_ledger_hash
   ; ledger_proof_statement =
       Snarked_ledger_state.With_sok.genesis ~genesis_ledger_hash
-  ; registers =
-      { first_pass_ledger = genesis_ledger_hash
-      ; second_pass_ledger = genesis_ledger_hash
-      ; pending_coinbase_stack = ()
-      ; local_state = Local_state.dummy ()
-      }
   ; timestamp = consensus_constants.genesis_state_timestamp
   ; body_reference = genesis_body_reference
   }
@@ -232,12 +180,6 @@ let display
     ({ staged_ledger_hash
      ; genesis_ledger_hash
      ; ledger_proof_statement
-     ; registers =
-         { first_pass_ledger
-         ; second_pass_ledger
-         ; pending_coinbase_stack = ()
-         ; local_state
-         }
      ; timestamp
      ; body_reference
      } :
@@ -250,16 +192,6 @@ let display
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; ledger_proof_statement =
       Snarked_ledger_state.With_sok.display ledger_proof_statement
-  ; registers =
-      { first_pass_ledger =
-          Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check first_pass_ledger
-      ; second_pass_ledger =
-          Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check second_pass_ledger
-      ; pending_coinbase_stack = ()
-      ; local_state = Local_state.display local_state
-      }
   ; timestamp =
       Time.to_string_trimmed ~zone:Time.Zone.utc
         (Block_time.to_time_exn timestamp)

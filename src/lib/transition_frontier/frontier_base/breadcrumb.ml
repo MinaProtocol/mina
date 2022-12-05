@@ -377,22 +377,14 @@ module For_tests = struct
         parent_breadcrumb |> block |> Mina_block.header
         |> Mina_block.Header.protocol_state
       in
-      let previous_registers =
-        previous_protocol_state |> Protocol_state.blockchain_state
-        |> Blockchain_state.registers
-      in
       let previous_ledger_proof_stmt =
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.ledger_proof_statement
       in
-      let next_registers, ledger_proof_statement =
+      let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) ->
-            ( { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
-                pending_coinbase_stack = ()
-              }
-            , Ledger_proof.statement_with_sok proof ) )
-          ~default:(previous_registers, previous_ledger_proof_stmt)
+          ~f:(fun (proof, _) -> Ledger_proof.statement_with_sok proof)
+          ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -401,8 +393,7 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
-          ~genesis_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:(Body.compute_reference body)
           ~ledger_proof_statement
       in
@@ -411,7 +402,9 @@ module For_tests = struct
       in
       let consensus_state =
         make_next_consensus_state
-          ~snarked_ledger_hash:previous_registers.second_pass_ledger
+          ~snarked_ledger_hash:
+            (Blockchain_state.snarked_ledger_hash
+               (Protocol_state.blockchain_state previous_protocol_state) )
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }

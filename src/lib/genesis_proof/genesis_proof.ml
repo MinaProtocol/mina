@@ -160,22 +160,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   in
   let curr = t.protocol_state_with_hashes.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
-    let reg (t : Blockchain_state.Value.t) =
-      { t.registers with
-        pending_coinbase_stack = Mina_base.Pending_coinbase.Stack.empty
-      }
-    in
-    let genesis_ledger_hash =
-      Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
-    in
-    { sok_digest = Mina_base.Sok_message.Digest.default
-    ; source = reg (Protocol_state.blockchain_state prev_state)
-    ; target = reg (Protocol_state.blockchain_state curr)
-    ; connecting_ledger_left = genesis_ledger_hash
-    ; connecting_ledger_right = genesis_ledger_hash
-    ; supply_increase = Currency.Amount.Signed.zero
-    ; fee_excess = Fee_excess.zero
-    }
+    Blockchain_state.ledger_proof_statement
+      (Protocol_state.blockchain_state curr)
   in
   let genesis_epoch_ledger =
     match t.genesis_epoch_data with
