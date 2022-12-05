@@ -23,11 +23,20 @@ module String_list_formatter = struct
 
   let to_text pks =
     let max_padding = Int.max 1 (List.length pks) |> log10 in
-    List.mapi pks ~f:(fun i pk ->
-        let i = i + 1 in
-        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
-        sprintf "%s%i, %s" padding i pk )
-    |> String.concat ~sep:"\n"
+    (* Create a format-string with padded integer *)
+    let fmt =
+      Scanf.format_from_string (Printf.sprintf "%%%di, %%s" max_padding) "%i%s"
+    in
+    let i = ref (-1) in
+    Format.pp_open_vbox ppf 0 ;
+    Format.pp_print_list ~pp_sep:Format.pp_print_cut
+      (fun ppf e ->
+        incr i ;
+        Format.fprintf ppf fmt !i e )
+      ppf pks ;
+    Format.pp_close_box ppf ()
+
+  let to_text pks = Format.asprintf "%a" pp pks
 end
 
 module Prove_receipt = struct
