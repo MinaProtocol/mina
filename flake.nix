@@ -211,6 +211,7 @@
               label = "Run ${test} integration test";
               depends_on = [ "push_mina-image-full" ]
                 ++ lib.optional with-archive "push_mina-archive-image-full";
+              "if" = ''build.pull_request.labels includes "nix-integration-tests"'';
             };
         in {
           steps = flakeSteps {
