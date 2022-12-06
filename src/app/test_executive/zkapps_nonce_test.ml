@@ -3,27 +3,6 @@ open Async
 open Integration_test_lib
 open Mina_base
 
-(*
-       Test plan:
-       1. Create a transaction that looks like the following:
-         [ fee_pay1; update1]
-         - fee_pay1 updates it's nonce to 1
-         - update1 should be the nonce after fee_pay1, so 1
-       2. Create a transaction that looks like the following:
-         [ fee_pay2; update2]
-         - fee_pay2 has the precondition of 1, otherwise it should fail
-         - update2 should have precondition after fee_pay2 is applied, so 2
-        3. Create a transaction that looks like the following:
-          [ fee_pay3; update3]
-      Outcome:
-        - Both transactions included in a block
-        - transaction1 should have Failed status
-        - transaction2 should have Applied status
-        - transaction3 should have Applied status
-        - Application order fee_pay1, fee_pay2, update1, update2
-
-    *)
-
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
   open Engine
@@ -90,8 +69,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
-    (* Setup *)
-    (* Use genesis accounts instead -- zkapps test*)
     let logger = Logger.create () in
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
@@ -114,7 +91,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "zkApp transaction included in transition frontier"
     in
-    (* Initialize *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
@@ -122,7 +98,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ( Network.seeds network @ block_producer_nodes
               @ Network.snark_coordinators network ) ) )
     in
-    (* Setup transactions*)
     let keymap =
       List.fold [ fish1_kp; fish2_kp ]
         ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -197,7 +172,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    (* Submit transactions*)
     let%bind () =
       section "Send a zkApp transaction with an invalid account_update nonce"
         (send_zkapp ~logger node invalid_nonce_transaction)
@@ -211,7 +185,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a zkApp transaction" (send_zkapp ~logger node t1)
     in
-    (* Check transactions*)
     let%bind () =
       section
         "Wait for zkApp transaction with invalid nonce to be rejected by \
@@ -263,7 +236,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
     in
-    (* End test *)
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
