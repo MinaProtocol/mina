@@ -63,8 +63,8 @@ let combine_evaluations' (type a n m)
   in
   List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
 
-let combine_evaluations' (type n) (t : (_, n, _) t) ~shifted_pow ~mul ~add ~one
-    ~evaluation_point ~xi (evals0 : (_, n) Vector.t) evals1 =
+let[@warning "-45"] combine_evaluations' (type n) (t : (_, n, _) t) ~shifted_pow
+    ~mul ~add ~one ~evaluation_point ~xi (evals0 : (_, n) Vector.t) evals1 =
   match evals0 with
   | Vector.[] ->
       failwith "Empty evals0"

@@ -45,6 +45,10 @@ end
 
 module Wrap = struct
   module Challenges_vector = struct
+    module Vector = Pickles_types.Vector
+    module Wrap_bp_vec = Import.Types.Wrap_bp_vec
+    open Import
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]

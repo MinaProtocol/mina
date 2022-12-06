@@ -14,6 +14,7 @@
    ;; local libraries
    mina_wire_types
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    bignum_bigint
    pickles.backend
    snarky_curves

@@ -25,6 +25,8 @@
   hex
   kimchi_backend.common
   kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_backend.pasta.constraint_system
   pickles_types
   sponge
   snarky.intf))

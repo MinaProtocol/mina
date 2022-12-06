@@ -216,7 +216,7 @@ module T = struct
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
-    |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
+    |> Option.bind ~f:(Fn.compose Mina_stdlib.Nonempty_list.of_list_opt snd)
 
   let scan_state { scan_state; _ } = scan_state
 
@@ -1021,9 +1021,9 @@ module T = struct
     Or_error.try_with (fun () ->
         let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
-          (Int.to_float @@ Fee.to_int total_snark_fee) ;
+          (Int.to_float @@ Fee.to_nanomina_int total_snark_fee) ;
         Gauge.set Scan_state_metrics.transaction_fees_per_block
-          (Int.to_float @@ Fee.to_int total_txn_fee) ;
+          (Int.to_float @@ Fee.to_nanomina_int total_txn_fee) ;
         Gauge.set Scan_state_metrics.purchased_snark_work_per_block
           (Float.of_int @@ List.length work) ;
         Gauge.set Scan_state_metrics.snark_work_required
@@ -1035,13 +1035,15 @@ module T = struct
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
-    let cs =
-      List.map cs
-        ~f:
-          (let open Ledger in
-          User_command.to_verifiable ~ledger ~get ~location_of_account)
-    in
     let open Deferred.Or_error.Let_syntax in
+    let%bind cs =
+      Or_error.try_with (fun () ->
+          List.map cs ~f:(fun cmd ->
+              let open Ledger in
+              User_command.to_verifiable ~ledger ~get ~location_of_account cmd
+              |> Or_error.ok_exn ) )
+      |> Deferred.return
+    in
     let%map xs = Verifier.verify_commands verifier cs in
     Result.all
       (List.map xs ~f:(function
@@ -2564,10 +2566,12 @@ let%test_module "staged ledger tests" =
                     ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
-                | Some ps ->
+                | Ok ps ->
                     ps
-                | None ->
-                    failwith "Could not create Zkapp_command.Valid.t"
+                | Error err ->
+                    Error.raise
+                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
+                         err
               in
               User_command.Zkapp_command valid_zkapp_command_with_auths
           | Signed_command _, _, _ ->
@@ -2890,7 +2894,8 @@ let%test_module "staged ledger tests" =
         let prover = stmt_to_prover stmts in
         Some
           { Transaction_snark_work.Checked.fee =
-              Currency.Fee.(sub work_fee (of_int 1)) |> Option.value_exn
+              Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+              |> Option.value_exn
           ; proofs = proofs stmts
           ; prover
           }
@@ -3218,7 +3223,8 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (of_int 1) (of_int 20))
+                  Fee.(
+                    gen_incl (of_nanomina_int_exn 1) (of_nanomina_int_exn 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3242,7 +3248,8 @@ let%test_module "staged ledger tests" =
               in
               let%map fees =
                 Quickcheck.Generator.list_with_length number_of_proofs
-                  Fee.(gen_incl (of_int 1) (of_int 20))
+                  Fee.(
+                    gen_incl (of_nanomina_int_exn 1) (of_nanomina_int_exn 20))
               in
               (number_of_proofs, fees) )
         in
@@ -3267,7 +3274,7 @@ let%test_module "staged ledger tests" =
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
-      let f_pop_and_add =
+      let f_pop_and_add () =
         let open Snark_params.Tick in
         let open Pending_coinbase in
         let proof_emitted =
@@ -3414,14 +3421,14 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.of_int 100_000_000_000 in
+      let balance = Balance.of_mina_int_exn 100 in
       (*Should fully vest by slot = 7*)
       let acc =
         Account.create_timed account_id balance ~initial_minimum_balance:balance
           ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
           ~cliff_amount:Amount.zero
           ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
-          ~vesting_increment:(Amount.of_int 50_000_000_000)
+          ~vesting_increment:(Amount.of_mina_int_exn 50)
         |> Or_error.ok_exn
       in
       (keypair, acc)
@@ -3437,7 +3444,7 @@ let%test_module "staged ledger tests" =
           (Public_key.compress keypair.public_key)
           Token_id.default
       in
-      let balance = Balance.of_int 100_000_000_000 in
+      let balance = Balance.of_mina_int_exn 100 in
       let acc = Account.create account_id balance in
       (keypair, acc)
 
@@ -3637,8 +3644,9 @@ let%test_module "staged ledger tests" =
           Public_key.Compressed.gen
       in
       let insufficient_account_creation_fee =
-        Currency.Fee.to_int constraint_constants.account_creation_fee / 2
-        |> Currency.Amount.of_int
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+        / 2
+        |> Currency.Amount.of_nanomina_int_exn
       in
       let source_pk = Public_key.compress kp.public_key in
       let body =
@@ -3706,9 +3714,10 @@ let%test_module "staged ledger tests" =
                     |> Option.value_exn ) )
             | `Invalid ->
                 (* Not enough account creation fee and using full balance for fee*)
-                ( Currency.Fee.to_int constraint_constants.account_creation_fee
+                ( Currency.Fee.to_nanomina_int
+                    constraint_constants.account_creation_fee
                   / 2
-                  |> Currency.Amount.of_int
+                  |> Currency.Amount.of_nanomina_int_exn
                 , Currency.Amount.to_fee balance )
           in
           let source_pk = Public_key.compress kp.public_key in
@@ -3813,8 +3822,8 @@ let%test_module "staged ledger tests" =
       in
       Quickcheck.test ~trials:1 gen
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
           let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
           let snapp_update =
             { Account_update.Update.dummy with
@@ -3874,7 +3883,7 @@ let%test_module "staged ledger tests" =
                       ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
-                    Option.value_exn
+                    Or_error.ok_exn
                       (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
                          ~get:Ledger.get
                          ~location_of_account:Ledger.location_of_account

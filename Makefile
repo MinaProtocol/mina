@@ -130,7 +130,7 @@ build_intgtest: ocaml_checks
 
 client_sdk: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune b src/lib/crypto/kimchi_bindings/js/node_js && dune b src/app/client_sdk/client_sdk.bc.js
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
 	$(info Build complete)
 
 client_sdk_test_sigs: ocaml_checks
@@ -149,7 +149,7 @@ mina_signer: ocaml_checks
 	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
 	&& dune b src/app/client_sdk/client_sdk.bc.js \
 	&& (cd frontend/mina-signer; \
-	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run build; \
 	cd ../..)
 	$(info Build complete)
 

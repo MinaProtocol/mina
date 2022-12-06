@@ -128,7 +128,7 @@ module Block = struct
         ; accounts_created :
             (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
         ; tokens_used :
-            (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
+            (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
         }
       [@@deriving yojson, equal]
 

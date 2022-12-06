@@ -5,30 +5,6 @@ const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
-const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
-
-const runCircleBuild = async (github) => {
-  const postData = JSON.stringify({
-    branch: `pull/${github.pull_request.number}/head`,
-    parameters: {
-      "run-ci": true,
-    },
-  });
-
-  const options = {
-    hostname: "circleci.com",
-    port: 443,
-    path: `/api/v2/project/github/MinaProtocol/mina/pipeline`,
-    method: "POST",
-    headers: {
-      "Circle-token": circleApiKey,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-  };
-  const request = await httpsRequest(options, postData);
-  return request;
-};
 
 const runBuild = async (github, pipeline_name, env) => {
   const postData = JSON.stringify({
@@ -88,42 +64,7 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  if (event == "pull_request") {
-    if (
-      // if PR has ci-build-me label
-      req.body.pull_request.labels.filter(
-        (label) => label.name == "ci-build-me"
-      ).length > 0 &&
-      // and we are pushing new commits or actively adding this label
-      (req.body.action == "synchronize" || req.body.action == "labeled") &&
-      // and this is PR _not_ from a fork
-      req.body.pull_request.head.user.login ==
-        req.body.pull_request.base.user.login
-    ) {
-      let buildAlreadyExists;
-      try {
-        const res = await hasExistingBuilds(req.body);
-        buildAlreadyExists = res;
-      } catch (e) {
-        // if this fails for some reason, assume we don't have an existing build
-        console.error(`Failed to find existing builds:`);
-        console.error(e);
-        buildAlreadyExists = false;
-      }
-
-      if (!buildAlreadyExists) {
-        const buildkite = await runBuild(req.body, "mina", {});
-        const circle = await runCircleBuild(req.body);
-        return [buildkite, circle];
-      } else {
-        console.info("Build for this commit on this branch was already found");
-        return [
-          "build already found for this commit",
-          "build already found for this commit",
-        ];
-      }
-    }
-  } else if (event == "issue_comment") {
+  if (event == "issue_comment") {
     // PR Gating Lifting section
     if (
       // we are creating the comment
@@ -172,7 +113,10 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-        orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0 ||
+          req.body.sender.login == "ylecornec" ||
+          req.body.sender.login == "balsoft" ||
+          req.body.sender.login == "bryanhonof"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(

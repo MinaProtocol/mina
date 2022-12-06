@@ -15,6 +15,7 @@
    pickles_base
    pickles.composition_types
    kimchi_backend
+   kimchi_types
    snarky.backendless
    tuple_lib
  ))

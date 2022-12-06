@@ -106,3 +106,9 @@ module Valid : sig
       }
   end
 end
+
+module Transaction_commitment : sig
+  module V1 : sig
+    type t = Pasta_bindings.Fp.t
+  end
+end

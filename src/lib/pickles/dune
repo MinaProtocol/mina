@@ -2,6 +2,9 @@
  (inline_tests)
  (name pickles)
  (public_name pickles)
+ (modules_without_implementation
+   full_signature
+   type)
  (flags -warn-error -22+34+33+27)
  (instrumentation
   (backend bisect_ppx))
@@ -34,6 +37,8 @@
    kimchi_types
    pasta_bindings
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
    bitstring_lib
    snarky.intf
    pickles.backend

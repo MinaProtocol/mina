@@ -79,8 +79,11 @@ pub mod fp {
 
     #[ocaml_gen::func]
     #[ocaml::func]
-    pub fn caml_pasta_fp_plonk_gate_vector_digest(v: CamlPastaFpPlonkGateVectorPtr) -> [u8; 32] {
-        Circuit(&v.as_ref().0).digest()
+    pub fn caml_pasta_fp_plonk_gate_vector_digest(
+        public_input_size: isize,
+        v: CamlPastaFpPlonkGateVectorPtr,
+    ) -> [u8; 32] {
+        Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0).digest()
     }
 }
 
@@ -153,7 +156,10 @@ pub mod fq {
 
     #[ocaml_gen::func]
     #[ocaml::func]
-    pub fn caml_pasta_fq_plonk_gate_vector_digest(v: CamlPastaFqPlonkGateVectorPtr) -> [u8; 32] {
-        Circuit(&v.as_ref().0).digest()
+    pub fn caml_pasta_fq_plonk_gate_vector_digest(
+        public_input_size: isize,
+        v: CamlPastaFqPlonkGateVectorPtr,
+    ) -> [u8; 32] {
+        Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0).digest()
     }
 }

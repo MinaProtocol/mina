@@ -152,7 +152,13 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration=3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
@@ -302,10 +309,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
+    ( match log_entries with
+    | [] ->
+        [%log spam] "No logs were pulled"
+    | log_entries ->
+        [%log spam] "Parsing events from $n logs"
+          ~metadata:[ ("n", `Int (List.length log_entries)) ] ) ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           ( match log_entry |> parse_event_from_log_entry ~logger ~network with

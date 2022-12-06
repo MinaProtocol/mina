@@ -390,7 +390,7 @@ module Snarkable = struct
     include Field_backed (Impl) (M)
 
     let pack_var bs =
-      assert (List.length bs = M.bit_length) ;
+      assert (Mina_stdlib.List.Length.Compare.(bs = M.bit_length)) ;
       project_var bs
 
     let pack_value = Fn.id

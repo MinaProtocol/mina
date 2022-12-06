@@ -15,6 +15,7 @@
    pickles
    pickles.backend
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    transaction_snark
    snark_params
    mina_ledger

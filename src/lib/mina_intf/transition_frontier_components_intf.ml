@@ -307,6 +307,7 @@ module type Transition_frontier_controller_intf = sig
          Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
+    -> unit
     -> Mina_block.Validated.t Strict_pipe.Reader.t
 end
 
@@ -321,8 +322,10 @@ module type Transition_router_intf = sig
 
   type network
 
+  (** [sync_local_state] is `true` by default, may be set to `false` for tests *)
   val run :
-       context:(module CONTEXT)
+       ?sync_local_state:bool
+    -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
@@ -346,6 +349,7 @@ module type Transition_router_intf = sig
          * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
