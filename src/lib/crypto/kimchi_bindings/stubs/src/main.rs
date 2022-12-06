@@ -1,4 +1,4 @@
-use kimchi::circuits::expr::FeatureFlag;
+use kimchi::circuits::{expr::FeatureFlag, lookup::lookups::LookupPattern};
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
@@ -16,8 +16,8 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain,
-        CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+        CamlLookupInfo, CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed,
+        CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
@@ -113,6 +113,8 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+            decl_type!(w, env, LookupPattern => "lookup_pattern");
+            decl_type!(w, env, CamlLookupInfo => "lookup_info");
             decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
         });

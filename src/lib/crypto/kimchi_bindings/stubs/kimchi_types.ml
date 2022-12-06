@@ -181,6 +181,21 @@ module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
+    type nonrec lookup_pattern =
+      | Xor
+      | ChaChaFinal
+      | LookupGate
+      | RangeCheckGate
+      | ForeignFieldMulGate
+
+    type nonrec lookup_info =
+      { kinds : lookup_pattern array
+      ; max_per_row : int
+      ; max_joint_size : int
+      ; uses_runtime_tables : bool
+      }
+    [@@boxed]
+
     type nonrec 't lookup_selectors = { lookup_gate : 't option } [@@boxed]
 
     type nonrec 'poly_comm t =
@@ -188,7 +203,7 @@ module VerifierIndex = struct
       ; lookup_table : 'poly_comm array
       ; lookup_selectors : 'poly_comm lookup_selectors
       ; table_ids : 'poly_comm option
-      ; max_joint_size : int
+      ; lookup_info : lookup_info
       ; runtime_tables_selector : 'poly_comm option
       }
     [@@boxed]

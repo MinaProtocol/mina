@@ -15,12 +15,28 @@ module Verifier_index_json = struct
       { lookup_gate : 't option }
     [@@deriving yojson]
 
+    type lookup_pattern = Kimchi_types.VerifierIndex.Lookup.lookup_pattern =
+      | Xor
+      | ChaChaFinal
+      | LookupGate
+      | RangeCheckGate
+      | ForeignFieldMulGate
+    [@@deriving yojson]
+
+    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
+      { kinds : lookup_pattern array
+      ; max_per_row : int
+      ; max_joint_size : int
+      ; uses_runtime_tables : bool
+      }
+    [@@deriving yojson]
+
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option
-      ; max_joint_size : int
+      ; lookup_info : lookup_info
       ; runtime_tables_selector : 'polyComm option
       }
     [@@deriving yojson]
