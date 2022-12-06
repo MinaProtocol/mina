@@ -209,7 +209,7 @@ module Token_symbol = struct
   let typ : (var, t) Typ.t =
     let (Typ typ) = Field.typ in
     Typ.transport
-      (Typ { typ with check = (fun x -> range_check x) })
+      (Typ { typ with check = range_check })
       ~there:to_field ~back:of_field
 
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
