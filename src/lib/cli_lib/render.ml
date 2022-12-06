@@ -21,7 +21,7 @@ module String_list_formatter = struct
 
   let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
 
-  let to_text pks =
+  let pp ppf pks =
     let max_padding = Int.max 1 (List.length pks) |> log10 in
     (* Create a format-string with padded integer *)
     let fmt =
@@ -67,6 +67,6 @@ module Public_key_with_details = struct
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance, nonce) ->
-        sprintf !"%s, %d, %d" public_key balance nonce )
+        sprintf "%s, %d, %d" public_key balance nonce )
     |> String.concat ~sep:"\n"
 end
