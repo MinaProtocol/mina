@@ -77,7 +77,7 @@ val typ :
   -> ( 'b
      , 'c
      , 'a
-     , (unit, 'a) Snarky_backendless.Checked_ast.t )
+     , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
      Snarky_backendless.Types.Typ.t
   -> ( 'd
      , 'e
