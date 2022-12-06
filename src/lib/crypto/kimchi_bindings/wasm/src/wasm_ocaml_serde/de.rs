@@ -32,6 +32,8 @@ struct ObjectAccess {
 
 impl ObjectAccess {
     fn new(data: Array, fields: &'static [&'static str]) -> Self {
+        // We start the index at 1, due to some js-of-ocaml expecting the first element to be 0
+        // this is due to OCaml implementation details.
         Self {
             data,
             idx: 1,
