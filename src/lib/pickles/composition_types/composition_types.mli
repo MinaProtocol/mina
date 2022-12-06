@@ -1,6 +1,5 @@
-(* Composition types *)
-
-module Opt = Pickles_types.Plonk_types.Opt
+open Pickles_types
+module Opt = Plonk_types.Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
@@ -13,7 +12,7 @@ module Digest = Digest
 module Spec = Spec
 module Branch_data = Branch_data
 module Bulletproof_challenge = Bulletproof_challenge
-module Nvector = Pickles_types.Vector.With_length
+module Nvector = Vector.With_length
 module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
@@ -89,10 +88,6 @@ module Wrap : sig
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
         end
 
-        module Generic_coeffs_vec :
-            module type of
-              Pickles_types.Vector.With_length (Pickles_types.Nat.N9)
-
         module In_circuit : sig
           module Lookup : sig
             type ('scalar_challenge, 'fp) t =
@@ -103,12 +98,12 @@ module Wrap : sig
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
             val to_struct :
-                 ('a Pickles_types.Hlist0.Id.t, 'b Pickles_types.Hlist0.Id.t) t
-              -> ('a * ('b * unit)) Pickles_types.Hlist.HlistId.t
+                 ('a Hlist0.Id.t, 'b Hlist0.Id.t) t
+              -> ('a * ('b * unit)) Hlist.HlistId.t
 
             val of_struct :
-                 ('a * ('b * unit)) Pickles_types.Hlist.HlistId.t
-              -> ('a Pickles_types.Hlist0.Id.t, 'b Pickles_types.Hlist0.Id.t) t
+                 ('a * ('b * unit)) Hlist.HlistId.t
+              -> ('a Hlist0.Id.t, 'b Hlist0.Id.t) t
 
             val typ :
                  ( 'a
@@ -124,10 +119,10 @@ module Wrap : sig
 
           (** All scalar values deferred by a verifier circuit.
 
-              The values in [poseidon_selector], [vbmul], [complete_add],
-              [endomul], [endomul_scalar], [perm], and [generic] n are all
-              scalars which will have been used to scale selector polynomials
-              during the computation of the linearized polynomial commitment.
+              The values in [vbmul], [complete_add], [endomul],
+              [endomul_scalar], [perm], and are all scalars which will have
+              been used to scale selector polynomials during the computation of
+              the linearized polynomial commitment.
 
               Then, we expose them so the next guy (who can do scalar
               arithmetic) can check that they were computed correctly from the
@@ -139,8 +134,6 @@ module Wrap : sig
             ; zeta : 'scalar_challenge
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; poseidon_selector : 'fp
-                  (** scalar used on the poseidon selector *)
             ; vbmul : 'fp  (** scalar used on the vbmul selector *)
             ; complete_add : 'fp
                   (** scalar used on the complete_add selector *)
@@ -149,8 +142,6 @@ module Wrap : sig
                   (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
-            ; generic : 'fp Generic_coeffs_vec.t
-                  (** scalars used on the coefficient column commitments. *)
             ; lookup : 'lookup_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
@@ -168,7 +159,7 @@ module Wrap : sig
 
           val typ :
                'f Spec.impl
-            -> lookup:Pickles_types.Plonk_types.Opt.Flag.t
+            -> lookup:Plonk_types.Opt.Flag.t
             -> dummy_scalar:'a
             -> dummy_scalar_challenge:'b Scalar_challenge.t
             -> challenge:
@@ -187,7 +178,7 @@ module Wrap : sig
                  , ( ('e Scalar_challenge.t, 'fp) Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Pickles_types.Plonk_types.Opt.t )
+                   Plonk_types.Opt.t )
                  t
                , ( 'd
                  , 'b Scalar_challenge.t
@@ -323,7 +314,7 @@ module Wrap : sig
 
         val typ :
              (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-          -> lookup:Pickles_types.Plonk_types.Opt.Flag.t
+          -> lookup:Plonk_types.Opt.Flag.t
           -> dummy_scalar:'a
           -> dummy_scalar_challenge:'b Scalar_challenge.t
           -> challenge:
@@ -349,13 +340,13 @@ module Wrap : sig
                  , ( ('e Scalar_challenge.t, 'fp) Plonk.In_circuit.Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Pickles_types.Plonk_types.Opt.t )
+                   Plonk_types.Opt.t )
                  Plonk.In_circuit.t
                , 'e Scalar_challenge.t
                , 'fp
                , ( 'e Scalar_challenge.t Bulletproof_challenge.t
                  , Backend.Tick.Rounds.n )
-                 Pickles_types.Vector.vec
+                 Vector.vec
                , 'g )
                Stable.Latest.t
              , ( ( 'd
@@ -368,7 +359,7 @@ module Wrap : sig
                , 'a
                , ( 'b Scalar_challenge.t Bulletproof_challenge.t
                  , Backend.Tick.Rounds.n )
-                 Pickles_types.Vector.vec
+                 Vector.vec
                , 'h )
                Stable.Latest.t
              , 'f )
@@ -476,7 +467,7 @@ module Wrap : sig
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       val to_field_elements :
-           ('g, (('f, 'a) Pickles_types.Vector.t, 'b) Pickles_types.Vector.t) t
+           ('g, (('f, 'a) Vector.t, 'b) Vector.t) t
         -> g1:('g -> 'f list)
         -> 'f Core_kernel.Array.t
 
@@ -488,9 +479,9 @@ module Wrap : sig
            )
            snarky_typ
         -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-        -> length:'f Pickles_types.Nat.nat
-        -> ( ('a, ('d, 'f) Pickles_types.Vector.vec) t
-           , ('b, ('e, 'f) Pickles_types.Vector.vec) t
+        -> length:'f Nat.nat
+        -> ( ('a, ('d, 'f) Vector.vec) t
+           , ('b, ('e, 'f) Vector.vec) t
            , 'c )
            Snarky_backendless.Typ.t
     end
@@ -542,7 +533,7 @@ module Wrap : sig
 
       val typ :
            (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-        -> lookup:Pickles_types.Plonk_types.Opt.Flag.t
+        -> lookup:Plonk_types.Opt.Flag.t
         -> dummy_scalar:'a
         -> dummy_scalar_challenge:'b Scalar_challenge.t
         -> challenge:
@@ -581,7 +572,7 @@ module Wrap : sig
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'f Snarky_backendless.Cvar.t
                    Snarky_backendless__Snark_intf.Boolean0.t )
-                 Pickles_types.Plonk_types.Opt.t )
+                 Plonk_types.Opt.t )
                Deferred_values.Plonk.In_circuit.t
              , 'e Scalar_challenge.t
              , 'fp
@@ -589,7 +580,7 @@ module Wrap : sig
              , 'i
              , ( 'e Scalar_challenge.t Bulletproof_challenge.t
                , Backend.Tick.Rounds.n )
-               Pickles_types.Vector.vec
+               Vector.vec
              , 'k )
              Stable.Latest.t
            , ( ( 'd
@@ -606,7 +597,7 @@ module Wrap : sig
              , 'j
              , ( 'b Scalar_challenge.t Bulletproof_challenge.t
                , Backend.Tick.Rounds.n )
-               Pickles_types.Vector.vec
+               Vector.vec
              , 'l )
              Stable.Latest.t
            , 'f )
@@ -629,7 +620,7 @@ module Wrap : sig
             (** The actual application-level state (e.g., for Mina, this is the
                 protocol state which contains the merkle root of the ledger,
                 state related to consensus, etc.) *)
-      ; dlog_plonk_index : 'g Pickles_types.Plonk_verification_key_evals.t
+      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
             (** The verification key corresponding to the wrap-circuit for this
                 recursive proof system.  It gets threaded through all the
                 circuits so that the step circuits can verify proofs against
@@ -640,22 +631,14 @@ module Wrap : sig
     [@@deriving sexp, hlist]
 
     val to_field_elements :
-         ( 'a
-         , 'b
-         , ('g, 'c) Pickles_types.Vector.t
-         , (('f, 'd) Pickles_types.Vector.t, 'c) Pickles_types.Vector.t )
-         t
+         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
       -> app_state:('b -> 'f Core_kernel.Array.t)
       -> comm:('a -> 'f Core_kernel.Array.t)
       -> g:('g -> 'f list)
       -> 'f Core_kernel.Array.t
 
     val to_field_elements_without_index :
-         ( 'a
-         , 'b
-         , ('g, 'c) Pickles_types.Vector.t
-         , (('f, 'd) Pickles_types.Vector.t, 'c) Pickles_types.Vector.t )
-         t
+         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
       -> app_state:('b -> 'f Core_kernel.Array.t)
       -> g:('g -> 'f list)
       -> 'f Core_kernel.Array.t
@@ -675,9 +658,9 @@ module Wrap : sig
          , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
          )
          snarky_typ
-      -> 'j Pickles_types.Nat.nat
-      -> ( ('a, 'f, ('d, 'j) Pickles_types.Vector.vec, 'h) t
-         , ('b, 'g, ('e, 'j) Pickles_types.Vector.vec, 'i) t
+      -> 'j Nat.nat
+      -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
+         , ('b, 'g, ('e, 'j) Vector.vec, 'i) t
          , 'c )
          Snarky_backendless.Typ.t
   end
@@ -685,15 +668,14 @@ module Wrap : sig
   module Lookup_parameters : sig
     type ('chal, 'chal_var, 'fp, 'fp_var) t =
       { zero : ('chal, 'chal_var, 'fp, 'fp_var) Zero_values.t
-      ; use : Pickles_types.Plonk_types.Opt.Flag.t
+      ; use : Plonk_types.Opt.Flag.t
       }
 
     val opt_spec :
          'f Spec.impl
-      -> ('a, 'b, 'c Pickles_types.Hlist0.Id.t, 'd Pickles_types.Hlist0.Id.t) t
-      -> ( ('a Scalar_challenge.t * ('c * unit)) Pickles_types.Hlist.HlistId.t
-           option
-         , ( ('b Scalar_challenge.t * ('d * unit)) Pickles_types.Hlist.HlistId.t
+      -> ('a, 'b, 'c Hlist0.Id.t, 'd Hlist0.Id.t) t
+      -> ( ('a Scalar_challenge.t * ('c * unit)) Hlist.HlistId.t option
+         , ( ('b Scalar_challenge.t * ('d * unit)) Hlist.HlistId.t
            , 'f Snarky_backendless.Cvar.t
              Snarky_backendless__Snark_intf.Boolean0.t )
            opt
@@ -864,49 +846,39 @@ module Wrap : sig
       [@@deriving compare, yojson, sexp, hash, equal]
 
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g) flat_repr :=
-        ( ('a, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-        * ( ('b, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-          * ( ('c, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-            * ( ('d, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-              * ( 'e
-                * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                  * ('g * unit) ) ) ) ) ) )
-        Pickles_types.Hlist.HlistId.t
+        ( ('a, Nat.N9.n) Vector.t
+        * ( ('b, Nat.N2.n) Vector.t
+          * ( ('c, Nat.N3.n) Vector.t
+            * ( ('d, Nat.N3.n) Vector.t
+              * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+        Hlist.HlistId.t
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
            'a Spec.impl
-        -> ( 'b
-           , 'c
-           , 'd Pickles_types.Hlist0.Id.t
-           , 'e Pickles_types.Hlist0.Id.t )
-           Lookup_parameters.t
+        -> ('b, 'c, 'd Hlist0.Id.t, 'e Hlist0.Id.t) Lookup_parameters.t
         -> ( ( 'd
              , 'b
              , 'b Scalar_challenge.t
              , 'f
-             , ('g, Backend.Tick.Rounds.n) Pickles_types.Vector.t
+             , ('g, Backend.Tick.Rounds.n) Vector.t
              , 'h
-             , ('b Scalar_challenge.t * ('d * unit))
-               Pickles_types.Hlist.HlistId.t
-               option )
+             , ('b Scalar_challenge.t * ('d * unit)) Hlist.HlistId.t option )
              flat_repr
-           , ( ('e, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('c, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-               * ( ( 'c Scalar_challenge.t
-                   , Pickles_types.Nat.N3.n )
-                   Pickles_types.Vector.t
-                 * ( ('i, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( ('j, Backend.Tick.Rounds.n) Pickles_types.Vector.t
-                     * ( ('k, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
+           , ( ('e, Nat.N9.n) Vector.t
+             * ( ('c, Nat.N2.n) Vector.t
+               * ( ('c Scalar_challenge.t, Nat.N3.n) Vector.t
+                 * ( ('i, Nat.N3.n) Vector.t
+                   * ( ('j, Backend.Tick.Rounds.n) Vector.t
+                     * ( ('k, Nat.N1.n) Vector.t
                        * ( ( ('c Scalar_challenge.t * ('e * unit))
-                             Pickles_types.Hlist.HlistId.t
+                             Hlist.HlistId.t
                            , 'a Snarky_backendless.Cvar.t
                              Snarky_backendless__Snark_intf.Boolean0.t )
                            opt
                          * unit ) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+             Hlist.HlistId.t
            , < bool1 : bool
              ; bool2 :
                  'a Snarky_backendless.Cvar.t
@@ -926,29 +898,29 @@ module Wrap : sig
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
       val to_data :
-           ('a, 'b, 'c, 'd, 'e, 'e, 'e, 'f Pickles_types.Hlist0.Id.t, 'g) t
+           ('a, 'b, 'c, 'd, 'e, 'e, 'e, 'f Hlist0.Id.t, 'g) t
         -> option_map:
              (   'd
               -> f:
-                   (   ( 'h Pickles_types.Hlist0.Id.t
-                       , 'i Pickles_types.Hlist0.Id.t )
+                   (   ( 'h Hlist0.Id.t
+                       , 'i Hlist0.Id.t )
                        Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-                    -> ('h * ('i * unit)) Pickles_types.Hlist.HlistId.t )
-              -> 'j Pickles_types.Hlist0.Id.t )
+                    -> ('h * ('i * unit)) Hlist.HlistId.t )
+              -> 'j Hlist0.Id.t )
         -> ('c, 'a, 'b, 'e, 'f, 'g, 'j) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
            ('a, 'b, 'c, 'd, 'e, 'f, 'g) flat_repr
         -> option_map:
-             (   'g Pickles_types.Hlist0.Id.t
+             (   'g Hlist0.Id.t
               -> f:
-                   (   ('h * ('i * unit)) Pickles_types.Hlist.HlistId.t
-                    -> ( 'h Pickles_types.Hlist0.Id.t
-                       , 'i Pickles_types.Hlist0.Id.t )
+                   (   ('h * ('i * unit)) Hlist.HlistId.t
+                    -> ( 'h Hlist0.Id.t
+                       , 'i Hlist0.Id.t )
                        Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
               -> 'j )
-        -> ('b, 'c, 'a, 'j, 'd, 'd, 'd, 'e Pickles_types.Hlist0.Id.t, 'f) t
+        -> ('b, 'c, 'a, 'j, 'd, 'd, 'd, 'e Hlist0.Id.t, 'f) t
     end
 
     val to_minimal :
@@ -962,10 +934,10 @@ module Wrap : sig
 end
 
 module Step : sig
-  module Plonk_polys = Pickles_types.Nat.N10
+  module Plonk_polys = Nat.N10
 
   module Bulletproof : sig
-    include module type of Pickles_types.Plonk_types.Openings.Bulletproof
+    include module type of Plonk_types.Openings.Bulletproof
 
     (** This is data that can be computed in linear time from the proof +
         statement.
@@ -1123,43 +1095,35 @@ module Step : sig
           representing it inside the circuit. *)
         val spec :
              'a Spec.impl
-          -> 'b Pickles_types.Nat.t
-          -> ( 'c
-             , 'd
-             , 'e Pickles_types.Hlist0.Id.t
-             , 'f Pickles_types.Hlist0.Id.t )
-             Wrap.Lookup_parameters.t
-          -> ( ( ('e, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-               * ( ('g, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                 * ( ('c, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                   * ( ( 'c Scalar_challenge.t
-                       , Pickles_types.Nat.N3.n )
-                       Pickles_types.Vector.t
-                     * ( ('h, 'b) Pickles_types.Vector.t
-                       * ( (bool, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
+          -> 'b Nat.t
+          -> ('c, 'd, 'e Hlist0.Id.t, 'f Hlist0.Id.t) Wrap.Lookup_parameters.t
+          -> ( ( ('e, Nat.N9.n) Vector.t
+               * ( ('g, Nat.N1.n) Vector.t
+                 * ( ('c, Nat.N2.n) Vector.t
+                   * ( ('c Scalar_challenge.t, Nat.N3.n) Vector.t
+                     * ( ('h, 'b) Vector.t
+                       * ( (bool, Nat.N1.n) Vector.t
                          * ( ('c Scalar_challenge.t * ('e * unit))
-                             Pickles_types.Hlist.HlistId.t
+                             Hlist.HlistId.t
                              option
                            * unit ) ) ) ) ) ) )
-               Pickles_types.Hlist.HlistId.t
-             , ( ('f, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-               * ( ('i, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                 * ( ('d, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                   * ( ( 'd Scalar_challenge.t
-                       , Pickles_types.Nat.N3.n )
-                       Pickles_types.Vector.t
-                     * ( ('j, 'b) Pickles_types.Vector.t
+               Hlist.HlistId.t
+             , ( ('f, Nat.N9.n) Vector.t
+               * ( ('i, Nat.N1.n) Vector.t
+                 * ( ('d, Nat.N2.n) Vector.t
+                   * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
+                     * ( ('j, 'b) Vector.t
                        * ( ( 'a Snarky_backendless.Cvar.t
                              Snarky_backendless__Snark_intf.Boolean0.t
-                           , Pickles_types.Nat.N1.n )
-                           Pickles_types.Vector.t
+                           , Nat.N1.n )
+                           Vector.t
                          * ( ( ('d Scalar_challenge.t * ('f * unit))
-                               Pickles_types.Hlist.HlistId.t
+                               Hlist.HlistId.t
                              , 'a Snarky_backendless.Cvar.t
                                Snarky_backendless__Snark_intf.Boolean0.t )
-                             Pickles_types.Plonk_types.Opt.t
+                             Plonk_types.Opt.t
                            * unit ) ) ) ) ) ) )
-               Pickles_types.Hlist.HlistId.t
+               Hlist.HlistId.t
              , < bool1 : bool
                ; bool2 :
                    'a Snarky_backendless.Cvar.t
@@ -1176,42 +1140,38 @@ module Step : sig
              Spec.T.t
 
         val to_data :
-             ('a, 'b, 'c, 'd, 'e Pickles_types.Hlist0.Id.t, 'f, 'g) t
+             ('a, 'b, 'c, 'd, 'e Hlist0.Id.t, 'f, 'g) t
           -> option_map:
                (   'd
                 -> f:
-                     (   ( 'h Pickles_types.Hlist0.Id.t
-                         , 'i Pickles_types.Hlist0.Id.t )
+                     (   ( 'h Hlist0.Id.t
+                         , 'i Hlist0.Id.t )
                          Deferred_values.Plonk.In_circuit.Lookup.t
-                      -> ('h * ('i * unit)) Pickles_types.Hlist.HlistId.t )
-                -> 'j Pickles_types.Hlist0.Id.t )
-          -> ( ('c, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-               * ( ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                 * ( ('b, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( 'e
-                     * ( ('g, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                       * ('j * unit) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+                      -> ('h * ('i * unit)) Hlist.HlistId.t )
+                -> 'j Hlist0.Id.t )
+          -> ( ('c, Nat.N9.n) Vector.t
+             * ( ('f, Nat.N1.n) Vector.t
+               * ( ('a, Nat.N2.n) Vector.t
+                 * ( ('b, Nat.N3.n) Vector.t
+                   * ('e * (('g, Nat.N1.n) Vector.t * ('j * unit))) ) ) ) )
+             Hlist.HlistId.t
 
         val of_data :
-             ( ('a, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('b, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-               * ( ('c, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                 * ( ('d, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( 'e
-                     * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                       * ('g * unit) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+             ( ('a, Nat.N9.n) Vector.t
+             * ( ('b, Nat.N1.n) Vector.t
+               * ( ('c, Nat.N2.n) Vector.t
+                 * ( ('d, Nat.N3.n) Vector.t
+                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+             Hlist.HlistId.t
           -> option_map:
-               (   'g Pickles_types.Hlist0.Id.t
+               (   'g Hlist0.Id.t
                 -> f:
-                     (   ('h * ('i * unit)) Pickles_types.Hlist.HlistId.t
-                      -> ( 'h Pickles_types.Hlist0.Id.t
-                         , 'i Pickles_types.Hlist0.Id.t )
+                     (   ('h * ('i * unit)) Hlist.HlistId.t
+                      -> ( 'h Hlist0.Id.t
+                         , 'i Hlist0.Id.t )
                          Deferred_values.Plonk.In_circuit.Lookup.t )
                 -> 'j )
-          -> ('c, 'd, 'a, 'j, 'e Pickles_types.Hlist0.Id.t, 'b, 'f) t
+          -> ('c, 'd, 'a, 'j, 'e Hlist0.Id.t, 'b, 'f) t
 
         val map_lookup :
              ('a, 'b, 'c, 'd, 'e, 'f, 'g) t
@@ -1237,16 +1197,15 @@ module Step : sig
         -> zero:
              ( Limb_vector.Challenge.Constant.t
              , 'a Limb_vector.Challenge.t
-             , 'c Pickles_types.Hlist0.Id.t
-             , 'b Pickles_types.Hlist0.Id.t )
+             , 'c Hlist0.Id.t
+             , 'b Hlist0.Id.t )
              Zero_values.t
         -> uses_lookup:Opt.Flag.t
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
-             , ( ( 'a Limb_vector.Challenge.t Scalar_challenge.t
-                   Pickles_types.Hlist0.Id.t
-                 , 'b Pickles_types.Hlist0.Id.t )
+             , ( ( 'a Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
+                 , 'b Hlist0.Id.t )
                  Deferred_values.Plonk.In_circuit.Lookup.t
                , 'a Snarky_backendless.Cvar.t
                  Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1254,8 +1213,8 @@ module Step : sig
              , ( 'a Limb_vector.Challenge.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
-               Pickles_types.Vector.t
-               Pickles_types.Hlist0.Id.t
+               Vector.t
+               Hlist0.Id.t
              , 'a Snarky_backendless.Cvar.t
              , 'a Snarky_backendless.Cvar.t
                Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1263,19 +1222,16 @@ module Step : sig
            , ( Limb_vector.Challenge.Constant.t
              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
              , 'c
-             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
-                 Pickles_types.Hlist0.Id.t
-               , 'c Pickles_types.Hlist0.Id.t )
+             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t Hlist0.Id.t
+               , 'c Hlist0.Id.t )
                Deferred_values.Plonk.In_circuit.Lookup.t
                option
              , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
-               Pickles_types.Vector.t
-               Pickles_types.Hlist0.Id.t
-             , ( Limb_vector.Constant.Hex64.t
-               , Digest.Limbs.n )
-               Pickles_types__Vector.vec
+               Vector.t
+               Hlist0.Id.t
+             , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
              , bool )
              In_circuit.t
            , 'a )
@@ -1295,88 +1251,70 @@ module Step : sig
     val spec :
          ('a, 'b, 'c) Spec.T.t
       -> ('d, 'e, 'c) Spec.T.t
-      -> ( ('a * ('d * unit)) Pickles_types.Hlist.HlistId.t
-         , ('b * ('e * unit)) Pickles_types.Hlist.HlistId.t
+      -> ( ('a * ('d * unit)) Hlist.HlistId.t
+         , ('b * ('e * unit)) Hlist.HlistId.t
          , 'c )
          Spec.T.t
 
     val to_data :
-         ( ( ( 'a
-             , 'b
-             , 'c
-             , 'd
-             , 'e Pickles_types.Hlist0.Id.t
-             , 'f
-             , 'g )
-             Per_proof.In_circuit.t
+         ( ( ('a, 'b, 'c, 'd, 'e Hlist0.Id.t, 'f, 'g) Per_proof.In_circuit.t
            , 'h )
-           Pickles_types.Vector.t
-         , 'i Pickles_types.Hlist0.Id.t )
+           Vector.t
+         , 'i Hlist0.Id.t )
          t
       -> ( (    option_map:
                   (   'd
                    -> f:
-                        (   ( 'j Pickles_types.Hlist0.Id.t
-                            , 'k Pickles_types.Hlist0.Id.t )
+                        (   ( 'j Hlist0.Id.t
+                            , 'k Hlist0.Id.t )
                             Deferred_values.Plonk.In_circuit.Lookup.t
-                         -> ('j * ('k * unit)) Pickles_types.Hlist.HlistId.t )
-                   -> 'l Pickles_types.Hlist0.Id.t )
-             -> ( ('c, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-                * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                  * ( ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                    * ( ('b, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                      * ( 'e
-                        * ( ('g, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                          * ('l * unit) ) ) ) ) ) )
-                Pickles_types.Hlist.HlistId.t
+                         -> ('j * ('k * unit)) Hlist.HlistId.t )
+                   -> 'l Hlist0.Id.t )
+             -> ( ('c, Nat.N9.n) Vector.t
+                * ( ('f, Nat.N1.n) Vector.t
+                  * ( ('a, Nat.N2.n) Vector.t
+                    * ( ('b, Nat.N3.n) Vector.t
+                      * ('e * (('g, Nat.N1.n) Vector.t * ('l * unit))) ) ) ) )
+                Hlist.HlistId.t
            , 'h )
-           Pickles_types.Vector.t
+           Vector.t
          * ('i * unit) )
-         Pickles_types.Hlist.HlistId.t
+         Hlist.HlistId.t
 
     val of_data :
-         ( ( ( ('a, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('b, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-               * ( ('c, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                 * ( ('d, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( 'e
-                     * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                       * ('g * unit) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+         ( ( ( ('a, Nat.N9.n) Vector.t
+             * ( ('b, Nat.N1.n) Vector.t
+               * ( ('c, Nat.N2.n) Vector.t
+                 * ( ('d, Nat.N3.n) Vector.t
+                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+             Hlist.HlistId.t
            , 'h )
-           Pickles_types.Vector.t
+           Vector.t
          * ('i * unit) )
-         Pickles_types.Hlist.HlistId.t
+         Hlist.HlistId.t
       -> ( (    option_map:
-                  (   'g Pickles_types.Hlist0.Id.t
+                  (   'g Hlist0.Id.t
                    -> f:
-                        (   ('j * ('k * unit)) Pickles_types.Hlist.HlistId.t
-                         -> ( 'j Pickles_types.Hlist0.Id.t
-                            , 'k Pickles_types.Hlist0.Id.t )
+                        (   ('j * ('k * unit)) Hlist.HlistId.t
+                         -> ( 'j Hlist0.Id.t
+                            , 'k Hlist0.Id.t )
                             Deferred_values.Plonk.In_circuit.Lookup.t )
                    -> 'l )
-             -> ( 'c
-                , 'd
-                , 'a
-                , 'l
-                , 'e Pickles_types.Hlist0.Id.t
-                , 'b
-                , 'f )
-                Per_proof.In_circuit.t
+             -> ('c, 'd, 'a, 'l, 'e Hlist0.Id.t, 'b, 'f) Per_proof.In_circuit.t
            , 'h )
-           Pickles_types.Vector.t
-         , 'i Pickles_types.Hlist0.Id.t )
+           Vector.t
+         , 'i Hlist0.Id.t )
          t
 
     val typ :
          'f Spec.impl
       -> ( Limb_vector.Challenge.Constant.t
          , 'f Limb_vector.Challenge.t
-         , 'a Pickles_types.Hlist0.Id.t
-         , 'b Pickles_types.Hlist0.Id.t )
+         , 'a Hlist0.Id.t
+         , 'b Hlist0.Id.t )
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-      -> (Pickles_types.Plonk_types.Opt.Flag.t, 'n) Pickles_types.Vector.t
+      -> (Plonk_types.Opt.Flag.t, 'n) Vector.t
       -> ( 'b
          , 'a
          , 'f
@@ -1386,9 +1324,8 @@ module Step : sig
       -> ( ( ( ( 'f Limb_vector.Challenge.t
                , 'f Limb_vector.Challenge.t Scalar_challenge.t
                , 'b
-               , ( ( 'f Limb_vector.Challenge.t Scalar_challenge.t
-                     Pickles_types.Hlist0.Id.t
-                   , 'b Pickles_types.Hlist0.Id.t )
+               , ( ( 'f Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
+                   , 'b Hlist0.Id.t )
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'f Snarky_backendless.Cvar.t
                    Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1396,39 +1333,35 @@ module Step : sig
                , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
-                 Pickles_types.Vector.t
-                 Pickles_types.Hlist0.Id.t
+                 Vector.t
+                 Hlist0.Id.t
                , 'f Snarky_backendless.Cvar.t
                , 'f Snarky_backendless.Cvar.t
                  Snarky_backendless__Snark_intf.Boolean0.t )
                Per_proof.In_circuit.t
              , 'n )
-             Pickles_types.Vector.t
+             Vector.t
            , 'f Snarky_backendless.Cvar.t )
            t
          , ( ( ( Limb_vector.Challenge.Constant.t
                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
                , 'a
                , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
-                   Pickles_types.Hlist0.Id.t
-                 , 'a Pickles_types.Hlist0.Id.t )
+                   Hlist0.Id.t
+                 , 'a Hlist0.Id.t )
                  Deferred_values.Plonk.In_circuit.Lookup.t
                  option
                , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
-                 Pickles_types.Vector.t
-                 Pickles_types.Hlist0.Id.t
-               , ( Limb_vector.Constant.Hex64.t
-                 , Digest.Limbs.n )
-                 Pickles_types__Vector.vec
+                 Vector.t
+                 Hlist0.Id.t
+               , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
                , bool )
                Per_proof.In_circuit.t
              , 'n )
-             Pickles_types.Vector.t
-           , ( Limb_vector.Constant.Hex64.t
-             , Digest.Limbs.n )
-             Pickles_types__Vector.vec )
+             Vector.t
+           , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t )
            t
          , 'f )
          Snarky_backendless.Typ.t
@@ -1450,119 +1383,107 @@ module Step : sig
              , 'b
              , 'c
              , 'd
-             , 'e Pickles_types.Hlist0.Id.t
+             , 'e Hlist0.Id.t
              , 'f
              , 'g )
              Proof_state.Per_proof.In_circuit.t
            , 'h )
-           Pickles_types.Vector.t
-         , 'i Pickles_types.Hlist0.Id.t
-         , 'j Pickles_types.Hlist0.Id.t )
+           Vector.t
+         , 'i Hlist0.Id.t
+         , 'j Hlist0.Id.t )
          t
       -> option_map:
            (   'd
             -> f:
-                 (   ( 'k Pickles_types.Hlist0.Id.t
-                     , 'l Pickles_types.Hlist0.Id.t )
+                 (   ( 'k Hlist0.Id.t
+                     , 'l Hlist0.Id.t )
                      Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-                  -> ('k * ('l * unit)) Pickles_types.Hlist.HlistId.t )
-            -> 'm Pickles_types.Hlist0.Id.t )
-      -> ( ( ( ('c, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-               * ( ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                 * ( ('b, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( 'e
-                     * ( ('g, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                       * ('m * unit) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+                  -> ('k * ('l * unit)) Hlist.HlistId.t )
+            -> 'm Hlist0.Id.t )
+      -> ( ( ( ('c, Nat.N9.n) Vector.t
+             * ( ('f, Nat.N1.n) Vector.t
+               * ( ('a, Nat.N2.n) Vector.t
+                 * ( ('b, Nat.N3.n) Vector.t
+                   * ('e * (('g, Nat.N1.n) Vector.t * ('m * unit))) ) ) ) )
+             Hlist.HlistId.t
            , 'h )
-           Pickles_types.Vector.t
+           Vector.t
          * ('i * ('j * unit)) )
-         Pickles_types.Hlist.HlistId.t
+         Hlist.HlistId.t
 
     val of_data :
-         ( ( ( ('a, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-             * ( ('b, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-               * ( ('c, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                 * ( ('d, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
-                   * ( 'e
-                     * ( ('f, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                       * ('g * unit) ) ) ) ) ) )
-             Pickles_types.Hlist.HlistId.t
+         ( ( ( ('a, Nat.N9.n) Vector.t
+             * ( ('b, Nat.N1.n) Vector.t
+               * ( ('c, Nat.N2.n) Vector.t
+                 * ( ('d, Nat.N3.n) Vector.t
+                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+             Hlist.HlistId.t
            , 'h )
-           Pickles_types.Vector.t
+           Vector.t
          * ('i * ('j * unit)) )
-         Pickles_types.Hlist.HlistId.t
+         Hlist.HlistId.t
       -> option_map:
-           (   'g Pickles_types.Hlist0.Id.t
+           (   'g Hlist0.Id.t
             -> f:
-                 (   ('k * ('l * unit)) Pickles_types.Hlist.HlistId.t
-                  -> ( 'k Pickles_types.Hlist0.Id.t
-                     , 'l Pickles_types.Hlist0.Id.t )
+                 (   ('k * ('l * unit)) Hlist.HlistId.t
+                  -> ( 'k Hlist0.Id.t
+                     , 'l Hlist0.Id.t )
                      Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
             -> 'm )
       -> ( ( ( 'c
              , 'd
              , 'a
              , 'm
-             , 'e Pickles_types.Hlist0.Id.t
+             , 'e Hlist0.Id.t
              , 'b
              , 'f )
              Proof_state.Per_proof.In_circuit.t
            , 'h )
-           Pickles_types.Vector.t
-         , 'i Pickles_types.Hlist0.Id.t
-         , 'j Pickles_types.Hlist0.Id.t )
+           Vector.t
+         , 'i Hlist0.Id.t
+         , 'j Hlist0.Id.t )
          t
 
     val spec :
          'a Spec.impl
-      -> 'b Pickles_types.Nat.t
-      -> 'c Pickles_types.Nat.t
-      -> ( 'd
-         , 'e
-         , 'f Pickles_types.Hlist0.Id.t
-         , 'g Pickles_types.Hlist0.Id.t )
-         Wrap.Lookup_parameters.t
-      -> ( ( ( ( ('f, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-               * ( ('h, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                 * ( ('d, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                   * ( ( 'd Scalar_challenge.t
-                       , Pickles_types.Nat.N3.n )
-                       Pickles_types.Vector.t
-                     * ( ('i, 'c) Pickles_types.Vector.t
-                       * ( (bool, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
+      -> 'b Nat.t
+      -> 'c Nat.t
+      -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
+      -> ( ( ( ( ('f, Nat.N9.n) Vector.t
+               * ( ('h, Nat.N1.n) Vector.t
+                 * ( ('d, Nat.N2.n) Vector.t
+                   * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
+                     * ( ('i, 'c) Vector.t
+                       * ( (bool, Nat.N1.n) Vector.t
                          * ( ('d Scalar_challenge.t * ('f * unit))
-                             Pickles_types.Hlist.HlistId.t
+                             Hlist.HlistId.t
                              option
                            * unit ) ) ) ) ) ) )
-               Pickles_types.Hlist.HlistId.t
+               Hlist.HlistId.t
              , 'b )
-             Pickles_types.Vector.t
-           * ('h * (('h, 'b) Pickles_types.Vector.t * unit)) )
-           Pickles_types.Hlist.HlistId.t
-         , ( ( ( ('g, Pickles_types.Nat.N19.n) Pickles_types.Vector.t
-               * ( ('j, Pickles_types.Nat.N1.n) Pickles_types.Vector.t
-                 * ( ('e, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-                   * ( ( 'e Scalar_challenge.t
-                       , Pickles_types.Nat.N3.n )
-                       Pickles_types.Vector.t
-                     * ( ('k, 'c) Pickles_types.Vector.t
+             Vector.t
+           * ('h * (('h, 'b) Vector.t * unit)) )
+           Hlist.HlistId.t
+         , ( ( ( ('g, Nat.N9.n) Vector.t
+               * ( ('j, Nat.N1.n) Vector.t
+                 * ( ('e, Nat.N2.n) Vector.t
+                   * ( ('e Scalar_challenge.t, Nat.N3.n) Vector.t
+                     * ( ('k, 'c) Vector.t
                        * ( ( 'a Snarky_backendless.Cvar.t
                              Snarky_backendless__Snark_intf.Boolean0.t
-                           , Pickles_types.Nat.N1.n )
-                           Pickles_types.Vector.t
+                           , Nat.N1.n )
+                           Vector.t
                          * ( ( ('e Scalar_challenge.t * ('g * unit))
-                               Pickles_types.Hlist.HlistId.t
+                               Hlist.HlistId.t
                              , 'a Snarky_backendless.Cvar.t
                                Snarky_backendless__Snark_intf.Boolean0.t )
-                             Pickles_types.Plonk_types.Opt.t
+                             Plonk_types.Opt.t
                            * unit ) ) ) ) ) ) )
-               Pickles_types.Hlist.HlistId.t
+               Hlist.HlistId.t
              , 'b )
-             Pickles_types.Vector.t
-           * ('j * (('j, 'b) Pickles_types.Vector.t * unit)) )
-           Pickles_types.Hlist.HlistId.t
+             Vector.t
+           * ('j * (('j, 'b) Vector.t * unit)) )
+           Hlist.HlistId.t
          , < bool1 : bool
            ; bool2 :
                'a Snarky_backendless.Cvar.t
@@ -1582,18 +1503,14 @@ end
 
 module Challenges_vector : sig
   type 'n t =
-    ( Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t
-    , 'n )
-    Pickles_types.Vector.t
+    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant : sig
-    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Pickles_types.Vector.t
+    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end
 
 (** Alias for
  ** {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)
 val index_to_field_elements :
-     'a Pickles_types__Plonk_verification_key_evals.Stable.V2.t
-  -> g:('a -> 'b array)
-  -> 'b array
+  'a Plonk_verification_key_evals.t -> g:('a -> 'b array) -> 'b array

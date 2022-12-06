@@ -81,54 +81,6 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
 
 module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 
-let%test_unit "scalars consistency" =
-  let module E = struct
-    type t =
-      | Add of t * t
-      | Mul of t * t
-      | Sub of t * t
-      | Pow of t * int
-      | Double of t
-      | Square of t
-      | Constant of string
-      | Var of Plonk_checks.Scalars.Column.t * Plonk_checks.Scalars.curr_or_next
-      | Mds of int * int
-      | Cell of t
-      | Alpha_pow of int
-      | Unnormalized_lagrange_basis of int
-    [@@deriving sexp, compare]
-  end in
-  let open E in
-  let env : E.t Plonk_checks.Scalars.Env.t =
-    { add = (fun x y -> Add (x, y))
-    ; sub = (fun x y -> Sub (x, y))
-    ; mul = (fun x y -> Mul (x, y))
-    ; pow = (fun (x, y) -> Pow (x, y))
-    ; square = (fun x -> Square x)
-    ; double = (fun x -> Double x)
-    ; var = (fun (x, y) -> Var (x, y))
-    ; field = (fun x -> Constant x)
-    ; mds = (fun (x, y) -> Mds (x, y))
-    ; cell = (fun x -> Cell x)
-    ; alpha_pow = (fun x -> Alpha_pow x)
-    ; zk_polynomial = Constant "zk_polynomial"
-    ; omega_to_minus_3 = Constant "omega_to_minus_3"
-    ; zeta_to_n_minus_1 = Constant "zeta_to_n_minus_1"
-    ; vanishes_on_last_4_rows = Constant "vanishes_on_last_4_rows"
-    ; joint_combiner = Constant "joint_combiner"
-    ; beta = Constant "beta"
-    ; gamma = Constant "gamma"
-    ; endo_coefficient = Constant "endo_coefficient"
-    ; srs_length_log2 = Nat.to_int Backend.Tick.Rounds.n
-    ; unnormalized_lagrange_basis = (fun x -> Unnormalized_lagrange_basis x)
-    }
-  in
-  let lookup_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms env in
-  Hashtbl.iteri (Plonk_checks.Scalars.Tick.index_terms env)
-    ~f:(fun ~key ~data ->
-      [%test_eq: t] (Lazy.force data)
-        (Lazy.force (Hashtbl.find_exn lookup_terms key)) )
-
 type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
 
 type deferred_values_and_hints =

@@ -676,6 +676,19 @@ struct
           k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force messages_for_next_wrap_proof_padded)
+      | Req.Wrap_domain_indices ->
+          let all_possible_domains = Wrap_verifier.all_possible_domains () in
+          let wrap_domain_indices =
+            Vector.map (Option.value_exn !actual_wrap_domains)
+              ~f:(fun domain_size ->
+                let domain_index =
+                  Vector.foldi ~init:0 all_possible_domains
+                    ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                      if Int.equal domain domain_size then j else acc )
+                in
+                Pickles_base.Proofs_verified.of_int domain_index )
+          in
+          k wrap_domain_indices
       | _ -> (
           match handler with
           | Some f ->
@@ -716,21 +729,35 @@ struct
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h)
         (fun () ->
-          Impls.Step.generate_witness_conv
-            ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-                    next_statement_hashed ->
-              let%map.Promise proof =
-                Backend.Tick.Proof.create_async ~primary:public_inputs
-                  ~auxiliary:auxiliary_inputs
-                  ~message:(Lazy.force prev_challenge_polynomial_commitments)
-                  pk
-              in
-              (proof, next_statement_hashed) )
-            ~input_typ:Impls.Step.Typ.unit ~return_typ:input
-            (fun () () ->
-              Impls.Step.handle
-                (fun () -> conv_inv (branch_data.main ~step_domains ()))
-                handler ) )
+          let promise_or_error =
+            (* Use a try_with to give an informative backtrace.
+               If we don't do this, the backtrace will be obfuscated by the
+               Promise, and it's significantly harder to track down errors.
+               This only applies to errors in the 'witness generation' stage;
+               proving errors are emitted inside the promise, and are therefore
+               unaffected.
+            *)
+            Or_error.try_with ~backtrace:true (fun () ->
+                Impls.Step.generate_witness_conv
+                  ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
+                          ; public_inputs
+                          } next_statement_hashed ->
+                    let%map.Promise proof =
+                      Backend.Tick.Proof.create_async ~primary:public_inputs
+                        ~auxiliary:auxiliary_inputs
+                        ~message:
+                          (Lazy.force prev_challenge_polynomial_commitments)
+                        pk
+                    in
+                    (proof, next_statement_hashed) )
+                  ~input_typ:Impls.Step.Typ.unit ~return_typ:input
+                  (fun () () ->
+                    Impls.Step.handle
+                      (fun () -> conv_inv (branch_data.main ~step_domains ()))
+                      handler ) )
+          in
+          (* Re-raise any captured errors, complete with their backtrace. *)
+          Or_error.ok_exn promise_or_error )
         ()
     in
     let prev_evals =

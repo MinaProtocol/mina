@@ -14,6 +14,8 @@ type t = Stable.V1.t = N0 | N1 | N2
 
 val of_nat : 'n Pickles_types.Nat.t -> t
 
+val of_int : int -> t
+
 val to_int : t -> int
 
 module One_hot : sig
