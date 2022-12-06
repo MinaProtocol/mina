@@ -243,6 +243,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
+      section
+        "Verify invalid zkApp transactions are removed from transaction pool"
+        (let%bind pooled_zkapp_commands =
+           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         if List.is_empty pooled_zkapp_commands then (
+           [%log info] "Ledger sees balance change from zkapp execution" ;
+           return () )
+         else
+           Malleable_error.hard_error
+             (Error.of_string
+                "Transaction pool contains invalid zkApp transactions after a \
+                 block was produced" ) )
+    in
+    let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )

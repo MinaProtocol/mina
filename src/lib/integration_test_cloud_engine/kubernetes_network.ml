@@ -792,7 +792,7 @@ module Node = struct
             |> Yojson.Safe.to_string )
     in
     [%log info] "Pooled zkapp commands" ~metadata:[] ;
-    return "return list of zkapp commands"
+    failwith "return list of zkapp commands"
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;

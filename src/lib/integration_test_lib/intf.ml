@@ -169,6 +169,12 @@ module Engine = struct
         -> account_id:Mina_base.Account_id.t
         -> Mina_base.Account_update.Update.t Deferred.Or_error.t
 
+      val get_pooled_zkapp_commands :
+           logger:Logger.t
+        -> t
+        -> pk:Signature_lib.Public_key.Compressed.t
+        -> Mina_base.Zkapp_command.t list Deferred.Or_error.t
+
       val get_peer_id :
         logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
 
