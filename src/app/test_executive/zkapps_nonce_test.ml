@@ -106,14 +106,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
-    let%bind.Deferred invalid_nonce_transaction =
+    let%bind.Deferred invalid_nonce_transaction_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                   0 ~increment_nonce:true
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -123,19 +123,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"invalid nonce transaction" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
+        |> mk_zkapp_command ~memo:"invalid transaction from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 0)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred valid_nonce_transaction =
+    let%bind.Deferred valid_nonce_transaction_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                   0 ~increment_nonce:true
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -145,19 +146,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid nonce transaction" ~fee:12_000_000
+        |> mk_zkapp_command ~memo:"valid transaction from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred t1 =
+    let%bind.Deferred invalid_nonce_transaction_from_fish2 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                (mk_account_update_body Signature Call fish2_kp Token_id.default
+                   0 ~increment_nonce:true
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -167,39 +168,79 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"t1" ~fee:12_000_000 ~fee_payer_pk:fish2_pk
+        |> mk_zkapp_command ~memo:"invalid transaction from fish2"
+             ~fee:12_000_000 ~fee_payer_pk:fish2_pk
              ~fee_payer_nonce:(Account.Nonce.of_int 0)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind () =
-      section "Send a zkApp transaction with an invalid account_update nonce"
-        (send_zkapp ~logger node invalid_nonce_transaction)
+    let%bind.Deferred valid_nonce_transaction_from_fish2 =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish2_kp Token_id.default
+                   0 ~increment_nonce:true
+                   ~preconditions:
+                     { Account_update.Preconditions.network =
+                         Zkapp_precondition.Protocol_state.accept
+                     ; account = Nonce (Account.Nonce.of_int 2)
+                     } )
+                []
+            ]
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"valid transaction from fish2" ~fee:12_000_000
+             ~fee_payer_pk:fish2_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
     in
     let%bind () =
       section
-        "Send a zkApp transaction that has it's nonce properly incremented \
-         after the first transaction"
-        (send_zkapp ~logger node valid_nonce_transaction)
-    in
-    let%bind () =
-      section "Send a zkApp transaction" (send_zkapp ~logger node t1)
+        "Send a zkapp command with an invalid account update nonce using fish1"
+        (send_zkapp ~logger node invalid_nonce_transaction_from_fish1)
     in
     let%bind () =
       section
-        "Wait for zkApp transaction with invalid nonce to be rejected by \
+        "Send a zkapp command with an invalid account update nonce using fish2"
+        (send_zkapp ~logger node invalid_nonce_transaction_from_fish2)
+    in
+    let%bind () =
+      section
+        "Send a zkapp command that has it's nonce properly incremented after \
+         the fish1 transaction"
+        (send_zkapp ~logger node valid_nonce_transaction_from_fish1)
+    in
+    let%bind () =
+      section
+        "Send a zkapp command that has it's nonce properly incremented after \
+         the fish2 transaction"
+        (send_zkapp ~logger node valid_nonce_transaction_from_fish2)
+    in
+    let%bind () =
+      section
+        "Wait for fish1 zkapp command with invalid nonce to be rejected by \
          transition frontier"
-        (wait_for_zkapp ~has_failures:true invalid_nonce_transaction)
+        (wait_for_zkapp ~has_failures:true invalid_nonce_transaction_from_fish1)
     in
     let%bind () =
       section
-        "Wait for first zkApp transaction with valid nonce to be accepted by \
+        "Wait for fish2 zkapp command with invalid nonce to be rejected by \
          transition frontier"
-        (wait_for_zkapp ~has_failures:false valid_nonce_transaction)
+        (wait_for_zkapp ~has_failures:true invalid_nonce_transaction_from_fish2)
     in
     let%bind () =
-      section "Wait for zkApp transaction to be accepted by transition frontier"
-        (wait_for_zkapp ~has_failures:false t1)
+      section
+        "Wait for fish1 zkapp command with valid nonce to be accepted by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false valid_nonce_transaction_from_fish1)
+    in
+    let%bind () =
+      section
+        "Wait for fish2 zkapp command with valid nonce to be accepted by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false valid_nonce_transaction_from_fish2)
     in
     let%bind () =
       let padding_payments =
@@ -216,8 +257,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
-      section
-        "Verify invalid zkApp transactions are removed from transaction pool"
+      section "Verify invalid zkapp commands are removed from transaction pool"
         (let%bind pooled_zkapp_commands =
            Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
            |> Deferred.bind ~f:Malleable_error.or_hard_error
@@ -228,7 +268,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          else
            Malleable_error.hard_error
              (Error.of_string
-                "Transaction pool contains invalid zkApp transactions after a \
+                "Transaction pool contains invalid zkapp commands after a \
                  block was produced" ) )
     in
     let%bind () =
