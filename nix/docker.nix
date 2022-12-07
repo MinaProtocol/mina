@@ -85,10 +85,20 @@ in {
     mina.mainnet
     mina.genesis
   ]);
-  mina-archive-image-full = mkFullImage "mina-archive" (with ocamlPackages_mina; [
-    mina-archive-scripts
-    gnutar
-    gzip
+  mina-devnet-image-full = mkFullImage "mina-devnet"
+    (with ocamlPackages_mina; [
+      mina-build-config
+      mina-daemon-scripts
+
+      mina-devnet.out
+      mina-devnet.testnet
+      mina-devnet.genesis
+    ]);
+  mina-archive-image-full = mkFullImage "mina-archive"
+    (with ocamlPackages_mina; [
+      mina-archive-scripts
+      gnutar
+      gzip
 
     mina.archive
   ]);

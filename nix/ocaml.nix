@@ -256,6 +256,8 @@ let
       # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
 
+      mina-devnet = wrapMina (self.mina-dev.overrideAttrs (_: { DUNE_PROFILE = "devnet"; })) { };
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
