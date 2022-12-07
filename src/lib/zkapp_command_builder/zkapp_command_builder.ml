@@ -10,8 +10,9 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body ?preconditions ?increment_nonce authorization_kind
-    caller kp token_id balance_change : Account_update.Body.Simple.t =
+let mk_account_update_body ?preconditions ?increment_nonce ?update
+    authorization_kind caller kp token_id balance_change :
+    Account_update.Body.Simple.t =
   let open Signature_lib in
   let preconditions =
     Option.value preconditions
@@ -22,7 +23,8 @@ let mk_account_update_body ?preconditions ?increment_nonce authorization_kind
           }
   in
   let increment_nonce = Option.value increment_nonce ~default:false in
-  { update = Account_update.Update.noop
+  let update = Option.value update ~default:Account_update.Update.noop in
+  { update
   ; public_key = Public_key.compress kp.Keypair.public_key
   ; token_id
   ; balance_change =
