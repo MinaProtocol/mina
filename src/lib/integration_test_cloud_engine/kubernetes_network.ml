@@ -791,8 +791,20 @@ module Node = struct
             |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
             |> Yojson.Safe.to_string )
     in
-    [%log info] "Pooled zkapp commands" ~metadata:[] ;
-    failwith "return list of zkapp commands"
+
+    let transaction_hashes =
+      Array.map zkapp_pool_obj.pooledZkappCommands ~f:(fun zkapp_command ->
+          zkapp_command.hash |> Transaction_hash.to_base58_check )
+      |> Array.to_list
+    in
+    [%log info] "Retrieved zkapp_commands from transaction pool"
+      ~metadata:
+        [ ("namespace", `String t.config.namespace)
+        ; ("pod_id", `String (id t))
+        ; ( "transaction_hashes"
+          , `List (List.map ~f:(fun t -> `String t) transaction_hashes) )
+        ] ;
+    return transaction_hashes
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;

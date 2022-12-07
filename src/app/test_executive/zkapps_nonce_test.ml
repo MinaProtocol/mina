@@ -223,7 +223,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
          if List.is_empty pooled_zkapp_commands then (
-           [%log info] "Ledger sees balance change from zkapp execution" ;
+           [%log info] "Transaction pool is empty" ;
            return () )
          else
            Malleable_error.hard_error
