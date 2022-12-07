@@ -229,6 +229,8 @@ let
 
       mina = wrapMina self.mina-dev { };
 
+      mina-devnet = wrapMina (self.mina-dev.overrideAttrs (_: { DUNE_PROFILE = "devnet"; })) { };
+
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
