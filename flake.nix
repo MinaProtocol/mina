@@ -331,7 +331,7 @@
             mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs) libp2p_helper kimchi_bindings_stubs;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
+            mina-image-slim mina-image-full mina-archive-image-full mina-testnet-image-full;
         };
 
         legacyPackages.musl = pkgs.pkgsMusl;
