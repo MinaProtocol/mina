@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 open Context
 open Bit_catchup_state
 
@@ -14,9 +15,11 @@ let rec update_status_for_unprocessed ~context ~transition_states ~actions
   let (module Context : CONTEXT) = context in
   let f = function
     | Transition_state.Downloading_body
-        ({ substate = { status = Failed _; _ }; _ } as r)
+        ({ substate = { status = Failed _ as old_status; _ }; _ } as r)
     | Transition_state.Downloading_body
-        ({ substate = { status = Processing (In_progress _); _ }; _ } as r) -> (
+        ( { substate = { status = Processing (In_progress _) as old_status; _ }
+          ; _
+          } as r ) -> (
         let block_vc =
           match status with
           | Substate.Failed _ ->
@@ -44,6 +47,17 @@ let rec update_status_for_unprocessed ~context ~transition_states ~actions
             ; baton = false
             }
         in
+        let metadata =
+          Substate.add_error_if_failed ~tag:"old_status_error" old_status
+          @@ Substate.add_error_if_failed ~tag:"new_status_error" status
+          @@ [ ("state_hash", State_hash.to_yojson state_hash) ]
+        in
+        [%log' debug Context.logger]
+          "Updating status of $state_hash from %s to %s (state: downloading \
+           body)"
+          (Substate.name_of_status old_status)
+          (Substate.name_of_status status)
+          ~metadata ;
         Transition_states.update transition_states st ;
         match (status, r.baton) with
         | Failed _, true ->
@@ -60,7 +74,9 @@ let rec update_status_for_unprocessed ~context ~transition_states ~actions
 (** [upon_f] is a callback to be executed upon completion of downloading
   a body (or a failure).
 *)
-and upon_f ~context ~transition_states ~state_hash ~actions = function
+and upon_f ~context ~transition_states ~state_hash (actions_undeferred, res) =
+  let actions = Async_kernel.Deferred.return actions_undeferred in
+  match res with
   | Result.Error () ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash
@@ -68,8 +84,8 @@ and upon_f ~context ~transition_states ~state_hash ~actions = function
   | Result.Ok (Result.Ok body) ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash (Processing (Done body)) ;
-      actions.Misc.mark_processed_and_promote ~reason:"downloaded body"
-        [ state_hash ]
+      actions_undeferred.Misc.mark_processed_and_promote
+        ~reason:"downloaded body" [ state_hash ]
   | Result.Ok (Result.Error e) ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash (Failed e)
@@ -97,8 +113,8 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
           ~preferred_peers
           (module I)
       in
-      Async_kernel.Deferred.upon (I.force action)
-        (upon_f ~context ~transition_states ~state_hash ~actions) ;
+      Async_kernel.Deferred.(upon @@ both actions (I.force action))
+        (upon_f ~context ~transition_states ~state_hash) ;
       let span = Time.Span.(bitwap_download_timeout + peer_download_timeout) in
       let timeout = Time.(add @@ now ()) span in
       let downto_ =
@@ -125,18 +141,30 @@ and restart_failed ~transition_states ~actions ~context = function
       let preferred_peers =
         List.map received ~f:(fun { sender; _ } -> sender)
       in
-      let ctx =
-        make_download_body_ctx ~preferred_peers ~body_opt:None ~header
-          ~transition_states ~actions ~context
+      let status =
+        Substate.Processing
+          (make_download_body_ctx ~preferred_peers ~body_opt:None ~header
+             ~transition_states ~actions ~context )
       in
+      let (module Context : CONTEXT) = context in
+      let state_hash = state_hash_of_header_with_validation header in
+      let metadata =
+        Substate.add_error_if_failed ~tag:"old_status_error" s.status
+        @@ Substate.add_error_if_failed ~tag:"new_status_error" status
+        @@ [ ("state_hash", State_hash.to_yojson state_hash) ]
+      in
+      [%log' debug Context.logger]
+        "Updating status of $state_hash from failed to %s (state: downloading \
+         body)"
+        (Substate.name_of_status status)
+        ~metadata ;
       Transition_states.update transition_states
         (Transition_state.Downloading_body
-           { r with substate = { s with status = Processing ctx } } )
+           { r with substate = { s with status } } )
       (* We don't need to update parent's childen sets because
          Failed -> Processing status change doesn't require that *)
   | _ ->
-      failwith
-        "promote_verifying_blockchain_proof: unexpected non-failed ancestor"
+      failwith "restart_failed: unexpected non-failed ancestor"
 
 (** Set [baton] of the next ancestor in [Transition_state.Downloading_body]
     and [Substate.Processing (Substate.In_progress _)] status to [true]
@@ -153,8 +181,15 @@ and pass_the_baton ~transition_states ~context ~actions state_hash =
       match collected with
       | Downloading_body ({ substate = { status = Processing _; _ }; _ } as r)
         :: rest ->
-          Transition_states.update transition_states
-            (Downloading_body { r with baton = true }) ;
+          if not r.baton then (
+            let state_hash = state_hash_of_header_with_validation r.header in
+            [%log' debug Context.logger]
+              "Pass the baton for $state_hash with status %s (state: \
+               downloading body)"
+              (Substate.name_of_status r.substate.status)
+              ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+            Transition_states.update transition_states
+              (Downloading_body { r with baton = true }) ) ;
           List.iter ~f:restart_f rest
       | _ ->
           List.iter ~f:restart_f collected )

@@ -159,7 +159,7 @@ let apply_diffs ~logger ({ transition_states; _ } as state)
             [%log warn]
               "Unexpected incoming breadcrumb for a state $state_hash in %s \
                state"
-              (Transition_state.name st)
+              (Transition_state.State_functions.name st)
               ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] )
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         let root_length =

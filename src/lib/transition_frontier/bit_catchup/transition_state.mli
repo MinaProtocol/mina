@@ -73,8 +73,6 @@ type t =
       { transition_meta : Substate_types.transition_meta; error : Error.t }
       (** Transition is invalid. *)
 
-val name : t -> string
-
 (** Instantiation of [Substate.State_functions] for transition state type [t].  *)
 module State_functions : Substate.State_functions with type state_t = t
 

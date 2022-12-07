@@ -247,7 +247,7 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network metas
         ~default:(`Meta meta, None)
         ~f:(fun (peer, block) -> (`Block block, Some peer)) )
 
-(** [promote_to_higher_state_impl] takes state with [Processed] status and
+(** [compute_next_state] takes state with [Processed] status and
     returns the next state with [Processing] status or [None] if the transition
     exits the catchup state.
     
@@ -255,9 +255,11 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network metas
 
     Note that some other states may be restarted (transitioned from [Failed] to [In_progress])
     on the course.
+
+    Actions are wrapped into [Deferred.t] to prevent using them in the current async context.
     *)
-let promote_to_higher_state_impl ~write_actions ~actions ~context
-    ~(transition_states : Transition_states.t) state =
+let compute_next_state ~write_actions ~(actions : Misc.actions Deferred.t)
+    ~context ~(transition_states : Transition_states.t) state =
   match state with
   | Transition_state.Received { header; substate; gossip_data; body_opt; aux }
     ->
@@ -344,43 +346,33 @@ let mark_invalid ~state ?reason ~error state_hash =
     state.transition_states
   |> handle_invalid ~children:state.children
 
-(** [promote_to_higher_state] takes state hash of a transition with [Processed] status
-    and updates it.
+(** [promote_to_next_state] takes [old_state] of a transition with [Processed] status
+    and updates it to [next_state_opt].
     
-    The transition is updated to the highest state possible (given the available data).
-    E.g. a transition with block body available from the gossip will be
-    updated from [Verifying_blockchain_proof] to [Verifying_complete_works] without
-    launching action to download body.
-
-    Some other states may also be updated (promoted) if promotion of the transition
-    triggers their subsequent update (promotion).
-
-    Pre-condition: state transition is in transition states and has [Processed] status.*)
-let rec promote_to_higher_state ~write_actions
-    ~context:(module Context : CONTEXT) ~state state_hash =
-  let context = (module Context : CONTEXT) in
+    Some other states may also be promoted if promotion of the transition
+    triggers they are successors of the transition and are in [Processed] status.
+*)
+let promote_to_next_state ~logger ~write_actions ~state old_state new_state_opt
+    =
   let transition_states = state.transition_states in
-  let old_state =
-    Option.value_exn @@ Transition_states.find transition_states state_hash
-  in
-  let actions = actions ~context ~state ~write_actions in
-  let state_opt =
-    promote_to_higher_state_impl ~context ~transition_states ~write_actions
-      ~actions old_state
-  in
-  [%log' info Context.logger]
-    "Promoting transition from state %s to state %s, status %s"
-    (Transition_state.name old_state)
-    (Option.value_map ~default:"(none)" ~f:Transition_state.name state_opt)
-    Option.(value ~default:"(none)" @@ bind ~f:get_status_name state_opt) ;
-  ( match state_opt with
+  let meta = Transition_state.State_functions.transition_meta old_state in
+  let state_hash = meta.state_hash in
+  let parent_hash = meta.parent_state_hash in
+  [%log info]
+    "Promoting transition $state_hash from state %s to state %s, status %s"
+    (Transition_state.State_functions.name old_state)
+    (Option.value_map ~default:"(none)" ~f:Transition_state.State_functions.name
+       new_state_opt )
+    Option.(value ~default:"(none)" @@ bind ~f:get_status_name new_state_opt)
+    ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+  ( match new_state_opt with
   | None ->
       State_hash.Table.change state.children state_hash
         ~f:(Option.map ~f:(Tuple2.map_fst ~f:(const `Parent_in_frontier))) ;
       Transition_states.remove transition_states state_hash
   | Some st ->
       Transition_states.update transition_states st ) ;
-  ( match state_opt with
+  ( match new_state_opt with
   | Some (Waiting_to_be_added_to_frontier { source; breadcrumb; _ } as st) ->
       Misc.add_to_children_of_parent_in_frontier ~state
         (Transition_state.State_functions.transition_meta st) ;
@@ -388,28 +380,18 @@ let rec promote_to_higher_state ~write_actions
       write_actions.write_breadcrumb source breadcrumb
   | _ ->
       () ) ;
-  let parent_hash =
-    (Transition_state.State_functions.transition_meta old_state)
-      .parent_state_hash
-  in
   Substate.update_children_on_promotion ~state_functions ~transition_states
-    ~parent_hash ~state_hash state_opt ;
-  Option.iter state_opt ~f:(fun state ->
-      if Substate.is_processing_done ~state_functions state then
-        actions.mark_processed_and_promote ~reason:"promoted to Processing Done"
-          [ state_hash ] )
+    ~parent_hash ~state_hash new_state_opt ;
+  Option.bind new_state_opt
+    ~f:
+      (Fn.compose
+         (Fn.flip Option.some_if state_hash)
+         (Substate.is_processing_done ~state_functions) )
 
-and actions ~context ~state ~write_actions =
-  { Misc.mark_processed_and_promote =
-      (fun ?reason hashes ->
-        if List.is_empty hashes then ()
-        else
-          mark_processed_and_promote ?reason ~context ~state ~write_actions
-            hashes )
-  ; mark_invalid = mark_invalid ~state
-  }
+(** 
+Returns [Misc.actions] object with [mark_invalid] and [mark_processed_and_promote] fields.
 
-(** [mark_processed_and_promote] takes a list of state hashes and marks corresponding
+[mark_processed_and_promote] takes a list of state hashes and marks corresponding
 transitions processed. Then it promotes all of the transitions that can be promoted
 as the result of [mark_processed].
 
@@ -422,43 +404,65 @@ as the result of [mark_processed].
 This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
 *)
-and mark_processed_and_promote ?(reason = "(reason not specified)")
-    ~write_actions ~context:(module Context : CONTEXT) ~state state_hashes =
+let actions ~write_actions ~context ~state =
+  let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
-  let higher_state_promotees =
-    Substate.mark_processed ~logger:Context.logger ~state_functions
-      ~transition_states state_hashes
-  in
   let transition_json h =
     let h_json = State_hash.to_yojson h in
     Option.value ~default:h_json
-    @@ let%map.Option s = Transition_states.find state.transition_states h in
+    @@ let%map.Option s = Transition_states.find transition_states h in
        `Tuple
          [ h_json
-         ; `String (Transition_state.name s)
+         ; `String (Transition_state.State_functions.name s)
          ; `String (Option.value ~default:"" @@ get_status_name s)
          ]
   in
-  [%log' info Context.logger] "Marking $transitions processed: %s" reason
-    ~metadata:
-      [ ("transitions", `List (List.map ~f:transition_json state_hashes)) ] ;
-  let open State_hash.Set in
-  let processed = of_list state_hashes in
-  let promoted = of_list higher_state_promotees in
-  iter (diff processed promoted) ~f:(fun key ->
-      Option.iter (Transition_states.find transition_states key) ~f:(fun st ->
-          let data = Transition_state.State_functions.transition_meta st in
-          let open Processed_skipping.Dsu in
-          add_exn ~key ~data Context.processed_dsu ;
-          union ~a:key ~b:data.parent_state_hash Context.processed_dsu ;
-          let children = Transition_state.children st in
-          iter children.processed ~f:(fun b ->
-              union ~a:key ~b Context.processed_dsu ) ) ) ;
-  iter (diff promoted processed) ~f:(fun key ->
-      Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
-  List.iter
-    ~f:(promote_to_higher_state ~write_actions ~context:(module Context) ~state)
-    higher_state_promotees
+  let mpp_impl ~actions ?(reason = "(reason not specified)") state_hashes =
+    [%log' debug Context.logger] "Marking $transitions processed: %s" reason
+      ~metadata:
+        [ ("transitions", `List (List.map ~f:transition_json state_hashes)) ] ;
+    let higher_state_promotees =
+      Substate.mark_processed ~logger:Context.logger ~state_functions
+        ~transition_states state_hashes
+    in
+    let open State_hash.Set in
+    let processed = of_list state_hashes in
+    let promoted = of_list higher_state_promotees in
+    iter (diff processed promoted) ~f:(fun key ->
+        Option.iter (Transition_states.find transition_states key) ~f:(fun st ->
+            let data = Transition_state.State_functions.transition_meta st in
+            let open Processed_skipping.Dsu in
+            add_exn ~key ~data Context.processed_dsu ;
+            union ~a:key ~b:data.parent_state_hash Context.processed_dsu ;
+            let children = Transition_state.children st in
+            iter children.processed ~f:(fun b ->
+                union ~a:key ~b Context.processed_dsu ) ) ) ;
+    iter (diff promoted processed) ~f:(fun key ->
+        Processed_skipping.Dsu.remove ~key Context.processed_dsu ) ;
+    List.filter_map higher_state_promotees ~f:(fun state_hash ->
+        let old_state =
+          Option.value_exn
+          @@ Transition_states.find transition_states state_hash
+        in
+        let new_state_opt =
+          compute_next_state ~context ~transition_states ~write_actions ~actions
+            old_state
+        in
+        promote_to_next_state ~write_actions ~logger:Context.logger ~state
+          old_state new_state_opt )
+  in
+  let rec mpp_loop ~actions ?reason hashes =
+    if List.is_empty hashes then ()
+    else
+      mpp_impl ~actions ?reason hashes
+      |> mpp_loop ~actions ~reason:"promoted to Processing Done"
+  in
+  let rec mark_processed_and_promote ?reason =
+    mpp_loop ~actions:(Deferred.return actions) ?reason
+  and actions =
+    { mark_invalid = mark_invalid ~state; mark_processed_and_promote }
+  in
+  actions
 
 let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
     ~block_storage ~get_completed_work
@@ -563,6 +567,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           let metas =
             hash_chain_to_metas ~target_length ~target_hash ancestors
           in
+          (* TODO add senders as preferred peers *)
           let%map.I.Result res =
             download_ancestors ~preferred_peers ~lookup_transition ~network
               metas
@@ -591,14 +596,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let processed_dsu = Processed_skipping.Dsu.create ()
 
-    let remote s = Network_peer.Envelope.Sender.Remote s
-
     let record_event = function
-      | `Invalid_frontier_dependencies (e, state_hash, senders) ->
-          Transition_handler.Processor.handle_frontier_validation_error
-            ~trust_system ~logger
-            ~senders:(List.map ~f:remote senders)
-            ~state_hash e
       | `Verified_header_relevance (Ok (), header_with_hash, sender) ->
           let sender = Network_peer.Envelope.Sender.Remote sender in
           (* This action is deferred because it may potentially trigger change of
@@ -651,6 +649,7 @@ struct
     don't_wait_for (Deferred.List.iter ~f aux.Transition_state.received)
 
   let on_add_new state_hash =
+    (* TODO print state that is added *)
     [%log' info Context.logger]
       "Adding transition $state_hash to bit-catchup state"
       ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
@@ -786,8 +785,8 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
              (List.map ~f:snd breadcrumbs)
          in
          let promote_do =
-           promote_to_higher_state_impl ~context ~transition_states ~actions
-             ~write_actions
+           compute_next_state ~context ~transition_states
+             ~actions:(Deferred.return actions) ~write_actions
          in
          let promote (source, b) =
            ( match source with

@@ -13,10 +13,6 @@ type event_t =
     Result.t
     * Mina_block.Header.with_hash
     * Network_peer.Peer.t
-  | `Invalid_frontier_dependencies of
-    [ `Already_in_frontier | `Not_selected_over_frontier_root ]
-    * State_hash.t
-    * Network_peer.Peer.t list
   | `Pre_validate_header_invalid of
     Network_peer.Peer.t
     * Mina_block.Header.t

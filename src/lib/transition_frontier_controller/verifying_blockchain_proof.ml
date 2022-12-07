@@ -79,8 +79,8 @@ let promote_to ~context ~actions ~header ~transition_states ~substate:s
   in
   ( if aux.Transition_state.received_via_gossip then
     let for_start =
-      collect_dependent_and_pass_the_baton_by_hash ~transition_states
-        ~dsu:Context.processed_dsu parent_hash
+      collect_dependent_and_pass_the_baton_by_hash ~logger:Context.logger
+        ~transition_states ~dsu:Context.processed_dsu parent_hash
     in
     start ~context ~actions ~transition_states for_start ) ;
   Transition_state.Verifying_blockchain_proof
@@ -108,9 +108,11 @@ let make_processed ~context ~actions ~transition_states header =
   let state_hash = state_hash_of_header_with_validation header in
   Option.value ~default:()
   @@ let%map.Option for_restart =
-       update_to_processing_done ~transition_states ~state_hash
-         ~dsu:Context.processed_dsu ~reuse_ctx:true header
+       update_to_processing_done ~logger:Context.logger ~transition_states
+         ~state_hash ~dsu:Context.processed_dsu ~reuse_ctx:true header
      in
-     start ~context ~actions ~transition_states for_restart ;
+     start ~context
+       ~actions:(Async_kernel.Deferred.return actions)
+       ~transition_states for_restart ;
      actions.Misc.mark_processed_and_promote [ state_hash ]
        ~reason:"gossip received"

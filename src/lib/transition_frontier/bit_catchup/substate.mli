@@ -72,6 +72,12 @@ val is_processing_done :
   -> 'state_t
   -> bool
 
+val add_error_if_failed :
+     tag:string
+  -> 'a status
+  -> (string * Yojson.Safe.t) list
+  -> (string * Yojson.Safe.t) list
+
 module For_tests : sig
   (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive)
   down the ancestry chain that are:

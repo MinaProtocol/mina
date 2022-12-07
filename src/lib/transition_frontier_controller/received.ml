@@ -17,16 +17,26 @@ let check_body_storage ~context header_with_hash =
   with a [Processing] or [Failed] status new status [Processing (Done ())] and
   returns in-progress context if the transition was in progress of receiving ancestry.
 *)
-let mark_done ~transition_states state_hash =
+let mark_done ~logger ~transition_states state_hash =
   let%bind.Option st = Transition_states.find transition_states state_hash in
   let%bind.Option st' =
     match st with
     | Transition_state.Received
-        ({ substate = { status = Processing _; _ } as s; _ } as r)
-    | Received ({ substate = { status = Failed _; _ } as s; _ } as r) ->
-        Some
-          (Transition_state.Received
-             { r with substate = { s with status = Processing (Done ()) } } )
+        ({ substate = { status = Processing _ as old_status; _ } as s; _ } as r)
+    | Received
+        ({ substate = { status = Failed _ as old_status; _ } as s; _ } as r) ->
+        let status = Substate.Processing (Done ()) in
+        let metadata =
+          Substate.add_error_if_failed ~tag:"old_status_error" old_status
+          @@ Substate.add_error_if_failed ~tag:"new_status_error" status
+          @@ [ ("state_hash", State_hash.to_yojson state_hash) ]
+        in
+        [%log debug]
+          "Updating status of $state_hash from %s to %s (state: received)"
+          (Substate.name_of_status old_status)
+          (Substate.name_of_status status)
+          ~metadata ;
+        Some (Transition_state.Received { r with substate = { s with status } })
     | _ ->
         None
   in
@@ -45,20 +55,32 @@ let mark_done ~transition_states state_hash =
 *)
 let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
   Transition_states.update transition_states st ;
+  let (module Context : CONTEXT) = context in
+  let meta = Transition_state.State_functions.transition_meta st in
+  let log_bp = function
+    | `No_body_preserved ->
+        ()
+    | `Preserved_body ->
+        [%log' debug Context.logger] "Preserved body for $state_hash (state %s)"
+          (Transition_state.State_functions.name st)
+          ~metadata:[ ("state_hash", State_hash.to_yojson meta.state_hash) ]
+  in
   match hint with
-  | `Nop ->
-      ()
-  | `Mark_verifying_blockchain_proof_processed iv_header ->
+  | `Nop bp ->
+      log_bp bp
+  | `Mark_verifying_blockchain_proof_processed (bp, iv_header) ->
+      log_bp bp ;
       Verifying_blockchain_proof.make_processed ~context ~actions
         ~transition_states iv_header
-  | `Start_processing_verifying_complete_works state_hash ->
+  | `Start_processing_verifying_complete_works (bp, state_hash) ->
+      log_bp bp ;
       Verifying_complete_works.make_independent ~context ~actions
         ~transition_states state_hash
   | `Mark_downloading_body_processed ivar_opt ->
-      let meta = Transition_state.State_functions.transition_meta st in
       ( match st with
       | Downloading_body { baton = true; _ } ->
-          Downloading_body.pass_the_baton ~transition_states ~context ~actions
+          Downloading_body.pass_the_baton ~transition_states ~context
+            ~actions:(Async_kernel.Deferred.return actions)
             meta.parent_state_hash
       | _ ->
           () ) ;
@@ -210,9 +232,8 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
   | Some st, _ ->
       let st' = Transition_state.modify_aux_data ~f:extend_aux st in
       let hint =
-        Option.value_map
-          ~f:(fun body -> Gossip.preserve_body ~body st')
-          ~default:(st', `Nop)
+        Option.value_map ~f:(Gossip.preserve_body st')
+          ~default:(st', `Nop `No_body_preserved)
           body
       in
       handle_preserve_hint ~actions ~transition_states:state.transition_states
@@ -313,8 +334,19 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
             ~transition_meta error ) ;
       res
   in
+  let (module Context : CONTEXT) = context in
+  let log_failed reason =
+    [%log' debug Context.logger]
+      "Updating status of $state_hash from processing (in progress) to failed \
+       (state: received)"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson top_state_hash)
+        ; ("new_status_error", reason)
+        ]
+  in
   let on_error e =
     cancel_child_contexts () ;
+    log_failed (Error_json.error_to_yojson e) ;
     Transition_states.update' state.transition_states top_state_hash
       ~f:(set_processing_to_failed e)
   in
@@ -326,12 +358,12 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
       ignore
         ( List.fold (Mina_stdlib.Nonempty_list.to_list lst) ~init:(Ok ()) ~f
           : unit Or_error.t ) ;
+      let reason = "failed to retrieve ancestors" in
+      log_failed (`String reason) ;
       (* This will trigger only is the top state hash remained in Processing state
          after handling all of the fetched ancestors *)
       Transition_states.update' state.transition_states top_state_hash
-        ~f:
-          ( set_processing_to_failed
-          @@ Error.of_string "failed to retrieve ancestors" )
+        ~f:(set_processing_to_failed @@ Error.of_string reason)
   | Ok (Error (`Other e)) ->
       on_error e
   | Ok (Error `Present) ->
@@ -362,7 +394,7 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
       | Some
           (Received
             ( { header
-              ; substate = { status = Failed _; _ }
+              ; substate = { status = Failed _ as old_status; _ }
               ; aux = { received; _ }
               ; _
               } as r ) ) ->
@@ -372,6 +404,17 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
                 (List.map received ~f:(fun { sender; _ } -> sender))
               header
           in
+          let state_hash = Gossip.state_hash_of_received_header header in
+          let metadata =
+            Substate.add_error_if_failed ~tag:"old_status_error" old_status
+            @@ Substate.add_error_if_failed ~tag:"new_status_error" status
+            @@ [ ("state_hash", State_hash.to_yojson state_hash) ]
+          in
+          [%log' debug Context.logger]
+            "Updating status of $state_hash from %s to %s (state: received)"
+            (Substate.name_of_status old_status)
+            (Substate.name_of_status status)
+            ~metadata ;
           Transition_states.update transition_states
             (Received { r with substate = { r.substate with status } })
       | _ ->
@@ -399,13 +442,13 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_presence =
-    match Transition_states.find transition_states state_hash with
+    match Transition_states.find transition_states parent_hash with
     | Some (Transition_state.Invalid _) ->
         `Invalid
     | Some _ ->
         `In_process
     | None ->
-        if is_in_frontier Context.frontier state_hash then `In_frontier
+        if is_in_frontier Context.frontier parent_hash then `In_frontier
         else `Not_present
   in
   let all_children =
@@ -433,7 +476,8 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
   (* descendants are marked as Done and responsibility to fetch ancestry is moved to
      the freshly received transition or its ancestors *)
   let child_contexts =
-    List.filter_map non_invalid_children ~f:(mark_done ~transition_states)
+    List.filter_map non_invalid_children
+      ~f:(mark_done ~logger:Context.logger ~transition_states)
   in
   let gossip = Option.is_some gossip_type in
   let add_to_state status =
@@ -473,9 +517,7 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
       Misc.handle_non_regular_child ~state ~is_parent_in_frontier
         ~is_invalid:false transition_meta ;
       actions.Misc.mark_processed_and_promote
-        ~reason:
-          ( if is_parent_in_frontier then "parent in frontier"
-          else "parent in transition states" )
+        ~reason:"parent in frontier/transition states"
         (state_hash :: non_invalid_children) ;
       restart_failed_ancestor ~state ~actions ~context parent_hash
   | `Not_present ->

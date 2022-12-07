@@ -109,8 +109,8 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
     let%map.Option parent =
       Transition_states.find transition_states parent_hash
     in
-    collect_dependent_and_pass_the_baton ~transition_states
-      ~dsu:Context.processed_dsu parent
+    collect_dependent_and_pass_the_baton ~logger:Context.logger
+      ~transition_states ~dsu:Context.processed_dsu parent
     |> start ~context ~actions ~transition_states
   in
   let handle_done () =
@@ -119,16 +119,13 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
     mk_processing (Done ())
   in
   let handle_processing () =
-    collect_dependent_and_pass_the_baton ~transition_states
-      ~dsu:Context.processed_dsu (mk_processing Dependent)
+    collect_dependent_and_pass_the_baton ~logger:Context.logger
+      ~transition_states ~dsu:Context.processed_dsu (mk_processing Dependent)
     |> Mina_stdlib.Nonempty_list.of_list_opt
-    |> Option.map
-         ~f:
-           ( Fn.compose mk_processing
-           @@ launch_in_progress ~context ~actions ~transition_states )
     |> function
-    | Some x ->
-        x
+    | Some sts ->
+        mk_processing
+          (launch_in_progress ~context ~actions ~transition_states sts)
     | None ->
         let state_hash = state_hash_of_header_with_validation header in
         [%log' error Context.logger]
@@ -156,7 +153,9 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
 let make_independent ~context ~actions ~transition_states state_hash =
   let (module Context : CONTEXT) = context in
   let for_start =
-    collect_dependent_and_pass_the_baton_by_hash ~transition_states
-      ~dsu:Context.processed_dsu state_hash
+    collect_dependent_and_pass_the_baton_by_hash ~logger:Context.logger
+      ~transition_states ~dsu:Context.processed_dsu state_hash
   in
-  start ~context ~actions ~transition_states for_start
+  start ~context
+    ~actions:(Async_kernel.Deferred.return actions)
+    ~transition_states for_start

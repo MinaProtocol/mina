@@ -68,12 +68,16 @@ let collect_unprocessed (type state_t)
     | bottom_state :: rest_states
       when is_status_processed ~state_functions bottom_state ->
         let key = (F.transition_meta bottom_state).state_hash in
-        Option.value ~default:[]
+        let res' = rest_states :: res in
+        Option.value ~default:res'
         @@ let%bind.Option ancestor = Dsu.get ~key dsu in
-           let%map.Option parent =
+           let%bind.Option parent =
              Transition_states.find states ancestor.parent_state_hash
            in
-           go (rest_states :: res) parent
+           let%map.Option () =
+             Option.some_if (F.equal_state_levels top_state parent) ()
+           in
+           go res' parent
     | _ ->
         collected :: res
   in

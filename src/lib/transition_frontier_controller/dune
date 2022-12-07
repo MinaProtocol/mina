@@ -64,4 +64,5 @@
    transition_chain_verifier
    async_unix
    transition_frontier_bit_catchup
+   error_json
 ))

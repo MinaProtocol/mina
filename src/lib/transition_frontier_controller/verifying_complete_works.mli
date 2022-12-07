@@ -5,7 +5,7 @@ open Bit_catchup_state
     [Processed] status to [Verifying_complete_works] state.
 *)
 val promote_to :
-     actions:Misc.actions
+     actions:Misc.actions Async_kernel.Deferred.t
   -> context:(module Context.CONTEXT)
   -> transition_states:Transition_states.t
   -> header:Mina_block.Validation.initial_valid_with_header

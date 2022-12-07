@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-module type Inmem_context = sig
+module type Callbacks = sig
   val on_invalid :
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
     -> error:Error.t
@@ -14,7 +14,7 @@ module type Inmem_context = sig
   val on_remove : State_hash.t -> unit
 end
 
-module Inmem (C : Inmem_context) = struct
+module Inmem (C : Callbacks) = struct
   type state_t = Transition_state.t
 
   type t = Transition_state.t State_hash.Table.t
@@ -123,7 +123,7 @@ type state_t = Transition_state.t
 
 type t = Transition_state.t Substate_types.transition_states
 
-let create_inmem (module C : Inmem_context) : t =
+let create_inmem (module C : Callbacks) : t =
   Substate.Transition_states ((module Inmem (C)), State_hash.Table.create ())
 
 let add_new (Substate.Transition_states ((module Impl), m) : t) = Impl.add_new m
