@@ -128,4 +128,4 @@ module Type1 :
     module type of
       Plonk_checks.Make
         (Pickles_types.Shifted_value.Type1)
-        (Plonk_checks.Scalars.Tick_with_lookup)
+        (Plonk_checks.Scalars.Tick)

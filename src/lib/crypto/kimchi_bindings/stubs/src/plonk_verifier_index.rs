@@ -1,7 +1,7 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
 use kimchi::circuits::lookup::index::LookupSelectors;
-use kimchi::circuits::lookup::lookups::{LookupInfo, LookupPattern, LookupsUsed};
+use kimchi::circuits::lookup::lookups::{LookupInfo, LookupFeatures};
 use kimchi::verifier_index::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
@@ -72,30 +72,24 @@ where
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupInfo {
-    /// A single lookup constraint is a vector of lookup constraints to be applied at a row.
-    /// This is a vector of all the kinds of lookup constraints in this configuration.
-    pub kinds: Vec<LookupPattern>,
     /// The maximum length of an element of `kinds`. This can be computed from `kinds`.
     pub max_per_row: ocaml::Int,
     /// The maximum joint size of any joint lookup in a constraint in `kinds`. This can be computed from `kinds`.
     pub max_joint_size: ocaml::Int,
-    /// True if runtime lookup tables are used.
-    pub uses_runtime_tables: bool,
+    pub features: LookupFeatures,
 }
 
 impl From<LookupInfo> for CamlLookupInfo {
     fn from(li: LookupInfo) -> CamlLookupInfo {
         let LookupInfo {
-            kinds,
+            features,
             max_per_row,
             max_joint_size,
-            uses_runtime_tables,
         } = li;
         CamlLookupInfo {
-            kinds,
+            features,
             max_per_row: max_per_row as ocaml::Int,
             max_joint_size: max_joint_size as ocaml::Int,
-            uses_runtime_tables,
         }
     }
 }
@@ -103,23 +97,21 @@ impl From<LookupInfo> for CamlLookupInfo {
 impl From<CamlLookupInfo> for LookupInfo {
     fn from(li: CamlLookupInfo) -> LookupInfo {
         let CamlLookupInfo {
-            kinds,
+            features,
             max_per_row,
             max_joint_size,
-            uses_runtime_tables,
         } = li;
         LookupInfo {
-            kinds,
+            features,
             max_per_row: max_per_row as usize,
             max_joint_size: max_joint_size as u32,
-            uses_runtime_tables,
         }
     }
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupVerifierIndex<PolyComm> {
-    pub lookup_used: CamlLookupsUsed,
+    pub joint_lookup_used: bool,
     pub lookup_table: Vec<PolyComm>,
     pub lookup_selectors: CamlLookupSelectors<PolyComm>,
     pub table_ids: Option<PolyComm>,
@@ -134,7 +126,7 @@ where
 {
     fn from(li: LookupVerifierIndex<G>) -> Self {
         let LookupVerifierIndex {
-            lookup_used,
+            joint_lookup_used,
             lookup_table,
             lookup_selectors,
             table_ids,
@@ -142,12 +134,7 @@ where
             runtime_tables_selector,
         } = li;
         CamlLookupVerifierIndex {
-            lookup_used: {
-                match lookup_used {
-                    LookupsUsed::Single => CamlLookupsUsed::Single,
-                    LookupsUsed::Joint => CamlLookupsUsed::Joint,
-                }
-            },
+            joint_lookup_used,
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
 
             lookup_selectors: lookup_selectors.into(),
@@ -165,7 +152,7 @@ where
 {
     fn from(li: CamlLookupVerifierIndex<CamlPolyComm>) -> Self {
         let CamlLookupVerifierIndex {
-            lookup_used,
+            joint_lookup_used,
             lookup_table,
             lookup_selectors,
             table_ids,
@@ -173,12 +160,7 @@ where
             runtime_tables_selector,
         } = li;
         LookupVerifierIndex {
-            lookup_used: {
-                match lookup_used {
-                    CamlLookupsUsed::Single => LookupsUsed::Single,
-                    CamlLookupsUsed::Joint => LookupsUsed::Joint,
-                }
-            },
+            joint_lookup_used,
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
             lookup_selectors: lookup_selectors.into(),
             table_ids: table_ids.map(From::from),

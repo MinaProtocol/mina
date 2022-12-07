@@ -833,7 +833,7 @@ struct
         (struct
           let constant_term = Plonk_checks.Scalars.Tick.constant_term
 
-          let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+          let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
   end
 

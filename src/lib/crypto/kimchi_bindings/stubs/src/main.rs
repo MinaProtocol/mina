@@ -1,4 +1,4 @@
-use kimchi::circuits::{expr::FeatureFlag, lookup::lookups::LookupPattern};
+use kimchi::circuits::{expr::FeatureFlag, lookup::lookups::{LookupPattern, LookupFeatures, LookupPatterns}};
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
@@ -104,6 +104,9 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
+    decl_type!(w, env, LookupPattern => "lookup_pattern");
+    decl_type!(w, env, LookupPatterns => "lookup_patterns");
+    decl_type!(w, env, LookupFeatures => "lookup_features");
     decl_type!(w, env, FeatureFlag => "feature_flag");
     decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
@@ -113,7 +116,6 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
-            decl_type!(w, env, LookupPattern => "lookup_pattern");
             decl_type!(w, env, CamlLookupInfo => "lookup_info");
             decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");

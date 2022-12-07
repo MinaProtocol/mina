@@ -10,6 +10,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use kimchi::circuits::constraints::FeatureFlags;
+use kimchi::circuits::lookup::lookups::{LookupPatterns, LookupFeatures};
 use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
@@ -90,7 +91,18 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             foreign_field_add: false,
             foreign_field_mul: false,
             xor: false,
-            lookup_configuration: None,
+            lookup_features:
+                LookupFeatures {
+                    patterns: LookupPatterns {
+                        xor: false,
+                        chacha_final: false,
+                        lookup_gate: false,
+                        range_check_gate: false,
+                        foreign_field_mul_gate: false,
+                    },
+                    joint_lookup_used: false,
+                    uses_runtime_tables: false,
+                }
         };
 
         // TODO chacha, dummy_lookup_value ?

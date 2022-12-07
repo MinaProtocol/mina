@@ -114,7 +114,9 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
-    | LookupKindIndex LookupGate ->
+    | LookupKindIndex
+        (LookupGate | Xor | ChaChaFinal | RangeCheckGate | ForeignFieldMulGate)
+      ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
         failwith "Lookup runtime selector should have been linearized away"

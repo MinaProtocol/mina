@@ -5,17 +5,12 @@ open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
-    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
-      | Single
-      | Joint
-    [@@deriving yojson]
-
     type 't lookup_selectors =
           't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
       { lookup_gate : 't option }
     [@@deriving yojson]
 
-    type lookup_pattern = Kimchi_types.VerifierIndex.Lookup.lookup_pattern =
+    type lookup_pattern = Kimchi_types.lookup_pattern =
       | Xor
       | ChaChaFinal
       | LookupGate
@@ -23,16 +18,28 @@ module Verifier_index_json = struct
       | ForeignFieldMulGate
     [@@deriving yojson]
 
-    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
-      { kinds : lookup_pattern array
-      ; max_per_row : int
-      ; max_joint_size : int
+    type lookup_patterns = Kimchi_types.lookup_patterns =
+      { xor : bool
+      ; chacha_final : bool
+      ; lookup_gate : bool
+      ; range_check_gate : bool
+      ; foreign_field_mul_gate : bool
+      }
+    [@@deriving yojson]
+
+    type lookup_features = Kimchi_types.lookup_features =
+      { patterns : lookup_patterns
+      ; joint_lookup_used : bool
       ; uses_runtime_tables : bool
       }
     [@@deriving yojson]
 
+    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
+    [@@deriving yojson]
+
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
-      { lookup_used : lookups_used
+      { joint_lookup_used : bool
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option

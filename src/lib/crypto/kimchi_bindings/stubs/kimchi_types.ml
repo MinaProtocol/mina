@@ -153,12 +153,38 @@ type nonrec gate_type =
   | ForeignFieldMul
   | Xor16
 
+type nonrec lookup_pattern =
+  | Xor
+  | ChaChaFinal
+  | LookupGate
+  | RangeCheckGate
+  | ForeignFieldMulGate
+
+type nonrec lookup_patterns =
+  { xor : bool
+  ; chacha_final : bool
+  ; lookup_gate : bool
+  ; range_check_gate : bool
+  ; foreign_field_mul_gate : bool
+  }
+[@@boxed]
+
+type nonrec lookup_features =
+  { patterns : lookup_patterns
+  ; joint_lookup_used : bool
+  ; uses_runtime_tables : bool
+  }
+[@@boxed]
+
 type nonrec feature_flag =
   | ChaCha
   | RangeCheck
   | ForeignFieldAdd
   | ForeignFieldMul
   | Xor
+  | LookupTables
+  | RuntimeLookupTables
+  | LookupPattern of lookup_pattern
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -181,25 +207,14 @@ module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
-    type nonrec lookup_pattern =
-      | Xor
-      | ChaChaFinal
-      | LookupGate
-      | RangeCheckGate
-      | ForeignFieldMulGate
-
     type nonrec lookup_info =
-      { kinds : lookup_pattern array
-      ; max_per_row : int
-      ; max_joint_size : int
-      ; uses_runtime_tables : bool
-      }
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
     [@@boxed]
 
     type nonrec 't lookup_selectors = { lookup_gate : 't option } [@@boxed]
 
     type nonrec 'poly_comm t =
-      { lookup_used : lookups_used
+      { joint_lookup_used : bool
       ; lookup_table : 'poly_comm array
       ; lookup_selectors : 'poly_comm lookup_selectors
       ; table_ids : 'poly_comm option
