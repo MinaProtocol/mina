@@ -979,8 +979,28 @@ struct
     in
     let env =
       with_label "scalars_env" (fun () ->
+          let module Env_bool = struct
+            include Boolean
+
+            type t = Boolean.var
+          end in
+          let module Env_field = struct
+            include Field
+
+            type bool = Env_bool.t
+
+            let if_ (b : bool) ~then_ ~else_ =
+              match Impl.Field.to_constant (b :> t) with
+              | Some x ->
+                  (* We have a constant, only compute the branch we care about. *)
+                  if Impl.Field.Constant.(equal one) x then then_ ()
+                  else else_ ()
+              | None ->
+                  if_ b ~then_:(then_ ()) ~else_:(else_ ())
+          end in
           Plonk_checks.scalars_env
-            (module Field)
+            (module Env_bool)
+            (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds

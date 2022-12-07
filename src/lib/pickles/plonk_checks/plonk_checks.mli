@@ -8,6 +8,14 @@ type 'field plonk_domain =
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
+module type Bool_intf = sig
+  type t
+
+  val true_ : t
+
+  val false_ : t
+end
+
 module type Field_intf = sig
   type t
 
@@ -32,6 +40,14 @@ module type Field_intf = sig
   val negate : t -> t
 end
 
+module type Field_with_if_intf = sig
+  include Field_intf
+
+  type bool
+
+  val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
+end
+
 type 'f field = (module Field_intf with type t = 'f)
 
 val tick_lookup_constant_term_part : 'a Scalars.Env.t -> 'a
@@ -52,7 +68,8 @@ val evals_of_split_evals :
   -> ('a * 'a) Pickles_types.Plonk_types.Evals.t
 
 val scalars_env :
-     't field
+     (module Bool_intf with type t = 'b)
+  -> (module Field_with_if_intf with type t = 't and type bool = 'b)
   -> endo:'t
   -> mds:'t array array
   -> field_of_hex:(string -> 't)

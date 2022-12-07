@@ -104,7 +104,7 @@ module Env = struct
     ; beta : 'a
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
-    ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
+    ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     ; foreign_field_modulus : int -> 'a
     ; neg_foreign_field_modulus : int -> 'a
     }
@@ -140,7 +140,7 @@ module Tick : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus = _
        ; neg_foreign_field_modulus = _
        } :
@@ -180,7 +180,7 @@ let () =
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus
        ; neg_foreign_field_modulus
        } :
@@ -231,7 +231,7 @@ module Tock : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus = _
        ; neg_foreign_field_modulus = _
        } :
@@ -271,7 +271,7 @@ let () =
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus
        ; neg_foreign_field_modulus
        } :

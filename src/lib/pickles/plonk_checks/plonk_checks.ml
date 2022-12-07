@@ -15,6 +15,14 @@ type 'field plonk_domain =
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
+module type Bool_intf = sig
+  type t
+
+  val true_ : t
+
+  val false_ : t
+end
+
 module type Field_intf = sig
   type t
 
@@ -37,6 +45,14 @@ module type Field_intf = sig
   val inv : t -> t
 
   val negate : t -> t
+end
+
+module type Field_with_if_intf = sig
+  include Field_intf
+
+  type bool
+
+  val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
 type 'f field = (module Field_intf with type t = 'f)
@@ -82,8 +98,9 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
-let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
-    ~field_of_hex ~domain ~srs_length_log2
+let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
+    (module F : Field_with_if_intf with type t = t and type bool = boolean)
+    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
   let witness = Vector.to_array e.w in
@@ -201,10 +218,30 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
               failwith "TODO"
         in
         Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
-  ; enabled_if =
-      (fun (_feature, _f) ->
-        (* TODO *)
-        F.zero )
+  ; if_feature =
+      (fun (feature, e1, e2) ->
+        let if_ b ~then_ ~else_ =
+          match b with None -> e2 () | Some b -> F.if_ b ~then_ ~else_
+        in
+        let b =
+          match feature with
+          | ChaCha ->
+              None
+          | RangeCheck ->
+              None
+          | ForeignFieldAdd ->
+              None
+          | ForeignFieldMul ->
+              None
+          | Xor ->
+              None
+          | LookupTables | RuntimeLookupTables | LookupPattern LookupGate -> (
+              match joint_combiner with None -> None | Some _ -> Some B.true_ )
+          | LookupPattern
+              (Xor | ChaChaFinal | RangeCheckGate | ForeignFieldMulGate) ->
+              None
+        in
+        if_ b ~then_:e1 ~else_:e2 )
   ; foreign_field_modulus = (fun _ -> failwith "TODO")
   ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")
   }
@@ -237,7 +274,7 @@ let tick_lookup_constant_term_part (type a)
      ; beta
      ; gamma
      ; unnormalized_lagrange_basis
-     ; enabled_if = _
+     ; if_feature = _
      ; foreign_field_modulus = _
      ; neg_foreign_field_modulus = _
      } :

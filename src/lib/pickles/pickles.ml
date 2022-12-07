@@ -2474,8 +2474,24 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Plonk_types.Evals.to_in_circuit tick_combined_evals
                       in
                       let tick_env =
+                        let module Env_bool = struct
+                          type t = bool
+
+                          let true_ = true
+
+                          let false_ = false
+                        end in
+                        let module Env_field = struct
+                          include Tick.Field
+
+                          type bool = Env_bool.t
+
+                          let if_ (b : bool) ~then_ ~else_ =
+                            if b then then_ () else else_ ()
+                        end in
                         Plonk_checks.scalars_env
-                          (module Tick.Field)
+                          (module Env_bool)
+                          (module Env_field)
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
@@ -3399,8 +3415,24 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Plonk_types.Evals.to_in_circuit tick_combined_evals
                       in
                       let tick_env =
+                        let module Env_bool = struct
+                          type t = bool
+
+                          let true_ = true
+
+                          let false_ = false
+                        end in
+                        let module Env_field = struct
+                          include Tick.Field
+
+                          type bool = Env_bool.t
+
+                          let if_ (b : bool) ~then_ ~else_ =
+                            if b then then_ () else else_ ()
+                        end in
                         Plonk_checks.scalars_env
-                          (module Tick.Field)
+                          (module Env_bool)
+                          (module Env_field)
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2

@@ -95,7 +95,7 @@ module Env = struct
     ; beta : 'a
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
-    ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
+    ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     ; foreign_field_modulus : int -> 'a
     ; neg_foreign_field_modulus : int -> 'a
     }
@@ -131,7 +131,7 @@ module Tick : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus = _
        ; neg_foreign_field_modulus = _
        } :
@@ -241,6 +241,56 @@ module Tick : S = struct
             + (mds (2, 0) * x_12)
             + (mds (2, 1) * x_13)
             + (mds (2, 2) * x_14) ) ) )
+    + if_feature
+        ( ChaCha
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldAdd
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldMul
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Xor
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
     + cell (var (Index Generic, Curr))
       * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
         + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
@@ -257,9 +307,9 @@ module Tick : S = struct
               * cell (var (Witness 3, Curr))
               * cell (var (Witness 4, Curr))
             + cell (var (Coefficient 9, Curr)) ) )
-    + enabled_if
+    + if_feature
         ( LookupTables
-        , fun () ->
+        , (fun () ->
             alpha_pow 24
             * ( vanishes_on_last_4_rows
               * ( cell (var (LookupAggreg, Next))
@@ -359,6 +409,10 @@ module Tick : S = struct
               * ( unnormalized_lagrange_basis 0
                 * ( cell (var (LookupSorted 3, Curr))
                   - cell (var (LookupSorted 4, Curr)) ) ) )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -382,7 +436,7 @@ module Tick : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus
        ; neg_foreign_field_modulus
        } :
@@ -390,9 +444,9 @@ module Tick : S = struct
     Column.Table.of_alist_exn
       [ ( LookupKindIndex Xor
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -461,12 +515,16 @@ module Tick : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -567,12 +625,16 @@ module Tick : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex LookupGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -640,12 +702,16 @@ module Tick : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex RangeCheckGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -702,12 +768,16 @@ module Tick : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex ForeignFieldMulGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -768,12 +838,19 @@ module Tick : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupRuntimeSelector
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () -> alpha_pow 31 * cell (var (LookupRuntimeTable, Curr))
+               , (fun () -> alpha_pow 31 * cell (var (LookupRuntimeTable, Curr)))
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
                ) ) )
       ; ( Index CompleteAdd
         , lazy
@@ -1541,9 +1618,9 @@ module Tick : S = struct
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Index ChaCha0
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1624,12 +1701,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 6, Curr))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha1
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1710,12 +1791,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 3, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha2
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1796,12 +1881,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 4, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 5, Curr)))
                    - cell (var (Witness 5, Curr))
                    + alpha_pow 1
@@ -1896,12 +1985,16 @@ module Tick : S = struct
                                "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
                              * ( cell (var (Witness 2, Next))
                                - cell (var (Witness 6, Next)) ) )
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck0
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -2210,12 +2303,16 @@ module Tick : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000001000"
                          * cell (var (Witness 1, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck1
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 1, Curr))
                    * ( cell (var (Witness 1, Curr))
                      - field
@@ -3072,12 +3169,16 @@ module Tick : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000000004"
                          * cell (var (Witness 1, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldAdd
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldAdd
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - cell (var (Witness 6, Curr)) )
@@ -3139,12 +3240,16 @@ module Tick : S = struct
                            * cell (var (Witness 5, Curr))
                          - cell (var (Witness 7, Curr))
                            * foreign_field_modulus 2
-                         + cell (var (Witness 9, Curr)) ) ) ) ) )
+                         + cell (var (Witness 9, Curr)) ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldMul
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldMul
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Next))
                    * ( cell (var (Witness 7, Next))
                      - field
@@ -3295,12 +3400,16 @@ module Tick : S = struct
                        - ( cell (var (Witness 12, Curr))
                          + neg_foreign_field_modulus 2 )
                        - cell (var (Witness 13, Curr))
-                       + cell (var (Witness 4, Next)) ) ) ) )
+                       + cell (var (Witness 4, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Xor16
         , lazy
-            (enabled_if
+            (if_feature
                ( Xor
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 3, Curr))
                    + cell (var (Witness 4, Curr))
                      * pow
@@ -3368,7 +3477,11 @@ module Tick : S = struct
                                "0x0000000000000000000000000000000000000000000000000000000000000002"
                            , 16 )
                          * cell (var (Witness 2, Next))
-                       - cell (var (Witness 2, Curr)) ) ) ) )
+                       - cell (var (Witness 2, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ]
 end
 
@@ -3395,7 +3508,7 @@ module Tock : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus = _
        ; neg_foreign_field_modulus = _
        } :
@@ -3505,6 +3618,56 @@ module Tock : S = struct
             + (mds (2, 0) * x_12)
             + (mds (2, 1) * x_13)
             + (mds (2, 2) * x_14) ) ) )
+    + if_feature
+        ( ChaCha
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldAdd
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldMul
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Xor
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
     + cell (var (Index Generic, Curr))
       * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
         + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
@@ -3521,9 +3684,9 @@ module Tock : S = struct
               * cell (var (Witness 3, Curr))
               * cell (var (Witness 4, Curr))
             + cell (var (Coefficient 9, Curr)) ) )
-    + enabled_if
+    + if_feature
         ( LookupTables
-        , fun () ->
+        , (fun () ->
             alpha_pow 24
             * ( vanishes_on_last_4_rows
               * ( cell (var (LookupAggreg, Next))
@@ -3623,6 +3786,10 @@ module Tock : S = struct
               * ( unnormalized_lagrange_basis 0
                 * ( cell (var (LookupSorted 3, Curr))
                   - cell (var (LookupSorted 4, Curr)) ) ) )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -3646,7 +3813,7 @@ module Tock : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
+       ; if_feature
        ; foreign_field_modulus
        ; neg_foreign_field_modulus
        } :
@@ -3654,9 +3821,9 @@ module Tock : S = struct
     Column.Table.of_alist_exn
       [ ( LookupKindIndex Xor
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -3725,12 +3892,16 @@ module Tock : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -3831,12 +4002,16 @@ module Tock : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex LookupGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -3904,12 +4079,16 @@ module Tock : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex RangeCheckGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -3966,12 +4145,16 @@ module Tock : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupKindIndex ForeignFieldMulGate
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () ->
+               , (fun () ->
                    alpha_pow 24
                    * ( vanishes_on_last_4_rows
                      * ( field
@@ -4032,12 +4215,19 @@ module Tock : S = struct
                                  )
                              + cell (var (LookupTable, Curr))
                              + (beta * cell (var (LookupTable, Next))) ) ) ) )
-                     ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( LookupRuntimeSelector
         , lazy
-            (enabled_if
+            (if_feature
                ( LookupTables
-               , fun () -> alpha_pow 31 * cell (var (LookupRuntimeTable, Curr))
+               , (fun () -> alpha_pow 31 * cell (var (LookupRuntimeTable, Curr)))
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
                ) ) )
       ; ( Index CompleteAdd
         , lazy
@@ -4805,9 +4995,9 @@ module Tock : S = struct
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Index ChaCha0
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -4888,12 +5078,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 6, Curr))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha1
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -4974,12 +5168,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 3, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha2
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -5060,12 +5258,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 4, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 5, Curr)))
                    - cell (var (Witness 5, Curr))
                    + alpha_pow 1
@@ -5160,12 +5362,16 @@ module Tock : S = struct
                                "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
                              * ( cell (var (Witness 2, Next))
                                - cell (var (Witness 6, Next)) ) )
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck0
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -5474,12 +5680,16 @@ module Tock : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000001000"
                          * cell (var (Witness 1, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck1
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 1, Curr))
                    * ( cell (var (Witness 1, Curr))
                      - field
@@ -6336,12 +6546,16 @@ module Tock : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000000004"
                          * cell (var (Witness 1, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldAdd
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldAdd
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - cell (var (Witness 6, Curr)) )
@@ -6403,12 +6617,16 @@ module Tock : S = struct
                            * cell (var (Witness 5, Curr))
                          - cell (var (Witness 7, Curr))
                            * foreign_field_modulus 2
-                         + cell (var (Witness 9, Curr)) ) ) ) ) )
+                         + cell (var (Witness 9, Curr)) ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldMul
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldMul
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Next))
                    * ( cell (var (Witness 7, Next))
                      - field
@@ -6559,12 +6777,16 @@ module Tock : S = struct
                        - ( cell (var (Witness 12, Curr))
                          + neg_foreign_field_modulus 2 )
                        - cell (var (Witness 13, Curr))
-                       + cell (var (Witness 4, Next)) ) ) ) )
+                       + cell (var (Witness 4, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Xor16
         , lazy
-            (enabled_if
+            (if_feature
                ( Xor
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 3, Curr))
                    + cell (var (Witness 4, Curr))
                      * pow
@@ -6632,6 +6854,10 @@ module Tock : S = struct
                                "0x0000000000000000000000000000000000000000000000000000000000000002"
                            , 16 )
                          * cell (var (Witness 2, Next))
-                       - cell (var (Witness 2, Curr)) ) ) ) )
+                       - cell (var (Witness 2, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ]
 end
