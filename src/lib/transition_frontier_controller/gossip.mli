@@ -30,10 +30,10 @@ val verify_header_is_relevant :
     hint is returned. Returned hint is [`Nop] otherwise.
 *)
 val preserve_body :
-     body:Mina_block.Body.t
+     Transition_state.t
+  -> Mina_block.Body.t
   -> Transition_state.t
-  -> Transition_state.t
-     * [> `Nop
+     * [ `Nop of [ `No_body_preserved | `Preserved_body ]
        | `Mark_downloading_body_processed of unit Async_kernel.Ivar.t option ]
 
 (** [preserve_relevant_gossip] takes data of a recently received gossip related to a
@@ -52,8 +52,10 @@ val preserve_relevant_gossip :
   -> sender:Network_peer.Peer.t
   -> Transition_state.t
   -> Transition_state.t
-     * [ `Nop
+     * [ `Nop of [ `No_body_preserved | `Preserved_body ]
        | `Mark_verifying_blockchain_proof_processed of
-         Mina_block.initial_valid_header
+         [ `No_body_preserved | `Preserved_body ]
+         * Mina_block.initial_valid_header
        | `Mark_downloading_body_processed of unit Async_kernel.Ivar.t option
-       | `Start_processing_verifying_complete_works of State_hash.t ]
+       | `Start_processing_verifying_complete_works of
+         [ `No_body_preserved | `Preserved_body ] * State_hash.t ]

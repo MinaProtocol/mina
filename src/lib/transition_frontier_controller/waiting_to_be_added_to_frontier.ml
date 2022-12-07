@@ -13,7 +13,8 @@ let promote_to ~context:(module Context : CONTEXT) ~block_vc ~aux
     | Processed b ->
         b
     | _ ->
-        failwith "promote_building_breadcrumb: expected to be processed"
+        failwith
+          "promote to Waiting to be added to frontier: expected to be processed"
   in
   let consensus_state =
     Frontier_base.Breadcrumb.protocol_state_with_hashes breadcrumb

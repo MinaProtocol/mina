@@ -133,6 +133,8 @@ module type State_functions = sig
       statuses).
   *)
   val equal_state_levels : state_t -> state_t -> bool
+
+  val name : state_t -> string
 end
 
 let transition_meta_of_header_with_hash hh =

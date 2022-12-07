@@ -48,11 +48,14 @@ let verify_header_is_relevant ?(event_recording = true)
     to [Substate.Processing (Substate.Done _)] and [`Mark_downloading_body_processed]
     hint is returned. Returned hint is [`Nop] otherwise.
 *)
-let preserve_body ~body = function
-  | Transition_state.Received r ->
-      (Transition_state.Received { r with body_opt = Some body }, `Nop)
-  | Verifying_blockchain_proof r ->
-      (Verifying_blockchain_proof { r with body_opt = Some body }, `Nop)
+let preserve_body st body =
+  match st with
+  | Transition_state.Received ({ body_opt = None; _ } as r) ->
+      ( Transition_state.Received { r with body_opt = Some body }
+      , `Nop `Preserved_body )
+  | Verifying_blockchain_proof ({ body_opt = None; _ } as r) ->
+      ( Verifying_blockchain_proof { r with body_opt = Some body }
+      , `Nop `Preserved_body )
   | Downloading_body
       ({ substate = { status = Processing (In_progress ctx); _ } as s; _ } as r)
     ->
@@ -63,8 +66,8 @@ let preserve_body ~body = function
       ( Downloading_body
           { r with substate = { s with status = Processing (Done body) } }
       , `Mark_downloading_body_processed None )
-  | st ->
-      (st, `Nop)
+  | _ ->
+      (st, `Nop `No_body_preserved)
 
 (** [preserve_relevant_gossip] takes data of a recently received gossip related to a
     transition already present in the catchup state. It preserves useful data of gossip
@@ -124,34 +127,33 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
   in
   let st, pre_decision =
     Option.value_map
-      ~default:(st, `Nop)
-      ~f:(fun body -> preserve_body ~body st)
-      body_opt
+      ~default:(st, `Nop `No_body_preserved)
+      ~f:(preserve_body st) body_opt
   in
   match (st, pre_decision) with
-  | Transition_state.Invalid _, `Nop ->
+  | Transition_state.Invalid _, `Nop bp ->
       fire_callback `Reject ;
-      (st, `Nop)
-  | Received ({ gossip_data; _ } as r), `Nop ->
+      (st, `Nop bp)
+  | Received ({ gossip_data; _ } as r), `Nop bp ->
       ( Received
           { r with
             gossip_data = update_gossip_data gossip_data
           ; header = Initial_valid gossip_header
           }
-      , `Nop )
+      , `Nop bp )
   | ( Verifying_blockchain_proof
         ({ gossip_data; substate = { status = Failed _; _ }; _ } as r)
-    , `Nop )
+    , `Nop bp )
   | ( Verifying_blockchain_proof
         ({ gossip_data; substate = { status = Processing _; _ }; _ } as r)
-    , `Nop ) ->
+    , `Nop bp ) ->
       ( Verifying_blockchain_proof
           { r with gossip_data = update_gossip_data gossip_data; baton = true }
-      , `Mark_verifying_blockchain_proof_processed gossip_header )
-  | Verifying_blockchain_proof ({ gossip_data; _ } as r), `Nop ->
+      , `Mark_verifying_blockchain_proof_processed (bp, gossip_header) )
+  | Verifying_blockchain_proof ({ gossip_data; _ } as r), `Nop bp ->
       ( Verifying_blockchain_proof
           { r with gossip_data = update_gossip_data gossip_data; baton = true }
-      , `Nop )
+      , `Nop bp )
   | Downloading_body ({ block_vc; header; _ } as r), _ ->
       accept_header (consensus_state @@ Mina_block.Validation.header header) ;
       ( Transition_state.Downloading_body
@@ -160,34 +162,36 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
   | ( Verifying_complete_works
         ( { block_vc; block; substate = { status = Processing Dependent; _ }; _ }
         as r )
-    , `Nop )
+    , `Nop bp )
   | ( Verifying_complete_works
         ({ block_vc; block; substate = { status = Failed _; _ }; _ } as r)
-    , `Nop ) ->
+    , `Nop bp ) ->
       accept_header
         (consensus_state @@ Mina_block.(header @@ Validation.block block)) ;
       ( Verifying_complete_works
           { r with block_vc = update_block_vc block_vc; baton = true }
       , `Start_processing_verifying_complete_works
-          (State_hash.With_state_hashes.state_hash
-             (Mina_block.Validation.block_with_hash block) ) )
-  | Verifying_complete_works ({ block_vc; block; _ } as r), `Nop ->
+          ( bp
+          , State_hash.With_state_hashes.state_hash
+              (Mina_block.Validation.block_with_hash block) ) )
+  | Verifying_complete_works ({ block_vc; block; _ } as r), `Nop bp ->
       accept_header
         (consensus_state @@ Mina_block.(header @@ Validation.block block)) ;
       ( Verifying_complete_works
           { r with block_vc = update_block_vc block_vc; baton = true }
-      , `Nop )
-  | Building_breadcrumb ({ block_vc; block; _ } as r), `Nop ->
+      , `Nop bp )
+  | Building_breadcrumb ({ block_vc; block; _ } as r), `Nop bp ->
       accept_header
         (consensus_state @@ Mina_block.(header @@ Validation.block block)) ;
-      (Building_breadcrumb { r with block_vc = update_block_vc block_vc }, `Nop)
-  | Waiting_to_be_added_to_frontier { breadcrumb; _ }, `Nop ->
+      ( Building_breadcrumb { r with block_vc = update_block_vc block_vc }
+      , `Nop bp )
+  | Waiting_to_be_added_to_frontier { breadcrumb; _ }, `Nop bp ->
       let consensus_state =
         consensus_state
         @@ Mina_block.(header @@ Frontier_base.Breadcrumb.block breadcrumb)
       in
       Option.iter vc_opt ~f:(fun valid_cb ->
           accept_gossip ~context ~valid_cb consensus_state ) ;
-      (st, `Nop)
+      (st, `Nop bp)
   | _, `Mark_downloading_body_processed _ ->
       failwith "Mark_downloading_body_processed: unexpected case"

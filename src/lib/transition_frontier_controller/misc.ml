@@ -30,10 +30,33 @@ is promoted multiple times or upon completion of deferred action.
 *)
   }
 
+let tag_to_string = function
+  | `Invalid_children ->
+      "invalid children"
+  | `Orphans ->
+      "orphans"
+  | `Parent_in_frontier ->
+      "parent in frontier"
+
+let assert_tags_equal =
+  Tuple2.curry
+  @@ function
+  | `Invalid_children, `Invalid_children ->
+      ()
+  | `Orphans, `Orphans ->
+      ()
+  | `Parent_in_frontier, `Parent_in_frontier ->
+      ()
+  | a, b ->
+      failwith
+        (sprintf "tags not equal: %s <> %s" (tag_to_string a) (tag_to_string b))
+
 let handle_non_regular_child_with_tag ~tag ~state
     (meta : Substate.transition_meta) =
   let f = function
     | Some (tag', lst) ->
+        (* TODO consider removing assert after debugging *)
+        assert_tags_equal tag tag' ;
         Some (tag', meta.state_hash :: lst)
     | None ->
         Some (tag, [ meta.state_hash ])

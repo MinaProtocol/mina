@@ -4,7 +4,7 @@ open Bit_catchup_state
     [Processed] status to [Building_breadcrumb] state.
 *)
 val promote_to :
-     actions:Misc.actions
+     actions:Misc.actions Async_kernel.Deferred.t
   -> context:(module Context.CONTEXT)
   -> transition_states:Transition_states.t
   -> block:Mina_block.Validation.initial_valid_with_block

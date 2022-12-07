@@ -22,6 +22,7 @@
    transition_frontier_base
    consensus
    non_empty_list
+   error_json
    mina_wire_types
    pickles.backend
    pickles
