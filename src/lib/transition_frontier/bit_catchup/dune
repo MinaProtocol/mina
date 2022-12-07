@@ -29,6 +29,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    non_empty_list
+   error_json
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina)))

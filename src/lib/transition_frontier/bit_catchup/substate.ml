@@ -59,19 +59,19 @@ let collect_states (type state_t) ~predicate ~state_functions
     and [Result.Error] otherwise.
 *)
 let mark_processed_modifier old_st subst =
-  let reshape res =
-    match res with
+  let old_children = subst.children in
+  let reshape = function
     | Result.Error _ as e ->
         (subst, e)
-    | Result.Ok (subst', children) ->
-        (subst', Result.Ok (old_st, children))
+    | Result.Ok subst' ->
+        (subst', Result.Ok (old_st, old_children))
   in
   let children =
-    { subst.children with
+    { old_children with
       waiting_for_parent = State_hash.Set.empty
     ; processing_or_failed =
-        State_hash.Set.union subst.children.processing_or_failed
-          subst.children.waiting_for_parent
+        State_hash.Set.union old_children.processing_or_failed
+          old_children.waiting_for_parent
     }
   in
   reshape
@@ -82,7 +82,7 @@ let mark_processed_modifier old_st subst =
   | Failed e ->
       Result.Error (sprintf "failed due to %s" (Error.to_string_mach e))
   | Processing (Done a_res) ->
-      Result.Ok ({ status = Processed a_res; children }, subst.children)
+      Result.Ok { status = Processed a_res; children }
   | Processing Dependent ->
       Result.Error "not started"
   | Processing (In_progress _) ->
@@ -110,7 +110,9 @@ let is_parent_higher (type state_t)
 
 (** Start processing a transition in [Waiting_for_parent] status.
     
-   Function modifies the status of the transition and then updates parent's children.
+   Function modifies the status of the transition.
+
+   It doesn't update parent's children structure, this is responsibility of the caller..
 *)
 let kickstart_waiting_for_parent (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
@@ -121,21 +123,12 @@ let kickstart_waiting_for_parent (type state_t)
   let ext_modifier old_st subst =
     match subst.status with
     | Waiting_for_parent mk_status ->
-        ({ subst with status = mk_status () }, Some (F.transition_meta old_st))
+        let status = mk_status () in
+        let err_opt = match status with Failed e -> Some e | _ -> None in
+        ( { subst with status }
+        , Some (name_of_status status, F.name old_st, err_opt) )
     | _ ->
         (subst, None)
-  in
-  let update_children_modifier subst =
-    ( { subst with
-        children =
-          { subst.children with
-            waiting_for_parent =
-              State_hash.Set.remove subst.children.waiting_for_parent state_hash
-          ; processing_or_failed =
-              State_hash.Set.add subst.children.processing_or_failed state_hash
-          }
-      }
-    , () )
   in
   let modified_opt =
     Transition_states.modify_substate states ~f:{ ext_modifier } state_hash
@@ -147,23 +140,30 @@ let kickstart_waiting_for_parent (type state_t)
   | Some None ->
       [%log warn] "child $state_hash is not in waiting_for_parent state"
         ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
-  | Some (Some meta) ->
-      Transition_states.modify_substate_ states meta.parent_state_hash
-        ~f:{ modifier = update_children_modifier }
+  | Some (Some (status_name, state_name, err_opt)) ->
+      let metadata =
+        ("state_hash", State_hash.to_yojson state_hash)
+        :: Option.to_list
+             (Option.map err_opt ~f:(fun e ->
+                  ("error", Error_json.error_to_yojson e) ) )
+      in
+      [%log debug]
+        "Updating status of $state_hash from waiting for parent to %s (state: \
+         %s)"
+        status_name state_name ~metadata
 
 (** Update children of the parent upon transition acquiring the [Processed] status *)
 let update_children_on_processed (type state_t)
     ~(transition_states : state_t transition_states) ~parent_hash
     ~state_functions:(module F : State_functions with type state_t = state_t)
     state_hash =
-  let modifier subst =
-    ( { subst with
-        children =
-          { subst.children with
-            processed = State_hash.Set.add subst.children.processed state_hash
+  let modifier { children; status } =
+    ( { status
+      ; children =
+          { children with
+            processed = State_hash.Set.add children.processed state_hash
           ; processing_or_failed =
-              State_hash.Set.remove subst.children.processing_or_failed
-                state_hash
+              State_hash.Set.remove children.processing_or_failed state_hash
           }
       }
     , () )
@@ -184,7 +184,7 @@ let update_children_on_processed (type state_t)
 
   Post-condition: list returned respects parent-child relationship and parent always comes first *)
 let mark_processed (type state_t) ~logger ~state_functions
-    ~(transition_states : state_t transition_states) processed =
+    ~(transition_states : state_t transition_states) =
   let (module F : State_functions with type state_t = state_t) =
     state_functions
   in
@@ -194,13 +194,25 @@ let mark_processed (type state_t) ~logger ~state_functions
   let kickstart_waiting =
     kickstart_waiting_for_parent ~state_functions ~logger ~transition_states
   in
+  let promoted = ref State_hash.Set.empty in
   let rec traverse_processed hash =
+    let viewer { children; status } =
+      (* This check should be redundant after debugging TODO *)
+      match status with
+      | Processed _ ->
+          children
+      | _ ->
+          failwith
+            (sprintf "traverse_processed: child not processed %s"
+               (State_hash.to_base58_check hash) )
+    in
     let open Option in
     Transition_states.find states hash
-    >>= view ~state_functions ~f:{ viewer = (fun { children; _ } -> children) }
+    >>= view ~state_functions ~f:{ viewer }
     >>| traverse_processed_children
-    |> value_map ~f:(List.cons hash) ~default:[]
+    |> value_map ~f:(List.cons hash) ~default:[ hash ]
   and traverse_processed_children children =
+    promoted := State_hash.Set.union children.processed !promoted ;
     List.concat_map ~f:traverse_processed
       (State_hash.Set.to_list children.processed)
   in
@@ -211,7 +223,9 @@ let mark_processed (type state_t) ~logger ~state_functions
         ~f:{ ext_modifier = mark_processed_modifier }
         hash
     in
-    Option.iter ~f:(fun err -> [%log warn] "error %s" err) (Result.error res) ;
+    Option.iter
+      ~f:(fun err -> [%log warn] "mark_processed: error %s" err)
+      (Result.error res) ;
     let%bind old_state, old_children = Result.ok res in
     let meta = F.transition_meta old_state in
     let parent_hash = meta.parent_state_hash in
@@ -220,7 +234,10 @@ let mark_processed (type state_t) ~logger ~state_functions
     State_hash.Set.iter ~f:kickstart_waiting old_children.waiting_for_parent ;
     let parent_opt = Transition_states.find states parent_hash in
     let%map () =
-      Option.some_if (is_parent_higher ~state_functions old_state parent_opt) ()
+      Option.some_if
+        ( State_hash.Set.mem !promoted parent_hash
+        || is_parent_higher ~state_functions old_state parent_opt )
+        ()
     in
     (* Parent is of higher state, hence it needs to be promoted.
 
@@ -232,9 +249,10 @@ let mark_processed (type state_t) ~logger ~state_functions
        in parent-first order and when a state from [processed] is considered,
        its children from [processed] are not yet marked processed (and hence won't
        be traversed). Neither can they appear in deeper layers of recursion. *)
+    promoted := State_hash.Set.add !promoted hash ;
     hash :: traverse_processed_children old_children
   in
-  List.concat_map processed ~f:(Fn.compose (Option.value ~default:[]) handle)
+  List.concat_map ~f:(Fn.compose (Option.value ~default:[]) handle)
 
 (** Update children of transition's parent when the transition is promoted
     to the higher state.
@@ -268,18 +286,17 @@ let update_children_on_promotion (type state_t) ~state_functions
       | _ ->
           (false, false)
     in
-    Option.value ~default:(false, false)
-    @@ Option.bind state_opt ~f:(view ~state_functions ~f:{ viewer })
+    Option.bind state_opt ~f:(view ~state_functions ~f:{ viewer })
+    |> Option.value ~default:(false, false)
   in
-  let modifier subst =
-    ( { subst with
-        children =
-          { processed =
-              State_hash.Set.remove subst.children.processed state_hash
+  let modifier { children; status } =
+    ( { status
+      ; children =
+          { processed = State_hash.Set.remove children.processed state_hash
           ; waiting_for_parent =
-              add_if is_waiting_for_parent subst.children.waiting_for_parent
+              add_if is_waiting_for_parent children.waiting_for_parent
           ; processing_or_failed =
-              add_if is_processing_or_failed subst.children.processing_or_failed
+              add_if is_processing_or_failed children.processing_or_failed
           }
       }
     , () )
@@ -300,6 +317,12 @@ let is_processing_done ~state_functions =
                | _ ->
                    false )
          }
+
+let add_error_if_failed ~tag = function
+  | Failed e ->
+      List.cons (tag, Error_json.error_to_yojson e)
+  | _ ->
+      Fn.id
 
 module For_tests = struct
   (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive)

@@ -5,7 +5,7 @@ open Bit_catchup_state
 *)
 val promote_to :
      context:(module Context.CONTEXT)
-  -> actions:Misc.actions
+  -> actions:Misc.actions Async_kernel.Deferred.t
   -> header:Gossip.received_header
   -> transition_states:Transition_states.t
   -> substate:unit Substate.t
