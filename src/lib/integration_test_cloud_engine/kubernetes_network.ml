@@ -792,19 +792,19 @@ module Node = struct
             |> Yojson.Safe.to_string )
     in
 
-    let transaction_hashes =
+    let transaction_ids =
       Array.map zkapp_pool_obj.pooledZkappCommands ~f:(fun zkapp_command ->
-          zkapp_command.hash |> Transaction_hash.to_base58_check )
+          zkapp_command.id |> Transaction_id.to_base64 )
       |> Array.to_list
     in
     [%log info] "Retrieved zkapp_commands from transaction pool"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
-        ; ( "transaction_hashes"
-          , `List (List.map ~f:(fun t -> `String t) transaction_hashes) )
+        ; ( "transaction ids"
+          , `List (List.map ~f:(fun t -> `String t) transaction_ids) )
         ] ;
-    return transaction_hashes
+    return transaction_ids
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
