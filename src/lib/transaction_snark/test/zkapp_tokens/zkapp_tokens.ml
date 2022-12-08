@@ -13,7 +13,7 @@ let%test_module "Zkapp tokens tests" =
     let constraint_constants = U.constraint_constants
 
     let account_creation_fee =
-      Currency.Fee.to_int constraint_constants.account_creation_fee
+      Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
 
     let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ())
 
@@ -58,7 +58,7 @@ let%test_module "Zkapp tokens tests" =
                      (Public_key.compress keypair.public_key)
                      token_id )
                     .balance
-                  (Currency.Balance.of_int balance)
+                  (Currency.Balance.of_nanomina_int_exn balance)
               in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let open Async.Deferred.Let_syntax in

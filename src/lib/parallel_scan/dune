@@ -19,7 +19,7 @@
    async_unix
    ;; local libraries
    mina_metrics
-   non_empty_list
+   mina_stdlib
    pipe_lib
    state_or_error
    ppx_version.runtime

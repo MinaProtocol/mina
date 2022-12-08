@@ -203,7 +203,8 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee) )
+           (Currency.Fee.to_nanomina_int
+              Mina_compile_config.default_snark_worker_fee ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -781,7 +782,8 @@ let setup_daemon logger =
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
-              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+              YJ.Util.to_int_option json
+              |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:Mina_compile_config.default_snark_worker_fee
@@ -1150,6 +1152,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 (Lazy.force precomputed_values.constraint_system_digests)
               ~protocol_major_version
           in
+          [%log info] "Daemon will use chain id %s" chain_id ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1406,7 +1409,8 @@ let replay_blocks logger =
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
-           "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
+           "Daemon is ready, replayed precomputed blocks. Clients can now \
+            connect" ;
          Async.never () ) )
 
 let dump_type_shapes =
@@ -1788,7 +1792,7 @@ let () =
      use the Jane Street scripts that generate their version information
   *)
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
-   let is_version_cmd = make_list_mem [ "version"; "-version" ] in
+   let is_version_cmd = make_list_mem [ "version"; "-version"; "--version" ] in
    let is_help_flag = make_list_mem [ "-help"; "-?" ] in
    match Sys.get_argv () with
    | [| _coda_exe; version |] when is_version_cmd version ->

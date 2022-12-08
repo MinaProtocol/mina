@@ -185,10 +185,10 @@ module Constraint_constants = struct
         ; transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
-            Currency.Amount.of_formatted_string coinbase_amount_string
+            Currency.Amount.of_mina_string_exn coinbase_amount_string
         ; supercharged_coinbase_factor
         ; account_creation_fee =
-            Currency.Fee.of_formatted_string account_creation_fee_string
+            Currency.Fee.of_mina_string_exn account_creation_fee_string
         ; fork
         }
     end :
@@ -237,6 +237,10 @@ module Protocol = struct
     module Stable = struct
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
+              ( 'length
+              , 'delta
+              , 'genesis_state_timestamp )
+              Mina_wire_types.Genesis_constants.Protocol.Poly.V1.t =
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length

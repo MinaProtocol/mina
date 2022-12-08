@@ -25,12 +25,7 @@ module Padded_length = Nat.N2
 
 (* Pad up to length 2 by preprending dummy values. *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
-  let v = Vector.to_array v in
-  let n = Array.length v in
-  assert (n <= 2) ;
-  let padding = 2 - n in
-  Vector.init Padded_length.n ~f:(fun i ->
-      if i < padding then dummy else v.(i - padding) )
+  Vector.extend_front_exn v Padded_length.n dummy
 
 (* Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
