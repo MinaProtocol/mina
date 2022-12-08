@@ -11,25 +11,19 @@ module Statement = Transaction_snark.Statement
 
 module Make_trivial_rule (Id : sig
   val id : int
+
+  val pk_compressed : Public_key.Compressed.t
 end) =
 struct
   open Snark_params.Tick.Run
 
-  type _ Snarky_backendless.Request.t +=
-    | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
-
   (** The request handler for the rule. *)
-  let handler (public_key : Public_key.Compressed.t)
-      (Snarky_backendless.Request.With { request; respond }) =
-    match request with
-    | Public_key ->
-        respond (Provide public_key)
-    | _ ->
-        respond Unhandled
+  let handler (Snarky_backendless.Request.With { request; respond }) =
+    match request with _ -> respond Unhandled
 
   let main input =
     let public_key =
-      exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+      exists Public_key.Compressed.typ ~compute:(fun () -> Id.pk_compressed)
     in
     Zkapps_examples.wrap_main ~public_key
       (fun account_update ->
@@ -50,14 +44,6 @@ end
 
 let%test_module "Verification key modify mid txn" =
   ( module struct
-    module Trivial_rule1 = Make_trivial_rule (struct
-      let id = 1
-    end)
-
-    module Trivial_rule2 = Make_trivial_rule (struct
-      let id = 2
-    end)
-
     let () = Base.Backtrace.elide := false
 
     let sk = Private_key.create ()
@@ -65,6 +51,18 @@ let%test_module "Verification key modify mid txn" =
     let pk = Public_key.of_private_key_exn sk
 
     let pk_compressed = Public_key.compress pk
+
+    module Trivial_rule1 = Make_trivial_rule (struct
+      let id = 1
+
+      let pk_compressed = pk_compressed
+    end)
+
+    module Trivial_rule2 = Make_trivial_rule (struct
+      let id = 2
+
+      let pk_compressed = pk_compressed
+    end)
 
     let account_id = Account_id.create pk_compressed Token_id.default
 
@@ -146,13 +144,13 @@ let%test_module "Verification key modify mid txn" =
     module Trivial_account_update1 = struct
       let account_update, _ =
         Async.Thread_safe.block_on_async_exn
-          (trivial_prover1 ~handler:(Trivial_rule1.handler pk_compressed))
+          (trivial_prover1 ~handler:Trivial_rule1.handler)
     end
 
     module Trivial_account_update2 = struct
       let account_update, _ =
         Async.Thread_safe.block_on_async_exn
-          (trivial_prover2 ~handler:(Trivial_rule2.handler pk_compressed))
+          (trivial_prover2 ~handler:Trivial_rule2.handler)
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
