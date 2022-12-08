@@ -17,13 +17,7 @@ let challenge_polynomial =
   Wrap_verifier.challenge_polynomial ~add ~mul ~one
 
 module Type1 =
-  Plonk_checks.Make
-    (Shifted_value.Type1)
-    (struct
-      let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-      let index_terms = Plonk_checks.Scalars.Tick.index_terms
-    end)
+  Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 
 let vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
@@ -177,23 +171,9 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       ~domain_generator:Backend.Tick.Field.domain_generator
   in
   let tick_env =
-    let module Env_bool = struct
-      type t = bool
-
-      let true_ = true
-
-      let false_ = false
-    end in
-    let module Env_field = struct
-      include Tick.Field
-
-      type bool = Env_bool.t
-
-      let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
-    end in
     Plonk_checks.scalars_env
-      (module Env_bool)
-      (module Env_field)
+      (module Env.Bool)
+      (module Env.Tick_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
       ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->

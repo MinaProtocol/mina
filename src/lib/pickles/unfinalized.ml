@@ -71,23 +71,9 @@ module Constant = struct
          Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
        in
        let env =
-         let module Env_bool = struct
-           type t = bool
-
-           let true_ = true
-
-           let false_ = false
-         end in
-         let module Env_field = struct
-           include Tock.Field
-
-           type bool = Env_bool.t
-
-           let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
-         end in
          Plonk_checks.scalars_env
-           (module Env_bool)
-           (module Env_field)
+           (module Env.Bool)
+           (module Env.Tock_field)
            ~srs_length_log2:Common.Max_degree.wrap_log2
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:

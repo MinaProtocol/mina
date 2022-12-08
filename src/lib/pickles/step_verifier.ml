@@ -826,15 +826,7 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-
-    include
-      Plonk_checks.Make
-        (Shifted_value.Type1)
-        (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-          let index_terms = Plonk_checks.Scalars.Tick.index_terms
-        end)
+    include Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
   end
 
   let domain_for_compiled (type branches)
@@ -990,11 +982,10 @@ struct
             type bool = Env_bool.t
 
             let if_ (b : bool) ~then_ ~else_ =
-              match Impl.Field.to_constant (b :> t) with
+              match to_constant (b :> t) with
               | Some x ->
                   (* We have a constant, only compute the branch we care about. *)
-                  if Impl.Field.Constant.(equal one) x then then_ ()
-                  else else_ ()
+                  if Constant.(equal one) x then then_ () else else_ ()
               | None ->
                   if_ b ~then_:(then_ ()) ~else_:(else_ ())
           end in
