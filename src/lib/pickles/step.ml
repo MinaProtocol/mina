@@ -116,7 +116,8 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+      let open Backend.Tock.Field in
+      Wrap_verifier.challenge_polynomial ~add ~mul ~one
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
@@ -265,7 +266,7 @@ struct
         in
         O.create dlog_vk
           ( Vector.map2
-              (Vector.extend_exn
+              (Vector.extend_front_exn
                  statement.messages_for_next_step_proof
                    .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
@@ -333,9 +334,7 @@ struct
         in
         let prechals =
           Vector.of_list_and_length_exn
-            ( Array.map prechals ~f:(fun x ->
-                  { Bulletproof_challenge.prechallenge = x } )
-            |> Array.to_list )
+            (Array.map prechals ~f:Bulletproof_challenge.unpack |> Array.to_list)
             Tock.Rounds.n
         in
         (prechals, b)
@@ -352,13 +351,13 @@ struct
             }
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
-            Vector.extend_exn
+            Vector.extend_front_exn
               t.statement.messages_for_next_step_proof
                 .challenge_polynomial_commitments Local_max_proofs_verified.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
-            Vector.extend_exn
+            Vector.extend_front_exn
               (Vector.map
                  t.statement.messages_for_next_step_proof
                    .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
@@ -550,12 +549,13 @@ struct
       prev_proofs := Some prev_proofs' ;
       actual_wrap_domains := Some actual_wrap_domains'
     in
+    let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
       lazy
-        (Vector.extend
-           (Option.value_exn !unfinalized_proofs)
+        (Vector.extend_front
+           (Lazy.force unfinalized_proofs)
            lte Max_proofs_verified.n
-           (Unfinalized.Constant.dummy ()) )
+           (Lazy.force Unfinalized.Constant.dummy) )
     in
     let module Extract = struct
       module type S = sig
@@ -647,10 +647,12 @@ struct
             :: pad [] ms n
       in
       lazy
-        (pad
-           (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
-                s.proof_state.messages_for_next_wrap_proof ) )
-           Maxes.maxes Maxes.length )
+        (Vector.rev
+           (pad
+              (Vector.map
+                 (Vector.rev (Option.value_exn !statements_with_hashes))
+                 ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
+              Maxes.maxes Maxes.length ) )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
@@ -671,9 +673,22 @@ struct
           auxiliary_value := Some res ;
           k ()
       | Req.Unfinalized_proofs ->
-          k (Lazy.force unfinalized_proofs_extended)
+          k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force messages_for_next_wrap_proof_padded)
+      | Req.Wrap_domain_indices ->
+          let all_possible_domains = Wrap_verifier.all_possible_domains () in
+          let wrap_domain_indices =
+            Vector.map (Option.value_exn !actual_wrap_domains)
+              ~f:(fun domain_size ->
+                let domain_index =
+                  Vector.foldi ~init:0 all_possible_domains
+                    ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                      if Int.equal domain domain_size then j else acc )
+                in
+                Pickles_base.Proofs_verified.of_int domain_index )
+          in
+          k wrap_domain_indices
       | _ -> (
           match handler with
           | Some f ->
@@ -714,21 +729,35 @@ struct
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h)
         (fun () ->
-          Impls.Step.generate_witness_conv
-            ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-                    next_statement_hashed ->
-              let%map.Promise proof =
-                Backend.Tick.Proof.create_async ~primary:public_inputs
-                  ~auxiliary:auxiliary_inputs
-                  ~message:(Lazy.force prev_challenge_polynomial_commitments)
-                  pk
-              in
-              (proof, next_statement_hashed) )
-            ~input_typ:Impls.Step.Typ.unit ~return_typ:input
-            (fun () () ->
-              Impls.Step.handle
-                (fun () -> conv_inv (branch_data.main ~step_domains ()))
-                handler ) )
+          let promise_or_error =
+            (* Use a try_with to give an informative backtrace.
+               If we don't do this, the backtrace will be obfuscated by the
+               Promise, and it's significantly harder to track down errors.
+               This only applies to errors in the 'witness generation' stage;
+               proving errors are emitted inside the promise, and are therefore
+               unaffected.
+            *)
+            Or_error.try_with ~backtrace:true (fun () ->
+                Impls.Step.generate_witness_conv
+                  ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
+                          ; public_inputs
+                          } next_statement_hashed ->
+                    let%map.Promise proof =
+                      Backend.Tick.Proof.create_async ~primary:public_inputs
+                        ~auxiliary:auxiliary_inputs
+                        ~message:
+                          (Lazy.force prev_challenge_polynomial_commitments)
+                        pk
+                    in
+                    (proof, next_statement_hashed) )
+                  ~input_typ:Impls.Step.Typ.unit ~return_typ:input
+                  (fun () () ->
+                    Impls.Step.handle
+                      (fun () -> conv_inv (branch_data.main ~step_domains ()))
+                      handler ) )
+          in
+          (* Re-raise any captured errors, complete with their backtrace. *)
+          Or_error.ok_exn promise_or_error )
         ()
     in
     let prev_evals =
@@ -766,7 +795,7 @@ struct
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
-          Vector.extend
+          Vector.extend_front
             (Vector.map2 prev_evals (Option.value_exn !x_hats)
                ~f:(fun (es, ft_eval1) x_hat ->
                  Plonk_types.All_evals.

@@ -1,20 +1,23 @@
-/* global Uint8Array_, BigInt_, _0n, _1n, _2n, _8n, caml_bigint_modulo, caml_bigint_of_bytes, 
+/* global Uint8Array_, BigInt_, caml_bigint_modulo, caml_bigint_of_bytes, 
    caml_finite_field_inverse, caml_pasta_p_bigint, caml_pasta_q_bigint, 
 */
 
+// TODO: constants, like generator points and cube roots for endomorphisms, should be drawn from
+// a common source, i.e. generated from the Rust code
+
 // Provides: caml_pallas_generator_projective
-// Requires: BigInt_, _1n
+// Requires: BigInt_
 var caml_pallas_generator_projective = {
-  x: _1n,
+  x: BigInt_(1),
   y: BigInt_("12418654782883325593414442427049395787963493412651469444558597405572177144507"),
-  z: _1n
+  z: BigInt_(1)
 }
 // Provides: caml_vesta_generator_projective
-// Requires: BigInt_, _1n
+// Requires: BigInt_
 var caml_vesta_generator_projective = {
-  x: _1n,
+  x: BigInt_(1),
   y: BigInt_("11426906929455361843568202299992114520848200991084027513389447476559454104162"),
-  z: _1n
+  z: BigInt_(1)
 }
 
 // projective repr: { x: bigint, y: bigint, z: bigint }
@@ -44,9 +47,9 @@ var GroupAffine = (function() {
 })();
 
 // Provides: caml_group_projective_zero
-// Requires: GroupProjective, _0n, _1n
+// Requires: GroupProjective, BigInt_
 function caml_group_projective_zero() {
-  return new GroupProjective({ x: _1n, y: _1n, z: _0n });
+  return new GroupProjective({ x: BigInt_(1), y: BigInt_(1), z: BigInt_(0) });
 }
 
 // Provides: caml_group_projective_neg
@@ -56,10 +59,10 @@ function caml_group_projective_neg(g, p) {
 }
 
 // Provides: caml_group_projective_add
-// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _2n, _0n
+// Requires: BigInt_, GroupProjective, caml_bigint_modulo
 function caml_group_projective_add(g, h, p) {
-  if (g.z === _0n) return new GroupProjective(h);
-  if (h.z === _0n) return new GroupProjective(g);
+  if (g.z === BigInt_(0)) return new GroupProjective(h);
+  if (h.z === BigInt_(0)) return new GroupProjective(g);
   var X1 = g.x, Y1 = g.y, Z1 = g.z, X2 = h.x, Y2 = h.y, Z2 = h.z;
   // http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#addition-add-2007-bl
   // Z1Z1 = Z1^2
@@ -77,26 +80,26 @@ function caml_group_projective_add(g, h, p) {
   // H = U2-U1
   var H = U2 - U1;
   // I = (2*H)^2
-  var I = caml_bigint_modulo(BigInt_(4)*H*H, p);
+  var I = caml_bigint_modulo((H*H) << BigInt_(2), p);
   // J = H*I
   var J = caml_bigint_modulo(H*I, p);
   // r = 2*(S2-S1)
-  var r = _2n*(S2 - S1);
+  var r = BigInt_(2)*(S2 - S1);
   // V = U1*I
   var V = caml_bigint_modulo(U1*I, p);
   // X3 = r^2-J-2*V
-  var X3 = caml_bigint_modulo(r*r - J - _2n*V, p);
+  var X3 = caml_bigint_modulo(r*r - J - BigInt_(2)*V, p);
   // Y3 = r*(V-X3)-2*S1*J
-  var Y3 = caml_bigint_modulo(r*(V - X3) - _2n*S1*J, p);
+  var Y3 = caml_bigint_modulo(r*(V - X3) - BigInt_(2)*S1*J, p);
   // Z3 = ((Z1+Z2)^2-Z1Z1-Z2Z2)*H
   var Z3 = caml_bigint_modulo(((Z1 + Z2)*(Z1 + Z2) - Z1Z1 - Z2Z2)*H, p);
   return new GroupProjective({ x: X3, y: Y3, z: Z3 });
 }
 
 // Provides: caml_group_projective_double
-// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _0n, _2n, _8n
+// Requires: BigInt_, GroupProjective, caml_bigint_modulo
 function caml_group_projective_double(g, p) {
-  if (g.z === _0n) return new GroupProjective(g);
+  if (g.z === BigInt_(0)) return new GroupProjective(g);
   var X1 = g.x, Y1 = g.y, Z1 = g.z;
   // http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#doubling-dbl-2009-l
   // !!! formula depends on a === 0 in the curve equation y^2 = x^3 + ax + b !!!
@@ -107,17 +110,17 @@ function caml_group_projective_double(g, p) {
   // C = B^2
   var C = caml_bigint_modulo(B*B, p);
   // D = 2*((X1+B)^2-A-C)
-  var D = caml_bigint_modulo(_2n*((X1 + B)*(X1 + B) - A - C), p);
+  var D = caml_bigint_modulo(BigInt_(2)*((X1 + B)*(X1 + B) - A - C), p);
   // E = 3*A
   var E = BigInt_(3)*A;
   // F = E^2
   var F = caml_bigint_modulo(E*E, p);
   // X3 = F-2*D
-  var X3 = caml_bigint_modulo(F - _2n*D, p);
+  var X3 = caml_bigint_modulo(F - BigInt_(2)*D, p);
   // Y3 = E*(D-X3)-8*C
-  var Y3 = caml_bigint_modulo(E*(D - X3) - _8n*C, p);
+  var Y3 = caml_bigint_modulo(E*(D - X3) - BigInt_(8)*C, p);
   // Z3 = 2*Y1*Z1
-  var Z3 = caml_bigint_modulo(_2n*Y1*Z1, p);
+  var Z3 = caml_bigint_modulo(BigInt_(2)*Y1*Z1, p);
   return new GroupProjective({ x: X3, y: Y3, z: Z3 });
 }
 
@@ -128,24 +131,24 @@ function caml_group_projective_sub(g, h, p) {
 }
 
 // Provides: caml_group_projective_scale
-// Requires: caml_group_projective_add, caml_group_projective_double, caml_group_projective_zero, _1n, _0n
+// Requires: caml_group_projective_add, caml_group_projective_double, caml_group_projective_zero, BigInt_
 function caml_group_projective_scale(g, x, p) {
   var h = caml_group_projective_zero();
-  while (x > _0n) {
-    if (x & _1n) h = caml_group_projective_add(h, g, p);
+  while (x > BigInt_(0)) {
+    if (x & BigInt_(1)) h = caml_group_projective_add(h, g, p);
     g = caml_group_projective_double(g, p);
-    x >>= _1n;
+    x >>= BigInt_(1);
   }
   return h;
 }
 
 // Provides: caml_group_projective_to_affine
-// Requires: caml_finite_field_inverse, caml_bigint_modulo, GroupAffine, _0n, _1n
+// Requires: caml_finite_field_inverse, caml_bigint_modulo, GroupAffine, BigInt_
 function caml_group_projective_to_affine(g, p) {
   var z = g.z;
-  if (z === _0n) { // infinity
-    return new GroupAffine({ x: _1n, y: _1n, infinity: true });
-  } else if (z === _1n) { // already normalized affine form
+  if (z === BigInt_(0)) { // infinity
+    return new GroupAffine({ x: BigInt_(1), y: BigInt_(1), infinity: true });
+  } else if (z === BigInt_(1)) { // already normalized affine form
     return new GroupAffine({ x: g.x, y: g.y, infinity: false });
   } else {
     var zinv = caml_finite_field_inverse(z, p);
@@ -249,14 +252,14 @@ function caml_vesta_to_affine(g) {
 }
 
 // Provides: caml_pallas_of_affine_coordinates
-// Requires: GroupProjective, _1n
+// Requires: GroupProjective, BigInt_
 function caml_pallas_of_affine_coordinates(x, y) {
-  return new GroupProjective({ x: x[0], y: y[0], z: _1n });
+  return new GroupProjective({ x: x[0], y: y[0], z: BigInt_(1) });
 }
 // Provides: caml_vesta_of_affine_coordinates
-// Requires: GroupProjective, _1n
+// Requires: GroupProjective, BigInt_
 function caml_vesta_of_affine_coordinates(x, y) {
-  return new GroupProjective({ x: x[0], y: y[0], z: _1n });
+  return new GroupProjective({ x: x[0], y: y[0], z: BigInt_(1) });
 }
 
 // Provides: caml_affine_of_js_affine

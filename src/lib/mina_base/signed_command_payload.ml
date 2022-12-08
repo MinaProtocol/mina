@@ -54,14 +54,9 @@ module Common = struct
       end
 
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-              ( 'fee
-              , 'public_key
-              , 'token_id
-              , 'nonce
-              , 'global_slot
-              , 'memo )
-              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V1.t =
           { fee : 'fee
           ; fee_token : 'token_id
           ; fee_payer_pk : 'public_key
@@ -90,6 +85,8 @@ module Common = struct
     end
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t =
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
@@ -196,6 +193,8 @@ module Body = struct
     end
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
@@ -210,7 +209,7 @@ module Body = struct
 
   module Tag = Transaction_union_tag
 
-  let gen ?source_pk ~max_amount =
+  let gen ?source_pk max_amount =
     let open Quickcheck.Generator in
     let stake_delegation_gen =
       match source_pk with
@@ -221,7 +220,7 @@ module Body = struct
     in
     map
       (variant2
-         (Payment_payload.gen ?source_pk ~max_amount)
+         (Payment_payload.gen ?source_pk max_amount)
          stake_delegation_gen )
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 
@@ -266,6 +265,8 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type ('common, 'body) t =
             ( 'common
             , 'body )
@@ -291,6 +292,8 @@ module Stable = struct
   end
 
   module V1 = struct
+    [@@@with_all_version_tags]
+
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -373,7 +376,7 @@ let gen =
     Currency.Amount.(sub max_int (of_fee common.fee))
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
-  let%map body = Body.gen ~source_pk:common.fee_payer_pk ~max_amount in
+  let%map body = Body.gen ~source_pk:common.fee_payer_pk max_amount in
   Poly.{ common; body }
 
 (** This module defines a weight for each payload component *)

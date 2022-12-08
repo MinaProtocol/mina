@@ -65,7 +65,6 @@ module Wrap = struct
         end
 
         open Pickles_types
-        module Generic_coeffs_vec = Vector.With_length (Nat.N9)
 
         module In_circuit = struct
           module Lookup = struct
@@ -90,7 +89,7 @@ module Wrap = struct
           end
 
           (** All scalar values deferred by a verifier circuit.
-              The values in [poseidon_selector], [vbmul], [complete_add], [endomul], [endomul_scalar], [perm], and [generic]
+              The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
               are all scalars which will have been used to scale selector polynomials during the
               computation of the linearized polynomial commitment.
 
@@ -107,8 +106,6 @@ module Wrap = struct
                   *)
             ; zeta_to_srs_length : 'fp
             ; zeta_to_domain_size : 'fp
-            ; poseidon_selector : 'fp
-                  (** scalar used on the poseidon selector *)
             ; vbmul : 'fp  (** scalar used on the vbmul selector *)
             ; complete_add : 'fp
                   (** scalar used on the complete_add selector *)
@@ -117,8 +114,6 @@ module Wrap = struct
                   (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
-            ; generic : 'fp Generic_coeffs_vec.t
-                  (** scalars used on the coefficient column commitments. *)
             ; lookup : 'lookup_opt
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
@@ -136,15 +131,13 @@ module Wrap = struct
 
           let map_fields t ~f =
             { t with
-              poseidon_selector = f t.poseidon_selector
-            ; zeta_to_srs_length = f t.zeta_to_srs_length
+              zeta_to_srs_length = f t.zeta_to_srs_length
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; vbmul = f t.vbmul
             ; complete_add = f t.complete_add
             ; endomul = f t.endomul
             ; endomul_scalar = f t.endomul_scalar
             ; perm = f t.perm
-            ; generic = Vector.map ~f t.generic
             ; lookup =
                 Opt.map t.lookup ~f:(fun (l : _ Lookup.t) ->
                     { l with lookup_gate = f l.lookup_gate } )
@@ -167,8 +160,6 @@ module Wrap = struct
               ; fp
               ; fp
               ; fp
-              ; fp
-              ; Vector.typ fp Nat.N9.n
               ; Plonk_types.Opt.typ Impl.Boolean.typ lookup
                   ~dummy:
                     { joint_combiner = dummy_scalar_challenge
@@ -567,11 +558,17 @@ module Wrap = struct
 
     let opt_spec (type f) ((module Impl) : f impl)
         { zero = { value; var }; use } =
-      Spec.Opt
+      Spec.T.Opt
         { inner = Struct [ Scalar Challenge; B Field ]
         ; flag = use
-        ; dummy1 = [ Spec.Sc.create value.challenge; value.scalar ]
-        ; dummy2 = [ Spec.Sc.create var.challenge; var.scalar ]
+        ; dummy1 =
+            [ Kimchi_backend_common.Scalar_challenge.create value.challenge
+            ; value.scalar
+            ]
+        ; dummy2 =
+            [ Kimchi_backend_common.Scalar_challenge.create var.challenge
+            ; var.scalar
+            ]
         ; bool = (module Impl.Boolean)
         }
   end
@@ -676,9 +673,8 @@ module Wrap = struct
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       let spec impl lookup =
-        let open Spec in
-        Struct
-          [ Vector (B Field, Nat.N19.n)
+        Spec.T.Struct
+          [ Vector (B Field, Nat.N9.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -703,13 +699,11 @@ module Wrap = struct
                        ; zeta
                        ; zeta_to_srs_length
                        ; zeta_to_domain_size
-                       ; poseidon_selector
                        ; vbmul
                        ; complete_add
                        ; endomul
                        ; endomul_scalar
                        ; perm
-                       ; generic
                        ; lookup
                        }
                    }
@@ -723,9 +717,16 @@ module Wrap = struct
             _ t ) ~option_map =
         let open Vector in
         let fp =
-          combined_inner_product :: b :: zeta_to_srs_length
-          :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
-          :: endomul :: endomul_scalar :: perm :: generic
+          [ combined_inner_product
+          ; b
+          ; zeta_to_srs_length
+          ; zeta_to_domain_size
+          ; vbmul
+          ; complete_add
+          ; endomul
+          ; endomul_scalar
+          ; perm
+          ]
         in
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
@@ -759,15 +760,16 @@ module Wrap = struct
             ; lookup
             ] ~option_map : _ t =
         let open Vector in
-        let (combined_inner_product
-            :: b
-               :: zeta_to_srs_length
-                  :: zeta_to_domain_size
-                     :: poseidon_selector
-                        :: vbmul
-                           :: complete_add
-                              :: endomul :: endomul_scalar :: perm :: generic )
-            =
+        let [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; vbmul
+            ; complete_add
+            ; endomul
+            ; endomul_scalar
+            ; perm
+            ] =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -793,13 +795,11 @@ module Wrap = struct
                     ; zeta
                     ; zeta_to_srs_length
                     ; zeta_to_domain_size
-                    ; poseidon_selector
                     ; vbmul
                     ; complete_add
                     ; endomul
                     ; endomul_scalar
                     ; perm
-                    ; generic
                     ; lookup =
                         option_map lookup
                           ~f:
@@ -820,7 +820,7 @@ module Wrap = struct
 end
 
 module Step = struct
-  module Plonk_polys = Vector.Nat.N10
+  module Plonk_polys = Nat.N10
 
   module Bulletproof = struct
     include Plonk_types.Openings.Bulletproof
@@ -978,9 +978,8 @@ module Step = struct
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         let spec impl bp_log2 lookup =
-          let open Spec in
-          Struct
-            [ Vector (B Field, Nat.N19.n)
+          Spec.T.Struct
+            [ Vector (B Field, Nat.N9.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
@@ -1002,13 +1001,11 @@ module Step = struct
                      ; zeta
                      ; zeta_to_srs_length
                      ; zeta_to_domain_size
-                     ; poseidon_selector
                      ; vbmul
                      ; complete_add
                      ; endomul
                      ; endomul_scalar
                      ; perm
-                     ; generic
                      ; lookup
                      }
                  }
@@ -1018,9 +1015,16 @@ module Step = struct
               _ t ) ~option_map =
           let open Vector in
           let fq =
-            combined_inner_product :: b :: zeta_to_srs_length
-            :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
-            :: endomul :: endomul_scalar :: perm :: generic
+            [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; vbmul
+            ; complete_add
+            ; endomul
+            ; endomul_scalar
+            ; perm
+            ]
           in
           let challenge = [ beta; gamma ] in
           let scalar_challenge = [ alpha; zeta; xi ] in
@@ -1039,16 +1043,17 @@ module Step = struct
 
         let of_data
             Hlist.HlistId.
-              [ Vector.(
-                  combined_inner_product
-                  :: b
-                     :: zeta_to_srs_length
-                        :: zeta_to_domain_size
-                           :: poseidon_selector
-                              :: vbmul
-                                 :: complete_add
-                                    :: endomul
-                                       :: endomul_scalar :: perm :: generic)
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; vbmul
+                  ; complete_add
+                  ; endomul
+                  ; endomul_scalar
+                  ; perm
+                  ]
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
@@ -1068,13 +1073,11 @@ module Step = struct
                   ; zeta
                   ; zeta_to_srs_length
                   ; zeta_to_domain_size
-                  ; poseidon_selector
                   ; vbmul
                   ; complete_add
                   ; endomul
                   ; endomul_scalar
                   ; perm
-                  ; generic
                   ; lookup =
                       option_map lookup
                         ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct
@@ -1123,8 +1126,7 @@ module Step = struct
     [@@deriving sexp, compare, yojson, hlist]
 
     let spec unfinalized_proofs messages_for_next_step_proof =
-      let open Spec in
-      Struct [ unfinalized_proofs; messages_for_next_step_proof ]
+      Spec.T.Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
     include struct
       open Hlist.HlistId
@@ -1205,11 +1207,10 @@ module Step = struct
       }
 
     let spec impl proofs_verified bp_log2 lookup =
-      let open Spec in
       let per_proof =
         Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup
       in
-      Struct
+      Spec.T.Struct
         [ Vector (per_proof, proofs_verified)
         ; B Digest
         ; Vector (B Digest, proofs_verified)

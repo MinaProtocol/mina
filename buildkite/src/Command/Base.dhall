@@ -104,6 +104,7 @@ let Config =
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
       , `if` : Optional B/If
+      , timeout_in_minutes : Optional Natural
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -116,6 +117,7 @@ let Config =
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
     , `if` = None B/If
+    , timeout_in_minutes = None Natural
     }
   }
 

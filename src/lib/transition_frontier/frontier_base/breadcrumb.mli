@@ -8,7 +8,6 @@ open Core_kernel
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_block
 open Network_peer
 
 type t [@@deriving sexp, equal, compare, to_yojson]
@@ -97,6 +96,7 @@ module For_tests : sig
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
+    -> unit
     -> (t -> t) Quickcheck.Generator.t
 
   val gen_seq :
