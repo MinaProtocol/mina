@@ -183,6 +183,12 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       let true_ = true
 
       let false_ = false
+
+      let ( &&& ) = ( && )
+
+      let ( ||| ) = ( || )
+
+      let any = List.exists ~f:Fn.id
     end in
     let module Env_field = struct
       include Tick.Field

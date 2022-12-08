@@ -77,6 +77,12 @@ module Constant = struct
            let true_ = true
 
            let false_ = false
+
+           let ( &&& ) = ( && )
+
+           let ( ||| ) = ( || )
+
+           let any = List.exists ~f:Fn.id
          end in
          let module Env_field = struct
            include Tock.Field

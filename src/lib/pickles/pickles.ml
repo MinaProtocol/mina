@@ -2480,6 +2480,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let true_ = true
 
                           let false_ = false
+
+                          let ( &&& ) = ( && )
+
+                          let ( ||| ) = ( || )
+
+                          let any = List.exists ~f:Fn.id
                         end in
                         let module Env_field = struct
                           include Tick.Field
@@ -3421,6 +3427,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let true_ = true
 
                           let false_ = false
+
+                          let ( &&& ) = ( && )
+
+                          let ( ||| ) = ( || )
+
+                          let any = List.exists ~f:Fn.id
                         end in
                         let module Env_field = struct
                           include Tick.Field

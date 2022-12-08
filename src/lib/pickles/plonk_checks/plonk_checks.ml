@@ -21,6 +21,12 @@ module type Bool_intf = sig
   val true_ : t
 
   val false_ : t
+
+  val ( &&& ) : t -> t -> t
+
+  val ( ||| ) : t -> t -> t
+
+  val any : t list -> t
 end
 
 module type Field_intf = sig
@@ -97,6 +103,141 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
   Plonk_types.Evals.map es ~f:(fun (x1, x2) -> (e zeta x1, e zetaw x2))
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+
+type 'bool feature_flags =
+  { chacha : 'bool
+  ; range_check : 'bool
+  ; foreign_field_add : 'bool
+  ; foreign_field_mul : 'bool
+  ; xor : 'bool
+  ; lookup : 'bool
+  ; runtime_tables : 'bool
+  }
+
+let no_features_map f =
+  { chacha = f false
+  ; range_check = f false
+  ; foreign_field_add = f false
+  ; foreign_field_mul = f false
+  ; xor = f false
+  ; lookup = f false
+  ; runtime_tables = f false
+  }
+
+let no_features = no_features_map Fn.id
+
+type 'bool all_feature_flags =
+  { lookup_tables : 'bool Lazy.t
+  ; table_width_1 : 'bool Lazy.t
+  ; table_width_2 : 'bool Lazy.t
+  ; table_width_3 : 'bool Lazy.t
+  ; lookups_per_row_2 : 'bool Lazy.t
+  ; lookups_per_row_3 : 'bool Lazy.t
+  ; lookups_per_row_4 : 'bool Lazy.t
+  ; lookup_pattern_xor : 'bool Lazy.t
+  ; features : 'bool feature_flags
+  }
+
+let expand_feature_flags (type boolean)
+    (module B : Bool_intf with type t = boolean)
+    ({ chacha
+     ; range_check
+     ; foreign_field_add
+     ; foreign_field_mul
+     ; xor
+     ; lookup
+     ; runtime_tables = _
+     } as features :
+      boolean feature_flags ) : boolean all_feature_flags =
+  let lookup_tables =
+    lazy (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul ])
+  in
+  let lookup_pattern_xor =
+    (* Xor, ChaCha gates use Xor lookup pattern *)
+    lazy (B.( ||| ) xor chacha)
+  in
+  (* Make sure these stay up-to-date with the layouts!! *)
+  let table_width_3 =
+    (* Xor, ChaChaFinal have max_joint_size = 3 *)
+    lookup_pattern_xor
+  in
+  let table_width_2 =
+    (* Lookup has max_joint_size = 2 *)
+    lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
+  in
+  let table_width_1 =
+    (* RangeCheck, ForeignFieldMul have max_joint_size = 2 *)
+    lazy (B.any [ Lazy.force table_width_2; range_check; foreign_field_mul ])
+  in
+  let lookups_per_row_4 =
+    (* Xor, ChaChaFinal, RangeCheckGate have max_lookups_per_row = 4 *)
+    lazy (B.( ||| ) (Lazy.force lookup_pattern_xor) range_check)
+  in
+  let lookups_per_row_3 =
+    (* Lookup has max_lookups_per_row = 3 *)
+    lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
+  in
+  let lookups_per_row_2 =
+    (* ForeignFieldMul has max_lookups_per_row = 2 *)
+    lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
+  in
+  { lookup_tables
+  ; table_width_1
+  ; table_width_2
+  ; table_width_3
+  ; lookups_per_row_2
+  ; lookups_per_row_3
+  ; lookups_per_row_4
+  ; lookup_pattern_xor
+  ; features
+  }
+
+let get_feature_flag (feature_flags : _ all_feature_flags)
+    (feature : Kimchi_types.feature_flag) =
+  match feature with
+  | ChaCha ->
+      Some feature_flags.features.chacha
+  | RangeCheck ->
+      Some feature_flags.features.range_check
+  | ForeignFieldAdd ->
+      Some feature_flags.features.foreign_field_add
+  | ForeignFieldMul ->
+      Some feature_flags.features.foreign_field_mul
+  | Xor ->
+      Some feature_flags.features.xor
+  | LookupTables ->
+      Some (Lazy.force feature_flags.lookup_tables)
+  | RuntimeLookupTables ->
+      Some feature_flags.features.runtime_tables
+  | TableWidth 3 ->
+      Some (Lazy.force feature_flags.table_width_3)
+  | TableWidth 2 ->
+      Some (Lazy.force feature_flags.table_width_2)
+  | TableWidth i when i <= 1 ->
+      Some (Lazy.force feature_flags.table_width_1)
+  | TableWidth _ ->
+      None
+  | LookupsPerRow 4 ->
+      Some (Lazy.force feature_flags.lookups_per_row_4)
+  | LookupsPerRow 3 ->
+      Some (Lazy.force feature_flags.lookups_per_row_3)
+  | LookupsPerRow i when i <= 2 ->
+      Some (Lazy.force feature_flags.lookups_per_row_2)
+  | LookupsPerRow _ ->
+      None
+  | LookupPattern LookupGate ->
+      Some feature_flags.features.lookup
+  | LookupPattern Xor ->
+      Some (Lazy.force feature_flags.lookup_pattern_xor)
+  | LookupPattern ChaChaFinal ->
+      Some feature_flags.features.chacha
+  | LookupPattern RangeCheckGate ->
+      Some feature_flags.features.range_check
+  | LookupPattern ForeignFieldMulGate ->
+      Some feature_flags.features.foreign_field_mul
+
+(* TODO: Delete *)
+let () = ignore ((expand_feature_flags, get_feature_flag) : _ * _)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)

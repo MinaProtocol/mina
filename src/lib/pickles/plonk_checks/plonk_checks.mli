@@ -8,12 +8,32 @@ type 'field plonk_domain =
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
+type 'bool feature_flags =
+  { chacha : 'bool
+  ; range_check : 'bool
+  ; foreign_field_add : 'bool
+  ; foreign_field_mul : 'bool
+  ; xor : 'bool
+  ; lookup : 'bool
+  ; runtime_tables : 'bool
+  }
+
+val no_features : bool feature_flags
+
+val no_features_map : (bool -> 'a) -> 'a feature_flags
+
 module type Bool_intf = sig
   type t
 
   val true_ : t
 
   val false_ : t
+
+  val ( &&& ) : t -> t -> t
+
+  val ( ||| ) : t -> t -> t
+
+  val any : t list -> t
 end
 
 module type Field_intf = sig
