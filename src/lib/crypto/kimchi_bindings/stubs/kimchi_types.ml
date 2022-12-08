@@ -185,6 +185,8 @@ type nonrec feature_flag =
   | LookupTables
   | RuntimeLookupTables
   | LookupPattern of lookup_pattern
+  | TableWidth of int
+  | LookupsPerRow of int
 
 type nonrec 'f circuit_gate =
   { typ : gate_type

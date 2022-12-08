@@ -235,10 +235,23 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
               None
           | Xor ->
               None
-          | LookupTables | RuntimeLookupTables | LookupPattern LookupGate -> (
+          | LookupTables
+          | RuntimeLookupTables
+          | LookupPattern LookupGate
+          | TableWidth 0
+          | TableWidth 1
+          | TableWidth 2
+          | LookupsPerRow 0
+          | LookupsPerRow 1
+          | LookupsPerRow 2
+          | LookupsPerRow 3 -> (
               match joint_combiner with None -> None | Some _ -> Some B.true_ )
           | LookupPattern
               (Xor | ChaChaFinal | RangeCheckGate | ForeignFieldMulGate) ->
+              None
+          | TableWidth _ ->
+              None
+          | LookupsPerRow _ ->
               None
         in
         if_ b ~then_:e1 ~else_:e2 )

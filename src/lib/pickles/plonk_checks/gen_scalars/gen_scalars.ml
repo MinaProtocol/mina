@@ -136,7 +136,7 @@ module Tick : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner
+       ; joint_combiner = _
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
@@ -227,7 +227,7 @@ module Tock : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner
+       ; joint_combiner = _
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
