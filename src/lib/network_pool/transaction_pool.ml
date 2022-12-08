@@ -1797,6 +1797,7 @@ let%test_module _ =
                     ( if Option.is_none fee_payer then
                       Account.Nonce.succ sender_nonce
                     else sender_nonce )
+              ; valid_until = Ignore
               }
         }
       in

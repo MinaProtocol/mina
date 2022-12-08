@@ -4384,6 +4384,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ( if Option.is_none fee_payer_opt then
                   Nonce (Account.Nonce.succ sender_nonce)
                 else Nonce sender_nonce )
+            ; valid_until =
+                Option.value_map preconditions
+                  ~f:(fun { valid_until; _ } -> valid_until)
+                  ~default:Zkapp_basic.Or_ignore.Ignore
             }
       in
 
@@ -5045,6 +5049,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
+                ; valid_until = Ignore
                 }
             ; use_full_commitment = false
             ; caller = Call
@@ -5067,6 +5072,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Full Zkapp_precondition.Account.accept
+                ; valid_until = Ignore
                 }
             ; use_full_commitment = false
             ; caller = Call

@@ -339,6 +339,7 @@ let%test_module "multisig_account" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; valid_until = Ignore
                         }
                     ; use_full_commitment = false
                     ; caller = Call
@@ -363,6 +364,7 @@ let%test_module "multisig_account" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Full Zkapp_precondition.Account.accept
+                        ; valid_until = Ignore
                         }
                     ; use_full_commitment = false
                     ; caller = Call

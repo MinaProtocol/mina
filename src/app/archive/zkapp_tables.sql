@@ -269,10 +269,11 @@ CREATE TABLE zkapp_account_update_body
 , sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
-, zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
+, zkapp_network_precondition_id         int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
+, zkapp_valid_until_precondition_id     int                       REFERENCES zkapp_global_slot_bounds(id)
 , use_full_commitment                   boolean         NOT NULL
-, caller                                call_type  NOT NULL
+, caller                                call_type       NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 

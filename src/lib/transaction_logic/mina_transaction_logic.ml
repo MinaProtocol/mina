@@ -2382,6 +2382,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    ; valid_until = Ignore
                     }
                 ; caller = Call
                 ; use_full_commitment
@@ -2410,6 +2411,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
+                    ; valid_until = Ignore
                     }
                 ; caller = Call
                 ; use_full_commitment = false

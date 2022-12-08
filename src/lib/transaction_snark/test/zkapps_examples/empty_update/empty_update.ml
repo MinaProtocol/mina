@@ -52,6 +52,7 @@ let deploy_account_update_body : Account_update.Body.t =
       { Account_update.Preconditions.network =
           Zkapp_precondition.Protocol_state.accept
       ; account = Accept
+      ; valid_until = Ignore
       }
   ; caller = Token_id.default
   ; use_full_commitment = true

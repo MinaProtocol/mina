@@ -619,6 +619,7 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
+       , 'valid_until_precondition
        , 'caller
        , 'authorization_kind )
        t =
@@ -633,6 +634,7 @@ module Account_update_body_components = struct
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
+    ; valid_until_precondition : 'valid_until_precondition
     ; use_full_commitment : 'bool
     ; caller : 'caller
     ; authorization_kind : 'authorization_kind
@@ -667,6 +669,7 @@ module Account_update_body_components = struct
     ; preconditions =
         { Account_update.Preconditions.network = t.protocol_state_precondition
         ; account = t.account_precondition
+        ; valid_until = t.valid_until_precondition
         }
     ; use_full_commitment = t.use_full_commitment
     ; caller = t.caller
@@ -699,7 +702,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_account_update_account_precondition :
        d -> Account_update.Account_precondition.t ) ~authorization_tag () :
-    (_, _, _, a, _, _, _, b, _, d, _, _) Account_update_body_components.t
+    (_, _, _, a, _, _, _, b, _, d, _, _, _) Account_update_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
@@ -873,6 +876,25 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
         | _ ->
             gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
+  and valid_until_precondition =
+    match protocol_state_view with
+    | None ->
+        return Zkapp_basic.Or_ignore.Ignore
+    | Some psv ->
+        let open Mina_numbers in
+        let%bind epsilon1 =
+          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+        in
+        let%bind epsilon2 =
+          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+        in
+        Zkapp_precondition.Closed_interval.
+          { lower =
+              Global_slot.sub psv.global_slot_since_genesis epsilon1
+              |> Option.value ~default:Global_slot.zero
+          ; upper = Global_slot.add psv.global_slot_since_genesis epsilon2
+          }
+        |> return |> Zkapp_basic.Or_ignore.gen
   and caller =
     match caller with
     | None ->
@@ -1011,6 +1033,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; call_depth
   ; protocol_state_precondition
   ; account_precondition
+  ; valid_until_precondition
   ; use_full_commitment
   ; caller
   ; authorization_kind

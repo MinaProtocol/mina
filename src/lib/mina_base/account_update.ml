@@ -761,6 +761,9 @@ module Preconditions = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
+        ; valid_until :
+            Mina_numbers.Global_slot.Stable.V1.t
+            Zkapp_precondition.Numeric.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
@@ -774,6 +777,7 @@ module Preconditions = struct
     Fields.make_creator obj
       ~network:!.Zkapp_precondition.Protocol_state.deriver
       ~account:!.Account_precondition.deriver
+      ~valid_until:!.Zkapp_precondition.Numeric.Derivers.global_slot
     |> finish "Preconditions" ~t_toplevel_annots
 
   let to_input ({ network; account } : t) =
@@ -786,8 +790,11 @@ module Preconditions = struct
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map network = Zkapp_precondition.Protocol_state.gen
-    and account = Account_precondition.gen in
-    { network; account }
+    and account = Account_precondition.gen
+    and valid_until =
+      Zkapp_precondition.Numeric.gen Global_slot.gen Global_slot.compare
+    in
+    { network; account; valid_until }
 
   module Checked = struct
     module Type_of_var (V : sig
@@ -804,25 +811,34 @@ module Preconditions = struct
     type t =
       { network : Zkapp_precondition.Protocol_state.Checked.t
       ; account : Account_precondition.Checked.t
+      ; valid_until :
+          Mina_numbers.Global_slot.Checked.t
+          Zkapp_precondition.Numeric.Checked.t
       }
     [@@deriving annot, hlist, fields]
 
-    let to_input ({ network; account } : t) =
+    let to_input ({ network; account; valid_until } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
         ; Zkapp_precondition.Account.Checked.to_input account
+        ; Zkapp_precondition.Numeric.(
+            Checked.to_input Tc.global_slot valid_until)
         ]
   end
 
   let typ () : (Checked.t, t) Typ.t =
     Typ.of_hlistable
-      [ Zkapp_precondition.Protocol_state.typ; Account_precondition.typ () ]
+      [ Zkapp_precondition.Protocol_state.typ
+      ; Account_precondition.typ ()
+      ; Zkapp_precondition.Numeric.(typ Tc.global_slot)
+      ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let accept =
     { network = Zkapp_precondition.Protocol_state.accept
     ; account = Account_precondition.Accept
+    ; valid_until = Ignore
     }
 end
 
@@ -1149,6 +1165,7 @@ module Body = struct
                  Check { lower = Global_slot.zero; upper = valid_until }
              } )
         ; account = Account_precondition.Nonce t.nonce
+        ; valid_until = Ignore
         }
     ; use_full_commitment = true
     ; caller = Token_id.default
@@ -1175,6 +1192,7 @@ module Body = struct
                  Check { lower = Global_slot.zero; upper = valid_until }
              } )
         ; account = Account_precondition.Nonce t.nonce
+        ; valid_until = Ignore
         }
     ; use_full_commitment = true
     ; caller = Call
