@@ -241,9 +241,7 @@ type t =
   Poly.t
 [@@deriving sexp, equal, compare, hash, yojson]
 
-let () =
-  let _f : unit -> (t, Stable.Latest.t) Type_equal.t = fun () -> Type_equal.T in
-  ()
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 [%%ifdef consensus_mechanism]
 

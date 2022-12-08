@@ -81,16 +81,12 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   module Stack_id : sig
-    (* using %%versioned here results in unused definitions *)
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp, to_yojson, compare, version]
+        type t [@@deriving sexp, yojson, compare, equal]
       end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
+    end]
 
     val of_int : int -> t
 
@@ -107,7 +103,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = int [@@deriving sexp, yojson, compare]
+        type t = int [@@deriving sexp, yojson, compare, equal]
 
         let to_latest = Fn.id
       end
@@ -725,9 +721,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Hash = struct
-      type t = Hash_builder.t [@@deriving equal, compare, sexp, yojson, hash]
-
-      type _unused = unit constraint t = Hash_versioned.t
+      type t = Hash_builder.t constraint t = Hash_versioned.t
+      [@@deriving equal, compare, sexp, yojson, hash]
 
       type var = Hash_builder.var
 
@@ -1271,9 +1266,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly_versioned.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let (_ : (t, T.t) Type_equal.t) = Type_equal.T
 
-      type _unused = unit constraint t = T.t
+      let to_latest = Fn.id
     end
   end]
 
