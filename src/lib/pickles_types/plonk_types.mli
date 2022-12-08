@@ -2,6 +2,24 @@
 
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
+module Features : sig
+  type 'bool t =
+    { chacha : 'bool
+    ; range_check : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal]
+
+  val none_map : (bool -> 'a) -> 'a t
+
+  val none : bool t
+end
+
 module Opt : sig
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]

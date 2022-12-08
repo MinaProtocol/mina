@@ -104,30 +104,6 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
-type 'bool feature_flags =
-  { chacha : 'bool
-  ; range_check : 'bool
-  ; foreign_field_add : 'bool
-  ; foreign_field_mul : 'bool
-  ; xor : 'bool
-  ; rot : 'bool
-  ; lookup : 'bool
-  ; runtime_tables : 'bool
-  }
-
-let no_features_map f =
-  { chacha = f false
-  ; range_check = f false
-  ; foreign_field_add = f false
-  ; foreign_field_mul = f false
-  ; xor = f false
-  ; lookup = f false
-  ; runtime_tables = f false
-  ; rot = f false
-  }
-
-let no_features = no_features_map Fn.id
-
 type 'bool all_feature_flags =
   { lookup_tables : 'bool Lazy.t
   ; table_width_1 : 'bool Lazy.t
@@ -138,7 +114,7 @@ type 'bool all_feature_flags =
   ; lookups_per_row_4 : 'bool Lazy.t
   ; lookup_pattern_xor : 'bool Lazy.t
   ; lookup_pattern_range_check : 'bool Lazy.t
-  ; features : 'bool feature_flags
+  ; features : 'bool Plonk_types.Features.t
   }
 
 let expand_feature_flags (type boolean)
@@ -152,7 +128,7 @@ let expand_feature_flags (type boolean)
      ; lookup
      ; runtime_tables = _
      } as features :
-      boolean feature_flags ) : boolean all_feature_flags =
+      boolean Plonk_types.Features.t ) : boolean all_feature_flags =
   let lookup_tables =
     lazy
       (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul; rot ])

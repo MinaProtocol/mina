@@ -18,6 +18,33 @@ module Permuts_minus_1_vec = Vector.Vector_6
 module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
+module Features = struct
+  type 'bool t =
+    { chacha : 'bool
+    ; range_check : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal]
+
+  let none_map f =
+    { chacha = f false
+    ; range_check = f false
+    ; foreign_field_add = f false
+    ; foreign_field_mul = f false
+    ; xor = f false
+    ; rot = f false
+    ; lookup = f false
+    ; runtime_tables = f false
+    }
+
+  let none = none_map Fn.id
+end
+
 module Opt = struct
   [@@@warning "-4"]
 
