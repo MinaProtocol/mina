@@ -46,7 +46,7 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~step_uses_lookup:d.step_uses_lookup ~sponge ~prev_challenges
+          ~feature_flags:d.feature_flags ~sponge ~prev_challenges
           proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
@@ -85,18 +85,10 @@ let verify_one ~srs
     }
   in
   let verified =
-    let features =
-      (* TODO *)
-      Plonk_types.Features.none_map (function
-        | false ->
-            Plonk_types.Opt.Flag.No
-        | true ->
-            Plonk_types.Opt.Flag.Yes )
-    in
     with_label __LOC__ (fun () ->
-        verify ~srs ~features
+        verify ~srs ~feature_flags:d.feature_flags
           ~lookup_parameters:
-            { use = d.step_uses_lookup
+            { use = d.feature_flags.lookup (* TODO: Change this *)
             ; zero =
                 { var =
                     { challenge = Field.zero
@@ -207,22 +199,22 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
-  let uses_lookup (d : _ Tag.t) =
-    if Type_equal.Id.same self.id d.id then basic.step_uses_lookup
-    else Types_map.uses_lookup d
+  let feature_flags (d : _ Tag.t) =
+    if Type_equal.Id.same self.id d.id then basic.feature_flags
+    else Types_map.feature_flags d
   in
-  let lookup_usage =
+  let feature_flags =
     let rec go :
         type e pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t, br) Vector.t =
+        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
      fun ds ld ->
       match (ds, ld) with
       | [], Z ->
           []
       | d :: ds, S ld ->
-          uses_lookup d :: go ds ld
+          feature_flags d :: go ds ld
       | [], _ ->
           .
       | _ :: _, _ ->
@@ -239,32 +231,28 @@ let step_main :
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
+        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
-     fun ds ns1 ns2 ld ln1 ln2 ->
-      match (ds, ns1, ns2, ld, ln1, ln2) with
-      | [], [], [], Z, Z, Z ->
+     fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
+      match (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
+      | [], [], [], Z, Z, Z, [] ->
           []
-      | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let features =
-            (* TODO *)
-            Plonk_types.Features.none_map (function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes )
-          in
-          let t =
-            Per_proof_witness.typ Typ.unit n1 n2 ~lookup:(uses_lookup d)
-              ~features
-          in
-          t :: join ds ns1 ns2 ld ln1 ln2
-      | [], _, _, _, _, _ ->
+      | ( d :: ds
+        , n1 :: ns1
+        , n2 :: ns2
+        , S ld
+        , S ln1
+        , S ln2
+        , feature_flags :: feature_flagss ) ->
+          let t = Per_proof_witness.typ Typ.unit n1 n2 ~feature_flags in
+          t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss
+      | [], _, _, _, _, _, _ ->
           .
-      | _ :: _, _, _, _, _, _ ->
+      | _ :: _, _, _, _, _, _, _ ->
           .
     in
     join rule.prevs local_signature local_branches proofs_verified
-      local_signature_length local_branches_length
+      local_signature_length local_branches_length feature_flags
   in
   let module Prev_typ =
     H4.Typ (Impls.Step) (Typ_with_max_proofs_verified)
@@ -367,18 +355,10 @@ let step_main :
           exists
             (Vector.typ'
                (Vector.map
-                  ~f:(fun uses_lookup ->
-                    let features =
-                      (* TODO *)
-                      Plonk_types.Features.none_map (function
-                        | false ->
-                            Plonk_types.Opt.Flag.No
-                        | true ->
-                            Plonk_types.Opt.Flag.Yes )
-                    in
+                  ~f:(fun feature_flags ->
                     Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
-                      ~uses_lookup ~features )
-                  lookup_usage ) )
+                      ~feature_flags )
+                  feature_flags ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
@@ -508,7 +488,7 @@ let step_main :
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
-                    ; step_uses_lookup = basic.step_uses_lookup
+                    ; feature_flags = basic.feature_flags
                     }
                   in
                   let module M =

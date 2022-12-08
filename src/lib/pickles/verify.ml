@@ -145,8 +145,14 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let plonk =
           let p =
+            let module Field = struct
+              include Tick.Field
+
+              type nonrec bool = bool
+            end in
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
+              (module Field)
+              ~feature_flags:Plonk_types.Features.none (* TODO *)
               ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
               tick_combined_evals
           in
@@ -159,14 +165,13 @@ let verify_heterogenous (ts : Instance.t list) =
               Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
-                    .lookup_gate = l.lookup_gate
-                  ; joint_combiner = Option.value_exn plonk0.joint_combiner
+                    .joint_combiner = Option.value_exn plonk0.joint_combiner
                   } )
-          ; optional_gates =
+          ; optional_column_scalars =
               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
               .In_circuit
-              .Optional_gates
-              .map ~f:Plonk_types.Opt.to_option p.optional_gates
+              .Optional_column_scalars
+              .map ~f:Plonk_types.Opt.to_option p.optional_column_scalars
           }
         in
         Timer.clock __LOC__ ;

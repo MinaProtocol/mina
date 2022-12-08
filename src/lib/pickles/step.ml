@@ -62,7 +62,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~uses_lookup ~self_dlog_plonk_index
+      ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -104,8 +104,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
-        , ( Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.Type1.t )
+        , Challenge.Constant.t Scalar_challenge.t
           Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , Digest.Constant.t
@@ -216,9 +215,15 @@ struct
             plonk_minimal combined_evals
         in
         time "plonk_checks" (fun () ->
+            let module Field = struct
+              include Tick.Field
+
+              type nonrec bool = bool
+            end in
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
-              ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
+              (module Field)
+              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
+              combined_evals )
       in
       let data = Types_map.lookup_basic tag in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
@@ -265,15 +270,18 @@ struct
                     ; gamma = plonk0.gamma
                     ; lookup =
                         Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
-                            { l with
-                              joint_combiner =
+                            { Composition_types.Wrap.Proof_state.Deferred_values
+                              .Plonk
+                              .In_circuit
+                              .Lookup
+                              .joint_combiner =
                                 Option.value_exn plonk0.joint_combiner
                             } )
-                    ; optional_gates =
+                    ; optional_column_scalars =
                         Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                         .In_circuit
-                        .Optional_gates
-                        .map ~f:Opt.to_option plonk.optional_gates
+                        .Optional_column_scalars
+                        .map ~f:Opt.to_option plonk.optional_column_scalars
                     }
                 }
             ; messages_for_next_wrap_proof =
@@ -476,7 +484,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1 ~lookup_constant_term_part:None
+            tock_combined_evals x_hat_1
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -484,8 +492,13 @@ struct
       in
       let chal = Challenge.Constant.of_tock_field in
       let plonk =
-        Plonk_checks.Type2.derive_plonk
-          (module Tock.Field)
+        let module Field = struct
+          include Tock.Field
+
+          type nonrec bool = bool
+        end in
+        Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+          (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals
       in
@@ -502,15 +515,18 @@ struct
                 ; gamma = chal plonk0.gamma
                 ; lookup =
                     Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
-                        { l with
-                          joint_combiner =
+                        { Composition_types.Wrap.Proof_state.Deferred_values
+                          .Plonk
+                          .In_circuit
+                          .Lookup
+                          .joint_combiner =
                             Option.value_exn plonk0.joint_combiner
                         } )
-                ; optional_gates =
+                ; optional_column_scalars =
                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                     .In_circuit
-                    .Optional_gates
-                    .map ~f:Opt.to_option plonk.optional_gates
+                    .Optional_column_scalars
+                    .map ~f:Opt.to_option plonk.optional_column_scalars
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
@@ -772,18 +788,10 @@ struct
                } )
            |> to_list) )
     in
-    let features =
-      (* TODO *)
-      Plonk_types.Features.none_map (function
-        | false ->
-            Plonk_types.Opt.Flag.No
-        | true ->
-            Plonk_types.Opt.Flag.Yes )
-    in
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
-        Impls.Step.input ~proofs_verified:Max_proofs_verified.n ~features
-          ~wrap_rounds:Tock.Rounds.n ~uses_lookup
+        Impls.Step.input ~proofs_verified:Max_proofs_verified.n
+          ~wrap_rounds:Tock.Rounds.n ~feature_flags
       in
       let { Domains.h } =
         List.nth_exn (Vector.to_list step_domains) branch_data.index

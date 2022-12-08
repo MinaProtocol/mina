@@ -374,7 +374,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 module type S = sig

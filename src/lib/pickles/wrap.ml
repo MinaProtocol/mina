@@ -51,9 +51,6 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       plonk ~env ~domain
       (Plonk_types.Evals.to_in_circuit combined_evals)
       (fst e.public_input)
-      ~lookup_constant_term_part:
-        (Option.map plonk.joint_combiner ~f:(fun _ ->
-             Plonk_checks.tick_lookup_constant_term_part ) )
   in
   let T = AB.eq in
   let challenge_polys =
@@ -91,9 +88,7 @@ type deferred_values_and_hints =
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
-        , ( ( scalar_challenge_constant
-            , Tick.Field.t Shifted_value.Type1.t )
-            Deferred_values.Plonk.In_circuit.Lookup.t
+        , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
           , bool )
           Opt.t )
         Deferred_values.Plonk.In_circuit.t
@@ -209,9 +204,15 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       ~domain:tick_domain tick_plonk_minimal tick_combined_evals
   in
   let plonk =
+    let module Field = struct
+      include Tick.Field
+
+      type nonrec bool = bool
+    end in
     Type1.derive_plonk
-      (module Tick.Field)
-      ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
+      (module Field)
+      ~feature_flags:Plonk_types.Features.none ~shift:Shifts.tick1 ~env:tick_env
+      tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
       Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -268,8 +269,10 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; gamma = chal plonk0.gamma
           ; lookup =
               Opt.map plonk.lookup ~f:(fun l ->
-                  { l with
-                    joint_combiner = Option.value_exn plonk0.joint_combiner
+                  { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                    .In_circuit
+                    .Lookup
+                    .joint_combiner = Option.value_exn plonk0.joint_combiner
                   } )
           }
       }
@@ -294,13 +297,17 @@ let%test "lookup finalization" =
     deferred_values ~sgs:[] ~prev_challenges:[] ~step_vk:vk
       ~public_input:[ public_input ] ~proof ~actual_proofs_verified:Nat.N0.n
   in
-  let features =
-    (* TODO *)
-    Plonk_types.Features.none_map (function
-      | false ->
-          Plonk_types.Opt.Flag.No
-      | true ->
-          Plonk_types.Opt.Flag.Yes )
+  let feature_flags =
+    let open Plonk_types.Opt.Flag in
+    { Plonk_types.Features.chacha = No
+    ; range_check = No
+    ; foreign_field_add = No
+    ; foreign_field_mul = No
+    ; xor = No
+    ; rot = No
+    ; lookup = Maybe
+    ; runtime_tables = Maybe
+    }
   in
   let deferred_values_typ =
     let open Impls.Step in
@@ -308,8 +315,7 @@ let%test "lookup finalization" =
     let open Step_verifier in
     Wrap.Proof_state.Deferred_values.In_circuit.typ
       (module Impls.Step)
-      ~features ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
-      ~lookup:Maybe
+      ~feature_flags ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
       ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
       ~dummy_scalar_challenge:
         (Kimchi_backend_common.Scalar_challenge.create
@@ -325,18 +331,17 @@ let%test "lookup finalization" =
         plonk =
           { deferred_values.plonk with
             lookup = Opt.to_option deferred_values.plonk.lookup
-          ; optional_gates =
+          ; optional_column_scalars =
               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
               .In_circuit
-              .Optional_gates
-              .map ~f:Opt.to_option deferred_values.plonk.optional_gates
+              .Optional_column_scalars
+              .map ~f:Opt.to_option
+                deferred_values.plonk.optional_column_scalars
           }
       }
   and evals =
     constant
-      (Plonk_types.All_evals.typ
-         (module Impls.Step)
-         { lookup = Maybe; runtime = Maybe } )
+      (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
       { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
       ; ft_eval1 = proof.openings.ft_eval1
       }
@@ -352,7 +357,7 @@ let%test "lookup finalization" =
         in
         Step_verifier.finalize_other_proof
           (module Nat.N0)
-          ~step_uses_lookup:Maybe
+          ~feature_flags
           ~step_domains:
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
           ~sponge ~prev_challenges:[] deferred_values evals
@@ -502,17 +507,9 @@ let wrap
         Snarky_backendless.Request.unhandled
   in
   let module O = Tick.Oracles in
-  let features =
-    (* TODO *)
-    Plonk_types.Features.none_map (function
-      | false ->
-          Plonk_types.Opt.Flag.No
-      | true ->
-          Plonk_types.Opt.Flag.Yes )
-  in
   let public_input =
-    tick_public_input_of_statement ~max_proofs_verified ~features
-      prev_statement_with_hashes ~uses_lookup:No
+    tick_public_input_of_statement ~max_proofs_verified
+      prev_statement_with_hashes ~feature_flags:Plonk_types.Features.none
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
@@ -610,12 +607,16 @@ let wrap
                         lookup =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
-                      ; optional_gates =
+                      ; optional_column_scalars =
                           (* TODO: This assumes that wrap circuits do not use
                              optional gates.
                           *)
-                          { chacha = None
-                          ; range_check = None
+                          { chacha0 = None
+                          ; chacha1 = None
+                          ; chacha2 = None
+                          ; chacha_final = None
+                          ; range_check0 = None
+                          ; range_check1 = None
                           ; foreign_field_add = None
                           ; foreign_field_mul = None
                           ; xor = None

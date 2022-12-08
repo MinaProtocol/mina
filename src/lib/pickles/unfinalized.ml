@@ -15,8 +15,7 @@ type t =
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
   , (Other_field.t Shifted_value.t, Boolean.var) Plonk_types.Opt.t
-  , ( ( Field.t Scalar_challenge.t
-      , Other_field.t Shifted_value.t )
+  , ( Field.t Scalar_challenge.t
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
     , Boolean.var )
     Plonk_types.Opt.t
@@ -38,8 +37,7 @@ module Constant = struct
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t Shifted_value.t
     , Tock.Field.t Shifted_value.t option
-    , ( Challenge.Constant.t Scalar_challenge.t
-      , Tock.Field.t Shifted_value.t )
+    , Challenge.Constant.t Scalar_challenge.t
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
       option
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
@@ -109,7 +107,14 @@ module Constant = struct
            chals evals
        in
        let plonk =
-         Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+         let module Field = struct
+           include Tock.Field
+
+           type nonrec bool = bool
+         end in
+         Plonk_checks.derive_plonk
+           (module Field)
+           ~env ~shift ~feature_flags:Plonk_types.Features.none chals evals
        in
        { deferred_values =
            { plonk =
@@ -119,9 +124,13 @@ module Constant = struct
                ; gamma
                ; zeta
                ; lookup = None
-               ; optional_gates =
-                   { chacha = None
-                   ; range_check = None
+               ; optional_column_scalars =
+                   { chacha0 = None
+                   ; chacha1 = None
+                   ; chacha2 = None
+                   ; chacha_final = None
+                   ; range_check0 = None
+                   ; range_check1 = None
                    ; foreign_field_add = None
                    ; foreign_field_mul = None
                    ; xor = None
@@ -140,23 +149,18 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~uses_lookup ~features : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ ~features
+let typ ~wrap_rounds ~feature_flags : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.typ ~feature_flags
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-    ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup
+    ~zero:Common.Lookup_parameters.tick_zero
 
 let dummy : unit -> t =
   Memo.unit (fun () ->
       let (Typ { var_of_fields; value_to_fields; _ }) =
-        typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
-          ~features:
-            (Plonk_types.Features.none_map (function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes ) )
+        typ ~wrap_rounds:Backend.Tock.Rounds.n
+          ~feature_flags:Plonk_types.Features.none
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )

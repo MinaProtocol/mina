@@ -13,12 +13,7 @@ val wrap :
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
-         , ( ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t
-             , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t )
+         , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
@@ -48,11 +43,7 @@ val wrap :
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
            option
-         , ( Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-             Pickles_types.Hlist0.Id.t
-           , Impls.Step.Other_field.Constant.t
-             Pickles_types.Shifted_value.Type2.t
-             Pickles_types.Hlist0.Id.t )
+         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
            Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t

@@ -2,24 +2,6 @@
 
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
-module Features : sig
-  type 'bool t =
-    { chacha : 'bool
-    ; range_check : 'bool
-    ; foreign_field_add : 'bool
-    ; foreign_field_mul : 'bool
-    ; xor : 'bool
-    ; rot : 'bool
-    ; lookup : 'bool
-    ; runtime_tables : 'bool
-    }
-  [@@deriving sexp, compare, yojson, hash, equal]
-
-  val none_map : (bool -> 'a) -> 'a t
-
-  val none : bool t
-end
-
 module Opt : sig
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]
@@ -72,6 +54,28 @@ module Opt : sig
   end
 end
 
+module Features : sig
+  type 'bool t =
+    { chacha : 'bool
+    ; range_check : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal]
+
+  val none : Opt.Flag.t t
+
+  val none_bool : bool t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+end
+
 module Poly_comm : sig
   module Without_degree_bound : sig
     type 'a t = 'a array
@@ -88,10 +92,6 @@ module Permuts_vec = Vector.Vector_7
 module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
-
-module Lookup_config : sig
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
-end
 
 module Messages : sig
   module Poly : sig
@@ -149,7 +149,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Lookup_config.t
+    -> Opt.Flag.t Features.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
@@ -333,7 +333,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Lookup_config.t
+    -> Opt.Flag.t Features.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

@@ -125,7 +125,7 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~uses_lookup ~features =
+  let input ~proofs_verified ~wrap_rounds ~feature_flags =
     let open Types.Step.Statement in
     let lookup :
         ( Challenge.Constant.t
@@ -133,7 +133,7 @@ module Step = struct
         , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
         , Other_field.t Pickles_types.Shifted_value.Type2.t )
         Types.Wrap.Lookup_parameters.t =
-      { use = uses_lookup
+      { use = feature_flags.Plonk_types.Features.lookup
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -146,7 +146,9 @@ module Step = struct
           }
       }
     in
-    let spec = spec (module Impl) proofs_verified wrap_rounds lookup features in
+    let spec =
+      spec (module Impl) proofs_verified wrap_rounds lookup feature_flags
+    in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -262,13 +264,6 @@ module Wrap = struct
       Other_field.typ_unchecked
     in
     let open Types.Wrap.Statement in
-    let no_features =
-      Plonk_types.Features.none_map (function
-        | false ->
-            Plonk_types.Opt.Flag.No
-        | true ->
-            Plonk_types.Opt.Flag.Yes )
-    in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -278,7 +273,7 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (In_circuit.spec (module Impl) lookup no_features)
+        (In_circuit.spec (module Impl) lookup Plonk_types.Features.none)
     in
     let typ =
       Typ.transport typ

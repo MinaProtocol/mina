@@ -195,7 +195,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Initialize snapp"; prevs = []; main; uses_lookup = false }
+      { identifier = "Initialize snapp"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Rule to update the zkApp state.
@@ -261,7 +265,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Update state"; prevs = []; main; uses_lookup = false }
+      { identifier = "Update state"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Callable zkApp addition rule.
@@ -320,7 +328,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Add method"; prevs = []; main; uses_lookup = false }
+      { identifier = "Add method"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Callable zkApp addition-and-call rule.
@@ -419,7 +431,7 @@ module Rules = struct
       { identifier = "Add-and-call method"
       ; prevs = []
       ; main
-      ; uses_lookup = false
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
   end
 end

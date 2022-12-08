@@ -1,3 +1,5 @@
+open Pickles_types
+
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial : 'field -> 'field >
 
@@ -54,9 +56,15 @@ module type Field_with_if_intf = sig
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
-type 'f field = (module Field_intf with type t = 'f)
+module type Field_with_equal_intf = sig
+  include Field_intf
 
-val tick_lookup_constant_term_part : 'a Scalars.Env.t -> 'a
+  type bool
+
+  val equal : t -> t -> bool
+end
+
+type 'f field = (module Field_intf with type t = 'f)
 
 val domain :
      't field
@@ -95,14 +103,14 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't
-    -> lookup_constant_term_part:('t Scalars.Env.t -> 't) option
     -> 't
 
   val derive_plonk :
        ?with_label:(string -> (unit -> 't) -> 't)
-    -> 't field
+    -> (module Field_with_equal_intf with type t = 't and type bool = 'b)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
+    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't
        , 't )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
@@ -111,8 +119,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        , 't
        , 't Shifted_value.t
        , ('t Shifted_value.t, 'b) Pickles_types.Plonk_types.Opt.t
-       , ( ( 't
-           , 't Shifted_value.t )
+       , ( 't
            Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t
@@ -124,14 +131,14 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        (module Snarky_backendless.Snark_intf.Run with type field = 't)
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
+    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t Shifted_value.t
        , ( 't Snarky_backendless.Cvar.t Shifted_value.t
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          Pickles_types.Plonk_types.Opt.t
-       , ( ( 't Snarky_backendless.Cvar.t
-           , 't Snarky_backendless.Cvar.t Shifted_value.t )
+       , ( 't Snarky_backendless.Cvar.t
            Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t

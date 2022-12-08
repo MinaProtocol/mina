@@ -162,18 +162,13 @@ val hash_messages_for_next_step_proof :
 
 val tick_public_input_of_statement :
      max_proofs_verified:'a Pickles_types.Nat.t
-  -> uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
-  -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
            option
-         , ( Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-             Pickles_types.Hlist0.Id.t
-           , Impls.Step.Other_field.Constant.t
-             Pickles_types.Shifted_value.Type2.t
-             Pickles_types.Hlist0.Id.t )
+         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
            Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t
@@ -210,10 +205,7 @@ val tock_public_input_of_statement :
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
-     , ( Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         Pickles_types.Hlist0.Id.t
-       , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         Pickles_types.Hlist0.Id.t )
+     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
        .Lookup
        .t
@@ -243,10 +235,7 @@ val tock_unpadded_public_input_of_statement :
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
-     , ( Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         Pickles_types.Hlist0.Id.t
-       , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         Pickles_types.Hlist0.Id.t )
+     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
        .Lookup
        .t

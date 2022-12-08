@@ -559,22 +559,32 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let module V = H4.To_vector (Int) in
         V.f prev_varss_length (M.f choices)
       in
-      let step_uses_lookup =
+      let feature_flags =
         let rec go :
-            type a b c d. (a, b, c, d) H4.T(IR).t -> Plonk_types.Opt.Flag.t =
+            type a b c d.
+               (a, b, c, d) H4.T(IR).t
+            -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
          fun rules ->
           match rules with
           | [] ->
-              No
-          | r :: rules -> (
-              let rest_usage = go rules in
-              match (r.uses_lookup, rest_usage) with
-              | true, Yes ->
-                  Yes
-              | false, No ->
-                  No
-              | _, Maybe | true, No | false, Yes ->
-                  Maybe )
+              Plonk_types.Features.none
+          | [ r ] ->
+              Plonk_types.Features.map r.feature_flags ~f:(function
+                | true ->
+                    Plonk_types.Opt.Flag.Yes
+                | false ->
+                    Plonk_types.Opt.Flag.No )
+          | r :: rules ->
+              let feature_flags = go rules in
+              Plonk_types.Features.map2 r.feature_flags feature_flags
+                ~f:(fun enabled flag ->
+                  match (enabled, flag) with
+                  | true, Yes ->
+                      Plonk_types.Opt.Flag.Yes
+                  | false, No ->
+                      No
+                  | _, Maybe | true, No | false, Yes ->
+                      Maybe )
         in
         go choices
       in
@@ -592,7 +602,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Timer.clock __LOC__ ;
                 let res =
                   Common.time "make step data" (fun () ->
-                      Step_branch_data.create ~index:!i ~step_uses_lookup
+                      Step_branch_data.create ~index:!i ~feature_flags
                         ~max_proofs_verified:Max_proofs_verified.n
                         ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                         Arg_var.to_field_elements Arg_value.to_field_elements
@@ -618,14 +628,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let cache_handle = ref (Lazy.return `Cache_hit) in
       let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
       Timer.clock __LOC__ ;
-      let features =
-        (* TODO *)
-        Plonk_types.Features.none_map (function
-          | false ->
-              Plonk_types.Opt.Flag.No
-          | true ->
-              Plonk_types.Opt.Flag.Yes )
-      in
       let step_keypairs =
         let disk_keys =
           Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
@@ -635,7 +637,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (struct
               let etyp =
                 Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                  ~wrap_rounds:Tock.Rounds.n ~uses_lookup:Maybe ~features
+                  ~wrap_rounds:Tock.Rounds.n
+                  ~feature_flags:
+                    { Plonk_types.Features.none with
+                      lookup = Plonk_types.Opt.Flag.Maybe
+                    }
               (* TODO *)
 
               let f (T b : _ Branch_data.t) =
@@ -806,7 +812,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
               ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
               ~public_input ~auxiliary_typ
-              ~uses_lookup:(if b.rule.uses_lookup then Yes else No)
+              ~feature_flags:
+                (Plonk_types.Features.map b.rule.feature_flags ~f:(fun b ->
+                     if b then Plonk_types.Opt.Flag.Yes else No ) )
               (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
               wrap_vk.index
           in
@@ -885,7 +893,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
         ; wrap_domains
         ; step_domains
-        ; step_uses_lookup
+        ; feature_flags
         }
       in
       Timer.clock __LOC__ ;
@@ -924,12 +932,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-    let create ~name ~max_proofs_verified ~uses_lookup ~typ =
+    let create ~name ~max_proofs_verified ~feature_flags ~typ =
       Types_map.add_side_loaded ~name
         { max_proofs_verified
         ; public_input = typ
         ; branches = Verification_key.Max_branches.n
-        ; step_uses_lookup = uses_lookup
+        ; feature_flags
         }
 
     module Proof = struct
@@ -1307,7 +1315,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -1370,7 +1378,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun _ ->
                           dummy_constraints () ;
@@ -1437,7 +1445,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ self ]
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -1543,7 +1551,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ No_recursion.tag; self ]
                     ; main =
                         (fun { public_input = self } ->
@@ -1676,7 +1684,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ No_recursion_return.tag; self ]
                     ; main =
                         (fun { public_input = () } ->
@@ -1799,7 +1807,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
                     ; main =
                         (fun { public_input = x } ->
@@ -1864,7 +1872,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
                     ; main =
                         (fun { public_input = input } ->
@@ -1971,7 +1979,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; public_output = ()
               ; auxiliary_output = ()
               } )
-        ; uses_lookup = false
+        ; feature_flags = Plonk_types.Features.none_bool
         }
 
       module M = struct
@@ -2088,24 +2096,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.[ 2 ] in
+          let feature_flags = Plonk_types.Features.none in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~step_uses_lookup:No
+            Step_branch_data.create ~index:0 ~feature_flags
               ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
               ~self ~public_input:(Input typ) ~auxiliary_typ:typ
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
               ~proofs_verifieds
           in
-          let features =
-            Plonk_types.Features.none_map (function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes )
-          in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
             let etyp =
-              Impls.Step.input ~uses_lookup:No ~features
+              Impls.Step.input ~feature_flags
                 ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
@@ -2248,8 +2250,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let _, prev_vars_length = b.proofs_verified in
               let step =
                 let wrap_vk = Lazy.force wrap_vk in
-                S.f branch_data () ~uses_lookup:No
-                  ~prevs_length:prev_vars_length ~self ~public_input:(Input typ)
+                S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
+                  ~self ~public_input:(Input typ)
                   ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
                   ~self_dlog_plonk_index:wrap_vk.commitments
                   (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
@@ -2364,7 +2366,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let module O = Tick.Oracles in
                     let public_input =
                       tick_public_input_of_statement ~max_proofs_verified
-                        ~features ~uses_lookup:No prev_statement_with_hashes
+                        ~feature_flags:Plonk_types.Features.none
+                        prev_statement_with_hashes
                     in
                     let prev_challenges =
                       Vector.map ~f:Ipa.Step.compute_challenges
@@ -2588,8 +2591,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (sg_new, overwritten_prechals, b)
                       in
                       let plonk =
+                        let module Field = struct
+                          include Tick.Field
+
+                          type nonrec bool = bool
+                        end in
                         Wrap.Type1.derive_plonk
-                          (module Tick.Field)
+                          (module Field)
+                          ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -2706,9 +2715,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
-                                        ; optional_gates =
-                                            { chacha = None
-                                            ; range_check = None
+                                        ; optional_column_scalars =
+                                            { chacha0 = None
+                                            ; chacha1 = None
+                                            ; chacha2 = None
+                                            ; chacha_final = None
+                                            ; range_check0 = None
+                                            ; range_check1 = None
                                             ; foreign_field_add = None
                                             ; foreign_field_mul = None
                                             ; xor = None
@@ -2760,7 +2773,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { branches = Branches.n
-            ; step_uses_lookup = No
+            ; feature_flags
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
@@ -2833,7 +2846,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~name:"recurse-on-bad" ~constraint_constants
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -2915,7 +2928,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
         { identifier = "main"
-        ; uses_lookup = false
+        ; feature_flags = Plonk_types.Features.none_bool
         ; prevs = [ tag; tag ]
         ; main =
             (fun { public_input = () } ->
@@ -3052,24 +3065,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.[ 2 ] in
+          let feature_flags = Plonk_types.Features.none in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~step_uses_lookup:No
+            Step_branch_data.create ~index:0 ~feature_flags
               ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
               ~self ~public_input:(Input typ) ~auxiliary_typ:typ
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
               ~proofs_verifieds
           in
-          let features =
-            Plonk_types.Features.none_map (function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes )
-          in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
             let etyp =
-              Impls.Step.input ~uses_lookup:No ~features
+              Impls.Step.input ~feature_flags
                 ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
@@ -3212,8 +3219,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let _, prev_vars_length = b.proofs_verified in
               let step =
                 let wrap_vk = Lazy.force wrap_vk in
-                S.f branch_data () ~uses_lookup:No
-                  ~prevs_length:prev_vars_length ~self ~public_input:(Input typ)
+                S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
+                  ~self ~public_input:(Input typ)
                   ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
                   ~self_dlog_plonk_index:wrap_vk.commitments
                   (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
@@ -3327,7 +3334,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let module O = Tick.Oracles in
                     let public_input =
-                      tick_public_input_of_statement ~uses_lookup:No ~features
+                      tick_public_input_of_statement
+                        ~feature_flags:Plonk_types.Features.none
                         ~max_proofs_verified prev_statement_with_hashes
                     in
                     let prev_challenges =
@@ -3516,8 +3524,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (prechals, b)
                       in
                       let plonk =
+                        let module Field = struct
+                          include Tick.Field
+
+                          type nonrec bool = bool
+                        end in
                         Wrap.Type1.derive_plonk
-                          (module Tick.Field)
+                          (module Field)
+                          ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -3635,9 +3649,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
-                                        ; optional_gates =
-                                            { chacha = None
-                                            ; range_check = None
+                                        ; optional_column_scalars =
+                                            { chacha0 = None
+                                            ; chacha1 = None
+                                            ; chacha2 = None
+                                            ; chacha_final = None
+                                            ; range_check0 = None
+                                            ; range_check1 = None
                                             ; foreign_field_add = None
                                             ; foreign_field_mul = None
                                             ; xor = None
@@ -3689,7 +3707,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { branches = Branches.n
-            ; step_uses_lookup = No
+            ; feature_flags
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
@@ -3762,7 +3780,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~name:"recurse-on-bad" ~constraint_constants
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -3873,7 +3891,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -3926,7 +3944,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -3979,7 +3997,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -4030,8 +4048,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
-            ~max_proofs_verified:(Nat.Add.create Nat.N2.n) ~uses_lookup:No
-            ~typ:Field.typ
+            ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
+            ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -4056,7 +4074,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.none_bool
                     ; main =
                         (fun { public_input = self } ->
                           let prev =

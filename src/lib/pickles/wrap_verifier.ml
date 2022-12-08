@@ -917,8 +917,7 @@ struct
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~lookup_constant_term_part:None ~env ~domain plonk_minimal
-                  combined_evals evals1.public_input )
+                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
@@ -988,7 +987,7 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          Plonk_checks.checked
+          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in

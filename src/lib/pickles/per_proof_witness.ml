@@ -63,8 +63,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
         Plonk_types.Opt.t
-      , ( ( scalar_challenge
-          , Impl.Field.t Shifted_value.Type1.t )
+      , ( scalar_challenge
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
         , Impl.Boolean.var )
         Plonk_types.Opt.t
@@ -118,8 +117,7 @@ module Constant = struct
         , scalar_challenge
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
-        , ( scalar_challenge
-          , Tick.Field.t Shifted_value.Type1.t )
+        , scalar_challenge
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
         , unit
@@ -142,7 +140,7 @@ module Constant = struct
   end
 end
 
-let typ (type n avar aval m) ~lookup ~features
+let typ (type n avar aval m) ~feature_flags
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
     (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
@@ -157,8 +155,7 @@ let typ (type n avar aval m) ~lookup ~features
     ; Wrap_proof.typ
     ; Types.Wrap.Proof_state.In_circuit.typ
         (module Impl)
-        ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup
-        ~features
+        ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
         ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
@@ -170,7 +167,7 @@ let typ (type n avar aval m) ~lookup ~features
     ; Plonk_types.All_evals.typ
         (module Impl)
         (* Assume we have lookup iff we have runtime tables *)
-        { lookup; runtime = lookup }
+        feature_flags
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]

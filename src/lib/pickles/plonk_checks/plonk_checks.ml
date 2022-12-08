@@ -61,6 +61,14 @@ module type Field_with_if_intf = sig
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
+module type Field_with_equal_intf = sig
+  include Field_intf
+
+  type bool
+
+  val equal : t -> t -> bool
+end
+
 type 'f field = (module Field_intf with type t = 'f)
 
 let pow2pow (type t) ((module F) : t field) (x : t) n : t =
@@ -402,117 +410,6 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
-let tick_lookup_constant_term_part (type a)
-    ({ add = ( + )
-     ; sub = ( - )
-     ; mul = ( * )
-     ; square = _
-     ; mds = _
-     ; endo_coefficient = _
-     ; pow
-     ; var
-     ; field
-     ; cell
-     ; alpha_pow
-     ; double = _
-     ; zk_polynomial = _
-     ; omega_to_minus_3 = _
-     ; zeta_to_n_minus_1 = _
-     ; srs_length_log2 = _
-     ; vanishes_on_last_4_rows
-     ; joint_combiner
-     ; beta
-     ; gamma
-     ; unnormalized_lagrange_basis
-     ; if_feature = _
-     ; foreign_field_modulus = _
-     ; neg_foreign_field_modulus = _
-     } :
-      a Scalars.Env.t ) =
-  alpha_pow 24
-  * ( vanishes_on_last_4_rows
-    * ( cell (var (LookupAggreg, Next))
-        * ( ( gamma
-              * ( beta
-                + field
-                    "0x0000000000000000000000000000000000000000000000000000000000000001"
-                )
-            + cell (var (LookupSorted 0, Curr))
-            + (beta * cell (var (LookupSorted 0, Next))) )
-          * ( gamma
-              * ( beta
-                + field
-                    "0x0000000000000000000000000000000000000000000000000000000000000001"
-                )
-            + cell (var (LookupSorted 1, Next))
-            + (beta * cell (var (LookupSorted 1, Curr))) )
-          * ( gamma
-              * ( beta
-                + field
-                    "0x0000000000000000000000000000000000000000000000000000000000000001"
-                )
-            + cell (var (LookupSorted 2, Curr))
-            + (beta * cell (var (LookupSorted 2, Next))) )
-          * ( gamma
-              * ( beta
-                + field
-                    "0x0000000000000000000000000000000000000000000000000000000000000001"
-                )
-            + cell (var (LookupSorted 3, Next))
-            + (beta * cell (var (LookupSorted 3, Curr))) ) )
-      - cell (var (LookupAggreg, Curr))
-        * ( ( gamma
-            + pow (joint_combiner, 2)
-              * field
-                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-            )
-          * ( gamma
-            + pow (joint_combiner, 2)
-              * field
-                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-            )
-          * ( gamma
-            + pow (joint_combiner, 2)
-              * field
-                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-            )
-          * pow
-              ( field
-                  "0x0000000000000000000000000000000000000000000000000000000000000001"
-                + beta
-              , 3 )
-          * ( gamma
-              * ( beta
-                + field
-                    "0x0000000000000000000000000000000000000000000000000000000000000001"
-                )
-            + cell (var (LookupTable, Curr))
-            + (beta * cell (var (LookupTable, Next))) ) ) ) )
-  + alpha_pow 25
-    * ( unnormalized_lagrange_basis 0
-      * ( cell (var (LookupAggreg, Curr))
-        - field
-            "0x0000000000000000000000000000000000000000000000000000000000000001"
-        ) )
-  + alpha_pow 26
-    * ( unnormalized_lagrange_basis (-4)
-      * ( cell (var (LookupAggreg, Curr))
-        - field
-            "0x0000000000000000000000000000000000000000000000000000000000000001"
-        ) )
-  + alpha_pow 27
-    * ( unnormalized_lagrange_basis (-4)
-      * (cell (var (LookupSorted 0, Curr)) - cell (var (LookupSorted 1, Curr)))
-      )
-  + alpha_pow 28
-    * ( unnormalized_lagrange_basis 0
-      * (cell (var (LookupSorted 1, Curr)) - cell (var (LookupSorted 2, Curr)))
-      )
-  + alpha_pow 29
-    * ( unnormalized_lagrange_basis (-4)
-      * (cell (var (LookupSorted 2, Curr)) - cell (var (LookupSorted 3, Curr)))
-      )
-
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta. 
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
@@ -520,8 +417,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _ } : _ Minimal.t)
-      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0
-      ~(lookup_constant_term_part : (F.t Scalars.Env.t -> F.t) option) =
+      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
@@ -557,16 +453,15 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     in
     let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    let constant_term =
-      let c = Sc.constant_term env in
-      Option.value_map lookup_constant_term_part ~default:c ~f:(fun x ->
-          c + x env )
-    in
+    let constant_term = Sc.constant_term env in
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)
-  let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
-      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
+  let derive_plonk (type boolean t)
+      ?(with_label = fun _ (f : unit -> t) -> f ())
+      (module F : Field_with_equal_intf with type t = t and type bool = boolean)
+      ~(env : t Scalars.Env.t) ~shift ~(feature_flags : _ Plonk_types.Features.t)
+      =
     let _ = with_label in
     let open F in
     fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
@@ -585,6 +480,17 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~init:(e1 z * beta * alpha_pow perm_alpha0 * zkp)
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
+      in
+      let compute_feature column feature_flag =
+        match feature_flag with
+        | Opt.Flag.Yes ->
+            Opt.Some (Lazy.force (Hashtbl.find_exn index_terms column))
+        | Opt.Flag.Maybe ->
+            let res = Lazy.force (Hashtbl.find_exn index_terms column) in
+            let is_some = F.equal res F.zero in
+            Opt.Maybe (is_some, res)
+        | Opt.Flag.No ->
+            Opt.None
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
@@ -606,21 +512,30 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | None ->
                 Plonk_types.Opt.None
             | Some joint_combiner ->
-                Some
-                  { joint_combiner
-                  ; lookup_gate =
-                      Lazy.force
-                        (Hashtbl.find_exn index_terms (LookupKindIndex Lookup))
-                  } )
-        ; optional_gates =
-            { chacha = Opt.None
-            ; range_check = Opt.None
-            ; foreign_field_add = Opt.None
-            ; foreign_field_mul = Opt.None
-            ; xor = Opt.None
-            ; rot = Opt.None
-            ; lookup_gate = Opt.None
-            ; runtime_tables = Opt.None
+                Some { joint_combiner } )
+        ; optional_column_scalars =
+            { chacha0 = compute_feature (Index ChaCha0) feature_flags.chacha
+            ; chacha1 = compute_feature (Index ChaCha1) feature_flags.chacha
+            ; chacha2 = compute_feature (Index ChaCha2) feature_flags.chacha
+            ; chacha_final =
+                compute_feature (Index ChaChaFinal) feature_flags.chacha
+            ; range_check0 =
+                compute_feature (Index RangeCheck0) feature_flags.range_check
+            ; range_check1 =
+                compute_feature (Index RangeCheck1) feature_flags.range_check
+            ; foreign_field_add =
+                compute_feature (Index ForeignFieldAdd)
+                  feature_flags.foreign_field_add
+            ; foreign_field_mul =
+                compute_feature (Index ForeignFieldMul)
+                  feature_flags.foreign_field_mul
+            ; xor = compute_feature (Index Xor16) feature_flags.xor
+            ; rot = compute_feature (Index Rot64) feature_flags.rot
+            ; lookup_gate =
+                compute_feature (LookupKindIndex Lookup) feature_flags.lookup
+            ; runtime_tables =
+                compute_feature LookupRuntimeSelector
+                  feature_flags.runtime_tables
             }
         }
 
@@ -634,11 +549,17 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env (plonk : (_, _, _, _ Opt.t, _ Opt.t) In_circuit.t) evals =
+      ~shift ~env ~feature_flags
+      (plonk : (_, _, _, _ Opt.t, _ Opt.t) In_circuit.t) evals =
     let actual =
+      let module Field = struct
+        include Impl.Field
+
+        type bool = Impl.Boolean.var
+      end in
       derive_plonk ~with_label:Impl.with_label
-        (module Impl.Field)
-        ~shift ~env
+        (module Field)
+        ~shift ~env ~feature_flags
         { alpha = plonk.alpha
         ; beta = plonk.beta
         ; gamma = plonk.gamma
@@ -661,7 +582,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
           Some (equal expected actual)
       | Maybe (is_some, expected), (Some actual | Maybe (_, actual)) ->
           Some (Boolean.( ||| ) (Boolean.not is_some) (equal expected actual))
-      | Some _, Maybe _ | None, (Some _ | Maybe _) | (Some _ | Maybe _), None ->
+      | Some _, Maybe _ ->
+          assert false
+      | None, (Some _ | Maybe _) ->
+          assert false
+      | (Some _ | Maybe _), None ->
           assert false
     in
     let open In_circuit in
@@ -673,13 +598,9 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         @ List.filter_map
             ~f:(equal_opt ~equal:(Shifted_value.equal Field.equal))
             (List.zip_exn
-               (In_circuit.Optional_gates.to_list plonk.optional_gates)
-               (In_circuit.Optional_gates.to_list actual.optional_gates) )
-        @ Option.to_list
-        @@ equal_opt
-             ~equal:(fun { In_circuit.Lookup.lookup_gate = l1; _ }
-                         { In_circuit.Lookup.lookup_gate = l2; _ } ->
-               Shifted_value.equal Field.equal l1 l2 )
-             (plonk.lookup, actual.lookup)
+               (In_circuit.Optional_column_scalars.to_list
+                  plonk.optional_column_scalars )
+               (In_circuit.Optional_column_scalars.to_list
+                  actual.optional_column_scalars ) )
         |> Boolean.all )
 end

@@ -873,7 +873,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(step_uses_lookup : Plonk_types.Opt.Flag.t)
+      ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1017,23 +1017,6 @@ struct
         with_label "ft_eval0" (fun () ->
             Plonk_checks.ft_eval0
               (module Field)
-              ~lookup_constant_term_part:
-                ( match step_uses_lookup with
-                | No ->
-                    None
-                | Yes ->
-                    Some Plonk_checks.tick_lookup_constant_term_part
-                | Maybe -> (
-                    match plonk.lookup with
-                    | Maybe ((b : Boolean.var), _) ->
-                        Some
-                          (fun env ->
-                            Field.(
-                              (b :> t)
-                              * Plonk_checks.tick_lookup_constant_term_part env)
-                            )
-                    | None | Some _ ->
-                        assert false ) )
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
       print_fp "ft_eval0" ft_eval0 ;
@@ -1097,7 +1080,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked
+          Plonk_checks.checked ~feature_flags
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
@@ -1189,7 +1172,7 @@ struct
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
-      ~lookup_parameters ~features ~(proof : Wrap_proof.Checked.t) ~srs
+      ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
       ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
         ( _
@@ -1208,7 +1191,7 @@ struct
             (module Impl)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
-               lookup_parameters features )
+               lookup_parameters feature_flags )
             (Types.Wrap.Statement.In_circuit.to_data
                ~option_map:Plonk_types.Opt.map statement ) )
       |> Array.map ~f:(function

@@ -36,13 +36,13 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup ~features t =
+let pack_statement max_proofs_verified ~lookup ~feature_flags t =
   let open Types.Step in
   Spec.pack
     (module Impl)
     (Statement.spec
        (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup features )
+       max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
     (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
@@ -82,14 +82,9 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
-let lookup_config = { Plonk_types.Lookup_config.lookup = No; runtime = No }
-
-let commitment_lookup_config =
-  { Plonk_types.Lookup_config.lookup = No; runtime = No }
-
 let lookup_config_for_pack =
   { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
-  ; use = No
+  ; use = Plonk_types.Opt.Flag.No
   }
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
@@ -122,6 +117,7 @@ let wrap_main
           , _ )
           Types.Wrap.Statement.In_circuit.t
        -> unit ) =
+  let feature_flags = Plonk_types.Features.none in
   Timer.clock __LOC__ ;
   let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                        with type n = max_proofs_verified )
@@ -206,20 +202,12 @@ let wrap_main
           with_label __LOC__ (fun () ->
               let open Types.Step.Proof_state in
               let typ =
-                let features =
-                  (* TODO *)
-                  Plonk_types.Features.none_map (function
-                    | false ->
-                        Plonk_types.Opt.Flag.No
-                    | true ->
-                        Plonk_types.Opt.Flag.Yes )
-                in
-                typ ~features
+                typ
                   (module Impl)
                   Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                       Plonk_types.Opt.Flag.No ) )
+                       Plonk_types.Features.none ) )
                   (Shifted_value.Type2.typ Field.typ)
               in
               exists typ ~request:(fun () -> Req.Proof_state) )
@@ -272,7 +260,7 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) lookup_config
+                    Plonk_types.All_evals.typ (module Impl) feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in
@@ -398,7 +386,7 @@ let wrap_main
                 exists
                   (Plonk_types.Messages.typ
                      (module Impl)
-                     Inner_curve.typ ~bool:Boolean.typ commitment_lookup_config
+                     Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
                        (Commitment_lengths.create ~of_int:Fn.id) )
@@ -406,20 +394,12 @@ let wrap_main
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              let features =
-                (* TODO *)
-                Plonk_types.Features.none_map (function
-                  | false ->
-                      Plonk_types.Opt.Flag.No
-                  | true ->
-                      Plonk_types.Opt.Flag.Yes )
-              in
               Wrap_verifier.incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
                 ~verification_key:step_plonk_index ~srs ~xi ~sponge
                 ~public_input:
                   (Array.map
-                     (pack_statement Max_proofs_verified.n ~features
+                     (pack_statement Max_proofs_verified.n ~feature_flags
                         ~lookup:lookup_config_for_pack prev_statement )
                      ~f:(function
                     | `Field (Shifted_value x) ->

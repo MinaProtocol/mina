@@ -39,8 +39,7 @@ module Step : sig
   val input :
        proofs_verified:'a Pickles_types.Nat.t
     -> wrap_rounds:'b Pickles_types.Nat.t
-    -> uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
-    -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
@@ -48,10 +47,8 @@ module Step : sig
                , Impl.field Snarky_backendless.Cvar.t
                  Snarky_backendless.Snark_intf.Boolean0.t )
                Pickles_types.Plonk_types.Opt.t
-             , ( ( Impl.Field.t Composition_types.Scalar_challenge.t
-                   Pickles_types.Hlist0.Id.t
-                 , Other_field.t Pickles_types.Shifted_value.Type2.t
-                   Pickles_types.Hlist0.Id.t )
+             , ( Impl.Field.t Composition_types.Scalar_challenge.t
+                 Pickles_types.Hlist0.Id.t
                  Composition_types.Step.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .Lookup
@@ -79,10 +76,7 @@ module Step : sig
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t option
-             , ( Challenge.Constant.t Composition_types.Scalar_challenge.t
-                 Pickles_types.Hlist0.Id.t
-               , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-                 Pickles_types.Hlist0.Id.t )
+             , Challenge.Constant.t Composition_types.Scalar_challenge.t
                Composition_types.Step.Proof_state.Deferred_values.Plonk
                .In_circuit
                .Lookup
@@ -164,12 +158,7 @@ module Wrap : sig
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
-         , ( ( Impl.Field.t Composition_types.Scalar_challenge.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t
-             , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t )
+         , ( Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
@@ -191,11 +180,7 @@ module Wrap : sig
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
-         , ( Limb_vector.Challenge.Constant.t
-             Composition_types.Scalar_challenge.t
-             Pickles_types.Hlist0.Id.t
-           , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-             Pickles_types.Hlist0.Id.t )
+         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
            Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t

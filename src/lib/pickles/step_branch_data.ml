@@ -73,7 +73,7 @@ let create
     (type branches max_proofs_verified local_signature local_branches var value
     a_var a_value ret_var ret_value prev_vars prev_values ) ~index
     ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
-    ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
+    ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -140,7 +140,7 @@ let create
         ; proofs_verifieds
         ; wrap_domains
         ; step_domains
-        ; step_uses_lookup
+        ; feature_flags
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
@@ -154,17 +154,9 @@ let create
         ~step_domains:
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
-    let features =
-      (* TODO *)
-      Plonk_types.Features.none_map (function
-        | false ->
-            Plonk_types.Opt.Flag.No
-        | true ->
-            Plonk_types.Opt.Flag.Yes )
-    in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No ~features
+        ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
       (* TODO *)
     in
     Fix_domains.domains
