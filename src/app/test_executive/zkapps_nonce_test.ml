@@ -77,6 +77,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish2_pk = Signature_lib.Public_key.compress fish2_kp.public_key in
+    let fish1_account_id =
+      Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
+    in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -106,7 +109,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
-    let%bind.Deferred invalid_zkapp_cmd_from_fish1 =
+    let%bind.Deferred invalid_nonce_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -114,11 +117,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
                    0 ~increment_nonce:true
-                   ~update:
-                     { Account_update.Update.dummy with
-                       permissions =
-                         Set { Permissions.user_default with send = Proof }
-                     }
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -141,6 +139,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
                    0 ~increment_nonce:true
+                   ~update:
+                     { Account_update.Update.dummy with
+                       permissions =
+                         Set { Permissions.user_default with send = Proof }
+                     }
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -152,6 +155,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         account_updates
         |> mk_zkapp_command ~memo:"valid zkapp cmd from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
+    in
+    let%bind.Deferred invalid_precondition_zkapp_cmd_from_fish1 =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish1_kp Token_id.default
+                   0 ~increment_nonce:true
+                   ~preconditions:
+                     { Account_update.Preconditions.network =
+                         Zkapp_precondition.Protocol_state.accept
+                     ; account = Nonce (Account.Nonce.of_int 4)
+                     } )
+                []
+            ]
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"invalid zkapp cmd from fish1" ~fee:12_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -202,7 +227,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section
         "Send a zkapp command with an invalid account update nonce using fish1"
-        (send_zkapp ~logger node invalid_zkapp_cmd_from_fish1)
+        (send_zkapp ~logger node invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
@@ -225,7 +250,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Wait for fish1 zkapp command with invalid nonce to be rejected by \
          transition frontier"
-        (wait_for_zkapp ~has_failures:true invalid_zkapp_cmd_from_fish1)
+        (wait_for_zkapp ~has_failures:true invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
@@ -258,6 +283,65 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
+    in
+    let%bind () =
+      section "Verify invalid zkapp commands are removed from transaction pool"
+        (let%bind pooled_zkapp_commands =
+           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         if List.is_empty pooled_zkapp_commands then (
+           [%log info] "Transaction pool is empty" ;
+           return () )
+         else
+           Malleable_error.hard_error
+             (Error.of_string
+                "Transaction pool contains invalid zkapp commands after a \
+                 block was produced" ) )
+    in
+    let%bind () =
+      section
+        "Send a zkapp command with an invalid account update precondition \
+         using fish1"
+        (send_zkapp ~logger node invalid_precondition_zkapp_cmd_from_fish1)
+    in
+    let%bind () =
+      section
+        "Wait for fish1 zkapp command with invalid precondition to be accepted \
+         by transition frontier"
+        (wait_for_zkapp ~has_failures:true
+           invalid_precondition_zkapp_cmd_from_fish1 )
+    in
+    let%bind () =
+      let padding_payments =
+        let needed = 36 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
+    in
+    let%bind () =
+      section_hard "wait for 1 block to be produced"
+        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+    in
+    let%bind () =
+      section
+        "Verify invalid precondition zkapp command was not applied by checking \
+         account nonce"
+        (let%bind { nonce = fish1_nonce; _ } =
+           Network.Node.get_account_data ~logger node
+             ~account_id:fish1_account_id
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         if Unsigned.UInt32.compare fish1_nonce (Unsigned.UInt32.of_int 3) > 0
+         then
+           Malleable_error.hard_error
+             (Error.of_string
+                "Invalid zkapp command applied nonce when it shouldn't have" )
+         else (
+           [%log info] "Invalid zkapp command was correctly ignored" ;
+           return () ) )
     in
     let%bind () =
       section "Verify invalid zkapp commands are removed from transaction pool"
