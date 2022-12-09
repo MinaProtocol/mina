@@ -130,7 +130,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let open Async.Deferred.Let_syntax in
   let%bind verifier =
-    Verifier.create ~logger:(Logger.create ()) ~proof_level:Full
+    Verifier.Prod.create ~logger:(Logger.create ()) ~proof_level:Full
       ~constraint_constants ~conf_dir:None
       ~pids:(Child_processes.Termination.create_pid_table ())
   in
@@ -139,7 +139,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
     if ignore_outside_snark then return ()
     else
       let%map verified_results =
-        Verifier.verify_commands verifier
+        Verifier.Prod.verify_commands verifier
           (List.map zkapp_commands ~f:(fun zkapp_command ->
                User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
                  ~location_of_account:Mina_ledger.Ledger.location_of_account
