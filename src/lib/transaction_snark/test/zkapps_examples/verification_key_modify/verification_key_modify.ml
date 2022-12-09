@@ -153,71 +153,72 @@ let%test_module "Verification key modify mid txn" =
           (trivial_prover2 ~handler:Trivial_rule2.handler)
     end
 
-    let test_zkapp_command ?expected_failure zkapp_command =
-      let memo = Signed_command_memo.empty in
-      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
-        (* TODO: This is a pain. *)
-        let account_updates_hash =
-          Zkapp_command.Call_forest.hash zkapp_command
+    let test_zkapp_command ?expected_failure zkapp_commands =
+      let fix_command zkapp_command : Zkapp_command.t =
+        let memo = Signed_command_memo.empty in
+        let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+          (* TODO: This is a pain. *)
+          let account_updates_hash =
+            Zkapp_command.Call_forest.hash zkapp_command
+          in
+          Zkapp_command.Transaction_commitment.create ~account_updates_hash
         in
-        Zkapp_command.Transaction_commitment.create ~account_updates_hash
-      in
-      let fee_payer : Account_update.Fee_payer.t =
-        { body =
-            { Account_update.Body.Fee_payer.dummy with
-              public_key = pk_compressed
-            ; fee = Currency.Fee.(of_nanomina_int_exn 100)
-            }
-        ; authorization = Signature.dummy
-        }
-      in
-      let memo_hash = Signed_command_memo.hash memo in
-      let full_commitment =
-        Zkapp_command.Transaction_commitment.create_complete
-          transaction_commitment ~memo_hash
-          ~fee_payer_hash:
-            (Zkapp_command.Call_forest.Digest.Account_update.create
-               (Account_update.of_fee_payer fee_payer) )
-      in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
-        let fee_payer =
-          match fee_payer with
-          | { body = { public_key; _ }; _ }
-            when Public_key.Compressed.equal public_key pk_compressed ->
-              { fee_payer with
-                authorization =
-                  Schnorr.Chunked.sign sk
-                    (Random_oracle.Input.Chunked.field full_commitment)
+        let fee_payer : Account_update.Fee_payer.t =
+          { body =
+              { Account_update.Body.Fee_payer.dummy with
+                public_key = pk_compressed
+              ; fee = Currency.Fee.(of_nanomina_int_exn 100)
               }
-          | fee_payer ->
-              fee_payer
+          ; authorization = Signature.dummy
+          }
         in
-        let account_updates =
-          Zkapp_command.Call_forest.map account_updates ~f:(function
-            | ({ body = { public_key; use_full_commitment; _ }
-               ; authorization = Signature _
-               } as account_update :
-                Account_update.t )
+        let memo_hash = Signed_command_memo.hash memo in
+        let full_commitment =
+          Zkapp_command.Transaction_commitment.create_complete
+            transaction_commitment ~memo_hash
+            ~fee_payer_hash:
+              (Zkapp_command.Call_forest.Digest.Account_update.create
+                 (Account_update.of_fee_payer fee_payer) )
+        in
+        let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+            Zkapp_command.t =
+          let fee_payer =
+            match fee_payer with
+            | { body = { public_key; _ }; _ }
               when Public_key.Compressed.equal public_key pk_compressed ->
-                let commitment =
-                  if use_full_commitment then full_commitment
-                  else transaction_commitment
-                in
-                { account_update with
+                { fee_payer with
                   authorization =
-                    Signature
-                      (Schnorr.Chunked.sign sk
-                         (Random_oracle.Input.Chunked.field commitment) )
+                    Schnorr.Chunked.sign sk
+                      (Random_oracle.Input.Chunked.field full_commitment)
                 }
-            | account_update ->
-                account_update )
+            | fee_payer ->
+                fee_payer
+          in
+          let account_updates =
+            Zkapp_command.Call_forest.map account_updates ~f:(function
+              | ({ body = { public_key; use_full_commitment; _ }
+                 ; authorization = Signature _
+                 } as account_update :
+                  Account_update.t )
+                when Public_key.Compressed.equal public_key pk_compressed ->
+                  let commitment =
+                    if use_full_commitment then full_commitment
+                    else transaction_commitment
+                  in
+                  { account_update with
+                    authorization =
+                      Signature
+                        (Schnorr.Chunked.sign sk
+                           (Random_oracle.Input.Chunked.field commitment) )
+                  }
+              | account_update ->
+                  account_update )
+          in
+          { fee_payer; account_updates; memo }
         in
-        { fee_payer; account_updates; memo }
-      in
-      let zkapp_command : Zkapp_command.t =
         sign_all { fee_payer; account_updates = zkapp_command; memo }
       in
+      let zkapp_commands = List.map zkapp_commands ~f:fix_command in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
             Account.create account_id
@@ -231,22 +232,23 @@ let%test_module "Verification key modify mid txn" =
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               check_zkapp_command_with_merges_exn ?expected_failure ledger
-                [ zkapp_command ] ) ;
+                zkapp_commands ) ;
           Ledger.get ledger loc )
 
     let%test_unit "Verification key swapped, later account updates run, \
                    transactions succeeds" =
       let account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree
-             Trivial_account_update2.account_update
-        |> Zkapp_command.Call_forest.cons
-             (Deploy_account_update.account_update vk2)
-        |> Zkapp_command.Call_forest.cons_tree
-             Trivial_account_update1.account_update
-        |> Zkapp_command.Call_forest.cons
-             (Deploy_account_update.account_update vk1)
-        |> test_zkapp_command
+        test_zkapp_command
+          [ []
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update2.account_update
+            |> Zkapp_command.Call_forest.cons
+                 (Deploy_account_update.account_update vk2)
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update1.account_update
+            |> Zkapp_command.Call_forest.cons
+                 (Deploy_account_update.account_update vk1)
+          ]
       in
       let (first_state :: _zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -260,18 +262,44 @@ let%test_module "Verification key modify mid txn" =
     let%test_unit "Verification key swapped, later account updates bad, \
                    transactions fails" =
       let _account =
-        []
-        |> Zkapp_command.Call_forest.cons_tree
-             Trivial_account_update1.account_update
-        |> Zkapp_command.Call_forest.cons
-             (Deploy_account_update.account_update vk2)
-        |> Zkapp_command.Call_forest.cons_tree
-             Trivial_account_update1.account_update
-        |> Zkapp_command.Call_forest.cons
-             (Deploy_account_update.account_update vk1)
-        |> test_zkapp_command
-             ~expected_failure:
-               Transaction_status.Failure.update_not_permitted_verification_key
+        test_zkapp_command
+          ~expected_failure:
+            Transaction_status.Failure.update_not_permitted_verification_key
+          [ []
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update1.account_update
+            |> Zkapp_command.Call_forest.cons
+                 (Deploy_account_update.account_update vk2)
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update1.account_update
+            |> Zkapp_command.Call_forest.cons
+                 (Deploy_account_update.account_update vk1)
+          ]
       in
       ()
+
+    let%test_unit "Verification key deployed in txn1. Txn2 use, swap, use. \
+                   Expect success" =
+      let account =
+        test_zkapp_command
+          [ Zkapp_command.Call_forest.cons
+              (Deploy_account_update.account_update vk1)
+              []
+          ; []
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update2.account_update
+            |> Zkapp_command.Call_forest.cons
+                 (Deploy_account_update.account_update vk2)
+            |> Zkapp_command.Call_forest.cons_tree
+                 Trivial_account_update1.account_update
+          ]
+      in
+      let (first_state :: _zkapp_state) =
+        (Option.value_exn (Option.value_exn account).zkapp).app_state
+      in
+      (* This should succeed and the end result is the state should be set to 2 *)
+      assert (
+        Snark_params.Tick.Field.equal
+          (Snark_params.Tick.Field.of_int 2)
+          first_state )
   end )
