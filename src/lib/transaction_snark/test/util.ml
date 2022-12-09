@@ -128,6 +128,59 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let open Async.Deferred.Let_syntax in
+  let%bind verifier =
+    Verifier.create ~logger:(Logger.create ()) ~proof_level:Full
+      ~constraint_constants ~conf_dir:None
+      ~pids:(Child_processes.Termination.create_pid_table ())
+  in
+  (* verify the proofs *)
+  let%bind () =
+    if ignore_outside_snark then return ()
+    else
+      let%map verified_results =
+        Verifier.verify_commands verifier
+          (List.map zkapp_commands ~f:(fun zkapp_command ->
+               User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
+                 ~location_of_account:Mina_ledger.Ledger.location_of_account
+                 (Zkapp_command zkapp_command)
+               |> Or_error.ok_exn ) )
+        |> Async.Deferred.map ~f:Or_error.ok_exn
+      in
+      let invalids =
+        List.fold verified_results ~init:[] ~f:(fun acc a ->
+            match a with
+            | `Valid _ | `Valid_assuming _ ->
+                (* assuming we don't need to check the valid-assuming! *)
+                acc
+            | _ ->
+                a :: acc )
+      in
+      if List.is_empty invalids then ()
+      else
+        let message =
+          List.map invalids ~f:(function
+            | `Invalid_keys keys ->
+                sprintf
+                  !"Invalid keys %{sexp: Public_key.Compressed.t list}"
+                  keys
+            | `Invalid_proof ->
+                "Invalid proof"
+            | `Invalid_signature keys ->
+                sprintf
+                  !"Invalid signature %{sexp: Public_key.Compressed.t list}"
+                  keys
+            | `Missing_verification_key keys ->
+                sprintf
+                  !"Missing verification key %{sexp: Public_key.Compressed.t \
+                    list}"
+                  keys
+            | _ ->
+                "Unknown" )
+          |> String.concat ~sep:" ; "
+        in
+        failwith (sprintf !"Verifier returned invalid transactions: %s" message)
+  in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
       match
         Or_error.try_with (fun () ->
