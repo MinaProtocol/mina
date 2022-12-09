@@ -150,24 +150,40 @@ end
 
 type job = Available_job.t [@@deriving sexp]
 
+(*Scan state and any zkapp updates that were applied to the to the most recent
+   snarked ledger but are from the tree just before the tree corresponding to
+   the snarked ledger*)
 [%%versioned
 module Stable = struct
   module V2 = struct
     type t =
-      ( Ledger_proof_with_sok_message.Stable.V2.t
-      , Transaction_with_witness.Stable.V2.t )
-      Parallel_scan.State.Stable.V1.t
+      { scan_state :
+          ( Ledger_proof_with_sok_message.Stable.V2.t
+          , Transaction_with_witness.Stable.V2.t )
+          Parallel_scan.State.Stable.V1.t
+      ; previous_incomplete_zkapp_updates :
+          Transaction_with_witness.Stable.V2.t list
+      }
     [@@deriving sexp]
 
     let to_latest = Fn.id
 
     let hash (t : t) =
       let state_hash =
-        Parallel_scan.State.hash t
+        Parallel_scan.State.hash t.scan_state
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
           (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
-      Staged_ledger_hash.Aux_hash.of_sha256 state_hash
+      let incomplete_updates =
+        List.fold ~init:"" t.previous_incomplete_zkapp_updates ~f:(fun acc t ->
+            acc
+            ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+        |> Digestif.SHA256.digest_string
+      in
+      Staged_ledger_hash.Aux_hash.of_sha256
+        Digestif.SHA256.(
+          digest_string
+            (to_raw_string state_hash ^ to_raw_string incomplete_updates))
   end
 end]
 
@@ -370,7 +386,9 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants tree ~statement_check ~verifier :
+  let scan_statement ~constraint_constants
+      ({ scan_state = tree; previous_incomplete_zkapp_updates } : t)
+      ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
@@ -453,6 +471,43 @@ struct
           in
           (acc_stmt, acc_pc)
     in
+    let check_base (acc_statement, acc_pc) transaction =
+      with_error "Bad base statement" ~f:(fun () ->
+          let%bind expected_statement =
+            match statement_check with
+            | `Full get_state ->
+                let%bind result =
+                  Timer.time timer
+                    (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
+                      Deferred.return
+                        (create_expected_statement ~constraint_constants
+                           ~get_state transaction ) )
+                in
+                let%map () = yield_always () in
+                result
+            | `Partial ->
+                return transaction.statement
+          in
+          let%bind () = yield_always () in
+          if
+            Transaction_snark.Statement.equal transaction.statement
+              expected_statement
+          then
+            let%bind acc_stmt =
+              merge_acc ~proofs:[] acc_statement transaction.statement
+            in
+            let%map acc_pc =
+              merge_pc acc_pc transaction.statement |> Deferred.return
+            in
+            (acc_stmt, acc_pc)
+          else
+            Deferred.Or_error.error_string
+              (sprintf
+                 !"Bad base statement expected: \
+                   %{sexp:Transaction_snark.Statement.t} got: \
+                   %{sexp:Transaction_snark.Statement.t}"
+                 transaction.statement expected_statement ) )
+    in
     let fold_step_d (acc_statement, acc_pc) job =
       match job with
       | Parallel_scan.Base.Job.Empty ->
@@ -467,45 +522,14 @@ struct
           in
           (acc_statement, acc_pc)
       | Full { job = transaction; _ } ->
-          with_error "Bad base statement" ~f:(fun () ->
-              let%bind expected_statement =
-                match statement_check with
-                | `Full get_state ->
-                    let%bind result =
-                      Timer.time timer
-                        (sprintf "create_expected_statement:%s" __LOC__)
-                        (fun () ->
-                          Deferred.return
-                            (create_expected_statement ~constraint_constants
-                               ~get_state transaction ) )
-                    in
-                    let%map () = yield_always () in
-                    result
-                | `Partial ->
-                    return transaction.statement
-              in
-              let%bind () = yield_always () in
-              if
-                Transaction_snark.Statement.equal transaction.statement
-                  expected_statement
-              then
-                let%bind acc_stmt =
-                  merge_acc ~proofs:[] acc_statement transaction.statement
-                in
-                let%map acc_pc =
-                  merge_pc acc_pc transaction.statement |> Deferred.return
-                in
-                (acc_stmt, acc_pc)
-              else
-                Deferred.Or_error.error_string
-                  (sprintf
-                     !"Bad base statement expected: \
-                       %{sexp:Transaction_snark.Statement.t} got: \
-                       %{sexp:Transaction_snark.Statement.t}"
-                     transaction.statement expected_statement ) )
+          check_base (acc_statement, acc_pc) transaction
     in
     let%bind.Deferred res =
-      Fold.fold_chronological_until tree ~init:(None, None)
+      let%bind previous_zkapp_updates =
+        Deferred.Or_error.List.fold ~init:(None, None)
+          previous_incomplete_zkapp_updates ~f:check_base
+      in
+      Fold.fold_chronological_until tree ~init:previous_zkapp_updates
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
           match%map.Deferred fold_step_a acc job with
@@ -636,9 +660,11 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         (Ledger_proof.statement p2)
       |> Result.ok
 
-let create ~work_delay ~transaction_capacity_log_2 =
+let create ~work_delay ~transaction_capacity_log_2 : t =
   let k = Int.pow 2 transaction_capacity_log_2 in
-  Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
+  { scan_state = Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
+  ; previous_incomplete_zkapp_updates = []
+  }
 
 let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
     =
@@ -657,29 +683,38 @@ let extract_txns txns_with_witnesses =
       (txn, state_hash) )
 
 let latest_ledger_proof t =
+  (*TODO: Deepthi; include previous incomplete zkapp updates*)
   let open Option.Let_syntax in
-  let%map proof, txns_with_witnesses = Parallel_scan.last_emitted_value t in
+  let%map proof, txns_with_witnesses =
+    Parallel_scan.last_emitted_value t.scan_state
+  in
   (proof, extract_txns txns_with_witnesses)
 
-let free_space = Parallel_scan.free_space
+let free_space t = Parallel_scan.free_space t.scan_state
 
 (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
-let all_jobs = Parallel_scan.all_jobs
+let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
-let next_on_new_tree = Parallel_scan.next_on_new_tree
+let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
-let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
+let base_jobs_on_latest_tree t =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
+  Parallel_scan.base_jobs_on_latest_tree t.scan_state
 
-let base_jobs_on_earlier_tree = Parallel_scan.base_jobs_on_earlier_tree
+let base_jobs_on_earlier_tree t =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
+  Parallel_scan.base_jobs_on_earlier_tree t.scan_state
 
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       t.transaction_with_info |> Ledger.Transaction_applied.transaction )
-  @@ Parallel_scan.pending_data t
+  @@ Parallel_scan.pending_data t.scan_state
 
 let staged_transactions_with_protocol_states t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       let txn =
@@ -687,13 +722,13 @@ let staged_transactions_with_protocol_states t
       in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state) )
-  @@ Parallel_scan.pending_data t
+  @@ Parallel_scan.pending_data t.scan_state
   |> Or_error.all
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
   let { Space_partition.first = slots, job_count; second } =
-    Parallel_scan.partition_if_overflowing t
+    Parallel_scan.partition_if_overflowing t.scan_state
   in
   { Space_partition.first = (slots, bundle_count job_count)
   ; second =
@@ -720,7 +755,7 @@ let snark_job_list_json t =
       Ledger_proof.statement (fst a)
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
-    Parallel_scan.view_jobs_with_position t fa fd
+    Parallel_scan.view_jobs_with_position t.scan_state fa fd
   in
   Yojson.Safe.to_string
     (`List
@@ -740,17 +775,17 @@ let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
                  stmt ) ) )
 
 let required_work_pairs t ~slots =
-  let work_list = Parallel_scan.jobs_for_slots t ~slots in
+  let work_list = Parallel_scan.jobs_for_slots t.scan_state ~slots in
   List.concat_map work_list ~f:(fun works -> One_or_two.group_list works)
 
 let k_work_pairs_for_new_diff t ~k =
-  let work_list = Parallel_scan.jobs_for_next_update t in
+  let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.(
     take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
-  let work_list = Parallel_scan.jobs_for_next_update t in
+  let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.concat_map work_list ~f:(fun work_seq ->
       One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
@@ -831,16 +866,16 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
-let update_metrics = Parallel_scan.update_metrics
+let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
-  let fill_in_transaction_snark_work t (works : Transaction_snark_work.t list) :
-      (Ledger_proof.t * Sok_message.t) list Or_error.t =
+  let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
+      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
     let next_jobs =
       List.(
         take
-          (concat @@ Parallel_scan.jobs_for_next_update t)
+          (concat @@ Parallel_scan.jobs_for_next_update tree)
           (total_proofs works))
     in
     map2_or_error next_jobs
@@ -850,10 +885,11 @@ let fill_work_and_enqueue_transactions t transactions work =
            |> One_or_two.to_list ) )
       ~f:completed_work_to_scanable_work
   in
-  let old_proof = Parallel_scan.last_emitted_value t in
-  let%bind work_list = fill_in_transaction_snark_work t work in
+  let old_proof = Parallel_scan.last_emitted_value t.scan_state in
+  let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
   let%bind proof_opt, updated_scan_state =
-    Parallel_scan.update t ~completed_jobs:work_list ~data:transactions
+    Parallel_scan.update t.scan_state ~completed_jobs:work_list
+      ~data:transactions
   in
   let%map result_opt =
     Option.value_map ~default:(Ok None) proof_opt
@@ -870,15 +906,18 @@ let fill_work_and_enqueue_transactions t transactions work =
           Ok (Some (proof, extract_txns txns_with_witnesses))
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
-  (result_opt, updated_scan_state)
+  (*TODO: Deepthi; include previous incomplete zkapp updates*)
+  (result_opt, { t with scan_state = updated_scan_state })
 
 let required_state_hashes t =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   List.fold ~init:State_hash.Set.empty
     ~f:(fun acc (t : Transaction_with_witness.t) ->
       Set.add acc (fst t.state_hash) )
-    (Parallel_scan.pending_data t)
+    (Parallel_scan.pending_data t.scan_state)
 
 let check_required_protocol_states t ~protocol_states =
+  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   let open Or_error.Let_syntax in
   let required_state_hashes = required_state_hashes t in
   let check_length states =
