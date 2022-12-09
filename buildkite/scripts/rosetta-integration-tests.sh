@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
+# See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
+
 set -eo pipefail
 
 export MINA_NETWORK=${MINA_NETWORK:=sandbox}
@@ -33,17 +36,22 @@ export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 
 # Rosetta CLI variables
-export ROSETTA_CONFIGURATION_FILE=${ROSETTA_CONFIGURATION_FILE:=/rosetta/rosetta-cli-config/config.json}
+# Files from ROSETTA_CLI_CONFIG_FILES will be read from
+# ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
+# substituted.
+ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/rosetta/rosetta-cli-config}
+ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
+ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
-mina libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
+mina-dev libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
 
 # Configuration
 echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} ==========================="
 mkdir -p $MINA_KEYS_PATH
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
@@ -66,10 +74,25 @@ cat <<EOF > "$MINA_CONFIG_FILE"
 EOF
 cat $MINA_CONFIG_FILE | jq .
 
+# Substitute placeholders in rosetta-cli configuration
+ROSETTA_CONFIGURATION_OUTPUT_DIR=/tmp/rosetta-cli-config
+mkdir -p "$ROSETTA_CONFIGURATION_OUTPUT_DIR"
+ROSETTA_CONFIGURATION_FILE="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "$MINA_KEYS_PATH/block-producer.key")
+for config_file in $ROSETTA_CLI_CONFIG_FILES
+do
+    sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
+        -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PK}/" \
+        -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
+        -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
+        "$ROSETTA_CONFIGURATION_INPUT_DIR/$config_file" > "$ROSETTA_CONFIGURATION_OUTPUT_DIR/$config_file"
+done
+
+
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
-mina accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
-mina accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
+mina-dev accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
+mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -104,7 +127,7 @@ sleep 5
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
-mina daemon \
+mina-dev daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PK" \
@@ -129,21 +152,22 @@ done
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
-mina accounts unlock --public-key $BLOCK_PRODUCER_PK
-mina accounts unlock --public-key $SNARK_PRODUCER_PK
+mina-dev accounts unlock --public-key $BLOCK_PRODUCER_PK
+mina-dev accounts unlock --public-key $SNARK_PRODUCER_PK
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
 rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
-rosetta-cli check:spec --all
+# uncomment after https://github.com/MinaProtocol/mina/pull/12317 is merged
+# rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-rosetta-cli check:construction
+rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
-rosetta-cli check:data
+rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
