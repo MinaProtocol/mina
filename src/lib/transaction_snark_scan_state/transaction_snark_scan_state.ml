@@ -180,7 +180,7 @@ let create_expected_statement ~constraint_constants
     ; ledger_witness
     ; init_stack
     ; statement
-    ; block_global_slot = _
+    ; block_global_slot
     } =
   let open Or_error.Let_syntax in
   let source_merkle_root =
@@ -196,7 +196,7 @@ let create_expected_statement ~constraint_constants
   let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
-          ~global_slot:(failwith "YAOGAI") ~txn_state_view:state_view
+          ~global_slot:block_global_slot ~txn_state_view:state_view
           ledger_witness transaction )
     |> Or_error.join
   in
@@ -627,10 +627,21 @@ let extract_txns txns_with_witnesses =
       let state_hash = fst txn_with_witness.state_hash in
       (txn, state_hash) )
 
+let extract_txns_and_global_slots txns_with_witness =
+  List.map txns_with_witness
+    ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
+      let txn =
+        Ledger.Transaction_applied.transaction
+          txn_with_witness.transaction_with_info
+      in
+      let state_hash = fst txn_with_witness.state_hash in
+      let global_slot = txn_with_witness.block_global_slot in
+      (txn, state_hash, global_slot) )
+
 let latest_ledger_proof t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses = Parallel_scan.last_emitted_value t in
-  (proof, extract_txns txns_with_witnesses)
+  (proof, extract_txns_and_global_slots txns_with_witnesses)
 
 let free_space = Parallel_scan.free_space
 
@@ -657,7 +668,8 @@ let staged_transactions_with_protocol_states t
         t.transaction_with_info |> Ledger.Transaction_applied.transaction
       in
       let%map protocol_state = get_state (fst t.state_hash) in
-      (txn, protocol_state) )
+      let global_slot = t.block_global_slot in
+      (txn, protocol_state, global_slot) )
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 

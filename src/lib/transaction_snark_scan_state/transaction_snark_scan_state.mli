@@ -89,7 +89,8 @@ val fill_work_and_enqueue_transactions :
 val latest_ledger_proof :
      t
   -> ( Ledger_proof_with_sok_message.t
-     * (Transaction.t With_status.t * State_hash.t) list )
+     * (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+       list )
      option
 
 val free_space : t -> int
@@ -109,7 +110,10 @@ val staged_transactions : t -> Transaction.t With_status.t list
 val staged_transactions_with_protocol_states :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
+  -> ( Transaction.t With_status.t
+     * Mina_state.Protocol_state.value
+     * Mina_numbers.Global_slot.t )
+     list
      Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)

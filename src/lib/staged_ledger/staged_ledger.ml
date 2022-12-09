@@ -329,11 +329,10 @@ module T = struct
     in
     let%bind _ =
       Deferred.Or_error.List.iter txs_with_protocol_state
-        ~f:(fun (tx, protocol_state) ->
+        ~f:(fun (tx, protocol_state, global_slot) ->
           let%map.Deferred () = Scheduler.yield () in
           let%bind.Or_error txn_with_info =
-            Ledger.apply_transaction ~constraint_constants
-              ~global_slot:(failwith "YAOGAI")
+            Ledger.apply_transaction ~constraint_constants ~global_slot
               ~txn_state_view:
                 (Mina_state.Protocol_state.Body.view protocol_state.body)
               snarked_ledger tx.data
