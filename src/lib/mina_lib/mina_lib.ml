@@ -1704,11 +1704,6 @@ let create ?wallets (config : Config.t) =
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
@@ -1723,11 +1718,6 @@ let create ?wallets (config : Config.t) =
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff ()

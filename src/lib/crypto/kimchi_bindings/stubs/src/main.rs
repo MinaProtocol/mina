@@ -1,5 +1,5 @@
-use kimchi::circuits::expr::FeatureFlag;
-use kimchi::proof::caml::CamlRecursionChallenge;
+use kimchi::circuits::{expr::FeatureFlag, lookup::lookups::LookupPattern};
+use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -16,8 +16,8 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain,
-        CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+        CamlLookupInfo, CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed,
+        CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
@@ -92,6 +92,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlGroupAffine<T1> => "or_infinity");
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
+    decl_type!(w, env, PointEvaluations::<T1> => "point_evaluations");
     decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
@@ -112,6 +113,8 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+            decl_type!(w, env, LookupPattern => "lookup_pattern");
+            decl_type!(w, env, CamlLookupInfo => "lookup_info");
             decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
         });
