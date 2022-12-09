@@ -46,6 +46,7 @@ module Transaction_with_witness = struct
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
         ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
       [@@deriving sexp]
 
@@ -179,6 +180,7 @@ let create_expected_statement ~constraint_constants
     ; ledger_witness
     ; init_stack
     ; statement
+    ; block_global_slot = _
     } =
   let open Or_error.Let_syntax in
   let source_merkle_root =
@@ -194,7 +196,8 @@ let create_expected_statement ~constraint_constants
   let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view ledger_witness transaction )
+          ~global_slot:(failwith "YAOGAI") ~txn_state_view:state_view
+          ledger_witness transaction )
     |> Or_error.join
   in
   let target_merkle_root =

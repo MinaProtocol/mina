@@ -164,6 +164,7 @@ val current_ledger_proof : t -> Ledger_proof.t option
 
 val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> ?log_block_creation:bool
   -> t
   -> coinbase_receiver:Public_key.Compressed.t

@@ -520,8 +520,9 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
       ~init:((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
       ~f:(fun ((max_span, sparse_ledger, coinbase_stack_source), proofs) t ->
         let sparse_ledger', _applied =
-          Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
-            sparse_ledger (Transaction.forget t)
+          Sparse_ledger.apply_transaction ~constraint_constants
+            ~global_slot:txn_state_view.global_slot_since_genesis
+            ~txn_state_view sparse_ledger (Transaction.forget t)
           |> Or_error.ok_exn
         in
         let coinbase_stack_target =
@@ -709,6 +710,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
           let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
+              ~global_slot:txn_state_view.global_slot_since_genesis
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
           in
@@ -755,6 +757,7 @@ let generate_base_snarks_witness sparse_ledger0
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
           let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
+              ~global_slot:txn_state_view.global_slot_since_genesis
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
           in

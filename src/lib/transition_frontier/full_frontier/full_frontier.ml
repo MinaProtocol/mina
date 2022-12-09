@@ -488,8 +488,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           in
           ignore
             ( Or_error.ok_exn
-                (Ledger.apply_transaction ~constraint_constants ~txn_state_view
-                   mt txn.data )
+                (Ledger.apply_transaction ~constraint_constants
+                   ~global_slot:(failwith "YAOGAI") ~txn_state_view mt txn.data )
               : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;

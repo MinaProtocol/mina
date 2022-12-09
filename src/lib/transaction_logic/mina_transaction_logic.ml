@@ -431,6 +431,7 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Global_slot.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
@@ -2125,11 +2126,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; burned_tokens
       }
 
-  let apply_transaction ~constraint_constants
+  let apply_transaction ~constraint_constants ~global_slot
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
     let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    let _g = global_slot in
     Or_error.map
       ( match t with
       | Command (Signed_command txn) ->

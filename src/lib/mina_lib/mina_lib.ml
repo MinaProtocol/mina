@@ -659,6 +659,7 @@ let get_snarked_ledger t state_hash_opt =
                             in
                             match
                               Ledger.apply_transaction
+                                ~global_slot:(failwith "YAOGAI")
                                 ~constraint_constants:
                                   t.config.precomputed_values
                                     .constraint_constants ~txn_state_view ledger

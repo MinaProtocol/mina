@@ -163,6 +163,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    } )
             else
               ( Ledger.apply_transaction ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis
                   ~txn_state_view:state_view ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
@@ -514,7 +515,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   in
   let expect_snark_failure, applied_transaction =
     match
-      Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
+      Ledger.apply_transaction ledger ~constraint_constants
+        ~global_slot:txn_state_view.global_slot_since_genesis ~txn_state_view
         txn_unchecked
     with
     | Ok res ->

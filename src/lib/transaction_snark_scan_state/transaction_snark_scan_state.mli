@@ -21,6 +21,7 @@ module Transaction_with_witness : sig
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; block_global_slot : Mina_numbers.Global_slot.t
     }
   [@@deriving sexp]
 end
