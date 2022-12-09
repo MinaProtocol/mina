@@ -127,6 +127,7 @@ val hash : t -> Staged_ledger_hash.t
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Staged_ledger_diff.t
   -> logger:Logger.t
@@ -146,6 +147,7 @@ val apply :
 
 val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t

@@ -1051,7 +1051,7 @@ module T = struct
               (Verifier.Failure.Verification_failed
                  (Error.of_string "batch verification failed") ) ) )
 
-  let apply ?skip_verification ~constraint_constants t
+  let apply ?skip_verification ~constraint_constants ~global_slot t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
@@ -1078,7 +1078,7 @@ module T = struct
       apply_diff
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
-        ~constraint_constants ~global_slot:(failwith "YAOGAI") t
+        ~constraint_constants ~global_slot t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
         ~log_prefix:"apply_diff"
@@ -1089,7 +1089,7 @@ module T = struct
           , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time)
           )
         ]
-      "Staged_ledger.apply_diff take $time_elapsed" ;
+      "Staged_ledger.apply_difff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
@@ -1099,7 +1099,7 @@ module T = struct
     in
     res
 
-  let apply_diff_unchecked ~constraint_constants t
+  let apply_diff_unchecked ~constraint_constants ~global_slot t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase =
@@ -1112,9 +1112,8 @@ module T = struct
     in
     apply_diff t
       (forget_prediff_info prediff)
-      ~constraint_constants ~global_slot:(failwith "YAOGAI") ~logger
-      ~current_state_view ~state_and_body_hash
-      ~log_prefix:"apply_diff_unchecked"
+      ~constraint_constants ~global_slot ~logger ~current_state_view
+      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
 
   module Resources = struct
     module Discarded = struct
@@ -2137,9 +2136,9 @@ let%test_module "staged ledger tests" =
               , `Staged_ledger sl'
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
-          Sl.apply ~constraint_constants !sl diff' ~logger ~verifier
-            ~current_state_view ~state_and_body_hash ~coinbase_receiver
-            ~supercharge_coinbase
+          Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
+            ~verifier ~current_state_view ~state_and_body_hash
+            ~coinbase_receiver ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -2850,9 +2849,12 @@ let%test_module "staged ledger tests" =
                         ~coinbase_amount:constraint_constants.coinbase_amount
                         cmds_this_iter work_done partitions
                     in
+                    let current_state_view = dummy_state_view () in
                     let%bind apply_res =
-                      Sl.apply ~constraint_constants !sl diff ~logger ~verifier
-                        ~current_state_view:(dummy_state_view ())
+                      Sl.apply ~constraint_constants
+                        ~global_slot:
+                          current_state_view.global_slot_since_genesis !sl diff
+                        ~logger ~verifier ~current_state_view
                         ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
                         ~coinbase_receiver ~supercharge_coinbase:true
@@ -3785,10 +3787,9 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   let%map res =
-                    Sl.apply ~constraint_constants !sl
+                    Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier
-                      ~current_state_view:(dummy_state_view ())
+                      ~logger ~verifier ~current_state_view
                       ~state_and_body_hash:
                         (State_hash.dummy, State_body_hash.dummy)
                       ~coinbase_receiver ~supercharge_coinbase:false

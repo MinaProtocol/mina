@@ -328,6 +328,7 @@ module Internal_command = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ string; int; int64; int; int64; int64; int64; int; int ]
 
+  (* JIAWEI: Should this also be changed in my PR? *)
   (* the transaction global slot since genesis is taken from the internal command's parent block, mirroring
      the call to Staged_ledger.apply in Block_producer
   *)

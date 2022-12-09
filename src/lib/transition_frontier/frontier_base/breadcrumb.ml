@@ -365,6 +365,7 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            ~global_slot:current_state_view.global_slot_since_genesis
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase

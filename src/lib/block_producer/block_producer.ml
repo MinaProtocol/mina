@@ -235,7 +235,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       match%map
         let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_state_view:previous_state_view
+          ~global_slot diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
           ~coinbase_receiver ~supercharge_coinbase
