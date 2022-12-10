@@ -37,7 +37,7 @@ WORKDIR $HOME/${MINA_DIR}
 RUN make libp2p_helper \
   && cd src/app/libp2p_helper/src/libp2p_helper \
   && go clean --cache --modcache --testcache -r \
-  && cd $HOME/${MINA_DIR}
+  && cd $HOME/${MINA_DIR} \
   && ./scripts/zexe-standardize.sh
 
 # --- Export the mina commit sha to use in rebuild-deb.sh

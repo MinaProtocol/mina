@@ -40,7 +40,7 @@ RUN mkdir ${HOME}/app
 RUN make libp2p_helper \
   && cd src/app/libp2p_helper/src/libp2p_helper \
   && go clean --cache --modcache --testcache -r \
-  && cd $HOME/${MINA_DIR}
+  && cd $HOME/${MINA_DIR} \
   && ./scripts/zexe-standardize.sh
 
 # --- Make rosetta-crucial components and the generate_keypair tool
