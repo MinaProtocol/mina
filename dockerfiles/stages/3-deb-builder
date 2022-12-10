@@ -33,14 +33,15 @@ RUN rm -rf ${MINA_DIR} && mkdir ${MINA_DIR} && cd ${MINA_DIR} \
 # Set the working directory to the cloned mina repo
 WORKDIR $HOME/${MINA_DIR}
 
-
-
 # --- Build libp2p_helper, clear cache, and run zexe standardize
 RUN make libp2p_helper \
   && cd src/app/libp2p_helper/src/libp2p_helper \
   && go clean --cache --modcache --testcache -r \
   && cd $HOME/${MINA_DIR}
   && ./scripts/zexe-standardize.sh
+
+# --- Export the mina commit sha to use in rebuild-deb.sh
+ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
 
 # --- Build all major tagets required for packaging
 RUN echo "--- Build all major tagets required for packaging" \
@@ -67,7 +68,7 @@ RUN echo "--- Build all major tagets required for packaging" \
 
 # --- MAKE DEB
 RUN eval $(opam config env) \
-   && echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}" \
+   && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1}" \
    && ./scripts/rebuild-deb.sh \
    && mkdir /debs/ \
    && cp mina*.deb /debs/ \
