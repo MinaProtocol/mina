@@ -108,9 +108,10 @@ let DockerfileDescription =
           { service : Text
           , dockerfilePaths : List Text
           , dockerContext : Optional Text
+          , targetStage : Optional Text
           , timeout : Optional Text
           }
-      , default = { dockerContext = None Text, timeout = Some "3600s" }
+      , default = { dockerContext = None Text, targetStage = None Text, timeout = Some "3600s" }
       }
 
 let optionalBuildArg
@@ -132,7 +133,8 @@ let mkArgs
     = λ(tag : Text) →
       λ(desc : DockerfileDescription.Type) →
       λ(serviceDesc : ServiceDescription.Type) →
-          optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
+        [ "--target", desc.targetStage ]
+        # optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
         # optionalBuildArg "MINA_REPO" serviceDesc.repo
         # optionalBuildArg "network" serviceDesc.network
         # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
@@ -253,6 +255,7 @@ let kanikoBuild
                   (   [ "--dockerfile=Dockerfile"
                       , "--context=dir://${context}"
                       , "--destination=${image}"
+                      , "--skip-unused-stages"
                       , "--cache=true"
                       , "--cache-ttl=24h"
                       ]
@@ -301,27 +304,30 @@ let dockerBuild
 let services =
       { mina-archive = DockerfileDescription::{
         , service = "mina-archive"
+        , targetStage = "archive"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
+        , targetStage = "daemon"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
+        , targetStage = "daemon"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-toolchain"
-          , "dockerfiles/stages/4-deb-builder"
-          , "dockerfiles/stages/5-mina-daemon"
+          , "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-daemon"
           ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
+        , targetStage = "toolchain"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
@@ -329,23 +335,24 @@ let services =
           ]
         , dockerContext = Some "dockerfiles"
         }
-      , mina-deb-builder = DockerfileDescription::{
-        , service = "mina-deb-builder"
+      , mina-builder = DockerfileDescription::{
+        , service = "mina-builder"
+        , targetStage = "builder"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-toolchain"
-          , "dockerfiles/stages/4-deb-builder"
+          , "dockerfiles/stages/3-builder"
           ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
+        , targetStage = "rosetta"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-builder"
-          , "dockerfiles/stages/4-production"
+          , "dockerfiles/stages/3-rosetta-builder"
+          , "dockerfiles/stages/4-rosetta"
           ]
         , dockerContext = Some "dockerfiles"
         }

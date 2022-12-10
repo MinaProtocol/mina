@@ -1,5 +1,5 @@
 ARG image=debian:stretch-slim
-FROM ${image}
+FROM ${image} AS daemon
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_release=unstable

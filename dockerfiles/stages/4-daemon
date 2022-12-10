@@ -1,5 +1,5 @@
 ARG image=debian:stretch-slim
-FROM ${image}
+FROM ${image} AS daemon
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_release=unstable
@@ -52,7 +52,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
   && apt-get update \
   && apt-get install -y google-cloud-sdk kubectl
 
-COPY --from=deb-builder /debs/mina-daemon-* /tmp/mina-daemon-package.deb
+COPY --from=builder /debs/mina-daemon-* /tmp/mina-daemon-package.deb
 
 # Mina daemon package
 # jemalloc is also installed automatically here (via apt-get install -f) to match the package dependencies for this $deb_codename

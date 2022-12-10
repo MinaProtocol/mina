@@ -1,10 +1,10 @@
 #################################################################################################
-# The "production" Stage
+# The "rosetta" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
 # Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
 ARG image=ubuntu:focal
-FROM ${image} AS production
+FROM ${image} AS rosetta
 ARG deb_codename=focal
 
 ARG MINA_DAEMON_PORT=10101
@@ -73,11 +73,11 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
 # --- Copy artifacts from the 3-builder stage
-COPY --from=builder /home/opam/app/* /usr/local/bin/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
-COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
+COPY --from=rosetta-builder /home/opam/app/* /usr/local/bin/
+COPY --from=rosetta-builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
+COPY --from=rosetta-builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
+COPY --from=rosetta-builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
+COPY --from=rosetta-builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 # --- Set up postgres
 USER postgres
