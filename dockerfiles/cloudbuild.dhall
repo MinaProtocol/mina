@@ -303,19 +303,19 @@ let dockerBuild
 let services =
       { mina-archive = DockerfileDescription::{
         , service = "mina-archive"
-        , targetStage = "archive"
+        , targetStage = Some "archive"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
-        , targetStage = "daemon"
+        , targetStage = Some "daemon"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
-        , targetStage = "daemon"
+        , targetStage = Some "daemon"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
@@ -326,7 +326,7 @@ let services =
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
-        , targetStage = "toolchain"
+        , targetStage = Some "toolchain"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
@@ -336,7 +336,7 @@ let services =
         }
       , mina-builder = DockerfileDescription::{
         , service = "mina-builder"
-        , targetStage = "builder"
+        , targetStage = Some "builder"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
@@ -346,7 +346,7 @@ let services =
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
-        , targetStage = "rosetta"
+        , targetStage = Some "rosetta"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
