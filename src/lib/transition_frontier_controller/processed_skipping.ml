@@ -42,7 +42,7 @@ let is_status_processed ~state_functions =
     Complexity of this funciton is [O(n)] for [n] being the number of
     states returned plus the number of states for which [`Take false] was returned.
 *)
-let collect_unprocessed (type state_t)
+let collect_unprocessed (type state_t) ~logger
     ?(predicate = { Substate.viewer = (fun _ -> (`Take true, `Continue true)) })
     ~state_functions ~(transition_states : state_t Substate.transition_states)
     ~dsu top_state =
@@ -59,39 +59,70 @@ let collect_unprocessed (type state_t)
     | _ ->
         predicate.Substate.viewer subst
   in
-  let rec go res state =
-    let collected =
-      Substate.collect_states ~predicate:{ viewer } ~state_functions
-        ~transition_states state
+  let top_state_hash = (F.transition_meta top_state).state_hash in
+  let get_next_unprocessed key =
+    (* TODO reduce amount of logging and/or use trace level *)
+    [%log debug]
+      "dsu: requesting set leader for $state_hash (for $top_state_hash)"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson key)
+        ; ("top_state_hash", State_hash.to_yojson top_state_hash)
+        ] ;
+    let%bind.Option ancestor = Dsu.get ~key dsu in
+    [%log debug]
+      "dsu: determined set leader for $state_hash: $ancestor_hash with parent \
+       $ancestor_parent_hash (for $top_state_hash)"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson key)
+        ; ("top_state_hash", State_hash.to_yojson top_state_hash)
+        ; ("ancestor_hash", State_hash.to_yojson ancestor.state_hash)
+        ; ( "ancestor_parent_hash"
+          , State_hash.to_yojson ancestor.parent_state_hash )
+        ] ;
+    let%bind.Option parent =
+      Transition_states.find states ancestor.parent_state_hash
     in
-    match collected with
+    let%map.Option () =
+      Option.some_if (F.equal_state_levels top_state parent) ()
+    in
+    [%log debug]
+      "dsu: returning set leader for $state_hash: $ancestor_hash with parent \
+       $ancestor_parent_hash (for $top_state_hash)"
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson key)
+        ; ("top_state_hash", State_hash.to_yojson top_state_hash)
+        ; ("ancestor_hash", State_hash.to_yojson ancestor.state_hash)
+        ; ( "ancestor_parent_hash"
+          , State_hash.to_yojson ancestor.parent_state_hash )
+        ] ;
+    parent
+  in
+  let rec go st =
+    Substate.collect_ancestors ~predicate:{ viewer } ~state_functions
+      ~transition_states st
+    |> function
     | bottom_state :: rest_states
       when is_status_processed ~state_functions bottom_state ->
-        let key = (F.transition_meta bottom_state).state_hash in
-        let res' = rest_states :: res in
-        Option.value ~default:res'
-        @@ let%bind.Option ancestor = Dsu.get ~key dsu in
-           let%bind.Option parent =
-             Transition_states.find states ancestor.parent_state_hash
-           in
-           let%map.Option () =
-             Option.some_if (F.equal_state_levels top_state parent) ()
-           in
-           go res' parent
-    | _ ->
-        collected :: res
+        let bottom_hash = (F.transition_meta bottom_state).state_hash in
+        Fn.compose
+          (Option.value_map ~default:Fn.id ~f:go
+             (get_next_unprocessed bottom_hash) )
+          (List.cons rest_states)
+    | collected ->
+        List.cons collected
   in
-  List.concat @@ go [] top_state
+  List.concat (go top_state [])
 
 (** [next_unprocessed top_state] finds next unprocessed transition of the same state level
     from the top state (inclusive) down the ancestry chain while.
 
     This function has quasi-constant complexity.
 *)
-let next_unprocessed ~state_functions ~transition_states ~dsu top_state =
+let next_unprocessed ~logger ~state_functions ~transition_states ~dsu top_state
+    =
   let viewer _ = (`Take true, `Continue false) in
   List.hd
-  @@ collect_unprocessed ~predicate:{ viewer } ~state_functions
+  @@ collect_unprocessed ~logger ~predicate:{ viewer } ~state_functions
        ~transition_states ~dsu top_state
 
 (** [collect_to_in_progress top_state] collects unprocessed transitions from
@@ -106,12 +137,11 @@ let next_unprocessed ~state_functions ~transition_states ~dsu top_state =
 
     Complexity of this funciton is [O(n)] for [n] being the size of the returned list.
 *)
-let collect_to_in_progress ~state_functions ~transition_states ~dsu top_state =
+let collect_to_in_progress =
   let viewer = function
     | { Substate.status = Processing (In_progress _); _ } ->
         (`Take true, `Continue false)
     | _ ->
         (`Take true, `Continue true)
   in
-  collect_unprocessed ~predicate:{ viewer } ~state_functions ~transition_states
-    ~dsu top_state
+  collect_unprocessed ~predicate:{ viewer }

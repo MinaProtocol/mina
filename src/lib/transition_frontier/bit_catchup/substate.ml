@@ -13,7 +13,7 @@ let view (type state_t)
   Fn.compose (Option.map ~f:snd)
     (F.modify_substate ~f:{ modifier = (fun st -> (st, f.viewer st)) })
 
-(** [collect_states top_state] collects transitions from the top state (inclusive) down the ancestry chain 
+(** [collect_ancestors top_state] collects transitions from the top state (inclusive) down the ancestry chain 
   while:
   
     1. Condition [predicate] is held
@@ -22,8 +22,8 @@ let view (type state_t)
 
     Returned list of states is in the parent-first order.
 *)
-let collect_states (type state_t) ~predicate ~state_functions
-    ~(transition_states : state_t transition_states) top_state =
+let collect_ancestors (type state_t) ~predicate ~state_functions
+    ~(transition_states : state_t transition_states) =
   let (Transition_states ((module Transition_states), transition_states)) =
     transition_states
   in
@@ -35,7 +35,7 @@ let collect_states (type state_t) ~predicate ~state_functions
     Option.value ~default:(`Take false, `Continue false)
     @@ view ~state_functions ~f:predicate state
   in
-  let rec loop state res =
+  let rec loop res state =
     let `Take to_take, `Continue to_continue = full_predicate state in
     let res' = if to_take then state :: res else res in
     Option.value ~default:res'
@@ -48,9 +48,9 @@ let collect_states (type state_t) ~predicate ~state_functions
        let%map.Option () =
          Option.some_if (equal_state_levels parent_state state) ()
        in
-       loop parent_state res'
+       loop res' parent_state
   in
-  loop top_state []
+  loop []
 
 (** Modify status of common substate to [Processed].
     
@@ -92,9 +92,9 @@ let mark_processed_modifier old_st subst =
 
 (** Function takes transition and returns true when one of conditions hold:
 
-      * Transition's parent is not in the catchup state (which means it's in frontier)
-      * Transition's parent has a higher state level
-    *)
+  - Transition's parent is not in the catchup state (which means it's in frontier)
+
+  - Transition's parent has a higher state level  *)
 let is_parent_higher (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
     state parent_opt =
@@ -112,8 +112,7 @@ let is_parent_higher (type state_t)
     
    Function modifies the status of the transition.
 
-   It doesn't update parent's children structure, this is responsibility of the caller..
-*)
+   It doesn't update parent's children structure, this is responsibility of the caller. *)
 let kickstart_waiting_for_parent (type state_t)
     ~state_functions:(module F : State_functions with type state_t = state_t)
     ~logger ~(transition_states : state_t transition_states) state_hash =
@@ -173,6 +172,39 @@ let update_children_on_processed (type state_t)
   in
   Transition_states.modify_substate_ states ~f:{ modifier } parent_hash
 
+(** [mark_processed_single state_hash] marks a transition as Processed.
+
+  It returns a pair of old transition state and old children or [None] if
+  marking as [Processed] failed.
+  Children structure of [state_hash]'s parent is updated.
+  Updating children of transition [state_hash] is responsibility of the caller.
+
+  Pre-condition: Transition [state_hash] is in [Processing (Done _)] status
+  Post-condition: list returned respects parent-child relationship and parent always comes first *)
+let mark_processed_single (type state_t) ~logger ~state_functions
+    ~(transition_states : state_t transition_states) state_hash =
+  let (module F : State_functions with type state_t = state_t) =
+    state_functions
+  in
+  let (Transition_states ((module Transition_states), states)) =
+    transition_states
+  in
+  let open Option.Let_syntax in
+  let%bind res =
+    Transition_states.modify_substate states
+      ~f:{ ext_modifier = mark_processed_modifier }
+      state_hash
+  in
+  Option.iter
+    ~f:(fun err -> [%log warn] "mark_processed: error %s" err)
+    (Result.error res) ;
+  let%map old_state, old_children = Result.ok res in
+  let meta = F.transition_meta old_state in
+  let parent_hash = meta.parent_state_hash in
+  update_children_on_processed ~transition_states ~state_functions ~parent_hash
+    meta.state_hash ;
+  (old_state, old_children)
+
 (** [mark_processed processed] marks a list of state hashes as Processed.
 
   It returns a list of state hashes to be promoted to higher state.
@@ -217,23 +249,14 @@ let mark_processed (type state_t) ~logger ~state_functions
       (State_hash.Set.to_list children.processed)
   in
   let handle hash =
-    let open Option.Let_syntax in
-    let%bind res =
-      Transition_states.modify_substate states
-        ~f:{ ext_modifier = mark_processed_modifier }
-        hash
+    let%bind.Option old_state, old_children =
+      mark_processed_single ~logger ~state_functions ~transition_states hash
     in
-    Option.iter
-      ~f:(fun err -> [%log warn] "mark_processed: error %s" err)
-      (Result.error res) ;
-    let%bind old_state, old_children = Result.ok res in
     let meta = F.transition_meta old_state in
     let parent_hash = meta.parent_state_hash in
-    update_children_on_processed ~transition_states ~state_functions
-      ~parent_hash meta.state_hash ;
     State_hash.Set.iter ~f:kickstart_waiting old_children.waiting_for_parent ;
     let parent_opt = Transition_states.find states parent_hash in
-    let%map () =
+    let%map.Option () =
       Option.some_if
         ( State_hash.Set.mem !promoted parent_hash
         || is_parent_higher ~state_functions old_state parent_opt )
@@ -342,7 +365,7 @@ module For_tests = struct
       | _ ->
           (`Take false, `Continue true)
     in
-    collect_states ~predicate:{ viewer } ~state_functions ~transition_states
+    collect_ancestors ~predicate:{ viewer } ~state_functions ~transition_states
       top_state
 
   (** [collect_dependent_ancestry top_state] collects transitions from the top state (inclusive) down the ancestry chain 
@@ -365,6 +388,6 @@ module For_tests = struct
       | Processed _ ->
           (`Take false, `Continue true)
     in
-    collect_states ~predicate:{ viewer } ~state_functions ~transition_states
+    collect_ancestors ~predicate:{ viewer } ~state_functions ~transition_states
       top_state
 end

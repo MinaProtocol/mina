@@ -1,6 +1,7 @@
 open Core_kernel
 
-let min_capacity = 64
+(* TODO Reduce min capacity to 64 *)
+let min_capacity = 10000
 
 module type Data = sig
   type t

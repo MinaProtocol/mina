@@ -192,7 +192,7 @@ let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
       | _ ->
           [%log' error Context.logger]
             "Failed ancestor $ancestor_hash of transition $state_hash in \
-             Building_breadcrumb can't be restarted"
+             Building_breadcrumb can't be restarted: no parent breadcrumb"
             ~metadata:
               [ ("ancestor_hash", State_hash.to_yojson ancestor_hash)
               ; ("state_hash", State_hash.to_yojson state_hash)
