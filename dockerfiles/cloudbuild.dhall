@@ -237,7 +237,7 @@ let kanikoBuild
               , args =
                   let script =
                         ''
-                        cat ${dockerfilePathsText} > ${context}/Dockerfile
+                        cat ${dockerfilePathsText} > /workspace/Dockerfile
                         ''
 
                   in  Some [ "-eEuo", "pipefail", "-c", script ]
