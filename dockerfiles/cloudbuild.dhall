@@ -304,6 +304,7 @@ let services =
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
         , dockerfilePaths = [ "Dockerfile-mina-daemon" ]
+        , dockerContext = Some "dockerfiles"
         }
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
@@ -313,6 +314,7 @@ let services =
           , "stages/3-deb-builder"
           , "stages/4-mina-daemon"
           ]
+        , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
@@ -321,6 +323,7 @@ let services =
           , "stages/2-opam-deps"
           , "stages/3-toolchain"
           ]
+        , dockerContext = Some "dockerfiles"
         }
       , mina-deb-builder = DockerfileDescription::{
         , service = "mina-deb-builder"
@@ -330,6 +333,7 @@ let services =
           , "stages/3-toolchain"
           , "stages/4-deb-builder"
           ]
+        , dockerContext = Some "dockerfiles"
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
@@ -339,6 +343,7 @@ let services =
           , "stages/3-builder"
           , "stages/4-production"
           ]
+        , dockerContext = Some "dockerfiles"
         }
       }
 
