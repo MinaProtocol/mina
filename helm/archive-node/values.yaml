@@ -37,7 +37,8 @@ archive:
     metrics: "10002"
   enableLocalDaemon: true
   enablePostgresDB: true
-  enableDumpCronjob: true
+  enableDumpCronjob: false
+  enableMissingBlocksCronjob: false
   bootstrap:
     fromDump: false
     suffix: ""

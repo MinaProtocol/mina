@@ -1,0 +1,42 @@
+{{- if and .Values.archive.enablePostgresDB .Values.archive.enableMissingBlocksCronjob }}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: "{{ template "archive-node.fullname" . }}-check-missing-cronjob"
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - 'apt-get install curl
+              && curl -o https://raw.githubusercontent.com/MinaProtocol/mina/lk86/more-flexible-db-bootstrap/scripts/missing-blocks-cron.sh
+              && mina-missing-blocks-auditor --postgres-uri {{ .Values.archive.postgresUri }}'
+            image: {{ .Values.archive.image }}
+            imagePullPolicy: IfNotPresent
+            name: "{{ template "archive-node.fullname" . }}-check-missing-cronjob"
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 0 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+{{- end -}}
