@@ -109,7 +109,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep rosettaSpec
+        DockerImage.generateStep rosettaSpec,
+
+        -- mina-daemon-deb image
+        let debDaemonSpec = DockerImage.ReleaseSpec::{
+          service="mina-daemon-deb",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          extra_args=["--build-arg", "MINA_COMMIT=\\\${BUILDKITE_COMMIT}"],
+          step_key="mina-daemon-deb-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep debDaemonSpec
 
       ]
     }

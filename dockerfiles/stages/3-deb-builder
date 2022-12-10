@@ -2,7 +2,7 @@
 # The "deb-builder" Stage
 # - builds mina and any other binaries required to run `make deb`
 #################################################################################################
-FROM toolchain AS deb-builder
+FROM opam-deps AS deb-builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet
@@ -11,19 +11,33 @@ ARG DUNE_PROFILE=devnet
 # can also be a tagged release
 ARG MINA_BRANCH=compatible
 
-ARG MINA_COMMIT
-
 # repo to checkout the branch from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
-ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
-
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-# HACK: build without special cpu features to allow more people to run mina
+ARG MINA_COMMIT=25388a0fed9695e8e9d04f75f50c2bae1c9c80db # 1.3.1.2 Stable Release (latest master at time of writing)
+# --- Shallow Clone the Mina repo from a given commit
+# Delete any previous clones of the mina repo and then clone into an empty directory
+RUN cd $HOME && rm -rf $HOME/${MINA_DIR} && mkdir $HOME/${MINA_DIR} \
+  && git init \
+  && git remote add origin ${MINA_REPO} \
+  && git fetch --depth 1 origin ${MINA_COMMIT} \
+  && git checkout FETCH_HEAD \
+  && git submodule update --init --recursive
+# Set the working directory to the cloned mina repo
+WORKDIR $HOME/${MINA_DIR}
+# Create a directory for compiled outputs
+RUN mkdir ${HOME}/app
+
+# --- Build libp2p_helper
+RUN make libp2p_helper \
+   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
+
+# HACK: build without special cpu features to allow more people to run mina-rosetta
 RUN ./scripts/zexe-standardize.sh
 
 # --- Build all major tagets required for packaging
@@ -39,23 +53,24 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/cli/src/mina_testnet_signatures.exe \
     src/app/cli/src/mina_mainnet_signatures.exe \
     src/app/archive/archive.exe \
-    src/app/archive/archive_testnet_signatures.exe \
-    src/app/archive/archive_mainnet_signatures.exe \
+    src/app/cli/src/mina_mainnet_signatures.exe \
+    src/app/archive_blocks/archive_blocks.exe \
+    src/app/extract_blocks/extract_blocks.exe \
+    src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+    src/app/replayer/replayer.exe \
     src/app/rosetta/rosetta.exe \
-    src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/rosetta_testnet_signatures.exe \
+    src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/ocaml-signer/signer.exe
 
 # --- MAKE DEB
 RUN eval $(opam config env) \
    && echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}" \
-   && ./scripts/rebuild-deb.sh
+   && ./scripts/rebuild-deb.sh \
+   && mkdir /debs/ \
+   && cp mina*.deb /debs/ \
+   && rm -rf _build
 
-# Rosetta-demo artifacts / build dir removal:
-# Make rosetta-crucial components and the generate_keypair tool
-#  && dune build --profile=${DUNE_PROFILE} \
-#  && _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-#    --config-file src/app/rosetta/demo-config.json \
-#    --genesis-dir ${HOME}/demo-genesis \
-#  && mv _build/default/src/app $HOME/app \
-#  && rm -rf _build
+# --- Clear go module caches to make the container smaller
+RUN cd src/app/libp2p_helper/src/libp2p_helper \
+  && go clean --cache --modcache --testcache -r

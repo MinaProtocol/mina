@@ -312,6 +312,27 @@ let services =
         , dockerContext = Some "dockerfiles/"
         , timeout = Some "3600s"
         }
+      , mina-deb-builder = DockerfileDescription::{
+        , service = "mina-deb-builder"
+        , dockerfilePaths = 
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-deb-builder"
+          ]
+        , dockerContext = Some "dockerfiles/"
+        , timeout = Some "3600s"
+        }
+      , mina-daemon-deb = DockerfileDescription::{
+        , service = "mina-daemon-deb"
+        , dockerfilePaths =
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-deb-builder"
+          , "dockerfiles/stages/4-mina-daemon"
+          ]
+        , dockerContext = Some "dockerfiles/"
+        , timeout = Some "3600s"
+        }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
         , dockerfilePaths =
