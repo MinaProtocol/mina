@@ -124,7 +124,7 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
       interrupt_after_timeout ~timeout I.interrupt_ivar ;
       Substate.In_progress
         { interrupt_ivar = I.interrupt_ivar
-        ; timeout
+        ; processing_status = Executing { timeout }
         ; downto_
         ; holder = ref state_hash
         }

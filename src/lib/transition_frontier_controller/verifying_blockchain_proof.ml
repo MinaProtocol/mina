@@ -34,14 +34,9 @@ module F = struct
     | st ->
         st
 
-  let create_in_progress_context ~context ~holder states =
-    let (module Context : CONTEXT) = context in
-    let module I = Interruptible.Make () in
+  let verify ~context:(module Context : CONTEXT) (module I : Interruptible.F)
+      states =
     let headers = Mina_stdlib.Nonempty_list.map ~f:to_header_exn states in
-    let downto_ =
-      Mina_stdlib.Nonempty_list.head headers
-      |> Mina_block.Validation.header |> Mina_block.Header.blockchain_length
-    in
     let header_list = Mina_stdlib.Nonempty_list.to_list headers in
     [%log' debug Context.logger] "verify_blockchain_proofs of $state_hashes"
       ~metadata:
@@ -52,14 +47,8 @@ module F = struct
                    (Fn.compose State_hash.to_yojson
                       state_hash_of_header_with_validation ) ) )
         ] ;
-    let action = Context.verify_blockchain_proofs (module I) header_list in
-    let timeout =
-      Time.add (Time.now ()) Context.ancestry_verification_timeout
-    in
-    interrupt_after_timeout ~timeout I.interrupt_ivar ;
-    ( Substate.In_progress
-        { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
-    , I.force action )
+    ( Context.verify_blockchain_proofs (module I) header_list
+    , Context.ancestry_verification_timeout )
 
   let data_name = "blockchain proof"
 

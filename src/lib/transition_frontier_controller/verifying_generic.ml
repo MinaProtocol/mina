@@ -71,7 +71,7 @@ module Make (F : F) = struct
       *)
   let try_to_reuse ~logger ~transition_states ts ctx =
     match ctx with
-    | Substate.In_progress { downto_; timeout = _; interrupt_ivar; holder } ->
+    | Substate.In_progress { downto_; interrupt_ivar; holder; _ } ->
         let for_restart, for_reuse =
           List.split_while ts ~f:(fun st ->
               let meta = Transition_state.State_functions.transition_meta st in
@@ -301,14 +301,16 @@ module Make (F : F) = struct
                 actions.Misc.mark_processed_and_promote [ state_hash ]
                   ~reason:("verified " ^ F.data_name) ) )
         |> fail_if_unequal_lengths
-    | Result.Ok (Result.Error (`Invalid_proof e)) ->
+    | Ok (Error (`Invalid_proof e)) ->
         (* We mark invalid only the top header because it is the only one for which
            we can be sure it's invalid. *)
         actions.Misc.mark_invalid
           ~error:(Error.tag ~tag:("invalid " ^ F.data_name) e)
           top_state_hash
-    | Result.Ok (Result.Error (`Verifier_error e)) ->
+    | Ok (Error (`Verifier_error e)) ->
         fail e
+    | Ok (Error `Late_to_start) ->
+        ()
 
   and launch_in_progress ~context ~actions ~transition_states states =
     let top_state = Mina_stdlib.Nonempty_list.last states in
@@ -317,11 +319,21 @@ module Make (F : F) = struct
     in
     let holder = ref top_state_hash in
     let state_hashes = Mina_stdlib.Nonempty_list.map ~f:get_state_hash states in
-    let ctx, action = F.create_in_progress_context ~context ~holder states in
-    let open Async_kernel.Deferred in
-    upon (both actions action)
-    @@ upon_f ~context ~transition_states ~state_hashes ~holder ;
-    ctx
+    let bottom_state = Mina_stdlib.Nonempty_list.head states in
+    let downto_ =
+      (Transition_state.State_functions.transition_meta bottom_state)
+        .blockchain_length
+    in
+    let module I = Interruptible.Make () in
+    let process_f () = F.verify ~context (module I) states in
+    let upon_f = upon_f ~context ~transition_states ~state_hashes ~holder in
+    let processing_status =
+      controlling_verifier_bandwidth ~context ~actions ~transition_states
+        ~state_hash:top_state_hash ~process_f ~upon_f
+        (module I)
+    in
+    Substate.In_progress
+      { interrupt_ivar = I.interrupt_ivar; processing_status; downto_; holder }
 
   and start_batch ~context ~actions ~transition_states states =
     let (module Context : CONTEXT) = context in

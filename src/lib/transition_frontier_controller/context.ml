@@ -53,6 +53,11 @@ module type CONTEXT = sig
     -> (module Interruptible.F)
     -> Mina_block.Body.t Or_error.t Interruptible.t
 
+  val allocate_verifier_bandwidth :
+    unit -> [ `Start_immediately | `Wait of unit Async_kernel.Ivar.t ]
+
+  val deallocate_verifier_bandwidth : unit -> unit
+
   (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
        received_at:Time.t
@@ -157,3 +162,54 @@ let accept_gossip ~context:(module Context : CONTEXT) ~valid_cb consensus_state
 let interrupt_after_timeout ~timeout interrupt_ivar =
   Async_kernel.upon (Async.at timeout)
     (Async_kernel.Ivar.fill_if_empty interrupt_ivar)
+
+let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
+    ~transition_states ~state_hash ~actions ~upon_f ~process_f
+    (module I : Interruptible.F) =
+  let mk_timeout span =
+    let timeout = Time.(add @@ now ()) span in
+    interrupt_after_timeout ~timeout I.interrupt_ivar ;
+    timeout
+  in
+  let start_action ~need_deallocate action =
+    Async_kernel.Deferred.(upon @@ both actions (I.force action)) (fun res ->
+        if need_deallocate then Context.deallocate_verifier_bandwidth () ;
+        upon_f res )
+  in
+  let late_start = I.return (Result.Error `Late_to_start) in
+  let ext_modifier _ = function
+    | { Substate_types.status =
+          Processing (In_progress ({ processing_status = Waiting; _ } as ctx))
+      ; _
+      } as s ->
+        let action, timeout_span = process_f () in
+        let timeout = mk_timeout timeout_span in
+        let status =
+          Substate_types.Processing
+            (In_progress { ctx with processing_status = Executing { timeout } })
+        in
+        ({ s with status }, action)
+    | st ->
+        (st, late_start)
+  in
+  let build_after_state_update () =
+    Transition_states.modify_substate transition_states state_hash
+      ~f:{ ext_modifier }
+  in
+  match Context.allocate_verifier_bandwidth () with
+  | `Start_immediately ->
+      let action, timeout_span = process_f () in
+      start_action ~need_deallocate:true action ;
+      Substate.Executing { timeout = mk_timeout timeout_span }
+  | `Wait wait_ivar ->
+      let action =
+        let%bind.I.Deferred_let_syntax () = Async_kernel.Ivar.read wait_ivar in
+        match build_after_state_update () with
+        | Some action_ ->
+            I.finally action_ ~f:Context.deallocate_verifier_bandwidth
+        | None ->
+            Context.deallocate_verifier_bandwidth () ;
+            late_start
+      in
+      start_action ~need_deallocate:false action ;
+      Substate.Waiting

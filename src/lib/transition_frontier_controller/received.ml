@@ -43,8 +43,26 @@ let mark_done ~logger ~transition_states state_hash =
   Transition_states.update transition_states st' ;
   match st with
   | Transition_state.Received
-      { substate = { status = Processing (In_progress ctx); _ }; _ } ->
-      Some (ctx.timeout, ctx.interrupt_ivar)
+      { substate =
+          { status =
+              Processing
+                (In_progress
+                  { interrupt_ivar
+                  ; processing_status = Executing { timeout }
+                  ; _
+                  } )
+          ; _
+          }
+      ; _
+      } ->
+      Some (timeout, interrupt_ivar)
+  | Transition_state.Received
+      { substate =
+          { status = Processing (In_progress { interrupt_ivar; _ }); _ }
+      ; _
+      } ->
+      Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
+      None
   | _ ->
       None
 
@@ -382,7 +400,12 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
     let state_hash = State_hash.With_state_hashes.state_hash hh in
     let downto_ = Mina_numbers.Length.zero in
     Substate.Processing
-      (In_progress { timeout; interrupt_ivar; downto_; holder = ref state_hash })
+      (In_progress
+         { processing_status = Executing { timeout }
+         ; interrupt_ivar
+         ; downto_
+         ; holder = ref state_hash
+         } )
   in
   let f st =
     if is_received st then
@@ -540,7 +563,7 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
       add_to_state
       @@ Processing
            (In_progress
-              { timeout
+              { processing_status = Executing { timeout }
               ; interrupt_ivar
               ; downto_ = Mina_numbers.Length.zero
               ; holder = ref state_hash

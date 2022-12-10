@@ -46,14 +46,8 @@ module F = struct
     | st ->
         st
 
-  let create_in_progress_context ~context:(module Context : CONTEXT) ~holder
+  let verify ~context:(module Context : CONTEXT) (module I : Interruptible.F)
       states =
-    let bottom_state = Mina_stdlib.Nonempty_list.head states in
-    let downto_ =
-      (Transition_state.State_functions.transition_meta bottom_state)
-        .blockchain_length
-    in
-    let module I = Interruptible.Make () in
     let states = Mina_stdlib.Nonempty_list.to_list states in
     let works = List.concat_map states ~f:(Fn.compose works body_exn) in
     let batches =
@@ -65,12 +59,6 @@ module F = struct
       mk_batch [] works
     in
     let batch_count = List.length batches in
-    let timeout =
-      Time.add (Time.now ())
-      @@ Time.Span.scale Context.transaction_snark_verification_timeout
-           (float_of_int batch_count)
-    in
-    interrupt_after_timeout ~timeout I.interrupt_ivar ;
     let f = function
       | Ok (Error e) ->
           Error (`Invalid_proof e)
@@ -90,13 +78,10 @@ module F = struct
     let verify_batch batch =
       I.map ~f (Context.verify_transaction_proofs (module I) batch)
     in
-    let action =
-      I.Result.map ~f:(const @@ List.map states ~f:(const ()))
+    ( I.Result.map ~f:(const @@ List.map states ~f:(const ()))
       @@ I.Result.all_unit (List.map batches ~f:verify_batch)
-    in
-    ( Substate.In_progress
-        { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
-    , I.force action )
+    , Time.Span.scale Context.transaction_snark_verification_timeout
+        (float_of_int batch_count) )
 
   let data_name = "complete work(s)"
 
