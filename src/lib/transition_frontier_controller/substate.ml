@@ -1,6 +1,6 @@
 open Mina_base
 open Core_kernel
-include Substate_types
+include Bit_catchup_state.Substate_types
 
 (** View the common substate.
     

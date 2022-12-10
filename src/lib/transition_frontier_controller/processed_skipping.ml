@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Bit_catchup_state
 
 module Data = struct
   open Substate

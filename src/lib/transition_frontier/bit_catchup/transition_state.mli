@@ -73,8 +73,8 @@ type t =
       { transition_meta : Substate_types.transition_meta; error : Error.t }
       (** Transition is invalid. *)
 
-(** Instantiation of [Substate.State_functions] for transition state type [t].  *)
-module State_functions : Substate.State_functions with type state_t = t
+(** Instantiation of [Substate_types.State_functions] for transition state type [t].  *)
+module State_functions : Substate_types.State_functions with type state_t = t
 
 (** Get children sets of a transition state.
 

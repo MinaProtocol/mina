@@ -6,7 +6,7 @@ module type Callbacks = sig
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
     -> error:Error.t
     -> aux:Transition_state.aux_data
-    -> Substate.transition_meta
+    -> Substate_types.transition_meta
     -> unit
 
   val on_add_new : State_hash.t -> unit
