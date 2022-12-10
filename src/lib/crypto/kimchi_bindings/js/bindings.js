@@ -1540,7 +1540,6 @@ var None = 0;
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     var domain = caml_plonk_domain_of_rust(x.domain);
     var max_poly_size = x.max_poly_size;
-    var max_quot_size = x.max_quot_size;
     var public_ = x.public_;
     var prev_challenges = x.prev_challenges;
     var srs = free_on_finalize(x.srs);
@@ -1550,20 +1549,19 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     // var linearization = linearization_of_rust(x.linearization, affine_class);
     var lookup_index = None;
     x.free();
-    return [0, domain, max_poly_size, max_quot_size, public_, prev_challenges, srs, evals, shifts, None];
+    return [0, domain, max_poly_size, public_, prev_challenges, srs, evals, shifts, None];
 };
 // Provides: caml_plonk_verifier_index_to_rust
 // Requires: caml_plonk_domain_to_rust, caml_plonk_verification_evals_to_rust, caml_plonk_verification_shifts_to_rust, free_finalization_registry
 var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
     var domain = caml_plonk_domain_to_rust(x[1], domain_class);
     var max_poly_size = x[2];
-    var max_quot_size = x[3];
     var public_ = x[4];
     var prev_challenges = x[5];
     var srs = x[6];
     var evals = caml_plonk_verification_evals_to_rust(x[7], verification_evals_class, poly_comm_class, mk_affine);
     var shifts = caml_plonk_verification_shifts_to_rust(x[8], verification_shifts_class);
-    return new klass(domain, max_poly_size, max_quot_size, public_, prev_challenges, srs, evals, shifts);
+    return new klass(domain, max_poly_size, public_, prev_challenges, srs, evals, shifts);
 };
 
 
