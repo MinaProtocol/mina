@@ -237,7 +237,7 @@ let kanikoBuild
               , args =
                   let script =
                         ''
-                        cat ${dockerfilePathsText} > /workspace/Dockerfile
+                        cat ${dockerfilePathsText} > ${context}/Dockerfile
                         ''
 
                   in  Some [ "-eEuo", "pipefail", "-c", script ]
@@ -309,39 +309,39 @@ let services =
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
         , dockerfilePaths =
-          [ "stages/1-build-deps"
-          , "stages/2-opam-deps"
-          , "stages/3-deb-builder"
-          , "stages/4-mina-daemon"
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-deb-builder"
+          , "dockerfiles/stages/4-mina-daemon"
           ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
         , dockerfilePaths =
-          [ "stages/1-build-deps"
-          , "stages/2-opam-deps"
-          , "stages/3-toolchain"
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-toolchain"
           ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-deb-builder = DockerfileDescription::{
         , service = "mina-deb-builder"
         , dockerfilePaths =
-          [ "stages/1-build-deps"
-          , "stages/2-opam-deps"
-          , "stages/3-toolchain"
-          , "stages/4-deb-builder"
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-toolchain"
+          , "dockerfiles/stages/4-deb-builder"
           ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
         , dockerfilePaths =
-          [ "stages/1-build-deps"
-          , "stages/2-opam-deps"
-          , "stages/3-builder"
-          , "stages/4-production"
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-production"
           ]
         , dockerContext = Some "dockerfiles"
         }
