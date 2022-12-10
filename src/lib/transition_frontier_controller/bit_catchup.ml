@@ -20,6 +20,11 @@ let sec_per_block =
     (Async.Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
     ~default:15. ~f:Float.of_string
 
+let verifier_max_jobs =
+  Option.value_map
+    (Async.Sys.getenv "MINA_VERIFIER_MAX_JOBS")
+    ~default:2 ~f:Int.of_string
+
 let convert_breadcrumb_error =
   let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
   let open Staged_ledger.Staged_ledger_error in
@@ -510,7 +515,7 @@ let actions ~write_actions ~context ~state =
   actions
 
 let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
-    ~block_storage
+    ~block_storage ~throttle
     ~context:(module Context_ : Transition_handler.Validator.CONTEXT) =
   let module Context = struct
     include Context_
@@ -657,6 +662,10 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           don't_wait_for
           @@ Trust_system.record_envelope_sender trust_system logger sender
                action
+
+    let allocate_verifier_bandwidth () = Simple_throttle.allocate throttle
+
+    let deallocate_verifier_bandwidth () = Simple_throttle.deallocate throttle
   end in
   (module Context : CONTEXT)
 
@@ -741,10 +750,10 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
     Pipe_lib.Strict_pipe.Writer.write breadcrumb_notification_writer ()
   in
   let write_actions = { write_verified_transition; write_breadcrumb } in
-
+  let throttle = Simple_throttle.create verifier_max_jobs in
   let context =
     make_context ~context ~frontier ~time_controller ~verifier ~trust_system
-      ~network ~block_storage
+      ~network ~block_storage ~throttle
   in
   let (module Context : CONTEXT) = context in
   let logger = Context.logger in

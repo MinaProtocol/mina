@@ -1,5 +1,4 @@
 open Core_kernel
-open Mina_base
 open Bit_catchup_state
 
 (** Summary of the state relevant to verifying generic functions  *)
@@ -19,8 +18,15 @@ module type F = sig
   val update :
     processing_result data -> Transition_state.t -> Transition_state.t
 
-  (** Launch processing and return the processing context
-    along with the deferred action launched.
+  (** Name of data being verified, for logging  *)
+  val data_name : string
+
+  val split_to_batches :
+       Transition_state.t Non_empty_list.t
+    -> Transition_state.t Non_empty_list.t Non_empty_list.t
+
+  (** Launch processing and return the deferred action launched along
+      with timeout.
 
     [states] parameter represents a list of transition and all of its
     ancestors that are neither in [Substate.Processed] status nor has an
@@ -28,21 +34,13 @@ module type F = sig
 
     Pre-condition: function takes non-empty list of states in parent-first order.
 *)
-  val create_in_progress_context :
+  val verify :
        context:(module Context.CONTEXT)
-    -> holder:State_hash.t ref
+    -> (module Interruptible.F)
     -> Transition_state.t Non_empty_list.t
-    -> processing_result Substate.processing_context
-       * ( ( processing_result list
-           , [ `Invalid_proof | `Verifier_error of Error.t ] )
-           Result.t
-         , unit )
-         Async_kernel.Deferred.Result.t
-
-  (** Name of data being verified, for logging  *)
-  val data_name : string
-
-  val split_to_batches :
-       Transition_state.t Non_empty_list.t
-    -> Transition_state.t Non_empty_list.t Non_empty_list.t
+    -> ( processing_result list
+       , [> `Invalid_proof | `Verifier_error of Error.t ] )
+       Result.t
+       Interruptible.t
+       * Time.Span.t
 end
