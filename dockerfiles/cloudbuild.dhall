@@ -311,7 +311,8 @@ let services =
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-deb-builder"
+          , "dockerfiles/stages/3-toolchain"
+          , "dockerfiles/stages/4-deb-builder"
           , "dockerfiles/stages/4-mina-daemon"
           ]
         , dockerContext = Some "dockerfiles"
