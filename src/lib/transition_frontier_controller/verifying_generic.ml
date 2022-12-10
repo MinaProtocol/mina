@@ -23,10 +23,13 @@ module Make (F : F) = struct
       State_hash.to_yojson
         (Transition_state.State_functions.transition_meta st).state_hash
     in
-    Processed_skipping.collect_to_in_progress ~state_functions
-      ~transition_states ~dsu top_state
-    |> function
-    | ancestor :: _ when Option.is_none (F.to_data ancestor) ->
+    let collected =
+      Processed_skipping.collect_to_in_progress ~logger ~state_functions
+        ~transition_states ~dsu top_state
+    in
+    let data_opt = Option.bind ~f:F.to_data (List.hd collected) in
+    match (collected, data_opt) with
+    | ancestor :: _, None ->
         [%log error]
           "collect_to_in_progress returned ancestor $ancestor_hash of state %s \
            for top state $state_hash of state %s (verifying %s)"
@@ -38,23 +41,22 @@ module Make (F : F) = struct
             ; ("ancestor_hash", state_hash_json ancestor)
             ] ;
         []
-    | ancestor :: rest -> (
-        let { substate; baton } = Option.value_exn (F.to_data ancestor) in
-        match substate.status with
-        | Processing (In_progress _) ->
-            if not baton then (
-              [%log debug]
-                "Pass the baton for $state_hash with status processing (in \
-                 progress) (state: %s)"
-                (Transition_state.State_functions.name ancestor)
-                ~metadata:[ ("state_hash", state_hash_json ancestor) ] ;
-              Transition_states.update transition_states
-                (F.update { substate; baton = true } ancestor) ) ;
-            rest
-        | _ ->
-            ancestor :: rest )
-    | [] ->
-        []
+    | ( ancestor :: rest
+      , Some
+          { substate = { status = Processing (In_progress _); _ } as substate
+          ; baton
+          } ) ->
+        if not baton then (
+          [%log debug]
+            "Pass the baton for $state_hash with status processing (in \
+             progress) (state: %s)"
+            (Transition_state.State_functions.name ancestor)
+            ~metadata:[ ("state_hash", state_hash_json ancestor) ] ;
+          Transition_states.update transition_states
+            (F.update { substate; baton = true } ancestor) ) ;
+        rest
+    | _ ->
+        collected
 
   (** Try to reuse processing context to handle some of 
       ancestors due for restart.
@@ -138,8 +140,8 @@ module Make (F : F) = struct
          Transition_states.find transition_states parent_hash
        in
        let%bind.Option next =
-         Processed_skipping.next_unprocessed ~state_functions ~transition_states
-           ~dsu parent
+         Processed_skipping.next_unprocessed ~logger ~state_functions
+           ~transition_states ~dsu parent
        in
        let%map.Option { substate; _ } = F.to_data next in
        let next_meta = Transition_state.State_functions.transition_meta next in
@@ -321,7 +323,7 @@ module Make (F : F) = struct
     @@ upon_f ~context ~transition_states ~state_hashes ~holder ;
     ctx
 
-  and start_impl ~context ~actions ~transition_states states =
+  and start_batch ~context ~actions ~transition_states states =
     let (module Context : CONTEXT) = context in
     let top_state = Mina_stdlib.Nonempty_list.last states in
     let top_state_hash =
@@ -353,16 +355,18 @@ module Make (F : F) = struct
         Transition_states.update transition_states (F.update r' top_state)
     | Some { substate = { status; _ }; _ } ->
         [%log' error Context.logger]
-          "Unexpected status %s (Verifying_blockchain_proof) for $state_hash \
-           in Verifying_blockchain_proof.start"
+          "Unexpected status %s (verifying %s) for $state_hash"
           (Substate.name_of_status status)
+          F.data_name
           ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
     | None ->
-        [%log' error Context.logger]
-          "Unexpected state %s for $state_hash in \
-           Verifying_blockchain_proof.start"
+        [%log' error Context.logger] "Unexpected state %s for $state_hash"
           (Transition_state.State_functions.name top_state)
           ~metadata:[ ("state_hash", State_hash.to_yojson top_state_hash) ]
+
+  and start_impl ~context ~actions ~transition_states =
+    let f = start_batch ~context ~actions ~transition_states in
+    Fn.compose (Mina_stdlib.Nonempty_list.iter ~f) F.split_to_batches
 
   and start ~context ~actions ~transition_states =
     Fn.compose

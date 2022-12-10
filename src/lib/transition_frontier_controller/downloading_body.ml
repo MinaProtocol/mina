@@ -131,7 +131,8 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
 
 (** Restart a failed ancestor. This function takes a transition state of ancestor and
     restarts the downloading process for it. *)
-and restart_failed ~transition_states ~actions ~context = function
+and restart_failed ~transition_states ~actions
+    ~context:(module Context : CONTEXT) = function
   | Transition_state.Downloading_body
       ( { header
         ; substate = { status = Failed _; _ } as s
@@ -144,9 +145,9 @@ and restart_failed ~transition_states ~actions ~context = function
       let status =
         Substate.Processing
           (make_download_body_ctx ~preferred_peers ~body_opt:None ~header
-             ~transition_states ~actions ~context )
+             ~transition_states ~actions
+             ~context:(module Context) )
       in
-      let (module Context : CONTEXT) = context in
       let state_hash = state_hash_of_header_with_validation header in
       let metadata =
         Substate.add_error_if_failed ~tag:"old_status_error" s.status
@@ -159,42 +160,52 @@ and restart_failed ~transition_states ~actions ~context = function
         (Substate.name_of_status status)
         ~metadata ;
       Transition_states.update transition_states
-        (Transition_state.Downloading_body
-           { r with substate = { s with status } } )
+        (Downloading_body { r with substate = { s with status } })
       (* We don't need to update parent's childen sets because
          Failed -> Processing status change doesn't require that *)
-  | _ ->
-      failwith "restart_failed: unexpected non-failed ancestor"
+  | st ->
+      let viewer Substate.{ status; _ } = Substate.name_of_status status in
+      let status_name =
+        Option.value ~default:""
+        @@ Substate.view ~state_functions ~f:{ viewer } st
+      in
+      [%log' error Context.logger]
+        "unexpected non-failed ancestor for restart: state %s, status %s"
+        (Transition_state.State_functions.name st)
+        status_name
 
 (** Set [baton] of the next ancestor in [Transition_state.Downloading_body]
     and [Substate.Processing (Substate.In_progress _)] status to [true]
     and restart all the failed ancestors before the next ancestors. *)
-and pass_the_baton ~transition_states ~context ~actions state_hash =
-  let restart_f = restart_failed ~transition_states ~actions ~context in
+and pass_the_baton ~transition_states ~context ~actions =
   let (module Context : CONTEXT) = context in
-  match Transition_states.find transition_states state_hash with
-  | Some (Transition_state.Downloading_body _ as st) -> (
-      let collected =
-        Processed_skipping.collect_to_in_progress ~state_functions
-          ~transition_states ~dsu:Context.processed_dsu st
-      in
-      match collected with
-      | Downloading_body ({ substate = { status = Processing _; _ }; _ } as r)
-        :: rest ->
-          if not r.baton then (
-            let state_hash = state_hash_of_header_with_validation r.header in
-            [%log' debug Context.logger]
-              "Pass the baton for $state_hash with status %s (state: \
-               downloading body)"
-              (Substate.name_of_status r.substate.status)
-              ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
-            Transition_states.update transition_states
-              (Downloading_body { r with baton = true }) ) ;
-          List.iter ~f:restart_f rest
-      | _ ->
-          List.iter ~f:restart_f collected )
-  | _ ->
-      ()
+  let restart_f = restart_failed ~transition_states ~actions ~context in
+  let handle_collected = function
+    | Transition_state.Downloading_body
+        ({ substate = { status = Processing _; _ }; _ } as r)
+      :: rest ->
+        if not r.baton then (
+          let state_hash = state_hash_of_header_with_validation r.header in
+          [%log' debug Context.logger]
+            "Pass the baton for $state_hash with status %s (state: downloading \
+             body)"
+            (Substate.name_of_status r.substate.status)
+            ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+          Transition_states.update transition_states
+            (Downloading_body { r with baton = true }) ) ;
+        List.iter ~f:restart_f rest
+    | collected ->
+        List.iter ~f:restart_f collected
+  in
+  let handle_state = function
+    | Some (Transition_state.Downloading_body _ as st) ->
+        Processed_skipping.collect_to_in_progress ~logger:Context.logger
+          ~state_functions ~transition_states ~dsu:Context.processed_dsu st
+        |> handle_collected
+    | _ ->
+        ()
+  in
+  Fn.compose handle_state (Transition_states.find transition_states)
 
 (** Promote a transition that is in [Transition_state.Verifying_blockchain_proof] state with
     [Substate.Processed] status to [Transition_state.Downloading_body] state.

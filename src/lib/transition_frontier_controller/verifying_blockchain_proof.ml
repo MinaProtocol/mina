@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 open Bit_catchup_state
 open Context
 
@@ -41,11 +42,17 @@ module F = struct
       Mina_stdlib.Nonempty_list.head headers
       |> Mina_block.Validation.header |> Mina_block.Header.blockchain_length
     in
-    let action =
-      Context.verify_blockchain_proofs
-        (module I)
-        (Mina_stdlib.Nonempty_list.to_list headers)
-    in
+    let header_list = Mina_stdlib.Nonempty_list.to_list headers in
+    [%log' debug Context.logger] "verify_blockchain_proofs of $state_hashes"
+      ~metadata:
+        [ ( "state_hashes"
+          , `List
+              (List.map header_list
+                 ~f:
+                   (Fn.compose State_hash.to_yojson
+                      state_hash_of_header_with_validation ) ) )
+        ] ;
+    let action = Context.verify_blockchain_proofs (module I) header_list in
     let timeout =
       Time.add (Time.now ()) Context.ancestry_verification_timeout
     in
@@ -55,6 +62,9 @@ module F = struct
     , I.force action )
 
   let data_name = "blockchain proof"
+
+  (* TODO consider limiting amount of proofs per batch *)
+  let split_to_batches = Mina_stdlib.Nonempty_list.singleton
 end
 
 include Verifying_generic.Make (F)

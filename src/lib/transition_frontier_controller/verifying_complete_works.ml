@@ -3,6 +3,11 @@ open Core_kernel
 open Context
 open Bit_catchup_state
 
+let max_works_per_batch =
+  Option.value_map
+    (Async.Sys.getenv "MINA_MAX_PROOFS_PER_BATCH")
+    ~default:30 ~f:Int.of_string
+
 (** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
 let body_exn = function
   | Transition_state.Verifying_complete_works { block; _ } ->
@@ -49,28 +54,68 @@ module F = struct
         .blockchain_length
     in
     let module I = Interruptible.Make () in
+    let states = Mina_stdlib.Nonempty_list.to_list states in
+    let works = List.concat_map states ~f:(Fn.compose works body_exn) in
+    let batches =
+      let rec mk_batch acc rest =
+        let batch, rest' = List.split_n rest max_works_per_batch in
+        let acc' = batch :: acc in
+        if List.is_empty rest' then acc' else mk_batch acc' rest'
+      in
+      mk_batch [] works
+    in
+    let batch_count = List.length batches in
     let timeout =
-      Time.add (Time.now ()) Context.transaction_snark_verification_timeout
+      Time.add (Time.now ())
+      @@ Time.Span.scale Context.transaction_snark_verification_timeout
+           (float_of_int batch_count)
     in
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
-    let states = Mina_stdlib.Nonempty_list.to_list states in
     let f = function
-      | Ok (Ok ()) ->
-          Ok (List.map states ~f:(const ()))
       | Ok (Error e) ->
           Error (`Invalid_proof e)
+      | Ok (Ok ()) ->
+          Ok ()
       | Error e ->
           Error (`Verifier_error e)
     in
-    let works = List.concat_map states ~f:(Fn.compose works body_exn) in
+    let state_hash_of_state st =
+      (Transition_state.State_functions.transition_meta st).state_hash
+    in
+    let state_hashes =
+      List.map ~f:(Fn.compose State_hash.to_yojson state_hash_of_state) states
+    in
+    [%log' debug Context.logger] "verify_transaction_proofs of $state_hashes"
+      ~metadata:[ ("state_hashes", `List state_hashes) ] ;
+    let verify_batch batch =
+      I.map ~f (Context.verify_transaction_proofs (module I) batch)
+    in
     let action =
-      I.map ~f (Context.verify_transaction_proofs (module I) works)
+      I.Result.map ~f:(const @@ List.map states ~f:(const ()))
+      @@ I.Result.all_unit (List.map batches ~f:verify_batch)
     in
     ( Substate.In_progress
         { interrupt_ivar = I.interrupt_ivar; timeout; downto_; holder }
     , I.force action )
 
   let data_name = "complete work(s)"
+
+  let split_to_batches =
+    let open Mina_stdlib.Nonempty_list in
+    let init_f st =
+      singleton (body_exn st |> works |> List.length, singleton st)
+    in
+    let f res st =
+      let (n, head), rest = uncons res in
+      let works = works (body_exn st) in
+      let wn = List.length works in
+      if n + wn > max_works_per_batch then cons (wn, singleton st) res
+      else init (n + wn, cons st head) rest
+    in
+    Fn.compose
+      (map ~f:(Fn.compose rev snd))
+      (fold_with_initiated_accum ~init:init_f ~f)
+    |> Fn.compose rev
 end
 
 include Verifying_generic.Make (F)
@@ -101,21 +146,15 @@ let promote_to ~actions ~context ~transition_states ~header ~substate ~block_vc
   in
   let mk_processing x = mk_state (Processing x) in
   let start_parent () =
-    let parent_hash =
-      Mina_block.Validation.header header
-      |> Mina_block.Header.protocol_state
-      |> Mina_state.Protocol_state.previous_state_hash
-    in
-    let%map.Option parent =
-      Transition_states.find transition_states parent_hash
-    in
-    collect_dependent_and_pass_the_baton ~logger:Context.logger
-      ~transition_states ~dsu:Context.processed_dsu parent
+    Mina_block.Validation.header header
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+    |> collect_dependent_and_pass_the_baton_by_hash ~logger:Context.logger
+         ~transition_states ~dsu:Context.processed_dsu
     |> start ~context ~actions ~transition_states
   in
   let handle_done () =
-    if aux.Transition_state.received_via_gossip then
-      ignore (start_parent () : unit option) ;
+    if aux.Transition_state.received_via_gossip then start_parent () ;
     mk_processing (Done ())
   in
   let handle_processing () =

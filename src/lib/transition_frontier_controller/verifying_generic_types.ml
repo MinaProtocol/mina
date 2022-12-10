@@ -26,7 +26,7 @@ module type F = sig
     ancestors that are neither in [Substate.Processed] status nor has an
     processing action already launched for it and its ancestors.
 
-    Pre-condition: function takes non-empty list of states in child-first order.
+    Pre-condition: function takes non-empty list of states in parent-first order.
 *)
   val create_in_progress_context :
        context:(module Context.CONTEXT)
@@ -39,5 +39,11 @@ module type F = sig
          , unit )
          Async_kernel.Deferred.Result.t
 
+  (** Name of data being verified, for logging  *)
   val data_name : string
+
+  val split_to_batches :
+       Transition_state.t Mina_stdlib.Nonempty_list.t
+    -> Transition_state.t Mina_stdlib.Nonempty_list.t
+       Mina_stdlib.Nonempty_list.t
 end

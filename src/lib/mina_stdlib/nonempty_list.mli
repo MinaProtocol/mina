@@ -55,6 +55,9 @@ val find_map : 'a t -> f:('a -> 'b option) -> 'b option
 
 val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 
+val fold_with_initiated_accum :
+  'a t -> init:('a -> 'accum) -> f:('accum -> 'a -> 'accum) -> 'accum
+
 val fold_right :
   'a t -> init:('a -> 'accum) -> f:('a -> 'accum -> 'accum) -> 'accum
 

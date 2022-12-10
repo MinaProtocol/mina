@@ -22,7 +22,8 @@ module Dsu : module type of Dsu.Make (Mina_base.State_hash) (Data)
     states returned plus the number of states for which [`Take false] was returned.
 *)
 val collect_unprocessed :
-     ?predicate:([ `Take of bool ] * [ `Continue of bool ]) Substate.viewer
+     logger:Logger.t
+  -> ?predicate:([ `Take of bool ] * [ `Continue of bool ]) Substate.viewer
   -> state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
   -> transition_states:'state_t Substate.transition_states
@@ -36,7 +37,8 @@ val collect_unprocessed :
     This function has quasi-constant complexity.
 *)
 val next_unprocessed :
-     state_functions:
+     logger:Logger.t
+  -> state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
   -> transition_states:'state_t Substate.transition_states
   -> dsu:Dsu.t
@@ -58,7 +60,8 @@ val next_unprocessed :
     Complexity of this funciton is [O(n)] for [n] being the size of the returned list.
 *)
 val collect_to_in_progress :
-     state_functions:
+     logger:Logger.t
+  -> state_functions:
        (module Substate.State_functions with type state_t = 'state_t)
   -> transition_states:'state_t Substate.transition_states
   -> dsu:Dsu.t

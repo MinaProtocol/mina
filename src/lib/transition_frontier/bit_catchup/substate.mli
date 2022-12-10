@@ -13,7 +13,7 @@ val view :
   -> 'state_t
   -> 'a option
 
-(** [collect_states top_state] collects transitions from the top state (inclusive) down the ancestry chain 
+(** [collect_ancestors top_state] collects transitions from the top state (inclusive) down the ancestry chain 
   while:
   
     1. [predicate] returns [(`Take _, `Continue true)]
@@ -24,7 +24,7 @@ val view :
     Only states for which [predicate] returned [(`Take true, `Continue_)] are collected.
     State for which [(`Take true, `Continue false)] was returned by [predicate] will be taken.
 *)
-val collect_states :
+val collect_ancestors :
      predicate:([ `Take of bool ] * [ `Continue of bool ]) viewer
   -> state_functions:(module State_functions with type state_t = 'state_t)
   -> transition_states:'state_t transition_states
@@ -46,6 +46,22 @@ val mark_processed :
   -> transition_states:'state_t transition_states
   -> State_hash.t list
   -> State_hash.t list
+
+(** [mark_processed_single state_hash] marks a transition as Processed.
+
+  It returns a pair of old transition state and old children or [None] if
+  marking as [Processed] failed.
+  Children structure of [state_hash]'s parent is updated.
+  Updating children of transition [state_hash] is responsibility of the caller.
+
+  Pre-condition: Transition [state_hash] is in [Processing (Done _)] status
+  Post-condition: list returned respects parent-child relationship and parent always comes first *)
+val mark_processed_single :
+     logger:Logger.t
+  -> state_functions:(module State_functions with type state_t = 'state_t)
+  -> transition_states:'state_t transition_states
+  -> State_hash.t
+  -> ('state_t * children_sets) option
 
 (** Update children of transition's parent when the transition is promoted
     to the higher state.
@@ -77,6 +93,17 @@ val add_error_if_failed :
   -> 'a status
   -> (string * Yojson.Safe.t) list
   -> (string * Yojson.Safe.t) list
+
+(** Function takes transition and returns true when one of conditions hold:
+
+  - Transition's parent is not in the catchup state (which means it's in frontier)
+
+  - Transition's parent has a higher state level  *)
+val is_parent_higher :
+     state_functions:(module State_functions with type state_t = 'state_t)
+  -> 'state_t
+  -> 'state_t option
+  -> bool
 
 module For_tests : sig
   (** [collect_failed_ancestry top_state] collects transitions from the top state (inclusive)

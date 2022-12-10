@@ -387,8 +387,8 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
   let f st =
     if is_received st then
       let unprocessed_opt =
-        Processed_skipping.next_unprocessed ~state_functions ~transition_states
-          ~dsu:Context.processed_dsu st
+        Processed_skipping.next_unprocessed ~logger:Context.logger
+          ~state_functions ~transition_states ~dsu:Context.processed_dsu st
       in
       match unprocessed_opt with
       | Some

@@ -52,6 +52,8 @@ let fold_right nel ~init ~f =
   let prefix, last = prefix_and_last nel in
   List.fold_right prefix ~init:(init last) ~f
 
+let fold_with_initiated_accum (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
+
 let to_list (x, xs) = x :: xs
 
 let append (x, xs) ys = (x, xs @ to_list ys)

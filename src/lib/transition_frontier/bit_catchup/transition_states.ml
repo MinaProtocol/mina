@@ -92,6 +92,7 @@ module Inmem (C : Callbacks) = struct
        State_hash.Table.set transition_states ~key:state_hash ~data:st
 
   let update transition_states state =
+    (* TODO raise exception on updating non-existent key *)
     State_hash.Table.set transition_states
       ~key:(Transition_state.State_functions.transition_meta state).state_hash
       ~data:state
