@@ -64,6 +64,7 @@ function usage() {
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
+  echo "  -c, --commit              The commit of the mina repository to use for staged docker builds. Default=tip of master"
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
@@ -83,7 +84,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK=", network = Some \"$2\""; shift;;
   -b|--branch) BRANCH=", branch = Some \"$2\""; shift;;
-  -c|--cache-from) CACHE=", cache = Some \"$2\""; shift;;
+  -c|--commit) COMMIT=", commit = Some \"$2\""; shift;;
+  --cache-from) CACHE=", cache = Some \"$2\""; shift;;
   --deb-codename) DEB_CODENAME=", debCodename = Some cb.DebCodename.$2"; shift;;
   --deb-release) DEB_RELEASE=", debRelease = Some \"$2\""; shift;;
   --deb-version) DEB_VERSION=", debVersion = Some \"$2\""; shift;;
@@ -119,6 +121,7 @@ dhall="
        $REPO
        $NETWORK
        $BRANCH
+       $COMMIT
        $CACHE
        $DEB_CODENAME
        $DEB_RELEASE

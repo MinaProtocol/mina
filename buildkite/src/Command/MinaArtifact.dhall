@@ -103,7 +103,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let rosettaSpec = DockerImage.ReleaseSpec::{
           service="mina-rosetta",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          extra_args=["--build-arg", "MINA_COMMIT=\\\${BUILDKITE_COMMIT}"],
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
@@ -115,7 +114,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let debDaemonSpec = DockerImage.ReleaseSpec::{
           service="mina-daemon-deb",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          extra_args=["--build-arg", "MINA_COMMIT=\\\${BUILDKITE_COMMIT}"],
           step_key="mina-daemon-deb-${DebianVersions.lowerName debVersion}-docker-image"
         }
 

@@ -81,6 +81,7 @@ let ServiceDescription =
           , version : Text
           , network : Optional Text
           , branch : Optional Text
+          , commit : Optional Text
           , cache : Optional Text
           , debCodename : Optional DebCodename
           , debRelease : Optional Text
@@ -92,6 +93,7 @@ let ServiceDescription =
         { repo = Some "https://github.com/minaprotocol/mina"
         , network = None Text
         , branch = None Text
+        , commit = None Text
         , cache = None Text
         , debCodename = None DebCodename
         , debRelease = None Text
@@ -134,6 +136,7 @@ let mkArgs
         # optionalBuildArg "MINA_REPO" serviceDesc.repo
         # optionalBuildArg "network" serviceDesc.network
         # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
+        # optionalBuildArg "MINA_COMMIT" serviceDesc.commit
         # optionalBuildArg
             "deb_codename"
             (debInfo_ serviceDesc.debCodename).debCodename
@@ -313,7 +316,7 @@ let services =
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-toolchain"
           , "dockerfiles/stages/4-deb-builder"
-          , "dockerfiles/stages/4-mina-daemon"
+          , "dockerfiles/stages/5-mina-daemon"
           ]
         , dockerContext = Some "dockerfiles"
         }
