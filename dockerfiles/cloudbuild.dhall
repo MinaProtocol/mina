@@ -298,12 +298,12 @@ let dockerBuild
 let services =
       { mina-archive = DockerfileDescription::{
         , service = "mina-archive"
-        , dockerfilePaths = [ "Dockerfile-mina-archive" ]
+        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
-        , dockerfilePaths = [ "Dockerfile-mina-daemon" ]
+        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon-deb = DockerfileDescription::{
