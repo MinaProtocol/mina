@@ -17,6 +17,7 @@ let ReleaseSpec = {
     service: Text,
     version: Text,
     branch: Text,
+    commit: Text,
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
