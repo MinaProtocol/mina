@@ -68,5 +68,5 @@ RUN eval $(opam config env) \
    && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1}" \
    && BUILDKITE_BRANCH=${MINA_BRANCH} ./scripts/rebuild-deb.sh \
    && mkdir ${HOME}/debs/ \
-   && cp mina-*.deb ${HOME}/debs/ \
+   && cp _build/mina-*.deb ${HOME}/debs/ \
    && rm -rf _build
