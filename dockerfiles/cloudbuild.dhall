@@ -298,48 +298,46 @@ let dockerBuild
 let services =
       { mina-archive = DockerfileDescription::{
         , service = "mina-archive"
-        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
+        , dockerfilePaths = [ "Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
-        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
-        , dockerContext = Some "dockerfiles"
+        , dockerfilePaths = [ "Dockerfile-mina-daemon" ]
         }
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-deb-builder"
-          , "dockerfiles/stages/4-mina-daemon"
+          [ "stages/1-build-deps"
+          , "stages/2-opam-deps"
+          , "stages/3-deb-builder"
+          , "stages/4-mina-daemon"
           ]
-        , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-toolchain"
+          [ "stages/1-build-deps"
+          , "stages/2-opam-deps"
+          , "stages/3-toolchain"
           ]
         }
       , mina-deb-builder = DockerfileDescription::{
         , service = "mina-deb-builder"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-toolchain"
-          , "dockerfiles/stages/4-deb-builder"
+          [ "stages/1-build-deps"
+          , "stages/2-opam-deps"
+          , "stages/3-toolchain"
+          , "stages/4-deb-builder"
           ]
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-builder"
-          , "dockerfiles/stages/4-production"
+          [ "stages/1-build-deps"
+          , "stages/2-opam-deps"
+          , "stages/3-builder"
+          , "stages/4-production"
           ]
         }
       }
