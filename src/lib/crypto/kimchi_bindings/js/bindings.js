@@ -1556,11 +1556,11 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
 var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verification_evals_class, poly_comm_class, mk_affine, verification_shifts_class) {
     var domain = caml_plonk_domain_to_rust(x[1], domain_class);
     var max_poly_size = x[2];
-    var public_ = x[4];
-    var prev_challenges = x[5];
-    var srs = x[6];
-    var evals = caml_plonk_verification_evals_to_rust(x[7], verification_evals_class, poly_comm_class, mk_affine);
-    var shifts = caml_plonk_verification_shifts_to_rust(x[8], verification_shifts_class);
+    var public_ = x[3];
+    var prev_challenges = x[4];
+    var srs = x[5];
+    var evals = caml_plonk_verification_evals_to_rust(x[6], verification_evals_class, poly_comm_class, mk_affine);
+    var shifts = caml_plonk_verification_shifts_to_rust(x[7], verification_shifts_class);
     return new klass(domain, max_poly_size, public_, prev_challenges, srs, evals, shifts);
 };
 
