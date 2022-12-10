@@ -20,10 +20,12 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
+WORKDIR $HOME
+
 ARG MINA_COMMIT=25388a0fed9695e8e9d04f75f50c2bae1c9c80db # 1.3.1.2 Stable Release (latest master at time of writing)
 # --- Shallow Clone the Mina repo from a given commit
 # Delete any previous clones of the mina repo and then clone into an empty directory
-RUN cd $HOME && rm -rf $HOME/${MINA_DIR} && mkdir $HOME/${MINA_DIR} \
+RUN rm -rf ${MINA_DIR} && mkdir ${MINA_DIR} && cd ${MINA_DIR} \
   && git init \
   && git remote add origin ${MINA_REPO} \
   && git fetch --depth 1 origin ${MINA_COMMIT} \
@@ -34,12 +36,12 @@ WORKDIR $HOME/${MINA_DIR}
 # Create a directory for compiled outputs
 RUN mkdir ${HOME}/app
 
-# --- Build libp2p_helper
+# --- Build libp2p_helper, clear cache, and run zexe standardize
 RUN make libp2p_helper \
-   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
-
-# HACK: build without special cpu features to allow more people to run mina-rosetta
-RUN ./scripts/zexe-standardize.sh
+  && cd src/app/libp2p_helper/src/libp2p_helper \
+  && go clean --cache --modcache --testcache -r \
+  && cd $HOME/${MINA_DIR}
+  && ./scripts/zexe-standardize.sh
 
 # --- Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
@@ -68,8 +70,5 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app/generate_keypair/generate_keypair.exe $HOME/app/mina-generate-keypair \
   && mv _build/default/src/app/validate_keypair/validate_keypair.exe $HOME/app/mina-validate-keypair \
   && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
+  && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper \
   && rm -rf _build
-
-# --- Clear go module caches to make the container smaller
-RUN cd src/app/libp2p_helper/src/libp2p_helper \
-  && go clean --cache --modcache --testcache -r
