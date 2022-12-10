@@ -96,8 +96,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-    include Comparable.Make_binable (Stable.Latest)
-    include Hashable.Make_binable (Stable.Latest)
+    module Binables = struct
+      include Comparable.Make_binable (Stable.Latest)
+      include Hashable.Make_binable (Stable.Latest)
+    end
+
+    include Binables
 
     let to_input : t -> _ Random_oracle_input.Chunked.t =
       Random_oracle_input.Chunked.field

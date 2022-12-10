@@ -1,4 +1,5 @@
 #! /bin/bash
+MINA_DAEMON_IMAGE="minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
 
 while [ $# -gt 0 ]; do
   case "$1" in

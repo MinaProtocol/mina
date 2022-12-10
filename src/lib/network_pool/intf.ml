@@ -263,7 +263,7 @@ end
 module type Snark_pool_diff_intf = sig
   type resource_pool
 
-  type t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t

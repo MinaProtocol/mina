@@ -125,7 +125,7 @@ let slots_per_epoch = Genesis_constants.slots_per_epoch
 let slots_per_epoch_uint32 = slots_per_epoch |> Unsigned.UInt32.of_int
 
 (* offset is slot within epoch, starting from 0 *)
-let epoch_and_offset_of_global_slot global_slot =
+let _epoch_and_offset_of_global_slot global_slot =
   let open Unsigned.UInt32 in
   let global_slot_uint32 = global_slot |> Int64.to_string |> of_string in
   let epoch = div global_slot_uint32 slots_per_epoch_uint32 in

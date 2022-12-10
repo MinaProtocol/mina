@@ -15,6 +15,7 @@ let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -33,6 +34,7 @@ let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; authorization_kind = p.authorization_kind
     }
   in
   { body = add_caller_body p.body caller; authorization = p.authorization }
@@ -942,6 +944,17 @@ module Digest = Call_forest.Digest
 module T = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@with_top_version_tag]
+
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_zkapp_command_vn for that version
+    *)
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -955,10 +968,6 @@ module T = struct
       [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
       let to_latest = Fn.id
-
-      let version_byte = Base58_check.Version_bytes.zkapp_command
-
-      let description = "Zkapp_command"
 
       module Wire = struct
         [%%versioned
@@ -1153,6 +1162,7 @@ let to_simple (t : t) : Simple.t =
               ; use_full_commitment = b.use_full_commitment
               ; caller = call_type
               ; call_depth = 0
+              ; authorization_kind = b.authorization_kind
               }
           } )
         ~null_id:Token_id.default
@@ -1228,11 +1238,17 @@ let zkapp_command_list (t : t) : Account_update.t list =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) =
-  Call_forest.fold t.account_updates
-    ~init:[ fee_payer t ]
-    ~f:(fun acc p -> Account_update.account_id p :: acc)
-  |> List.rev |> List.stable_dedup
+let accounts_accessed (t : t) (status : Transaction_status.t) =
+  match status with
+  | Applied ->
+      Call_forest.fold t.account_updates
+        ~init:[ fee_payer t ]
+        ~f:(fun acc p -> Account_update.account_id p :: acc)
+      |> List.rev |> List.stable_dedup
+  | Failed _ ->
+      [ fee_payer t ]
+
+let accounts_referenced (t : t) = accounts_accessed t Applied
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 
@@ -1475,6 +1491,14 @@ struct
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
+          let%bind () =
+            match (p.authorization, p.body.authorization_kind) with
+            | None_given, None_given | Proof _, Proof | Signature _, Signature
+              ->
+                Some ()
+            | _ ->
+                None
+          in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
             let%map { With_hash.hash; _ } = vk_opt in
             Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
@@ -1513,12 +1537,10 @@ struct
     create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end
 
-include Codable.Make_base58_check (Stable.Latest)
-
-(* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-include Codable.Make_base64 (Stable.Latest)
+(* so transaction ids have a version tag *)
+include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
 type account_updates =
   (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
@@ -1963,10 +1985,10 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let proof_cost = 10.26 in
-  let signed_pair_cost = 10.08 in
-  let signed_single_cost = 9.14 in
-  let cost_limit = 69.45 in
+  let proof_cost = genesis_constants.zkapp_proof_update_cost in
+  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
+  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
+  let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_sequence_event_elements =
     genesis_constants.max_sequence_event_elements
@@ -2032,4 +2054,10 @@ let%test_module "Test" =
     let%test_unit "full circuit" =
       Run_in_thread.block_on_async_exn
       @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
+
+    let%test "latest zkApp version" =
+      (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+         for latest version, then update this test
+      *)
+      Stable.Latest.version = 1
   end )

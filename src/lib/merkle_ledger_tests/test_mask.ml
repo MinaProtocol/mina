@@ -364,7 +364,7 @@ module Make (Test : Test_intf) = struct
             @@ Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
                  (Mask.Addr.root ())
           in
-          assert (List.length accounts = List.length retrieved_accounts) ;
+          assert (Stdlib.List.compare_lengths accounts retrieved_accounts = 0) ;
           assert (List.equal Account.equal accounts retrieved_accounts) )
 
   let%test_unit "get_all_accounts should preserve the ordering of accounts by \
@@ -421,9 +421,7 @@ module Make (Test : Test_intf) = struct
                  (Mask.Addr.root ())
           in
           assert (
-            Int.equal
-              (List.length base_accounts)
-              (List.length retrieved_accounts) ) ;
+            Stdlib.List.compare_lengths base_accounts retrieved_accounts = 0 ) ;
           assert (List.equal Account.equal expected_accounts retrieved_accounts) )
 
   let%test_unit "removing accounts from mask restores Merkle root" =
@@ -561,7 +559,7 @@ module Make (Test : Test_intf) = struct
             ignore @@ create_existing_account_exn attached_mask account ) ;
         let mask_list = Mask.Attached.to_list attached_mask in
         (* same number of accounts after adding them to mask *)
-        assert (Int.equal (List.length parent_list) (List.length mask_list)) ;
+        assert (Stdlib.List.compare_lengths parent_list mask_list = 0) ;
         (* should only see the zero balances in mask list *)
         let is_in_same_order =
           List.for_all2_exn parent_list mask_list
@@ -675,7 +673,7 @@ module Make (Test : Test_intf) = struct
         in
         (* the number of accounts in parent, mask should agree *)
         assert (
-          Int.equal parent_num_accounts (List.length accounts)
+          Mina_stdlib.List.Length.Compare.(accounts = parent_num_accounts)
           && Int.equal parent_num_accounts mask_num_accounts_before
           && Int.equal parent_num_accounts mask_num_accounts_after ) )
 

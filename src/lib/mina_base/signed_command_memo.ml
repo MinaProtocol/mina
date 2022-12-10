@@ -16,6 +16,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = string [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id

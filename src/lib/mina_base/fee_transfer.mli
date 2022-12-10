@@ -1,6 +1,3 @@
-open Core_kernel
-open Mina_base_import
-
 include
   Fee_transfer_intf.Full
     with type Single.Stable.V2.t =

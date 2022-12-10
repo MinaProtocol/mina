@@ -11,7 +11,9 @@
    kimchi_backend
    kimchi_backend_common
    kimchi_pasta
+   kimchi_backend.pasta.basic
    mina_base
+   mina_base.import
    pickles
    pickles.backend
    pickles_types

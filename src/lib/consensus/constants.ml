@@ -309,8 +309,8 @@ let to_protocol_constants
   ; slots_per_epoch
   }
 
-let data_spec =
-  Data_spec.
+let typ =
+  Typ.of_hlistable
     [ Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
@@ -326,11 +326,8 @@ let data_spec =
     ; Block_time.Span.Checked.typ
     ; Block_time.Checked.typ
     ]
-
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : t) =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append

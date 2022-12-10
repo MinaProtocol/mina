@@ -40,6 +40,7 @@
    cache_dir
    snarky.backendless
    sgn
+   sgn_type
    mina_state
    o1trace
    pickles
@@ -56,11 +57,12 @@
    transaction_witness
    mina_ledger
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    merkle_ledger
    mina_base.util
    ppx_version.runtime
  )
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (instrumentation (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))

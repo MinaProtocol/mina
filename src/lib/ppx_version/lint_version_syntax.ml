@@ -314,7 +314,13 @@ let lint_ast =
         match expr.pmod_desc with
         (* don't match special case of functor with () argument *)
         | Pmod_functor (Named _, body) ->
-            self#module_expr body { acc with in_functor = true }
+            (* Don't match special case of functor called [Make_str].
+               This convention is used when using the [mina_wire_types] library framework.
+            *)
+            let in_functor =
+              match acc.module_path with "Make_str" :: _ -> false | _ -> true
+            in
+            self#module_expr body { acc with in_functor }
         | Pmod_apply
             ( { pmod_desc =
                   Pmod_apply

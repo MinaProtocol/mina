@@ -12,6 +12,12 @@ module Poly = struct
            , 'time
            , 'body_reference )
            t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; registers :
@@ -71,18 +77,16 @@ let create_value ~staged_ledger_hash ~genesis_ledger_hash ~registers ~timestamp
   ; body_reference
   }
 
-let data_spec =
-  let open Data_spec in
-  [ Staged_ledger_hash.typ
-  ; Frozen_ledger_hash.typ
-  ; Registers.typ [ Frozen_ledger_hash.typ; Typ.unit; Local_state.typ ]
-  ; Block_time.Checked.typ
-  ; Consensus.Body_reference.typ
-  ]
-
 let typ : (var, Value.t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable
+    [ Staged_ledger_hash.typ
+    ; Frozen_ledger_hash.typ
+    ; Registers.typ [ Frozen_ledger_hash.typ; Typ.unit; Local_state.typ ]
+    ; Block_time.Checked.typ
+    ; Consensus.Body_reference.typ
+    ]
+    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    ~value_of_hlist:of_hlist
 
 module Impl = Pickles.Impls.Step
 

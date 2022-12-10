@@ -22,6 +22,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type ('payload, 'pk, 'signature) t =
               ( 'payload
               , 'pk
@@ -35,6 +37,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@with_top_version_tag]
+
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_signed_command_vn for that version
+    *)
+
     module V2 = struct
       type t =
         ( Payload.Stable.V2.t
@@ -44,10 +57,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       [@@deriving compare, sexp, hash, yojson]
 
       let to_latest = Fn.id
-
-      let description = "User command"
-
-      let version_byte = Base58_check.Version_bytes.user_command
 
       module T = struct
         (* can't use nonrec + deriving *)
@@ -59,10 +68,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Comparable.Make (T)
       include Hashable.Make (T)
 
-      let accounts_accessed ({ payload; _ } : t) =
-        Payload.accounts_accessed payload
+      let accounts_accessed ({ payload; _ } : t) status =
+        Payload.accounts_accessed payload status
+
+      let accounts_referenced (t : t) = accounts_accessed t Applied
+    end
+
+    module V1 = struct
+      [@@@with_all_version_tags]
+
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, sexp, hash, yojson]
+
+      (* don't need to coerce old commands to new ones *)
+      let to_latest _ = failwith "Not implemented"
     end
   end]
+
+  (* type of signed commands, pre-Berkeley hard fork *)
+  type t_v1 = Stable.V1.t
 
   type _unused = unit
     constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -349,12 +377,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let to_valid_unsafe t =
     `If_this_is_used_it_should_have_a_comment_justifying_it t
 
-  module Base58_check = Codable.Make_base58_check (Stable.Latest)
+  (* so we can deserialize Base58Check transaction ids created before Berkeley hard fork *)
+  module V1_all_tagged = struct
+    include Stable.V1.With_all_version_tags
 
-  [%%define_locally
-  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+    let description = "Signed command"
 
-  include Codable.Make_base64 (Stable.Latest)
+    let version_byte = Base58_check.Version_bytes.signed_command_v1
+  end
+
+  module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged)
+
+  let of_base58_check_exn_v1 = Base58_check_v1.of_base58_check
+
+  (* give transaction ids have version tag *)
+  include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
   let check_signature ?signature_kind ({ payload; signer; signature } : t) =
     Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
@@ -403,11 +440,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let filter_by_participant user_commands public_key =
     List.filter user_commands ~f:(fun user_command ->
         Core_kernel.List.exists
-          (accounts_accessed user_command)
+          (accounts_referenced user_command)
           ~f:
             (Fn.compose
                (Public_key.Compressed.equal public_key)
                Account_id.public_key ) )
+
+  let%test "latest signed command version" =
+    (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
+       for latest version, then update this test
+    *)
+    Int.equal Stable.Latest.version 2
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

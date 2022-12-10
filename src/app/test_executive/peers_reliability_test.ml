@@ -96,21 +96,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            let sender_kp =
              (Option.value_exn (Node.network_keypair node_c)).keypair
            in
-           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+           let (parties_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+               =
              { sender = (sender_kp, nonce)
              ; fee
              ; fee_payer = None
-             ; receivers = []
              ; amount
              ; zkapp_account_keypairs = [ zkapp_account_keypair ]
              ; memo
              ; new_zkapp_account = true
              ; snapp_update = Mina_base.Account_update.Update.dummy
-             ; current_auth = Mina_base.Permissions.Auth_required.Signature
-             ; call_data = Snark_params.Tick.Field.zero
-             ; events = []
-             ; sequence_events = []
              ; preconditions = None
+             ; authorization_kind = Signature
              }
            in
            return

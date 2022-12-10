@@ -20,6 +20,8 @@
   kimchi_backend.common
   promise
   kimchi_bindings
+  kimchi_pasta_basic
+  kimchi_pasta_constraint_system
   kimchi_types
   pasta_bindings
   snarkette
