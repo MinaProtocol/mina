@@ -255,8 +255,13 @@ let kanikoBuild
                       , "--context=dir://${context}"
                       , "--destination=${image}"
                       , "--skip-unused-stages"
+                      , "--use-new-run"
+                      , "--snapshotMode=redo"
+                      , "--reproducible"
+                      , "--log-timestamp"
+                      , "--cleanup"
                       , "--cache=true"
-                      , "--cache-ttl=24h"
+                      , "--cache-ttl=72h"
                       ]
                     # mkArgs image desc serviceDesc
                   )
