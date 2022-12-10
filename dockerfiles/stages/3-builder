@@ -20,15 +20,15 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-# --- Shallow Clone the Mina repo
+ARG MINA_COMMIT=25388a0fed9695e8e9d04f75f50c2bae1c9c80db # 1.3.1.2 Stable Release (latest master at time of writing)
+# --- Shallow Clone the Mina repo from a given commit
 # Delete any previous clones of the mina repo and then clone into an empty directory
-RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
-  && git clone \
-  -b "${MINA_BRANCH}" \
-  --depth 1 \
-  --shallow-submodules \
-  --recurse-submodules \
-  ${MINA_REPO} ${HOME}/${MINA_DIR}
+RUN cd $HOME && rm -rf $HOME/${MINA_DIR} && mkdir $HOME/${MINA_DIR} \
+  && git init \
+  && git remote add origin ${MINA_REPO} \
+  && git fetch --depth 1 origin ${MINA_COMMIT} \
+  && git checkout FETCH_HEAD \
+  && git submodule update --init --recursive
 # Set the working directory to the cloned mina repo
 WORKDIR $HOME/${MINA_DIR}
 # Create a directory for compiled outputs
