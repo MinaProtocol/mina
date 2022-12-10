@@ -2,7 +2,7 @@
 # The "builder" Stage
 # - builds mina and any other binaries required to run `make deb`
 #################################################################################################
-FROM toolchain AS builder
+FROM opam-deps AS builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet
