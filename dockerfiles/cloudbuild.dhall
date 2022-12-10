@@ -133,8 +133,7 @@ let mkArgs
     = λ(tag : Text) →
       λ(desc : DockerfileDescription.Type) →
       λ(serviceDesc : ServiceDescription.Type) →
-        [ "--target", desc.targetStage ]
-        # optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
+        optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
         # optionalBuildArg "MINA_REPO" serviceDesc.repo
         # optionalBuildArg "network" serviceDesc.network
         # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
