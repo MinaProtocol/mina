@@ -1,6 +1,6 @@
 open Mina_base
 
-include module type of Substate_types
+include module type of Bit_catchup_state.Substate_types
 
 (** View the common substate.
     

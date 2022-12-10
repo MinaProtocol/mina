@@ -1,5 +1,3 @@
-open Bit_catchup_state
-
 module Data : Dsu.Data with type t = Substate.transition_meta
 
 module Dsu : module type of Dsu.Make (Mina_base.State_hash) (Data)

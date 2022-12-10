@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 module Length_map = Length_map
-module Substate = Substate
+module Substate_types = Substate_types
 module Transition_state = Transition_state
 module Transition_states = Transition_states
 module Gossip_types = Gossip_types
