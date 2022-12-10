@@ -108,9 +108,31 @@ if [[ -n "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO=", repo = Some \"${BUILDKITE_PULL_REQUEST_REPO}\""
 fi
 
+# Remove some unused build-args depending on the service
 if [ "${SERVICE}" != "mina-daemon" ]; then
   NETWORK=", network = None Text"
 fi
+
+case "${SERVICE}" in
+  # pulled from debian package repo, no need for commit or branch
+  mina-daemon|mina-archive|mina-generate-keypair)
+    COMMIT=", commit = None Text"
+    BRANCH=", branch = None Text"
+    ;;
+  # pulled and built exclusively based on branch, no need for commit or deb repo
+  mina-rosetta|mina-toolchain)
+    COMMIT=", commit = None Text"
+    DEB_CODENAME=", commit = None Text"
+    DEB_VERSION=", debVersion = None Text"
+    DEB_RELEASE=", debRelease = None Text"
+    ;;
+  # pulled and built based on commit and branch, no need for deb repo
+  mina-*-deb|mina-deb-builder)
+    DEB_CODENAME=", commit = None Text"
+    DEB_VERSION=", debVersion = None Text"
+    DEB_RELEASE=", debRelease = None Text"
+    ;;
+esac
 
 pushd "$ROOT"
 
