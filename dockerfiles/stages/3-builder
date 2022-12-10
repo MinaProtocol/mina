@@ -63,6 +63,8 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/ocaml-signer/signer.exe
 
+ENV BUILDKITE_BRANCH=${MINA_BRANCH}
+
 # --- MAKE DEB
 RUN eval $(opam config env) \
    && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1}" \
