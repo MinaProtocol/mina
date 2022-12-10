@@ -6,7 +6,7 @@ module type Callbacks = sig
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
     -> error:Error.t
     -> aux:Transition_state.aux_data
-    -> Substate.transition_meta
+    -> Substate_types.transition_meta
     -> unit
 
   val on_add_new : State_hash.t -> unit
@@ -23,7 +23,7 @@ module Inmem (C : Callbacks) = struct
     let transition_meta =
       Transition_state.State_functions.transition_meta state
     in
-    let key = transition_meta.Substate.state_hash in
+    let key = transition_meta.Substate_types.state_hash in
     State_hash.Table.add_exn transition_states ~key ~data:state ;
     C.on_add_new key
 
@@ -125,32 +125,40 @@ type state_t = Transition_state.t
 type t = Transition_state.t Substate_types.transition_states
 
 let create_inmem (module C : Callbacks) : t =
-  Substate.Transition_states ((module Inmem (C)), State_hash.Table.create ())
+  Substate_types.Transition_states
+    ((module Inmem (C)), State_hash.Table.create ())
 
-let add_new (Substate.Transition_states ((module Impl), m) : t) = Impl.add_new m
+let add_new (Substate_types.Transition_states ((module Impl), m) : t) =
+  Impl.add_new m
 
-let mark_invalid ?reason (Substate.Transition_states ((module Impl), m) : t) =
+let mark_invalid ?reason
+    (Substate_types.Transition_states ((module Impl), m) : t) =
   Impl.mark_invalid ?reason m
 
-let find (Substate.Transition_states ((module Impl), m) : t) = Impl.find m
+let find (Substate_types.Transition_states ((module Impl), m) : t) = Impl.find m
 
-let modify_substate (Substate.Transition_states ((module Impl), m) : t) =
+let modify_substate (Substate_types.Transition_states ((module Impl), m) : t) =
   Impl.modify_substate m
 
-let modify_substate_ (Substate.Transition_states ((module Impl), m) : t) =
+let modify_substate_ (Substate_types.Transition_states ((module Impl), m) : t) =
   Impl.modify_substate_ m
 
-let remove (Substate.Transition_states ((module Impl), m) : t) = Impl.remove m
+let remove (Substate_types.Transition_states ((module Impl), m) : t) =
+  Impl.remove m
 
-let update (Substate.Transition_states ((module Impl), m) : t) = Impl.update m
+let update (Substate_types.Transition_states ((module Impl), m) : t) =
+  Impl.update m
 
-let update' (Substate.Transition_states ((module Impl), m) : t) = Impl.update' m
+let update' (Substate_types.Transition_states ((module Impl), m) : t) =
+  Impl.update' m
 
-let shutdown_in_progress (Substate.Transition_states ((module Impl), m) : t) =
+let shutdown_in_progress
+    (Substate_types.Transition_states ((module Impl), m) : t) =
   Impl.shutdown_in_progress m
 
-let fold (Substate.Transition_states ((module Impl), m) : t) = Impl.fold m
+let fold (Substate_types.Transition_states ((module Impl), m) : t) = Impl.fold m
 
-let clear (Substate.Transition_states ((module Impl), m) : t) = Impl.clear m
+let clear (Substate_types.Transition_states ((module Impl), m) : t) =
+  Impl.clear m
 
 let iter ~f m = fold m ~init:() ~f:(fun st () -> f st)

@@ -73,8 +73,9 @@ type t =
       { transition_meta : Substate_types.transition_meta; error : Error.t }
       (** Transition is invalid. *)
 
-(** Instantiation of [Substate.State_functions] for transition state type [t].  *)
-module State_functions : Substate.State_functions with type state_t = t = struct
+(** Instantiation of [Substate_types.State_functions] for transition state type [t].  *)
+module State_functions : Substate_types.State_functions with type state_t = t =
+struct
   type state_t = t
 
   let name = function
@@ -93,7 +94,7 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     | Invalid _ ->
         "invalid"
 
-  let modify_substate ~f:{ Substate.modifier = f } state =
+  let modify_substate ~f:{ Substate_types.modifier = f } state =
     match state with
     | Received ({ substate = s; _ } as obj) ->
         let substate, v = f s in
@@ -117,22 +118,22 @@ module State_functions : Substate.State_functions with type state_t = t = struct
     let of_block = With_hash.map ~f:Mina_block.header in
     match st with
     | Received { header; _ } ->
-        Substate.transition_meta_of_header_with_hash
+        Substate_types.transition_meta_of_header_with_hash
         @@ Gossip_types.header_with_hash_of_received_header header
     | Verifying_blockchain_proof { header; _ } ->
-        Substate.transition_meta_of_header_with_hash
+        Substate_types.transition_meta_of_header_with_hash
         @@ Mina_block.Validation.header_with_hash header
     | Downloading_body { header; _ } ->
-        Substate.transition_meta_of_header_with_hash
+        Substate_types.transition_meta_of_header_with_hash
         @@ Mina_block.Validation.header_with_hash header
     | Verifying_complete_works { block; _ } ->
-        Substate.transition_meta_of_header_with_hash @@ of_block
+        Substate_types.transition_meta_of_header_with_hash @@ of_block
         @@ Mina_block.Validation.block_with_hash block
     | Building_breadcrumb { block; _ } ->
-        Substate.transition_meta_of_header_with_hash @@ of_block
+        Substate_types.transition_meta_of_header_with_hash @@ of_block
         @@ Mina_block.Validation.block_with_hash block
     | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
-        Substate.transition_meta_of_header_with_hash @@ of_block
+        Substate_types.transition_meta_of_header_with_hash @@ of_block
         @@ Frontier_base.Breadcrumb.block_with_hash breadcrumb
     | Invalid { transition_meta; _ } ->
         transition_meta
@@ -170,7 +171,7 @@ let children st =
   | Waiting_to_be_added_to_frontier { children; _ } ->
       children
   | Invalid _ ->
-      Substate.empty_children_sets
+      Substate_types.empty_children_sets
 
 (** Returns true iff the state's status is [Failed].
     
@@ -212,8 +213,9 @@ let aux_data = function
       None
 
 let shutdown_modifier = function
-  | { Substate.status = Processing (In_progress { interrupt_ivar; _ }); _ } as r
-    ->
+  | { Substate_types.status = Processing (In_progress { interrupt_ivar; _ })
+    ; _
+    } as r ->
       Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
       ({ r with status = Failed (Error.of_string "shut down") }, ())
   | s ->
