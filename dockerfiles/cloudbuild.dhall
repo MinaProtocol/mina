@@ -108,7 +108,7 @@ let DockerfileDescription =
           , dockerContext : Optional Text
           , timeout : Optional Text
           }
-      , default = { dockerContext = None Text, timeout = Some "10800s" }
+      , default = { dockerContext = None Text, timeout = Some "3600s" }
       }
 
 let optionalBuildArg
@@ -301,26 +301,10 @@ let services =
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
-      , bot = DockerfileDescription::{
-        , service = "bot"
-        , dockerfilePaths = [ "frontend/bot/Dockerfile" ]
-        , dockerContext = Some "frontend/bot"
-        }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
-        , dockerContext = Some "dockerfiles/"
-        , timeout = Some "3600s"
-        }
-      , mina-deb-builder = DockerfileDescription::{
-        , service = "mina-deb-builder"
-        , dockerfilePaths = 
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-deb-builder"
-          ]
-        , dockerContext = Some "dockerfiles/"
-        , timeout = Some "3600s"
+        , dockerContext = Some "dockerfiles"
         }
       , mina-daemon-deb = DockerfileDescription::{
         , service = "mina-daemon-deb"
@@ -330,8 +314,7 @@ let services =
           , "dockerfiles/stages/3-deb-builder"
           , "dockerfiles/stages/4-mina-daemon"
           ]
-        , dockerContext = Some "dockerfiles/"
-        , timeout = Some "3600s"
+        , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
@@ -340,7 +323,15 @@ let services =
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-toolchain"
           ]
-        , timeout = Some "14400s"
+        }
+      , mina-deb-builder = DockerfileDescription::{
+        , service = "mina-deb-builder"
+        , dockerfilePaths =
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-toolchain"
+          , "dockerfiles/stages/4-deb-builder"
+          ]
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
@@ -350,24 +341,6 @@ let services =
           , "dockerfiles/stages/3-builder"
           , "dockerfiles/stages/4-production"
           ]
-        , timeout = Some "14400s"
-        }
-      , leaderboard = DockerfileDescription::{
-        , service = "leaderboard"
-        , dockerfilePaths = [ "frontend/leaderboard/Dockerfile" ]
-        , dockerContext = Some "frontend/leaderboard"
-        }
-      , delegation-backend = DockerfileDescription::{
-        , service = "delegation-backend"
-        , dockerfilePaths = [ "dockerfiles/Dockerfile-delegation-backend" ]
-        , dockerContext = Some "src/app/delegation_backend"
-        }
-      , delegation-backend-toolchain = DockerfileDescription::{
-        , service = "delegation-backend"
-        , dockerfilePaths =
-          [ "dockerfiles/Dockerfile-delegation-backend-toolchain" ]
-        , dockerContext = Some "src/app/delegation_backend"
-        , timeout = Some "10800s"
         }
       }
 

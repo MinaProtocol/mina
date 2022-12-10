@@ -130,12 +130,12 @@ dhall="
 
 if [[ $FUNCTION == cloudBuild ]]; then
     dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
-    gcloud builds submit
+    gcloud builds submit dockerfiles/
 elif [[ $FUNCTION == dockerBuild ]]; then
     eval eval "$(dhall-to-bash <<< "$dhall")"
 elif [[ $FUNCTION == kanikoBuild ]]; then
     dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
-    gcloud builds submit --config=./cloudbuild.yaml
+    gcloud builds submit --config=./cloudbuild.yaml dockerfiles/
 else
     echo "Unknown function: $FUNCTION" > /dev/stderr
     exit 1
