@@ -2,6 +2,8 @@ open Mina_base
 open Core_kernel
 open Async_kernel
 
+type processing_status = Executing of { timeout : Time.t } | Waiting
+
 (** Context for a transition that is being processed.
 
     Parameter ['a] denotes the result of deferred action associated
@@ -9,8 +11,8 @@ open Async_kernel
 *)
 type 'a processing_context =
   | In_progress of
-      { interrupt_ivar : unit Ivar.t
-      ; timeout : Time.t
+      { processing_status : processing_status
+      ; interrupt_ivar : unit Ivar.t
       ; downto_ : Mina_numbers.Length.t
       ; holder : State_hash.t ref
             (** Last transition which held this context *)

@@ -63,11 +63,13 @@ let upon_f ~logger ~state_hash ~transition_states (actions, res) =
         (Processing (Done breadcrumb)) ;
       actions.Misc.mark_processed_and_promote ~reason:"built breadcrumb"
         [ state_hash ]
-  | Result.Ok (Result.Error (`Invalid (error, reason))) ->
+  | Result.Ok (Error (`Invalid (error, reason))) ->
       actions.Misc.mark_invalid ~reason ~error state_hash
-  | Result.Ok (Result.Error (`Verifier_error e)) ->
+  | Result.Ok (Error (`Verifier_error e)) ->
       update_status_for_unprocessed ~logger ~transition_states ~state_hash
       @@ Failed e
+  | Result.Ok (Error `Late_to_start) ->
+      ()
 
 (** [building_breadcrumb_status ~parent block] decides upon status of [block]
   that is a child of transition with the already-built breadcrumb [parent].
@@ -91,17 +93,20 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   in
   let module I = Interruptible.Make () in
   let received_at = (List.last_exn received).Transition_state.received_at in
-  let action =
-    Context.build_breadcrumb ~received_at ~parent ~transition (module I)
+  let process_f () =
+    ( Context.build_breadcrumb ~received_at ~parent ~transition (module I)
+    , Context.building_breadcrumb_timeout )
   in
-  let timeout = Time.(add @@ now ()) Context.building_breadcrumb_timeout in
-  Async_kernel.Deferred.(upon @@ both actions (I.force action))
-    (upon_f ~logger:Context.logger ~transition_states ~state_hash) ;
-  interrupt_after_timeout ~timeout I.interrupt_ivar ;
+  let upon_f = upon_f ~logger:Context.logger ~transition_states ~state_hash in
+  let processing_status =
+    controlling_verifier_bandwidth ~context ~actions ~transition_states
+      ~state_hash ~process_f ~upon_f
+      (module I)
+  in
   Substate.Processing
     (In_progress
        { interrupt_ivar = I.interrupt_ivar
-       ; timeout
+       ; processing_status
        ; downto_
        ; holder = ref state_hash
        } )
