@@ -36,11 +36,8 @@ WORKDIR $HOME/${MINA_DIR}
 # Create a directory for compiled outputs
 RUN mkdir ${HOME}/app
 
-# --- Build libp2p_helper, clear cache, and run zexe standardize
+# --- Build libp2p_helper and run zexe standardize
 RUN make libp2p_helper \
-  && cd src/app/libp2p_helper/src/libp2p_helper \
-  && go clean --cache --modcache --testcache -r \
-  && cd $HOME/${MINA_DIR} \
   && ./scripts/zexe-standardize.sh
 
 # --- Make rosetta-crucial components and the generate_keypair tool
@@ -72,3 +69,7 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper \
   && rm -rf _build
+
+# --- rm go module cache for a smaller container size
+RUN cd src/app/libp2p_helper/src/libp2p_helper \
+  && go clean --cache --modcache --testcache -r

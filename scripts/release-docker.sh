@@ -120,14 +120,14 @@ case "${SERVICE}" in
     BRANCH=", branch = None Text"
     ;;
   # pulled and built exclusively based on branch, no need for commit or deb repo
-  mina-rosetta|mina-toolchain)
+  mina-toolchain)
     COMMIT=", commit = None Text"
     DEB_CODENAME=", commit = None Text"
     DEB_VERSION=", debVersion = None Text"
     DEB_RELEASE=", debRelease = None Text"
     ;;
   # pulled and built based on commit and branch, no need for deb repo
-  mina-*-deb|mina-deb-builder)
+  mina-rosetta|mina-*-deb|mina-deb-builder)
     DEB_CODENAME=", commit = None Text"
     DEB_VERSION=", debVersion = None Text"
     DEB_RELEASE=", debRelease = None Text"

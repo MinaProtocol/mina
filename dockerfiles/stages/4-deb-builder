@@ -33,11 +33,8 @@ RUN rm -rf ${MINA_DIR} && mkdir ${MINA_DIR} && cd ${MINA_DIR} \
 # Set the working directory to the cloned mina repo
 WORKDIR $HOME/${MINA_DIR}
 
-# --- Build libp2p_helper, clear cache, and run zexe standardize
+# --- Build libp2p_helper, and run zexe standardize
 RUN make libp2p_helper \
-  && cd src/app/libp2p_helper/src/libp2p_helper \
-  && go clean --cache --modcache --testcache -r \
-  && cd $HOME/${MINA_DIR} \
   && ./scripts/zexe-standardize.sh
 
 # --- Export the mina commit sha to use in rebuild-deb.sh

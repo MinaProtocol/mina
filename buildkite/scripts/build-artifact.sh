@@ -26,8 +26,6 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/cli/src/mina_testnet_signatures.exe \
   src/app/cli/src/mina_mainnet_signatures.exe \
   src/app/archive/archive.exe \
-  src/app/archive/archive_testnet_signatures.exe \
-  src/app/archive/archive_mainnet_signatures.exe \
   src/app/extract_blocks/extract_blocks.exe \
   src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
   src/app/archive_blocks/archive_blocks.exe \
