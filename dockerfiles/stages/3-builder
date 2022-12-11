@@ -35,10 +35,10 @@ WORKDIR $HOME/${MINA_DIR}
 RUN make libp2p_helper \
   && ./scripts/zexe-standardize.sh
 
-# --- Export the mina commit sha to use in rebuild-deb.sh
+# --- Export the mina commit sha to use in rebuild.sh
 ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
 
-# --- Build all major tagets required for packaging
+# --- Build all major tagets required for packaging and the packages themselves
 RUN echo "--- Build all major tagets required for packaging" \
    && echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}" \
    && eval $(opam config env) \
@@ -59,10 +59,7 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/rosetta/rosetta.exe \
     src/app/rosetta/rosetta_testnet_signatures.exe \
     src/app/rosetta/rosetta_mainnet_signatures.exe \
-    src/app/rosetta/ocaml-signer/signer.exe
-
-# --- MAKE DEB
-RUN eval $(opam config env) \
+    src/app/rosetta/ocaml-signer/signer.exe \
    && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1}" \
    && BUILDKITE_BRANCH=${MINA_BRANCH} ./scripts/rebuild-deb.sh \
    && mkdir ${HOME}/debs/ \
