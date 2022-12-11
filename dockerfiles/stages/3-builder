@@ -20,6 +20,9 @@ ARG MINA_DIR=mina
 WORKDIR $HOME
 
 ARG MINA_COMMIT=25388a0fed9695e8e9d04f75f50c2bae1c9c80db # 1.3.1.2 Stable Release (latest master at time of writing)
+# --- Export the mina commit sha to use in rebuild.sh
+ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
+
 # --- Shallow Clone the Mina repo from a given commit
 # Delete any previous clones of the mina repo and then clone into an empty directory
 RUN rm -rf ${MINA_DIR} && mkdir ${MINA_DIR} && cd ${MINA_DIR} \
@@ -31,16 +34,10 @@ RUN rm -rf ${MINA_DIR} && mkdir ${MINA_DIR} && cd ${MINA_DIR} \
 # Set the working directory to the cloned mina repo
 WORKDIR $HOME/${MINA_DIR}
 
-# --- Build libp2p_helper, and run zexe standardize
-RUN make libp2p_helper \
-  && ./scripts/zexe-standardize.sh
-
-# --- Export the mina commit sha to use in rebuild.sh
-ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
-
 # --- Build all major tagets required for packaging and the packages themselves
-RUN echo "--- Build all major tagets required for packaging" \
-   && echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}" \
+RUN make libp2p_helper \
+   && ./scripts/zexe-standardize.sh
+   && echo "--- Build all major tagets required for packaging from Commit SHA: ${MINA_COMMIT_SHA1}" \
    && eval $(opam config env) \
    && dune build --profile=${DUNE_PROFILE} \
     src/app/logproc/logproc.exe \
