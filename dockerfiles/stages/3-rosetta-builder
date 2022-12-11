@@ -36,7 +36,7 @@ RUN mkdir ${HOME}/app
 
 # --- Build all of the required binaries and move them to ${HOME}/app/ and then cleanup
 RUN make libp2p_helper \
-  && ./scripts/zexe-standardize.sh
+  && ./scripts/zexe-standardize.sh \
   && eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/cli/src/mina_testnet_signatures.exe \
