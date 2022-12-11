@@ -12,11 +12,9 @@ ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
-ENV DEBIAN_FRONTEND noninteractive
-
 # --- Dependencies across many platforms
-RUN apt-get update -y \
-  && apt-get install -y \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     apt-utils \
     curl \
     ca-certificates \
@@ -34,8 +32,8 @@ RUN apt-get update -y \
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
          libjemalloc2 \
          libprocps7 \
          libffi6 \
@@ -43,8 +41,8 @@ RUN test "$deb_codename" = "buster" \
 
 # --- Debian 9 "Stretch" Dependencies
 RUN test "$deb_codename" = "stretch" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
          libjemalloc1 \
          libprocps6 \
          libffi6 \
@@ -52,8 +50,8 @@ RUN test "$deb_codename" = "stretch" \
 
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
          libjemalloc2 \
          libprocps8 \
          libffi7 \
@@ -62,8 +60,9 @@ RUN test "$deb_codename" = "focal" \
 # --- Install the latest version of rosetta-cli
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
 
-# --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
+# --- Remove apt-cache and generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
+RUN rm -rf /var/lib/apt/lists/* \
+  && locale-gen en_US.UTF-8
 
 # --- Set up sample/demo wallets and configuration
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
