@@ -1,0 +1,22 @@
+FROM daemon AS daemon-puppet
+
+# Dependencies
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    apt-transport-https \
+    ca-certificates \
+    jq \
+    python3 && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install google-cloud-sdk for GCLOUD_UPLOAD feature
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && DEBIAN_FRONTEND=noninteractive apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y google-cloud-sdk kubectl
+
+COPY --chown=${UID} puppeteer-context/* /
+RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

@@ -110,16 +110,16 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep rosettaSpec,
 
-        -- mina-daemon-deb image
-        let debDaemonSpec = DockerImage.ReleaseSpec::{
-          service="mina-daemon-deb",
+        -- mina-daemon-puppet image
+        let daemonPuppetSpec = DockerImage.ReleaseSpec::{
+          service="mina-daemon-puppet",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="mina-daemon-deb-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="mina-daemon-puppet-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
 
-        DockerImage.generateStep debDaemonSpec
+        DockerImage.generateStep daemonPuppetSpec
 
       ]
     }

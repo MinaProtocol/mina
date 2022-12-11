@@ -318,14 +318,15 @@ let services =
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
         , dockerContext = Some "dockerfiles"
         }
-      , mina-daemon-deb = DockerfileDescription::{
-        , service = "mina-daemon-deb"
-        , targetStage = Some "daemon"
+      , mina-daemon-puppet = DockerfileDescription::{
+        , service = "mina-daemon-puppet"
+        , targetStage = Some "daemon-puppet"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-builder"
           , "dockerfiles/stages/4-daemon"
+          , "dockerfiles/stages/5-daemon-puppet"
           ]
         , dockerContext = Some "dockerfiles"
         }
