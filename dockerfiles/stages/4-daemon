@@ -35,7 +35,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
     libssl1.1 \
     libpq-dev \
     procps \
-    tzdata && \
+    tzdata
 
 # Mina daemon package, copied from the builder container
 COPY --from=builder /home/mina/debs/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
