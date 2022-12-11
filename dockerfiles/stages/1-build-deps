@@ -124,7 +124,7 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
 
-# Export the 
+# Export the PATH changes so that downstream containers inherit this value
 ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
