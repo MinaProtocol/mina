@@ -126,7 +126,7 @@ case "${SERVICE}" in
     DEB_RELEASE=", debRelease = None Text"
     ;;
   # pulled and built based on commit and branch, no need for deb repo
-  mina-rosetta|mina-*-deb|mina-deb-builder)
+  mina-rosetta)
     DEB_VERSION=", debVersion = None Text"
     DEB_RELEASE=", debRelease = None Text"
     ;;
