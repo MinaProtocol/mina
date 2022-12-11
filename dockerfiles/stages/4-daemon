@@ -2,8 +2,6 @@ ARG image=debian:stretch-slim
 FROM ${image} AS daemon
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
-ARG deb_release=unstable
-ARG deb_codename=stretch
 ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -54,9 +52,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 
 # Mina daemon package, copied from the builder container
-COPY --from=builder /home/mina/debs/mina-${network}-*.deb /root/mina-daemon-package.deb
+COPY --from=builder /home/mina/debs/mina-${network}-${deb_version}.deb /root/mina-daemon-package.deb
 # And then installed along with any missing dependencies
-RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
   && dpkg -i /root/mina-daemon-package.deb \
   && apt-get -f install \
   && rm -rf /root/mina-daemon-package.deb
