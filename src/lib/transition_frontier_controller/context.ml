@@ -204,12 +204,13 @@ let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
   | `Wait wait_ivar ->
       let action =
         let%bind.I.Deferred_let_syntax () = Async_kernel.Ivar.read wait_ivar in
-        match build_after_state_update () with
-        | Some action_ ->
-            I.finally action_ ~f:Context.deallocate_verifier_bandwidth
-        | None ->
-            Context.deallocate_verifier_bandwidth () ;
-            late_start
+        Option.value ~default:late_start (build_after_state_update ())
       in
-      start_action ~need_deallocate:false action ;
+      let handle_wait_ivar () =
+        if Async_kernel.Ivar.is_full wait_ivar then
+          Context.deallocate_verifier_bandwidth ()
+        else Async_kernel.Ivar.fill wait_ivar ()
+      in
+      let action' = I.finally action ~f:handle_wait_ivar in
+      start_action ~need_deallocate:false action' ;
       Substate.Waiting
