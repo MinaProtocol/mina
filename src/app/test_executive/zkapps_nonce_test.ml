@@ -124,7 +124,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"invalid zkapp cmd from fish1" ~fee:12_000_000
+        |> mk_zkapp_command ~memo:"invalid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
       in
       replace_authorizations ~keymap with_dummy_signatures
@@ -146,7 +146,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp cmd from fish1" ~fee:12_000_000
+        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
       in
       replace_authorizations ~keymap with_dummy_signatures
@@ -168,7 +168,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"precondition zkapp cmd from fish1"
+        |> mk_zkapp_command ~memo:"precondition zkapp from fish1"
              ~fee:12_000_000 ~fee_payer_pk:fish1_pk
              ~fee_payer_nonce:(Account.Nonce.of_int 2)
       in
@@ -186,7 +186,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp cmd from fish1" ~fee:12_000_000
+        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
       in
       replace_authorizations ~keymap with_dummy_signatures
