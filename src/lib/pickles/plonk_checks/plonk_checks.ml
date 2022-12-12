@@ -131,8 +131,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
-    | LookupKindIndex
-        (LookupGate | Xor | ChaChaFinal | RangeCheckGate | ForeignFieldMulGate)
+    | LookupKindIndex (Lookup | Xor | ChaChaFinal | RangeCheck | ForeignFieldMul)
       ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
@@ -235,9 +234,11 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
               None
           | Xor ->
               None
+          | Rot ->
+              None
           | LookupTables
           | RuntimeLookupTables
-          | LookupPattern LookupGate
+          | LookupPattern Lookup
           | TableWidth 0
           | TableWidth 1
           | TableWidth 2
@@ -246,8 +247,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
           | LookupsPerRow 2
           | LookupsPerRow 3 -> (
               match joint_combiner with None -> None | Some _ -> Some B.true_ )
-          | LookupPattern
-              (Xor | ChaChaFinal | RangeCheckGate | ForeignFieldMulGate) ->
+          | LookupPattern (Xor | ChaChaFinal | RangeCheck | ForeignFieldMul) ->
               None
           | TableWidth _ ->
               None
@@ -473,8 +473,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                   { joint_combiner
                   ; lookup_gate =
                       Lazy.force
-                        (Hashtbl.find_exn index_terms
-                           (LookupKindIndex LookupGate) )
+                        (Hashtbl.find_exn index_terms (LookupKindIndex Lookup))
                   } )
         }
 

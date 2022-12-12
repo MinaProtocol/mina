@@ -31,7 +31,7 @@ pub enum CamlLookupsUsed {
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupSelectors<T> {
-    pub lookup_gate: Option<T>,
+    pub lookup: Option<T>,
 }
 
 impl<G, CamlPolyComm> From<LookupSelectors<PolyComm<G>>> for CamlLookupSelectors<CamlPolyComm>
@@ -43,12 +43,12 @@ where
         let LookupSelectors {
             xor: _,
             chacha_final: _,
-            lookup_gate,
-            range_check_gate: _,
-            ffmul_gate: _,
+            lookup,
+            range_check: _,
+            ffmul: _,
         } = val;
         CamlLookupSelectors {
-            lookup_gate: lookup_gate.map(From::from),
+            lookup: lookup.map(From::from),
         }
     }
 }
@@ -59,13 +59,13 @@ where
     PolyComm<G>: From<CamlPolyComm>,
 {
     fn from(val: CamlLookupSelectors<CamlPolyComm>) -> Self {
-        let CamlLookupSelectors { lookup_gate } = val;
+        let CamlLookupSelectors { lookup } = val;
         LookupSelectors {
             xor: None,
             chacha_final: None,
-            lookup_gate: lookup_gate.map(From::from),
-            range_check_gate: None,
-            ffmul_gate: None,
+            lookup: lookup.map(From::from),
+            range_check: None,
+            ffmul: None,
         }
     }
 }
@@ -174,7 +174,6 @@ where
 pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub domain: CamlPlonkDomain<Fr>,
     pub max_poly_size: ocaml::Int,
-    pub max_quot_size: ocaml::Int,
     pub public: ocaml::Int,
     pub prev_challenges: ocaml::Int,
     pub srs: SRS,

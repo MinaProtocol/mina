@@ -125,7 +125,7 @@ impl ser::SerializeStruct for ArraySerializer<'_> {
 pub struct Serializer(serde_wasm_bindgen::Serializer);
 
 impl Serializer {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self(serde_wasm_bindgen::Serializer::new())
     }
 }

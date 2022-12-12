@@ -30,7 +30,6 @@ impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
                 group_gen: CamlFq(vi.domain.group_gen),
             },
             max_poly_size: vi.max_poly_size as isize,
-            max_quot_size: vi.max_quot_size as isize,
             public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
             srs: CamlFqSrs(vi.srs.get().expect("have an srs").clone()),
@@ -90,15 +89,16 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             range_check: false,
             foreign_field_add: false,
             foreign_field_mul: false,
+            rot: false,
             xor: false,
             lookup_features:
                 LookupFeatures {
                     patterns: LookupPatterns {
                         xor: false,
                         chacha_final: false,
-                        lookup_gate: false,
-                        range_check_gate: false,
-                        foreign_field_mul_gate: false,
+                        lookup: false,
+                        range_check: false,
+                        foreign_field_mul: false,
                     },
                     joint_lookup_used: false,
                     uses_runtime_tables: false,
@@ -111,7 +111,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
         VerifierIndex::<Pallas> {
             domain,
             max_poly_size: index.max_poly_size as usize,
-            max_quot_size: index.max_quot_size as usize,
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
@@ -138,6 +137,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             range_check_comm: None,
             foreign_field_add_comm: None,
             foreign_field_mul_comm: None,
+            rot_comm: None,
 
             foreign_field_modulus: None,
 
@@ -249,7 +249,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             group_gen: Fq::one().into(),
         },
         max_poly_size: 0,
-        max_quot_size: 0,
         public: 0,
         prev_challenges: 0,
         srs: CamlFqSrs::new(SRS::create(0)),

@@ -35,6 +35,7 @@ module Gate_type = struct
       | ForeignFieldAdd
       | ForeignFieldMul
       | Xor16
+      | Rot64
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -47,9 +48,9 @@ module Lookup_pattern = struct
     type t = Kimchi_types.lookup_pattern =
       | Xor
       | ChaChaFinal
-      | LookupGate
-      | RangeCheckGate
-      | ForeignFieldMulGate
+      | Lookup
+      | RangeCheck
+      | ForeignFieldMul
     [@@deriving hash, eq, compare, sexp]
   end
 
