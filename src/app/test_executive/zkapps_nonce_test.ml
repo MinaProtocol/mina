@@ -72,11 +72,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
-    let[@warning "-8"] [ fish1_kp; fish2_kp ] =
+    let[@warning "-8"] [ fish1_kp; _fish2_kp ] =
       Network.extra_genesis_keypairs network
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
-    let fish2_pk = Signature_lib.Public_key.compress fish2_kp.public_key in
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
     in
@@ -102,8 +101,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               @ Network.snark_coordinators network ) ) )
     in
     let keymap =
-      List.fold [ fish1_kp; fish2_kp ]
-        ~init:Signature_lib.Public_key.Compressed.Map.empty
+      List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
         ~f:(fun map { private_key; public_key } ->
           Signature_lib.Public_key.Compressed.Map.add_exn map
             ~key:(Signature_lib.Public_key.compress public_key)
@@ -116,7 +114,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0 ~increment_nonce:true
+                   0
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -138,12 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0 ~increment_nonce:true
-                   ~update:
-                     { Account_update.Update.dummy with
-                       permissions =
-                         Set { Permissions.user_default with send = Proof }
-                     }
+                   0
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -158,69 +151,43 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred invalid_precondition_zkapp_cmd_from_fish1 =
+    let%bind.Deferred set_precondition_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
           mk_forest
             [ mk_node
                 (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0 ~increment_nonce:true
-                   ~preconditions:
-                     { Account_update.Preconditions.network =
-                         Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 4)
+                   0
+                   ~update:
+                     { Account_update.Update.dummy with
+                       permissions =
+                         Set { Permissions.user_default with send = Proof }
                      } )
                 []
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"invalid zkapp cmd from fish1" ~fee:12_000_000
+        |> mk_zkapp_command ~memo:"precondition zkapp cmd from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 2)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
+    in
+    let%bind.Deferred valid_precondition_zkapp_cmd_from_fish1 =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature Call fish1_kp Token_id.default
+                   0 )
+                []
+            ]
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"valid zkapp cmd from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
-      in
-      replace_authorizations ~keymap with_dummy_signatures
-    in
-    let%bind.Deferred invalid_zkapp_cmd_from_fish2 =
-      let open Zkapp_command_builder in
-      let with_dummy_signatures =
-        let account_updates =
-          mk_forest
-            [ mk_node
-                (mk_account_update_body Signature Call fish2_kp Token_id.default
-                   0 ~increment_nonce:true
-                   ~preconditions:
-                     { Account_update.Preconditions.network =
-                         Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 1)
-                     } )
-                []
-            ]
-        in
-        account_updates
-        |> mk_zkapp_command ~memo:"invalid zkapp cmd from fish2" ~fee:12_000_000
-             ~fee_payer_pk:fish2_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
-      in
-      replace_authorizations ~keymap with_dummy_signatures
-    in
-    let%bind.Deferred valid_zkapp_cmd_from_fish2 =
-      let open Zkapp_command_builder in
-      let with_dummy_signatures =
-        let account_updates =
-          mk_forest
-            [ mk_node
-                (mk_account_update_body Signature Call fish2_kp Token_id.default
-                   0 ~increment_nonce:true
-                   ~preconditions:
-                     { Account_update.Preconditions.network =
-                         Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 2)
-                     } )
-                []
-            ]
-        in
-        account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp cmd from fish2" ~fee:12_000_000
-             ~fee_payer_pk:fish2_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -231,20 +198,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Send a zkapp command with an invalid account update nonce using fish2"
-        (send_zkapp ~logger node invalid_zkapp_cmd_from_fish2)
-    in
-    let%bind () =
-      section
         "Send a zkapp command that has it's nonce properly incremented after \
          the fish1 transaction"
         (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Send a zkapp command that has it's nonce properly incremented after \
-         the fish2 transaction"
-        (send_zkapp ~logger node valid_zkapp_cmd_from_fish2)
     in
     let%bind () =
       section
@@ -254,21 +210,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Wait for fish2 zkapp command with invalid nonce to be rejected by \
-         transition frontier"
-        (wait_for_zkapp ~has_failures:true invalid_zkapp_cmd_from_fish2)
-    in
-    let%bind () =
-      section
         "Wait for fish1 zkapp command with valid nonce to be accepted by \
          transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Wait for fish2 zkapp command with valid nonce to be accepted by \
-         transition frontier"
-        (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish2)
     in
     let%bind () =
       let padding_payments =
@@ -301,16 +245,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Send a zkapp command with an invalid account update precondition \
-         using fish1"
-        (send_zkapp ~logger node invalid_precondition_zkapp_cmd_from_fish1)
+        "Send a zkapp command account update that sets send precondition using \
+         fish1"
+        (send_zkapp ~logger node set_precondition_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
-        "Wait for fish1 zkapp command with invalid precondition to be accepted \
-         by transition frontier"
-        (wait_for_zkapp ~has_failures:true
-           invalid_precondition_zkapp_cmd_from_fish1 )
+        "Send a zkapp command that should be valid after precondition from the \
+         fish1 transaction"
+        (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
+    in
+    let%bind () =
+      section
+        "Wait for fish1 zkapp command with set precondition to be accepted by \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false
+           set_precondition_zkapp_cmd_from_fish1 )
+    in
+    let%bind () =
+      section
+        "Wait for fish1 zkapp command to be accepted by transition frontier"
+        (wait_for_zkapp ~has_failures:false
+           valid_precondition_zkapp_cmd_from_fish1 )
     in
     let%bind () =
       let padding_payments =
@@ -327,18 +283,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Verify invalid precondition zkapp command was not applied by checking \
-         account nonce"
+        "Verify precondition zkapp command was applied by checking account \
+         nonce"
         (let%bind { nonce = fish1_nonce; _ } =
            Network.Node.get_account_data ~logger node
              ~account_id:fish1_account_id
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
-         if Unsigned.UInt32.compare fish1_nonce (Unsigned.UInt32.of_int 3) > 0
+         if Unsigned.UInt32.compare fish1_nonce (Unsigned.UInt32.of_int 4) > 0
          then
            Malleable_error.hard_error
              (Error.of_string
-                "Invalid zkapp command applied nonce when it shouldn't have" )
+                "Nonce value of fish1 does not match expected nonce" )
          else (
            [%log info] "Invalid zkapp command was correctly ignored" ;
            return () ) )
