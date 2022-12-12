@@ -58,6 +58,12 @@ module Protocol_state = struct
   end
 end
 
+module Valid_until = struct
+  module V1 = struct
+    type t = Mina_numbers.Global_slot.V1.t Numeric.V1.t
+  end
+end
+
 module Account = struct
   module V2 = struct
     type t =

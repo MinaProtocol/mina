@@ -777,7 +777,7 @@ module Preconditions = struct
     Fields.make_creator obj
       ~network:!.Zkapp_precondition.Protocol_state.deriver
       ~account:!.Account_precondition.deriver
-      ~valid_until:!.Zkapp_precondition.Numeric.Derivers.global_slot
+      ~valid_until:!.Zkapp_precondition.Valid_until.deriver
     |> finish "Preconditions" ~t_toplevel_annots
 
   let to_input ({ network; account } : t) =
@@ -791,9 +791,7 @@ module Preconditions = struct
     let open Quickcheck.Generator.Let_syntax in
     let%map network = Zkapp_precondition.Protocol_state.gen
     and account = Account_precondition.gen
-    and valid_until =
-      Zkapp_precondition.Numeric.gen Global_slot.gen Global_slot.compare
-    in
+    and valid_until = Zkapp_precondition.Valid_until.gen in
     { network; account; valid_until }
 
   module Checked = struct
@@ -811,9 +809,7 @@ module Preconditions = struct
     type t =
       { network : Zkapp_precondition.Protocol_state.Checked.t
       ; account : Account_precondition.Checked.t
-      ; valid_until :
-          Mina_numbers.Global_slot.Checked.t
-          Zkapp_precondition.Numeric.Checked.t
+      ; valid_until : Zkapp_precondition.Valid_until.Checked.t
       }
     [@@deriving annot, hlist, fields]
 
@@ -821,8 +817,7 @@ module Preconditions = struct
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
         ; Zkapp_precondition.Account.Checked.to_input account
-        ; Zkapp_precondition.Numeric.(
-            Checked.to_input Tc.global_slot valid_until)
+        ; Zkapp_precondition.Valid_until.to_input valid_until
         ]
   end
 
@@ -830,7 +825,7 @@ module Preconditions = struct
     Typ.of_hlistable
       [ Zkapp_precondition.Protocol_state.typ
       ; Account_precondition.typ ()
-      ; Zkapp_precondition.Numeric.(typ Tc.global_slot)
+      ; Zkapp_precondition.Valid_until.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

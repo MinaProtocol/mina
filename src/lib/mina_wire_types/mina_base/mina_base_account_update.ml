@@ -54,9 +54,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
-      ; valid_until :
-          Mina_numbers.Global_slot.V1.t
-          Mina_base_zkapp_precondition.Numeric.V1.t
+      ; valid_until : Mina_base_zkapp_precondition.Valid_until.V1.t
       }
   end
 end

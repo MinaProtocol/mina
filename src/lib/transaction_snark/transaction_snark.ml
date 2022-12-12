@@ -2030,8 +2030,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; protocol_state_precondition :
                 Zkapp_precondition.Protocol_state.Checked.t
             ; valid_until_precondition :
-                Mina_numbers.Global_slot.Checked.t
-                Zkapp_precondition.Numeric.Checked.t
+                Zkapp_precondition.Valid_until.Checked.t
             ; transaction_commitment : Transaction_commitment.t
             ; full_transaction_commitment : Transaction_commitment.t
             ; field : Field.t
@@ -2044,10 +2043,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             (eff : (r, Env.t) Mina_transaction_logic.Zkapp_command_logic.Eff.t)
             : r =
           match eff with
-          | Check_valid_until_precondition
-              (valid_until_precondition, global_state) ->
-              Zkapp_precondition.Checked.check_valid_until
-                valid_until_precondition global_state.block_global_slot
+          | Check_valid_until_precondition (valid_until, global_state) ->
+              Zkapp_precondition.Valid_until.Checked.check valid_until
+                global_state.block_global_slot
           | Check_protocol_state_precondition
               (protocol_state_predicate, global_state) ->
               Zkapp_precondition.Protocol_state.Checked.check

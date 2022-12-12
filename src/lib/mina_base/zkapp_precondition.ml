@@ -1368,6 +1368,15 @@ module Valid_until = struct
     end
   end]
 
+  let deriver = Numeric.Derivers.global_slot
+
+  let gen = Numeric.gen Global_slot.gen Global_slot.compare
+
+  let typ = Numeric.(typ Tc.global_slot)
+
+  let to_input valid_until =
+    Numeric.(Checked.to_input Tc.global_slot valid_until)
+
   let check (valid_until : t) global_slot =
     Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
       valid_until global_slot
@@ -1379,10 +1388,6 @@ module Valid_until = struct
       Numeric.(Checked.check Tc.global_slot) valid_until global_slot
   end
 end
-
-let check_valid_until valid_until_precondition block_global_slot =
-  Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
-    valid_until_precondition block_global_slot
 
 module Account_type = struct
   [%%versioned
@@ -1641,9 +1646,6 @@ module Checked = struct
   let digest t =
     Random_oracle.Checked.(
       hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
-
-  let check_valid_until valid_until_precondition global_slot =
-    Numeric.(Checked.check Tc.global_slot) valid_until_precondition global_slot
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =
