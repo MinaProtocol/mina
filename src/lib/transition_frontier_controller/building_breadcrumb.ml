@@ -175,7 +175,7 @@ let filter_unprocessed ~transition_states ancestors =
       unprocessed )
     last_processed_opt
 
-let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
+let restart_failed_ancestor ~actions ~context ~transition_states ~state_hash
     ancestor_hash =
   let (module Context : CONTEXT) = context in
   match Transition_states.find transition_states ancestor_hash with
@@ -185,12 +185,18 @@ let restart_failed_ancestor ~build ~context ~transition_states ~state_hash
       let ancestor_meta = Transition_state.State_functions.transition_meta st in
       match get_parent ~transition_states ~context ancestor_meta with
       | Ok parent ->
-          let status = build parent in
+          let status =
+            building_breadcrumb_status ~context ~actions ~transition_states
+              ~received:r.aux.Transition_state.received ~parent r.block
+          in
           [%log' debug Context.logger]
-            "Updating status of $state_hash from failed to %s (state: building \
-             breadcrumb)"
+            "Updating status of ancestor $ancestor_hash of transition \
+             $state_hash from failed to %s (state: building breadcrumb)"
             (Substate.name_of_status status)
-            ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+            ~metadata:
+              [ ("ancestor_hash", State_hash.to_yojson ancestor_hash)
+              ; ("state_hash", State_hash.to_yojson state_hash)
+              ] ;
           Transition_states.update transition_states
             (Building_breadcrumb
                { r with substate = { r.substate with status } } )
@@ -236,7 +242,7 @@ let promote_to ~actions ~context ~transition_states ~block ~substate ~block_vc
   in
   let ancestors = filter_unprocessed ~transition_states ancestors in
   Option.iter (Length_map.min_elt ancestors) ~f:(fun (_, ancestor_hash) ->
-      restart_failed_ancestor ~build ~context ~transition_states
+      restart_failed_ancestor ~actions ~context ~transition_states
         ~state_hash:meta.state_hash ancestor_hash ) ;
   Transition_state.Building_breadcrumb
     { block; block_vc; substate = { substate with status }; aux; ancestors }

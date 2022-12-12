@@ -160,10 +160,24 @@ let insert_invalid_state ~actions ~is_parent_in_frontier ~state ~transition_meta
   insert_invalid_state_impl ~actions ~state ~is_parent_in_frontier
     ~transition_meta ~children_list error
 
-let set_processing_to_failed error = function
+let set_processing_to_failed ~state_hash ~logger error = function
   | Transition_state.Received
       ( { substate = { status = Processing (In_progress _); _ }; gossip_data; _ }
       as r ) ->
+      let reason, error =
+        match error with
+        | `Error e ->
+            (Error_json.error_to_yojson e, e)
+        | `String s ->
+            (`String s, Error.of_string s)
+      in
+      [%log debug]
+        "Updating status of $state_hash from processing (in progress) to \
+         failed (state: received)"
+        ~metadata:
+          [ ("state_hash", State_hash.to_yojson state_hash)
+          ; ("new_status_error", reason)
+          ] ;
       Gossip.drop_gossip_data `Ignore gossip_data ;
       Some
         (Transition_state.Received
@@ -353,20 +367,12 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
       res
   in
   let (module Context : CONTEXT) = context in
-  let log_failed reason =
-    [%log' debug Context.logger]
-      "Updating status of $state_hash from processing (in progress) to failed \
-       (state: received)"
-      ~metadata:
-        [ ("state_hash", State_hash.to_yojson top_state_hash)
-        ; ("new_status_error", reason)
-        ]
-  in
   let on_error e =
     cancel_child_contexts () ;
-    log_failed (Error_json.error_to_yojson e) ;
     Transition_states.update' state.transition_states top_state_hash
-      ~f:(set_processing_to_failed e)
+      ~f:
+        (set_processing_to_failed ~logger:Context.logger
+           ~state_hash:top_state_hash (`Error e) )
   in
   function
   | Result.Error () ->
@@ -377,11 +383,12 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
         ( List.fold (Mina_stdlib.Nonempty_list.to_list lst) ~init:(Ok ()) ~f
           : unit Or_error.t ) ;
       let reason = "failed to retrieve ancestors" in
-      log_failed (`String reason) ;
-      (* This will trigger only is the top state hash remained in Processing state
+      (* This will make change only is the top state hash remained in Processing state
          after handling all of the fetched ancestors *)
       Transition_states.update' state.transition_states top_state_hash
-        ~f:(set_processing_to_failed @@ Error.of_string reason)
+        ~f:
+          (set_processing_to_failed ~logger:Context.logger
+             ~state_hash:top_state_hash (`String reason) )
   | Ok (Error (`Other e)) ->
       on_error e
   | Ok (Error `Present) ->
