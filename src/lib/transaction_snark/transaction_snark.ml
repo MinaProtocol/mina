@@ -3762,8 +3762,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-  let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
-      ledger
+  let zkapp_command_witnesses_exn ~constraint_constants ~global_slot ~state_body
+      ~fee_excess ledger
       (zkapp_commands :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -3791,8 +3791,8 @@ module Make_str (A : Wire_types.Concrete) = struct
            ->
           let _, states =
             Sparse_ledger.apply_zkapp_command_unchecked_with_states
-              sparse_ledger ~constraint_constants ~state_view ~fee_excess
-              ~supply_increase zkapp_command
+              sparse_ledger ~constraint_constants ~global_slot ~state_view
+              ~fee_excess ~supply_increase zkapp_command
             |> Or_error.ok_exn
           in
           let final_state =

@@ -122,6 +122,7 @@ module Transaction_key = struct
   let of_zkapp_command ~ledger (p : Zkapp_command.t) =
     let segments, _ =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+        ~global_slot:Mina_numbers.Global_slot.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty

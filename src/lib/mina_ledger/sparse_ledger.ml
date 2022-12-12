@@ -81,11 +81,11 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
-let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase ledger c =
+let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase ledger c =
   let open T in
-  apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase (ref ledger) c ~init:[]
+  apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase (ref ledger) c ~init:[]
     ~f:(fun
          acc
          ({ ledger; fee_excess; supply_increase; protocol_state }, local_state)

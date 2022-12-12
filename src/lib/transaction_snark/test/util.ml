@@ -98,8 +98,8 @@ let apply_zkapp_command ledger zkapp_command =
   in
   let witnesses, final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      (`Ledger ledger) zkapp_command
+      ~global_slot:Mina_numbers.Global_slot.zero ~state_body:genesis_state_body
+      ~fee_excess:Amount.Signed.zero (`Ledger ledger) zkapp_command
   in
   let open Impl in
   List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
@@ -132,7 +132,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
       match
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-              ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              ~global_slot:state_view.global_slot_since_genesis ~state_body
+              ~fee_excess:Amount.Signed.zero (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
                     (pending_coinbase_state_stack ~state_body_hash)

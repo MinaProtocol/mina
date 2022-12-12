@@ -692,7 +692,8 @@ let extract_from_job (job : job) =
         , d.statement
         , d.state_hash
         , d.ledger_witness
-        , d.init_stack )
+        , d.init_stack
+        , d.block_global_slot )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -758,7 +759,8 @@ let all_work_pairs t
         , statement
         , state_hash
         , ledger_witness
-        , init_stack ) ->
+        , init_stack
+        , block_global_slot ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
             Mina_transaction_logic.Transaction_applied.transaction_with_status
@@ -780,6 +782,7 @@ let all_work_pairs t
           ; protocol_state_body
           ; init_stack
           ; status
+          ; block_global_slot
           }
         in
         Snark_work_lib.Work.Single.Spec.Transition (statement, witness)

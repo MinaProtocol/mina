@@ -360,6 +360,7 @@ module type S = sig
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
@@ -393,6 +394,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -1702,6 +1704,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(global_slot : Global_slot.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
       ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
@@ -1717,6 +1720,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               (loc, a)) ) )
     in
     let perform eff = Env.perform ~constraint_constants eff in
+    let _g = global_slot in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
@@ -1840,9 +1844,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               "Zkapp_command application failed but new accounts created or \
                some of the other account_update updates applied"
 
-  let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger c =
-    apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ledger c
-      ~init:None ~f:(fun _acc (global_state, local_state) ->
+  let apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+      ~state_view ledger c =
+    apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
+      ~state_view ledger c ~init:None
+      ~f:(fun _acc (global_state, local_state) ->
         Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
            (account_update_applied, Option.value_exn state_res) )
@@ -2131,7 +2137,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
     let txn_global_slot = txn_state_view.global_slot_since_genesis in
-    let _g = global_slot in
     Or_error.map
       ( match t with
       | Command (Signed_command txn) ->
@@ -2141,8 +2146,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               Transaction_applied.Varying.Command (Signed_command applied) )
       | Command (Zkapp_command txn) ->
           Or_error.map
-            (apply_zkapp_command_unchecked ~state_view:txn_state_view
-               ~constraint_constants ledger txn ) ~f:(fun (applied, _) ->
+            (apply_zkapp_command_unchecked ~global_slot
+               ~state_view:txn_state_view ~constraint_constants ledger txn )
+            ~f:(fun (applied, _) ->
               Transaction_applied.Varying.Command (Zkapp_command applied) )
       | Fee_transfer t ->
           Or_error.map

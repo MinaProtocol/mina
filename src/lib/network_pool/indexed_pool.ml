@@ -1740,7 +1740,9 @@ let%test_module _ =
       | User_command.Zkapp_command p -> (
           let applied, _ =
             Mina_ledger.Ledger.apply_zkapp_command_unchecked
-              ~constraint_constants ~state_view:dummy_state_view ledger p
+              ~constraint_constants
+              ~global_slot:dummy_state_view.global_slot_since_genesis
+              ~state_view:dummy_state_view ledger p
             |> Or_error.ok_exn
           in
           match With_status.status applied.command with
