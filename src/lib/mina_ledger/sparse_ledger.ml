@@ -88,9 +88,20 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
     ~state_view ~fee_excess ~supply_increase (ref ledger) c ~init:[]
     ~f:(fun
          acc
-         ({ ledger; fee_excess; supply_increase; protocol_state }, local_state)
+         ( { ledger
+           ; fee_excess
+           ; supply_increase
+           ; protocol_state
+           ; block_global_slot
+           }
+         , local_state )
        ->
-      ( { GS.ledger = !ledger; fee_excess; supply_increase; protocol_state }
+      ( { GS.ledger = !ledger
+        ; fee_excess
+        ; supply_increase
+        ; protocol_state
+        ; block_global_slot
+        }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
   |> Result.map ~f:(fun (account_update_applied, states) ->

@@ -978,6 +978,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; fee_excess : Amount.Signed.var
           ; supply_increase : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
+          ; block_global_slot : Global_slot.Checked.var
           }
       end
 
@@ -1662,6 +1663,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Zkapp_precondition.Protocol_state.Checked.t
         end
 
+        module Valid_until_precondition = struct
+          type t = Zkapp_precondition.Valid_until.Checked.t
+        end
+
         module Field = Impl.Field
 
         module Local_state = struct
@@ -1854,6 +1859,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             let protocol_state_precondition (t : t) =
               t.account_update.data.preconditions.network
 
+            let valid_until_precondition (t : t) =
+              t.account_update.data.preconditions.valid_until
+
             let token_id (t : t) = t.account_update.data.token_id
 
             let public_key (t : t) = t.account_update.data.public_key
@@ -2021,6 +2029,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Mina_transaction_logic.Zkapp_command_logic.Local_state.t
             ; protocol_state_precondition :
                 Zkapp_precondition.Protocol_state.Checked.t
+            ; valid_until_precondition :
+                Mina_numbers.Global_slot.Checked.t
+                Zkapp_precondition.Numeric.Checked.t
             ; transaction_commitment : Transaction_commitment.t
             ; full_transaction_commitment : Transaction_commitment.t
             ; field : Field.t
@@ -2033,6 +2044,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             (eff : (r, Env.t) Mina_transaction_logic.Zkapp_command_logic.Eff.t)
             : r =
           match eff with
+          | Check_valid_until_precondition
+              (valid_until_precondition, global_state) ->
+              Zkapp_precondition.Checked.check_valid_until
+                valid_until_precondition global_state.block_global_slot
           | Check_protocol_state_precondition
               (protocol_state_predicate, global_state) ->
               Zkapp_precondition.Protocol_state.Checked.check
@@ -2124,6 +2139,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
+            ; block_global_slot = failwith "add-valid-until-for-account-update"
             }
           in
           let l : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =

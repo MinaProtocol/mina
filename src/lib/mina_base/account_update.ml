@@ -1601,6 +1601,10 @@ let balance_change (t : t) : Amount.Signed.t = t.body.balance_change
 let protocol_state_precondition (t : t) : Zkapp_precondition.Protocol_state.t =
   t.body.preconditions.network
 
+let valid_until_precondition (t : t) :
+    Mina_numbers.Global_slot.t Zkapp_precondition.Numeric.t =
+  t.body.preconditions.valid_until
+
 let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 
 let token_id (t : t) : Token_id.t = t.body.token_id

@@ -334,6 +334,7 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Mina_numbers.Global_slot.t
       }
   end
 
@@ -981,6 +982,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Global_slot.t
       }
 
     let ledger { ledger; _ } = L.create_masked ledger
@@ -997,8 +999,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let set_supply_increase t supply_increase = { t with supply_increase }
 
-    let global_slot_since_genesis { protocol_state; _ } =
-      protocol_state.global_slot_since_genesis
+    let global_slot_since_genesis { block_global_slot; _ } = block_global_slot
   end
 
   module Inputs = struct
@@ -1454,6 +1455,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Zkapp_precondition.Protocol_state
     end
 
+    module Valid_until_precondition = struct
+      include Zkapp_precondition.Valid_until
+    end
+
     module Account_update = struct
       include Account_update
 
@@ -1658,6 +1663,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_status.Failure.Collection.t )
           Zkapp_command_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
+      ; valid_until_precondition :
+          Mina_numbers.Global_slot.t Zkapp_precondition.Numeric.t
       ; transaction_commitment : Transaction_commitment.t
       ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
@@ -1666,6 +1673,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
+      | Check_valid_until_precondition (valid_until_precondition, global_state)
+        -> (
+          Zkapp_precondition.check_valid_until valid_until_precondition
+            global_state.block_global_slot
+          |> fun or_error ->
+          match or_error with Ok () -> true | Error _ -> false )
       | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
@@ -1720,7 +1733,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               (loc, a)) ) )
     in
     let perform eff = Env.perform ~constraint_constants eff in
-    let _g = global_slot in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
@@ -1736,7 +1748,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
+      ( { protocol_state = state_view
+        ; ledger
+        ; fee_excess
+        ; supply_increase
+        ; block_global_slot = global_slot
+        }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default

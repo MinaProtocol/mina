@@ -1357,6 +1357,33 @@ module Protocol_state = struct
     ()
 end
 
+module Valid_until = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Global_slot.Stable.V1.t Numeric.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let check (valid_until : t) global_slot =
+    Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
+      valid_until global_slot
+
+  module Checked = struct
+    type t = Global_slot.Checked.t Numeric.Checked.t
+
+    let check (valid_until : t) global_slot =
+      Numeric.(Checked.check Tc.global_slot) valid_until global_slot
+  end
+end
+
+let check_valid_until valid_until_precondition block_global_slot =
+  Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
+    valid_until_precondition block_global_slot
+
 module Account_type = struct
   [%%versioned
   module Stable = struct
@@ -1614,6 +1641,9 @@ module Checked = struct
   let digest t =
     Random_oracle.Checked.(
       hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
+
+  let check_valid_until valid_until_precondition global_slot =
+    Numeric.(Checked.check Tc.global_slot) valid_until_precondition global_slot
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =

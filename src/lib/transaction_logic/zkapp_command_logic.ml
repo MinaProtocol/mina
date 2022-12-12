@@ -165,6 +165,10 @@ module type Protocol_state_precondition_intf = sig
   type t
 end
 
+module type Valid_until_precondition_intf = sig
+  type t
+end
+
 module Local_state = struct
   open Core_kernel
 
@@ -294,6 +298,8 @@ module type Account_update_intf = sig
 
   type protocol_state_precondition
 
+  type valid_until_precondition
+
   type public_key
 
   type token_id
@@ -309,6 +315,8 @@ module type Account_update_intf = sig
   val balance_change : t -> signed_amount
 
   val protocol_state_precondition : t -> protocol_state_precondition
+
+  val valid_until_precondition : t -> valid_until_precondition
 
   val public_key : t -> public_key
 
@@ -616,6 +624,14 @@ end
 
 module Eff = struct
   type (_, _) t =
+    | Check_valid_until_precondition :
+        'valid_until_precondition * 'global_state
+        -> ( 'bool
+           , < bool : 'bool
+             ; valid_until_precondition : 'valid_until_precondition
+             ; global_state : 'global_state
+             ; .. > )
+           t
     | Check_account_precondition :
         (* the bool input is a new_account flag *)
         'account_update
@@ -675,6 +691,8 @@ module type Inputs_intf = sig
 
   module Protocol_state_precondition : Protocol_state_precondition_intf
 
+  module Valid_until_precondition : Valid_until_precondition_intf
+
   module Controller : Controller_intf with type bool := Bool.t
 
   module Global_slot : Global_slot_intf with type bool := Bool.t
@@ -729,6 +747,7 @@ module type Inputs_intf = sig
     (Account_update_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_precondition := Protocol_state_precondition.t
+       and type valid_until_precondition := Valid_until_precondition.t
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
@@ -1153,9 +1172,19 @@ module Make (Inputs : Inputs_intf) = struct
            ( Account_update.protocol_state_precondition account_update
            , global_state ) )
     in
+    let valid_until_satisfied =
+      h.perform
+        (Check_valid_until_precondition
+           (Account_update.valid_until_precondition account_update, global_state)
+        )
+    in
     let local_state =
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
+    in
+    let local_state =
+      Local_state.add_check local_state Valid_until_precondition_unsatisfied
+        valid_until_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
