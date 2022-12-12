@@ -50,7 +50,7 @@ module Transaction_with_witness = struct
         ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
               [@sexp.opaque]
         }
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -671,24 +671,230 @@ let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
   create ~work_delay:constraint_constants.work_delay
     ~transaction_capacity_log_2:constraint_constants.transaction_capacity_log_2
 
-let extract_txns txns_with_witnesses =
-  (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
-  List.map txns_with_witnesses
-    ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
-      let txn =
-        Ledger.Transaction_applied.transaction
-          txn_with_witness.transaction_with_info
-      in
-      let state_hash = fst txn_with_witness.state_hash in
-      (txn, state_hash) )
+module Transactions_ordered = struct
+  module Poly = struct
+    type 'a t =
+      { first_pass : 'a list
+      ; second_pass : 'a list
+      ; previous_incomplete : 'a list
+      ; current_incomplete : 'a list
+      }
+    [@@deriving sexp, to_yojson]
+  end
+
+  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
+
+  let map (t : 'a Poly.t) ~f : 'b Poly.t =
+    let f = List.map ~f in
+    { Poly.first_pass = f t.first_pass
+    ; second_pass = f t.second_pass
+    ; previous_incomplete = f t.previous_incomplete
+    ; current_incomplete = f t.current_incomplete
+    }
+
+  let fold (t : 'a Poly.t) ~f ~init =
+    let init = List.fold ~init t.first_pass ~f in
+    let init = List.fold ~init t.previous_incomplete ~f in
+    let init = List.fold ~init t.second_pass ~f in
+    List.fold ~init t.current_incomplete ~f
+
+  let first_and_second_pass_transactions_per_tree ~previous_incomplete
+      (txns_per_tree : Transaction_with_witness.t list) =
+    let complete_and_incomplete_transactions = function
+      | [] ->
+          None
+      | (h : Transaction_with_witness.t) :: _ as txns_with_witnesses ->
+          let target_first_pass_ledger = h.statement.source.first_pass_ledger in
+          let first_pass_txns, second_pass_txns, target_first_pass_ledger =
+            let first_pass_txns, second_pass_txns, target_first_pass_ledger =
+              List.fold ~init:([], [], target_first_pass_ledger)
+                txns_with_witnesses
+                ~f:(fun
+                     (first_pass_txns, second_pass_txns, second_pass_ledger_hash)
+                     (txn_with_witness : Transaction_with_witness.t)
+                   ->
+                  let txn =
+                    Ledger.Transaction_applied.transaction
+                      txn_with_witness.transaction_with_info
+                  in
+                  match txn.data with
+                  | Transaction.Coinbase _
+                  | Fee_transfer _
+                  | Command (User_command.Signed_command _) ->
+                      ( txn_with_witness :: first_pass_txns
+                      , second_pass_txns
+                      , second_pass_ledger_hash )
+                  | Command (Zkapp_command _) ->
+                      let target_first_pass_ledger =
+                        txn_with_witness.statement.target.first_pass_ledger
+                      in
+                      ( txn_with_witness :: first_pass_txns
+                      , txn_with_witness :: second_pass_txns
+                      , target_first_pass_ledger ) )
+            in
+            ( List.rev first_pass_txns
+            , List.rev second_pass_txns
+            , target_first_pass_ledger )
+          in
+          let second_pass_txns, incomplete_txns =
+            match List.hd second_pass_txns with
+            | None ->
+                ([], [])
+            | Some txn_with_witness ->
+                if
+                  Frozen_ledger_hash.equal
+                    txn_with_witness.statement.source.second_pass_ledger
+                    target_first_pass_ledger
+                then
+                  (*second pass completed in the same tree*)
+                  (second_pass_txns, [])
+                else ([], second_pass_txns)
+          in
+          let previous_incomplete =
+            match previous_incomplete with
+            | [] ->
+                []
+            | (t : Transaction_with_witness.t) :: _ ->
+                if State_hash.equal (fst t.state_hash) (fst h.state_hash) then
+                  (*same block*)
+                  previous_incomplete
+                else []
+          in
+          Some
+            { Poly.first_pass = first_pass_txns
+            ; second_pass = second_pass_txns
+            ; current_incomplete = incomplete_txns
+            ; previous_incomplete
+            }
+    in
+    let txns_by_block (txns_per_tree : Transaction_with_witness.t list) =
+      List.group txns_per_tree ~break:(fun t1 t2 ->
+          State_hash.equal (fst t1.state_hash) (fst t2.state_hash) |> not )
+    in
+    List.filter_map ~f:complete_and_incomplete_transactions
+      (txns_by_block txns_per_tree)
+
+  let first_and_second_pass_transactions_per_forest scan_state_txns
+      ~previous_incomplete =
+    List.map scan_state_txns
+      ~f:(first_and_second_pass_transactions_per_tree ~previous_incomplete)
+end
+
+let extract_txn (txn_with_witness : Transaction_with_witness.t) =
+  let txn =
+    Ledger.Transaction_applied.transaction
+      txn_with_witness.transaction_with_info
+  in
+  let state_hash = fst txn_with_witness.state_hash in
+  (txn, state_hash)
 
 let latest_ledger_proof t =
-  (*TODO: Deepthi; include previous incomplete zkapp updates*)
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
   in
-  (proof, extract_txns txns_with_witnesses)
+  let txns =
+    Transactions_ordered.first_and_second_pass_transactions_per_tree
+      txns_with_witnesses
+      ~previous_incomplete:t.previous_incomplete_zkapp_updates
+  in
+  (proof, List.map txns ~f:(Transactions_ordered.map ~f:extract_txn))
+
+let incomplete_txns_from_recent_proof_tree t =
+  let open Option.Let_syntax in
+  let%map proof, txns_with_witnesses =
+    Parallel_scan.last_emitted_value t.scan_state
+  in
+  let txns_per_block =
+    Transactions_ordered.first_and_second_pass_transactions_per_tree
+      txns_with_witnesses
+      ~previous_incomplete:t.previous_incomplete_zkapp_updates
+  in
+  let txns =
+    match List.last txns_per_block with
+    | None ->
+        []
+    | Some txns_in_last_block ->
+        txns_in_last_block.current_incomplete
+  in
+  (proof, txns)
+
+let staged_transactions t =
+  let previous_incomplete =
+    Option.value_map ~default:[]
+      (incomplete_txns_from_recent_proof_tree t)
+      ~f:snd
+  in
+  Transactions_ordered.first_and_second_pass_transactions_per_forest
+    (Parallel_scan.pending_data t.scan_state)
+    ~previous_incomplete
+  |> List.concat
+
+(*All the transactions in the order in which they were applied along with the parent protocol state of the blocks that contained them*)
+let staged_transactions_with_state_hash t =
+  let pending_transactions_per_block = staged_transactions t in
+  List.map pending_transactions_per_block
+    ~f:(Transactions_ordered.map ~f:extract_txn)
+
+let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
+    ~apply_first_pass ~apply_second_pass =
+  let open Or_error.Let_syntax in
+  let go ~apply txns =
+    let apply t state_hash =
+      match get_protocol_state state_hash with
+      | Ok state ->
+          let txn_state_view =
+            Mina_state.Protocol_state.body state
+            |> Mina_state.Protocol_state.Body.view
+          in
+          apply ~txn_state_view ledger t
+      | Error e ->
+          Or_error.errorf
+            !"Coudln't find protocol state with hash %s: %s"
+            (State_hash.to_base58_check state_hash)
+            (Error.to_string_hum e)
+    in
+    List.fold_until txns ~init:(Ok ())
+      ~f:(fun _acc ((t : Transaction.t With_status.t), state_hash) ->
+        match apply t.data state_hash with
+        | Ok _ ->
+            Continue (Ok ())
+        | Error e ->
+            Stop (Error e) )
+      ~finish:Fn.id
+  in
+  List.fold_until ordered_txns ~init:(Ok [])
+    ~f:(fun acc (txns_per_block : _ Transactions_ordered.Poly.t) ->
+      match
+        let%bind previous_incomplete = acc in
+        let%bind () = go txns_per_block.first_pass ~apply:apply_first_pass in
+        let%bind () = go previous_incomplete ~apply:apply_second_pass in
+        let%map () = go txns_per_block.second_pass ~apply:apply_second_pass in
+        txns_per_block.current_incomplete
+      with
+      | Ok current_incomplete ->
+          Continue (Ok current_incomplete)
+      | Error e ->
+          Stop (Error e) )
+    ~finish:Fn.id
+  |> Or_error.ignore_m
+
+let apply_last_proof_transactions ~ledger ~get_protocol_state ~apply_first_pass
+    ~apply_second_pass t =
+  match latest_ledger_proof t with
+  | None ->
+      Or_error.errorf "No transactions found"
+  | Some (_, txns_per_block) ->
+      apply_ordered_txns txns_per_block ~ledger ~get_protocol_state
+        ~apply_first_pass ~apply_second_pass
+
+let apply_staged_transactions ~ledger ~get_protocol_state ~apply_first_pass
+    ~apply_second_pass t =
+  let staged_transactions_with_state_hash =
+    staged_transactions_with_state_hash t
+  in
+  apply_ordered_txns staged_transactions_with_state_hash ~ledger
+    ~get_protocol_state ~apply_first_pass ~apply_second_pass
 
 let free_space t = Parallel_scan.free_space t.scan_state
 
@@ -698,32 +904,10 @@ let all_jobs t = Parallel_scan.all_jobs t.scan_state
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
 let base_jobs_on_latest_tree t =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   Parallel_scan.base_jobs_on_latest_tree t.scan_state
 
 let base_jobs_on_earlier_tree t =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   Parallel_scan.base_jobs_on_earlier_tree t.scan_state
-
-(*All the transactions in the order in which they were applied*)
-let staged_transactions t =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
-  List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Transaction_applied.transaction )
-  @@ Parallel_scan.pending_data t.scan_state
-
-let staged_transactions_with_protocol_states t
-    ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
-  let open Or_error.Let_syntax in
-  List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      let txn =
-        t.transaction_with_info |> Ledger.Transaction_applied.transaction
-      in
-      let%map protocol_state = get_state (fst t.state_hash) in
-      (txn, protocol_state) )
-  @@ Parallel_scan.pending_data t.scan_state
-  |> Or_error.all
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
@@ -885,39 +1069,57 @@ let fill_work_and_enqueue_transactions t transactions work =
            |> One_or_two.to_list ) )
       ~f:completed_work_to_scanable_work
   in
-  let old_proof = Parallel_scan.last_emitted_value t.scan_state in
+  (*get incomplete transactions from previous proof which will be completed in
+     the new proof, if there's one*)
+  let old_proof_and_incomplete_zkapp_updates =
+    incomplete_txns_from_recent_proof_tree t
+  in
   let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
   let%bind proof_opt, updated_scan_state =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
-  let%map result_opt =
-    Option.value_map ~default:(Ok None) proof_opt
+  let%map result_opt, previous_incomplete_zkapp_updates =
+    Option.value_map
+      ~default:(Ok (None, t.previous_incomplete_zkapp_updates))
+      proof_opt
       ~f:(fun ((proof, _), txns_with_witnesses) ->
         let curr_source = (Ledger_proof.statement proof).source in
         (*TODO: get genesis ledger hash if the old_proof is none*)
-        let prev_target =
-          Option.value_map ~default:curr_source old_proof
-            ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
+        let prev_target, incomplete_zkapp_updates_from_old_proof =
+          Option.value_map ~default:(curr_source, [])
+            old_proof_and_incomplete_zkapp_updates
+            ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
+              ( (Ledger_proof.statement p').target
+              , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is
           important here*)
         if Mina_state.Registers.Value.connected prev_target curr_source then
-          Ok (Some (proof, extract_txns txns_with_witnesses))
+          let txns =
+            Transactions_ordered.first_and_second_pass_transactions_per_tree
+              txns_with_witnesses
+              ~previous_incomplete:incomplete_zkapp_updates_from_old_proof
+          in
+          Ok
+            ( Some
+                ( proof
+                , List.map txns ~f:(Transactions_ordered.map ~f:extract_txn) )
+            , incomplete_zkapp_updates_from_old_proof )
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
-  (*TODO: Deepthi; include previous incomplete zkapp updates*)
-  (result_opt, { t with scan_state = updated_scan_state })
+  ( result_opt
+  , { scan_state = updated_scan_state; previous_incomplete_zkapp_updates } )
 
 let required_state_hashes t =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   List.fold ~init:State_hash.Set.empty
-    ~f:(fun acc (t : Transaction_with_witness.t) ->
-      Set.add acc (fst t.state_hash) )
-    (Parallel_scan.pending_data t.scan_state)
+    ~f:(fun acc (txns : Transactions_ordered.t) ->
+      Transactions_ordered.fold ~init:acc txns
+        ~f:(fun acc (t : Transaction_with_witness.t) ->
+          Set.add acc (fst t.state_hash) ) )
+    (staged_transactions t)
 
 let check_required_protocol_states t ~protocol_states =
-  (*TODO: Deepthi; include previous incomplete zkapp updates?*)
   let open Or_error.Let_syntax in
   let required_state_hashes = required_state_hashes t in
   let check_length states =

@@ -475,22 +475,24 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
       (* STEP 5 *)
-      Mina_stdlib.Nonempty_list.iter
-        (Option.value_exn
-           (Staged_ledger.proof_txns_with_state_hashes
-              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
-        ~f:(fun (txn, state_hash) ->
-          (*Validate transactions against the protocol state associated with the transaction*)
-          let txn_state_view =
-            find_protocol_state t state_hash
-            |> Option.value_exn |> Protocol_state.body
-            |> Protocol_state.Body.view
-          in
-          ignore
-            ( Or_error.ok_exn
-                (Ledger.apply_transaction ~constraint_constants ~txn_state_view
-                   mt txn.data )
-              : Ledger.Transaction_applied.t ) ) ;
+      (*Validate transactions against the protocol state associated with the transaction*)
+      (*TODO: get appropriate functions*)
+      let apply_first_pass = Ledger.apply_transaction ~constraint_constants in
+      let apply_second_pass = Ledger.apply_transaction ~constraint_constants in
+      let get_protocol_state state_hash =
+        match find_protocol_state t state_hash with
+        | Some s ->
+            Ok s
+        | None ->
+            Or_error.errorf "Failed to find protocol state for hash %s"
+              (State_hash.to_base58_check state_hash)
+      in
+      Or_error.ok_exn
+        ( Staged_ledger.Scan_state.apply_last_proof_transactions ~ledger:mt
+            ~get_protocol_state ~apply_first_pass ~apply_second_pass
+            (Staged_ledger.scan_state
+               (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
+          : unit Or_error.t ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

@@ -26,6 +26,21 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
+  module Transactions_ordered : sig
+    module Poly : sig
+      type 'a t =
+        { first_pass : 'a list
+        ; second_pass : 'a list
+        ; previous_incomplete : 'a list
+        ; current_incomplete : 'a list
+        }
+      [@@deriving sexp, to_yojson]
+    end
+
+    type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
+    [@@deriving sexp, to_yojson]
+  end
+
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   val empty :
@@ -33,13 +48,11 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
-  val staged_transactions : t -> Transaction.t With_status.t list
-
-  val staged_transactions_with_protocol_states :
+  (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
+  val staged_transactions_with_state_hash :
        t
-    -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-    -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
-       Or_error.t
+    -> (Transaction.t With_status.t * State_hash.t) Transactions_ordered.Poly.t
+       list
 
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
@@ -53,6 +66,30 @@ module Scan_state : sig
          Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
     -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
        Or_error.t
+
+  (** Apply transactions coorresponding to the last emitted proof based on the 
+    two-pass system- first pass includes legacy transactions and zkapp payments
+    and the second pass includes account updates. [ignore_incomplete] is to
+    ignore the account updates that were not completed in a single scan state
+    tree corresponding to a proof. Set this to true when applying transactions
+    to get the snarked ledger corresponding to a proof.
+    *)
+  val apply_last_proof_transactions :
+       ledger:'a
+    -> get_protocol_state:
+         (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+    -> apply_first_pass:
+         (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+          -> 'a
+          -> Transaction.t
+          -> 'd Or_error.t )
+    -> apply_second_pass:
+         (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+          -> 'a
+          -> Transaction.t
+          -> 'd Or_error.t )
+    -> t
+    -> unit Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -113,7 +150,9 @@ val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
      t
-  -> (Transaction.t With_status.t * State_hash.t) Mina_stdlib.Nonempty_list.t
+  -> (Transaction.t With_status.t * State_hash.t)
+     Scan_state.Transactions_ordered.Poly.t
+     Mina_stdlib.Nonempty_list.t
      option
 
 val copy : t -> t
@@ -133,7 +172,10 @@ val apply :
   -> supercharge_coinbase:bool
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+           ( Ledger_proof.t
+           * (Transaction.t With_status.t * State_hash.t)
+             Scan_state.Transactions_ordered.Poly.t
+             list )
            option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
@@ -151,7 +193,10 @@ val apply_diff_unchecked :
   -> supercharge_coinbase:bool
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+           ( Ledger_proof.t
+           * (Transaction.t With_status.t * State_hash.t)
+             Scan_state.Transactions_ordered.Poly.t
+             list )
            option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]

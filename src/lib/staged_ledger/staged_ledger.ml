@@ -330,30 +330,38 @@ module T = struct
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
     in
-    let%bind txs_with_protocol_state =
-      Scan_state.staged_transactions_with_protocol_states scan_state ~get_state
+    (*TODO: get appropriate functions*)
+    let apply_first_pass = Ledger.apply_transaction ~constraint_constants in
+    let apply_second_pass = Ledger.apply_transaction ~constraint_constants in
+    let%bind () =
+      Scan_state.apply_staged_transactions ~ledger:snarked_ledger
+        ~get_protocol_state:get_state ~apply_first_pass ~apply_second_pass
+        scan_state
       |> Deferred.return
     in
-    let%bind _ =
-      Deferred.Or_error.List.iter txs_with_protocol_state
-        ~f:(fun (tx, protocol_state) ->
-          let%map.Deferred () = Scheduler.yield () in
-          let%bind.Or_error txn_with_info =
-            Ledger.apply_transaction ~constraint_constants
-              ~txn_state_view:
-                (Mina_state.Protocol_state.Body.view protocol_state.body)
-              snarked_ledger tx.data
-          in
-          let computed_status =
-            Ledger.Transaction_applied.transaction_status txn_with_info
-          in
-          if Transaction_status.equal tx.status computed_status then Ok ()
-          else
-            Or_error.errorf
-              !"Mismatched user command status. Expected: %{sexp: \
-                Transaction_status.t} Got: %{sexp: Transaction_status.t}"
-              tx.status computed_status )
-    in
+    (*TODO: Reviewer : Before I fully replace the code below
+       1. do we want to yield after every transaction especially when the first pass has only fee payer updates
+       2. Do we need to check the transaction status if we are checking the ledger hash below*)
+    (*let%bind _ =
+        Deferred.Or_error.List.iter txs_with_protocol_state
+          ~f:(fun (tx, protocol_state) ->
+            let%map.Deferred () = Scheduler.yield () in
+            let%bind.Or_error txn_with_info =
+              Ledger.apply_transaction ~constraint_constants
+                ~txn_state_view:
+                  (Mina_state.Protocol_state.Body.view protocol_state.body)
+                snarked_ledger tx.data
+            in
+            let computed_status =
+              Ledger.Transaction_applied.transaction_status txn_with_info
+            in
+            if Transaction_status.equal tx.status computed_status then Ok ()
+            else
+              Or_error.errorf
+                !"Mismatched user command status. Expected: %{sexp: \
+                  Transaction_status.t} Got: %{sexp: Transaction_status.t}"
+                tx.status computed_status )
+      in*)
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
       Deferred.return
@@ -2396,8 +2404,12 @@ let%test_module "staged ledger tests" =
 
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess :
-        (Ledger_proof.t * (Transaction.t With_status.t * _) list) option -> unit
-        =
+           ( Ledger_proof.t
+           * (Transaction.t With_status.t * _)
+             Sl.Scan_state.Transactions_ordered.Poly.t
+             list )
+           option
+        -> unit =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee_excess.zero proof_opt

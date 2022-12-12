@@ -74,6 +74,20 @@ end) : sig
     -> (unit, Error.t) Deferred.Result.t
 end
 
+module Transactions_ordered : sig
+  module Poly : sig
+    type 'a t =
+      { first_pass : 'a list
+      ; second_pass : 'a list
+      ; previous_incomplete : 'a list
+      ; current_incomplete : 'a list
+      }
+    [@@deriving sexp, to_yojson]
+  end
+
+  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
+end
+
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
@@ -81,7 +95,10 @@ val fill_work_and_enqueue_transactions :
      t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+  -> ( ( Ledger_proof.t
+       * (Transaction.t With_status.t * State_hash.t)
+         Transactions_ordered.Poly.t
+         list )
        option
      * t )
      Or_error.t
@@ -89,8 +106,57 @@ val fill_work_and_enqueue_transactions :
 val latest_ledger_proof :
      t
   -> ( Ledger_proof_with_sok_message.t
-     * (Transaction.t With_status.t * State_hash.t) list )
+     * (Transaction.t With_status.t * State_hash.t) Transactions_ordered.Poly.t
+       list )
      option
+
+(** Apply transactions coorresponding to the last emitted proof based on the 
+    two-pass system- first pass includes legacy transactions and zkapp payments
+    and the second pass includes account updates. [ignore_incomplete] is to
+    ignore the account updates that were not completed in a single scan state
+    tree corresponding to a proof. Set this to true when applying transactions
+    to get the snarked ledger corresponding to a proof.
+    *)
+val apply_last_proof_transactions :
+     ledger:'a
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> 'a
+        -> Transaction.t
+        -> 'd Or_error.t )
+  -> apply_second_pass:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> 'a
+        -> Transaction.t
+        -> 'd Or_error.t )
+  -> t
+  -> unit Or_error.t
+
+(** Apply all the currently staged transaction to snarked ledger based on the 
+    two-pass system- first pass includes legacy transactions and zkapp payments
+    and the second pass includes account updates. [ignore_incomplete] is to
+    ignore the account updates that were not completed in a single scan state
+    tree corresponding to a proof. Set this to true when applying transactions
+    to get the snarked ledger corresponding to a proof.
+    *)
+val apply_staged_transactions :
+     ledger:'a
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> 'a
+        -> Transaction.t
+        -> 'd Or_error.t )
+  -> apply_second_pass:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> 'a
+        -> Transaction.t
+        -> 'd Or_error.t )
+  -> t
+  -> unit Or_error.t
 
 val free_space : t -> int
 
@@ -102,15 +168,11 @@ val base_jobs_on_earlier_tree :
 
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 
-(** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t With_status.t list
-
-(** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
-val staged_transactions_with_protocol_states :
+(** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
+val staged_transactions_with_state_hash :
      t
-  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
-     Or_error.t
+  -> (Transaction.t With_status.t * State_hash.t) Transactions_ordered.Poly.t
+     list
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t

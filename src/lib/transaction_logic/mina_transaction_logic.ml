@@ -17,7 +17,7 @@ module Transaction_applied = struct
           type t =
             { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t
             }
-          [@@deriving sexp]
+          [@@deriving sexp, to_yojson]
 
           let to_latest = Fn.id
         end
@@ -33,7 +33,7 @@ module Transaction_applied = struct
             | Stake_delegation of
                 { previous_delegate : Public_key.Compressed.Stable.V1.t option }
             | Failed
-          [@@deriving sexp]
+          [@@deriving sexp, to_yojson]
 
           let to_latest = Fn.id
         end
@@ -44,7 +44,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t = { common : Common.Stable.V2.t; body : Body.Stable.V2.t }
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -68,7 +68,7 @@ module Transaction_applied = struct
           ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
           ; new_accounts : Account_id.Stable.V2.t list
           }
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -82,7 +82,7 @@ module Transaction_applied = struct
         type t =
           | Signed_command of Signed_command_applied.Stable.V2.t
           | Zkapp_command of Zkapp_command_applied.Stable.V1.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -98,7 +98,7 @@ module Transaction_applied = struct
           ; new_accounts : Account_id.Stable.V2.t list
           ; burned_tokens : Currency.Amount.Stable.V1.t
           }
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -114,7 +114,7 @@ module Transaction_applied = struct
           ; new_accounts : Account_id.Stable.V2.t list
           ; burned_tokens : Currency.Amount.Stable.V1.t
           }
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -129,7 +129,7 @@ module Transaction_applied = struct
           | Command of Command_applied.Stable.V2.t
           | Fee_transfer of Fee_transfer_applied.Stable.V2.t
           | Coinbase of Coinbase_applied.Stable.V2.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -143,7 +143,7 @@ module Transaction_applied = struct
         { previous_hash : Ledger_hash.Stable.V1.t
         ; varying : Varying.Stable.V2.t
         }
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end

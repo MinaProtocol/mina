@@ -630,55 +630,44 @@ let get_snarked_ledger t state_hash_opt =
         List.fold_until ~init:(Ok ()) path
           ~f:(fun _acc b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
+              (*Validate transactions against the protocol state associated with the transaction*)
+              let get_protocol_state state_hash =
+                match
+                  Transition_frontier.find_protocol_state frontier state_hash
+                with
+                | Some s ->
+                    Ok s
+                | None ->
+                    Or_error.errorf "Failed to find protocol state for hash %s"
+                      (State_hash.to_base58_check state_hash)
+              in
+              (*TODO: get appropriate functions*)
+              let apply_first_pass =
+                Ledger.apply_transaction
+                  ~constraint_constants:
+                    t.config.precomputed_values.constraint_constants
+              in
+              let apply_second_pass =
+                Ledger.apply_transaction
+                  ~constraint_constants:
+                    t.config.precomputed_values.constraint_constants
+              in
               match
-                Staged_ledger.proof_txns_with_state_hashes
-                  (Transition_frontier.Breadcrumb.staged_ledger b)
+                Staged_ledger.Scan_state.apply_last_proof_transactions ~ledger
+                  ~get_protocol_state ~apply_first_pass ~apply_second_pass
+                  (Staged_ledger.scan_state
+                     (Transition_frontier.Breadcrumb.staged_ledger b) )
               with
-              | None ->
+              | Ok () ->
+                  Continue (Ok ())
+              | Error e ->
                   Stop
-                    (Or_error.error_string
-                       (sprintf
-                          "No transactions corresponding to the emitted proof \
-                           for state_hash:%s"
-                          (State_hash.to_base58_check
-                             (Transition_frontier.Breadcrumb.state_hash b) ) ) )
-              | Some txns -> (
-                  match
-                    List.fold_until ~init:(Ok ())
-                      (Mina_stdlib.Nonempty_list.to_list txns)
-                      ~f:(fun _acc (txn, state_hash) ->
-                        (*Validate transactions against the protocol state associated with the transaction*)
-                        match
-                          Transition_frontier.find_protocol_state frontier
-                            state_hash
-                        with
-                        | Some state -> (
-                            let txn_state_view =
-                              Mina_state.Protocol_state.body state
-                              |> Mina_state.Protocol_state.Body.view
-                            in
-                            match
-                              Ledger.apply_transaction
-                                ~constraint_constants:
-                                  t.config.precomputed_values
-                                    .constraint_constants ~txn_state_view ledger
-                                txn.data
-                            with
-                            | Ok _ ->
-                                Continue (Ok ())
-                            | e ->
-                                Stop (Or_error.map e ~f:ignore) )
-                        | None ->
-                            Stop
-                              (Or_error.errorf
-                                 !"Coudln't find protocol state with hash %s"
-                                 (State_hash.to_base58_check state_hash) ) )
-                      ~finish:Fn.id
-                  with
-                  | Ok _ ->
-                      Continue (Ok ())
-                  | e ->
-                      Stop e )
+                    (Or_error.errorf
+                       "Failed to apply proof transactions for state_hash:%s : \
+                        %s"
+                       (State_hash.to_base58_check
+                          (Transition_frontier.Breadcrumb.state_hash b) )
+                       (Error.to_string_hum e) )
             else Continue (Ok ()) )
           ~finish:Fn.id
       in
