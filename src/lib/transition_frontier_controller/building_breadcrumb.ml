@@ -93,6 +93,7 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   in
   let module I = Interruptible.Make () in
   let received_at = (List.last_exn received).Transition_state.received_at in
+  (* TODO consider using result of comptation even in case of interruption *)
   let process_f () =
     ( Context.build_breadcrumb ~received_at ~parent ~transition (module I)
     , Context.building_breadcrumb_timeout )
@@ -210,6 +211,8 @@ let restart_failed_ancestor ~actions ~context ~transition_states ~state_hash
               ] )
   | _ ->
       ()
+
+(* TODO investigate issue of building breadcrumbs being prematurely abrupted (e.g. after 15s) *)
 
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.
