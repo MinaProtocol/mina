@@ -11,9 +11,11 @@ import sys
 from compare_versioned_items import run_comparison
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] == sys.argv[2] :
-        print("Usage: %s path1-to-file.ml path2-to-file.ml" % sys.argv[0], file=sys.stderr)
+    if len(sys.argv) != 3 or sys.argv[1] == sys.argv[2]:
+        print("Usage: %s path1-to-file.ml path2-to-file.ml" %
+              sys.argv[0], file=sys.stderr)
         print("The .ml files must have the same name, with different paths")
         sys.exit(1)
 
-    run_comparison('_build/default/src/external/ppx_version/tools/print_versioned_types.exe','Versioned types',sys.argv[1],sys.argv[2])
+    run_comparison('_build/default/src/lib/ppx_version/tools/print_versioned_types.exe',
+                   'Versioned types', sys.argv[1], sys.argv[2])
