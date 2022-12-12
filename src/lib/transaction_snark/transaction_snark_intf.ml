@@ -469,6 +469,7 @@ module type Full = sig
 
     val deploy_snapp :
          ?no_auth:bool
+      -> ?default_permissions:bool
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
@@ -479,8 +480,7 @@ module type Full = sig
         ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
         ; fee_payer :
             (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers :
-            (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+        ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
         ; amount : Currency.Amount.t
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
@@ -497,7 +497,8 @@ module type Full = sig
     end
 
     val update_states :
-         ?zkapp_prover:
+         ?receiver_auth:Control.Tag.t
+      -> ?zkapp_prover:
            ( unit
            , unit
            , unit
@@ -505,6 +506,7 @@ module type Full = sig
            , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
              Async.Deferred.t )
            Pickles.Prover.t
+      -> ?empty_sender:bool
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Update_states_spec.t
       -> Zkapp_command.t Async.Deferred.t

@@ -161,6 +161,7 @@ module Evals : sig
   module In_circuit : sig
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
+      ; coefficients : 'f Columns_vec.t
       ; z : 'f
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
@@ -194,6 +195,7 @@ module Evals : sig
 
   type 'a t =
     { w : 'a Columns_vec.t
+    ; coefficients : 'a Columns_vec.t
     ; z : 'a
     ; s : 'a Permuts_minus_1_vec.t
     ; generic_selector : 'a
@@ -230,12 +232,12 @@ module Openings : sig
          ( 'a
          , 'b
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_ast.t )
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> ( 'd
          , 'e
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_ast.t )
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> length:int
       -> (('d, 'a) t, ('e, 'b) t, 'c) Snarky_backendless.Typ.t
@@ -320,7 +322,7 @@ module All_evals : sig
          In_circuit.t
        , ('f, 'f array) t
        , 'f
-       , (unit, 'f) Snarky_backendless.Checked_ast.t )
+       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless.Types.Typ.typ
 end
 

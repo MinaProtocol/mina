@@ -121,10 +121,11 @@ let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_zkapp_command_with_merges_exn ?expected_failure
+let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
     ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple zkApp transactions*)
+  let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
@@ -152,13 +153,23 @@ let check_zkapp_command_with_merges_exn ?expected_failure
       | Ok (witnesses, _) -> (
           let open Async.Deferred.Let_syntax in
           let applied =
-            Ledger.apply_transaction ~constraint_constants
-              ~txn_state_view:state_view ledger
-              (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command)
-              )
-            |> Or_error.ok_exn
+            if ignore_outside_snark then
+              Ledger.Transaction_applied.Varying.Command
+                (Zkapp_command
+                   { command =
+                       { With_status.status = Applied; data = zkapp_command }
+                   ; accounts = []
+                   ; new_accounts = []
+                   } )
+            else
+              ( Ledger.apply_transaction ~constraint_constants
+                  ~txn_state_view:state_view ledger
+                  (Mina_transaction.Transaction.Command
+                     (Zkapp_command zkapp_command) )
+              |> Or_error.ok_exn )
+                .varying
           in
-          match applied.varying with
+          match applied with
           | Command (Zkapp_command { command; _ }) -> (
               match command.status with
               | Applied -> (
@@ -200,12 +211,13 @@ let check_zkapp_command_with_merges_exn ?expected_failure
                                 T.merge ~sok_digest prev curr )
                       in
                       let p = Or_error.ok_exn p in
-                      let target_ledger_root_snark =
-                        (Transaction_snark.statement p).target.ledger
-                      in
-                      let target_ledger_root = Ledger.merkle_root ledger in
-                      [%test_eq: Ledger_hash.t] target_ledger_root
-                        target_ledger_root_snark )
+                      if not ignore_outside_snark then
+                        let target_ledger_root_snark =
+                          (Transaction_snark.statement p).target.ledger
+                        in
+                        let target_ledger_root = Ledger.merkle_root ledger in
+                        [%test_eq: Ledger_hash.t] target_ledger_root
+                          target_ledger_root_snark )
               | Failed failure_tbl -> (
                   match expected_failure with
                   | None ->
@@ -347,7 +359,7 @@ module Wallet = struct
       { private_key
       ; account =
           Account.create account_id
-            (Balance.of_int ((50 + Random.int 100) * 1_000_000_000))
+            (Balance.of_mina_int_exn (50 + Random.int 100))
       }
     in
     Array.init n ~f:(fun _ -> random_wallet ())
@@ -358,7 +370,10 @@ module Wallet = struct
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
+        ~body:
+          (Payment
+             { source_pk; receiver_pk; amount = Amount.of_nanomina_int_exn amt }
+          )
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -417,7 +432,7 @@ let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
 let check_balance pk balance ledger =
   let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
   let acc = Ledger.get ledger loc |> Option.value_exn in
-  [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
+  [%test_eq: Balance.t] acc.balance (Balance.of_nanomina_int_exn balance)
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =

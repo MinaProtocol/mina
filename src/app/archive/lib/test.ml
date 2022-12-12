@@ -116,8 +116,9 @@ let%test_module "Archive node unit tests" =
       User_command.Zkapp_command zkapp_command
 
     let fee_transfer_gen =
-      Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0 ~max_fee:10
+      Fee_transfer.Single.Gen.with_random_receivers ~min_fee:0 ~max_fee:10
         ~token:(Quickcheck.Generator.return Token_id.default)
+        keys
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100

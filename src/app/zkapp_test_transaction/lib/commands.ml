@@ -38,7 +38,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
-      (Account.create id Currency.Balance.(of_int 1000000000000))
+      (Account.create id Currency.Balance.(of_mina_int_exn 1_000))
     |> Or_error.ok_exn
   in
   let _v =
@@ -46,7 +46,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
         let `VK vk, `Prover _ = Lazy.force vk_and_prover in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
-          { (Account.create id Currency.Balance.(of_int 1000000000000)) with
+          { (Account.create id Currency.Balance.(of_mina_int_exn 1_000)) with
             permissions =
               { Permissions.user_default with
                 edit_state = Proof
@@ -122,9 +122,9 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let spec =
     { Mina_transaction_logic.For_tests.Transaction_spec.sender =
         (keypair, Account.Nonce.zero)
-    ; fee = Currency.Fee.of_int 10000000000 (*1 Mina*)
+    ; fee = Currency.Fee.of_mina_int_exn 10
     ; receiver
-    ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
+    ; amount = Currency.Amount.of_mina_int_exn 10 (*10 Mina*)
     ; receiver_is_new = false
     }
   in
@@ -236,12 +236,16 @@ module Util = struct
 
   let snapp_keypair_of_file = keypair_of_file ~which:"Zkapp Account"
 
-  let print_snapp_transaction zkapp_command =
-    printf !"Zkapp_command sexp:\n %{sexp: Zkapp_command.t}\n\n%!" zkapp_command ;
-    printf "Zkapp transaction yojson:\n %s\n\n%!"
-      (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
-    printf "Zkapp transaction graphQL input %s\n\n%!"
-      (graphql_zkapp_command zkapp_command)
+  let print_snapp_transaction ~debug zkapp_command =
+    if debug then (
+      printf
+        !"Zkapp_command sexp:\n %{sexp: Zkapp_command.t}\n\n%!"
+        zkapp_command ;
+      printf "Zkapp transaction yojson:\n %s\n\n%!"
+        (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
+      printf "Zkapp transaction graphQL input %s\n\n%!"
+        (graphql_zkapp_command zkapp_command) )
+    else printf "%s\n%!" (graphql_zkapp_command zkapp_command)
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
@@ -300,15 +304,17 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   in
   generate_zkapp_txn keypair ledger ~zkapp_kp
 
-let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
-    ~memo =
+let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
+    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind sender_keypair = Util.keypair_of_file sender in
+  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
-    { Transaction_snark.For_tests.Deploy_snapp_spec.sender = (keypair, nonce)
+    { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
+        (sender_keypair, sender_nonce)
     ; fee
-    ; fee_payer = None
+    ; fee_payer = Some (fee_payer_keypair, fee_payer_nonce)
     ; amount
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
@@ -319,7 +325,8 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     }
   in
   let zkapp_command =
-    Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+    Transaction_snark.For_tests.deploy_snapp ~default_permissions:true
+      ~constraint_constants spec
   in
   let%map () = if debug then gen_proof zkapp_command else return () in
   zkapp_command
@@ -374,19 +381,21 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   zkapp_command
 
-let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
+let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
+    ~memo ~receivers =
   let open Deferred.Let_syntax in
   let%bind receivers = receivers in
   let amount =
     List.fold ~init:Currency.Amount.zero receivers ~f:(fun acc (_, a) ->
         Option.value_exn (Currency.Amount.add acc a) )
   in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind sender_keypair = Util.keypair_of_file sender in
+  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
   let spec =
     { Transaction_snark.For_tests.Multiple_transfers_spec.sender =
-        (keypair, nonce)
+        (sender_keypair, sender_nonce)
     ; fee
-    ; fee_payer = None
+    ; fee_payer = Some (fee_payer_keypair, fee_payer_nonce)
     ; receivers
     ; amount
     ; zkapp_account_keypairs = []
@@ -420,7 +429,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = { Account_update.Update.dummy with app_state }
-    ; current_auth = Permissions.Auth_required.Proof
+    ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
@@ -496,7 +505,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; memo = Util.memo memo
     ; new_zkapp_account = false
     ; snapp_update = Account_update.Update.dummy
-    ; current_auth = Permissions.Auth_required.Proof
+    ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events

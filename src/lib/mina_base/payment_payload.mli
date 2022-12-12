@@ -51,14 +51,16 @@ end]
 
 val dummy : t
 
+(** [gen ?source_pk max_amount] *)
 val gen :
      ?source_pk:Public_key.Compressed.t
-  -> max_amount:Currency.Amount.t
+  -> Currency.Amount.t
   -> t Quickcheck.Generator.t
 
+(** [gen_default_token ?source_pk max_amount] *)
 val gen_default_token :
      ?source_pk:Public_key.Compressed.t
-  -> max_amount:Currency.Amount.t
+  -> Currency.Amount.t
   -> t Quickcheck.Generator.t
 
 type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t

@@ -49,7 +49,7 @@
    one_or_two
    o1trace
    mina_state
-   non_empty_list
+   mina_stdlib
    snark_work_lib
    child_processes
    consensus

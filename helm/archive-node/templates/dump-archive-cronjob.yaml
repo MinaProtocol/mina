@@ -1,9 +1,8 @@
-# kubectl apply -f helm/cron_jobs/mainnet-dump-archive-cronjob.yaml
-# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+{{- if and .Values.archive.enablePostgresDB .Values.archive.enableDumpCronjob }}
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: mainnet-dump-archive-cronjob
+  name: "{{ template "archive-node.fullname" . }}-dump-cronjob"
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
@@ -18,14 +17,15 @@ spec:
             - '
             apk add curl;
             apk add python3;
-            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
-            tar -xzf google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-410.0.0-linux-x86_64.tar.gz;
+            tar -xzf google-cloud-cli-410.0.0-linux-x86_64.tar.gz;
+            ./google-cloud-sdk/install.sh --quiet;
             echo "installed gsutil";
 
             DATE="$(date +%F_%H%M)";
-            FILENAME=mainnet-archive-dump-"${DATE:: -1}0".sql;
+            FILENAME="{{ .Values.testnetName }}-archive-dump-${DATE}".sql;
 
-            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive_balances_migrated > $FILENAME;
+            pg_dump --no-owner --create --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} > $FILENAME;
 
             tar -czvf $FILENAME.tar.gz $FILENAME;
 
@@ -37,11 +37,16 @@ spec:
 
             '
             env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: "{{ template "archive-node.fullname" . }}-postgresql"
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: postgres:11-alpine
+            image: postgres:15-alpine
             imagePullPolicy: IfNotPresent
-            name: mainnet-dump-archive-cronjob
+            name: "{{ template "archive-node.fullname" . }}-dump-cronjob"
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
@@ -64,3 +69,4 @@ spec:
   schedule: 0 0 * * *
   successfulJobsHistoryLimit: 3
   suspend: false
+{{- end -}}

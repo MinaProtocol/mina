@@ -34,7 +34,9 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
     let%bind (predicate_account : Zkapp_precondition.Account.t) =
       let%bind balance =
         let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
-        let balance_change = Currency.Amount.of_int balance_change_int in
+        let balance_change =
+          Currency.Amount.of_nanomina_int_exn balance_change_int
+        in
         let lower =
           match Currency.Balance.sub_amount balance balance_change with
           | None ->
@@ -273,16 +275,15 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
   let small_balance_change =
     (*make small transfers to allow generating large number of zkapp_command without an overflow*)
     let open Currency in
-    if
-      Balance.(effective_balance < of_formatted_string "1.0") && not new_account
+    if Balance.(effective_balance < of_mina_string_exn "1.0") && not new_account
     then failwith "account has low balance"
-    else Balance.of_formatted_string "0.000001"
+    else Balance.of_mina_string_exn "0.000001"
   in
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "50.0")
-        (Currency.Amount.of_formatted_string "100.0")
+        (Currency.Amount.of_mina_string_exn "50.0")
+        (Currency.Amount.of_mina_string_exn "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)
@@ -369,18 +370,6 @@ let gen_protocol_state_precondition
   let%bind snarked_ledger_hash =
     Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
-  let%bind timestamp =
-    let%bind epsilon1 =
-      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
-    in
-    let%bind epsilon2 =
-      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
-    in
-    { lower = Block_time.sub psv.timestamp epsilon1
-    ; upper = Block_time.add psv.timestamp epsilon2
-    }
-    |> return |> Zkapp_basic.Or_ignore.gen
-  in
   let%bind blockchain_length =
     let open Mina_numbers in
     let%bind epsilon1 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
@@ -406,10 +395,10 @@ let gen_protocol_state_precondition
   let%bind total_currency =
     let open Currency in
     let%bind epsilon1 =
-      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+      Amount.gen_incl Amount.zero (Amount.of_mina_int_exn 1)
     in
     let%bind epsilon2 =
-      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+      Amount.gen_incl Amount.zero (Amount.of_mina_int_exn 1)
     in
     { lower =
         Amount.sub psv.total_currency epsilon1
@@ -417,21 +406,6 @@ let gen_protocol_state_precondition
     ; upper =
         Amount.add psv.total_currency epsilon2
         |> Option.value ~default:psv.total_currency
-    }
-    |> return |> Zkapp_basic.Or_ignore.gen
-  in
-  let%bind global_slot_since_hard_fork =
-    let open Mina_numbers in
-    let%bind epsilon1 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
-    in
-    let%bind epsilon2 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
-    in
-    { lower =
-        Global_slot.sub psv.global_slot_since_hard_fork epsilon1
-        |> Option.value ~default:Global_slot.zero
-    ; upper = Global_slot.add psv.global_slot_since_hard_fork epsilon2
     }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
@@ -455,12 +429,10 @@ let gen_protocol_state_precondition
   in
   let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
   { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
-  ; timestamp
   ; blockchain_length
   ; min_window_density
   ; last_vrf_output = ()
   ; total_currency
-  ; global_slot_since_hard_fork
   ; global_slot_since_genesis
   ; staking_epoch_data
   ; next_epoch_data
@@ -471,11 +443,9 @@ let gen_invalid_protocol_state_precondition
     Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let module Tamperable = struct
     type t =
-      | Timestamp
       | Blockchain_length
       | Min_window_density
       | Total_currency
-      | Global_slot_since_hard_fork
       | Global_slot_since_genesis
   end in
   let open Quickcheck.Let_syntax in
@@ -484,32 +454,13 @@ let gen_invalid_protocol_state_precondition
   let%bind lower = Bool.quickcheck_generator in
   match%bind
     Quickcheck.Generator.of_list
-      ( [ Timestamp
-        ; Blockchain_length
+      ( [ Blockchain_length
         ; Min_window_density
         ; Total_currency
-        ; Global_slot_since_hard_fork
         ; Global_slot_since_genesis
         ]
         : Tamperable.t list )
   with
-  | Timestamp ->
-      let%map timestamp =
-        let%map epsilon =
-          Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
-        in
-        if lower || Block_time.(psv.timestamp > add zero epsilon) then
-          { lower = Block_time.zero
-          ; upper = Block_time.sub psv.timestamp epsilon
-          }
-        else
-          { lower = Block_time.add psv.timestamp epsilon
-          ; upper = Block_time.max_value
-          }
-      in
-      { protocol_state_precondition with
-        timestamp = Zkapp_basic.Or_ignore.Check timestamp
-      }
   | Blockchain_length ->
       let open Mina_numbers in
       let%map blockchain_length =
@@ -550,7 +501,7 @@ let gen_invalid_protocol_state_precondition
       let open Currency in
       let%map total_currency =
         let%map epsilon =
-          Amount.(gen_incl (of_int 1_000) (of_int 1_000_000_000))
+          Amount.(gen_incl (of_nanomina_int_exn 1_000) (of_mina_int_exn 1))
         in
         if lower || Amount.(psv.total_currency > epsilon) then
           { lower = Amount.zero
@@ -567,25 +518,6 @@ let gen_invalid_protocol_state_precondition
       in
       { protocol_state_precondition with
         total_currency = Zkapp_basic.Or_ignore.Check total_currency
-      }
-  | Global_slot_since_hard_fork ->
-      let open Mina_numbers in
-      let%map global_slot_since_hard_fork =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_hard_fork > epsilon) then
-          { lower = Global_slot.zero
-          ; upper =
-              Global_slot.sub psv.global_slot_since_hard_fork epsilon
-              |> Option.value ~default:Global_slot.zero
-          }
-        else
-          { lower = Global_slot.add psv.global_slot_since_hard_fork epsilon
-          ; upper = Global_slot.max_value
-          }
-      in
-      { protocol_state_precondition with
-        global_slot_since_hard_fork =
-          Zkapp_basic.Or_ignore.Check global_slot_since_hard_fork
       }
   | Global_slot_since_genesis ->
       let open Mina_numbers in
@@ -754,7 +686,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
                 Account_id.create available_pk Token_id.default
           in
           let account_with_pk =
-            Account.create account_id (Currency.Balance.of_int 0)
+            Account.create account_id Currency.Balance.zero
           in
           let account =
             if zkapp_account then

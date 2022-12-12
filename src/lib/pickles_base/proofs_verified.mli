@@ -14,6 +14,8 @@ type t = Stable.V1.t = N0 | N1 | N2
 
 val of_nat : 'n Pickles_types.Nat.t -> t
 
+val of_int : int -> t
+
 val to_int : t -> int
 
 module One_hot : sig
@@ -28,11 +30,7 @@ module One_hot : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ( 'f Checked.t
-       , t
-       , 'f
-       , (unit, 'f) Snarky_backendless.Checked_ast.t )
-       Snarky_backendless__.Types.Typ.t
+    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
 end
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
@@ -53,6 +51,6 @@ module Prefix_mask : sig
     -> ( 'f Checked.t
        , t
        , 'f
-       , (unit, 'f) Snarky_backendless.Checked_ast.t )
+       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless__.Types.Typ.t
 end

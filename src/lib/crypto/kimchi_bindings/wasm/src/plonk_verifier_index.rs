@@ -5,6 +5,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
+    constraints::FeatureFlags,
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
@@ -385,7 +386,17 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false, false);
+                let feature_flags =
+                    FeatureFlags {
+                        chacha: false,
+                        range_check: false,
+                        foreign_field_add: false,
+                        foreign_field_mul: false,
+                        xor: false,
+                        lookup_configuration: None,
+                    };
+
+                let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
                 let index =
                     DlogVerifierIndex {
@@ -406,6 +417,7 @@ macro_rules! impl_verification_key {
                         chacha_comm: None,
                         range_check_comm: None,
                         foreign_field_add_comm: None,
+                        foreign_field_mul_comm: None,
                         xor_comm: None,
 
                         foreign_field_modulus: None,
@@ -642,8 +654,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -666,8 +678,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );

@@ -179,18 +179,10 @@ CREATE TABLE zkapp_accounts
 , zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
 );
 
-CREATE TYPE zkapp_authorization_kind_type AS ENUM ('proof','signature','none_given');
-
 CREATE TABLE zkapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
 , token_id_lower_bound     text             NOT NULL
 , token_id_upper_bound     text             NOT NULL
-);
-
-CREATE TABLE zkapp_timestamp_bounds
-( id                        serial          PRIMARY KEY
-, timestamp_lower_bound     text            NOT NULL
-, timestamp_upper_bound     text            NOT NULL
 );
 
 CREATE TABLE zkapp_length_bounds
@@ -232,12 +224,10 @@ CREATE TABLE zkapp_epoch_data
 CREATE TABLE zkapp_network_precondition
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
-, timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
 , blockchain_length_id             int                            REFERENCES zkapp_length_bounds(id)
 , min_window_density_id            int                            REFERENCES zkapp_length_bounds(id)
 /* omitting 'last_vrf_output' for now, it's the unit value in OCaml */
 , total_currency_id                int                            REFERENCES zkapp_amount_bounds(id)
-, curr_global_slot_since_hard_fork int                            REFERENCES zkapp_global_slot_bounds(id)
 , global_slot_since_genesis        int                            REFERENCES zkapp_global_slot_bounds(id)
 , staking_epoch_data_id            int                            REFERENCES zkapp_epoch_data(id)
 , next_epoch_data_id               int                            REFERENCES zkapp_epoch_data(id)
@@ -278,10 +268,10 @@ CREATE TABLE zkapp_account_update_body
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 
+/* possible future enhancement: add NULLable authorization column for proofs and signatures */
 CREATE TABLE zkapp_account_update
 ( id                       serial                          PRIMARY KEY
 , body_id                  int                             NOT NULL REFERENCES zkapp_account_update_body(id)
-, authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
 
 /* a list of of failures for an account update in a zkApp

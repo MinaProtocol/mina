@@ -325,7 +325,7 @@ let try_to_connect_hash_chain t hashes ~frontier
     |> Consensus.Data.Consensus_state.blockchain_length
   in
   List.fold_until
-    (Non_empty_list.to_list hashes)
+    (Mina_stdlib.Nonempty_list.to_list hashes)
     ~init:(blockchain_length_of_target_hash, [])
     ~f:(fun (blockchain_length, acc) hash ->
       let f x = Continue_or_stop.Stop (Ok (x, acc)) in
@@ -401,7 +401,7 @@ module Downloader = struct
 end
 
 let with_lengths hs ~target_length =
-  List.filter_mapi (Non_empty_list.to_list hs) ~f:(fun i x ->
+  List.filter_mapi (Mina_stdlib.Nonempty_list.to_list hs) ~f:(fun i x ->
       let open Option.Let_syntax in
       let%map x_len = Length.sub target_length (Length.of_int i) in
       (x, x_len) )
@@ -983,7 +983,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
             Strict_pipe.Writer.write catchup_breadcrumbs_writer
               ( [ Rose_tree.of_non_empty_list
-                    (Non_empty_list.singleton (c, valid_cb))
+                    (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
                 ]
               , `Ledger_catchup finished ) ;
             let%bind () =

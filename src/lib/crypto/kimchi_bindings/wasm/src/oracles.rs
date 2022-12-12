@@ -2,7 +2,7 @@ use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::circuits::scalars::RandomOracles;
 use kimchi::proof::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -36,7 +36,7 @@ macro_rules! impl_oracles {
 
         paste! {
             use crate::wasm_flat_vector::WasmFlatVector;
-            use oracle::sponge::ScalarChallenge;
+            use mina_poseidon::sponge::ScalarChallenge;
 
             #[wasm_bindgen]
             #[derive(Clone, Copy)]

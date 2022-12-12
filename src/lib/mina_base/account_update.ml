@@ -26,12 +26,15 @@ module Authorization_kind = struct
     module V1 = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
-        | None_given
         | Signature
         | Proof
+        | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      (* control tags are the same thing *)
+      let _f () : (t, Control.Tag.t) Type_equal.t = Type_equal.T
     end
   end]
 
@@ -187,7 +190,7 @@ module Update = struct
         Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
       in
       let%map vesting_increment =
-        Amount.gen_incl Amount.one (Amount.of_int 100)
+        Amount.gen_incl Amount.one (Amount.of_nanomina_int_exn 100)
       in
       { initial_minimum_balance
       ; cliff_time
@@ -492,7 +495,7 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
-      ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
+      ; Set_or_keep.to_input permissions ~dummy:Permissions.empty
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
@@ -533,7 +536,7 @@ module Update = struct
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    } ) )
-      ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
              ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
@@ -1152,6 +1155,33 @@ module Body = struct
     ; authorization_kind = Signature
     }
 
+  let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
+    { public_key = t.public_key
+    ; token_id = Token_id.default
+    ; update = Update.noop
+    ; balance_change =
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
+    ; increment_nonce = true
+    ; events = []
+    ; sequence_events = []
+    ; call_data = Field.zero
+    ; preconditions =
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
+        ; account = Account_precondition.Nonce t.nonce
+        }
+    ; use_full_commitment = true
+    ; caller = Call
+    ; call_depth = 0
+    ; authorization_kind = Signature
+    }
+
   let to_fee_payer_exn (t : t) : Fee_payer.t =
     let { public_key
         ; token_id = _
@@ -1534,6 +1564,10 @@ include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
+
+let verification_key_update_to_option (t : t) :
+    Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
+  Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }

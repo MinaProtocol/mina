@@ -10,12 +10,14 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
+use kimchi::proof::{
+    PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
+};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
@@ -142,15 +144,19 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         delta: g,
         sg: g,
     };
-    let proof_evals = ProofEvaluations {
-        w: array_init(|_| vec![Fq::one()]),
-        z: vec![Fq::one()],
-        s: array_init(|_| vec![Fq::one()]),
-        lookup: None,
-        generic_selector: vec![Fq::one()],
-        poseidon_selector: vec![Fq::one()],
+    let eval = || PointEvaluations {
+        zeta: vec![Fq::one()],
+        zeta_omega: vec![Fq::one()],
     };
-    let evals = [proof_evals.clone(), proof_evals];
+    let evals = ProofEvaluations {
+        w: array_init(|_| eval()),
+        coefficients: array_init(|_| eval()),
+        z: eval(),
+        s: array_init(|_| eval()),
+        lookup: None,
+        generic_selector: eval(),
+        poseidon_selector: eval(),
+    };
 
     let dlogproof = ProverProof {
         commitments: ProverCommitments {

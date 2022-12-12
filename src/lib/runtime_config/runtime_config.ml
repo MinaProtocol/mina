@@ -326,7 +326,6 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
-      ; transaction_expiry_hr : int option [@default None]
       ; zkapp_proof_update_cost : float option [@default None]
       ; zkapp_signed_single_update_cost : float option [@default None]
       ; zkapp_signed_pair_update_cost : float option [@default None]
@@ -783,7 +782,6 @@ module Daemon = struct
   type t = Json_layout.Daemon.t =
     { txpool_max_size : int option
     ; peer_list_url : string option
-    ; transaction_expiry_hr : int option
     ; zkapp_proof_update_cost : float option [@default None]
     ; zkapp_signed_single_update_cost : float option [@default None]
     ; zkapp_signed_pair_update_cost : float option [@default None]
@@ -807,9 +805,6 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; transaction_expiry_hr =
-        opt_fallthrough ~default:t1.transaction_expiry_hr
-          t2.transaction_expiry_hr
     ; zkapp_proof_update_cost =
         opt_fallthrough ~default:t1.zkapp_proof_update_cost
           t2.zkapp_proof_update_cost
