@@ -60,31 +60,14 @@ let collect_unprocessed (type state_t) ~logger
   in
   let top_state_hash = (F.transition_meta top_state).state_hash in
   let get_next_unprocessed key =
-    (* TODO reduce amount of logging and/or use trace level *)
-    [%log debug]
-      "dsu: requesting set leader for $state_hash (for $top_state_hash)"
-      ~metadata:
-        [ ("state_hash", State_hash.to_yojson key)
-        ; ("top_state_hash", State_hash.to_yojson top_state_hash)
-        ] ;
     let%bind.Option ancestor = Dsu.get ~key dsu in
-    [%log debug]
-      "dsu: determined set leader for $state_hash: $ancestor_hash with parent \
-       $ancestor_parent_hash (for $top_state_hash)"
-      ~metadata:
-        [ ("state_hash", State_hash.to_yojson key)
-        ; ("top_state_hash", State_hash.to_yojson top_state_hash)
-        ; ("ancestor_hash", State_hash.to_yojson ancestor.state_hash)
-        ; ( "ancestor_parent_hash"
-          , State_hash.to_yojson ancestor.parent_state_hash )
-        ] ;
     let%bind.Option parent =
       Transition_states.find states ancestor.parent_state_hash
     in
     let%map.Option () =
       Option.some_if (F.equal_state_levels top_state parent) ()
     in
-    [%log debug]
+    [%log trace]
       "dsu: returning set leader for $state_hash: $ancestor_hash with parent \
        $ancestor_parent_hash (for $top_state_hash)"
       ~metadata:
