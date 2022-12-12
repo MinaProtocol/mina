@@ -121,6 +121,13 @@ module Accounts = struct
             ; proved_state
             ; zkapp_uri
             } ->
+            let%bind () =
+              let zkapp_uri_length = String.length zkapp_uri in
+              if zkapp_uri_length > Zkapp_account.Zkapp_uri.max_length then
+                Or_error.errorf "zkApp URI \"%s\" exceeds max length: %d > %d"
+                  zkapp_uri zkapp_uri_length Zkapp_account.Zkapp_uri.max_length
+              else Or_error.return ()
+            in
             let%bind app_state =
               if
                 Mina_stdlib.List.Length.Compare.(
@@ -145,7 +152,7 @@ module Accounts = struct
               then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
               else
                 Or_error.errorf
-                  !"Snap account sequence_state has invalid length %{sexp: \
+                  !"zkApp account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t
                   (List.length sequence_state)
