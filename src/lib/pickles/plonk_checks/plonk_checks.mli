@@ -14,6 +14,7 @@ type 'bool feature_flags =
   ; foreign_field_add : 'bool
   ; foreign_field_mul : 'bool
   ; xor : 'bool
+  ; rot : 'bool
   ; lookup : 'bool
   ; runtime_tables : 'bool
   }

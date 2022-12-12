@@ -110,6 +110,7 @@ type 'bool feature_flags =
   ; foreign_field_add : 'bool
   ; foreign_field_mul : 'bool
   ; xor : 'bool
+  ; rot : 'bool
   ; lookup : 'bool
   ; runtime_tables : 'bool
   }
@@ -122,6 +123,7 @@ let no_features_map f =
   ; xor = f false
   ; lookup = f false
   ; runtime_tables = f false
+  ; rot = f false
   }
 
 let no_features = no_features_map Fn.id
@@ -135,6 +137,7 @@ type 'bool all_feature_flags =
   ; lookups_per_row_3 : 'bool Lazy.t
   ; lookups_per_row_4 : 'bool Lazy.t
   ; lookup_pattern_xor : 'bool Lazy.t
+  ; lookup_pattern_range_check : 'bool Lazy.t
   ; features : 'bool feature_flags
   }
 
@@ -145,12 +148,18 @@ let expand_feature_flags (type boolean)
      ; foreign_field_add
      ; foreign_field_mul
      ; xor
+     ; rot
      ; lookup
      ; runtime_tables = _
      } as features :
       boolean feature_flags ) : boolean all_feature_flags =
   let lookup_tables =
-    lazy (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul ])
+    lazy
+      (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul; rot ])
+  in
+  let lookup_pattern_range_check =
+    (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
+    lazy (B.( ||| ) range_check rot)
   in
   let lookup_pattern_xor =
     (* Xor, ChaCha gates use Xor lookup pattern *)
@@ -167,11 +176,19 @@ let expand_feature_flags (type boolean)
   in
   let table_width_1 =
     (* RangeCheck, ForeignFieldMul have max_joint_size = 2 *)
-    lazy (B.any [ Lazy.force table_width_2; range_check; foreign_field_mul ])
+    lazy
+      (B.any
+         [ Lazy.force table_width_2
+         ; Lazy.force lookup_pattern_range_check
+         ; foreign_field_mul
+         ] )
   in
   let lookups_per_row_4 =
     (* Xor, ChaChaFinal, RangeCheckGate have max_lookups_per_row = 4 *)
-    lazy (B.( ||| ) (Lazy.force lookup_pattern_xor) range_check)
+    lazy
+      (B.( ||| )
+         (Lazy.force lookup_pattern_xor)
+         (Lazy.force lookup_pattern_range_check) )
   in
   let lookups_per_row_3 =
     (* Lookup has max_lookups_per_row = 3 *)
@@ -189,6 +206,7 @@ let expand_feature_flags (type boolean)
   ; lookups_per_row_3
   ; lookups_per_row_4
   ; lookup_pattern_xor
+  ; lookup_pattern_range_check
   ; features
   }
 
@@ -205,6 +223,8 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
       Some feature_flags.features.foreign_field_mul
   | Xor ->
       Some feature_flags.features.xor
+  | Rot ->
+      Some feature_flags.features.rot
   | LookupTables ->
       Some (Lazy.force feature_flags.lookup_tables)
   | RuntimeLookupTables ->
@@ -225,15 +245,15 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
       Some (Lazy.force feature_flags.lookups_per_row_2)
   | LookupsPerRow _ ->
       None
-  | LookupPattern LookupGate ->
+  | LookupPattern Lookup ->
       Some feature_flags.features.lookup
   | LookupPattern Xor ->
       Some (Lazy.force feature_flags.lookup_pattern_xor)
   | LookupPattern ChaChaFinal ->
       Some feature_flags.features.chacha
-  | LookupPattern RangeCheckGate ->
-      Some feature_flags.features.range_check
-  | LookupPattern ForeignFieldMulGate ->
+  | LookupPattern RangeCheck ->
+      Some (Lazy.force feature_flags.lookup_pattern_range_check)
+  | LookupPattern ForeignFieldMul ->
       Some feature_flags.features.foreign_field_mul
 
 (* TODO: Delete *)
