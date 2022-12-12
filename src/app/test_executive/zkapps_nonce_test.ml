@@ -253,7 +253,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Send a zkapp command that should be valid after precondition from the \
          fish1 transaction"
-        (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
+        (send_zkapp ~logger node valid_precondition_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
