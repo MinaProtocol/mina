@@ -11,9 +11,11 @@ let allocate t =
     let ivar = Ivar.create () in
     Queue.add ivar t.queue ; `Wait ivar
 
-let deallocate t =
+let rec deallocate t =
   assert (t.active_jobs > 0) ;
   match Queue.take_opt t.queue with
+  | Some ivar when Async_kernel.Ivar.is_full ivar ->
+      deallocate t
   | Some ivar ->
       Ivar.fill_if_empty ivar ()
   | None ->
