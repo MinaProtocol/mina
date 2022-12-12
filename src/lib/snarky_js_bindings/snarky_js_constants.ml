@@ -14,6 +14,7 @@ let prefixes =
     ; ("zkappMemo", `String (zkapp_memo :> string))
     ; ("signatureMainnet", `String (signature_mainnet :> string))
     ; ("signatureTestnet", `String (signature_testnet :> string))
+    ; ("zkappUri", `String (zkapp_uri :> string))
     ]
 
 let version_bytes =
