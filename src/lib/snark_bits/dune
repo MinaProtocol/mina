@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
+  ;; opam libraries
   core_kernel
   integers
   base
@@ -14,10 +14,10 @@
   tuple_lib
   bitstring_lib
   snarky.intf
-  mina_stdlib
-  )
+  mina_stdlib)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_snarky ppx_optcomp ppx_let ppx_inline_test ppx_compare))
- (instrumentation (backend bisect_ppx))
+  (pps ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Snark parameters"))
