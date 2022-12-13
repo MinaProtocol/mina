@@ -262,6 +262,7 @@ module Inputs = struct
                                 { Transaction_protocol_state.Poly.transaction =
                                     t
                                 ; block_data = w.protocol_state_body
+                                ; global_slot = w.block_global_slot
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage

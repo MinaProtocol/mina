@@ -558,6 +558,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
             ~init_stack:coinbase_stack_source
             { Transaction_protocol_state.Poly.transaction = t
             ; block_data = Lazy.force state_body
+            ; global_slot = txn_state_view.global_slot_since_genesis
             }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -738,6 +739,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
+              ; global_slot = txn_state_view.global_slot_since_genesis
               }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in
@@ -785,6 +787,7 @@ let generate_base_snarks_witness sparse_ledger0
               ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
+              ; global_slot = txn_state_view.global_slot_since_genesis
               }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in

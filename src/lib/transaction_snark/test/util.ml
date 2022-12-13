@@ -561,6 +561,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
       ~f:(fun txn ->
         Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
   in
+  let global_slot =
+    match txn_global_slot with
+    | None ->
+        Mina_numbers.Global_slot.zero
+    | Some global_slot ->
+        global_slot
+  in
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
@@ -571,7 +578,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             ; target = pending_coinbase_stack_target
             }
           ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
-          { transaction = txn; block_data = state_body }
+          { transaction = txn; block_data = state_body; global_slot }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
   | Error _e ->
