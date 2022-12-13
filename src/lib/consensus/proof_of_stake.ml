@@ -3442,6 +3442,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~(prev_state : Protocol_state.var)
             ~(prev_state_hash : Mina_base.State_hash.var) transition
             supply_increase =
+          let open Tick in
+          let open Tick.Checked.Let_syntax in
           let label =
             Stdlib.(
               "next_state_checked: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
