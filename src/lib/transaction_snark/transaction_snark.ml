@@ -2283,6 +2283,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~else_:statement.target.local_state.stack_frame
         in
         with_label __LOC__ (fun () ->
+            Boolean.Assert.(
+              local.success = statement.target.local_state.success) ) ;
+        with_label __LOC__ (fun () ->
             Local_state.Checked.assert_equal statement.target.local_state
               { local with
                 stack_frame = local_state_ledger
@@ -2354,6 +2357,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   let zkapp_input =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
+                  let proof_must_verify =
+                    Run.run_checked
+                      (Boolean.all [ b; stmt.target.local_state.success ])
+                  in
                   let proof =
                     Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
                         Zkapp_proof )
@@ -2361,7 +2368,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   { previous_proof_statements =
                       [ { public_input = Option.value_exn zkapp_input
                         ; proof
-                        ; proof_must_verify = b
+                        ; proof_must_verify
                         }
                       ]
                   ; public_output = ()
