@@ -39,16 +39,17 @@ module type S = sig
     -> Transaction_snark_work.Checked.t option
 
   val load :
-       config:Resource_pool.Config.t
+       ?allow_multiple_instances_for_tests:bool
+    -> config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> unit
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 

@@ -18,58 +18,61 @@ type nonrec 'caml_f random_oracles =
   }
 [@@boxed]
 
+type nonrec 'evals point_evaluations = { zeta : 'evals; zeta_omega : 'evals }
+[@@boxed]
+
 type nonrec 'caml_f lookup_evaluations =
-  { sorted : 'caml_f array array
-  ; aggreg : 'caml_f array
-  ; table : 'caml_f array
-  ; runtime : 'caml_f array option
+  { sorted : 'caml_f array point_evaluations array
+  ; aggreg : 'caml_f array point_evaluations
+  ; table : 'caml_f array point_evaluations
+  ; runtime : 'caml_f array point_evaluations option
   }
 [@@boxed]
 
 type nonrec 'caml_f proof_evaluations =
   { w :
-      'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-  ; coefficients :
-      'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-  ; z : 'caml_f array
+      'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+  ; z : 'caml_f array point_evaluations
   ; s :
-      'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-  ; generic_selector : 'caml_f array
-  ; poseidon_selector : 'caml_f array
+      'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+  ; coefficients :
+      'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
+      * 'caml_f array point_evaluations
   ; lookup : 'caml_f lookup_evaluations option
+  ; generic_selector : 'caml_f array point_evaluations
+  ; poseidon_selector : 'caml_f array point_evaluations
   }
 [@@boxed]
 
@@ -118,7 +121,7 @@ type nonrec 'caml_g prover_commitments =
 type nonrec ('caml_g, 'caml_f) prover_proof =
   { commitments : 'caml_g prover_commitments
   ; proof : ('caml_g, 'caml_f) opening_proof
-  ; evals : 'caml_f proof_evaluations * 'caml_f proof_evaluations
+  ; evals : 'caml_f proof_evaluations
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
@@ -147,7 +150,15 @@ type nonrec gate_type =
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd
+  | ForeignFieldMul
   | Xor16
+
+type nonrec feature_flag =
+  | ChaCha
+  | RangeCheck
+  | ForeignFieldAdd
+  | ForeignFieldMul
+  | Xor
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -170,6 +181,21 @@ module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
+    type nonrec lookup_pattern =
+      | Xor
+      | ChaChaFinal
+      | LookupGate
+      | RangeCheckGate
+      | ForeignFieldMulGate
+
+    type nonrec lookup_info =
+      { kinds : lookup_pattern array
+      ; max_per_row : int
+      ; max_joint_size : int
+      ; uses_runtime_tables : bool
+      }
+    [@@boxed]
+
     type nonrec 't lookup_selectors = { lookup_gate : 't option } [@@boxed]
 
     type nonrec 'poly_comm t =
@@ -177,7 +203,7 @@ module VerifierIndex = struct
       ; lookup_table : 'poly_comm array
       ; lookup_selectors : 'poly_comm lookup_selectors
       ; table_ids : 'poly_comm option
-      ; max_joint_size : int
+      ; lookup_info : lookup_info
       ; runtime_tables_selector : 'poly_comm option
       }
     [@@boxed]

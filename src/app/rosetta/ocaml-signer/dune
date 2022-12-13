@@ -23,6 +23,7 @@
    mina_base
    snark_params
    pickles.backend
+   secrets
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

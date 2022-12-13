@@ -127,6 +127,7 @@ CREATE TABLE epoch_data
 , start_checkpoint text   NOT NULL
 , lock_checkpoint  text   NOT NULL
 , epoch_length     bigint NOT NULL
+, UNIQUE (seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');

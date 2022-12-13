@@ -8,6 +8,14 @@ open Mina_transaction
 
 let mina_archive_container_id = "archive"
 
+let mina_archive_username = "mina"
+
+let mina_archive_pw = "zo3moong7moog4Iep7eNgo3iecaesahH"
+
+let postgres_url =
+  Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
+    mina_archive_username mina_archive_pw
+
 let node_password = "naughty blue worm"
 
 type config =
@@ -21,32 +29,39 @@ let base_kube_args { cluster; namespace; _ } =
   [ "--cluster"; cluster; "--namespace"; namespace ]
 
 module Node = struct
-  type info =
+  type pod_info =
     { network_keypair : Network_keypair.t option
-    ; has_archive_container : bool
     ; primary_container_id : string
+          (* this is going to be probably either "mina" or "worker" *)
+    ; has_archive_container : bool
+          (* archive pods have a "mina" container and an "archive" container alongside *)
     }
 
-  type t = { app_id : string; pod_id : string; info : info; config : config }
+  type t =
+    { app_id : string; pod_id : string; pod_info : pod_info; config : config }
 
   let id { pod_id; _ } = pod_id
 
-  let network_keypair { info = { network_keypair; _ }; _ } = network_keypair
+  let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  let get_logs_in_container ?container_id { pod_id; config; info; _ } =
+  let get_logs_in_container ?container_id { pod_id; config; pod_info; _ } =
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?(exit_code = 10) ?container_id ~cmd t =
-    let { pod_id; config; info; _ } = t in
+  let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
+      ~cmd t =
+    let { config; pod_info; _ } = t in
+    let pod_id =
+      match override_with_pod_id with Some pid -> pid | None -> t.pod_id
+    in
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
@@ -55,9 +70,9 @@ module Node = struct
       @ cmd )
 
   let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_id; config; info; _ } = t in
+    let { pod_id; config; pod_info; _ } = t in
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let tmp_file, oc =
       Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
@@ -115,7 +130,9 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey
+          account {
+            public_key: publicKey
+          }
         }
       }
     |}
@@ -933,22 +950,40 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
-    (* this function won't work if t doesn't happen to be an archive node *)
-    if not t.info.has_archive_container then
+    (* this function won't work if `t` doesn't happen to be an archive node *)
+    if not t.pod_info.has_archive_container then
       failwith
         "No archive container found.  One can only dump archive data of an \
          archive node." ;
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
-      mina_archive_container_id ;
+    let postgresql_pod_id = t.app_id ^ "-postgresql-0" in
+    let postgresql_container_id = "postgresql" in
+    (* Some quick clarification on the archive nodes:
+         An archive node archives all blocks as they come through, but does not produce blocks.
+         An archive node uses postgresql as storage, the postgresql db needs to be separately brought up and is sort of it's own thing infra wise
+         Archive nodes can be run side-by-side with an actual mina node
+
+       in the integration test framework, every archive node will have it's own single postgresql instance.
+       thus in the integration testing framework there will always be a one to one correspondence between archive node and postgresql db.
+       however more generally, it's entirely possible for a mina user/operator set up multiple archive nodes to be backed by a single postgresql database.
+       But for now we will assume that we don't need to test that
+
+       The integration test framework creates kubenetes deployments or "workloads" as they are called in GKE, but Nodes are mainly tracked by pod_id
+
+       A postgresql workload in the integration test framework will always have 1 managed pod,
+         whose pod_id is simply the app id/workload name of the archive node appended with "-postgresql-0".
+         so if the archive node is called "archive-1", then the corresponding postgresql managed pod will be called "archive-1-postgresql-0".
+       That managed pod will have exactly 1 container, and it will be called simply "postgresql"
+
+       It's rather hardcoded but this was just the simplest way to go, as our kubernetes_network tracks Nodes, ie MINA nodes.  a postgresql db is hard to account for
+       It's possible to run pg_dump from the archive node instead of directly reaching out to the postgresql pod, and that's what we used to do but there were occasionally version mismatches between the pg_dump on the archive node and the postgresql on the postgresql db
+    *)
+    [%log info] "Dumping archive data from (node: %s, container: %s)"
+      postgresql_pod_id postgresql_container_id ;
     let%map data =
-      run_in_container t ~container_id:mina_archive_container_id
-        ~cmd:
-          [ "pg_dump"
-          ; "--create"
-          ; "--no-owner"
-          ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
-          ]
+      run_in_container t ~container_id:postgresql_container_id
+        ~override_with_pod_id:postgresql_pod_id
+        ~cmd:[ "pg_dump"; "--create"; "--no-owner"; postgres_url ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
@@ -977,7 +1012,7 @@ module Node = struct
       ~cmd:
         [ "mina-replayer"
         ; "--archive-uri"
-        ; "postgres://mina:zo3moong7moog4Iep7eNgo3iecaesahH@archive-1-postgresql:5432/archive"
+        ; postgres_url
         ; "--input-file"
         ; dest
         ; "--output-file"
@@ -988,7 +1023,7 @@ module Node = struct
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
-      t.info.primary_container_id ;
+      t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -998,7 +1033,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.pod_id t.info.primary_container_id ;
+      t.pod_id t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -1109,10 +1144,16 @@ module Node = struct
         }
 end
 
-module Workload = struct
-  type t = { workload_id : string; node_info : Node.info list }
+module Workload_to_deploy = struct
+  type t = { workload_id : string; pod_info : Node.pod_info list }
 
-  let get_nodes t ~config =
+  let construct_workload workload_id pod_info : t = { workload_id; pod_info }
+
+  let cons_pod_info ?network_keypair ?(has_archive_container = false)
+      primary_container_id : Node.pod_info =
+    { network_keypair; has_archive_container; primary_container_id }
+
+  let get_nodes_from_workload t ~config =
     let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
     let%bind app_id =
@@ -1136,13 +1177,14 @@ module Workload = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if Stdlib.List.compare_lengths t.node_info pod_ids <> 0 then
+    if Stdlib.List.compare_lengths t.pod_info pod_ids <> 0 then
       failwithf
         "Unexpected number of replicas in kubernetes deployment for workload \
          %s: expected %d, got %d"
-        t.workload_id (List.length t.node_info) (List.length pod_ids) () ;
-    List.zip_exn t.node_info pod_ids
-    |> List.map ~f:(fun (info, pod_id) -> { Node.app_id; pod_id; info; config })
+        t.workload_id (List.length t.pod_info) (List.length pod_ids) () ;
+    List.zip_exn t.pod_info pod_ids
+    |> List.map ~f:(fun (pod_info, pod_id) ->
+           { Node.app_id; pod_id; pod_info; config } )
 end
 
 type t =

@@ -8,6 +8,9 @@ run tests in to testing the capabilities of the system in the privacy
 of one's own house. Most of these steps need to be done just once and
 then many blockchains can be created using the same input data.
 
+Note that before you begin ensure you have the `mina.exe` set up as an alias
+or a PATH variable.
+
 Generating keys
 ---------------
 
@@ -16,8 +19,9 @@ node(s). In this file we describe a single-node network for the sake of
 simplicity, but adding more nodes to the network shouldn't be that
 difficult.
 
-To run the network we'll need at least 3 key pairs: one for the node
-operator, another for the block producer and yet another for the SNARK
+To run the network we'll need at least 3 key pairs. One of them will
+identify and authenticate the daemon in the p2p network. The other two
+will be used for Mina accounts of the block producer and of the SNARK
 worker. Let's put them in `keys` directory:
 
 ```shell
@@ -36,7 +40,7 @@ These variables hold passwords protecting private keys. If they are
 not set, the node will ask for those passwords before creating the
 keys. It won't be able to access these keys without these variables
 set. User is free to put any passwords there, however, in development
-or testing setups it not really necessary, as those networks don't
+or testing setups it's not really necessary, as those networks don't
 hold any real assets anyway. These settings are essential for the
 security of mainnet nodes, though, and that's why they're mandatory.
 
@@ -44,8 +48,9 @@ security of mainnet nodes, though, and that's why they're mandatory.
 $ mina libp2p generate-keypair --privkey-path keys/node.key
 ```
 
-This command creates a key for the node operator. This is a key to use
-to identify the node in the p2p network. In a single-network setup it
+This command (which depends on environment variables set up by Nix)
+creates a p2p key pair for the daemon, which will identify and
+authenticate the node in the p2p network. In a single-network setup it
 might not be the most relevant, but it's required nonetheless.
 
 Then we need key pairs for the block producer(s) and SNARK worker(s):
@@ -57,17 +62,18 @@ $ chmod -R 0700 keys
 ```
 
 Don't forget to set key files' permissions to `0700` or else the
-client will refuse to import them.
+client will refuse to import them. Note that the command to generate
+these keys is different. That's because these are not p2p keys, but
+Mina account keys, which use a different format.
 
 Additionally, the block producer's key should be copied to the `wallets`
 directory in the node's config dir. This directory doesn't exist yet
-probably, so one can create it by hand or try launching the node to
+probably, so one can create it by hand or use the following command to
 set up the config directory. The filename should be identical to the
 block producer's public key.
 
 ```shell
-$ mkdir -p .mina-config/wallets/store
-$ cp keys/block-producer.key .mina-config/wallets/store/$(cat keys/block-producer.key.pub)
+$ mina accounts import --privkey-path keys/block-producer.key --config-directory .mina-config
 ```
 
 Of course we are free to produce more keys for regular users of the
@@ -117,6 +123,9 @@ In particular it's possible to override the defaults compiled into the
 binary using the `dune` profiles. Explaining these options is, however,
 outside the scope of this instruction.
 
+The `genesis_state_timestamp` should be within a few minutes of when you intend
+to start the node.
+
 Starting the node
 -----------------
 
@@ -127,7 +136,9 @@ environment variable, as it might be required in some setups:
 $ export MINA_ROSETTA_MAX_DB_POOL_SIZE=128
 ```
 
-Assuming `mina` CLI is in you path, run the following command:
+Assuming `mina` CLI is in your path, run the following command, 
+making sure that required environment variables are properly set
+(by Nix shell or otherwise):
 
 ```shell
 $ mina daemon \
@@ -147,7 +158,9 @@ blockchain.
 
 `--config-directoy` can be omitted, in which case it defaults to
 `~/.mina-config`. You should pass it if you already have another
-blockchain's data stored in there.
+blockchain's data stored in there. In case the daemon fails, 
+complaining about write access to this directory, try providing an
+absolute path rather than relative one.
 
 If the block producer's key wasn't copied over to the wallet
 previously. The following error will appear:
@@ -159,19 +172,6 @@ Cannot open file: ./.mina-config/wallets/store/B62qqhZY2AsNuPEAHVnk8sn6dTW7Mpge5
 If this happens, simply copy the block producer's key to the given
 location and restart the node.
 
-When the node starts, you'll notice it does not produce any blocks,
-but spits some warnings instead. That is because we need to import
-the required keys so that block producer and snarker can start
-working.
-
-```shell
-$ mina accounts import \
-    --privkey-path keys/snark-producer.key \
-    --config-directory ./.mina-sandbox/
-```
-
-And similarly for the block producer. Note again that
-`--config-directory` option can be omitted if its the default.
 At this point the node should start producing blocks every a
 certain amount of time, which depends on the configuration. For
 the `dev` profile the default is 2s. Note that the node will

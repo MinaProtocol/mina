@@ -8,8 +8,11 @@
    yojson
    core_kernel
    cmdliner
+   base.base_internalhash_types
    base.caml
    async_unix
+   unsigned_extended
+   stdio
    ;; local libraries
    mina_wire_types
    with_hash
@@ -45,6 +48,8 @@
    integers
    user_command_input
    participating_state
+   graph_algorithms
+   visualization
    sgn
    zkapp_command_builder
    network_pool

@@ -495,7 +495,7 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
-      ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
+      ; Set_or_keep.to_input permissions ~dummy:Permissions.empty
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
@@ -536,7 +536,7 @@ module Update = struct
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    } ) )
-      ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
              ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
@@ -1564,6 +1564,10 @@ include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
+
+let verification_key_update_to_option (t : t) :
+    Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
+  Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
