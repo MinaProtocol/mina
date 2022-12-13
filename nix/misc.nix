@@ -29,7 +29,7 @@ final: prev: {
   # Jobs/Lint/ValidationService
   # Jobs/Test/ValidationService
   validation = ((final.mix-to-nix.override {
-    beamPackages = final.beam.packagesWith final.erlangR22; # todo: jose
+    beamPackages = final.beam.packagesWith final.erlangR23; # todo: jose
   }).mixToNix {
     src = ../src/app/validation;
     # todo: think about fixhexdep overlay
