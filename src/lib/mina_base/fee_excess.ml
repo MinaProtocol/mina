@@ -180,15 +180,15 @@ let to_input_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
 
 let assert_equal_checked (t1 : var) (t2 : var) =
   Checked.all_unit
-    [ [%with_label_ "fee_token_l"] (fun () ->
+    [ with_label "fee_token_l" (fun () ->
           make_checked (fun () ->
               Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l ) )
-    ; [%with_label_ "fee_excess_l"] (fun () ->
+    ; with_label "fee_excess_l" (fun () ->
           Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l )
-    ; [%with_label_ "fee_token_r"] (fun () ->
+    ; with_label "fee_token_r" (fun () ->
           make_checked (fun () ->
               Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r ) )
-    ; [%with_label_ "fee_excess_r"] (fun () ->
+    ; with_label "fee_excess_r" (fun () ->
           Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r )
     ]
 
@@ -246,10 +246,15 @@ let eliminate_fee_excess (fee_token_l, fee_excess_l) (fee_token_m, fee_excess_m)
    This optimisation saves serveral hundred constraints in the proof by not
    unpacking the result of each arithmetic operation.
 *)
-let%snarkydef_ eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
+let eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     (fee_token_m, fee_excess_m) (fee_token_r, fee_excess_r) =
   let open Tick in
   let open Checked.Let_syntax in
+  let label =
+    Stdlib.(
+      "eliminate_fee_excess_checked: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   let combine (fee_token, fee_excess) fee_excess_m =
     let%bind fee_token_equal =
       make_checked (fun () -> Token_id.Checked.equal fee_token fee_token_m)
@@ -286,7 +291,7 @@ let%snarkydef_ eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     combine (fee_token_r, fee_excess_r) fee_excess_m
   in
   let%map () =
-    [%with_label_ "Fee excess is eliminated"]
+    with_label "Fee excess is eliminated"
       Field.(fun () -> Checked.Assert.equal (Var.constant zero) fee_excess_m)
   in
   ((fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r))
@@ -414,7 +419,7 @@ let combine
 
 [%%ifdef consensus_mechanism]
 
-let%snarkydef_ combine_checked
+let combine_checked
     { fee_token_l = fee_token1_l
     ; fee_excess_l = fee_excess1_l
     ; fee_token_r = fee_token1_r
@@ -426,6 +431,10 @@ let%snarkydef_ combine_checked
     ; fee_excess_r = fee_excess2_r
     } =
   let open Checked.Let_syntax in
+  let label =
+    Stdlib.("combine_checked: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   (* Represent amounts as field elements. *)
   let%bind fee_excess1_l = Fee.Signed.Checked.to_field_var fee_excess1_l in
   let%bind fee_excess1_r = Fee.Signed.Checked.to_field_var fee_excess1_r in
@@ -434,7 +443,7 @@ let%snarkydef_ combine_checked
   (* Eliminations. *)
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_l, fee_excess2_l) =
     (* [1l; 1r; 2l; 2r] -> [1l; 2l; 2r] *)
-    [%with_label_ "Eliminate fee_excess1_r"] (fun () ->
+    with_label "Eliminate fee_excess1_r" (fun () ->
         eliminate_fee_excess_checked
           (fee_token1_l, fee_excess1_l)
           (fee_token1_r, fee_excess1_r)
@@ -442,7 +451,7 @@ let%snarkydef_ combine_checked
   in
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_r, fee_excess2_r) =
     (* [1l; 2l; 2r] -> [1l; 2r] *)
-    [%with_label_ "Eliminate fee_excess2_l"] (fun () ->
+    with_label "Eliminate fee_excess2_l" (fun () ->
         eliminate_fee_excess_checked
           (fee_token1_l, fee_excess1_l)
           (fee_token2_l, fee_excess2_l)
@@ -488,18 +497,18 @@ let%snarkydef_ combine_checked
       Fee.Signed.Checked.to_field_var currency_excess
     in
     let%map () =
-      [%with_label_ "Fee excess does not overflow"] (fun () ->
+      with_label "Fee excess does not overflow" (fun () ->
           Field.Checked.Assert.equal excess excess_from_currency )
     in
     currency_excess
   in
   (* Convert to currency. *)
   let%bind fee_excess_l =
-    [%with_label_ "Check for overflow in fee_excess_l"] (fun () ->
+    with_label "Check for overflow in fee_excess_l" (fun () ->
         convert_to_currency fee_excess_l )
   in
   let%map fee_excess_r =
-    [%with_label_ "Check for overflow in fee_excess_r"] (fun () ->
+    with_label "Check for overflow in fee_excess_r" (fun () ->
         convert_to_currency fee_excess_r )
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }

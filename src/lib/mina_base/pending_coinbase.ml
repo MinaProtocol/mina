@@ -835,10 +835,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           (fun () -> Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
           reraise_merkle_requests
 
-      let%snarkydef_ add_coinbase
+      let add_coinbase
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ({ action; coinbase_amount = amount } : Update.var) ~coinbase_receiver
           ~supercharge_coinbase state_body_hash =
+        let label =
+          Stdlib.("add_coinbase: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+        in
+        let%bind () = with_label label (fun _ -> return ()) in
         let depth = constraint_constants.pending_coinbase_depth in
         let%bind addr1, addr2 =
           request_witness
@@ -959,9 +963,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Hash.var_of_hash_packed root
 
-      let%snarkydef_ pop_coinbases
+      let pop_coinbases
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ~proof_emitted =
+        let label =
+          Stdlib.("pop_coinbases: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+        in
+        let%bind () = with_label label (fun _ -> return ()) in
         let depth = constraint_constants.pending_coinbase_depth in
         let%bind addr =
           request_witness (Address.typ ~depth)

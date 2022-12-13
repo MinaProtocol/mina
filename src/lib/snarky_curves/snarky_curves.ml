@@ -184,8 +184,10 @@ module Make_weierstrass_checked
 
   open Let_syntax
 
-  let%snarkydef_ add' ~div (ax, ay) (bx, by) =
+  let add' ~div (ax, ay) (bx, by) =
     let open F in
+    let label = Stdlib.("add': " ^ __FILE__ ^ ":" ^ string_of_int __LINE__) in
+    let%bind () = with_label label (fun _ -> return ()) in
     let%bind lambda = div (by - ay) (bx - ax) in
     let%bind cx =
       exists typ
@@ -274,8 +276,10 @@ module Make_weierstrass_checked
       (module M : S)
   end
 
-  let%snarkydef_ double (ax, ay) =
+  let double (ax, ay) =
     let open F in
+    let label = Stdlib.("double: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__) in
+    let%bind () = with_label label (fun _ -> return ()) in
     let%bind x_squared = square ax in
     let%bind lambda =
       exists typ
@@ -323,12 +327,13 @@ module Make_weierstrass_checked
     in
     (choose x1 x2, choose y1 y2)
 
-  let%snarkydef_ scale (type shifted)
-      (module Shifted : Shifted.S with type t = shifted) t
+  let scale (type shifted) (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       shifted Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
     let open Let_syntax in
+    let label = Stdlib.("scale: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__) in
+    let%bind () = with_label label (fun _ -> return ()) in
     let rec go i bs0 acc pt =
       match bs0 with
       | [] ->

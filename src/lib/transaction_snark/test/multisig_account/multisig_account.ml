@@ -33,12 +33,18 @@ let%test_module "multisig_account" =
             let open Checked in
             Checked.List.map ~f:(fun (_, pk') -> neq_pk pk pk') xs
             >>= fun bs ->
-            [%with_label_ __LOC__] (fun () ->
+            with_label __LOC__ (fun () ->
                 Boolean.Assert.all bs >>= fun () -> distinct_public_keys xs )
         | [] ->
             Checked.return ()
 
-      let%snarkydef_ distinct_public_keys x = distinct_public_keys x
+      let distinct_public_keys x =
+        let label =
+          Stdlib.(
+            "distinct_public_keys: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+        in
+        let%bind () = with_label label (fun _ -> Checked.return ()) in
+        distinct_public_keys x
 
       (* check a signature on msg against a public key *)
       let check_sig pk msg sigma : Boolean.var Checked.t =
@@ -46,7 +52,11 @@ let%test_module "multisig_account" =
         Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
       (* verify witness signatures against public keys *)
-      let%snarkydef_ verify_sigs pubkeys commitment witness =
+      let verify_sigs pubkeys commitment witness =
+        let label =
+          Stdlib.("verify_sigs: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+        in
+        let%bind () = with_label label (fun _ -> Checked.return ()) in
         let%bind pubkeys =
           exists
             (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
@@ -59,7 +69,7 @@ let%test_module "multisig_account" =
               |> Checked.List.all >>= Boolean.all )
         in
         Checked.List.map witness ~f:verify_sig
-        >>= fun bs -> [%with_label_ __LOC__] (fun () -> Boolean.Assert.all bs)
+        >>= fun bs -> with_label __LOC__ (fun () -> Boolean.Assert.all bs)
 
       let check_witness m pubkeys commitment witness =
         if List.length witness <> m then

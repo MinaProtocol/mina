@@ -101,10 +101,11 @@ let non_pc_registers_equal_var t1 t2 =
         transition consensus data is valid
         new consensus state is a function of the old consensus state
 *)
-let%snarkydef_ step ~(logger : Logger.t)
-    ~(proof_level : Genesis_constants.Proof_level.t)
+let step ~(logger : Logger.t) ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) new_state
     : _ Tick.Checked.t =
+  let label = Stdlib.("step: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__) in
+  let%bind () = with_label label (fun _ -> Checked.return ()) in
   let new_state_hash =
     State_hash.var_of_hash_packed (Data_as_hash.hash new_state)
   in

@@ -81,8 +81,11 @@ let get ~depth t addr =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef_ modify_account ~depth t aid
-    ~(filter : Account.var -> 'a Checked.t) ~f =
+let modify_account ~depth t aid ~(filter : Account.var -> 'a Checked.t) ~f =
+  let label =
+    Stdlib.("modify_account: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   let%bind addr =
     request_witness
       (Account.Index.Unpacked.typ ~ledger_depth:depth)
@@ -105,10 +108,14 @@ let%snarkydef_ modify_account ~depth t aid
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef_ modify_account_send ~depth t aid ~is_writeable ~f =
+let modify_account_send ~depth t aid ~is_writeable ~f =
+  let label =
+    Stdlib.("modify_account_send: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label_ "modify_account_send filter"] (fun () ->
+      with_label "modify_account_send filter" (fun () ->
           let%bind account_already_there =
             Account_id.Checked.equal (Account.identifier_of_var account) aid
           in
@@ -120,7 +127,7 @@ let%snarkydef_ modify_account_send ~depth t aid ~is_writeable ~f =
             Boolean.(account_not_there && is_writeable)
           in
           let%bind () =
-            [%with_label_ "account is either present or empty and writeable"]
+            with_label "account is either present or empty and writeable"
               (fun () ->
                 Boolean.Assert.any
                   [ account_already_there; not_there_but_writeable ] )
@@ -136,10 +143,14 @@ let%snarkydef_ modify_account_send ~depth t aid ~is_writeable ~f =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef_ modify_account_recv ~depth t aid ~f =
+let modify_account_recv ~depth t aid ~f =
+  let label =
+    Stdlib.("modify_account_recv: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   modify_account ~depth t aid
     ~filter:(fun account ->
-      [%with_label_ "modify_account_recv filter"] (fun () ->
+      with_label "modify_account_recv filter" (fun () ->
           let%bind account_already_there =
             Account_id.Checked.equal (Account.identifier_of_var account) aid
           in
@@ -148,7 +159,7 @@ let%snarkydef_ modify_account_recv ~depth t aid ~f =
               Public_key.Compressed.(var_of_t empty)
           in
           let%bind () =
-            [%with_label_ "account is either present or empty"] (fun () ->
+            with_label "account is either present or empty" (fun () ->
                 Boolean.Assert.any [ account_already_there; account_not_there ] )
           in
           return account_not_there ) )

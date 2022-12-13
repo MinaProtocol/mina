@@ -73,7 +73,11 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let%snarkydef_ var_to_bits t =
+  let var_to_bits t =
+    let label =
+      Stdlib.("var_to_bits: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+    in
+    let%bind () = with_label label (fun _ -> return ()) in
     match t.bits with
     | Some bits ->
         return (bits :> Boolean.var list)

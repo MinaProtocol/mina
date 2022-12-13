@@ -266,22 +266,40 @@ module Snarkable = struct
     let compare_var x y =
       Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
-    let%snarkydef_ increment_if_var bs (b : Boolean.var) =
+    let increment_if_var bs (b : Boolean.var) =
       let open Impl in
+      let label =
+        Stdlib.("increment_if_var: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (b :> Field.Var.t) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef_ increment_var bs =
+    let increment_var bs =
       let open Impl in
+      let label =
+        Stdlib.("increment_var: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (Field.Var.constant Field.one) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef_ equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+    let equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      let label =
+        Stdlib.("equal_var: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
+
       Field.Checked.equal (pack_var n) (pack_var n')
 
-    let%snarkydef_ assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+    let assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      let label =
+        Stdlib.("assert_equal_var: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
+
       Field.Checked.Assert.equal (pack_var n) (pack_var n')
 
     let if_ (cond : Boolean.var) ~(then_ : Unpacked.var) ~(else_ : Unpacked.var)

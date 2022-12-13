@@ -298,11 +298,15 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef_ verifier (type s) ~equal ~final_check
+    let verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
+      let label =
+        Stdlib.("verifier: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
       let%bind e = Message.hash_checked m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
@@ -553,7 +557,11 @@ module Message = struct
 
     type var = (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    let%snarkydef_ hash_checked t ~public_key ~r =
+    let hash_checked t ~public_key ~r =
+      let label =
+        Stdlib.("hash_checked: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
       let input =
         let px, py = public_key in
         Random_oracle.Input.Legacy.append t
@@ -621,7 +629,11 @@ module Message = struct
 
     type var = Field.Var.t Random_oracle.Input.Chunked.t
 
-    let%snarkydef_ hash_checked t ~public_key ~r =
+    let hash_checked t ~public_key ~r =
+      let label =
+        Stdlib.("hash_checked: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+      in
+      let%bind () = with_label label (fun _ -> Checked.return ()) in
       let input =
         let px, py = public_key in
         Random_oracle.Input.Chunked.append t

@@ -18,7 +18,11 @@ let check_sig pk msg sigma : Boolean.var Checked.t =
   Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
-let%snarkydef_ verify_sig pubkeys msg sigma =
+let verify_sig pubkeys msg sigma =
+  let label =
+    Stdlib.("verify_sig: " ^ __FILE__ ^ ":" ^ string_of_int __LINE__)
+  in
+  let%bind () = with_label label (fun _ -> return ()) in
   let%bind pubkeys =
     exists
       (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)

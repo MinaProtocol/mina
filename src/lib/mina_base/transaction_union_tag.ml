@@ -221,7 +221,7 @@ module Unpacked = struct
             let open Checked.Let_syntax in
             let%bind () = base_typ.check t in
             let%bind () =
-              [%with_label_ "Only one tag is set"] (fun () ->
+              with_label "Only one tag is set" (fun () ->
                   Boolean.Assert.exactly_one
                     [ is_payment
                     ; is_stake_delegation
@@ -231,7 +231,7 @@ module Unpacked = struct
                     ; is_coinbase
                     ] )
             in
-            [%with_label_ "User command flag is correctly set"] (fun () ->
+            with_label "User command flag is correctly set" (fun () ->
                 Boolean.Assert.exactly_one
                   [ is_user_command; is_fee_transfer; is_coinbase ] ) )
       }
