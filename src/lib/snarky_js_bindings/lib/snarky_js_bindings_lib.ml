@@ -3103,7 +3103,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
