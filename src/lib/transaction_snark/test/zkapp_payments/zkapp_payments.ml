@@ -15,10 +15,13 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
-    let merkle_root_after_zkapp_command_exn t ~txn_state_view txn =
+    let merkle_root_after_zkapp_command_exn t
+        ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) txn =
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
-          ~constraint_constants:U.constraint_constants ~txn_state_view t txn
+          ~constraint_constants:U.constraint_constants
+          ~global_slot:txn_state_view.global_slot_since_genesis ~txn_state_view
+          t txn
       in
       Frozen_ledger_hash.of_ledger_hash hash
 

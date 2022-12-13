@@ -370,7 +370,8 @@ let%test_module "account timing check" =
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
       let sparse_ledger_after, txn_applied =
         Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view sparse_ledger_before transaction
+          ~global_slot:txn_global_slot ~txn_state_view sparse_ledger_before
+          transaction
         |> Or_error.ok_exn
       in
       let coinbase_stack_target =
@@ -399,6 +400,7 @@ let%test_module "account timing check" =
         ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
+        ; global_slot = txn_global_slot
         }
         (unstage (Mina_ledger.Sparse_ledger.handler sparse_ledger_before))
 
@@ -1009,7 +1011,9 @@ let%test_module "account timing check" =
               in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1088,7 +1092,9 @@ let%test_module "account timing check" =
               in
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               with
               | Ok _txn_applied ->
                   failwith "Should have failed with min balance violation"
@@ -1185,7 +1191,9 @@ let%test_module "account timing check" =
               in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1298,7 +1306,9 @@ let%test_module "account timing check" =
               in
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               with
               | Ok _txn_applied ->
                   failwith "Should have failed with min balance violation"
@@ -1534,7 +1544,9 @@ let%test_module "account timing check" =
               in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1687,7 +1699,9 @@ let%test_module "account timing check" =
               in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:state_view.global_slot_since_genesis ~state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure Transaction_status.Failure.Overflow result ) )
 

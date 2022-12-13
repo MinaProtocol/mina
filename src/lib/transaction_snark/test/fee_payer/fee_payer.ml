@@ -160,13 +160,16 @@ let%test_module "Fee payer tests" =
                 Transaction_snark.For_tests.deploy_snapp test_spec
                   ~constraint_constants
               in
+              let txn_state_view =
+                Mina_state.Protocol_state.Body.view U.genesis_state_body
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
                   Ledger.apply_transaction ledger0 ~constraint_constants
-                    ~txn_state_view:
-                      (Mina_state.Protocol_state.Body.view U.genesis_state_body)
+                    ~global_slot:txn_state_view.global_slot_since_genesis
+                    ~txn_state_view
                     (Transaction.Command (Zkapp_command zkapp_command))
                 with
               | Error _ ->

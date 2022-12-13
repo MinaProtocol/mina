@@ -56,6 +56,7 @@ let%test_module "Transaction union tests" =
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction = user_command
         ; block_data = state_body
+        ; global_slot = current_global_slot
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
@@ -79,6 +80,10 @@ let%test_module "Transaction union tests" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+      let global_slot =
+        Mina_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
       let producer = mk_pubkey () in
       let producer_id = Account_id.create producer Token_id.default in
       let receiver = mk_pubkey () in
@@ -108,7 +113,10 @@ let%test_module "Transaction union tests" =
           pending_coinbase_init
       in
       let txn_in_block =
-        { Transaction_protocol_state.Poly.transaction; block_data = state_body }
+        { Transaction_protocol_state.Poly.transaction
+        ; block_data = state_body
+        ; global_slot
+        }
       in
       Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
           Ledger.create_new_account_exn ledger producer_id
@@ -120,6 +128,7 @@ let%test_module "Transaction union tests" =
           let sparse_ledger_after, applied_transaction =
             Sparse_ledger.apply_transaction
               ~constraint_constants:U.constraint_constants sparse_ledger
+              ~global_slot
               ~txn_state_view:
                 (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
               txn_in_block.transaction
@@ -214,7 +223,10 @@ let%test_module "Transaction union tests" =
                 ~target ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
-                { transaction = t1; block_data = state_body }
+                { transaction = t1
+                ; block_data = state_body
+                ; global_slot = current_global_slot
+                }
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee =

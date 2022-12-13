@@ -707,8 +707,9 @@ let%test_module "Account precondition tests" =
                 init_ledger ledger ;
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view:psv ledger
-                  zkapp_command_with_invalid_fee_payer
+                  ~constraint_constants
+                  ~global_slot:psv.global_slot_since_genesis ~state_view:psv
+                  ledger zkapp_command_with_invalid_fee_payer
               with
               | Error e ->
                   assert (
