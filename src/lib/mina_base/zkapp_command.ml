@@ -1743,7 +1743,7 @@ end) : sig
   end
 
   val group_by_zkapp_command_rev :
-       Account_update.t list list
+       t list
     -> (Input.global_state * Input.local_state) list list
     -> Zkapp_command_intermediate_state.t list
 end = struct
@@ -1761,14 +1761,14 @@ end = struct
   end
 
   (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-      statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+      statements, corresponding to account updates for each zkapp_command in [zkapp_commands] which minimize the
       number of snark proofs needed to prove all of the zkapp_command.
 
-      This function is intended to take the zkapp_command from multiple transactions as
-      its input, which may be converted from a [Zkapp_command.t list] using
-      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-      the same length, with 1 more state than the number of zkapp_command for each
-      transaction.
+      This function is intended to take multiple zkapp transactions as
+      its input, which is then converted to a [Account_update.t list list] using
+      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should
+      be a list of the same length, with 1 more state than the number of
+      zkapp_command for each transaction.
 
       For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
       [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
@@ -1781,7 +1781,7 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
+  let group_by_zkapp_command_rev (zkapp_commands : t list)
       (stmtss : (global_state * local_state) list list) :
       Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
@@ -1791,13 +1791,27 @@ end = struct
       ; state_after = { global = fst after; local = snd after }
       }
     in
+    let zkapp_account_updatess =
+      []
+      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+             Call_forest.fold zkapp_command.account_updates
+               ~init:
+                 [ ( `Fee_payer
+                   , Account_update.of_fee_payer
+                       (fee_payer_account_update zkapp_command) )
+                 ]
+               ~f:(fun acc update -> (`Zkapp_update, update) :: acc)
+             |> List.rev )
+    in
     let rec group_by_zkapp_command_rev
-        (zkapp_commands : Account_update.t list list) stmtss acc =
+        (zkapp_commands :
+          ([ `Fee_payer | `Zkapp_update ] * Account_update.t) list list ) stmtss
+        acc =
       match (zkapp_commands, stmtss) with
       | ([] | [ [] ]), [ _ ] ->
           (* We've associated statements with all given zkapp_command. *)
           acc
-      | [ [ { authorization = a1; _ } ] ], [ [ before; after ] ] ->
+      | [ [ (_, { authorization = a1; _ }) ] ], [ [ before; after ] ] ->
           (* There are no later zkapp_command to pair this one with. Prove it on its
              own.
           *)
@@ -1805,7 +1819,8 @@ end = struct
             ~spec:(zkapp_segment_of_controls [ a1 ])
             ~before ~after
           :: acc
-      | [ []; [ { authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ] ->
+      | [ []; [ (_, { authorization = a1; _ }) ] ], [ [ _ ]; [ before; after ] ]
+        ->
           (* This account_update is part of a new transaction, and there are no later
              zkapp_command to pair it with. Prove it on its own.
           *)
@@ -1813,10 +1828,10 @@ end = struct
             ~spec:(zkapp_segment_of_controls [ a1 ])
             ~before ~after
           :: acc
-      | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command)
+      | ( ((`Fee_payer, { authorization = a1; _ }) :: zkapp_command)
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
-          (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+          (* This account_update is for a fee payer, don't pair it with other account updates. *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss)
@@ -1825,11 +1840,10 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = Proof _ as a1; _ } :: zkapp_command)
+          :: ((`Fee_payer, { authorization = a1; _ }) :: zkapp_command)
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
-          (* This account_update is part of a new transaction, and contains a proof, don't
-             pair it with other zkapp_command.
+          (* This account_update is part of a new transaction, and corresponds to the fee payer, don't pair it with other account updates.
           *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
@@ -1838,8 +1852,46 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = a1; _ }
-          :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+      | ( ((_, { authorization = a1; _ }) :: ([] as zkapp_command))
+          :: (((`Fee_payer, _) :: _) :: _ as zkapp_commands)
+        , (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* The next account_update is in the next transaction and corresponds to a fee payer,
+             don't pair it with this account_update.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( ((_, { authorization = Proof _ as a1; _ }) :: zkapp_command)
+          :: zkapp_commands
+        , (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* This account_update contains a proof, don't pair it with other account updates. *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`Same
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( []
+          :: ((_, { authorization = Proof _ as a1; _ }) :: zkapp_command)
+             :: zkapp_commands
+        , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
+          (* This account_update is part of a new transaction, and contains a proof, don't
+             pair it with other account updates.
+          *)
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after
+            :: acc )
+      | ( ((_, { authorization = a1; _ })
+          :: ((_, { authorization = Proof _; _ }) :: _ as zkapp_command) )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next account_update contains a proof, don't pair it with this account_update. *)
@@ -1850,8 +1902,8 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = a1; _ } :: ([] as zkapp_command))
-          :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+      | ( ((_, { authorization = a1; _ }) :: ([] as zkapp_command))
+          :: (((_, { authorization = Proof _; _ }) :: _) :: _ as zkapp_commands)
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next account_update is in the next transaction and contains a proof,
              don't pair it with this account_update.
@@ -1863,8 +1915,8 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = (Signature _ | None_given) as a1; _ }
-          :: { authorization = (Signature _ | None_given) as a2; _ }
+      | ( ((_, { authorization = (Signature _ | None_given) as a1; _ })
+          :: (_, { authorization = (Signature _ | None_given) as a2; _ })
              :: zkapp_command )
           :: zkapp_commands
         , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1881,8 +1933,8 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = a1; _ }
-             :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
+          :: ((_, { authorization = a1; _ })
+             :: ((_, { authorization = Proof _; _ }) :: _ as zkapp_command) )
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is in the next transaction, and the next account_update contains a
@@ -1896,8 +1948,8 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = (Signature _ | None_given) as a1; _ }
-             :: { authorization = (Signature _ | None_given) as a2; _ }
+          :: ((_, { authorization = (Signature _ | None_given) as a1; _ })
+             :: (_, { authorization = (Signature _ | None_given) as a2; _ })
                 :: zkapp_command )
              :: zkapp_commands
         , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1913,8 +1965,8 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
                 ~before ~after
             :: acc )
-      | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
-          :: ({ authorization = (Signature _ | None_given) as a2; _ }
+      | ( [ (_, { authorization = (Signature _ | None_given) as a1; _ }) ]
+          :: ((_, { authorization = (Signature _ | None_given) as a2; _ })
              :: zkapp_command )
              :: zkapp_commands
         , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
@@ -1932,8 +1984,9 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = a1; _ } :: zkapp_command)
-             :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+          :: ((_, { authorization = a1; _ }) :: zkapp_command)
+             :: ( ((_, { authorization = Proof _; _ }) :: _) :: _ as
+                zkapp_commands )
         , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
           (* The next transaction contains a proof, and this account_update is in a new
              transaction, don't pair it with the next account_update.
@@ -1946,8 +1999,8 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
-             :: ({ authorization = (Signature _ | None_given) as a2; _ }
+          :: [ (_, { authorization = (Signature _ | None_given) as a1; _ }) ]
+             :: ((_, { authorization = (Signature _ | None_given) as a2; _ })
                 :: zkapp_command )
                 :: zkapp_commands
         , [ _ ]
@@ -1966,13 +2019,13 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
                 ~before ~after
             :: acc )
-      | [ [ { authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
+      | [ [ (_, { authorization = a1; _ }) ] ], (before :: after :: _) :: _ ->
           (* This account_update is the final account_update given. Prove it on its own. *)
           intermediate_state ~kind:`Same
             ~spec:(zkapp_segment_of_controls [ a1 ])
             ~before ~after
           :: acc
-      | ( [] :: [ { authorization = a1; _ } ] :: [] :: _
+      | ( [] :: [ (_, { authorization = a1; _ }) ] :: [] :: _
         , [ _ ] :: (before :: after :: _) :: _ ) ->
           (* This account_update is the final account_update given, in a new transaction. Prove it
              on its own.
@@ -2031,7 +2084,7 @@ end = struct
             "group_by_zkapp_command_rev: No statements given for transaction \
              after next"
     in
-    group_by_zkapp_command_rev zkapp_commands stmtss []
+    group_by_zkapp_command_rev zkapp_account_updatess stmtss []
 end
 
 (*Transaction_snark.Zkapp_command_segment.Basic.t*)
@@ -2083,7 +2136,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
-    Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
+    Update_group.group_by_zkapp_command_rev [ t ]
       ( [ ((), ()) ]
       :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
   in

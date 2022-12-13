@@ -3541,11 +3541,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let states = List.rev states_rev in
     let states_rev =
       Account_update_group.group_by_zkapp_command_rev
-        ( []
-        :: List.map
-             ~f:(fun (_, _, zkapp_command) ->
-               Zkapp_command.zkapp_command_list zkapp_command )
-             zkapp_commands )
+        (List.map
+           ~f:(fun (_, _, zkapp_command) -> zkapp_command)
+           zkapp_commands )
         ([ List.hd_exn (List.hd_exn states) ] :: states)
     in
     let commitment = ref (Local_state.dummy ()).transaction_commitment in
