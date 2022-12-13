@@ -1,3 +1,5 @@
+open Pickles_types
+
 module Challenge : module type of Import.Challenge.Make (Step_main_inputs.Impl)
 
 module Digest : module type of Import.Digest.Make (Step_main_inputs.Impl)
@@ -57,6 +59,9 @@ val finalize_other_proof :
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Import.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+       , Step_main_inputs.Impl.Boolean.var )
+       Composition_types.Opt.t
      , ( ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
            Import.Scalar_challenge.t
          , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t )
@@ -128,6 +133,7 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
+  -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> wrap_domain:
        [ `Known of Import.Domain.t
@@ -141,11 +147,12 @@ val verify :
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+       , Step_main_inputs.Impl.Boolean.var )
+       Pickles_types.Plonk_types.Opt.t
      , ( ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
            Composition_types.Scalar_challenge.t
-           Pickles_types.Hlist0.Id.t
-         , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           Pickles_types.Hlist0.Id.t )
+         , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t )
          Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
          .Lookup
          .t
@@ -166,6 +173,7 @@ val verify :
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
+     , _
      , 'c
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t

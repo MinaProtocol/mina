@@ -60,6 +60,9 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( challenge
       , scalar_challenge
       , Impl.Field.t Shifted_value.Type1.t
+      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+        , Impl.Boolean.var )
+        Plonk_types.Opt.t
       , ( ( scalar_challenge
           , Impl.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -114,6 +117,7 @@ module Constant = struct
         ( challenge
         , scalar_challenge
         , Tick.Field.t Shifted_value.Type1.t
+        , Tick.Field.t Shifted_value.Type1.t option
         , ( scalar_challenge
           , Tick.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -138,8 +142,9 @@ module Constant = struct
   end
 end
 
-let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
-    (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
+let typ (type n avar aval m) ~lookup ~features
+    (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
+    (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let module Sc = Scalar_challenge in
   let open Impls.Step in
@@ -153,6 +158,7 @@ let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
     ; Types.Wrap.Proof_state.In_circuit.typ
         (module Impl)
         ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup
+        ~features
         ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)

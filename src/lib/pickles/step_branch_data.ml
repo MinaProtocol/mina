@@ -154,9 +154,17 @@ let create
         ~step_domains:
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
+    let features =
+      (* TODO *)
+      Plonk_types.Features.none_map (function
+        | false ->
+            Plonk_types.Opt.Flag.No
+        | true ->
+            Plonk_types.Opt.Flag.Yes )
+    in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No ~features
       (* TODO *)
     in
     Fix_domains.domains

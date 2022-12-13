@@ -61,20 +61,17 @@ module Step = struct
       let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
       let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
       let f x =
+        let open Option.Let_syntax in
         let hi = test_bit x (Field.size_in_bits - 1) in
         let lo = B.shift_right x 1 in
-        let lo =
-          (* IMPORTANT: in practice we should filter such values
-             see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
-             but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
-          *)
+        let%map lo =
           let modulus = Impl.Field.size in
-          if B.compare modulus lo <= 0 then Tick.Field.zero
-          else Impl.Bigint.(to_field (of_bignum_bigint lo))
+          if B.compare modulus lo <= 0 then None
+          else Some Impl.Bigint.(to_field (of_bignum_bigint lo))
         in
         (lo, hi)
       in
-      values |> List.map ~f
+      values |> List.filter_map ~f
 
     let%test_unit "preserve circuit behavior for Step" =
       let expected_list =
@@ -128,7 +125,7 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~uses_lookup =
+  let input ~proofs_verified ~wrap_rounds ~uses_lookup ~features =
     let open Types.Step.Statement in
     let lookup :
         ( Challenge.Constant.t
@@ -149,7 +146,7 @@ module Step = struct
           }
       }
     in
-    let spec = spec (module Impl) proofs_verified wrap_rounds lookup in
+    let spec = spec (module Impl) proofs_verified wrap_rounds lookup features in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -205,21 +202,15 @@ module Wrap = struct
       let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
       let f x =
         let modulus = Impl.Field.size in
-        (* IMPORTANT: in practice we should filter such values
-           see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
-           but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
-        *)
-        if B.compare modulus x <= 0 then Wrap_field.zero
-        else Impl.Bigint.(to_field (of_bignum_bigint x))
+        if B.compare modulus x <= 0 then None
+        else Some Impl.Bigint.(to_field (of_bignum_bigint x))
       in
-      values |> List.map ~f
+      values |> List.filter_map ~f
 
     let%test_unit "preserve circuit behavior for Wrap" =
       let expected_list =
         [ "91120631062839412180561524743370440705"
         ; "91120631062839412180561524743370440706"
-        ; "0"
-        ; "0"
         ]
       in
       let str_list =
@@ -271,6 +262,13 @@ module Wrap = struct
       Other_field.typ_unchecked
     in
     let open Types.Wrap.Statement in
+    let no_features =
+      Plonk_types.Features.none_map (function
+        | false ->
+            Plonk_types.Opt.Flag.No
+        | true ->
+            Plonk_types.Opt.Flag.Yes )
+    in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -280,7 +278,7 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (In_circuit.spec (module Impl) lookup)
+        (In_circuit.spec (module Impl) lookup no_features)
     in
     let typ =
       Typ.transport typ

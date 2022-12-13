@@ -117,6 +117,24 @@ module Wrap : sig
               -> (('a, 'fp) t, ('b, 'c) t, 'f) Snarky_backendless.Typ.t
           end
 
+          module Optional_gates : sig
+            type 'fp t =
+              { chacha : 'fp
+              ; range_check : 'fp
+              ; foreign_field_add : 'fp
+              ; foreign_field_mul : 'fp
+              ; xor : 'fp
+              ; rot : 'fp
+              ; lookup_gate : 'fp
+              ; runtime_tables : 'fp
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
+
+            val to_list : 'fp t -> 'fp list
+
+            val map : f:('a -> 'b) -> 'a t -> 'b t
+          end
+
           (** All scalar values deferred by a verifier circuit.
 
               The values in [vbmul], [complete_add], [endomul],
@@ -127,7 +145,7 @@ module Wrap : sig
               Then, we expose them so the next guy (who can do scalar
               arithmetic) can check that they were computed correctly from the
               evaluations in the proof and the challenges.  *)
-          type ('challenge, 'scalar_challenge, 'fp, 'lookup_opt) t =
+          type ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'lookup_opt) t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -143,19 +161,20 @@ module Wrap : sig
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; lookup : 'lookup_opt
+            ; optional_gates : 'fp_opt Optional_gates.t
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
           val map_challenges :
-               ('a, 'b, 'c, (('b, 'd) Lookup.t, 'e) Opt.t) t
+               ('a, 'b, 'c, 'fp_opt, (('b, 'd) Lookup.t, 'e) Opt.t) t
             -> f:('a -> 'f)
             -> scalar:('b -> 'g)
-            -> ('f, 'g, 'c, (('g, 'd) Lookup.t, 'e) Opt.t) t
+            -> ('f, 'g, 'c, 'fp_opt, (('g, 'd) Lookup.t, 'e) Opt.t) t
 
           val map_fields :
-               ('a, 'b, 'c, (('d, 'c) Lookup.t, 'e) Opt.t) t
+               ('a, 'b, 'c, ('c, 'e) Opt.t, (('d, 'c) Lookup.t, 'e) Opt.t) t
             -> f:('c -> 'f)
-            -> ('a, 'b, 'f, (('d, 'f) Lookup.t, 'e) Opt.t) t
+            -> ('a, 'b, 'f, ('f, 'e) Opt.t, (('d, 'f) Lookup.t, 'e) Opt.t) t
 
           val typ :
                'f Spec.impl
@@ -171,10 +190,15 @@ module Wrap : sig
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
             -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+            -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
+                 , ( 'fp
+                   , 'f Snarky_backendless.Cvar.t
+                     Snarky_backendless__Snark_intf.Boolean0.t )
+                   Plonk_types.Opt.t
                  , ( ('e Scalar_challenge.t, 'fp) Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
@@ -183,6 +207,7 @@ module Wrap : sig
                , ( 'd
                  , 'b Scalar_challenge.t
                  , 'a
+                 , 'a option
                  , ('b Scalar_challenge.t, 'a) Lookup.t option )
                  t
                , 'f )
@@ -190,7 +215,12 @@ module Wrap : sig
         end
 
         val to_minimal :
-             ('challenge, 'scalar_challenge, 'fp, 'lookup_opt) In_circuit.t
+             ( 'challenge
+             , 'scalar_challenge
+             , 'fp
+             , 'fp_opt
+             , 'lookup_opt )
+             In_circuit.t
           -> to_option:
                (   'lookup_opt
                 -> ('scalar_challenge, 'fp) In_circuit.Lookup.t option )
@@ -300,11 +330,17 @@ module Wrap : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
+             , 'fp_opt
              , 'lookup_opt
              , 'bulletproof_challenges
              , 'branch_data )
              t =
-          ( ('challenge, 'scalar_challenge, 'fp, 'lookup_opt) Plonk.In_circuit.t
+          ( ( 'challenge
+            , 'scalar_challenge
+            , 'fp
+            , 'fp_opt
+            , 'lookup_opt )
+            Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fp
           , 'bulletproof_challenges
@@ -326,6 +362,7 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+          -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
@@ -337,6 +374,10 @@ module Wrap : sig
           -> ( ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
+                 , ( 'fp
+                   , 'f Snarky_backendless.Cvar.t
+                     Snarky_backendless__Snark_intf.Boolean0.t )
+                   Plonk_types.Opt.t
                  , ( ('e Scalar_challenge.t, 'fp) Plonk.In_circuit.Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
@@ -352,6 +393,7 @@ module Wrap : sig
              , ( ( 'd
                  , 'b Scalar_challenge.t
                  , 'a
+                 , 'a option
                  , ('b Scalar_challenge.t, 'a) Plonk.In_circuit.Lookup.t option
                  )
                  Plonk.In_circuit.t
@@ -367,7 +409,7 @@ module Wrap : sig
       end
 
       val to_minimal :
-           ('a, 'b, 'c, 'd, 'e, 'f) In_circuit.t
+           ('a, 'b, 'c, _, 'd, 'e, 'f) In_circuit.t
         -> to_option:('d -> ('b, 'c) Plonk.In_circuit.Lookup.t option)
         -> ('a, 'b, 'c, 'e, 'f) Minimal.t
     end
@@ -511,6 +553,7 @@ module Wrap : sig
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
+           , 'fp_opt
            , 'lookup_opt
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -520,6 +563,7 @@ module Wrap : sig
         ( ( 'challenge
           , 'scalar_challenge
           , 'fp
+          , 'fp_opt
           , 'lookup_opt )
           Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
@@ -545,6 +589,7 @@ module Wrap : sig
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+        -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
@@ -567,6 +612,10 @@ module Wrap : sig
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
+               , ( 'fp
+                 , 'f Snarky_backendless.Cvar.t
+                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 Plonk_types.Opt.t
                , ( ( 'e Scalar_challenge.t
                    , 'fp )
                    Deferred_values.Plonk.In_circuit.Lookup.t
@@ -586,6 +635,7 @@ module Wrap : sig
            , ( ( 'd
                , 'b Scalar_challenge.t
                , 'a
+               , 'a option
                , ( 'b Scalar_challenge.t
                  , 'a )
                  Deferred_values.Plonk.In_circuit.Lookup.t
@@ -605,7 +655,7 @@ module Wrap : sig
     end
 
     val to_minimal :
-         ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) In_circuit.t
+         ('a, 'b, 'c, _, 'd, 'e, 'f, 'g, 'h) In_circuit.t
       -> to_option:
            ('d -> ('b, 'c) Deferred_values.Plonk.In_circuit.Lookup.t option)
       -> ('a, 'b, 'i, 'c, 'e, 'f, 'g, 'h) Minimal.t
@@ -823,6 +873,7 @@ module Wrap : sig
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
+           , 'fp_opt
            , 'lookup_opt
            , 'messages_for_next_wrap_proof
            , 'digest
@@ -833,6 +884,7 @@ module Wrap : sig
         ( ( 'challenge
           , 'scalar_challenge
           , 'fp
+          , 'fp_opt
           , 'lookup_opt )
           Proof_state.Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
@@ -845,73 +897,89 @@ module Wrap : sig
         Stable.Latest.t
       [@@deriving compare, yojson, sexp, hash, equal]
 
-      type ('a, 'b, 'c, 'd, 'e, 'f, 'g) flat_repr :=
+      type 'a vec8 :=
+        ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+        Hlist.HlistId.t
+
+      type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt) flat_repr :=
         ( ('a, Nat.N9.n) Vector.t
         * ( ('b, Nat.N2.n) Vector.t
           * ( ('c, Nat.N3.n) Vector.t
             * ( ('d, Nat.N3.n) Vector.t
-              * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+              * ('e * (('f, Nat.N1.n) Vector.t * ('g * ('fp_opt vec8 * unit))))
+              ) ) ) )
         Hlist.HlistId.t
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
            'a Spec.impl
-        -> ('b, 'c, 'd Hlist0.Id.t, 'e Hlist0.Id.t) Lookup_parameters.t
-        -> ( ( 'd
-             , 'b
-             , 'b Scalar_challenge.t
-             , 'f
-             , ('g, Backend.Tick.Rounds.n) Vector.t
-             , 'h
-             , ('b Scalar_challenge.t * ('d * unit)) Hlist.HlistId.t option )
+        -> ( 'challenge1
+           , 'challenge2
+           , 'field1 Hlist0.Id.t
+           , 'field2 Hlist0.Id.t )
+           Lookup_parameters.t
+        -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> ( ( 'field1
+             , 'challenge1
+             , 'challenge1 Scalar_challenge.t
+             , 'digest1
+             , ('bulletproof_challenge1, Backend.Tick.Rounds.n) Vector.t
+             , 'branch_data1
+             , ('challenge1 Scalar_challenge.t * ('field1 * unit))
+               Hlist.HlistId.t
+               option
+             , 'field1 option )
              flat_repr
-           , ( ('e, Nat.N9.n) Vector.t
-             * ( ('c, Nat.N2.n) Vector.t
-               * ( ('c Scalar_challenge.t, Nat.N3.n) Vector.t
-                 * ( ('i, Nat.N3.n) Vector.t
-                   * ( ('j, Backend.Tick.Rounds.n) Vector.t
-                     * ( ('k, Nat.N1.n) Vector.t
-                       * ( ( ('c Scalar_challenge.t * ('e * unit))
-                             Hlist.HlistId.t
-                           , 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t )
-                           opt
-                         * unit ) ) ) ) ) ) )
-             Hlist.HlistId.t
+           , ( 'field2
+             , 'challenge2
+             , 'challenge2 Scalar_challenge.t
+             , 'digest2
+             , ('bulletproof_challenge2, Backend.Tick.Rounds.n) Vector.t
+             , 'branch_data2
+             , ( ('challenge2 Scalar_challenge.t * ('field2 * unit))
+                 Hlist.HlistId.t
+               , 'a Snarky_backendless.Cvar.t
+                 Snarky_backendless__Snark_intf.Boolean0.t )
+               opt
+             , ( 'field2
+               , 'a Snarky_backendless.Cvar.t
+                 Snarky_backendless__Snark_intf.Boolean0.t )
+               opt )
+             flat_repr
            , < bool1 : bool
              ; bool2 :
                  'a Snarky_backendless.Cvar.t
                  Snarky_backendless__Snark_intf.Boolean0.t
-             ; branch_data1 : 'h
-             ; branch_data2 : 'k
-             ; bulletproof_challenge1 : 'g
-             ; bulletproof_challenge2 : 'j
-             ; challenge1 : 'b
-             ; challenge2 : 'c
-             ; digest1 : 'f
-             ; digest2 : 'i
-             ; field1 : 'd
-             ; field2 : 'e
+             ; branch_data1 : 'branch_data1
+             ; branch_data2 : 'branch_data2
+             ; bulletproof_challenge1 : 'bulletproof_challenge1
+             ; bulletproof_challenge2 : 'bulletproof_challenge2
+             ; challenge1 : 'challenge1
+             ; challenge2 : 'challenge2
+             ; digest1 : 'digest1
+             ; digest2 : 'digest2
+             ; field1 : 'field1
+             ; field2 : 'field2
              ; .. > )
            Spec.T.t
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
       val to_data :
-           ('a, 'b, 'c, 'd, 'e, 'e, 'e, 'f Hlist0.Id.t, 'g) t
+           ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'e, 'e, 'f, 'g) t
         -> option_map:
              (   'd
               -> f:
-                   (   ( 'h Hlist0.Id.t
-                       , 'i Hlist0.Id.t )
+                   (   ( 'h
+                       , 'i )
                        Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                     -> ('h * ('i * unit)) Hlist.HlistId.t )
               -> 'j Hlist0.Id.t )
-        -> ('c, 'a, 'b, 'e, 'f, 'g, 'j) flat_repr
+        -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
-           ('a, 'b, 'c, 'd, 'e, 'f, 'g) flat_repr
+           ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt) flat_repr
         -> option_map:
              (   'g Hlist0.Id.t
               -> f:
@@ -920,11 +988,11 @@ module Wrap : sig
                        , 'i Hlist0.Id.t )
                        Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
               -> 'j )
-        -> ('b, 'c, 'a, 'j, 'd, 'd, 'd, 'e Hlist0.Id.t, 'f) t
+        -> ('b, 'c, 'a, 'fp_opt, 'j, 'd, 'd, 'd, 'e Hlist0.Id.t, 'f) t
     end
 
     val to_minimal :
-         ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) In_circuit.t
+         ('a, 'b, 'c, _, 'd, 'e, 'f, 'g, 'h, 'i) In_circuit.t
       -> to_option:
            (   'd
             -> ('b, 'c) Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -994,12 +1062,14 @@ module Step : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fq
+             , 'fq_opt
              , 'bool
              , 'bulletproof_challenges )
              t =
           ( ( 'challenge
             , 'scalar_challenge
             , 'fq
+            , 'fq_opt
             , (('scalar_challenge, 'fq) Plonk.In_circuit.Lookup.t, 'bool) Opt.t
             )
             Plonk.In_circuit.t
@@ -1073,6 +1143,7 @@ module Step : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fq
+             , 'fq_opt
              , 'lookup_opt
              , 'bulletproof_challenges
              , 'digest
@@ -1081,6 +1152,7 @@ module Step : sig
           ( ( 'challenge
             , 'scalar_challenge
             , 'fq
+            , 'fq_opt
             , 'lookup_opt )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge
@@ -1091,69 +1163,94 @@ module Step : sig
           t_
         [@@deriving sexp, compare, yojson]
 
+        type 'a vec8 :=
+          ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+          Hlist.HlistId.t
+
+        type ( 'field
+             , 'digest
+             , 'challenge
+             , 'bulletproof_challenge
+             , 'bool
+             , 'optional
+             , 'fp_opt
+             , 'num_bulletproof_challenges )
+             flat_repr :=
+          ( ('field, Nat.N9.n) Vector.t
+          * ( ('digest, Nat.N1.n) Vector.t
+            * ( ('challenge, Nat.N2.n) Vector.t
+              * ( ('challenge Scalar_challenge.t, Nat.N3.n) Vector.t
+                * ( ( 'bulletproof_challenge
+                    , 'num_bulletproof_challenges )
+                    Vector.t
+                  * ( ('bool, Nat.N1.n) Vector.t
+                    * ('optional * ('fp_opt vec8 * unit)) ) ) ) ) ) )
+          Hlist.HlistId.t
+
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         val spec :
-             'a Spec.impl
-          -> 'b Nat.t
-          -> ('c, 'd, 'e Hlist0.Id.t, 'f Hlist0.Id.t) Wrap.Lookup_parameters.t
-          -> ( ( ('e, Nat.N9.n) Vector.t
-               * ( ('g, Nat.N1.n) Vector.t
-                 * ( ('c, Nat.N2.n) Vector.t
-                   * ( ('c Scalar_challenge.t, Nat.N3.n) Vector.t
-                     * ( ('h, 'b) Vector.t
-                       * ( (bool, Nat.N1.n) Vector.t
-                         * ( ('c Scalar_challenge.t * ('e * unit))
-                             Hlist.HlistId.t
-                             option
-                           * unit ) ) ) ) ) ) )
-               Hlist.HlistId.t
-             , ( ('f, Nat.N9.n) Vector.t
-               * ( ('i, Nat.N1.n) Vector.t
-                 * ( ('d, Nat.N2.n) Vector.t
-                   * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
-                     * ( ('j, 'b) Vector.t
-                       * ( ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
-                           , Nat.N1.n )
-                           Vector.t
-                         * ( ( ('d Scalar_challenge.t * ('f * unit))
-                               Hlist.HlistId.t
-                             , 'a Snarky_backendless.Cvar.t
-                               Snarky_backendless__Snark_intf.Boolean0.t )
-                             Plonk_types.Opt.t
-                           * unit ) ) ) ) ) ) )
-               Hlist.HlistId.t
+             'f Spec.impl
+          -> 'num_bulletproof_challenges Nat.t
+          -> ( 'challenge1
+             , 'challenge2
+             , 'field1 Hlist0.Id.t
+             , 'field2 Hlist0.Id.t )
+             Wrap.Lookup_parameters.t
+          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> ( ( 'field1
+               , 'digest1
+               , 'challenge1
+               , 'bulletproof_challenge1
+               , bool
+               , ('challenge1 Scalar_challenge.t * ('field1 * unit))
+                 Hlist.HlistId.t
+                 option
+               , 'field1 option
+               , 'num_bulletproof_challenges )
+               flat_repr
+             , ( 'field2
+               , 'digest2
+               , 'challenge2
+               , 'bulletproof_challenge2
+               , 'field2 Snarky_backendless__Snark_intf.Boolean0.t
+               , ( ('challenge2 Scalar_challenge.t * ('field2 * unit))
+                   Hlist.HlistId.t
+                 , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
+                 Plonk_types.Opt.t
+               , ( 'field2
+                 , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
+                 Plonk_types.Opt.t
+               , 'num_bulletproof_challenges )
+               flat_repr
              , < bool1 : bool
-               ; bool2 :
-                   'a Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t
-               ; bulletproof_challenge1 : 'h
-               ; bulletproof_challenge2 : 'j
-               ; challenge1 : 'c
-               ; challenge2 : 'd
-               ; digest1 : 'g
-               ; digest2 : 'i
-               ; field1 : 'e
-               ; field2 : 'f
+               ; bool2 : 'field2 Snarky_backendless__Snark_intf.Boolean0.t
+               ; bulletproof_challenge1 : 'bulletproof_challenge1
+               ; bulletproof_challenge2 : 'bulletproof_challenge2
+               ; challenge1 : 'challenge1
+               ; challenge2 : 'challenge2
+               ; digest1 : 'digest1
+               ; digest2 : 'digest2
+               ; field1 : 'field1
+               ; field2 : ('f Snarky_backendless.Cvar.t as 'field2)
                ; .. > )
              Spec.T.t
 
         val to_data :
-             ('a, 'b, 'c, 'd, 'e Hlist0.Id.t, 'f, 'g) t
+             ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) t
           -> option_map:
                (   'd
                 -> f:
-                     (   ( 'h Hlist0.Id.t
-                         , 'i Hlist0.Id.t )
-                         Deferred_values.Plonk.In_circuit.Lookup.t
+                     (   ('h, 'i) Deferred_values.Plonk.In_circuit.Lookup.t
                       -> ('h * ('i * unit)) Hlist.HlistId.t )
                 -> 'j Hlist0.Id.t )
           -> ( ('c, Nat.N9.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
-                   * ('e * (('g, Nat.N1.n) Vector.t * ('j * unit))) ) ) ) )
+                   * ( 'e
+                     * (('g, Nat.N1.n) Vector.t * ('j * ('fp_opt vec8 * unit)))
+                     ) ) ) ) )
              Hlist.HlistId.t
 
         val of_data :
@@ -1161,28 +1258,22 @@ module Step : sig
              * ( ('b, Nat.N1.n) Vector.t
                * ( ('c, Nat.N2.n) Vector.t
                  * ( ('d, Nat.N3.n) Vector.t
-                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+                   * ( 'e
+                     * (('f, Nat.N1.n) Vector.t * ('g * ('fp_opt vec8 * unit)))
+                     ) ) ) ) )
              Hlist.HlistId.t
           -> option_map:
                (   'g Hlist0.Id.t
                 -> f:
                      (   ('h * ('i * unit)) Hlist.HlistId.t
-                      -> ( 'h Hlist0.Id.t
-                         , 'i Hlist0.Id.t )
-                         Deferred_values.Plonk.In_circuit.Lookup.t )
+                      -> ('h, 'i) Deferred_values.Plonk.In_circuit.Lookup.t )
                 -> 'j )
-          -> ('c, 'd, 'a, 'j, 'e Hlist0.Id.t, 'b, 'f) t
+          -> ('c, 'd, 'a, 'fp_opt, 'j, 'e, 'b, 'f) t
 
         val map_lookup :
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g) t
+             ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) t
           -> f:('d -> 'h)
-          -> ( ('a, 'b, 'c, 'h) Deferred_values.Plonk.In_circuit.t
-             , 'b
-             , 'c
-             , 'e
-             , 'f
-             , 'g )
-             t_
+          -> ('a, 'b, 'c, 'fp_opt, 'h, 'e, 'f, 'g) t
       end
 
       val typ :
@@ -1201,9 +1292,14 @@ module Step : sig
              , 'b Hlist0.Id.t )
              Zero_values.t
         -> uses_lookup:Opt.Flag.t
+        -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
+             , ( 'b
+               , 'a Snarky_backendless.Cvar.t
+                 Snarky_backendless__Snark_intf.Boolean0.t )
+               Opt.t
              , ( ( 'a Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
                  , 'b Hlist0.Id.t )
                  Deferred_values.Plonk.In_circuit.Lookup.t
@@ -1222,8 +1318,9 @@ module Step : sig
            , ( Limb_vector.Challenge.Constant.t
              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
              , 'c
-             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t Hlist0.Id.t
-               , 'c Hlist0.Id.t )
+             , 'c option
+             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+               , 'c )
                Deferred_values.Plonk.In_circuit.Lookup.t
                option
              , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1256,8 +1353,12 @@ module Step : sig
          , 'c )
          Spec.T.t
 
+    type 'a vec8 :=
+      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+      Hlist.HlistId.t
+
     val to_data :
-         ( ( ('a, 'b, 'c, 'd, 'e Hlist0.Id.t, 'f, 'g) Per_proof.In_circuit.t
+         ( ( ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) Per_proof.In_circuit.t
            , 'h )
            Vector.t
          , 'i Hlist0.Id.t )
@@ -1265,16 +1366,16 @@ module Step : sig
       -> ( (    option_map:
                   (   'd
                    -> f:
-                        (   ( 'j Hlist0.Id.t
-                            , 'k Hlist0.Id.t )
-                            Deferred_values.Plonk.In_circuit.Lookup.t
+                        (   ('j, 'k) Deferred_values.Plonk.In_circuit.Lookup.t
                          -> ('j * ('k * unit)) Hlist.HlistId.t )
                    -> 'l Hlist0.Id.t )
              -> ( ('c, Nat.N9.n) Vector.t
                 * ( ('f, Nat.N1.n) Vector.t
                   * ( ('a, Nat.N2.n) Vector.t
                     * ( ('b, Nat.N3.n) Vector.t
-                      * ('e * (('g, Nat.N1.n) Vector.t * ('l * unit))) ) ) ) )
+                      * ( 'e
+                        * ( ('g, Nat.N1.n) Vector.t
+                          * ('l * ('fp_opt vec8 * unit)) ) ) ) ) ) )
                 Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1286,7 +1387,9 @@ module Step : sig
              * ( ('b, Nat.N1.n) Vector.t
                * ( ('c, Nat.N2.n) Vector.t
                  * ( ('d, Nat.N3.n) Vector.t
-                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+                   * ( 'e
+                     * (('f, Nat.N1.n) Vector.t * ('g * ('fp_opt vec8 * unit)))
+                     ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1296,14 +1399,21 @@ module Step : sig
                   (   'g Hlist0.Id.t
                    -> f:
                         (   ('j * ('k * unit)) Hlist.HlistId.t
-                         -> ( 'j Hlist0.Id.t
-                            , 'k Hlist0.Id.t )
-                            Deferred_values.Plonk.In_circuit.Lookup.t )
+                         -> ('j, 'k) Deferred_values.Plonk.In_circuit.Lookup.t
+                        )
                    -> 'l )
-             -> ('c, 'd, 'a, 'l, 'e Hlist0.Id.t, 'b, 'f) Per_proof.In_circuit.t
+             -> ( 'c
+                , 'd
+                , 'a
+                , 'fp_opt
+                , 'l
+                , 'e Hlist0.Id.t
+                , 'b
+                , 'f )
+                Per_proof.In_circuit.t
            , 'h )
            Vector.t
-         , 'i Hlist0.Id.t )
+         , 'i )
          t
 
     val typ :
@@ -1314,6 +1424,7 @@ module Step : sig
          , 'b Hlist0.Id.t )
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
+      -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
       -> (Plonk_types.Opt.Flag.t, 'n) Vector.t
       -> ( 'b
          , 'a
@@ -1324,8 +1435,12 @@ module Step : sig
       -> ( ( ( ( 'f Limb_vector.Challenge.t
                , 'f Limb_vector.Challenge.t Scalar_challenge.t
                , 'b
-               , ( ( 'f Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
-                   , 'b Hlist0.Id.t )
+               , ( 'b
+                 , 'f Snarky_backendless.Cvar.t
+                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 Opt.t
+               , ( ( 'f Limb_vector.Challenge.t Scalar_challenge.t
+                   , 'b )
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'f Snarky_backendless.Cvar.t
                    Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1346,9 +1461,9 @@ module Step : sig
          , ( ( ( Limb_vector.Challenge.Constant.t
                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
                , 'a
+               , 'a option
                , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
-                   Hlist0.Id.t
-                 , 'a Hlist0.Id.t )
+                 , 'a )
                  Deferred_values.Plonk.In_circuit.Lookup.t
                  option
                , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1378,10 +1493,15 @@ module Step : sig
       }
     [@@deriving sexp, compare, yojson]
 
+    type 'a vec8 :=
+      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+      Hlist.HlistId.t
+
     val to_data :
          ( ( ( 'a
              , 'b
              , 'c
+             , 'fp_opt
              , 'd
              , 'e Hlist0.Id.t
              , 'f
@@ -1395,8 +1515,8 @@ module Step : sig
       -> option_map:
            (   'd
             -> f:
-                 (   ( 'k Hlist0.Id.t
-                     , 'l Hlist0.Id.t )
+                 (   ( 'k
+                     , 'l )
                      Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                   -> ('k * ('l * unit)) Hlist.HlistId.t )
             -> 'm Hlist0.Id.t )
@@ -1404,7 +1524,9 @@ module Step : sig
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
-                   * ('e * (('g, Nat.N1.n) Vector.t * ('m * unit))) ) ) ) )
+                   * ( 'e
+                     * (('g, Nat.N1.n) Vector.t * ('m * ('fp_opt vec8 * unit)))
+                     ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1416,7 +1538,9 @@ module Step : sig
              * ( ('b, Nat.N1.n) Vector.t
                * ( ('c, Nat.N2.n) Vector.t
                  * ( ('d, Nat.N3.n) Vector.t
-                   * ('e * (('f, Nat.N1.n) Vector.t * ('g * unit))) ) ) ) )
+                   * ( 'e
+                     * (('f, Nat.N1.n) Vector.t * ('g * ('fp_opt vec8 * unit)))
+                     ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1426,13 +1550,14 @@ module Step : sig
            (   'g Hlist0.Id.t
             -> f:
                  (   ('k * ('l * unit)) Hlist.HlistId.t
-                  -> ( 'k Hlist0.Id.t
-                     , 'l Hlist0.Id.t )
+                  -> ( 'k
+                     , 'l )
                      Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
             -> 'm )
       -> ( ( ( 'c
              , 'd
              , 'a
+             , 'fp_opt
              , 'm
              , 'e Hlist0.Id.t
              , 'b
@@ -1440,8 +1565,8 @@ module Step : sig
              Proof_state.Per_proof.In_circuit.t
            , 'h )
            Vector.t
-         , 'i Hlist0.Id.t
-         , 'j Hlist0.Id.t )
+         , 'i
+         , 'j )
          t
 
     val spec :
@@ -1449,6 +1574,7 @@ module Step : sig
       -> 'b Nat.t
       -> 'c Nat.t
       -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
+      -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
       -> ( ( ( ( ('f, Nat.N9.n) Vector.t
                * ( ('h, Nat.N1.n) Vector.t
                  * ( ('d, Nat.N2.n) Vector.t
@@ -1458,7 +1584,7 @@ module Step : sig
                          * ( ('d Scalar_challenge.t * ('f * unit))
                              Hlist.HlistId.t
                              option
-                           * unit ) ) ) ) ) ) )
+                           * ('f option vec8 * unit) ) ) ) ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t
@@ -1478,7 +1604,12 @@ module Step : sig
                              , 'a Snarky_backendless.Cvar.t
                                Snarky_backendless__Snark_intf.Boolean0.t )
                              Plonk_types.Opt.t
-                           * unit ) ) ) ) ) ) )
+                           * ( ( 'g
+                               , 'a Snarky_backendless.Cvar.t
+                                 Snarky_backendless__Snark_intf.Boolean0.t )
+                               Plonk_types.Opt.t
+                               vec8
+                             * unit ) ) ) ) ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t

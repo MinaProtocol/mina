@@ -85,8 +85,16 @@ let verify_one
     }
   in
   let verified =
+    let features =
+      (* TODO *)
+      Plonk_types.Features.none_map (function
+        | false ->
+            Plonk_types.Opt.Flag.No
+        | true ->
+            Plonk_types.Opt.Flag.Yes )
+    in
     with_label __LOC__ (fun () ->
-        verify
+        verify ~features
           ~lookup_parameters:
             { use = d.step_uses_lookup
             ; zero =
@@ -237,8 +245,17 @@ let step_main :
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
+          let features =
+            (* TODO *)
+            Plonk_types.Features.none_map (function
+              | false ->
+                  Plonk_types.Opt.Flag.No
+              | true ->
+                  Plonk_types.Opt.Flag.Yes )
+          in
           let t =
             Per_proof_witness.typ Typ.unit n1 n2 ~lookup:(uses_lookup d)
+              ~features
           in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
@@ -351,8 +368,16 @@ let step_main :
             (Vector.typ'
                (Vector.map
                   ~f:(fun uses_lookup ->
+                    let features =
+                      (* TODO *)
+                      Plonk_types.Features.none_map (function
+                        | false ->
+                            Plonk_types.Opt.Flag.No
+                        | true ->
+                            Plonk_types.Opt.Flag.Yes )
+                    in
                     Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
-                      ~uses_lookup )
+                      ~uses_lookup ~features )
                   lookup_usage ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =

@@ -512,6 +512,7 @@ struct
          ( _
          , _
          , _ Shifted_value.Type2.t
+         , _
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
@@ -893,6 +894,7 @@ struct
         , Field.t Shifted_value.Type1.t
         , _
         , _
+        , _
         , Field.Constant.t Branch_data.Checked.t )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -1190,12 +1192,13 @@ struct
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
-      ~lookup_parameters ~(proof : Wrap_proof.Checked.t) ~wrap_domain
+      ~lookup_parameters ~features ~(proof : Wrap_proof.Checked.t) ~wrap_domain
       ~wrap_verification_key statement
       (unfinalized :
         ( _
         , _
         , _ Shifted_value.Type2.t
+        , _
         , _
         , _
         , _
@@ -1208,7 +1211,7 @@ struct
             (module Impl)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
-               lookup_parameters )
+               lookup_parameters features )
             (Types.Wrap.Statement.In_circuit.to_data
                ~option_map:Plonk_types.Opt.map statement ) )
       |> Array.map ~f:(function

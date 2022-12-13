@@ -9,6 +9,10 @@ val wrap :
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+         , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
+             Snarky_backendless.Snark_intf.Boolean0.t )
+           Pickles_types.Plonk_types.Opt.t
          , ( ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                Pickles_types.Hlist0.Id.t
                Pickles_types.Hlist0.Id.t
@@ -42,6 +46,8 @@ val wrap :
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
+         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
+           option
          , ( Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
              Pickles_types.Hlist0.Id.t
            , Impls.Step.Other_field.Constant.t

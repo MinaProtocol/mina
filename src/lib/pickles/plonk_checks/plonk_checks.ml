@@ -612,6 +612,16 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                       Lazy.force
                         (Hashtbl.find_exn index_terms (LookupKindIndex Lookup))
                   } )
+        ; optional_gates =
+            { chacha = Opt.None
+            ; range_check = Opt.None
+            ; foreign_field_add = Opt.None
+            ; foreign_field_mul = Opt.None
+            ; xor = Opt.None
+            ; rot = Opt.None
+            ; lookup_gate = Opt.None
+            ; runtime_tables = Opt.None
+            }
         }
 
   (** Check that computed proof scalars match the expected ones,
@@ -624,7 +634,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env (plonk : (_, _, _, _ Opt.t) In_circuit.t) evals =
+      ~shift ~env (plonk : (_, _, _, _ Opt.t, _ Opt.t) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)
@@ -643,28 +653,33 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         evals
     in
     let open Impl in
+    let equal_opt ~equal ((expected : _ Opt.t), (actual : _ Opt.t)) =
+      match (expected, actual) with
+      | None, None ->
+          None
+      | Some expected, Some actual ->
+          Some (equal expected actual)
+      | Maybe (is_some, expected), (Some actual | Maybe (_, actual)) ->
+          Some (Boolean.( ||| ) (Boolean.not is_some) (equal expected actual))
+      | Some _, Maybe _ | None, (Some _ | Maybe _) | (Some _ | Maybe _), None ->
+          assert false
+    in
     let open In_circuit in
     with_label __LOC__ (fun () ->
-        ( with_label __LOC__ (fun () ->
-              List.map
-                ~f:(fun f ->
-                  Shifted_value.equal Field.equal (f plonk) (f actual) )
-                [ vbmul; complete_add; endomul; perm ] )
-        @
-        match (plonk.lookup, actual.lookup) with
-        | None, None ->
-            []
-        | Some plonk, Some actual ->
-            [ Shifted_value.equal Field.equal plonk.lookup_gate
-                actual.lookup_gate
-            ]
-        | Maybe (is_some, plonk), (Some actual | Maybe (_, actual)) ->
-            [ Boolean.( ||| ) (Boolean.not is_some)
-                (Shifted_value.equal Field.equal plonk.lookup_gate
-                   actual.lookup_gate )
-            ]
-        | Some _, Maybe _ | None, (Some _ | Maybe _) | (Some _ | Maybe _), None
-          ->
-            assert false )
+        with_label __LOC__ (fun () ->
+            List.map
+              ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
+              [ vbmul; complete_add; endomul; perm ] )
+        @ List.filter_map
+            ~f:(equal_opt ~equal:(Shifted_value.equal Field.equal))
+            (List.zip_exn
+               (In_circuit.Optional_gates.to_list plonk.optional_gates)
+               (In_circuit.Optional_gates.to_list actual.optional_gates) )
+        @ Option.to_list
+        @@ equal_opt
+             ~equal:(fun { In_circuit.Lookup.lookup_gate = l1; _ }
+                         { In_circuit.Lookup.lookup_gate = l2; _ } ->
+               Shifted_value.equal Field.equal l1 l2 )
+             (plonk.lookup, actual.lookup)
         |> Boolean.all )
 end

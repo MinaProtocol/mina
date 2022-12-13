@@ -36,13 +36,13 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup t =
+let pack_statement max_proofs_verified ~lookup ~features t =
   let open Types.Step in
   Spec.pack
     (module Impl)
     (Statement.spec
        (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup )
+       max_proofs_verified Backend.Tock.Rounds.n lookup features )
     (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
@@ -118,6 +118,7 @@ let wrap_main
           , _
           , _
           , _
+          , _
           , _ )
           Types.Wrap.Statement.In_circuit.t
        -> unit ) =
@@ -155,6 +156,7 @@ let wrap_main
         ( _
         , _
         , _ Shifted_value.Type1.t
+        , _
         , _
         , _
         , _
@@ -204,7 +206,15 @@ let wrap_main
           with_label __LOC__ (fun () ->
               let open Types.Step.Proof_state in
               let typ =
-                typ
+                let features =
+                  (* TODO *)
+                  Plonk_types.Features.none_map (function
+                    | false ->
+                        Plonk_types.Opt.Flag.No
+                    | true ->
+                        Plonk_types.Opt.Flag.Yes )
+                in
+                typ ~features
                   (module Impl)
                   Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
@@ -396,12 +406,20 @@ let wrap_main
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
           with_label __LOC__ (fun () ->
+              let features =
+                (* TODO *)
+                Plonk_types.Features.none_map (function
+                  | false ->
+                      Plonk_types.Opt.Flag.No
+                  | true ->
+                      Plonk_types.Opt.Flag.Yes )
+              in
               Wrap_verifier.incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
                 ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:
                   (Array.map
-                     (pack_statement Max_proofs_verified.n
+                     (pack_statement Max_proofs_verified.n ~features
                         ~lookup:lookup_config_for_pack prev_statement )
                      ~f:(function
                     | `Field (Shifted_value x) ->

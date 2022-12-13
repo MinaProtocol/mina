@@ -103,6 +103,7 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
+        , Tick.Field.t Shifted_value.Type1.t option
         , ( Challenge.Constant.t Scalar_challenge.t
           , Tick.Field.t Shifted_value.Type1.t )
           Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -238,6 +239,7 @@ struct
           , _
           , _
           , _
+          , _
           , _ )
           Wrap.Statement.In_circuit.t =
         { messages_for_next_step_proof =
@@ -267,6 +269,11 @@ struct
                               joint_combiner =
                                 Option.value_exn plonk0.joint_combiner
                             } )
+                    ; optional_gates =
+                        Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                        .In_circuit
+                        .Optional_gates
+                        .map ~f:Opt.to_option plonk.optional_gates
                     }
                 }
             ; messages_for_next_wrap_proof =
@@ -499,6 +506,11 @@ struct
                           joint_combiner =
                             Option.value_exn plonk0.joint_combiner
                         } )
+                ; optional_gates =
+                    Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                    .In_circuit
+                    .Optional_gates
+                    .map ~f:Opt.to_option plonk.optional_gates
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
@@ -760,9 +772,17 @@ struct
                } )
            |> to_list) )
     in
+    let features =
+      (* TODO *)
+      Plonk_types.Features.none_map (function
+        | false ->
+            Plonk_types.Opt.Flag.No
+        | true ->
+            Plonk_types.Opt.Flag.Yes )
+    in
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
-        Impls.Step.input ~proofs_verified:Max_proofs_verified.n
+        Impls.Step.input ~proofs_verified:Max_proofs_verified.n ~features
           ~wrap_rounds:Tock.Rounds.n ~uses_lookup
       in
       let { Domains.h } =

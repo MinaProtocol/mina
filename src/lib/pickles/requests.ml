@@ -31,6 +31,7 @@ module Wrap = struct
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
               , Field.Constant.t Shifted_value.Type2.t
+              , Field.Constant.t Shifted_value.Type2.t option
               , ( Challenge.Constant.t Scalar_challenge.t
                 , Field.Constant.t Shifted_value.Type2.t )
                 Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -82,6 +83,7 @@ module Wrap = struct
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
                 , Tock.Field.t Shifted_value.Type2.t
+                , Tock.Field.t Shifted_value.Type2.t option
                 , ( Challenge.Constant.t Scalar_challenge.t
                   , Tock.Field.t Shifted_value.Type2.t )
                   Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup

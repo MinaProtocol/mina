@@ -90,6 +90,7 @@ type deferred_values_and_hints =
       ( ( Challenge.Constant.t
         , scalar_challenge_constant
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+        , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
         , ( ( scalar_challenge_constant
             , Tick.Field.t Shifted_value.Type1.t )
             Deferred_values.Plonk.In_circuit.Lookup.t
@@ -293,13 +294,22 @@ let%test "lookup finalization" =
     deferred_values ~sgs:[] ~prev_challenges:[] ~step_vk:vk
       ~public_input:[ public_input ] ~proof ~actual_proofs_verified:Nat.N0.n
   in
+  let features =
+    (* TODO *)
+    Plonk_types.Features.none_map (function
+      | false ->
+          Plonk_types.Opt.Flag.No
+      | true ->
+          Plonk_types.Opt.Flag.Yes )
+  in
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_main_inputs in
     let open Step_verifier in
     Wrap.Proof_state.Deferred_values.In_circuit.typ
       (module Impls.Step)
-      ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup:Maybe
+      ~features ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
+      ~lookup:Maybe
       ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
       ~dummy_scalar_challenge:
         (Kimchi_backend_common.Scalar_challenge.create
@@ -315,6 +325,11 @@ let%test "lookup finalization" =
         plonk =
           { deferred_values.plonk with
             lookup = Opt.to_option deferred_values.plonk.lookup
+          ; optional_gates =
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Optional_gates
+              .map ~f:Opt.to_option deferred_values.plonk.optional_gates
           }
       }
   and evals =
@@ -487,8 +502,16 @@ let wrap
         Snarky_backendless.Request.unhandled
   in
   let module O = Tick.Oracles in
+  let features =
+    (* TODO *)
+    Plonk_types.Features.none_map (function
+      | false ->
+          Plonk_types.Opt.Flag.No
+      | true ->
+          Plonk_types.Opt.Flag.Yes )
+  in
   let public_input =
-    tick_public_input_of_statement ~max_proofs_verified
+    tick_public_input_of_statement ~max_proofs_verified ~features
       prev_statement_with_hashes ~uses_lookup:No
   in
   let prev_challenges =
@@ -587,6 +610,19 @@ let wrap
                         lookup =
                           (* TODO: This assumes wrap circuits do not use lookup *)
                           None
+                      ; optional_gates =
+                          (* TODO: This assumes that wrap circuits do not use
+                             optional gates.
+                          *)
+                          { chacha = None
+                          ; range_check = None
+                          ; foreign_field_add = None
+                          ; foreign_field_mul = None
+                          ; xor = None
+                          ; rot = None
+                          ; lookup_gate = None
+                          ; runtime_tables = None
+                          }
                       }
                   }
               }

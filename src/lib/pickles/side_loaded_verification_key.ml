@@ -40,10 +40,18 @@ let bits = V.bits
 let input_size ~of_int ~add ~mul w =
   let open Composition_types in
   (* This should be an affine function in [a]. *)
+  let features =
+    (* TODO *)
+    Plonk_types.Features.none_map (function
+      | false ->
+          Plonk_types.Opt.Flag.No
+      | true ->
+          Plonk_types.Opt.Flag.Yes )
+  in
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
-        ~uses_lookup:No
+        ~uses_lookup:No ~features
     in
     typ.size_in_field_elements
   in
@@ -375,8 +383,16 @@ let%test_unit "input_size" =
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
          let (T (Typ typ, _conv, _conv_inv)) =
+           let features =
+             (* TODO *)
+             Plonk_types.Features.none_map (function
+               | false ->
+                   Plonk_types.Opt.Flag.No
+               | true ->
+                   Plonk_types.Opt.Flag.Yes )
+           in
            Impls.Step.input ~proofs_verified:a
-             ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+             ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No ~features
          in
          typ.size_in_field_elements ) )
 

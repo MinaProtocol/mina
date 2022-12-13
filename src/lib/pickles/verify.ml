@@ -162,6 +162,11 @@ let verify_heterogenous (ts : Instance.t list) =
                     .lookup_gate = l.lookup_gate
                   ; joint_combiner = Option.value_exn plonk0.joint_combiner
                   } )
+          ; optional_gates =
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Optional_gates
+              .map ~f:Plonk_types.Opt.to_option p.optional_gates
           }
         in
         Timer.clock __LOC__ ;

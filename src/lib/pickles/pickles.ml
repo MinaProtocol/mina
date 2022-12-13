@@ -618,6 +618,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let cache_handle = ref (Lazy.return `Cache_hit) in
       let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
       Timer.clock __LOC__ ;
+      let features =
+        (* TODO *)
+        Plonk_types.Features.none_map (function
+          | false ->
+              Plonk_types.Opt.Flag.No
+          | true ->
+              Plonk_types.Opt.Flag.Yes )
+      in
       let step_keypairs =
         let disk_keys =
           Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
@@ -627,7 +635,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (struct
               let etyp =
                 Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                  ~wrap_rounds:Tock.Rounds.n ~uses_lookup:Maybe
+                  ~wrap_rounds:Tock.Rounds.n ~uses_lookup:Maybe ~features
               (* TODO *)
 
               let f (T b : _ Branch_data.t) =
@@ -2088,10 +2096,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
               ~proofs_verifieds
           in
+          let features =
+            Plonk_types.Features.none_map (function
+              | false ->
+                  Plonk_types.Opt.Flag.No
+              | true ->
+                  Plonk_types.Opt.Flag.Yes )
+          in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
             let etyp =
-              Impls.Step.input ~uses_lookup:No
+              Impls.Step.input ~uses_lookup:No ~features
                 ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
@@ -2350,7 +2365,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     let module O = Tick.Oracles in
                     let public_input =
                       tick_public_input_of_statement ~max_proofs_verified
-                        ~uses_lookup:No prev_statement_with_hashes
+                        ~features ~uses_lookup:No prev_statement_with_hashes
                     in
                     let prev_challenges =
                       Vector.map ~f:Ipa.Step.compute_challenges
@@ -2692,6 +2707,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
+                                        ; optional_gates =
+                                            { chacha = None
+                                            ; range_check = None
+                                            ; foreign_field_add = None
+                                            ; foreign_field_mul = None
+                                            ; xor = None
+                                            ; rot = None
+                                            ; lookup_gate = None
+                                            ; runtime_tables = None
+                                            }
                                         }
                                     }
                                 }
@@ -3035,10 +3060,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
               ~proofs_verifieds
           in
+          let features =
+            Plonk_types.Features.none_map (function
+              | false ->
+                  Plonk_types.Opt.Flag.No
+              | true ->
+                  Plonk_types.Opt.Flag.Yes )
+          in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
             let etyp =
-              Impls.Step.input ~uses_lookup:No
+              Impls.Step.input ~uses_lookup:No ~features
                 ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
@@ -3296,7 +3328,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let module O = Tick.Oracles in
                     let public_input =
-                      tick_public_input_of_statement ~uses_lookup:No
+                      tick_public_input_of_statement ~uses_lookup:No ~features
                         ~max_proofs_verified prev_statement_with_hashes
                     in
                     let prev_challenges =
@@ -3604,6 +3636,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                             .plonk
                                           with
                                           lookup = None
+                                        ; optional_gates =
+                                            { chacha = None
+                                            ; range_check = None
+                                            ; foreign_field_add = None
+                                            ; foreign_field_mul = None
+                                            ; xor = None
+                                            ; rot = None
+                                            ; lookup_gate = None
+                                            ; runtime_tables = None
+                                            }
                                         }
                                     }
                                 }

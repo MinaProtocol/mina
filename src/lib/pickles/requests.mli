@@ -88,6 +88,7 @@ module Wrap : sig
           ( ( ( Impls.Wrap.Challenge.Constant.t
               , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
               , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t
+              , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t option
               , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
                 , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t )
                 Import.Types.Step.Proof_state.Deferred_values.Plonk.In_circuit

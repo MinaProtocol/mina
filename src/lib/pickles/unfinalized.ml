@@ -14,6 +14,7 @@ type t =
   ( Field.t
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
+  , (Other_field.t Shifted_value.t, Boolean.var) Plonk_types.Opt.t
   , ( ( Field.t Scalar_challenge.t
       , Other_field.t Shifted_value.t )
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -36,6 +37,7 @@ module Constant = struct
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t Shifted_value.t
+    , Tock.Field.t Shifted_value.t option
     , ( Challenge.Constant.t Scalar_challenge.t
       , Tock.Field.t Shifted_value.t )
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
@@ -110,7 +112,24 @@ module Constant = struct
          Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
        in
        { deferred_values =
-           { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
+           { plonk =
+               { plonk with
+                 alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; lookup = None
+               ; optional_gates =
+                   { chacha = None
+                   ; range_check = None
+                   ; foreign_field_add = None
+                   ; foreign_field_mul = None
+                   ; xor = None
+                   ; rot = None
+                   ; lookup_gate = None
+                   ; runtime_tables = None
+                   }
+               }
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
@@ -121,8 +140,8 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ
+let typ ~wrap_rounds ~uses_lookup ~features : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.typ ~features
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
@@ -132,6 +151,12 @@ let dummy : unit -> t =
   Memo.unit (fun () ->
       let (Typ { var_of_fields; value_to_fields; _ }) =
         typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+          ~features:
+            (Plonk_types.Features.none_map (function
+              | false ->
+                  Plonk_types.Opt.Flag.No
+              | true ->
+                  Plonk_types.Opt.Flag.Yes ) )
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )
