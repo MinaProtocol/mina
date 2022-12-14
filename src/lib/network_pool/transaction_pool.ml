@@ -2696,8 +2696,8 @@ let%test_module _ =
             mk_basic_zkapp ~empty_update:true 0 fee_payer_kp
             |> mk_zkapp_user_cmd t.txn_pool
           in
-          let%bind () = add_commands' t [ valid_command1; valid_command2 ] in
-          let%bind () = reorg t [ valid_command1 ] [ valid_command2 ] in
+          let valid_commands = [ valid_command1; valid_command2 ] in
+          let%bind () = add_commands' t valid_commands in
           assert_pool_txs t [ valid_command2 ] ;
           Deferred.unit )
   end )
