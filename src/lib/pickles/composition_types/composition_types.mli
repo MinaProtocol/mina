@@ -109,7 +109,9 @@ module Wrap : sig
                  ( 'a
                  , 'b
                  , 'f
-                 , (unit, 'f) Snarky_backendless.Checked_ast.t )
+                 , ( unit
+                   , 'f )
+                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
               -> ('fp, 'c, 'f) Snarky_backendless.Typ.t
               -> (('a, 'fp) t, ('b, 'c) t, 'f) Snarky_backendless.Typ.t
@@ -164,7 +166,9 @@ module Wrap : sig
                  ( 'c
                  , 'd
                  , 'f
-                 , (unit, 'f) Snarky_backendless.Checked_ast.t )
+                 , ( unit
+                   , 'f )
+                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
             -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
@@ -317,14 +321,18 @@ module Wrap : sig
                ( 'c
                , 'd
                , 'f
-               , (unit, 'f) Snarky_backendless.Checked_ast.t )
+               , ( unit
+                 , 'f )
+                 Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
              , 'f
-             , (unit, 'f) Snarky_backendless.Checked_ast.t )
+             , ( unit
+               , 'f )
+               Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
           -> ( ( ( 'c
                  , 'e Scalar_challenge.t
@@ -464,7 +472,12 @@ module Wrap : sig
         -> 'f Core_kernel.Array.t
 
       val typ :
-           ('a, 'b, 'c, (unit, 'c) Snarky_backendless.Checked_ast.t) snarky_typ
+           ( 'a
+           , 'b
+           , 'c
+           , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+           )
+           snarky_typ
         -> ('d, 'e, 'c) Snarky_backendless.Typ.t
         -> length:'f Nat.nat
         -> ( ('a, ('d, 'f) Vector.vec) t
@@ -527,13 +540,30 @@ module Wrap : sig
              ( 'c
              , 'd
              , 'f
-             , (unit, 'f) Snarky_backendless.Checked_ast.t )
+             , ( unit
+               , 'f )
+               Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
-        -> ('g, 'h, 'f, (unit, 'f) Snarky_backendless.Checked_ast.t) snarky_typ
-        -> ('i, 'j, 'f, (unit, 'f) Snarky_backendless.Checked_ast.t) snarky_typ
-        -> ('k, 'l, 'f, (unit, 'f) Snarky_backendless.Checked_ast.t) snarky_typ
+        -> ( 'g
+           , 'h
+           , 'f
+           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+           )
+           snarky_typ
+        -> ( 'i
+           , 'j
+           , 'f
+           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+           )
+           snarky_typ
+        -> ( 'k
+           , 'l
+           , 'f
+           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+           )
+           snarky_typ
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
@@ -616,8 +646,18 @@ module Wrap : sig
     val typ :
          ('a, 'b, 'c) Snarky_backendless.Typ.t
       -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ('f, 'g, 'c, (unit, 'c) Snarky_backendless.Checked_ast.t) snarky_typ
-      -> ('h, 'i, 'c, (unit, 'c) Snarky_backendless.Checked_ast.t) snarky_typ
+      -> ( 'f
+         , 'g
+         , 'c
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+         )
+         snarky_typ
+      -> ( 'h
+         , 'i
+         , 'c
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+         )
+         snarky_typ
       -> 'j Nat.nat
       -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
          , ('b, 'g, ('e, 'j) Vector.vec, 'i) t
@@ -1147,7 +1187,12 @@ module Step : sig
 
       val typ :
            'a Spec.impl
-        -> ('b, 'c, 'a, (unit, 'a) Snarky_backendless.Checked_ast.t) snarky_typ
+        -> ( 'b
+           , 'c
+           , 'a
+           , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+           )
+           snarky_typ
         -> assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
         -> zero:
              ( Limb_vector.Challenge.Constant.t
@@ -1270,7 +1315,12 @@ module Step : sig
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
       -> (Plonk_types.Opt.Flag.t, 'n) Vector.t
-      -> ('b, 'a, 'f, (unit, 'f) Snarky_backendless.Checked_ast.t) snarky_typ
+      -> ( 'b
+         , 'a
+         , 'f
+         , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+         )
+         snarky_typ
       -> ( ( ( ( 'f Limb_vector.Challenge.t
                , 'f Limb_vector.Challenge.t Scalar_challenge.t
                , 'b

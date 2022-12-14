@@ -231,8 +231,12 @@ let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Zkapp_command _ ->
-      Mina_numbers.Global_slot.max_value
+  | Zkapp_command { fee_payer; _ } -> (
+      match fee_payer.Account_update.Fee_payer.body.valid_until with
+      | Some valid_until ->
+          valid_until
+      | None ->
+          Mina_numbers.Global_slot.max_value )
 
 module Valid = struct
   [%%versioned
