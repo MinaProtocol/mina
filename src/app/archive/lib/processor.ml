@@ -1336,11 +1336,9 @@ end
 module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
     ; total_currency_id : int option
-    ; curr_global_slot_since_hard_fork : int option
     ; global_slot_since_genesis : int option
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
@@ -1350,16 +1348,7 @@ module Zkapp_network_precondition = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; int
-        ; int
-        ]
+        [ option int; option int; option int; option int; option int; int; int ]
 
   let table_name = "zkapp_network_precondition"
 
@@ -1370,11 +1359,6 @@ module Zkapp_network_precondition = struct
       Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
-    in
-    let%bind timestamp_id =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
-        ps.timestamp
     in
     let%bind blockchain_length_id =
       Mina_caqti.add_if_zkapp_check
@@ -1391,11 +1375,6 @@ module Zkapp_network_precondition = struct
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
-    let%bind curr_global_slot_since_hard_fork =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
-        ps.global_slot_since_hard_fork
-    in
     let%bind global_slot_since_genesis =
       Mina_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
@@ -1409,11 +1388,9 @@ module Zkapp_network_precondition = struct
     in
     let value =
       { snarked_ledger_hash_id
-      ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
       ; total_currency_id
-      ; curr_global_slot_since_hard_fork
       ; global_slot_since_genesis
       ; staking_epoch_data_id
       ; next_epoch_data_id
@@ -1580,33 +1557,10 @@ module Zkapp_account_update_body = struct
 end
 
 module Zkapp_account_update = struct
-  type t = { body_id : int; authorization_kind : Control.Tag.t }
-  [@@deriving fields, hlist]
-
-  let authorization_kind_typ =
-    let encode = function
-      | Control.Tag.Proof ->
-          "proof"
-      | Control.Tag.Signature ->
-          "signature"
-      | Control.Tag.None_given ->
-          "none_given"
-    in
-    let decode = function
-      | "proof" ->
-          Result.return Control.Tag.Proof
-      | "signature" ->
-          Result.return Control.Tag.Signature
-      | "none_given" ->
-          Result.return Control.Tag.None_given
-      | _ ->
-          Result.failf "Failed to decode authorization_kind_typ"
-    in
-    Caqti_type.enum "zkapp_authorization_kind_type" ~encode ~decode
+  type t = { body_id : int } [@@deriving fields, hlist]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; authorization_kind_typ ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
 
   let table_name = "zkapp_account_update"
 
@@ -1618,8 +1572,7 @@ module Zkapp_account_update = struct
         (module Conn)
         account_update.body
     in
-    let authorization_kind = Control.tag account_update.authorization in
-    let value = { body_id; authorization_kind } in
+    let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2455,8 +2408,7 @@ module Zkapp_account = struct
 
   let table_name = "zkapp_accounts"
 
-  (* TODO: when zkapp_uri moved to Zkapp.Account in OCaml, no need to pass it in separately *)
-  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri zkapp_account =
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_account =
     let open Deferred.Result.Let_syntax in
     let ({ app_state
          ; verification_key
@@ -2464,6 +2416,7 @@ module Zkapp_account = struct
          ; sequence_state
          ; last_sequence_slot
          ; proved_state
+         ; zkapp_uri
          }
           : Mina_base.Zkapp_account.t ) =
       zkapp_account
@@ -2599,9 +2552,8 @@ module Accounts_accessed = struct
             account.permissions
         in
         let%bind zkapp_id =
-          (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
           Mina_caqti.add_if_some
-            (Zkapp_account.add_if_doesn't_exist (module Conn) account.zkapp_uri)
+            (Zkapp_account.add_if_doesn't_exist (module Conn))
             account.zkapp
         in
         let account_accessed : t =

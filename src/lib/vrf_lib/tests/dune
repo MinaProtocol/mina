@@ -30,6 +30,7 @@
    kimchi_types
    pasta_bindings
    kimchi_pasta
+   kimchi_backend.pasta.basic
    snarky_field_extensions
    tuple_lib
    genesis_constants

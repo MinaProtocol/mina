@@ -323,11 +323,9 @@ let protocol_state_precondition_of_id pool id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
   let%bind ({ snarked_ledger_hash_id
-            ; timestamp_id
             ; blockchain_length_id
             ; min_window_density_id
             ; total_currency_id
-            ; curr_global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data_id
             ; next_epoch_data_id
@@ -346,41 +344,19 @@ let protocol_state_precondition_of_id pool id =
     in
     Or_ignore.of_option hash_opt
   in
-  let%bind timestamp =
-    let%map ts_db_opt =
-      Option.value_map timestamp_id ~default:(return None) ~f:(fun id ->
-          let%map ts =
-            query_db ~f:(fun db -> Processor.Zkapp_timestamp_bounds.load db id)
-          in
-          Some ts )
-    in
-    let ts_opt =
-      Option.map ts_db_opt
-        ~f:(fun { timestamp_lower_bound; timestamp_upper_bound } ->
-          let lower = Block_time.of_string_exn timestamp_lower_bound in
-          let upper = Block_time.of_string_exn timestamp_upper_bound in
-          ({ lower; upper } : Block_time.t Zkapp_precondition.Closed_interval.t) )
-    in
-    Or_ignore.of_option ts_opt
-  in
   let%bind blockchain_length = get_length_bounds pool blockchain_length_id in
   let%bind min_window_density = get_length_bounds pool min_window_density_id in
   let%bind total_currency = get_amount_bounds pool total_currency_id in
-  let%bind global_slot_since_hard_fork =
-    get_global_slot_bounds pool curr_global_slot_since_hard_fork
-  in
   let%bind global_slot_since_genesis =
     get_global_slot_bounds pool global_slot_since_genesis
   in
   let%bind staking_epoch_data = staking_data_of_id pool staking_epoch_data_id in
   let%map next_epoch_data = staking_data_of_id pool next_epoch_data_id in
   ( { snarked_ledger_hash
-    ; timestamp
     ; blockchain_length
     ; min_window_density
     ; last_vrf_output = ()
     ; total_currency
-    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; staking_epoch_data
     ; next_epoch_data
@@ -775,8 +751,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; zkapp_version
            ; sequence_state_id
            ; last_sequence_slot
-           ; proved_state (* TODO : we'll have this at some point *)
-           ; zkapp_uri_id = _
+           ; proved_state
+           ; zkapp_uri_id
            }
          ->
         let%bind { element0
@@ -838,7 +814,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
               Processor.Zkapp_sequence_states.load db sequence_state_id )
         in
         let elements = [ element0; element1; element2; element3; element4 ] in
-        let%map sequence_state =
+        let%bind sequence_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
@@ -850,6 +826,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           last_sequence_slot |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Global_slot.of_uint32
         in
+        let%map zkapp_uri =
+          query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp_uri_id)
+        in
         Some
           ( { app_state
             ; verification_key
@@ -857,14 +836,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
+            ; zkapp_uri
             }
             : Mina_base.Zkapp_account.t ) )
-  in
-  (* TODO: the URI will be moved to the zkApp, no longer in the account *)
-  let%bind zkapp_uri =
-    Option.value_map zkapp_db ~default:(return "https://dummy.com")
-      ~f:(fun zkapp ->
-        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id) )
   in
   (* TODO: token permissions is going away *)
   let account =
@@ -881,7 +855,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; timing
       ; permissions
       ; zkapp
-      ; zkapp_uri
       }
       : Mina_base.Account.t )
   in

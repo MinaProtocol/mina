@@ -1,8 +1,5 @@
 [%%import "/src/config.mlh"]
 
-open Core_kernel
-open Intf
-
 type uint64 = Unsigned.uint64
 
 (** Here, we simply include the full expected signature, while clarifying that

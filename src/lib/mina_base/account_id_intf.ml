@@ -18,9 +18,14 @@ module type S = sig
 
     include Stringable.S with type t := t
 
-    include Comparable_binable with type t := t
+    (* so we can easily import these into Token_id *)
+    module Binables : sig
+      include Comparable_binable with type t := t
 
-    include Hashable_binable with type t := t
+      include Hashable_binable with type t := t
+    end
+
+    include module type of Binables
 
     val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 

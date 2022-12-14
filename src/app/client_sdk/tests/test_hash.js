@@ -1,5 +1,5 @@
 const assert = require('assert');
-const mina = require('./client_sdk.js').minaSDK;
+const mina = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").minaSDK;
 const fs = require('fs');
 
 // helpers
@@ -92,5 +92,3 @@ assert.throws(() => {
     input[0] += 1;
     mina.hashFieldElems([input]);
 });
-
-mina.shutdown();

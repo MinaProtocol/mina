@@ -4,7 +4,28 @@ type curr_or_next = Curr | Next [@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
+    type t = Kimchi_types.gate_type =
+      | Zero
+      | Generic
+      | Poseidon
+      | CompleteAdd
+      | VarBaseMul
+      | EndoMul
+      | EndoMulScalar
+      | ChaCha0
+      | ChaCha1
+      | ChaCha2
+      | ChaChaFinal
+      | Lookup
+      | CairoClaim
+      | CairoInstruction
+      | CairoFlags
+      | CairoTransition
+      | RangeCheck0
+      | RangeCheck1
+      | ForeignFieldAdd
+      | ForeignFieldMul
+      | Xor16
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -68,6 +89,9 @@ module Env = struct
     ; beta : 'a
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
+    ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
+    ; foreign_field_modulus : int -> 'a
+    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -101,6 +125,9 @@ module Tick : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -120,57 +147,117 @@ module Tick : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
 
   let index_terms (type a)
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow = _
+       ; pow
        ; var
        ; field
        ; cell
@@ -187,6 +274,9 @@ module Tick : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if
+       ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -954,110 +1044,1836 @@ module Tick : S = struct
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
+      ; ( Index ChaCha0
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-            ) )
-      ; ( Coefficient 1
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 3, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 4, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 6, Curr))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaCha1
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 2
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 4, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 3, Next))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaCha2
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 3
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 3, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 4, Next))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaChaFinal
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 4
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 5, Curr)))
+                   - cell (var (Witness 5, Curr))
+                   + alpha_pow 1
+                     * ( square (cell (var (Witness 6, Curr)))
+                       - cell (var (Witness 6, Curr)) )
+                   + alpha_pow 2
+                     * ( square (cell (var (Witness 7, Curr)))
+                       - cell (var (Witness 7, Curr)) )
+                   + alpha_pow 3
+                     * ( square (cell (var (Witness 8, Curr)))
+                       - cell (var (Witness 8, Curr)) )
+                   + alpha_pow 4
+                     * ( square (cell (var (Witness 5, Next)))
+                       - cell (var (Witness 5, Next)) )
+                   + alpha_pow 5
+                     * ( square (cell (var (Witness 6, Next)))
+                       - cell (var (Witness 6, Next)) )
+                   + alpha_pow 6
+                     * ( square (cell (var (Witness 7, Next)))
+                       - cell (var (Witness 7, Next)) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 8, Next)))
+                       - cell (var (Witness 8, Next)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000000000000000000000000000000000000000000000008"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                         * ( cell (var (Witness 3, Next))
+                           - cell (var (Witness 7, Next)) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 4, Next))
+                               - cell (var (Witness 8, Next)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 6, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 1, Curr))
+                               - cell (var (Witness 5, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 7, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 2, Curr))
+                               - cell (var (Witness 6, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 8, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 3, Curr))
+                               - cell (var (Witness 7, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 5, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 4, Curr))
+                               - cell (var (Witness 8, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 6, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 1, Next))
+                               - cell (var (Witness 5, Next)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 7, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                             * ( cell (var (Witness 2, Next))
+                               - cell (var (Witness 6, Next)) ) )
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index RangeCheck0
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 5
+            (enabled_if
+               ( RangeCheck
+               , fun () ->
+                   cell (var (Witness 7, Curr))
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 10, Curr))
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 11, Curr))
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 12, Curr))
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 13, Curr))
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 7
+                     * ( cell (var (Witness 14, Curr))
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 2, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 1, Curr))
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index RangeCheck1
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 6
+            (enabled_if
+               ( RangeCheck
+               , fun () ->
+                   cell (var (Witness 1, Curr))
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 2, Curr))
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 7, Curr))
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 10, Curr))
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 11, Curr))
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 7
+                     * ( cell (var (Witness 12, Curr))
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 13, Curr))
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 9
+                     * ( cell (var (Witness 14, Curr))
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 10
+                     * ( cell (var (Witness 1, Next))
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 11
+                     * ( cell (var (Witness 2, Next))
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 12
+                     * ( cell (var (Witness 7, Next))
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 13
+                     * ( cell (var (Witness 8, Next))
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 14
+                     * ( cell (var (Witness 9, Next))
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 15
+                     * ( cell (var (Witness 10, Next))
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 16
+                     * ( cell (var (Witness 11, Next))
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 17
+                     * ( cell (var (Witness 12, Next))
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 18
+                     * ( cell (var (Witness 13, Next))
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 19
+                     * ( cell (var (Witness 14, Next))
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 20
+                     * ( cell (var (Witness 14, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 2, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 1, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 2, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 1, Curr))
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index ForeignFieldAdd
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 7
+            (enabled_if
+               ( ForeignFieldAdd
+               , fun () ->
+                   cell (var (Witness 7, Curr))
+                   * ( cell (var (Witness 7, Curr))
+                     - cell (var (Witness 6, Curr)) )
+                   + alpha_pow 1
+                     * ( ( cell (var (Witness 6, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 6, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 0, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 3, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 0
+                         - cell (var (Witness 8, Curr))
+                           * field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 1, Next))
+                       - ( cell (var (Witness 1, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 4, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 1
+                         - cell (var (Witness 9, Curr))
+                           * field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         + cell (var (Witness 8, Curr)) ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 2, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 5, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 2
+                         + cell (var (Witness 9, Curr)) ) ) ) ) )
+      ; ( Index ForeignFieldMul
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 8
+            (enabled_if
+               ( ForeignFieldMul
+               , fun () ->
+                   cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 0, Curr))
+                         * cell (var (Witness 4, Curr))
+                       + cell (var (Witness 1, Curr))
+                         * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 10, Curr))
+                         * neg_foreign_field_modulus 1
+                       + cell (var (Witness 11, Curr))
+                         * neg_foreign_field_modulus 0
+                       - ( field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * ( field
+                                 "0x0000000000000000000000000000000000000000010000000000000000000000"
+                               * cell (var (Witness 7, Next))
+                             + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 5, Next)) ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 9, Curr))
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 0
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 5, Next))
+                         - cell (var (Witness 0, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next)) ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 8, Curr))
+                       - field
+                           "0x0000000000000000000000000000000000000000000000000000000000000200"
+                         * cell (var (Witness 7, Curr)) )
+                   + alpha_pow 5
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Curr))
+                           + cell (var (Witness 6, Curr)) )
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 5, Curr))
+                         + cell (var (Witness 2, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 1, Curr))
+                           * cell (var (Witness 4, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 2
+                         + cell (var (Witness 12, Curr))
+                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 11, Curr))
+                           * neg_foreign_field_modulus 1
+                         + ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Next))
+                           + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 9, Curr))
+                         - cell (var (Witness 2, Next)) ) )
+                   + alpha_pow 6
+                     * ( ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Curr))
+                         + cell (var (Witness 0, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 4, Curr))
+                           + cell (var (Witness 3, Curr)) )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 12, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + cell (var (Witness 10, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * foreign_field_modulus 2
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * foreign_field_modulus 1
+                           + foreign_field_modulus 0 )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Next))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next))
+                         + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 13, Curr)))
+                       - cell (var (Witness 13, Curr)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 13, Curr))
+                       - ( cell (var (Witness 10, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + ( neg_foreign_field_modulus 0
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * neg_foreign_field_modulus 1 ) )
+                       + cell (var (Witness 3, Next)) )
+                   + alpha_pow 9
+                     * ( square (cell (var (Witness 14, Curr)))
+                       - cell (var (Witness 14, Curr)) )
+                   + alpha_pow 10
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * cell (var (Witness 14, Curr))
+                       - ( cell (var (Witness 12, Curr))
+                         + neg_foreign_field_modulus 2 )
+                       - cell (var (Witness 13, Curr))
+                       + cell (var (Witness 4, Next)) ) ) ) )
+      ; ( Index Xor16
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
+            (enabled_if
+               ( Xor
+               , fun () ->
+                   cell (var (Witness 3, Curr))
+                   + cell (var (Witness 4, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 4 )
+                   + cell (var (Witness 5, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 8 )
+                   + cell (var (Witness 6, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 12 )
+                   + pow
+                       ( field
+                           "0x0000000000000000000000000000000000000000000000000000000000000002"
+                       , 16 )
+                     * cell (var (Witness 0, Next))
+                   - cell (var (Witness 0, Curr))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + cell (var (Witness 8, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 4 )
+                       + cell (var (Witness 9, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 8 )
+                       + cell (var (Witness 10, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 12 )
+                       + pow
+                           ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000002"
+                           , 16 )
+                         * cell (var (Witness 1, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 11, Curr))
+                       + cell (var (Witness 12, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 4 )
+                       + cell (var (Witness 13, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 8 )
+                       + cell (var (Witness 14, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 12 )
+                       + pow
+                           ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000002"
+                           , 16 )
+                         * cell (var (Witness 2, Next))
+                       - cell (var (Witness 2, Curr)) ) ) ) )
       ]
 end
 
@@ -1084,6 +2900,9 @@ module Tock : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -1103,57 +2922,117 @@ module Tock : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
 
   let index_terms (type a)
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow = _
+       ; pow
        ; var
        ; field
        ; cell
@@ -1170,6 +3049,9 @@ module Tock : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if
+       ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -1937,110 +3819,1836 @@ module Tock : S = struct
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
+      ; ( Index ChaCha0
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-            ) )
-      ; ( Coefficient 1
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 3, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 4, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 6, Curr))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaCha1
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 2
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 4, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 3, Next))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaCha2
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 3
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 2, Next)))
+                   - cell (var (Witness 2, Next))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 10, Next))
+                       - cell (var (Witness 0, Next)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 0, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000100000000"
+                         * cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 2, Curr)) ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 14, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 5, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * cell (var (Witness 6, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * cell (var (Witness 3, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * cell (var (Witness 4, Next))
+                       - cell (var (Witness 1, Next)) ) ) ) )
+      ; ( Index ChaChaFinal
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 4
+            (enabled_if
+               ( ChaCha
+               , fun () ->
+                   square (cell (var (Witness 5, Curr)))
+                   - cell (var (Witness 5, Curr))
+                   + alpha_pow 1
+                     * ( square (cell (var (Witness 6, Curr)))
+                       - cell (var (Witness 6, Curr)) )
+                   + alpha_pow 2
+                     * ( square (cell (var (Witness 7, Curr)))
+                       - cell (var (Witness 7, Curr)) )
+                   + alpha_pow 3
+                     * ( square (cell (var (Witness 8, Curr)))
+                       - cell (var (Witness 8, Curr)) )
+                   + alpha_pow 4
+                     * ( square (cell (var (Witness 5, Next)))
+                       - cell (var (Witness 5, Next)) )
+                   + alpha_pow 5
+                     * ( square (cell (var (Witness 6, Next)))
+                       - cell (var (Witness 6, Next)) )
+                   + alpha_pow 6
+                     * ( square (cell (var (Witness 7, Next)))
+                       - cell (var (Witness 7, Next)) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 8, Next)))
+                       - cell (var (Witness 8, Next)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000000000000000000000000000000000000000000000008"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                         * ( cell (var (Witness 3, Next))
+                           - cell (var (Witness 7, Next)) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000010"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 4, Next))
+                               - cell (var (Witness 8, Next)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000100"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 6, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 1, Curr))
+                               - cell (var (Witness 5, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 7, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 2, Curr))
+                               - cell (var (Witness 6, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000010000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 8, Curr))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 3, Curr))
+                               - cell (var (Witness 7, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000100000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 5, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 4, Curr))
+                               - cell (var (Witness 8, Curr)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000001000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 6, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 1, Next))
+                               - cell (var (Witness 5, Next)) ) )
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000010000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000008"
+                             * cell (var (Witness 7, Next))
+                           + field
+                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                             * ( cell (var (Witness 2, Next))
+                               - cell (var (Witness 6, Next)) ) )
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index RangeCheck0
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 5
+            (enabled_if
+               ( RangeCheck
+               , fun () ->
+                   cell (var (Witness 7, Curr))
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 10, Curr))
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 11, Curr))
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 12, Curr))
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 13, Curr))
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 7
+                     * ( cell (var (Witness 14, Curr))
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 2, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 1, Curr))
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index RangeCheck1
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 6
+            (enabled_if
+               ( RangeCheck
+               , fun () ->
+                   cell (var (Witness 1, Curr))
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 1, Curr))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 2, Curr))
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 2, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 7, Curr))
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 7, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 10, Curr))
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 11, Curr))
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 7
+                     * ( cell (var (Witness 12, Curr))
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 13, Curr))
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 9
+                     * ( cell (var (Witness 14, Curr))
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 10
+                     * ( cell (var (Witness 1, Next))
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 1, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 11
+                     * ( cell (var (Witness 2, Next))
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 2, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 12
+                     * ( cell (var (Witness 7, Next))
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 7, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 13
+                     * ( cell (var (Witness 8, Next))
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 8, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 14
+                     * ( cell (var (Witness 9, Next))
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 15
+                     * ( cell (var (Witness 10, Next))
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 10, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 16
+                     * ( cell (var (Witness 11, Next))
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 11, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 17
+                     * ( cell (var (Witness 12, Next))
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 12, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 18
+                     * ( cell (var (Witness 13, Next))
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 13, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 19
+                     * ( cell (var (Witness 14, Next))
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 14, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 20
+                     * ( cell (var (Witness 14, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 2, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 1, Next))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 14, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 13, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 12, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 11, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 10, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 9, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 8, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 7, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 6, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 5, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 4, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 3, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * cell (var (Witness 2, Curr))
+                       + field
+                           "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000001000"
+                         * field
+                             "0x0000000000000000000000000000000000000000000000000000000000000004"
+                         * cell (var (Witness 1, Curr))
+                       - cell (var (Witness 0, Curr)) ) ) ) )
+      ; ( Index ForeignFieldAdd
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 7
+            (enabled_if
+               ( ForeignFieldAdd
+               , fun () ->
+                   cell (var (Witness 7, Curr))
+                   * ( cell (var (Witness 7, Curr))
+                     - cell (var (Witness 6, Curr)) )
+                   + alpha_pow 1
+                     * ( ( cell (var (Witness 6, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 6, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 8, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 3
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 0, Next))
+                       - ( cell (var (Witness 0, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 3, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 0
+                         - cell (var (Witness 8, Curr))
+                           * field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         ) )
+                   + alpha_pow 5
+                     * ( cell (var (Witness 1, Next))
+                       - ( cell (var (Witness 1, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 4, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 1
+                         - cell (var (Witness 9, Curr))
+                           * field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         + cell (var (Witness 8, Curr)) ) )
+                   + alpha_pow 6
+                     * ( cell (var (Witness 2, Next))
+                       - ( cell (var (Witness 2, Curr))
+                         + cell (var (Witness 6, Curr))
+                           * cell (var (Witness 5, Curr))
+                         - cell (var (Witness 7, Curr))
+                           * foreign_field_modulus 2
+                         + cell (var (Witness 9, Curr)) ) ) ) ) )
+      ; ( Index ForeignFieldMul
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 8
+            (enabled_if
+               ( ForeignFieldMul
+               , fun () ->
+                   cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000002"
+                     )
+                   * ( cell (var (Witness 7, Next))
+                     - field
+                         "0x0000000000000000000000000000000000000000000000000000000000000003"
+                     )
+                   + alpha_pow 1
+                     * ( cell (var (Witness 0, Curr))
+                         * cell (var (Witness 4, Curr))
+                       + cell (var (Witness 1, Curr))
+                         * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 10, Curr))
+                         * neg_foreign_field_modulus 1
+                       + cell (var (Witness 11, Curr))
+                         * neg_foreign_field_modulus 0
+                       - ( field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * ( field
+                                 "0x0000000000000000000000000000000000000000010000000000000000000000"
+                               * cell (var (Witness 7, Next))
+                             + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 5, Next)) ) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         )
+                       * ( cell (var (Witness 9, Curr))
+                         - field
+                             "0x0000000000000000000000000000000000000000000000000000000000000003"
+                         ) )
+                   + alpha_pow 3
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 9, Curr))
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 0
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 5, Next))
+                         - cell (var (Witness 0, Next))
+                         - field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next)) ) )
+                   + alpha_pow 4
+                     * ( cell (var (Witness 8, Curr))
+                       - field
+                           "0x0000000000000000000000000000000000000000000000000000000000000200"
+                         * cell (var (Witness 7, Curr)) )
+                   + alpha_pow 5
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Curr))
+                           + cell (var (Witness 6, Curr)) )
+                       - ( cell (var (Witness 0, Curr))
+                           * cell (var (Witness 5, Curr))
+                         + cell (var (Witness 2, Curr))
+                           * cell (var (Witness 3, Curr))
+                         + cell (var (Witness 1, Curr))
+                           * cell (var (Witness 4, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * neg_foreign_field_modulus 2
+                         + cell (var (Witness 12, Curr))
+                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 11, Curr))
+                           * neg_foreign_field_modulus 1
+                         + ( field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 7, Next))
+                           + cell (var (Witness 6, Next)) )
+                         + cell (var (Witness 9, Curr))
+                         - cell (var (Witness 2, Next)) ) )
+                   + alpha_pow 6
+                     * ( ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Curr))
+                         + cell (var (Witness 0, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * cell (var (Witness 5, Curr))
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * cell (var (Witness 4, Curr))
+                           + cell (var (Witness 3, Curr)) )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 12, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + cell (var (Witness 10, Curr)) )
+                         * ( field
+                               "0x0000000000000000000100000000000000000000000000000000000000000000"
+                             * foreign_field_modulus 2
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * foreign_field_modulus 1
+                           + foreign_field_modulus 0 )
+                       - ( field
+                             "0x0000000000000000000100000000000000000000000000000000000000000000"
+                           * cell (var (Witness 2, Next))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 1, Next))
+                         + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 7
+                     * ( square (cell (var (Witness 13, Curr)))
+                       - cell (var (Witness 13, Curr)) )
+                   + alpha_pow 8
+                     * ( field
+                           "0x0000000000000000000100000000000000000000000000000000000000000000"
+                         * cell (var (Witness 13, Curr))
+                       - ( cell (var (Witness 10, Curr))
+                         + field
+                             "0x0000000000000000000000000000000000000000010000000000000000000000"
+                           * cell (var (Witness 11, Curr))
+                         + ( neg_foreign_field_modulus 0
+                           + field
+                               "0x0000000000000000000000000000000000000000010000000000000000000000"
+                             * neg_foreign_field_modulus 1 ) )
+                       + cell (var (Witness 3, Next)) )
+                   + alpha_pow 9
+                     * ( square (cell (var (Witness 14, Curr)))
+                       - cell (var (Witness 14, Curr)) )
+                   + alpha_pow 10
+                     * ( field
+                           "0x0000000000000000000000000000000000000000010000000000000000000000"
+                         * cell (var (Witness 14, Curr))
+                       - ( cell (var (Witness 12, Curr))
+                         + neg_foreign_field_modulus 2 )
+                       - cell (var (Witness 13, Curr))
+                       + cell (var (Witness 4, Next)) ) ) ) )
+      ; ( Index Xor16
         , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
+            (enabled_if
+               ( Xor
+               , fun () ->
+                   cell (var (Witness 3, Curr))
+                   + cell (var (Witness 4, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 4 )
+                   + cell (var (Witness 5, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 8 )
+                   + cell (var (Witness 6, Curr))
+                     * pow
+                         ( field
+                             "0x0000000000000000000000000000000000000000000000000000000000000002"
+                         , 12 )
+                   + pow
+                       ( field
+                           "0x0000000000000000000000000000000000000000000000000000000000000002"
+                       , 16 )
+                     * cell (var (Witness 0, Next))
+                   - cell (var (Witness 0, Curr))
+                   + alpha_pow 1
+                     * ( cell (var (Witness 7, Curr))
+                       + cell (var (Witness 8, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 4 )
+                       + cell (var (Witness 9, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 8 )
+                       + cell (var (Witness 10, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 12 )
+                       + pow
+                           ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000002"
+                           , 16 )
+                         * cell (var (Witness 1, Next))
+                       - cell (var (Witness 1, Curr)) )
+                   + alpha_pow 2
+                     * ( cell (var (Witness 11, Curr))
+                       + cell (var (Witness 12, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 4 )
+                       + cell (var (Witness 13, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 8 )
+                       + cell (var (Witness 14, Curr))
+                         * pow
+                             ( field
+                                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+                             , 12 )
+                       + pow
+                           ( field
+                               "0x0000000000000000000000000000000000000000000000000000000000000002"
+                           , 16 )
+                         * cell (var (Witness 2, Next))
+                       - cell (var (Witness 2, Curr)) ) ) ) )
       ]
 end
 
@@ -2067,6 +5675,9 @@ module Tick_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -2086,50 +5697,110 @@ module Tick_with_lookup : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
     + ( alpha_pow 24
         * ( vanishes_on_last_4_rows
           * ( cell (var (LookupAggreg, Next))
@@ -2236,6 +5907,9 @@ module Tick_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -3061,110 +6735,6 @@ module Tick_with_lookup : S = struct
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-              ) ) )
       ]
 end
 
@@ -3191,6 +6761,9 @@ module Tock_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -3210,50 +6783,110 @@ module Tock_with_lookup : S = struct
     let x_14 = pow (cell (var (Witness 5, Curr)), 7) in
     cell (var (Index Poseidon, Curr))
     * ( cell (var (Witness 6, Curr))
-      - ((mds (0, 0) * x_0) + (mds (0, 1) * x_1) + (mds (0, 2) * x_2))
+      - ( cell (var (Coefficient 0, Curr))
+        + (mds (0, 0) * x_0)
+        + (mds (0, 1) * x_1)
+        + (mds (0, 2) * x_2) )
       + alpha_pow 1
         * ( cell (var (Witness 7, Curr))
-          - ((mds (1, 0) * x_0) + (mds (1, 1) * x_1) + (mds (1, 2) * x_2)) )
+          - ( cell (var (Coefficient 1, Curr))
+            + (mds (1, 0) * x_0)
+            + (mds (1, 1) * x_1)
+            + (mds (1, 2) * x_2) ) )
       + alpha_pow 2
         * ( cell (var (Witness 8, Curr))
-          - ((mds (2, 0) * x_0) + (mds (2, 1) * x_1) + (mds (2, 2) * x_2)) )
+          - ( cell (var (Coefficient 2, Curr))
+            + (mds (2, 0) * x_0)
+            + (mds (2, 1) * x_1)
+            + (mds (2, 2) * x_2) ) )
       + alpha_pow 3
         * ( cell (var (Witness 9, Curr))
-          - ((mds (0, 0) * x_3) + (mds (0, 1) * x_4) + (mds (0, 2) * x_5)) )
+          - ( cell (var (Coefficient 3, Curr))
+            + (mds (0, 0) * x_3)
+            + (mds (0, 1) * x_4)
+            + (mds (0, 2) * x_5) ) )
       + alpha_pow 4
         * ( cell (var (Witness 10, Curr))
-          - ((mds (1, 0) * x_3) + (mds (1, 1) * x_4) + (mds (1, 2) * x_5)) )
+          - ( cell (var (Coefficient 4, Curr))
+            + (mds (1, 0) * x_3)
+            + (mds (1, 1) * x_4)
+            + (mds (1, 2) * x_5) ) )
       + alpha_pow 5
         * ( cell (var (Witness 11, Curr))
-          - ((mds (2, 0) * x_3) + (mds (2, 1) * x_4) + (mds (2, 2) * x_5)) )
+          - ( cell (var (Coefficient 5, Curr))
+            + (mds (2, 0) * x_3)
+            + (mds (2, 1) * x_4)
+            + (mds (2, 2) * x_5) ) )
       + alpha_pow 6
         * ( cell (var (Witness 12, Curr))
-          - ((mds (0, 0) * x_6) + (mds (0, 1) * x_7) + (mds (0, 2) * x_8)) )
+          - ( cell (var (Coefficient 6, Curr))
+            + (mds (0, 0) * x_6)
+            + (mds (0, 1) * x_7)
+            + (mds (0, 2) * x_8) ) )
       + alpha_pow 7
         * ( cell (var (Witness 13, Curr))
-          - ((mds (1, 0) * x_6) + (mds (1, 1) * x_7) + (mds (1, 2) * x_8)) )
+          - ( cell (var (Coefficient 7, Curr))
+            + (mds (1, 0) * x_6)
+            + (mds (1, 1) * x_7)
+            + (mds (1, 2) * x_8) ) )
       + alpha_pow 8
         * ( cell (var (Witness 14, Curr))
-          - ((mds (2, 0) * x_6) + (mds (2, 1) * x_7) + (mds (2, 2) * x_8)) )
+          - ( cell (var (Coefficient 8, Curr))
+            + (mds (2, 0) * x_6)
+            + (mds (2, 1) * x_7)
+            + (mds (2, 2) * x_8) ) )
       + alpha_pow 9
         * ( cell (var (Witness 3, Curr))
-          - ((mds (0, 0) * x_9) + (mds (0, 1) * x_10) + (mds (0, 2) * x_11)) )
+          - ( cell (var (Coefficient 9, Curr))
+            + (mds (0, 0) * x_9)
+            + (mds (0, 1) * x_10)
+            + (mds (0, 2) * x_11) ) )
       + alpha_pow 10
         * ( cell (var (Witness 4, Curr))
-          - ((mds (1, 0) * x_9) + (mds (1, 1) * x_10) + (mds (1, 2) * x_11)) )
+          - ( cell (var (Coefficient 10, Curr))
+            + (mds (1, 0) * x_9)
+            + (mds (1, 1) * x_10)
+            + (mds (1, 2) * x_11) ) )
       + alpha_pow 11
         * ( cell (var (Witness 5, Curr))
-          - ((mds (2, 0) * x_9) + (mds (2, 1) * x_10) + (mds (2, 2) * x_11)) )
+          - ( cell (var (Coefficient 11, Curr))
+            + (mds (2, 0) * x_9)
+            + (mds (2, 1) * x_10)
+            + (mds (2, 2) * x_11) ) )
       + alpha_pow 12
         * ( cell (var (Witness 0, Next))
-          - ((mds (0, 0) * x_12) + (mds (0, 1) * x_13) + (mds (0, 2) * x_14)) )
+          - ( cell (var (Coefficient 12, Curr))
+            + (mds (0, 0) * x_12)
+            + (mds (0, 1) * x_13)
+            + (mds (0, 2) * x_14) ) )
       + alpha_pow 13
         * ( cell (var (Witness 1, Next))
-          - ((mds (1, 0) * x_12) + (mds (1, 1) * x_13) + (mds (1, 2) * x_14)) )
+          - ( cell (var (Coefficient 13, Curr))
+            + (mds (1, 0) * x_12)
+            + (mds (1, 1) * x_13)
+            + (mds (1, 2) * x_14) ) )
       + alpha_pow 14
         * ( cell (var (Witness 2, Next))
-          - ((mds (2, 0) * x_12) + (mds (2, 1) * x_13) + (mds (2, 2) * x_14)) )
-      )
+          - ( cell (var (Coefficient 14, Curr))
+            + (mds (2, 0) * x_12)
+            + (mds (2, 1) * x_13)
+            + (mds (2, 2) * x_14) ) ) )
+    + cell (var (Index Generic, Curr))
+      * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
+        + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
+        + (cell (var (Coefficient 2, Curr)) * cell (var (Witness 2, Curr)))
+        + cell (var (Coefficient 3, Curr))
+          * cell (var (Witness 0, Curr))
+          * cell (var (Witness 1, Curr))
+        + cell (var (Coefficient 4, Curr))
+        + alpha_pow 1
+          * ( (cell (var (Coefficient 5, Curr)) * cell (var (Witness 3, Curr)))
+            + (cell (var (Coefficient 6, Curr)) * cell (var (Witness 4, Curr)))
+            + (cell (var (Coefficient 7, Curr)) * cell (var (Witness 5, Curr)))
+            + cell (var (Coefficient 8, Curr))
+              * cell (var (Witness 3, Curr))
+              * cell (var (Witness 4, Curr))
+            + cell (var (Coefficient 9, Curr)) ) )
     + ( alpha_pow 24
         * ( vanishes_on_last_4_rows
           * ( cell (var (LookupAggreg, Next))
@@ -3360,6 +6993,9 @@ module Tock_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -4185,109 +7821,5 @@ module Tock_with_lookup : S = struct
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
                  * cell (var (Witness 13, Curr)) ) ) )
-      ; ( Coefficient 0
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * field
-                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-            ) )
-      ; ( Coefficient 1
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 1
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 2
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 2
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 3
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 3
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 4
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 4
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 5
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 5
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 6
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 6
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 7
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 7
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 8
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 8
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 9
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 9
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 10
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 10
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 11
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 11
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 12
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 12
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 13
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 13
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
-      ; ( Coefficient 14
-        , lazy
-            ( cell (var (Index Poseidon, Curr))
-            * ( alpha_pow 14
-              * field
-                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-              ) ) )
       ]
 end

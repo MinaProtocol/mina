@@ -126,7 +126,7 @@ module Evals = struct
   module type S = sig
     type n
 
-    val n : n Vector.nat
+    val n : n Nat.t
 
     include Binable.S1 with type 'a t = ('a, n) Vector.t
 

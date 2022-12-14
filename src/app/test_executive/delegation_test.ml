@@ -32,7 +32,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     (* fee for user commands *)
-    let fee = Currency.Fee.of_int 10_000_000 in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in
@@ -40,11 +40,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Delegate all mina currency from node_b to node_a"
         (let delegation_receiver = node_a in
          let%bind delegation_receiver_pub_key =
-           Util.pub_key_of_node delegation_receiver
+           pub_key_of_node delegation_receiver
          in
          let delegation_sender = node_b in
          let%bind delegation_sender_pub_key =
-           Util.pub_key_of_node delegation_sender
+           pub_key_of_node delegation_sender
          in
          let%bind { hash; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender

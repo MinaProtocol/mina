@@ -610,7 +610,7 @@ let%test_module "Test" =
 
       let derived inner init =
         iso ~map:of_option ~contramap:to_option
-          ((option ~js_type:`Flagged_option @@ inner @@ o ()) (o ()))
+          ((option ~js_type:Flagged_option @@ inner @@ o ()) (o ()))
           init
     end
 

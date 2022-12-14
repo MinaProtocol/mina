@@ -116,7 +116,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let min_fee = constraint_constants.account_creation_fee in
       let%map fee_transfer =
-        Option.quickcheck_generator (Fee_transfer.Gen.gen ~min_fee ~max_fee)
+        Option.quickcheck_generator (Fee_transfer.Gen.gen ~min_fee max_fee)
       in
       let fee_transfer =
         match fee_transfer with
@@ -137,7 +137,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Quickcheck_lib.of_array keys
         >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
       and amount =
-        Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+        Int.gen_incl min_amount max_amount
+        >>| Currency.Amount.of_nanomina_int_exn
       in
       let%map fee_transfer =
         Option.quickcheck_generator (fee_transfer ~coinbase_amount:amount)

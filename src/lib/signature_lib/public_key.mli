@@ -4,17 +4,14 @@ open Core_kernel
 open Snark_params
 open Tick
 
-type t = Field.t * Field.t [@@deriving sexp, hash]
-
-include Codable.S with type t := t
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
-  end
+    [@@@with_all_version_tags]
 
-  module Latest = V1
-end
+    type t = Field.t * Field.t [@@deriving sexp, hash, compare, yojson]
+  end
+end]
 
 include Comparable.S_binable with type t := t
 
@@ -47,6 +44,8 @@ module Compressed : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t = (Field.t, bool) Poly.t [@@deriving sexp, equal, compare, hash]
 
       include Codable.S with type t := t

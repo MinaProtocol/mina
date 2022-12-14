@@ -307,7 +307,8 @@ let account_creation_fee_uint64 =
   Currency.Fee.to_uint64 constraint_constants.account_creation_fee
 
 let account_creation_fee_int64 =
-  Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
+  Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+  |> Int64.of_int
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
@@ -543,7 +544,6 @@ module Zkapp_helpers = struct
           let snarked_ledger_hash =
             Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
           in
-          let timestamp = Block_time.of_string_exn parent_block.timestamp in
           let blockchain_length =
             parent_block.height |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Length.of_uint32
@@ -556,10 +556,6 @@ module Zkapp_helpers = struct
           let last_vrf_output = () in
           let total_currency =
             Currency.Amount.of_string parent_block.total_currency
-          in
-          let global_slot_since_hard_fork =
-            parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
           in
           let global_slot_since_genesis =
             parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
@@ -612,12 +608,10 @@ module Zkapp_helpers = struct
           in
           return
             { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
-            ; timestamp
             ; blockchain_length
             ; min_window_density
             ; last_vrf_output
             ; total_currency
-            ; global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data
             ; next_epoch_data
@@ -640,14 +634,14 @@ let zkapp_command_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
   let%bind (account_updates : Account_update.Simple.t list) =
     Deferred.List.map (Array.to_list cmd.zkapp_account_updates_ids)
       ~f:(fun id ->
-        let%bind { body_id; authorization_kind } =
+        let%bind { body_id } =
           query_db ~f:(fun db -> Processor.Zkapp_account_update.load db id)
         in
         let%map body =
           Archive_lib.Load_data.get_account_update_body ~pool body_id
         in
         let (authorization : Control.t) =
-          match authorization_kind with
+          match body.authorization_kind with
           | Proof ->
               Proof Proof.transaction_dummy
           | Signature ->

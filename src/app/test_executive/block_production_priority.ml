@@ -6,6 +6,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -33,9 +35,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; snark_worker_fee = "0.0001"
     }
 
-  let fee = Currency.Fee.of_int 10_000_000
+  let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
-  let amount = Currency.Amount.of_int 10_000_000
+  let amount = Currency.Amount.of_nanomina_int_exn 10_000_000
 
   let tx_delay_ms = 500
 
@@ -56,12 +58,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       | _ ->
           Malleable_error.hard_error_string "no block producer / observer"
     in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    let%bind receiver_pub_key = pub_key_of_node receiver in
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
     let%bind () =
       Malleable_error.List.iter senders ~f:(fun s ->
-          let%map pk = Util.pub_key_of_node s in
+          let%map pk = pub_key_of_node s in
           [%log info] "sender: %s" (pk_to_string pk) )
     in
     let window_ms =
@@ -134,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          let%bind () =
            ok_if_true "not enough blocks"
-             (List.length blocks >= min_resulting_blocks)
+             Mina_stdlib.List.Length.Compare.(blocks >= min_resulting_blocks)
          in
          let tx_counts =
            Array.of_list

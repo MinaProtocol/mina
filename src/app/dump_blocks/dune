@@ -7,7 +7,7 @@
    ppx_inline_test.runner.lib
    transition_frontier_base transition_frontier_full_frontier
    logger precomputed_values block_time mina_base
-   transition_frontier mina_state mina_block
+   transition_frontier mina_state mina_block mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_custom_printf))
