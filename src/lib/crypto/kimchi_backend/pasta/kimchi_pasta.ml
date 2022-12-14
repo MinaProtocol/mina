@@ -41,7 +41,4 @@ module Pasta = struct
   module Fq = Pasta.Fq
   module Vesta = Pasta.Vesta
   module Pallas = Pasta.Pallas
-  module Precomputed = Pasta.Precomputed
 end
-
-module Precomputed = Precomputed
