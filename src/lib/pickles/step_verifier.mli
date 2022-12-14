@@ -135,6 +135,7 @@ val verify :
        Composition_types.Wrap.Lookup_parameters.t
   -> features:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
+  -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of

@@ -106,7 +106,7 @@ let wrap_main
       , branches )
       Vector.t
       Lazy.t ) (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t, branches) Vector.t)
+    (step_domains : (Domains.t, branches) Vector.t) ~srs
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
@@ -416,7 +416,7 @@ let wrap_main
               in
               Wrap_verifier.incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
-                ~verification_key:step_plonk_index ~xi ~sponge
+                ~verification_key:step_plonk_index ~srs ~xi ~sponge
                 ~public_input:
                   (Array.map
                      (pack_statement Max_proofs_verified.n ~features
