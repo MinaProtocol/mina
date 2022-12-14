@@ -1524,7 +1524,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:N1 (* Inferred domain size is too large *)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1658,7 +1657,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
-                ~override_wrap_domain:N1 (* Inferred domain size is too large *)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
