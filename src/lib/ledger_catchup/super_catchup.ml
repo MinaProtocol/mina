@@ -440,16 +440,17 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
   in
   find_map_ok ~how:(`Max_concurrent_jobs 5) peers ~f:(fun peer ->
       let open Deferred.Result.Let_syntax in
-      let%bind transition_chain_proof =
-        let open Deferred.Let_syntax in
-        match%map
-          Mina_networking.get_transition_chain_proof
-            ~timeout:(Time.Span.of_sec 10.) network peer target_hash
-        with
-        | Error _ ->
-            Result.fail `Failed_to_download_transition_chain_proof
-        | Ok transition_chain_proof ->
-            Result.return transition_chain_proof
+      let%bind transition_chain_proof' =
+        Mina_networking.get_transition_chain_proof network peer
+          ( target_hash
+          , Transition_frontier.[ Breadcrumb.state_hash (root frontier) ] )
+        |> Deferred.map
+             ~f:
+               (Result.map_error ~f:(fun e ->
+                    `Failed_to_download_transition_chain_proof e ) )
+      in
+      let transition_chain_proof =
+        Mina_block.strip_headers_from_chain_proof transition_chain_proof'
       in
       let now = Time.now () in
       (* a list of state_hashes from new to old *)
@@ -1116,16 +1117,22 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
       | None ->
           return `All
       | Some (h, len) -> (
+          let root_hash =
+            Transition_frontier.root frontier
+            |> Frontier_base.Breadcrumb.state_hash
+          in
           match%map
             Mina_networking.get_transition_chain_proof
-              ~timeout:(Time.Span.of_sec 30.) ~heartbeat_timeout network peer h
+              ~timeout:(Time.Span.of_sec 30.) ~heartbeat_timeout network peer
+              (h, [ root_hash ])
           with
           | Error _ ->
               `Some []
           | Ok p -> (
               match
                 Transition_chain_verifier.verify ~target_hash:h
-                  ~transition_chain_proof:p
+                  ~transition_chain_proof:
+                    (Mina_block.strip_headers_from_chain_proof p)
               with
               | Some hs ->
                   let ks = with_lengths hs ~target_length:len in

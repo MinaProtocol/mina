@@ -38,7 +38,7 @@ module F = struct
       states =
     let headers = Mina_stdlib.Nonempty_list.map ~f:to_header_exn states in
     let header_list = Mina_stdlib.Nonempty_list.to_list headers in
-    [%log' debug Context.logger] "verify_blockchain_proofs of $state_hashes"
+    [%log' debug Context.logger] "verify blockchain proofs of $state_hashes"
       ~metadata:
         [ ( "state_hashes"
           , `List

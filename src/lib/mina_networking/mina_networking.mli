@@ -47,9 +47,11 @@ module Rpcs : sig
   end
 
   module Get_transition_chain_proof : sig
-    type query = State_hash.t
+    type query = State_hash.t * State_hash.t list
 
-    type response = (State_hash.t * State_body_hash.t list) option
+    type response =
+      (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+      option
   end
 
   module Get_ancestry : sig
@@ -215,8 +217,9 @@ val get_transition_chain_proof :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> State_hash.t
-  -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
+  -> State_hash.t * State_hash.t list
+  -> (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+     Deferred.Or_error.t
 
 val get_transition_chain :
      ?heartbeat_timeout:Time_ns.Span.t

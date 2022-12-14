@@ -1958,8 +1958,10 @@ let create ?wallets (config : Config.t) =
                   ~get_node_status
                   ~get_transition_chain_proof:
                     (handle_request "get_transition_chain_proof"
-                       ~f:(fun ~frontier hash ->
-                         Transition_chain_prover.prove ~frontier hash ) )
+                       ~f:(fun ~frontier (state_hash, canopy) ->
+                         Transition_chain_prover.prove_with_headers ~frontier
+                           ~canopy:(State_hash.Set.of_list canopy)
+                           state_hash ) )
                   ~get_transition_chain:
                     (handle_request "get_transition_chain"
                        ~f:Sync_handler.get_transition_chain )

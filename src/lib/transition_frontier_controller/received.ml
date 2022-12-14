@@ -203,6 +203,55 @@ let split_retrieve_chain_element ~context = function
 
 let is_received = function Transition_state.Received _ -> true | _ -> false
 
+(** Skips elements of list exponentially and returns collected elements
+  reversed.
+
+  First element is always skipped.
+  Second element (if present) is taken. Then two elements are skipped and fifth is returned.
+  Then four elements are skipped and tenth is returned and so forth.
+  
+  E.g. for a list [[l1, l2, .., l10, l11]] a list [[l10, l4, l2]] is returned.
+    *)
+let exponential_skip =
+  let rec go n lst =
+    match List.drop lst n with
+    | [] ->
+        []
+    | hd :: rest ->
+        hd :: go (n lsl 1) rest
+  in
+  go 1
+
+let get_canopy ~frontier ~state length =
+  (* TODO consider moving to config *)
+  let close_transitions_n = 20 in
+  let best_tip_closest_n = 5 in
+  let lengths =
+    Mina_numbers.Length.Map.to_sequence ~order:`Decreasing_key
+      ~keys_less_or_equal_to:length state.transition_hashes_by_length
+  in
+  let canopy_from_transitions =
+    Sequence.fold_until lengths ~init:(close_transitions_n, []) ~finish:snd
+      ~f:(fun (n, acc) (_, hashes) ->
+        let n', acc' =
+          let taken = List.take hashes n in
+          (n - List.length taken, taken @ acc)
+        in
+        if n' = 0 then Continue_or_stop.Stop acc' else Continue (n', acc') )
+  in
+  (* TODO consider collecting canopy from secondary branches (not only best tip) *)
+  let best_tip_path_rev =
+    Transition_frontier.best_tip_path frontier
+    |> List.rev_map ~f:Frontier_base.Breadcrumb.state_hash
+  in
+  let best_tip_closest, best_tip_rest =
+    List.split_n best_tip_path_rev best_tip_closest_n
+  in
+  let best_tip_rest_sparse = exponential_skip best_tip_rest in
+  Transition_frontier.(Breadcrumb.state_hash @@ root frontier)
+  :: canopy_from_transitions
+  @ best_tip_closest @ best_tip_rest_sparse
+
 let rec pre_validate_and_add ~context ~actions ~sender ~state ?body hh =
   match pre_validate_header ~context hh with
   | Ok vh ->
@@ -304,10 +353,9 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
     Mina_block.Header.blockchain_length (With_hash.data header_with_hash)
     |> Mina_numbers.Length.pred
   in
-  let lookup_transition =
-    lookup_transition ~transition_states:state.transition_states
-      ~frontier:Context.frontier
-  in
+  let transition_states = state.transition_states in
+  let frontier = Context.frontier in
+  let lookup_transition = lookup_transition ~transition_states ~frontier in
   let some_ancestors =
     let rec impl lst h =
       Option.value_map (State_hash.Table.find state.parents h) ~default:lst
@@ -317,10 +365,18 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
   in
   let module I = Interruptible.Make () in
   let retrieve_do () =
-    Context.retrieve_chain
-      ~some_ancestors:(some_ancestors parent_hash)
-      ~target_length:parent_length ~target_hash:parent_hash ~preferred_peers
-      ~lookup_transition
+    let some_ancestors = some_ancestors parent_hash in
+    let canopy =
+      match some_ancestors with
+      | (ancestor, _) :: _ ->
+          (* Non-empty [some_ancestors] is most likely because we received
+             hash chain before and ancestor is in frontier/transition states *)
+          [ ancestor ]
+      | _ ->
+          get_canopy ~frontier ~state (Mina_numbers.Length.pred parent_length)
+    in
+    Context.retrieve_chain ~some_ancestors ~canopy ~target_length:parent_length
+      ~target_hash:parent_hash ~preferred_peers ~lookup_transition
       (module I)
     |> I.map ~f:(Result.map_error ~f:(fun e -> `Other e))
   in

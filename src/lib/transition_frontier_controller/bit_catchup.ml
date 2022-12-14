@@ -120,43 +120,86 @@ let result_pair_both a =
     (Result.map ~f:(fun x -> (a, x)))
     (Result.map_error ~f:(fun x -> (a, x)))
 
+let check_hash_chain ~lookup_transition ~target_length ~root_length ~target_hash
+    transition_chain_proof =
+  let%bind.Result hashes =
+    Transition_chain_verifier.verify ~target_hash ~transition_chain_proof
+    |> Option.value_map ~f:Result.return
+         ~default:(Error `Invalid_transition_chain_proof)
+  in
+  let hashes_without_target_hash = Mina_stdlib.Nonempty_list.tail hashes in
+  try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length
+    hashes_without_target_hash
+
+let parent_hash header =
+  With_hash.data header |> Mina_block.Header.protocol_state
+  |> Mina_state.Protocol_state.previous_state_hash
+
+let parent_length h =
+  With_hash.data h |> Mina_block.Header.blockchain_length
+  |> Mina_numbers.Length.pred
+
+let handle_transition_chain_proof ~lookup_transition ~root_length ~target_length
+    ~target_hash (bottom_hash, body_hashes, headers) =
+  let headers_rev = List.rev headers in
+  let check_header (found_ancestor, state_hash, acc) header =
+    let parent_hash = parent_hash header in
+    if State_hash.(With_state_hashes.state_hash header = state_hash) then
+      match lookup_transition parent_hash with
+      | `Invalid ->
+          Continue_or_stop.Stop (Result.Ok (true, parent_hash, header :: acc))
+      | `Present ->
+          Continue (true, parent_hash, header :: acc)
+      | _ ->
+          Continue (found_ancestor, parent_hash, header :: acc)
+    else Stop (Error `Invalid_transition_chain_proof)
+  in
+  let%bind.Result found_ancestor, parent_hash_of_first_header, headers =
+    List.fold_until headers_rev ~init:(false, target_hash, []) ~f:check_header
+      ~finish:Result.return
+  in
+  if found_ancestor then
+    Ok (Mina_stdlib.Nonempty_list.singleton parent_hash_of_first_header, headers)
+  else
+    let target_length' =
+      Option.value_map (List.hd headers) ~default:target_length ~f:parent_length
+    in
+    check_hash_chain ~lookup_transition ~target_length:target_length'
+      ~root_length ~target_hash:parent_hash_of_first_header
+      (bottom_hash, body_hashes)
+    |> Result.map ~f:(fun hashes -> (hashes, headers))
+
 let retrieve_hash_chain_from_peer ~network ~trust_system ~logger ~root_length
-    ~peer ~target_hash ~target_length ~lookup_transition
+    ~target_hash ~target_length ~lookup_transition ~canopy peer
     (module I : Interruptible.F) =
-  let%bind.I.Result transition_chain_proof =
+  let%bind.I.Result resp =
     I.map
       ~f:
         (Result.map_error
            ~f:(const `Failed_to_download_transition_chain_proof) )
     @@ I.lift
     @@ Mina_networking.get_transition_chain_proof
-         ~timeout:(Time.Span.of_sec 10.) network peer target_hash
+         ~timeout:(Time.Span.of_sec 10.) network peer (target_hash, canopy)
   in
-  (* a list of state_hashes from new to old *)
-  let%bind.I.Result hashes =
-    match
-      Transition_chain_verifier.verify ~target_hash ~transition_chain_proof
-    with
-    | Some hs ->
-        I.Result.return hs
-    | None ->
-        let error_msg =
-          sprintf !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof" peer
-        in
-        let%bind.I () =
-          I.lift
-          @@ Trust_system.(
-               record trust_system logger peer
-                 Actions.
-                   ( Sent_invalid_transition_chain_merkle_proof
-                   , Some (error_msg, []) ))
-        in
-        I.return (Result.Error `Invalid_transition_chain_proof)
-  in
-  let hashes_without_target_hash = Mina_stdlib.Nonempty_list.tail hashes in
-  I.return
-    (try_to_connect_hash_chain ~lookup_transition ~target_length ~root_length
-       hashes_without_target_hash )
+  match
+    handle_transition_chain_proof ~lookup_transition ~root_length ~target_length
+      ~target_hash resp
+  with
+  | Ok res ->
+      I.Result.return res
+  | Error e ->
+      let error_msg =
+        sprintf !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof" peer
+      in
+      let%map.I () =
+        I.lift
+        @@ Trust_system.(
+             record trust_system logger peer
+               Actions.
+                 ( Sent_invalid_transition_chain_merkle_proof
+                 , Some (error_msg, []) ))
+      in
+      Error e
 
 let remove_duplicate_peers peers =
   let open Network_peer.Peer in
@@ -168,13 +211,13 @@ let get_peers ~preferred_peers network =
   @@ Mina_networking.peers network
 
 let retrieve_hash_chain ~network ~trust_system ~logger ~root_length
-    ~preferred_peers ~target_hash ~target_length ~lookup_transition
+    ~preferred_peers ~target_hash ~target_length ~lookup_transition ~canopy
     (module I : Interruptible.F) =
   let%bind.I peers = I.lift (get_peers ~preferred_peers network) in
   let f peer =
     I.map ~f:(result_pair_both peer)
     @@ retrieve_hash_chain_from_peer ~network ~trust_system ~logger ~root_length
-         ~peer ~target_hash ~target_length ~lookup_transition
+         ~target_hash ~target_length ~lookup_transition ~canopy peer
          (module I)
   in
   let%map.I res =
@@ -515,8 +558,8 @@ let actions ~write_actions ~context ~state =
   in
   actions
 
-let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
-    ~block_storage ~get_completed_work ~throttle
+let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
+    ~trust_system ~network ~block_storage ~get_completed_work ~throttle
     ~context:(module Context_ : Transition_handler.Validator.CONTEXT) =
   let outdated_root_cache =
     Transition_handler.Core_extended_cache.Lru.create ~destruct:None 1000
@@ -574,7 +617,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
             ~transition_receipt_time:(Some received_at) ()
         |> Deferred.Result.map_error ~f:convert_breadcrumb_error )
 
-    let retrieve_chain ~some_ancestors ~target_hash ~target_length
+    let retrieve_chain ~some_ancestors ~canopy ~target_hash ~target_length
         ~preferred_peers ~lookup_transition (module I : Interruptible.F) =
       match
         ( lookup_transition target_hash
@@ -582,36 +625,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
       with
       | `Invalid, _ | `Present, _ ->
           I.return (Or_error.error_string "target transition is present")
-      | `Not_present, None -> (
-          let root_length =
-            Transition_frontier.root frontier
-            |> Frontier_base.Breadcrumb.consensus_state
-            |> Consensus.Data.Consensus_state.blockchain_length
-          in
-          let%bind.I.Result peer, hashes =
-            retrieve_hash_chain ~network ~trust_system ~logger ~root_length
-              ~preferred_peers ~target_hash ~target_length ~lookup_transition
-              (module I)
-          in
-          let metas = hash_chain_to_metas ~target_length ~target_hash hashes in
-          match lookup_transition (Mina_stdlib.Nonempty_list.head hashes) with
-          | `Invalid ->
-              I.Result.return
-                (Mina_stdlib.Nonempty_list.map
-                   ~f:(fun x -> (`Meta x, peer))
-                   metas )
-          | `Present ->
-              (* Present *)
-              let%map.I.Result res =
-                download_ancestors ~preferred_peers:(peer :: preferred_peers)
-                  ~lookup_transition ~network metas
-                  (module I)
-              in
-              Mina_stdlib.Nonempty_list.map res
-                ~f:(Tuple2.map_snd ~f:(Option.value ~default:peer))
-          | `Not_present ->
-              failwith "Unexpected return of retrieve_hash_chain" )
-      | `Not_present, Some ancestors_and_senders -> (
+      | `Not_present, Some ancestors_and_senders when not bitswap_enabled -> (
           let ancestors, senders =
             Mina_stdlib.Nonempty_list.unzip ancestors_and_senders
           in
@@ -631,6 +645,45 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
               a
           | _ ->
               failwith "unexpected condition in retrieve_chain" )
+      | `Not_present, _ -> (
+          let senders = List.(rev @@ map ~f:snd some_ancestors) in
+          let preferred_peers = preferred_peers @ senders in
+          let root_length =
+            Transition_frontier.root frontier
+            |> Frontier_base.Breadcrumb.consensus_state
+            |> Consensus.Data.Consensus_state.blockchain_length
+          in
+          let%bind.I.Result peer, (hashes, headers) =
+            retrieve_hash_chain ~network ~trust_system ~logger ~root_length
+              ~preferred_peers ~target_hash ~target_length ~lookup_transition
+              ~canopy
+              (module I)
+          in
+          let hash_metas =
+            Option.value_map (List.hd headers)
+              ~default:(hash_chain_to_metas ~target_length ~target_hash)
+              ~f:(fun h ->
+                hash_chain_to_metas ~target_length:(parent_length h)
+                  ~target_hash:(parent_hash h) )
+              hashes
+          in
+          let metas =
+            let head, rest = Mina_stdlib.Nonempty_list.uncons hash_metas in
+            Mina_stdlib.Nonempty_list.init (`Meta head, peer)
+            @@ List.map ~f:(fun m -> (`Meta m, peer)) rest
+            @ List.map headers ~f:(fun h -> (`Header h, peer))
+          in
+          match lookup_transition (Mina_stdlib.Nonempty_list.head hashes) with
+          | `Present when List.is_empty headers ->
+              let%map.I.Result res =
+                download_ancestors ~preferred_peers:(peer :: preferred_peers)
+                  ~lookup_transition ~network hash_metas
+                  (module I)
+              in
+              Mina_stdlib.Nonempty_list.map res
+                ~f:(Tuple2.map_snd ~f:(Option.value ~default:peer))
+          | _ ->
+              I.Result.return metas )
 
     let genesis_state_hash =
       let genesis_protocol_state =
@@ -761,8 +814,9 @@ let run ~frontier ~context ~trust_system ~verifier ~network ~time_controller
   let write_actions = { write_verified_transition; write_breadcrumb } in
   let throttle = Simple_throttle.create verifier_max_jobs in
   let context =
-    make_context ~context ~frontier ~time_controller ~verifier ~trust_system
-      ~network ~block_storage ~get_completed_work ~throttle
+    make_context ~bitswap_enabled:true ~context ~frontier ~time_controller
+      ~verifier ~trust_system ~network ~block_storage ~get_completed_work
+      ~throttle
   in
   let (module Context : CONTEXT) = context in
   let logger = Context.logger in

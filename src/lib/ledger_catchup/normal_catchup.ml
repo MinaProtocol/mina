@@ -252,22 +252,23 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
     "Doing a catchup job with target $target_hash" ;
+  let root = Transition_frontier.root frontier in
   let blockchain_length_of_root =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.consensus_state
+    Transition_frontier.Breadcrumb.consensus_state root
     |> Consensus.Data.Consensus_state.blockchain_length
   in
   let open Deferred.Result.Let_syntax in
   find_map_ok peers ~f:(fun peer ->
-      let%bind transition_chain_proof =
-        let open Deferred.Let_syntax in
-        match%map
-          Mina_networking.get_transition_chain_proof network peer target_hash
-        with
-        | Error err ->
-            Result.fail @@ `Failed_to_download_transition_chain_proof err
-        | Ok transition_chain_proof ->
-            Result.return transition_chain_proof
+      let%bind transition_chain_proof' =
+        Mina_networking.get_transition_chain_proof network peer
+          (target_hash, [ Frontier_base.Breadcrumb.state_hash root ])
+        |> Deferred.map
+             ~f:
+               (Result.map_error ~f:(fun e ->
+                    `Failed_to_download_transition_chain_proof e ) )
+      in
+      let transition_chain_proof =
+        Mina_block.strip_headers_from_chain_proof transition_chain_proof'
       in
       (* a list of state_hashes from new to old *)
       let%bind hashes =

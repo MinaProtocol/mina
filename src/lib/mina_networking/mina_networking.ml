@@ -329,9 +329,15 @@ module Rpcs = struct
       let name = "get_transition_chain_proof"
 
       module T = struct
-        type query = State_hash.t [@@deriving sexp, to_yojson]
+        (* Target hash and "canopy" of known transitions *)
+        type query = State_hash.t * State_hash.t list
+        [@@deriving sexp, to_yojson]
 
-        type response = (State_hash.t * State_body_hash.t list) option
+        type response =
+          ( State_hash.t
+          * State_body_hash.t list
+          * Mina_block.Header.with_hash list )
+          option
       end
 
       module Caller = T
@@ -359,6 +365,47 @@ module Rpcs = struct
       include Master
     end)
 
+    let compute_hashes =
+      Fn.compose Mina_state.Protocol_state.hashes
+        Mina_block.Header.protocol_state
+
+    module V2 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t * State_hash.Stable.V1.t list
+        [@@deriving sexp]
+
+        type response =
+          ( State_hash.Stable.V1.t
+          * State_body_hash.Stable.V1.t list
+          * Mina_block.Header.Stable.V2.t list )
+          option
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model =
+          Option.map ~f:(Tuple3.map_trd ~f:(List.map ~f:With_hash.data))
+
+        let caller_model_of_response =
+          Option.map
+            ~f:
+              (Tuple3.map_trd
+                 ~f:(List.map ~f:(With_hash.of_data ~hash_data:compute_hashes)) )
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving sexp]
@@ -366,13 +413,21 @@ module Rpcs = struct
         type response =
           (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
 
-        let query_of_caller_model = Fn.id
+        let query_of_caller_model (target, _) = target
 
-        let callee_model_of_query = Fn.id
+        let callee_model_of_query target = (target, [])
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model =
+          Option.map ~f:(fun (init_st, body_hashes, headers) ->
+              let body_hashes' =
+                List.map headers
+                  ~f:
+                    (State_hash.With_state_hashes.state_body_hash
+                       ~compute_hashes )
+              in
+              (init_st, body_hashes @ body_hashes') )
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response = Option.map ~f:(fun (a, b) -> (a, b, []))
       end
 
       module T' =
