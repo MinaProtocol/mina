@@ -73,4 +73,14 @@ let consensus_state =
   Fn.compose Protocol_state.consensus_state
     (Fn.compose Header.protocol_state Block.header)
 
+let strip_headers_from_chain_proof (init_st, body_hashes, headers) =
+  let compute_hashes =
+    Fn.compose Mina_state.Protocol_state.hashes Header.protocol_state
+  in
+  let body_hashes' =
+    List.map headers
+      ~f:(State_hash.With_state_hashes.state_body_hash ~compute_hashes)
+  in
+  (init_st, body_hashes @ body_hashes')
+
 include Block

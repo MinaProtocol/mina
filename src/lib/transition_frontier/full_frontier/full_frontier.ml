@@ -212,7 +212,7 @@ let path_map ?max_length t breadcrumb ~f =
     | Some count when count <= 0 ->
         acc
     | _ ->
-        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let count_opt = Option.map ~f:Int.pred count_opt in
         let elem = f b in
         let parent_hash = Breadcrumb.parent_hash b in
         if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
