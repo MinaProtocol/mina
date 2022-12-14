@@ -98,8 +98,9 @@ let apply_zkapp_command ledger zkapp_command =
   in
   let witnesses, final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~global_slot:Mina_numbers.Global_slot.zero ~state_body:genesis_state_body
-      ~fee_excess:Amount.Signed.zero (`Ledger ledger) zkapp_command
+      ~global_slot:Mina_numbers.Global_slot.(of_int 2)
+      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+      (`Ledger ledger) zkapp_command
   in
   let open Impl in
   List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->

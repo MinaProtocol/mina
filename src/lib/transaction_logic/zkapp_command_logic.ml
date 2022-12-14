@@ -854,7 +854,7 @@ module type Inputs_intf = sig
 
     val set_supply_increase : t -> Amount.Signed.t -> t
 
-    val global_slot_since_genesis : t -> Global_slot.t
+    val block_global_slot : t -> Global_slot.t
   end
 end
 
@@ -1322,7 +1322,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_balance balance a in
       (a, local_state)
     in
-    let txn_global_slot = Global_state.global_slot_since_genesis global_state in
+    let txn_global_slot = Global_state.block_global_slot global_state in
     (* Check timing with current balance *)
     let a, local_state =
       let `Invalid_timing invalid_timing, timing =

@@ -17,11 +17,15 @@ let%test_module "Zkapp payments tests" =
 
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) txn =
+      let slot_advancement = Mina_numbers.Global_slot.of_int 3 in
+      let global_slot =
+        Mina_numbers.Global_slot.(
+          add txn_state_view.global_slot_since_genesis slot_advancement)
+      in
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
-          ~constraint_constants:U.constraint_constants
-          ~global_slot:txn_state_view.global_slot_since_genesis ~txn_state_view
-          t txn
+          ~constraint_constants:U.constraint_constants ~global_slot
+          ~txn_state_view t txn
       in
       Frozen_ledger_hash.of_ledger_hash hash
 
@@ -139,7 +143,7 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let zkapp_command =
                 account_update_send ~constraint_constants (List.hd_exn specs)

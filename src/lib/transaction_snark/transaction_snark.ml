@@ -1989,8 +1989,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
               }
 
-            let global_slot_since_genesis { protocol_state; _ } =
-              protocol_state.global_slot_since_genesis
+            let block_global_slot { block_global_slot; _ } = block_global_slot
           end
 
           module Nonce_precondition = struct

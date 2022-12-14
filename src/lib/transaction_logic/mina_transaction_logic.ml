@@ -999,7 +999,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let set_supply_increase t supply_increase = { t with supply_increase }
 
-    let global_slot_since_genesis { block_global_slot; _ } = block_global_slot
+    let block_global_slot { block_global_slot; _ } = block_global_slot
   end
 
   module Inputs = struct
