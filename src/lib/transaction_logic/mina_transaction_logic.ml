@@ -2522,12 +2522,10 @@ module For_tests = struct
       }
     in
     { snarked_ledger_hash = h
-    ; timestamp = Block_time.zero
     ; blockchain_length = len
     ; min_window_density = len
     ; last_vrf_output = ()
     ; total_currency = a
-    ; global_slot_since_hard_fork = txn_global_slot
     ; global_slot_since_genesis = txn_global_slot
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data

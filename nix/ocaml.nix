@@ -146,6 +146,8 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
+        DUNE_PROFILE = "devnet";
+
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
           "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
