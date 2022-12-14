@@ -390,8 +390,7 @@ let compiled : t =
   ; zkapp_transaction_cost_limit =
       Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
-  ; max_action_elements =
-      Mina_compile_config.max_action_elements
+  ; max_action_elements = Mina_compile_config.max_action_elements
   }
 
 let for_unit_tests = compiled

@@ -164,8 +164,7 @@ module Account_update_under_construction = struct
 
       let create () = { actions = [] }
 
-      let add_actions t actions : t =
-        { actions = t.actions @ actions }
+      let add_actions t actions : t = { actions = t.actions @ actions }
 
       let to_zkapp_command_actions ({ actions } : t) :
           Zkapp_account.Sequence_events.var =
@@ -226,8 +225,7 @@ module Account_update_under_construction = struct
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
-        ; actions =
-            Sequence_events.to_zkapp_command_actions t.actions
+        ; actions = Sequence_events.to_zkapp_command_actions t.actions
         ; preconditions =
             { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -300,10 +298,7 @@ module Account_update_under_construction = struct
       { t with events = Events.add_events t.events events }
 
     let add_actions actions (t : t) =
-      { t with
-        actions =
-          Sequence_events.add_actions t.actions actions
-      }
+      { t with actions = Sequence_events.add_actions t.actions actions }
   end
 end
 
@@ -350,8 +345,8 @@ class account_update ~public_key ?token_id ?caller =
 
     method add_actions actions =
       account_update <-
-        Account_update_under_construction.In_circuit.add_actions
-          actions account_update
+        Account_update_under_construction.In_circuit.add_actions actions
+          account_update
 
     method account_update_under_construction = account_update
   end

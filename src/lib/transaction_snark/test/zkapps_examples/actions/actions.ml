@@ -91,9 +91,7 @@ let%test_module "Sequence events test" =
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
           (add_actions_prover
-             ~handler:
-               (Zkapps_actions.update_actions_handler
-                  actions ) )
+             ~handler:(Zkapps_actions.update_actions_handler actions) )
     end
 
     let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
@@ -227,8 +225,7 @@ let%test_module "Sequence events test" =
       let zkapp_command1, account1 =
         let ledger = create_ledger () in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_actions.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -239,8 +236,7 @@ let%test_module "Sequence events test" =
         Zkapp_command.Call_forest.to_list zkapp_command1.account_updates
       in
       List.iteri account_updates1 ~f:(fun i account_update ->
-          if i > 1 then
-            assert (not @@ List.is_empty account_update.body.actions)
+          if i > 1 then assert (not @@ List.is_empty account_update.body.actions)
           else assert (List.is_empty account_update.body.actions) ) ;
       let seq_state_elts1, last_seq_slot1 =
         seq_state_elts_of_account account1
@@ -274,8 +270,7 @@ let%test_module "Sequence events test" =
       let _zkapp_command0, account0 =
         let state_body = make_state_body slot1 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_actions.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -306,8 +301,7 @@ let%test_module "Sequence events test" =
       let _zkapp_command1, account1 =
         let state_body = make_state_body slot2 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_actions.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
@@ -339,8 +333,7 @@ let%test_module "Sequence events test" =
       let _zkapp_command2, account2 =
         let state_body = make_state_body slot3 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_actions.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;

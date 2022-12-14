@@ -2103,9 +2103,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
-  let max_action_elements =
-    genesis_constants.max_action_elements
-  in
+  let max_action_elements = genesis_constants.max_action_elements in
   (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
   let zkapp_cost_within_limit =
     Float.(
@@ -2115,12 +2113,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
       < cost_limit)
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
-  let valid_action_elements =
-    num_action_elements <= max_action_elements
-  in
-  if
-    zkapp_cost_within_limit && valid_event_elements
-    && valid_action_elements
+  let valid_action_elements = num_action_elements <= max_action_elements in
+  if zkapp_cost_within_limit && valid_event_elements && valid_action_elements
   then Ok ()
   else
     let proof_zkapp_command_err =

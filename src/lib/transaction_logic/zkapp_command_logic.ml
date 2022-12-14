@@ -975,8 +975,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     { account_update; account_update_forest; new_frame; new_call_stack }
 
-  let update_sequence_state (sequence_state : _ Pickles_types.Vector.t)
-      actions ~txn_global_slot ~last_sequence_slot =
+  let update_sequence_state (sequence_state : _ Pickles_types.Vector.t) actions
+      ~txn_global_slot ~last_sequence_slot =
     (* Push events to s1. *)
     let [ s1'; s2'; s3'; s4'; s5' ] = sequence_state in
     let is_empty = Sequence_events.is_empty actions in
@@ -1393,9 +1393,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Update sequence state. *)
     let a, local_state =
-      let actions =
-        Account_update.Update.actions account_update
-      in
+      let actions = Account_update.Update.actions account_update in
       let last_sequence_slot = Account.last_sequence_slot a in
       let sequence_state, last_sequence_slot =
         update_sequence_state (Account.sequence_state a) actions

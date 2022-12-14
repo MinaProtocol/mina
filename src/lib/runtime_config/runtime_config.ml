@@ -820,8 +820,7 @@ module Daemon = struct
     ; max_event_elements =
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
-        opt_fallthrough ~default:t1.max_action_elements
-          t2.max_action_elements
+        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
     }
 end
 

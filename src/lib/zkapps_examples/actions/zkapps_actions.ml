@@ -9,11 +9,9 @@ let initialize public_key =
     ignore
 
 type _ Snarky_backendless.Request.t +=
-  | Updated_actions :
-      Field.Constant.t array list Snarky_backendless.Request.t
+  | Updated_actions : Field.Constant.t array list Snarky_backendless.Request.t
 
-let update_actions_handler
-    (updated_actions : Field.Constant.t array list)
+let update_actions_handler (updated_actions : Field.Constant.t array list)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
   | Updated_actions ->

@@ -1509,8 +1509,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let actions (account_update : t) =
-          account_update.body.actions
+        let actions (account_update : t) = account_update.body.actions
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri

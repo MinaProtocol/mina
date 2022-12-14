@@ -770,9 +770,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
     Quickcheck.Generator.list_with_length list_len array_gen
   in
   let%bind events = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
-  let%bind actions =
-    field_array_list_gen ~max_array_len:2 ~max_list_len:1
-  in
+  let%bind actions = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
   let%bind call_data = Snark_params.Tick.Field.gen in
   let first_use_of_account =
     let account_id = Account_id.create public_key token_id in
