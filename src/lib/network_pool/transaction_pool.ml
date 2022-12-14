@@ -2608,36 +2608,40 @@ let%test_module _ =
       let zkapp_command = List.hd_exn zkapp_command in
       Deferred.return zkapp_command
 
+    let mk_basic_zkapp ?preconditions ~nonce ~fee_payer_kp =
+      let open Zkapp_command_builder in
+      let preconditions =
+        Option.value preconditions
+          ~default:
+            Account_update.Preconditions.
+              { network = Zkapp_precondition.Protocol_state.accept
+              ; account = Account_update.Account_precondition.Accept
+              }
+      in
+      let account_updates =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body Signature Call fee_payer_kp
+                 Token_id.default 0 ~preconditions )
+              []
+          ]
+      in
+      account_updates
+      |> mk_zkapp_command ~memo:"" ~fee:10_000_000_000
+           ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
+           ~fee_payer_nonce:(Account.Nonce.of_int nonce)
+
     let%test_unit "zkapp cmd with incrementing fee payer nonces are added to \
                    the pool" =
       Thread_safe.block_on_async_exn (fun () ->
-          let open Zkapp_command_builder in
           let%bind () = after (Time.Span.of_sec 2.) in
           let%bind t = setup_test () in
           assert_pool_txs t [] ;
           let fee_payer_kp = test_keys.(0) in
-          let fee_payer_pk = Public_key.compress fee_payer_kp.public_key in
           let%bind valid_commands =
             List.mapi (List.init 10 ~f:Fn.id) ~f:(fun i _ ->
-                let with_dummy_signatures =
-                  let account_updates =
-                    mk_forest
-                      [ mk_node
-                          (mk_account_update_body Signature Call fee_payer_kp
-                             Token_id.default 0
-                             ~preconditions:
-                               { Account_update.Preconditions.network =
-                                   Zkapp_precondition.Protocol_state.accept
-                               ; account = Nonce (Account.Nonce.of_int (i + 1))
-                               } )
-                          []
-                      ]
-                  in
-                  account_updates
-                  |> mk_zkapp_command ~memo:"" ~fee:10_000_000_000 ~fee_payer_pk
-                       ~fee_payer_nonce:(Account.Nonce.of_int i)
-                in
-                mk_zkapp_user_cmd t.txn_pool with_dummy_signatures )
+                mk_basic_zkapp ?preconditions:None ~nonce:i ~fee_payer_kp
+                |> mk_zkapp_user_cmd t.txn_pool )
             |> Deferred.all
           in
           let%bind () = add_commands' t valid_commands in
