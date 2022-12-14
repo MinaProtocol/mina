@@ -73,7 +73,7 @@ module F = struct
     let state_hashes =
       List.map ~f:(Fn.compose State_hash.to_yojson state_hash_of_state) states
     in
-    [%log' debug Context.logger] "verify_transaction_proofs of $state_hashes"
+    [%log' debug Context.logger] "verify transaction proofs of $state_hashes"
       ~metadata:[ ("state_hashes", `List state_hashes) ] ;
     let verify_batch batch =
       I.map ~f (Context.verify_transaction_proofs (module I) batch)

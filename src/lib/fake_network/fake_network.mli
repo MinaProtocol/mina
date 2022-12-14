@@ -57,8 +57,12 @@ type peer_state =
   ; get_transition_knowledge :
       unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         (State_hash.t * State_hash.t list) Envelope.Incoming.t
+      -> ( State_hash.t
+         * State_body_hash.t list
+         * Mina_block.Header.with_hash list )
+         option
+         Deferred.t
   ; get_transition_chain :
          Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_block.t list option Deferred.t
@@ -126,9 +130,12 @@ module Generator : sig
     -> ?get_transition_knowledge:
          (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
-         (   Pasta_bindings.Fp.t Envelope.Incoming.t
-          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
-         )
+         (   (State_hash.t * State_hash.t list) Envelope.Incoming.t
+          -> ( State_hash.t
+             * State_body_hash.t list
+             * Mina_block.Header.with_hash list )
+             option
+             Deferred.t )
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
           -> Mina_block.t list option Deferred.t )
@@ -177,9 +184,12 @@ module Generator : sig
     -> ?get_transition_knowledge:
          (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
-         (   Pasta_bindings.Fp.t Envelope.Incoming.t
-          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
-         )
+         (   (State_hash.t * State_hash.t list) Envelope.Incoming.t
+          -> ( State_hash.t
+             * State_body_hash.t list
+             * Mina_block.Header.with_hash list )
+             option
+             Deferred.t )
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
           -> Mina_block.t list option Deferred.t )

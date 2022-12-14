@@ -22,7 +22,8 @@ type t =
   ; parents : (State_hash.t * Network_peer.Peer.t) State_hash.Table.t
         (** Map from transition's state_hash to parent for transitions that are not in transition states.
     This map is like a cache for old methods of getting transition chain. *)
-  ; transition_hashes_by_length : State_hash.t list Mina_numbers.Length.Table.t
+  ; mutable transition_hashes_by_length :
+      State_hash.t list Mina_numbers.Length.Map.t
         (** Multi-map from blockchain length to list of state hashes contained in [transition_states]
       field that have this blockchain length *)
   ; children :
@@ -64,13 +65,15 @@ let breadcrumb_length =
     Frontier_base.Breadcrumb.consensus_state
 
 let extract_structures ~is_in_frontier transition_states =
-  let transition_hashes_by_length = Mina_numbers.Length.Table.create () in
+  let transition_hashes_by_length = ref Mina_numbers.Length.Map.empty in
   let breadcrumb_queue = Queue.create () in
   let children = State_hash.Table.create () in
   Transition_states.iter transition_states ~f:(fun st ->
       let meta = Transition_state.State_functions.transition_meta st in
-      Mina_numbers.Length.Table.add_multi transition_hashes_by_length
-        ~key:meta.blockchain_length ~data:meta.state_hash ;
+      transition_hashes_by_length :=
+        Mina_numbers.Length.Map.add_multi
+          !transition_hashes_by_length
+          ~key:meta.blockchain_length ~data:meta.state_hash ;
       let parent_hash = meta.parent_state_hash in
       let tag =
         if
@@ -100,7 +103,7 @@ let extract_structures ~is_in_frontier transition_states =
   let arr = Queue.to_array breadcrumb_queue in
   Array.sort arr ~compare:(fun (_, b1) (_, b2) ->
       Mina_numbers.Length.compare (breadcrumb_length b1) (breadcrumb_length b2) ) ;
-  (children, transition_hashes_by_length, Queue.of_array arr)
+  (children, !transition_hashes_by_length, Queue.of_array arr)
 
 let rec remove_tree ~state state_hash =
   let f = remove_tree ~state in
@@ -172,3 +175,23 @@ let apply_diffs ~logger ({ transition_states; _ } as state)
           ~f:(remove_tree ~state)
     | E (Best_tip_changed _) ->
         () )
+
+let find_header { transition_states; _ } state_hash =
+  let%bind.Option st = Transition_states.find transition_states state_hash in
+  match st with
+  | Downloading_body { header; _ } ->
+      Some (Mina_block.Validation.header_with_hash header)
+  | Verifying_complete_works { block; _ } ->
+      Some
+        ( Mina_block.Validation.block_with_hash block
+        |> With_hash.map ~f:Mina_block.header )
+  | Building_breadcrumb { block; _ } ->
+      Some
+        ( Mina_block.Validation.block_with_hash block
+        |> With_hash.map ~f:Mina_block.header )
+  | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
+      Some
+        ( Frontier_base.Breadcrumb.block_with_hash breadcrumb
+        |> With_hash.map ~f:Mina_block.header )
+  | _ ->
+      None

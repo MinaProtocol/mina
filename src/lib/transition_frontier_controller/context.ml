@@ -88,6 +88,7 @@ module type CONTEXT = sig
        some_ancestors:
          (* List of ancestors in parent-first order along with senders that shared them first *)
          (State_hash.t * Network_peer.Peer.t) list
+    -> canopy:State_hash.t list
     -> target_hash:State_hash.t
     -> target_length:Mina_numbers.Length.t
     -> preferred_peers:Network_peer.Peer.t list

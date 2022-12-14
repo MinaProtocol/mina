@@ -257,6 +257,15 @@ module type Transition_chain_prover_intf = sig
     -> frontier:transition_frontier
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t list) option
+
+  val prove_with_headers :
+       ?length:int
+    -> ?max_headers:int
+    -> frontier:transition_frontier
+    -> canopy:State_hash.Set.t
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+       option
 end
 
 module type Bootstrap_controller_intf = sig

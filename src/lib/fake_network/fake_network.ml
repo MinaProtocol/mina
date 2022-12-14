@@ -60,8 +60,12 @@ type peer_state =
   ; get_transition_knowledge :
       unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         (State_hash.t * State_hash.t list) Envelope.Incoming.t
+      -> ( State_hash.t
+         * State_body_hash.t list
+         * Mina_block.Header.with_hash list )
+         option
+         Deferred.t
   ; get_transition_chain :
          Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_block.t list option Deferred.t
@@ -278,9 +282,11 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
+              let state_hash, canopy = Envelope.Incoming.data query_env in
               Deferred.return
-                (Transition_chain_prover.prove ~frontier
-                   (Envelope.Incoming.data query_env) ) )
+                (Transition_chain_prover.prove_with_headers ~frontier
+                   ~canopy:(State_hash.Set.of_list canopy)
+                   state_hash ) )
     ; get_transition_chain =
         ( match get_transition_chain with
         | Some f ->
