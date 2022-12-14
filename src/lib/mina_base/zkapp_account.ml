@@ -181,6 +181,52 @@ module Sequence_events = struct
   [%%endif]
 end
 
+module Zkapp_uri = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+
+        let to_latest = Fn.id
+
+        let max_length = 255
+
+        let check (x : t) = assert (String.length x <= max_length)
+
+        let t_of_sexp sexp =
+          let res = t_of_sexp sexp in
+          check res ; res
+
+        let of_yojson json =
+          let res = of_yojson json in
+          Result.bind res ~f:(fun res ->
+              Result.try_with (fun () -> check res)
+              |> Result.map ~f:(Fn.const res)
+              |> Result.map_error
+                   ~f:(Fn.const "Zkapp_uri.of_yojson: symbol is too long") )
+      end
+
+      include T
+
+      include
+        Binable.Of_binable_without_uuid
+          (Core_kernel.String.Stable.V1)
+          (struct
+            type t = string
+
+            let to_binable = Fn.id
+
+            let of_binable x = check x ; x
+          end)
+    end
+  end]
+
+  [%%define_locally
+  Stable.Latest.
+    (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -222,7 +268,7 @@ module Stable = struct
       , F.Stable.V1.t
       , Mina_numbers.Global_slot.Stable.V1.t
       , bool
-      , string )
+      , Zkapp_uri.Stable.V1.t )
       Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -237,13 +283,11 @@ type t =
   , F.t
   , Mina_numbers.Global_slot.t
   , bool
-  , string )
+  , Zkapp_uri.t )
   Poly.t
 [@@deriving sexp, equal, compare, hash, yojson]
 
-let () =
-  let _f : unit -> (t, Stable.Latest.t) Type_equal.t = fun () -> Type_equal.T in
-  ()
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 [%%ifdef consensus_mechanism]
 
