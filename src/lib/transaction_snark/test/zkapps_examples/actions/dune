@@ -35,7 +35,7 @@
   transaction_snark
   transaction_snark_tests
   with_hash
-  zkapps_sequence_events
+  zkapps_actions
   zkapps_examples
   yojson
   mina_wire_types)

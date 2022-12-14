@@ -20,7 +20,7 @@ let%test_module "Sequence events test" =
     let ( tag
         , _
         , p_module
-        , Pickles.Provers.[ initialize_prover; add_sequence_events_prover ] ) =
+        , Pickles.Provers.[ initialize_prover; add_actions_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
@@ -30,8 +30,8 @@ let%test_module "Sequence events test" =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self:_ ->
-          [ Zkapps_sequence_events.initialize_rule pk_compressed
-          ; Zkapps_sequence_events.update_sequence_events_rule pk_compressed
+          [ Zkapps_actions.initialize_rule pk_compressed
+          ; Zkapps_actions.update_actions_rule pk_compressed
           ] )
 
     module P = (val p_module)
@@ -81,19 +81,19 @@ let%test_module "Sequence events test" =
         Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
-    module Add_sequence_events = struct
-      let sequence_events =
-        let open Zkapps_sequence_events in
+    module Add_actions = struct
+      let actions =
+        let open Zkapps_actions in
         List.init num_events ~f:(fun outer ->
             Array.init event_length ~f:(fun inner ->
                 Snark_params.Tick.Field.of_int (outer + inner) ) )
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
-          (add_sequence_events_prover
+          (add_actions_prover
              ~handler:
-               (Zkapps_sequence_events.update_sequence_events_handler
-                  sequence_events ) )
+               (Zkapps_actions.update_actions_handler
+                  actions ) )
     end
 
     let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
@@ -197,7 +197,7 @@ let%test_module "Sequence events test" =
       in
       (* we haven't added any sequence events *)
       List.iter account_updates ~f:(fun account_update ->
-          assert (List.is_empty account_update.body.sequence_events) )
+          assert (List.is_empty account_update.body.actions) )
 
     let%test_unit "Initialize and add sequence events" =
       let zkapp_command0, account0 =
@@ -212,7 +212,7 @@ let%test_module "Sequence events test" =
         Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
       in
       List.iter account_updates0 ~f:(fun account_update ->
-          assert (List.is_empty account_update.body.sequence_events) ) ;
+          assert (List.is_empty account_update.body.actions) ) ;
       assert (Option.is_some account0) ;
       (* sequence state unmodified *)
       let seq_state_elts0, last_seq_slot0 =
@@ -228,7 +228,7 @@ let%test_module "Sequence events test" =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+             Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -240,8 +240,8 @@ let%test_module "Sequence events test" =
       in
       List.iteri account_updates1 ~f:(fun i account_update ->
           if i > 1 then
-            assert (not @@ List.is_empty account_update.body.sequence_events)
-          else assert (List.is_empty account_update.body.sequence_events) ) ;
+            assert (not @@ List.is_empty account_update.body.actions)
+          else assert (List.is_empty account_update.body.actions) ) ;
       let seq_state_elts1, last_seq_slot1 =
         seq_state_elts_of_account account1
       in
@@ -275,7 +275,7 @@ let%test_module "Sequence events test" =
         let state_body = make_state_body slot1 in
         []
         |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+             Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -307,7 +307,7 @@ let%test_module "Sequence events test" =
         let state_body = make_state_body slot2 in
         []
         |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+             Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
@@ -340,7 +340,7 @@ let%test_module "Sequence events test" =
         let state_body = make_state_body slot3 in
         []
         |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+             Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;
