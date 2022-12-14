@@ -82,6 +82,7 @@ in
       ];
       sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
       nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
+      buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock =
         let fixupLockFile = path: builtins.readFile path;
         in {
@@ -155,6 +156,7 @@ in
       ];
       sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
       nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
+      buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock.lockFile = lock;
       cargoLock.outputHashes = narHashesFromCargoLock lock;
 
