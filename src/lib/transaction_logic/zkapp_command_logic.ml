@@ -347,9 +347,9 @@ module type Account_update_intf = sig
 
     val verification_key : t -> verification_key set_or_keep
 
-    type sequence_events
+    type actions
 
-    val sequence_events : t -> sequence_events
+    val actions : t -> actions
 
     type zkapp_uri
 
@@ -739,7 +739,7 @@ module type Inputs_intf = sig
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
-       and type Update.sequence_events := Sequence_events.t
+       and type Update.actions := Sequence_events.t
        and type Update.zkapp_uri := Zkapp_uri.t
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
@@ -976,11 +976,11 @@ module Make (Inputs : Inputs_intf) = struct
     { account_update; account_update_forest; new_frame; new_call_stack }
 
   let update_sequence_state (sequence_state : _ Pickles_types.Vector.t)
-      sequence_events ~txn_global_slot ~last_sequence_slot =
+      actions ~txn_global_slot ~last_sequence_slot =
     (* Push events to s1. *)
     let [ s1'; s2'; s3'; s4'; s5' ] = sequence_state in
-    let is_empty = Sequence_events.is_empty sequence_events in
-    let s1_updated = Sequence_events.push_events s1' sequence_events in
+    let is_empty = Sequence_events.is_empty actions in
+    let s1_updated = Sequence_events.push_events s1' actions in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
     let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
@@ -1393,17 +1393,17 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Update sequence state. *)
     let a, local_state =
-      let sequence_events =
-        Account_update.Update.sequence_events account_update
+      let actions =
+        Account_update.Update.actions account_update
       in
       let last_sequence_slot = Account.last_sequence_slot a in
       let sequence_state, last_sequence_slot =
-        update_sequence_state (Account.sequence_state a) sequence_events
+        update_sequence_state (Account.sequence_state a) actions
           ~txn_global_slot ~last_sequence_slot
       in
       let is_empty =
         (* also computed in update_sequence_state, but messy to return it *)
-        Sequence_events.is_empty sequence_events
+        Sequence_events.is_empty actions
       in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies

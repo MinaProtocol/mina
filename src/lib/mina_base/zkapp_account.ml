@@ -156,7 +156,7 @@ module Sequence_events = struct
   include Make_events (struct
     let salt_phrase = "MinaZkappSequenceEmpty"
 
-    let hash_prefix = Hash_prefix_states.zkapp_sequence_events
+    let hash_prefix = Hash_prefix_states.zkapp_actions
 
     let deriver_name = "SequenceEvents"
   end)
@@ -175,7 +175,7 @@ module Sequence_events = struct
   [%%ifdef consensus_mechanism]
 
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
-    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_sequence_events
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
 
   [%%endif]

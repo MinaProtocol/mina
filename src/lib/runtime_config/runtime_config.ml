@@ -331,7 +331,7 @@ module Json_layout = struct
       ; zkapp_signed_pair_update_cost : float option [@default None]
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
-      ; max_sequence_event_elements : int option [@default None]
+      ; max_action_elements : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -787,7 +787,7 @@ module Daemon = struct
     ; zkapp_signed_pair_update_cost : float option [@default None]
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
-    ; max_sequence_event_elements : int option [@default None]
+    ; max_action_elements : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -819,9 +819,9 @@ module Daemon = struct
           t2.zkapp_transaction_cost_limit
     ; max_event_elements =
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
-    ; max_sequence_event_elements =
-        opt_fallthrough ~default:t1.max_sequence_event_elements
-          t2.max_sequence_event_elements
+    ; max_action_elements =
+        opt_fallthrough ~default:t1.max_action_elements
+          t2.max_action_elements
     }
 end
 

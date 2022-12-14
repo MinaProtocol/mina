@@ -233,7 +233,7 @@ CREATE TABLE zkapp_network_precondition
 , next_epoch_data_id               int                            REFERENCES zkapp_epoch_data(id)
 );
 
-/* events_ids and sequence_events_ids indicate a list of ids in
+/* events_ids and actions_ids indicate a list of ids in
    zkapp_state_data_array.
 */
 CREATE TABLE zkapp_fee_payer_body
@@ -248,7 +248,7 @@ CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
-/* events_ids and sequence_events_ids indicate a list of ids in
+/* events_ids and actions_ids indicate a list of ids in
    zkapp_state_data_array.
 */
 CREATE TABLE zkapp_account_update_body
@@ -258,7 +258,7 @@ CREATE TABLE zkapp_account_update_body
 , balance_change                        text            NOT NULL
 , increment_nonce                       boolean         NOT NULL
 , events_id                             int             NOT NULL  REFERENCES zkapp_events(id)
-, sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
+, actions_id                            int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
 , zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
