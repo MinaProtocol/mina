@@ -93,7 +93,7 @@ RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terra
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
     && sudo apt-get update -y \
-    && sudo apt-get install -y google-cloud-sdk kubectl
+    && sudo apt-get install -y google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin
 
 # --- Helm tools
 RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
