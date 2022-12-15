@@ -780,11 +780,12 @@ module Preconditions = struct
       ~valid_until:!.Zkapp_precondition.Valid_until.deriver
     |> finish "Preconditions" ~t_toplevel_annots
 
-  let to_input ({ network; account } : t) =
+  let to_input ({ network; account; valid_until } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
       ; Zkapp_precondition.Account.to_input
           (Account_precondition.to_full account)
+      ; Zkapp_precondition.Valid_until.to_input valid_until
       ]
 
   let gen =
@@ -817,7 +818,7 @@ module Preconditions = struct
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
         ; Zkapp_precondition.Account.Checked.to_input account
-        ; Zkapp_precondition.Valid_until.to_input valid_until
+        ; Zkapp_precondition.Valid_until.Checked.to_input valid_until
         ]
   end
 

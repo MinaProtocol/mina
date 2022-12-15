@@ -1374,8 +1374,7 @@ module Valid_until = struct
 
   let typ = Numeric.(typ Tc.global_slot)
 
-  let to_input valid_until =
-    Numeric.(Checked.to_input Tc.global_slot valid_until)
+  let to_input valid_until = Numeric.(to_input Tc.global_slot valid_until)
 
   let check (valid_until : t) global_slot =
     Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
@@ -1386,6 +1385,9 @@ module Valid_until = struct
 
     let check (valid_until : t) global_slot =
       Numeric.(Checked.check Tc.global_slot) valid_until global_slot
+
+    let to_input valid_until =
+      Numeric.(Checked.to_input Tc.global_slot valid_until)
   end
 end
 
