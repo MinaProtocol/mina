@@ -1171,13 +1171,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
-        module Sequence_events = struct
-          type t = Zkapp_account.Sequence_events.var
+        module Actions = struct
+          type t = Zkapp_account.Actions.var
 
           let is_empty x =
-            run_checked (Account_update.Sequence_events.is_empty_var x)
+            run_checked (Account_update.Actions.is_empty_var x)
 
-          let push_events = Account_update.Sequence_events.push_events_checked
+          let push_events = Account_update.Actions.push_events_checked
         end
 
         module Zkapp_uri = struct

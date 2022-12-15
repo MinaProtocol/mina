@@ -159,7 +159,7 @@ module Account_update_under_construction = struct
           ~f:(Fn.flip Zkapp_account.Events.push_to_data_as_hash)
     end
 
-    module Sequence_events = struct
+    module Actions = struct
       type t = { actions : Field.t array list }
 
       let create () = { actions = [] }
@@ -167,14 +167,14 @@ module Account_update_under_construction = struct
       let add_actions t actions : t = { actions = t.actions @ actions }
 
       let to_zkapp_command_actions ({ actions } : t) :
-          Zkapp_account.Sequence_events.var =
+          Zkapp_account.Actions.var =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
-          exists ~compute:(fun () -> []) Zkapp_account.Sequence_events.typ
+          exists ~compute:(fun () -> []) Zkapp_account.Actions.typ
         in
-        (* matches fold_right in Zkapp_account.Sequence_events.hash *)
+        (* matches fold_right in Zkapp_account.Actions.hash *)
         List.fold_right actions ~init:empty_var
-          ~f:(Fn.flip Zkapp_account.Sequence_events.push_to_data_as_hash)
+          ~f:(Fn.flip Zkapp_account.Actions.push_to_data_as_hash)
     end
 
     type t =
@@ -189,7 +189,7 @@ module Account_update_under_construction = struct
           list
       ; call_data : Field.t option
       ; events : Events.t
-      ; actions : Sequence_events.t
+      ; actions : Actions.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default))
@@ -202,7 +202,7 @@ module Account_update_under_construction = struct
       ; rev_calls = []
       ; call_data = None
       ; events = Events.create ()
-      ; actions = Sequence_events.create ()
+      ; actions = Actions.create ()
       }
 
     let to_account_update_and_calls (t : t) :
@@ -225,7 +225,7 @@ module Account_update_under_construction = struct
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
-        ; actions = Sequence_events.to_zkapp_command_actions t.actions
+        ; actions = Actions.to_zkapp_command_actions t.actions
         ; preconditions =
             { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -298,7 +298,7 @@ module Account_update_under_construction = struct
       { t with events = Events.add_events t.events events }
 
     let add_actions actions (t : t) =
-      { t with actions = Sequence_events.add_actions t.actions actions }
+      { t with actions = Actions.add_actions t.actions actions }
   end
 end
 
