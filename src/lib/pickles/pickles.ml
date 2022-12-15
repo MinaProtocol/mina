@@ -505,6 +505,35 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
       Timer.clock __LOC__ ;
+      let feature_flags =
+        let rec go :
+            type a b c d.
+               (a, b, c, d) H4.T(IR).t
+            -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+         fun rules ->
+          match rules with
+          | [] ->
+              Plonk_types.Features.none
+          | [ r ] ->
+              Plonk_types.Features.map r.feature_flags ~f:(function
+                | true ->
+                    Plonk_types.Opt.Flag.Yes
+                | false ->
+                    Plonk_types.Opt.Flag.No )
+          | r :: rules ->
+              let feature_flags = go rules in
+              Plonk_types.Features.map2 r.feature_flags feature_flags
+                ~f:(fun enabled flag ->
+                  match (enabled, flag) with
+                  | true, Yes ->
+                      Plonk_types.Opt.Flag.Yes
+                  | false, No ->
+                      No
+                  | _, Maybe | true, No | false, Yes ->
+                      Maybe )
+        in
+        go choices
+      in
       let wrap_domains =
         match override_wrap_domain with
         | None ->
@@ -513,16 +542,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (Auxiliary_var)
                 (Auxiliary_value)
             in
-            let rec f :
-                type a b c d.
-                (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t = function
-              | [] ->
-                  []
-              | x :: xs ->
-                  x :: f xs
-            in
-            M.f full_signature prev_varss_n prev_varss_length ~self
-              ~choices:(f choices) ~max_proofs_verified
+            M.f full_signature prev_varss_n prev_varss_length
+              ~max_proofs_verified ~feature_flags
         | Some override ->
             Common.wrap_domains
               ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -558,35 +579,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         in
         let module V = H4.To_vector (Int) in
         V.f prev_varss_length (M.f choices)
-      in
-      let feature_flags =
-        let rec go :
-            type a b c d.
-               (a, b, c, d) H4.T(IR).t
-            -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
-         fun rules ->
-          match rules with
-          | [] ->
-              Plonk_types.Features.none
-          | [ r ] ->
-              Plonk_types.Features.map r.feature_flags ~f:(function
-                | true ->
-                    Plonk_types.Opt.Flag.Yes
-                | false ->
-                    Plonk_types.Opt.Flag.No )
-          | r :: rules ->
-              let feature_flags = go rules in
-              Plonk_types.Features.map2 r.feature_flags feature_flags
-                ~f:(fun enabled flag ->
-                  match (enabled, flag) with
-                  | true, Yes ->
-                      Plonk_types.Opt.Flag.Yes
-                  | false, No ->
-                      No
-                  | _, Maybe | true, No | false, Yes ->
-                      Maybe )
-        in
-        go choices
       in
       let step_data =
         let i = ref 0 in
@@ -638,8 +630,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (struct
               let etyp =
                 Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                  ~wrap_rounds:Tock.Rounds.n
-                  ~feature_flags
+                  ~wrap_rounds:Tock.Rounds.n ~feature_flags
 
               let f (T b : _ Branch_data.t) =
                 let (T (typ, _conv, conv_inv)) = etyp in
@@ -717,8 +708,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       Timer.clock __LOC__ ;
       let wrap_requests, wrap_main =
         let srs = Tick.Keypair.load_urs () in
-        Wrap_main.wrap_main ~srs full_signature prev_varss_length step_vks
-          proofs_verifieds step_domains max_proofs_verified
+        Wrap_main.wrap_main ~feature_flags ~srs full_signature prev_varss_length
+          step_vks proofs_verifieds step_domains max_proofs_verified
       in
       Timer.clock __LOC__ ;
       let (wrap_pk, wrap_vk), disk_key =
@@ -808,8 +799,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let wrap_vk = Lazy.force wrap_vk in
             S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
               ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
-              ~public_input ~auxiliary_typ
-              ~feature_flags
+              ~public_input ~auxiliary_typ ~feature_flags
               (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
               wrap_vk.index
           in
@@ -2067,12 +2057,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let full_signature =
             { Full_signature.padded; maxes = (module Maxes) }
           in
+          let feature_flags = Plonk_types.Features.none in
+          let actual_feature_flags = Plonk_types.Features.none_bool in
           let wrap_domains =
             let module M =
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
-            M.f full_signature prev_varss_n prev_varss_length ~self
-              ~choices:[ rule ]
+            M.f full_signature prev_varss_n prev_varss_length ~feature_flags
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
@@ -2092,8 +2083,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.[ 2 ] in
-          let feature_flags = Plonk_types.Features.none in
-          let actual_feature_flags = Plonk_types.Features.none_bool in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
@@ -3039,12 +3028,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let full_signature =
             { Full_signature.padded; maxes = (module Maxes) }
           in
+          let feature_flags = Plonk_types.Features.none in
+          let actual_feature_flags = Plonk_types.Features.none_bool in
           let wrap_domains =
             let module M =
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
-            M.f full_signature prev_varss_n prev_varss_length ~self
-              ~choices:[ rule ]
+            M.f full_signature prev_varss_n prev_varss_length ~feature_flags
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
@@ -3064,8 +3054,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.[ 2 ] in
-          let feature_flags = Plonk_types.Features.none in
-          let actual_feature_flags = Plonk_types.Features.none_bool in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
