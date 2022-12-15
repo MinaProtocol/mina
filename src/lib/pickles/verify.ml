@@ -112,6 +112,14 @@ let verify_heterogenous (ts : Instance.t list) =
             step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
+        let feature_flags =
+          (* TODO: GET FROM VERIFICATION KEY!!! *)
+          Plonk_types.Features.none
+        in
+        let actual_feature_flags =
+          (* TODO: GET FROM PROOF!!! *)
+          Plonk_types.Features.none_bool
+        in
         let tick_env =
           let module Env_bool = struct
             type t = bool
@@ -136,7 +144,8 @@ let verify_heterogenous (ts : Instance.t list) =
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+            ~feature_flags:actual_feature_flags ~endo:Endo.Step_inner_curve.base
+            ~mds:Tick_field_sponge.params.mds
             ~srs_length_log2:Common.Max_degree.step_log2
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -152,9 +161,8 @@ let verify_heterogenous (ts : Instance.t list) =
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags:Plonk_types.Features.none (* TODO *)
-              ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-              tick_combined_evals
+              ~feature_flags ~shift:Shifts.tick1 ~env:tick_env
+              tick_plonk_minimal tick_combined_evals
           in
           { p with
             zeta = plonk0.zeta

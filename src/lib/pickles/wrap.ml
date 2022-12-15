@@ -196,6 +196,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     Plonk_checks.scalars_env
       (module Env_bool)
       (module Env_field)
+      ~feature_flags:Plonk_types.Features.none_bool
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
       ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
@@ -309,6 +310,13 @@ let%test "lookup finalization" =
     ; runtime_tables = Maybe
     }
   in
+  let actual_feature_flags =
+    Plonk_types.Features.map feature_flags ~f:(function
+      | Plonk_types.Opt.Flag.Yes | Maybe ->
+          Impls.Step.Boolean.true_
+      | No ->
+          Impls.Step.Boolean.false_ )
+  in
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_main_inputs in
@@ -357,7 +365,7 @@ let%test "lookup finalization" =
         in
         Step_verifier.finalize_other_proof
           (module Nat.N0)
-          ~feature_flags
+          ~feature_flags ~actual_feature_flags
           ~step_domains:
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
           ~sponge ~prev_challenges:[] deferred_values evals

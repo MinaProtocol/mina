@@ -874,6 +874,7 @@ struct
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+      ~(actual_feature_flags : Boolean.var Plonk_types.Features.t)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -1000,6 +1001,7 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
+            ~feature_flags:actual_feature_flags
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds

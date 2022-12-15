@@ -47,6 +47,8 @@ type ('a, 'b) vector := ('a, 'b) Pickles_types.Vector.t
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
   -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> actual_feature_flags:
+       Step_main_inputs.Impl.Boolean.var Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]

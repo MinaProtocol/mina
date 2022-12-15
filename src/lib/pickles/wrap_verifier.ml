@@ -900,6 +900,9 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
+        (* This proof is a wrap proof; no need to consider features. *)
+        ~feature_flags:
+          Plonk_types.Features.(map ~f:Boolean.var_of_value none_bool)
         ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
@@ -987,6 +990,7 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
+          (* This proof is a wrap proof; no need to consider features. *)
           Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )

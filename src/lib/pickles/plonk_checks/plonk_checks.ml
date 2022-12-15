@@ -245,9 +245,10 @@ let () = ignore ((expand_feature_flags, get_feature_flag) : _ * _)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
+    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2 ~feature_flags
     ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
+  let feature_flags = expand_feature_flags (module B) feature_flags in
   let witness = Vector.to_array e.w in
   let coefficients = Vector.to_array e.coefficients in
   let var (col, row) =
@@ -367,38 +368,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         let if_ b ~then_ ~else_ =
           match b with None -> e2 () | Some b -> F.if_ b ~then_ ~else_
         in
-        let b =
-          match feature with
-          | ChaCha ->
-              None
-          | RangeCheck ->
-              None
-          | ForeignFieldAdd ->
-              None
-          | ForeignFieldMul ->
-              None
-          | Xor ->
-              None
-          | Rot ->
-              None
-          | LookupTables
-          | RuntimeLookupTables
-          | LookupPattern Lookup
-          | TableWidth 0
-          | TableWidth 1
-          | TableWidth 2
-          | LookupsPerRow 0
-          | LookupsPerRow 1
-          | LookupsPerRow 2
-          | LookupsPerRow 3 -> (
-              match joint_combiner with None -> None | Some _ -> Some B.true_ )
-          | LookupPattern (Xor | ChaChaFinal | RangeCheck | ForeignFieldMul) ->
-              None
-          | TableWidth _ ->
-              None
-          | LookupsPerRow _ ->
-              None
-        in
+        let b = get_feature_flag feature_flags feature in
         if_ b ~then_:e1 ~else_:e2 )
   ; foreign_field_modulus = (fun _ -> failwith "TODO")
   ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")

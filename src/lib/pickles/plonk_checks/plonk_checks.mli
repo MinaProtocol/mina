@@ -89,6 +89,7 @@ val scalars_env :
   -> field_of_hex:(string -> 't)
   -> domain:< generator : 't ; vanishing_polynomial : 't -> 't ; .. >
   -> srs_length_log2:int
+  -> feature_flags:'b Plonk_types.Features.t
   -> ('t, 't) Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t

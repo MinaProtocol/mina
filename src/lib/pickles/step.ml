@@ -199,10 +199,14 @@ struct
 
             let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
           end in
+          let feature_flags =
+            (* TODO: MUST GET FROM PROOF!!!! *)
+            Plonk_types.Features.none_bool
+          in
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~srs_length_log2:Common.Max_degree.step_log2
+            ~feature_flags ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -450,7 +454,8 @@ struct
         Plonk_checks.scalars_env
           (module Env_bool)
           (module Env_field)
-          ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
+          ~feature_flags:Plonk_types.Features.none_bool ~domain:tock_domain
+          ~srs_length_log2:Common.Max_degree.wrap_log2
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
