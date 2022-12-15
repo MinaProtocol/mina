@@ -42,9 +42,10 @@ module Wrap = struct
                   See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
                   from the [Minimal] value.
               *)
-              type ('challenge, 'scalar_challenge) t =
+              type ('challenge, 'scalar_challenge, 'bool) t =
                     ( 'challenge
-                    , 'scalar_challenge )
+                    , 'scalar_challenge
+                    , 'bool )
                     Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
                     .Deferred_values
                     .Plonk
@@ -56,6 +57,7 @@ module Wrap = struct
                 ; gamma : 'challenge
                 ; zeta : 'scalar_challenge
                 ; joint_combiner : 'scalar_challenge option
+                ; feature_flags : 'bool Plonk_types.Features.Stable.V1.t
                 }
               [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
@@ -276,7 +278,13 @@ module Wrap = struct
               Then, we expose them so the next guy (who can do scalar arithmetic) can check that they
               were computed correctly from the evaluations in the proof and the challenges.
           *)
-          type ('challenge, 'scalar_challenge, 'fp, 'fp_opt, 'lookup_opt) t =
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fp_opt
+               , 'lookup_opt
+               , 'bool )
+               t =
             { alpha : 'scalar_challenge
             ; beta : 'challenge
             ; gamma : 'challenge
@@ -294,6 +302,7 @@ module Wrap = struct
                   (** scalar used on the endomul_scalar selector *)
             ; perm : 'fp
                   (** scalar used on one of the permutation polynomial commitments. *)
+            ; feature_flags : 'bool Plonk_types.Features.t
             ; lookup : 'lookup_opt
             ; optional_column_scalars : 'fp_opt Optional_column_scalars.t
             }
@@ -325,7 +334,7 @@ module Wrap = struct
           let typ (type f fp)
               (module Impl : Snarky_backendless.Snark_intf.Run
                 with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~feature_flags
+              ~challenge ~scalar_challenge ~bool ~feature_flags
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
@@ -339,6 +348,7 @@ module Wrap = struct
               ; fp
               ; fp
               ; fp
+              ; Plonk_types.Features.typ bool
               ; Plonk_types.Opt.typ Impl.Boolean.typ
                   feature_flags.Plonk_types.Features.lookup
                   ~dummy:{ joint_combiner = dummy_scalar_challenge }
@@ -353,11 +363,16 @@ module Wrap = struct
 
         let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
             (t :
-              (challenge, scalar_challenge, fp, fp_opt, lookup_opt) In_circuit.t
-              )
+              ( challenge
+              , scalar_challenge
+              , fp
+              , fp_opt
+              , lookup_opt
+              , 'bool )
+              In_circuit.t )
             ~(to_option :
                lookup_opt -> scalar_challenge In_circuit.Lookup.t option ) :
-            (challenge, scalar_challenge) Minimal.t =
+            (challenge, scalar_challenge, 'bool) Minimal.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
@@ -365,6 +380,7 @@ module Wrap = struct
           ; joint_combiner =
               Option.map (to_option t.lookup) ~f:(fun l ->
                   l.In_circuit.Lookup.joint_combiner )
+          ; feature_flags = t.feature_flags
           }
       end
 
@@ -436,10 +452,11 @@ module Wrap = struct
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
+             , 'bool
              , 'bulletproof_challenges
              , 'index )
              t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fp
           , 'bulletproof_challenges
@@ -471,13 +488,15 @@ module Wrap = struct
              , 'fp_opt
              , 'lookup_opt
              , 'bulletproof_challenges
-             , 'branch_data )
+             , 'branch_data
+             , 'bool )
              t =
           ( ( 'challenge
             , 'scalar_challenge
             , 'fp
             , 'fp_opt
-            , 'lookup_opt )
+            , 'lookup_opt
+            , 'bool )
             Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fp
@@ -489,13 +508,14 @@ module Wrap = struct
         let to_hlist, of_hlist = (to_hlist, of_hlist)
 
         let typ (type f fp)
-            (impl :
+            ((module Impl) as impl :
               (module Snarky_backendless.Snark_intf.Run with type field = f) )
             ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
             ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ impl ~dummy_scalar ~dummy_scalar_challenge
-                ~challenge ~scalar_challenge ~feature_flags fp
+                ~challenge ~scalar_challenge ~bool:Impl.Boolean.typ
+                ~feature_flags fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge
@@ -586,14 +606,14 @@ module Wrap = struct
     module Minimal = struct
       type ( 'challenge
            , 'scalar_challenge
-           , 'scalar_challenge_opt
            , 'fp
+           , 'bool
            , 'messages_for_next_wrap_proof
            , 'digest
            , 'bp_chals
            , 'index )
            t =
-        ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+        ( ('challenge, 'scalar_challenge, 'bool) Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
         , 'messages_for_next_wrap_proof
@@ -610,6 +630,7 @@ module Wrap = struct
            , 'fp
            , 'fp_opt
            , 'lookup_opt
+           , 'bool
            , 'messages_for_next_wrap_proof
            , 'digest
            , 'bp_chals
@@ -619,7 +640,8 @@ module Wrap = struct
           , 'scalar_challenge
           , 'fp
           , 'fp_opt
-          , 'lookup_opt )
+          , 'lookup_opt
+          , 'bool )
           Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
@@ -809,6 +831,7 @@ module Wrap = struct
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
+               , 'bool
                , 'messages_for_next_wrap_proof
                , 'digest
                , 'messages_for_next_step_proof
@@ -816,7 +839,8 @@ module Wrap = struct
                , 'index )
                t =
             ( ( 'challenge
-              , 'scalar_challenge )
+              , 'scalar_challenge
+              , 'bool )
               Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
             , 'scalar_challenge
             , 'fp
@@ -837,6 +861,7 @@ module Wrap = struct
            , 'fp
            , 'fp_opt
            , 'lookup_opt
+           , 'bool
            , 'messages_for_next_wrap_proof
            , 'digest
            , 'messages_for_next_step_proof
@@ -847,7 +872,8 @@ module Wrap = struct
           , 'scalar_challenge
           , 'fp
           , 'fp_opt
-          , 'lookup_opt )
+          , 'lookup_opt
+          , 'bool )
           Proof_state.Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
@@ -869,6 +895,7 @@ module Wrap = struct
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
+          ; Vector (B Bool, Nat.N8.n)
           ; Lookup_parameters.opt_spec impl lookup
           ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
             .spec impl lookup.zero feature_flags
@@ -895,6 +922,7 @@ module Wrap = struct
                        ; endomul
                        ; endomul_scalar
                        ; perm
+                       ; feature_flags
                        ; lookup
                        ; optional_column_scalars
                        }
@@ -940,6 +968,7 @@ module Wrap = struct
           ; digest
           ; bulletproof_challenges
           ; index
+          ; Plonk_types.Features.to_vector feature_flags
           ; option_map lookup
               ~f:Proof_state.Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ; optional_column_scalars
@@ -954,6 +983,7 @@ module Wrap = struct
             ; digest
             ; bulletproof_challenges
             ; index
+            ; feature_flags
             ; lookup
             ; optional_column_scalars
             ] ~option_map : _ t =
@@ -1002,6 +1032,8 @@ module Wrap = struct
                     ; endomul
                     ; endomul_scalar
                     ; perm
+                    ; feature_flags =
+                        Plonk_types.Features.of_vector feature_flags
                     ; lookup =
                         option_map lookup
                           ~f:
@@ -1068,8 +1100,13 @@ module Step = struct
       [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
-        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+        type ( 'challenge
+             , 'scalar_challenge
+             , 'bool
+             , 'fq
+             , 'bulletproof_challenges )
+             t =
+          ( ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1089,7 +1126,8 @@ module Step = struct
             , 'scalar_challenge
             , 'fq
             , 'fq_opt
-            , ('scalar_challenge Plonk.In_circuit.Lookup.t, 'bool) Opt.t )
+            , ('scalar_challenge Plonk.In_circuit.Lookup.t, 'bool) Opt.t
+            , 'bool )
             Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
@@ -1147,7 +1185,10 @@ module Step = struct
              , 'digest
              , 'bool )
              t =
-          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+          ( ( 'challenge
+            , 'scalar_challenge
+            , 'bool )
+            Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
@@ -1171,7 +1212,8 @@ module Step = struct
             , 'scalar_challenge
             , 'fq
             , 'fq_opt
-            , 'lookup_opt )
+            , 'lookup_opt
+            , 'bool )
             Deferred_values.Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fq
@@ -1191,6 +1233,7 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
+            ; Vector (B Bool, Nat.N8.n)
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
               .Optional_column_scalars
@@ -1215,6 +1258,7 @@ module Step = struct
                      ; endomul
                      ; endomul_scalar
                      ; perm
+                     ; feature_flags
                      ; lookup
                      ; optional_column_scalars
                      }
@@ -1251,6 +1295,7 @@ module Step = struct
           ; scalar_challenge
           ; bulletproof_challenges
           ; bool
+          ; Plonk_types.Features.to_vector feature_flags
           ; option_map lookup
               ~f:Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ; optional_column_scalars
@@ -1274,6 +1319,7 @@ module Step = struct
               ; Vector.[ alpha; zeta; xi ]
               ; bulletproof_challenges
               ; Vector.[ should_finalize ]
+              ; feature_flags
               ; lookup
               ; optional_column_scalars
               ] ~option_map : _ t =
@@ -1294,6 +1340,7 @@ module Step = struct
                   ; endomul
                   ; endomul_scalar
                   ; perm
+                  ; feature_flags = Plonk_types.Features.of_vector feature_flags
                   ; lookup =
                       option_map lookup
                         ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct

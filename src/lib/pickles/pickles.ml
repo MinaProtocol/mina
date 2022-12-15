@@ -2422,6 +2422,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               ~f:
                                 (Scalar_challenge.map
                                    ~f:Challenge.Constant.of_tick_field )
+                        ; feature_flags = Plonk_types.Features.none_bool
                         }
                       in
                       let r = scalar_chal O.u in
@@ -2501,7 +2502,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Plonk_checks.scalars_env
                           (module Env_bool)
                           (module Env_field)
-                          ~feature_flags:Plonk_types.Features.none_bool
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
@@ -2586,7 +2586,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Wrap.Type1.derive_plonk
                           (module Field)
                           ~feature_flags:Plonk_types.Features.none
-                          ~actual_feature_flags:Plonk_types.Features.none_bool
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -3393,6 +3392,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               ~f:
                                 (Scalar_challenge.map
                                    ~f:Challenge.Constant.of_tick_field )
+                        ; feature_flags = Plonk_types.Features.none_bool
                         }
                       in
                       let r = scalar_chal O.u in
@@ -3472,7 +3472,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Plonk_checks.scalars_env
                           (module Env_bool)
                           (module Env_field)
-                          ~feature_flags:Plonk_types.Features.none_bool
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
@@ -3520,7 +3519,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
-                          ~actual_feature_flags
                           ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals

@@ -265,9 +265,10 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2 ~feature_flags
-    ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
-    (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
+    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
+    ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+      (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
+    =
   let feature_flags = expand_feature_flags (module B) feature_flags in
   let witness = Vector.to_array e.w in
   let coefficients = Vector.to_array e.coefficients in
@@ -406,8 +407,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
-      ({ alpha = _; beta; gamma; zeta; joint_combiner = _ } : _ Minimal.t)
-      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
+      ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
+        _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
@@ -449,11 +450,17 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift
-      ~(feature_flags : _ Plonk_types.Features.t)
-      ~(actual_feature_flags : _ Plonk_types.Features.t) =
+      ~(feature_flags : _ Plonk_types.Features.t) =
     let _ = with_label in
     let open F in
-    fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
+    fun ({ alpha
+         ; beta
+         ; gamma
+         ; zeta
+         ; joint_combiner
+         ; feature_flags = actual_feature_flags
+         } :
+          _ Minimal.t )
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in
@@ -542,6 +549,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                   feature_flags.runtime_tables
                   actual_feature_flags.runtime_tables
             }
+        ; feature_flags = actual_feature_flags
         }
 
   (** Check that computed proof scalars match the expected ones,
@@ -554,12 +562,12 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env ~feature_flags ~actual_feature_flags
-      (plonk : (_, _, _, _ Opt.t, _ Opt.t) In_circuit.t) evals =
+      ~shift ~env ~feature_flags
+      (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)
-        ~shift ~env ~feature_flags ~actual_feature_flags
+        ~shift ~env ~feature_flags
         { alpha = plonk.alpha
         ; beta = plonk.beta
         ; gamma = plonk.gamma
@@ -570,6 +578,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                 None
             | Some l | Maybe (_, l) ->
                 Some l.In_circuit.Lookup.joint_combiner )
+        ; feature_flags = plonk.feature_flags
         }
         evals
     in

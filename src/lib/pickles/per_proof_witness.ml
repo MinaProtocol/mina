@@ -67,6 +67,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
         , Impl.Boolean.var )
         Plonk_types.Opt.t
+      , Impl.Boolean.var
       , unit
       , Digest.Make(Impl).t
       , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
@@ -120,6 +121,7 @@ module Constant = struct
         , scalar_challenge
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
+        , bool
         , unit
         , Digest.Constant.t
         , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t

@@ -165,6 +165,7 @@ module Wrap : sig
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
+         , Impl.Boolean.var
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
@@ -185,6 +186,7 @@ module Wrap : sig
            .Lookup
            .t
            option
+         , bool
          , ( Limb_vector.Constant.Hex64.t
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec

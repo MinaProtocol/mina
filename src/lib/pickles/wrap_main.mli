@@ -27,6 +27,7 @@ val wrap_main :
              , Wrap_main_inputs.Impl.Boolean.var )
              Pickles_types.Plonk_types.Opt.t
            , 'a
+           , Impls.Wrap.Boolean.var
            , Impls.Wrap.Field.t
            , Impls.Wrap.Field.t
            , 'b

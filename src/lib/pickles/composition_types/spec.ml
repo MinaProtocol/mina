@@ -7,6 +7,7 @@ module Sc = Kimchi_backend_common.Scalar_challenge
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
 type ('a, 'b, 'c) basic =
+  | Unit : (unit, unit, < .. >) basic
   | Field
       : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
@@ -257,6 +258,8 @@ let pack_basic (type field other_field other_field_var)
       -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
    fun basic x ->
     match basic with
+    | Unit ->
+        [||]
     | Field ->
         [| `Field x |]
     | Bool ->
@@ -294,6 +297,8 @@ let typ_basic (type field other_field other_field_var)
       -> (b, a) Impl.Typ.t =
    fun basic ->
     match basic with
+    | Unit ->
+        Typ.unit
     | Field ->
         field
     | Bool ->
@@ -341,6 +346,8 @@ let packed_typ_basic (type field other_field other_field_var)
       type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> (b, a, field) ETyp.t = function
+    | Unit ->
+        T (Typ.unit, Fn.id, Fn.id)
     | Field ->
         field
     | Bool ->

@@ -1,6 +1,7 @@
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
 type (_, _, _) basic =
+  | Unit : (unit, unit, < .. >) basic
   | Field
       : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic

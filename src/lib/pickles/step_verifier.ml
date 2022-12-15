@@ -342,11 +342,13 @@ struct
   let assert_eq_deferred_values
       (m1 :
         ( 'a
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t
+        , _ )
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t )
       (m2 :
         ( Inputs.Impl.Field.t
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t
+        , _ )
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
@@ -510,6 +512,7 @@ struct
          , _
          , _ Shifted_value.Type2.t
          , _
+         , _
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
@@ -632,8 +635,15 @@ struct
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           ; joint_combiner
+          ; feature_flags = plonk.feature_flags
           }
-          { alpha; beta; gamma; zeta; joint_combiner } ;
+          { alpha
+          ; beta
+          ; gamma
+          ; zeta
+          ; joint_combiner
+          ; feature_flags = plonk.feature_flags
+          } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =
@@ -874,7 +884,6 @@ struct
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-      ~(actual_feature_flags : Boolean.var Plonk_types.Features.t)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -893,7 +902,8 @@ struct
         , _
         , _
         , _
-        , Field.Constant.t Branch_data.Checked.t )
+        , Field.Constant.t Branch_data.Checked.t
+        , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let open Vector in
@@ -1001,7 +1011,6 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~feature_flags:actual_feature_flags
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
@@ -1082,7 +1091,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked ~feature_flags ~actual_feature_flags
+          Plonk_checks.checked ~feature_flags
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in

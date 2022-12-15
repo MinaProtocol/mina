@@ -107,6 +107,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t
           Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
+        , bool
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -148,10 +149,6 @@ struct
       in
       let data = Types_map.lookup_basic tag in
       let feature_flags = data.feature_flags in
-      let actual_feature_flags =
-        (* TODO: MUST GET FROM PROOF!!!! *)
-        Plonk_types.Features.none_bool
-      in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -182,6 +179,7 @@ struct
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
+          ; feature_flags = plonk0.feature_flags
           }
         in
         let env =
@@ -208,7 +206,6 @@ struct
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~feature_flags:actual_feature_flags
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
@@ -229,8 +226,8 @@ struct
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~actual_feature_flags ~env ~shift:Shifts.tick1
-              plonk_minimal combined_evals )
+              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
+              combined_evals )
       in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
       let T = Local_max_proofs_verified.eq in
@@ -245,6 +242,7 @@ struct
           ( _
           , _
           , _ Shifted_value.Type1.t
+          , _
           , _
           , _
           , _
@@ -335,6 +333,8 @@ struct
             Option.map
               ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
               (O.joint_combiner_chal o)
+        ; feature_flags =
+            t.statement.proof_state.deferred_values.plonk.feature_flags
         }
       in
       let xi = scalar_chal O.v in
@@ -455,9 +455,8 @@ struct
         end in
         Plonk_checks.scalars_env
           (module Env_bool)
-          (module Env_field) (* Wrap proof, no need to use features *)
-          ~feature_flags:Plonk_types.Features.none_bool ~domain:tock_domain
-          ~srs_length_log2:Common.Max_degree.wrap_log2
+          (module Env_field)
+          ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
@@ -506,7 +505,6 @@ struct
         end in
         (* Wrap proof, no features *)
         Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
-          ~actual_feature_flags:Plonk_types.Features.none_bool
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals

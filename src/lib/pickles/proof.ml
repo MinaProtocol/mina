@@ -55,6 +55,7 @@ module Base = struct
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
               , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
+              , bool
               , 'messages_for_next_wrap_proof
               , Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
@@ -83,6 +84,7 @@ module Base = struct
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
           , Tick.Field.t Shifted_value.Type1.t
+          , bool
           , 'messages_for_next_wrap_proof
           , Digest.Constant.t
           , 'messages_for_next_step_proof
@@ -153,6 +155,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     ; gamma = chal ()
                     ; zeta = scalar_chal ()
                     ; joint_combiner = None
+                    ; feature_flags = Plonk_types.Features.none_bool
                     }
                 }
             ; sponge_digest_before_evaluations =

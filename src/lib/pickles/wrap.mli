@@ -22,6 +22,7 @@ val wrap :
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
+         , Impls.Wrap.Impl.Boolean.var
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
@@ -114,7 +115,8 @@ val combined_inner_product :
   -> r:Backend.Tick.Field.t
   -> plonk:
        ( Backend.Tick.Field.t
-       , Backend.Tick.Field.t )
+       , Backend.Tick.Field.t
+       , bool )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
   -> xi:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t

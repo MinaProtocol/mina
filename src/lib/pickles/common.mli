@@ -49,7 +49,8 @@ val ft_comm :
        , 'e
        , 'b
        , 'g
-       , 'f )
+       , 'f
+       , 'bool )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'a array
   -> 'a
@@ -210,6 +211,7 @@ val tock_public_input_of_statement :
        .Lookup
        .t
        option
+     , bool
      , ( Limb_vector.Constant.Hex64.t
        , Composition_types.Digest.Limbs.n )
        Pickles_types.Vector.vec
@@ -240,6 +242,7 @@ val tock_unpadded_public_input_of_statement :
        .Lookup
        .t
        option
+     , bool
      , ( Limb_vector.Constant.Hex64.t
        , Composition_types.Digest.Limbs.n )
        Pickles_types.Vector.vec

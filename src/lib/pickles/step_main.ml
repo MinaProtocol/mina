@@ -44,14 +44,10 @@ let verify_one ~srs
           Sponge.absorb sponge (`Field sponge_digest) ;
           sponge
         in
-        let actual_feature_flags =
-          (* TODO: GET FROM THE PROOF!!!! *)
-          Plonk_types.Features.(map none_bool ~f:(fun _ -> Boolean.false_))
-        in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~feature_flags:d.feature_flags ~actual_feature_flags ~sponge
-          ~prev_challenges proof_state.deferred_values prev_proof_evals )
+          ~feature_flags:d.feature_flags ~sponge ~prev_challenges
+          proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =

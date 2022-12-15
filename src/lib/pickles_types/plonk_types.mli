@@ -55,17 +55,30 @@ module Opt : sig
 end
 
 module Features : sig
-  type 'bool t =
-    { chacha : 'bool
-    ; range_check : 'bool
-    ; foreign_field_add : 'bool
-    ; foreign_field_mul : 'bool
-    ; xor : 'bool
-    ; rot : 'bool
-    ; lookup : 'bool
-    ; runtime_tables : 'bool
-    }
-  [@@deriving sexp, compare, yojson, hash, equal]
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type 'bool t =
+        { chacha : 'bool
+        ; range_check : 'bool
+        ; foreign_field_add : 'bool
+        ; foreign_field_mul : 'bool
+        ; xor : 'bool
+        ; rot : 'bool
+        ; lookup : 'bool
+        ; runtime_tables : 'bool
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  val to_vector : 'a t -> ('a, Nat.N8.n) Vector.t
+
+  val of_vector : ('a, Nat.N8.n) Vector.t -> 'a t
+
+  val typ :
+       ('var, 'value, 'f) Snarky_backendless.Typ.t
+    -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
 
   val none : Opt.Flag.t t
 

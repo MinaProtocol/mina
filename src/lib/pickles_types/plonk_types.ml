@@ -168,17 +168,68 @@ module Opt = struct
 end
 
 module Features = struct
-  type 'bool t =
-    { chacha : 'bool
-    ; range_check : 'bool
-    ; foreign_field_add : 'bool
-    ; foreign_field_mul : 'bool
-    ; xor : 'bool
-    ; rot : 'bool
-    ; lookup : 'bool
-    ; runtime_tables : 'bool
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'bool t =
+        { chacha : 'bool
+        ; range_check : 'bool
+        ; foreign_field_add : 'bool
+        ; foreign_field_mul : 'bool
+        ; xor : 'bool
+        ; rot : 'bool
+        ; lookup : 'bool
+        ; runtime_tables : 'bool
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  let to_vector
+      { chacha
+      ; range_check
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; xor
+      ; rot
+      ; lookup
+      ; runtime_tables
+      } : _ Vector.t =
+    [ chacha
+    ; range_check
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    ]
+
+  let of_vector
+      ([ chacha
+       ; range_check
+       ; foreign_field_add
+       ; foreign_field_mul
+       ; xor
+       ; rot
+       ; lookup
+       ; runtime_tables
+       ] :
+        _ Vector.t ) =
+    { chacha
+    ; range_check
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
     }
-  [@@deriving sexp, compare, yojson, hash, equal]
+
+  let typ bool =
+    Vector.typ bool Nat.N8.n
+    |> Snarky_backendless.Typ.transport ~there:to_vector ~back:of_vector
+    |> Snarky_backendless.Typ.transport_var ~there:to_vector ~back:of_vector
 
   let none =
     { chacha = Opt.Flag.No

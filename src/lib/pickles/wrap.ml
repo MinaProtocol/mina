@@ -90,7 +90,8 @@ type deferred_values_and_hints =
         , (Tick.Field.t Shifted_value.Type1.t, bool) Opt.t
         , ( scalar_challenge_constant Deferred_values.Plonk.In_circuit.Lookup.t
           , bool )
-          Opt.t )
+          Opt.t
+        , bool )
         Deferred_values.Plonk.In_circuit.t
       , scalar_challenge_constant
       , Tick.Field.t Shifted_value.Type1.t
@@ -131,6 +132,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         (* TODO: Needs to be changed when lookups are fully implemented *)
         Option.map (O.joint_combiner_chal o)
           ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tick_field)
+    ; feature_flags = actual_feature_flags
     }
   in
   let r = scalar_chal O.u in
@@ -197,8 +199,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     Plonk_checks.scalars_env
       (module Env_bool)
       (module Env_field)
-      ~feature_flags:actual_feature_flags ~endo:Endo.Step_inner_curve.base
-      ~mds:Tick_field_sponge.params.mds
+      ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
       ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -213,8 +214,8 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     end in
     Type1.derive_plonk
       (module Field)
-      ~feature_flags ~actual_feature_flags ~shift:Shifts.tick1 ~env:tick_env
-      tick_plonk_minimal tick_combined_evals
+      ~feature_flags ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
+      tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
       Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -319,10 +320,6 @@ let%test "lookup finalization" =
       ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
       ~actual_proofs_verified:Nat.N0.n
   in
-  let actual_feature_flags =
-    Plonk_types.Features.map ~f:Impls.Step.Boolean.var_of_value
-      actual_feature_flags
-  in
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_main_inputs in
@@ -371,7 +368,7 @@ let%test "lookup finalization" =
         in
         Step_verifier.finalize_other_proof
           (module Nat.N0)
-          ~feature_flags ~actual_feature_flags
+          ~feature_flags
           ~step_domains:
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
           ~sponge ~prev_challenges:[] deferred_values evals

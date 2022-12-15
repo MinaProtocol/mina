@@ -32,6 +32,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
           .t
         , Impl.Boolean.var )
         Pickles_types.Plonk_types.Opt.t
+      , Impl.Boolean.var
       , unit
       , Import.Digest.Make(Impl).t
       , scalar_challenge Import.Bulletproof_challenge.t
@@ -89,6 +90,7 @@ module Constant : sig
           Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
           .t
           option
+        , bool
         , unit
         , Import.Digest.Constant.t
         , scalar_challenge Import.Bulletproof_challenge.t

@@ -490,8 +490,8 @@ struct
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
   let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
-      (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
+      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.t)
+      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
@@ -718,8 +718,15 @@ struct
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           ; joint_combiner
+          ; feature_flags = plonk.feature_flags
           }
-          { alpha; beta; gamma; zeta; joint_combiner } ;
+          { alpha
+          ; beta
+          ; gamma
+          ; zeta
+          ; joint_combiner
+          ; feature_flags = plonk.feature_flags
+          } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -900,9 +907,6 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        (* This proof is a wrap proof; no need to consider features. *)
-        ~feature_flags:
-          Plonk_types.Features.(map ~f:Boolean.var_of_value none_bool)
         ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
@@ -992,8 +996,6 @@ struct
       with_label __LOC__ (fun () ->
           (* This proof is a wrap proof; no need to consider features. *)
           Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
-            ~actual_feature_flags:
-              Plonk_types.Features.(map none ~f:(fun _ -> Boolean.false_))
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in
