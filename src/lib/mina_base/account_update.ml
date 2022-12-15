@@ -607,7 +607,7 @@ module Update = struct
 end
 
 module Events = Zkapp_account.Events
-module Sequence_events = Zkapp_account.Sequence_events
+module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned
@@ -928,7 +928,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
         ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
         ~increment_nonce:!.bool ~events:!.Events.deriver
-        ~actions:!.Sequence_events.deriver ~call_data:!.field
+        ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
         ~caller:!.Token_id.deriver ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
@@ -1237,7 +1237,7 @@ module Body = struct
       ; balance_change : Amount.Signed.var
       ; increment_nonce : Boolean.var
       ; events : Events.var
-      ; actions : Sequence_events.var
+      ; actions : Actions.var
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
@@ -1270,7 +1270,7 @@ module Body = struct
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
-        ; Sequence_events.var_to_input actions
+        ; Actions.var_to_input actions
         ; Random_oracle_input.Chunked.field call_data
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
@@ -1292,7 +1292,7 @@ module Body = struct
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
-      ; Sequence_events.typ
+      ; Actions.typ
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
@@ -1346,7 +1346,7 @@ module Body = struct
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
-      ; Sequence_events.to_input actions
+      ; Actions.to_input actions
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)

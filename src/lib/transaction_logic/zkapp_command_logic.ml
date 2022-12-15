@@ -149,7 +149,7 @@ module type Token_id_intf = sig
   val default : t
 end
 
-module type Sequence_events_intf = sig
+module type Actions_intf = sig
   type t
 
   type bool
@@ -722,8 +722,8 @@ module type Inputs_intf = sig
        and type token_id := Token_id.t
        and type account_id := Account_id.t)
 
-  and Sequence_events :
-    (Sequence_events_intf with type bool := Bool.t and type field := Field.t)
+  and Actions :
+    (Actions_intf with type bool := Bool.t and type field := Field.t)
 
   and Account_update :
     (Account_update_intf
@@ -739,7 +739,7 @@ module type Inputs_intf = sig
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
-       and type Update.actions := Sequence_events.t
+       and type Update.actions := Actions.t
        and type Update.zkapp_uri := Zkapp_uri.t
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
@@ -979,8 +979,8 @@ module Make (Inputs : Inputs_intf) = struct
       ~txn_global_slot ~last_sequence_slot =
     (* Push events to s1. *)
     let [ s1'; s2'; s3'; s4'; s5' ] = sequence_state in
-    let is_empty = Sequence_events.is_empty actions in
-    let s1_updated = Sequence_events.push_events s1' actions in
+    let is_empty = Actions.is_empty actions in
+    let s1_updated = Actions.push_events s1' actions in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
     let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
@@ -1401,7 +1401,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let is_empty =
         (* also computed in update_sequence_state, but messy to return it *)
-        Sequence_events.is_empty actions
+        Actions.is_empty actions
       in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies

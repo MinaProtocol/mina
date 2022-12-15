@@ -353,7 +353,7 @@ module type S = sig
 
   val update_sequence_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-    -> Zkapp_account.Sequence_events.t
+    -> Zkapp_account.Actions.t
     -> txn_global_slot:Global_slot.t
     -> last_sequence_slot:Global_slot.t
     -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
@@ -1214,12 +1214,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
-    module Sequence_events = struct
-      type t = Zkapp_account.Sequence_events.t
+    module Actions = struct
+      type t = Zkapp_account.Actions.t
 
       let is_empty = List.is_empty
 
-      let push_events = Account_update.Sequence_events.push_events
+      let push_events = Account_update.Actions.push_events
     end
 
     module Zkapp_uri = struct

@@ -152,7 +152,7 @@ module Events = struct
         failwithf "Error from run_and_check: %s" (Error.to_string_hum err) ()
 end
 
-module Sequence_events = struct
+module Actions = struct
   include Make_events (struct
     let salt_phrase = "MinaZkappSequenceEmpty"
 
@@ -432,7 +432,7 @@ let default : _ Poly.t =
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
-      (let empty = Sequence_events.empty_state_element in
+      (let empty = Actions.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
   ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
