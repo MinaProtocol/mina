@@ -186,6 +186,37 @@ let expand_feature_flags (type boolean)
   ; features
   }
 
+let lookup_tables_used feature_flags =
+  let module Bool = struct
+    type t = Plonk_types.Opt.Flag.t
+
+    let (true_ : t) = Yes
+
+    let (false_ : t) = No
+
+    let ( &&& ) (x : t) (y : t) : t =
+      match (x, y) with
+      | Yes, Yes ->
+          Yes
+      | Maybe, _ | _, Maybe ->
+          Maybe
+      | No, _ | _, No ->
+          No
+
+    let ( ||| ) (x : t) (y : t) : t =
+      match (x, y) with
+      | Yes, _ | _, Yes ->
+          Yes
+      | Maybe, _ | _, Maybe ->
+          Maybe
+      | No, No ->
+          No
+
+    let any = List.fold_left ~f:( ||| ) ~init:false_
+  end in
+  let all_feature_flags = expand_feature_flags (module Bool) feature_flags in
+  Lazy.force all_feature_flags.lookup_tables
+
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
   match feature with

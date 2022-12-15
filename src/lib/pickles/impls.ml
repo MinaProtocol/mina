@@ -133,7 +133,7 @@ module Step = struct
         , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
         , Other_field.t Pickles_types.Shifted_value.Type2.t )
         Types.Wrap.Lookup_parameters.t =
-      { use = feature_flags.Plonk_types.Features.lookup
+      { use = Plonk_checks.lookup_tables_used feature_flags
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero

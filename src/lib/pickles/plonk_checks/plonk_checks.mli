@@ -58,6 +58,9 @@ end
 
 type 'f field = (module Field_intf with type t = 'f)
 
+val lookup_tables_used :
+  Plonk_types.Opt.Flag.t Plonk_types.Features.t -> Plonk_types.Opt.Flag.t
+
 val domain :
      't field
   -> shifts:(log2_size:int -> 't array)

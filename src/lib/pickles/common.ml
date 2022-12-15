@@ -128,9 +128,6 @@ module Lookup_parameters = struct
         ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
         }
     }
-
-  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
-    { use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
