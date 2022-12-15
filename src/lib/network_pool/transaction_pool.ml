@@ -2634,54 +2634,6 @@ let%test_module _ =
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 
-    let%test_unit "zkapp cmd with incrementing fee payer nonces are added to \
-                   the pool" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind () = after (Time.Span.of_sec 2.) in
-          let%bind t = setup_test () in
-          assert_pool_txs t [] ;
-          let fee_payer_kp = test_keys.(0) in
-          let%bind valid_commands =
-            List.mapi (List.init 10 ~f:Fn.id) ~f:(fun i _ ->
-                mk_basic_zkapp i fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool )
-            |> Deferred.all
-          in
-          let%bind () = add_commands' t valid_commands in
-          assert_pool_txs t valid_commands ;
-
-          let%bind () = advance_chain t valid_commands in
-          let%bind () = reorg t [] [] in
-          assert_pool_txs t [] ;
-
-          Deferred.unit )
-
-    let%test_unit "zkapp cmd with non-incrementing fee payer nonces are \
-                   rejected from the pool" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind () = after (Time.Span.of_sec 2.) in
-          let%bind t = setup_test () in
-          assert_pool_txs t [] ;
-          let fee_payer_kp = test_keys.(0) in
-          let%bind valid_command1 =
-            mk_basic_zkapp 0 fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool
-          in
-          let%bind valid_command2 =
-            mk_basic_zkapp 1 fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool
-          in
-          let%bind invalid_command1 =
-            mk_basic_zkapp 3 fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool
-          in
-          let%bind invalid_command2 =
-            mk_basic_zkapp 4 fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool
-          in
-          let valid_commands = [ valid_command1; valid_command2 ] in
-          let invalid_commands = [ invalid_command1; invalid_command2 ] in
-          let%bind () =
-            add_commands t (valid_commands @ invalid_commands)
-            >>| assert_pool_apply valid_commands
-          in
-          Deferred.unit )
-
     let%test_unit "zkapp cmd with same nonce should replace previous submitted \
                    zkapp with same nonce" =
       Thread_safe.block_on_async_exn (fun () ->
