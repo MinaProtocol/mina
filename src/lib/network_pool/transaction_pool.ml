@@ -2608,8 +2608,8 @@ let%test_module _ =
       let zkapp_command = List.hd_exn zkapp_command in
       Deferred.return zkapp_command
 
-    let mk_basic_zkapp ?(empty_update = false) ?(preconditions = None) nonce
-        fee_payer_kp =
+    let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
+        ?(preconditions = None) nonce fee_payer_kp =
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2630,7 +2630,7 @@ let%test_module _ =
             ]
       in
       account_updates
-      |> mk_zkapp_command ~memo:"" ~fee:10_000_000_000
+      |> mk_zkapp_command ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 
@@ -2690,15 +2690,16 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let fee_payer_kp = test_keys.(0) in
           let%bind valid_command1 =
-            mk_basic_zkapp 0 fee_payer_kp |> mk_zkapp_user_cmd t.txn_pool
+            mk_basic_zkapp ~fee:10_000_000_000 0 fee_payer_kp
+            |> mk_zkapp_user_cmd t.txn_pool
           in
           let%bind valid_command2 =
-            mk_basic_zkapp ~empty_update:true 0 fee_payer_kp
+            mk_basic_zkapp ~fee:20_000_000_000 ~empty_update:true 0 fee_payer_kp
             |> mk_zkapp_user_cmd t.txn_pool
           in
           let%bind () =
             add_commands t ([ valid_command1 ] @ [ valid_command2 ])
-            >>| assert_pool_apply [ valid_command1 ]
+            >>| assert_pool_apply [ valid_command2 ]
           in
           Deferred.unit )
   end )
