@@ -625,6 +625,8 @@ let get_snarked_ledger t state_hash_opt =
         Transition_frontier.root_snarked_ledger frontier
       in
       let ledger = Ledger.of_database root_snarked_ledger in
+      if true then failwith "TODO" ;
+      (*
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind _ =
         List.fold_until ~init:(Ok ()) path
@@ -682,6 +684,7 @@ let get_snarked_ledger t state_hash_opt =
             else Continue (Ok ()) )
           ~finish:Fn.id
       in
+      *)
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
         |> Mina_block.header |> Header.protocol_state

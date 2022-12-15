@@ -511,6 +511,10 @@ let format_time_span ts =
 (* TODO *)
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
+let profile_user_command (module T : Transaction_snark.S) _sparse_ledger0
+    _transitions _ =
+  failwith "TODO"
+(*
 let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
@@ -595,6 +599,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   in
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
+*)
 
 let profile_zkapps ~verifier ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
@@ -699,6 +704,8 @@ let profile_zkapps ~verifier ledger zkapp_commands =
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
 
+let check_base_snarks _ _ _ = failwith "TODO"
+(*
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
@@ -748,7 +755,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
           sparse_ledger' )
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
+*)
 
+let generate_base_snarks_witness _ _ _ = failwith "TODO"
+(*
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.Valid.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
@@ -798,6 +808,7 @@ let generate_base_snarks_witness sparse_ledger0
           sparse_ledger' )
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
+*)
 
 let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =

@@ -349,7 +349,6 @@ let calculate_root_transition_diff t heir =
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
-  let open Context in
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -475,6 +474,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
       (* STEP 5 *)
+      if true then failwith "TODO" ;
+      (*
       Mina_stdlib.Nonempty_list.iter
         (Option.value_exn
            (Staged_ledger.proof_txns_with_state_hashes
@@ -491,6 +492,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
                 (Ledger.apply_transaction ~constraint_constants ~txn_state_view
                    mt txn.data )
               : Ledger.Transaction_applied.t ) ) ;
+      *)
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
