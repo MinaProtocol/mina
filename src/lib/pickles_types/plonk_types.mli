@@ -19,7 +19,7 @@ module Opt : sig
   val to_option : ('a, 'bool) t -> 'a option
 
   module Flag : sig
-    type t = Yes | No | Maybe
+    type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
   end
 
   val constant_layout_typ :

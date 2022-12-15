@@ -302,6 +302,32 @@ let wrap_main
                        ; wrap_domain
                        ]
                      ->
+                    let deferred_values =
+                      (* strengthen the values to constants when we know they're true or false.
+                         This lets us skip some later computations.
+                      *)
+                      { deferred_values with
+                        plonk =
+                          { deferred_values.plonk with
+                            feature_flags =
+                              Plonk_types.Features.map2
+                                deferred_values.plonk.feature_flags
+                                Plonk_types.Features.none
+                                ~f:(fun actual_flag flag ->
+                                  match flag with
+                                  | No ->
+                                      Boolean.Assert.( = ) actual_flag
+                                        Boolean.false_ ;
+                                      Boolean.false_
+                                  | Yes ->
+                                      Boolean.Assert.( = ) actual_flag
+                                        Boolean.true_ ;
+                                      Boolean.true_
+                                  | Maybe ->
+                                      actual_flag )
+                          }
+                      }
+                    in
                     let sponge =
                       let s = Sponge.create sponge_params in
                       Sponge.absorb s sponge_digest_before_evaluations ;
