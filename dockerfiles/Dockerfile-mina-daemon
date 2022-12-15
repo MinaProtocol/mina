@@ -52,6 +52,8 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
   && apt-get update \
   && apt-get install -y google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin
 
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \

@@ -95,6 +95,8 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a
     && sudo apt-get update -y \
     && sudo apt-get install -y google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin
 
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
 # --- Helm tools
 RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
