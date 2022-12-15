@@ -2702,4 +2702,62 @@ let%test_module _ =
             >>| assert_pool_apply [ valid_command2 ]
           in
           Deferred.unit )
+
+    let%test_unit "zkapp cmd with incrementing nonce but insufficient funds \
+                   for fees are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind () = after (Time.Span.of_sec 2.) in
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let new_fee_payer_kp = extra_keys.(0) in
+          let new_fee_payer_pk =
+            Public_key.compress new_fee_payer_kp.public_key
+          in
+          let amount_for_new_fee_payer = 100_000_000_000 in
+          let%bind () =
+            let fee_payer_kp = test_keys.(0) in
+            let fee_payer_pk = Public_key.compress fee_payer_kp.public_key in
+            let fund_new_fee_payer_pk =
+              User_command.Signed_command
+                (Signed_command.sign fee_payer_kp
+                   (Signed_command_payload.create
+                      ~fee:
+                        (Currency.Fee.of_nanomina_int_exn
+                           amount_for_new_fee_payer )
+                      ~fee_payer_pk ~valid_until:None
+                      ~nonce:(Account.Nonce.of_int 0)
+                      ~memo:
+                        (Signed_command_memo.create_by_digesting_string_exn
+                           "Funding new_fee_payer" )
+                      ~body:
+                        (Signed_command_payload.Body.Payment
+                           { source_pk = fee_payer_pk
+                           ; receiver_pk = new_fee_payer_pk
+                           ; amount =
+                               Currency.Amount.of_nanomina_int_exn
+                                 amount_for_new_fee_payer
+                           } ) ) )
+            in
+            let fund_fee_payer_command = [ fund_new_fee_payer_pk ] in
+            let%bind () = add_commands' t fund_fee_payer_command in
+            assert_pool_txs t fund_fee_payer_command ;
+            let%bind () = advance_chain t fund_fee_payer_command in
+            assert_pool_txs t [] ; Deferred.unit
+          in
+          (* Use a fee for 5 zkapp commands to pass *)
+          let new_fee_payer_fee_amount = amount_for_new_fee_payer / 6 in
+          (* Generate 10 zkapp cmds with the intention of the last 5 to fail due to insufficient funds *)
+          let%bind commands =
+            List.mapi (List.init 10 ~f:Fn.id) ~f:(fun i _ ->
+                mk_basic_zkapp ~fee:new_fee_payer_fee_amount i new_fee_payer_kp
+                |> mk_zkapp_user_cmd t.txn_pool )
+            |> Deferred.all
+          in
+          let valid_commands = List.take commands 5 in
+          let invalid_commands = List.slice commands 5 (List.length commands) in
+          let%bind () =
+            add_commands t (valid_commands @ invalid_commands)
+            >>| assert_pool_apply valid_commands
+          in
+          Deferred.unit )
   end )
