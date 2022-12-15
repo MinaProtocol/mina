@@ -114,6 +114,13 @@ module Accounts = struct
             ; proved_state
             ; zkapp_uri
             } ->
+            let%bind () =
+              let zkapp_uri_length = String.length zkapp_uri in
+              if zkapp_uri_length > Zkapp_account.Zkapp_uri.max_length then
+                Or_error.errorf "zkApp URI \"%s\" exceeds max length: %d > %d"
+                  zkapp_uri zkapp_uri_length Zkapp_account.Zkapp_uri.max_length
+              else Or_error.return ()
+            in
             let%bind app_state =
               if
                 Mina_stdlib.List.Length.Compare.(
@@ -138,7 +145,7 @@ module Accounts = struct
               then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
               else
                 Or_error.errorf
-                  !"Snap account sequence_state has invalid length %{sexp: \
+                  !"zkApp account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t
                   (List.length sequence_state)
@@ -555,9 +562,6 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
-  ; transaction_expiry_hr =
-      Option.value ~default:default.transaction_expiry_hr
-        (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
   ; zkapp_proof_update_cost =
       Option.value ~default:default.zkapp_proof_update_cost
         (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
@@ -602,8 +606,6 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
-          ; transaction_expiry_hr =
-              Some precomputed_values.genesis_constants.transaction_expiry_hr
           ; zkapp_proof_update_cost =
               Some precomputed_values.genesis_constants.zkapp_proof_update_cost
           ; zkapp_signed_single_update_cost =
