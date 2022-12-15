@@ -643,7 +643,10 @@ let zkapp_command_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
         let (authorization : Control.t) =
           match body.authorization_kind with
           | Proof ->
-              Proof Proof.transaction_dummy
+              Proof
+                { proof = Proof.transaction_dummy
+                ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
+                }
           | Signature ->
               Signature Signature.dummy
           | None_given ->
