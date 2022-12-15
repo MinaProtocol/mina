@@ -7,6 +7,8 @@ type invalid =
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_proof
   | `Missing_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Unexpected_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
 [@@deriving bin_io_unversioned, to_yojson]
 
@@ -23,6 +25,8 @@ let invalid_to_string (invalid : invalid) =
       sprintf "Invalid_signature: [%s]" (keys_to_string keys)
   | `Missing_verification_key keys ->
       sprintf "Missing_verification_key: [%s]" (keys_to_string keys)
+  | `Unexpected_verification_key keys ->
+      sprintf "Unexpected_verification_key: [%s]" (keys_to_string keys)
   | `Invalid_proof ->
       "Invalid_proof"
 
@@ -91,7 +95,7 @@ let check :
                     None
                 | None_given ->
                     None
-                | Proof { proof = pi; verification_key_hash = _ } -> (
+                | Proof { proof = pi; verification_key_hash } -> (
                     match vk_opt with
                     | None ->
                         return
@@ -100,7 +104,17 @@ let check :
                               @@ Account_update.account_id p
                             ] )
                     | Some (vk : _ With_hash.t) ->
-                        Some (vk.data, stmt, pi) ) )
+                        (* check that vk expected for proof is the one being used *)
+                        if
+                          Snark_params.Tick.Field.equal verification_key_hash
+                            (With_hash.hash vk)
+                        then Some (vk.data, stmt, pi)
+                        else
+                          return
+                            (`Unexpected_verification_key
+                              [ Account_id.public_key
+                                @@ Account_update.account_id p
+                              ] ) ) )
           in
           let v : User_command.Valid.t =
             (*Verification keys should be present if it reaches here*)

@@ -4796,7 +4796,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let update_states ?receiver_auth ?zkapp_prover ?empty_sender
+    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
         ~constraint_constants (spec : Update_states_spec.t) =
       let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
@@ -4834,28 +4834,21 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (Snarky_backendless.Request.With { request; respond }) =
                   match request with _ -> respond Unhandled
                 in
-                let prover =
-                  match zkapp_prover with
-                  | Some prover ->
-                      prover
+                let prover, vk =
+                  match zkapp_prover_and_vk with
+                  | Some (prover, vk) ->
+                      (prover, vk)
                   | None ->
-                      let _, `Prover p =
+                      let `VK vk, `Prover prover =
                         create_trivial_snapp ~constraint_constants ()
                       in
-                      p
+                      (prover, vk)
                 in
                 let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
                     =
                   prover ~handler tx_statement
                 in
-                (* TODO: does this make sense? where did the hash come from? *)
-                let verification_key_hash =
-                  match simple_snapp_account_update.authorization with
-                  | Control.Proof { verification_key_hash; _ } ->
-                      verification_key_hash
-                  | _ ->
-                      assert false
-                in
+                let verification_key_hash = With_hash.hash vk in
                 ( { body = simple_snapp_account_update.body
                   ; authorization = Proof { proof = pi; verification_key_hash }
                   }

@@ -1035,7 +1035,8 @@ module T = struct
         | ( `Invalid_keys _
           | `Invalid_signature _
           | `Invalid_proof
-          | `Missing_verification_key _ ) as invalid ->
+          | `Missing_verification_key _
+          | `Unexpected_verification_key _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string
@@ -3860,8 +3861,9 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn

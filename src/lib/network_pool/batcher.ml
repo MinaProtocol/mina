@@ -100,6 +100,12 @@ let rec determine_outcome :
                   [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
                 None
+            | `Unexpected_verification_key keys ->
+                if Ivar.is_full elt.res then
+                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res
+                  (Ok (Error (`Unexpected_verification_key keys))) ;
+                None
             | `Potentially_invalid new_hint ->
                 Some (elt, new_hint) )
       in
@@ -329,6 +335,9 @@ module Transaction_pool = struct
                 | `Missing_verification_key keys ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Missing_verification_key keys
+                | `Unexpected_verification_key keys ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Unexpected_verification_key keys
                 | `Invalid_proof ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Invalid_proof
@@ -337,7 +346,8 @@ module Transaction_pool = struct
                     | `Invalid_keys _
                     | `Invalid_signature _
                     | `Invalid_proof
-                    | `Missing_verification_key _ ->
+                    | `Missing_verification_key _
+                    | `Unexpected_verification_key _ ->
                         (* If this diff has already been declared invalid, knowing that one of its
                            transactions is partially valid is not useful. *)
                         ()
@@ -350,7 +360,8 @@ module Transaction_pool = struct
                     | `Invalid_keys _
                     | `Invalid_signature _
                     | `Invalid_proof
-                    | `Missing_verification_key _ ->
+                    | `Missing_verification_key _
+                    | `Unexpected_verification_key _ ->
                         ()
                     | `In_progress a ->
                         a.(j) <- `Valid c ) ) ;
@@ -363,6 +374,8 @@ module Transaction_pool = struct
                   `Invalid_proof
               | `Missing_verification_key keys ->
                   `Missing_verification_key keys
+              | `Unexpected_verification_key keys ->
+                  `Unexpected_verification_key keys
               | `In_progress a -> (
                   (* If the diff is all valid, we're done. If not, we return a partial
                        result. *)
