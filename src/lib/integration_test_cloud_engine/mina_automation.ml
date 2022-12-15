@@ -217,7 +217,6 @@ module Network_config = struct
           Some
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
-            ; transaction_expiry_hr = None
             ; zkapp_proof_update_cost = None
             ; zkapp_signed_single_update_cost = None
             ; zkapp_signed_pair_update_cost = None

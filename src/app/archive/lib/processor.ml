@@ -1339,11 +1339,9 @@ end
 module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
     ; total_currency_id : int option
-    ; curr_global_slot_since_hard_fork : int option
     ; global_slot_since_genesis : int option
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
@@ -1353,16 +1351,7 @@ module Zkapp_network_precondition = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; int
-        ; int
-        ]
+        [ option int; option int; option int; option int; option int; int; int ]
 
   let table_name = "zkapp_network_precondition"
 
@@ -1373,11 +1362,6 @@ module Zkapp_network_precondition = struct
       Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
-    in
-    let%bind timestamp_id =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
-        ps.timestamp
     in
     let%bind blockchain_length_id =
       Mina_caqti.add_if_zkapp_check
@@ -1394,11 +1378,6 @@ module Zkapp_network_precondition = struct
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
-    let%bind curr_global_slot_since_hard_fork =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
-        ps.global_slot_since_hard_fork
-    in
     let%bind global_slot_since_genesis =
       Mina_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
@@ -1412,11 +1391,9 @@ module Zkapp_network_precondition = struct
     in
     let value =
       { snarked_ledger_hash_id
-      ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
       ; total_currency_id
-      ; curr_global_slot_since_hard_fork
       ; global_slot_since_genesis
       ; staking_epoch_data_id
       ; next_epoch_data_id

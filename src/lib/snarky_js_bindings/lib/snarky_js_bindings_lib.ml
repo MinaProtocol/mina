@@ -2913,8 +2913,13 @@ module Ledger = struct
           (Zkapp_command.Call_forest.hash account_update.elt.calls :> Impl.field)
     end
 
-  let sign_field_element (x : field_class Js.t) (key : private_key) =
-    Signature_lib.Schnorr.Chunked.sign (private_key key)
+  let sign_field_element (x : field_class Js.t) (key : private_key)
+      (is_mainnet : bool Js.t) =
+    let network_id =
+      Mina_signature_kind.(if Js.to_bool is_mainnet then Mainnet else Testnet)
+    in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind:network_id
+      (private_key key)
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
 

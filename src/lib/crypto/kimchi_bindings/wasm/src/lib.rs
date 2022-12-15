@@ -109,3 +109,5 @@ pub mod poseidon;
 
 // exposes circuit for inspection
 pub mod circuit;
+
+pub mod wasm_ocaml_serde;
