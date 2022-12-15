@@ -524,7 +524,7 @@ let wrap
   let module O = Tick.Oracles in
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
-      prev_statement_with_hashes ~feature_flags:Plonk_types.Features.none
+      prev_statement_with_hashes ~feature_flags
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges

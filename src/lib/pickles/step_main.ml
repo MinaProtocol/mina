@@ -92,7 +92,7 @@ let verify_one ~srs
     with_label __LOC__ (fun () ->
         verify ~srs ~feature_flags:d.feature_flags
           ~lookup_parameters:
-            { use = d.feature_flags.lookup (* TODO: Change this *)
+            { use = d.feature_flags.lookup (* TODO: This needs to be true if *any* lookup gate is enabled. *)
             ; zero =
                 { var =
                     { challenge = Field.zero

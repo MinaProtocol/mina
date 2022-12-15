@@ -639,11 +639,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let etyp =
                 Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                   ~wrap_rounds:Tock.Rounds.n
-                  ~feature_flags:
-                    { Plonk_types.Features.none with
-                      lookup = Plonk_types.Opt.Flag.Maybe
-                    }
-              (* TODO *)
+                  ~feature_flags
 
               let f (T b : _ Branch_data.t) =
                 let (T (typ, _conv, conv_inv)) = etyp in
@@ -813,9 +809,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
               ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
               ~public_input ~auxiliary_typ
-              ~feature_flags:
-                (Plonk_types.Features.map b.rule.feature_flags ~f:(fun b ->
-                     if b then Plonk_types.Opt.Flag.Yes else No ) )
+              ~feature_flags
               (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
               wrap_vk.index
           in

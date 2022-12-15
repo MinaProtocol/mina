@@ -94,6 +94,7 @@ module Constant = struct
          Plonk_checks.scalars_env
            (module Env_bool)
            (module Env_field)
+           (* Wrap proof, no features needed *)
            ~feature_flags:Plonk_types.Features.none_bool
            ~srs_length_log2:Common.Max_degree.wrap_log2
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
@@ -115,6 +116,7 @@ module Constant = struct
          end in
          Plonk_checks.derive_plonk
            (module Field)
+           (* Wrap proof, no features needed *)
            ~env ~shift ~feature_flags:Plonk_types.Features.none
            ~actual_feature_flags:Plonk_types.Features.none_bool chals evals
        in

@@ -232,9 +232,6 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   | LookupPattern ForeignFieldMul ->
       Some feature_flags.features.foreign_field_mul
 
-(* TODO: Delete *)
-let () = ignore ((expand_feature_flags, get_feature_flag) : _ * _)
-
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
     ~endo ~mds ~field_of_hex ~domain ~srs_length_log2 ~feature_flags

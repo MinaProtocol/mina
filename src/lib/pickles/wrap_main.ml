@@ -91,6 +91,7 @@ let lookup_config_for_pack =
 let wrap_main
     (type max_proofs_verified branches prev_varss prev_valuess env
     max_local_max_proofs_verifieds )
+    ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -117,7 +118,6 @@ let wrap_main
           , _ )
           Types.Wrap.Statement.In_circuit.t
        -> unit ) =
-  let feature_flags = Plonk_types.Features.none in
   Timer.clock __LOC__ ;
   let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                        with type n = max_proofs_verified )

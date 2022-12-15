@@ -273,6 +273,7 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
+        (* Wrap circuit: no features needed. *)
         (In_circuit.spec (module Impl) lookup Plonk_types.Features.none)
     in
     let typ =
