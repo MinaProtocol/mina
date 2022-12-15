@@ -1174,8 +1174,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         module Actions = struct
           type t = Zkapp_account.Actions.var
 
-          let is_empty x =
-            run_checked (Account_update.Actions.is_empty_var x)
+          let is_empty x = run_checked (Account_update.Actions.is_empty_var x)
 
           let push_events = Account_update.Actions.push_events_checked
         end
