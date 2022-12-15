@@ -161,8 +161,8 @@ let verify_heterogenous (ts : Instance.t list) =
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~shift:Shifts.tick1 ~env:tick_env
-              tick_plonk_minimal tick_combined_evals
+              ~feature_flags ~actual_feature_flags ~shift:Shifts.tick1
+              ~env:tick_env tick_plonk_minimal tick_combined_evals
           in
           { p with
             zeta = plonk0.zeta

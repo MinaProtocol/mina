@@ -115,7 +115,8 @@ module Constant = struct
          end in
          Plonk_checks.derive_plonk
            (module Field)
-           ~env ~shift ~feature_flags:Plonk_types.Features.none chals evals
+           ~env ~shift ~feature_flags:Plonk_types.Features.none
+           ~actual_feature_flags:Plonk_types.Features.none_bool chals evals
        in
        { deferred_values =
            { plonk =

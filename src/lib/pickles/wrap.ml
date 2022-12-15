@@ -101,6 +101,7 @@ type deferred_values_and_hints =
   }
 
 let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
+    ~feature_flags ~actual_feature_flags
     ~(prev_challenges : ((Backend.Tick.Field.t, _) Vector.t, n) Vector.t)
     ~(step_vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
     ~(public_input : Backend.Tick.Field.t list) ~(proof : Backend.Tick.Proof.t)
@@ -196,8 +197,8 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     Plonk_checks.scalars_env
       (module Env_bool)
       (module Env_field)
-      ~feature_flags:Plonk_types.Features.none_bool
-      ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+      ~feature_flags:actual_feature_flags ~endo:Endo.Step_inner_curve.base
+      ~mds:Tick_field_sponge.params.mds
       ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -212,7 +213,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
     end in
     Type1.derive_plonk
       (module Field)
-      ~feature_flags:Plonk_types.Features.none ~shift:Shifts.tick1 ~env:tick_env
+      ~feature_flags ~actual_feature_flags ~shift:Shifts.tick1 ~env:tick_env
       tick_plonk_minimal tick_combined_evals
   and new_bulletproof_challenges, b =
     let prechals =
@@ -294,10 +295,6 @@ let%test "lookup finalization" =
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
   let proof = Backend.Tick.Proof.of_backend proof in
-  let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-    deferred_values ~sgs:[] ~prev_challenges:[] ~step_vk:vk
-      ~public_input:[ public_input ] ~proof ~actual_proofs_verified:Nat.N0.n
-  in
   let feature_flags =
     let open Plonk_types.Opt.Flag in
     { Plonk_types.Features.chacha = No
@@ -313,9 +310,18 @@ let%test "lookup finalization" =
   let actual_feature_flags =
     Plonk_types.Features.map feature_flags ~f:(function
       | Plonk_types.Opt.Flag.Yes | Maybe ->
-          Impls.Step.Boolean.true_
+          true
       | No ->
-          Impls.Step.Boolean.false_ )
+          false )
+  in
+  let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
+    deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
+      ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
+      ~actual_proofs_verified:Nat.N0.n
+  in
+  let actual_feature_flags =
+    Plonk_types.Features.map ~f:Impls.Step.Boolean.var_of_value
+      actual_feature_flags
   in
   let deferred_values_typ =
     let open Impls.Step in
@@ -387,7 +393,8 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices pk
+    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
+    ~actual_feature_flags pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -550,7 +557,7 @@ let wrap
   in
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
-      ~actual_proofs_verified
+      ~actual_proofs_verified ~feature_flags ~actual_feature_flags
   in
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
     let messages_for_next_wrap_proof :

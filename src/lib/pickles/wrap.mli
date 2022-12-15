@@ -1,3 +1,5 @@
+open Pickles_types
+
 val wrap :
      max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> (module Pickles_types.Hlist.Maxes.S
@@ -36,6 +38,8 @@ val wrap :
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> actual_feature_flags:bool Plonk_types.Features.t
   -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b
      , ( ( Impls.Wrap.Challenge.Constant.t

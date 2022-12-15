@@ -146,6 +146,12 @@ struct
             }
         }
       in
+      let data = Types_map.lookup_basic tag in
+      let feature_flags = data.feature_flags in
+      let actual_feature_flags =
+        (* TODO: MUST GET FROM PROOF!!!! *)
+        Plonk_types.Features.none_bool
+      in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -199,14 +205,11 @@ struct
 
             let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
           end in
-          let feature_flags =
-            (* TODO: MUST GET FROM PROOF!!!! *)
-            Plonk_types.Features.none_bool
-          in
           Plonk_checks.scalars_env
             (module Env_bool)
             (module Env_field)
-            ~feature_flags ~srs_length_log2:Common.Max_degree.step_log2
+            ~feature_flags:actual_feature_flags
+            ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -226,10 +229,9 @@ struct
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
-              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
-              combined_evals )
+              ~feature_flags ~actual_feature_flags ~env ~shift:Shifts.tick1
+              plonk_minimal combined_evals )
       in
-      let data = Types_map.lookup_basic tag in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
       let T = Local_max_proofs_verified.eq in
       let statement = t.statement in
@@ -453,7 +455,7 @@ struct
         end in
         Plonk_checks.scalars_env
           (module Env_bool)
-          (module Env_field)
+          (module Env_field) (* Wrap proof, no need to use features *)
           ~feature_flags:Plonk_types.Features.none_bool ~domain:tock_domain
           ~srs_length_log2:Common.Max_degree.wrap_log2
           ~field_of_hex:(fun s ->
@@ -502,7 +504,9 @@ struct
 
           type nonrec bool = bool
         end in
+        (* Wrap proof, no features *)
         Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+          ~actual_feature_flags:Plonk_types.Features.none_bool
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals

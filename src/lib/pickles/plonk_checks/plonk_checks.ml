@@ -61,14 +61,6 @@ module type Field_with_if_intf = sig
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
-module type Field_with_equal_intf = sig
-  include Field_intf
-
-  type bool
-
-  val equal : t -> t -> bool
-end
-
 type 'f field = (module Field_intf with type t = 'f)
 
 let pow2pow (type t) ((module F) : t field) (x : t) n : t =
@@ -427,11 +419,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)
-  let derive_plonk (type boolean t)
-      ?(with_label = fun _ (f : unit -> t) -> f ())
-      (module F : Field_with_equal_intf with type t = t and type bool = boolean)
-      ~(env : t Scalars.Env.t) ~shift ~(feature_flags : _ Plonk_types.Features.t)
-      =
+  let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
+      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift
+      ~(feature_flags : _ Plonk_types.Features.t)
+      ~(actual_feature_flags : _ Plonk_types.Features.t) =
     let _ = with_label in
     let open F in
     fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
@@ -451,14 +442,13 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
       in
-      let compute_feature column feature_flag =
+      let compute_feature column feature_flag actual_feature_flag =
         match feature_flag with
         | Opt.Flag.Yes ->
             Opt.Some (Lazy.force (Hashtbl.find_exn index_terms column))
         | Opt.Flag.Maybe ->
             let res = Lazy.force (Hashtbl.find_exn index_terms column) in
-            let is_some = F.equal res F.zero in
-            Opt.Maybe (is_some, res)
+            Opt.Maybe (actual_feature_flag, res)
         | Opt.Flag.No ->
             Opt.None
       in
@@ -484,28 +474,45 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-            { chacha0 = compute_feature (Index ChaCha0) feature_flags.chacha
-            ; chacha1 = compute_feature (Index ChaCha1) feature_flags.chacha
-            ; chacha2 = compute_feature (Index ChaCha2) feature_flags.chacha
+            { chacha0 =
+                compute_feature (Index ChaCha0) feature_flags.chacha
+                  actual_feature_flags.chacha
+            ; chacha1 =
+                compute_feature (Index ChaCha1) feature_flags.chacha
+                  actual_feature_flags.chacha
+            ; chacha2 =
+                compute_feature (Index ChaCha2) feature_flags.chacha
+                  actual_feature_flags.chacha
             ; chacha_final =
                 compute_feature (Index ChaChaFinal) feature_flags.chacha
+                  actual_feature_flags.chacha
             ; range_check0 =
                 compute_feature (Index RangeCheck0) feature_flags.range_check
+                  actual_feature_flags.range_check
             ; range_check1 =
                 compute_feature (Index RangeCheck1) feature_flags.range_check
+                  actual_feature_flags.range_check
             ; foreign_field_add =
                 compute_feature (Index ForeignFieldAdd)
                   feature_flags.foreign_field_add
+                  actual_feature_flags.foreign_field_add
             ; foreign_field_mul =
                 compute_feature (Index ForeignFieldMul)
                   feature_flags.foreign_field_mul
-            ; xor = compute_feature (Index Xor16) feature_flags.xor
-            ; rot = compute_feature (Index Rot64) feature_flags.rot
+                  actual_feature_flags.foreign_field_mul
+            ; xor =
+                compute_feature (Index Xor16) feature_flags.xor
+                  actual_feature_flags.xor
+            ; rot =
+                compute_feature (Index Rot64) feature_flags.rot
+                  actual_feature_flags.rot
             ; lookup_gate =
                 compute_feature (LookupKindIndex Lookup) feature_flags.lookup
+                  actual_feature_flags.lookup
             ; runtime_tables =
                 compute_feature LookupRuntimeSelector
                   feature_flags.runtime_tables
+                  actual_feature_flags.runtime_tables
             }
         }
 
@@ -519,17 +526,12 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env ~feature_flags
+      ~shift ~env ~feature_flags ~actual_feature_flags
       (plonk : (_, _, _, _ Opt.t, _ Opt.t) In_circuit.t) evals =
     let actual =
-      let module Field = struct
-        include Impl.Field
-
-        type bool = Impl.Boolean.var
-      end in
       derive_plonk ~with_label:Impl.with_label
-        (module Field)
-        ~shift ~env ~feature_flags
+        (module Impl.Field)
+        ~shift ~env ~feature_flags ~actual_feature_flags
         { alpha = plonk.alpha
         ; beta = plonk.beta
         ; gamma = plonk.gamma
@@ -550,8 +552,13 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
           None
       | Some expected, Some actual ->
           Some (equal expected actual)
-      | Maybe (is_some, expected), (Some actual | Maybe (_, actual)) ->
-          Some (Boolean.( ||| ) (Boolean.not is_some) (equal expected actual))
+      | Maybe (is_some, expected), Some actual ->
+          Some (Boolean.( &&& ) is_some (equal expected actual))
+      | Maybe (is_some, expected), Maybe (is_some_actual, actual) ->
+          Some
+            (Boolean.( ||| )
+               (Boolean.equal is_some is_some_actual)
+               (equal expected actual) )
       | Some _, Maybe _ ->
           assert false
       | None, (Some _ | Maybe _) ->

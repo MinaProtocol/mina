@@ -1082,7 +1082,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked ~feature_flags
+          Plonk_checks.checked ~feature_flags ~actual_feature_flags
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in

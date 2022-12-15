@@ -56,14 +56,6 @@ module type Field_with_if_intf = sig
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
-module type Field_with_equal_intf = sig
-  include Field_intf
-
-  type bool
-
-  val equal : t -> t -> bool
-end
-
 type 'f field = (module Field_intf with type t = 'f)
 
 val domain :
@@ -108,10 +100,11 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
 
   val derive_plonk :
        ?with_label:(string -> (unit -> 't) -> 't)
-    -> (module Field_with_equal_intf with type t = 't and type bool = 'b)
+    -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> actual_feature_flags:'b Plonk_types.Features.t
     -> ( 't
        , 't )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
@@ -133,6 +126,9 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> actual_feature_flags:
+         't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+         Plonk_types.Features.t
     -> ( 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t
        , 't Snarky_backendless.Cvar.t Shifted_value.t

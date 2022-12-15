@@ -603,6 +603,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 let res =
                   Common.time "make step data" (fun () ->
                       Step_branch_data.create ~index:!i ~feature_flags
+                        ~actual_feature_flags:rule.feature_flags
                         ~max_proofs_verified:Max_proofs_verified.n
                         ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                         Arg_var.to_field_elements Arg_value.to_field_elements
@@ -840,6 +841,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let%map.Promise proof =
               Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
+                ~feature_flags ~actual_feature_flags:b.feature_flags
                 full_signature.maxes wrap_requests
                 ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
                 ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
@@ -2097,12 +2099,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.[ 2 ] in
           let feature_flags = Plonk_types.Features.none in
+          let actual_feature_flags = Plonk_types.Features.none_bool in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
-              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
-              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
-              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
-              ~proofs_verifieds
+              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
+              ~branches:Branches.n ~self ~public_input:(Input typ)
+              ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
+              rule ~wrap_domains ~proofs_verifieds
           in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
@@ -2600,6 +2603,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         Wrap.Type1.derive_plonk
                           (module Field)
                           ~feature_flags:Plonk_types.Features.none
+                          ~actual_feature_flags:Plonk_types.Features.none_bool
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -3067,12 +3071,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.[ 2 ] in
           let feature_flags = Plonk_types.Features.none in
+          let actual_feature_flags = Plonk_types.Features.none_bool in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
-              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
-              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
-              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
-              ~proofs_verifieds
+              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
+              ~branches:Branches.n ~self ~public_input:(Input typ)
+              ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
+              rule ~wrap_domains ~proofs_verifieds
           in
           let step_domains = Vector.[ inner_step_data.domains ] in
           let step_keypair =
@@ -3533,6 +3538,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
+                          ~actual_feature_flags
                           ~feature_flags:Plonk_types.Features.none
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals

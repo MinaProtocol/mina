@@ -992,6 +992,8 @@ struct
       with_label __LOC__ (fun () ->
           (* This proof is a wrap proof; no need to consider features. *)
           Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
+            ~actual_feature_flags:
+              Plonk_types.Features.(map none ~f:(fun _ -> Boolean.false_))
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in
