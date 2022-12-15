@@ -391,8 +391,9 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         in
         let b = get_feature_flag feature_flags feature in
         if_ b ~then_:e1 ~else_:e2 )
-  ; foreign_field_modulus = (fun _ -> failwith "TODO")
-  ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")
+  (* These are going away.. Just hard-code as zero *)
+  ; foreign_field_modulus = (fun _ -> F.zero)
+  ; neg_foreign_field_modulus = (fun _ -> F.zero)
   }
 
 (* TODO: not true anymore if lookup is used *)
