@@ -166,8 +166,8 @@ module Account_update_under_construction = struct
 
       let add_actions t actions : t = { actions = t.actions @ actions }
 
-      let to_zkapp_command_actions ({ actions } : t) :
-          Zkapp_account.Actions.var =
+      let to_zkapp_command_actions ({ actions } : t) : Zkapp_account.Actions.var
+          =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
           exists ~compute:(fun () -> []) Zkapp_account.Actions.typ
