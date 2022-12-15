@@ -111,7 +111,7 @@ let%test_module "Access permission tests" =
         { Account_update.Fee_payer.body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; fee = Currency.Fee.(of_int 100)
+            ; fee = Currency.Fee.of_nanomina_int_exn 100
             }
         ; authorization = Signature.dummy
         }
@@ -176,7 +176,7 @@ let%test_module "Access permission tests" =
               (Account.create account_id
                  Currency.Balance.(
                    Option.value_exn
-                     (add_amount zero (Currency.Amount.of_int 500))) )
+                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
           in
           Async.Thread_safe.block_on_async_exn
           @@ fun () ->
