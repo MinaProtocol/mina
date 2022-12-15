@@ -368,7 +368,12 @@ let%test_module "multisig_account" =
                     ; caller = Call
                     ; authorization_kind = Proof
                     }
-                ; authorization = Proof Mina_base.Proof.transaction_dummy
+                ; authorization =
+                    Proof
+                      { proof = Mina_base.Proof.transaction_dummy
+                      ; verification_key_hash =
+                          Mina_base.Zkapp_account.dummy_vk_hash ()
+                      }
                 }
               in
               let memo = Signed_command_memo.empty in
@@ -453,7 +458,11 @@ let%test_module "multisig_account" =
                   ; account_updates =
                       [ sender
                       ; { body = snapp_account_update_data.body
-                        ; authorization = Proof pi
+                        ; authorization =
+                            Proof
+                              { proof = pi
+                              ; verification_key_hash = With_hash.hash vk
+                              }
                         }
                       ]
                   ; memo

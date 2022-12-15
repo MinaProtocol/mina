@@ -3091,9 +3091,17 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3116,9 +3124,15 @@
               "description": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
+              "defaultValue": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
             },
             {
@@ -6509,7 +6523,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SnappProof",
+          "name": "ZkappProof",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -6528,9 +6542,17 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },

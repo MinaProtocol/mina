@@ -99,7 +99,7 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
+let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -229,7 +229,12 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; caller = Call
                 ; authorization_kind = Proof
                 }
-            ; authorization = Proof Mina_base.Proof.transaction_dummy
+            ; authorization =
+                Proof
+                  { proof = Mina_base.Proof.transaction_dummy
+                  ; verification_key_hash =
+                      Mina_base.Zkapp_account.dummy_vk_hash ()
+                  }
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
@@ -298,7 +303,11 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
               ; account_updates =
                   [ sender
                   ; { body = snapp_account_update_data.body
-                    ; authorization = Proof pi
+                    ; authorization =
+                        Proof
+                          { proof = pi
+                          ; verification_key_hash = With_hash.hash vk
+                          }
                     }
                   ]
               ; memo

@@ -91,7 +91,7 @@ let check :
                     None
                 | None_given ->
                     None
-                | Proof pi -> (
+                | Proof { proof = pi; verification_key_hash = _ } -> (
                     match vk_opt with
                     | None ->
                         return

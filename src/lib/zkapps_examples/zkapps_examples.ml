@@ -582,9 +582,15 @@ let compile :
                     , proof ) =
               prover ?handler ()
             in
+            (* TODO : is there a vk to hash? *)
+            let verification_key_hash = Zkapp_account.dummy_vk_hash () in
             let account_update : Account_update.t =
               { body = account_update
-              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
+              ; authorization =
+                  Proof
+                    { proof = Pickles.Side_loaded.Proof.of_proof proof
+                    ; verification_key_hash
+                    }
               }
             in
             ( { Zkapp_command.Call_forest.Tree.account_update

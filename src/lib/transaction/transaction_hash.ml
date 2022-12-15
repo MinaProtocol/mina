@@ -56,7 +56,10 @@ let hash_signed_command, hash_zkapp_command =
               let dummy_auth =
                 match acct_update.authorization with
                 | Control.Proof _ ->
-                    Control.Proof Proof.transaction_dummy
+                    Control.Proof
+                      { proof = Proof.transaction_dummy
+                      ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
+                      }
                 | Control.Signature _ ->
                     Control.Signature Signature.dummy
                 | Control.None_given ->

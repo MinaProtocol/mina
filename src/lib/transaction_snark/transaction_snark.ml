@@ -4142,7 +4142,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let account_update_proof (p : Account_update.t) =
       match p.authorization with
-      | Proof p ->
+      | Proof { proof = p; _ } ->
           Some p
       | Signature _ | None_given ->
           None
@@ -4848,8 +4848,16 @@ module Make_str (A : Wire_types.Concrete) = struct
                     =
                   prover ~handler tx_statement
                 in
+                (* TODO: does this make sense? where did the hash come from? *)
+                let verification_key_hash =
+                  match simple_snapp_account_update.authorization with
+                  | Control.Proof { verification_key_hash; _ } ->
+                      verification_key_hash
+                  | _ ->
+                      assert false
+                in
                 ( { body = simple_snapp_account_update.body
-                  ; authorization = Proof pi
+                  ; authorization = Proof { proof = pi; verification_key_hash }
                   }
                   : Account_update.Simple.t )
             | Signature ->
@@ -5075,7 +5083,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; caller = Call
             ; authorization_kind = Proof
             }
-        ; authorization = Proof Mina_base.Proof.blockchain_dummy
+        ; authorization =
+            Proof
+              { proof = Mina_base.Proof.transaction_dummy
+              ; verification_key_hash = Mina_base.Zkapp_account.dummy_vk_hash ()
+              }
         }
       in
       let memo = Signed_command_memo.empty in
@@ -5131,8 +5143,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       in
       let account_updates =
+        let verification_key_hash = With_hash.hash vk in
         [ sender
-        ; { body = snapp_account_update_data.body; authorization = Proof pi }
+        ; { body = snapp_account_update_data.body
+          ; authorization = Proof { proof = pi; verification_key_hash }
+          }
         ]
       in
       let zkapp_command : Zkapp_command.t =
