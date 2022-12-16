@@ -156,14 +156,24 @@ option.  It tells the node not to shut down when it does not find any
 peers to connect to, because its purpose is to create a fresh
 blockchain.
 
-`--config-directoy` can be omitted, in which case it defaults to
+`--config-directory` can be omitted, in which case it defaults to
 `~/.mina-config`. You should pass it if you already have another
 blockchain's data stored in there. In case the daemon fails, 
 complaining about write access to this directory, try providing an
 absolute path rather than relative one.
 
+The consensus algorithm that Mina uses requires that blocks are being
+produced constantly and if there's too long a delay, the chain will
+halt. For that reason for every restart of the daemon, a new
+blockchain should be started (because there are no other nodes to keep
+it running while our node is out, as it would be the case in a normal
+network). Therefore, when reusing the same config directory over and
+over again, it's important to remove it before each restart. Otherwise
+the daemon will try to pick up the old blockchain and will get stuck
+on it.
+
 If the block producer's key wasn't copied over to the wallet
-previously. The following error will appear:
+previously, the following error will appear:
 
 ```log
 Cannot open file: ./.mina-config/wallets/store/B62qqhZY2AsNuPEAHVnk8sn6dTW7Mpge5Xsn85EPii6hDPNVzJP437S. Error: No such file or directory
