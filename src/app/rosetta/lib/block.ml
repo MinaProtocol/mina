@@ -731,13 +731,15 @@ WITH RECURSIVE chain AS (
         {| 
   SELECT zc.id, zc.memo, zc.hash,
     pk_fee_payer.value as fee_payer, zfpb.fee, zfpb.valid_until, zfpb.nonce,
-    bzc.sequence_no, bzc.status, zauf.failures
+    bzc.sequence_no, bzc.status,
+    array(SELECT unnest(zauf.failures)
+          FROM zkapp_account_update_failures zauf
+          WHERE zauf.id = ANY (bzc.failure_reasons_ids))
 FROM blocks_zkapp_commands bzc
  INNER JOIN zkapp_commands zc on zc.id = bzc.zkapp_command_id
  INNER JOIN zkapp_fee_payer_body zfpb on zc.zkapp_fee_payer_body_id = zfpb.id
  INNER JOIN account_identifiers ai_fee_payer on ai_fee_payer.id = zfpb.account_identifier_id
  INNER JOIN public_keys pk_fee_payer on ai_fee_payer.public_key_id = pk_fee_payer.id
- LEFT JOIN zkapp_account_update_failures zauf on zauf.id = ANY(bzc.failure_reasons_ids)
 WHERE bzc.block_id = ?
       |}
 
