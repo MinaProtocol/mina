@@ -148,6 +148,7 @@ $ mina daemon \
     --proof-level none \
     --block-producer-pubkey "$(cat keys/block-producer.key.pub)" \
     --run-snark-worker "$(cat keys/snark-producer.key.pub)" \
+    --demo-mode \
     --seed
 ```
 
@@ -171,6 +172,11 @@ network). Therefore, when reusing the same config directory over and
 over again, it's important to remove it before each restart. Otherwise
 the daemon will try to pick up the old blockchain and will get stuck
 on it.
+
+`--demo-mode` option tells the daemon to assume it's already synced
+with the network (because in this case *it is* the entire network).
+Without this option the daemon will exit after approximately 30 minutes
+of being unable to connect to other nodes.
 
 If the block producer's key wasn't copied over to the wallet
 previously, the following error will appear:
