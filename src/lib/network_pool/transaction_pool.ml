@@ -2782,39 +2782,18 @@ let%test_module _ =
           let valid_commands =
             [ valid_command1; valid_command2; set_precondition_command ]
           in
+          let%bind () = add_commands' t valid_commands in
+          assert_pool_txs t valid_commands ;
+          let%bind () = advance_chain t valid_commands in
+          assert_pool_txs t [] ;
           let invalid_commands = [ invalid_command1; invalid_command2 ] in
-          let all_commands = valid_commands @ invalid_commands in
-          let%bind () = add_commands' t all_commands in
-          assert_pool_txs t all_commands ;
           let%bind expect_to_fail =
-            return (Exn.does_raise (fun () -> advance_chain t all_commands))
+            return (Exn.does_raise (fun () -> advance_chain t invalid_commands))
           in
           if not expect_to_fail then
             failwith
               "zkapp commands with unauthorized fee payer should be rejected, \
                but passed" ;
-          (*
-             TODO: This assert has weird behavior. Seems as though there's garbage data in the pool.
-             We should expect that the pool has no zkapp commands since the invalid ones are rejected.
-             But it fails this assertion with the following data:
-
-             assert_pool_txs t [] ;
-
-             (monitor.ml.Error
-             (runtime-lib/runtime.ml.E "comparison failed"
-               (("P\191\bM\1975\223\016\207 X\184M\1354\135\196\031\209\241\166\220rs\178\239FBHF\200\174"
-                  "j|;c6v}\245\012\019\186\030>\152\028\229\022\b\000\207\ta\017\168\233\230\241\206\006nZ\163"
-                  "\164oS\218\195\171\229\134\151\152<\180N\019$\227D\227!\246%<-\002\016*\236Pb\216)\029"
-                  "\191?\011\138[\149\136(\202\244\024#\187\255B\197;\015\193\149.F5\241\019\149\022\162\011x\201\133"
-                  "\2045\146D`\187\178E\145c$\1977\234BW\007\131\246k\181\24073\134\255\210\192*\196)\218")
-                 vs () (Loc src/lib/network_pool/transaction_pool.ml:1594:17)))
-             ("Raised at Ppx_assert_lib__Runtime.failwith in file \"runtime-lib/runtime.ml\", line 28, characters 28-53"
-               "Called from Network_pool__Transaction_pool.(fun).M.(fun) in file \"src/lib/network_pool/transaction_pool.ml\", line 2799, characters 10-30"
-               "Called from Async_kernel__Deferred0.bind.(fun) in file \"src/deferred0.ml\", line 54, characters 64-69"
-               "Called from Async_kernel__Job_queue.run_job in file \"src/job_queue.ml\" (inlined), line 128, characters 2-5"
-               "Called from Async_kernel__Job_queue.run_jobs in file \"src/job_queue.ml\", line 169, characters 6-47"
-               "Caught by monitor block_on_async")
-
-          *)
+          assert_pool_txs t [] ;
           Deferred.unit )
   end )
