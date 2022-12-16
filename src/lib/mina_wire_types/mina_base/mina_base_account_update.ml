@@ -1,6 +1,7 @@
 module Authorization_kind = struct
   module V1 = struct
-    type t = Signature | Proof | None_given
+    (* field for Proof is a verification key hash *)
+    type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
   end
 end
 

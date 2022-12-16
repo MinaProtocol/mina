@@ -24,91 +24,116 @@ module Authorization_kind = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (* TODO: yojson for Field.t in snarky *)
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature
-        | Proof
+        | Proof of
+            (Field.t
+            [@version_asserted]
+            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
+            [@of_yojson
+              function
+              | `String s ->
+                  let field = Snark_params.Tick.Field.of_string s in
+                  let s' = Snark_params.Tick.Field.to_string field in
+                  if String.equal s s' then Ok field
+                  else Error "Invalid JSON for field"
+              | _ ->
+                  Error "expected JSON string"] )
         | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
-
-      (* control tags are the same thing *)
-      let _f () : (t, Control.Tag.t) Type_equal.t = Type_equal.T
     end
   end]
 
   module Structured = struct
-    type t = { is_signed : bool; is_proved : bool } [@@deriving hlist]
+    type t =
+      { is_signed : bool
+      ; is_proved : bool
+      ; verification_key_hash : Snark_params.Tick.Field.t
+      }
+    [@@deriving hlist, annot, fields]
 
-    let to_input ({ is_signed; is_proved } : t) =
+    let to_input ({ is_signed; is_proved; verification_key_hash } : t) =
       let f x = if x then Field.one else Field.zero in
       Random_oracle_input.Chunked.packeds
-        [| (f is_signed, 1); (f is_proved, 1) |]
+        [| (f is_signed, 1); (f is_proved, 1); (verification_key_hash, 1) |]
 
     [%%ifdef consensus_mechanism]
 
     module Checked = struct
-      type t = { is_signed : Boolean.var; is_proved : Boolean.var }
+      type t =
+        { is_signed : Boolean.var
+        ; is_proved : Boolean.var
+        ; verification_key_hash : Snark_params.Tick.Field.Var.t
+        }
       [@@deriving hlist]
 
-      let to_input { is_signed; is_proved } =
+      let to_input { is_signed; is_proved; verification_key_hash } =
         let f (x : Boolean.var) = (x :> Field.Var.t) in
         Random_oracle_input.Chunked.packeds
-          [| (f is_signed, 1); (f is_proved, 1) |]
+          [| (f is_signed, 1); (f is_proved, 1); (verification_key_hash, 1) |]
     end
 
     let typ =
       Typ.of_hlistable ~var_to_hlist:Checked.to_hlist
         ~var_of_hlist:Checked.of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
-        [ Boolean.typ; Boolean.typ ]
+        [ Boolean.typ; Boolean.typ; Field.typ ]
+
+    let deriver obj =
+      let open Fields_derivers_zkapps in
+      let open Fields in
+      let ( !. ) = ( !. ) ~t_fields_annots in
+      Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
+        ~verification_key_hash:!.field
+      |> finish "AuthorizationKindStructured" ~t_toplevel_annots
 
     [%%endif]
   end
 
+  let to_control_tag : t -> Control.Tag.t = function
+    | None_given ->
+        None_given
+    | Signature ->
+        Signature
+    | Proof _ ->
+        Proof
+
   let to_structured : t -> Structured.t = function
     | None_given ->
-        { is_signed = false; is_proved = false }
+        { is_signed = false
+        ; is_proved = false
+        ; verification_key_hash = Field.zero
+        }
     | Signature ->
-        { is_signed = true; is_proved = false }
-    | Proof ->
-        { is_signed = false; is_proved = true }
+        { is_signed = true
+        ; is_proved = false
+        ; verification_key_hash = Field.zero
+        }
+    | Proof verification_key_hash ->
+        { is_signed = false; is_proved = true; verification_key_hash }
 
   let of_structured_exn : Structured.t -> t = function
-    | { is_signed = false; is_proved = false } ->
+    | { is_signed = false; is_proved = false; _ } ->
         None_given
-    | { is_signed = true; is_proved = false } ->
+    | { is_signed = true; is_proved = false; _ } ->
         Signature
-    | { is_signed = false; is_proved = true } ->
-        Proof
+    | { is_signed = false; is_proved = true; verification_key_hash } ->
+        Proof verification_key_hash
     | { is_signed = true; is_proved = true } ->
         failwith "Invalid authorization kind"
 
-  let to_string = function
-    | None_given ->
-        "None_given"
-    | Signature ->
-        "Signature"
-    | Proof ->
-        "Proof"
-
-  let of_string_exn = function
-    | "None_given" ->
-        None_given
-    | "Signature" ->
-        Signature
-    | "Proof" ->
-        Proof
-    | _ ->
-        failwith "Invalid authorization kind"
-
-  let gen = Quickcheck.Generator.of_list [ None_given; Signature; Proof ]
+  let gen =
+    let%bind.Quickcheck vk_hash = Field.gen in
+    Quickcheck.Generator.of_list [ None_given; Signature; Proof vk_hash ]
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_string ~name:"AuthorizationKind" ~js_type:(Custom "AuthorizationKind")
-      ~to_string ~of_string:of_string_exn obj
+    iso_record ~to_record:to_structured ~of_record:of_structured_exn
+      Structured.deriver obj
 
   let to_input x = Structured.to_input (to_structured x)
 

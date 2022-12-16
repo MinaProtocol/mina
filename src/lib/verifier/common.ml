@@ -95,7 +95,7 @@ let check :
                     None
                 | None_given ->
                     None
-                | Proof { proof = pi; verification_key_hash } -> (
+                | Proof pi -> (
                     match vk_opt with
                     | None ->
                         return
@@ -103,18 +103,23 @@ let check :
                             [ Account_id.public_key
                               @@ Account_update.account_id p
                             ] )
-                    | Some (vk : _ With_hash.t) ->
-                        (* check that vk expected for proof is the one being used *)
-                        if
-                          Snark_params.Tick.Field.equal verification_key_hash
-                            (With_hash.hash vk)
-                        then Some (vk.data, stmt, pi)
-                        else
-                          return
-                            (`Unexpected_verification_key
-                              [ Account_id.public_key
-                                @@ Account_update.account_id p
-                              ] ) ) )
+                    | Some (vk : _ With_hash.t) -> (
+                        match p.body.authorization_kind with
+                        | Proof vk_hash ->
+                            if
+                              (* check that vk expected for proof is the one being used *)
+                              Snark_params.Tick.Field.equal vk_hash
+                                (With_hash.hash vk)
+                            then Some (vk.data, stmt, pi)
+                            else
+                              return
+                                (`Unexpected_verification_key
+                                  [ Account_id.public_key
+                                    @@ Account_update.account_id p
+                                  ] )
+                        | _ ->
+                            (* TODO: can this happen? *)
+                            failwith "Expected Proof authorization kind" ) ) )
           in
           let v : User_command.Valid.t =
             (*Verification keys should be present if it reaches here*)

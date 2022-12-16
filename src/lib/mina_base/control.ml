@@ -5,41 +5,11 @@ open Core_kernel
 (* TODO: temporary hack *)
 [%%ifdef consensus_mechanism]
 
-(* we could use With_hash, but the hash is not of the data, the proof *)
-module Proof_with_vk_hash = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('proof, 'hash) t =
-            ( 'proof
-            , 'hash )
-            Mina_wire_types.Mina_base.Control.Proof_with_vk_hash.V1.t =
-        { proof : 'proof; verification_key_hash : 'hash }
-      [@@deriving sexp, yojson, hash, equal, compare]
-    end
-  end]
-end
-
-(* TODO: yojson for Field.t in snarky *)
 [%%versioned
 module Stable = struct
   module V2 = struct
     type t = Mina_wire_types.Mina_base.Control.V2.t =
-      | Proof of
-          ( Pickles.Side_loaded.Proof.Stable.V2.t
-          , (Snark_params.Tick.Field.t
-            [@version_asserted]
-            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
-            [@of_yojson
-              function
-              | `String s ->
-                  let field = Snark_params.Tick.Field.of_string s in
-                  let s' = Snark_params.Tick.Field.to_string field in
-                  if String.equal s s' then Ok field
-                  else Error "Invalid JSON for field"
-              | _ ->
-                  Error "expected JSON string"] ) )
-          Proof_with_vk_hash.Stable.V1.t
+      | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
       | Signature of Signature.Stable.V1.t
       | None_given
     [@@deriving sexp, equal, yojson, hash, compare]
@@ -56,8 +26,7 @@ let gen_with_dummies : t Quickcheck.Generator.t =
          (let dummy_proof =
             let n2 = Pickles_types.Nat.N2.n in
             let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
-            Proof
-              { proof; verification_key_hash = Zkapp_account.dummy_vk_hash () }
+            Proof proof
           in
           let dummy_signature = Signature Signature.dummy in
           [ dummy_proof; dummy_signature; None_given ] ) )
@@ -100,13 +69,27 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
-    | Signature
-    | Proof
-    | None_given
-  [@@deriving equal, compare, sexp]
+  type t = Signature | Proof | None_given [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
+
+  let to_string = function
+    | Signature ->
+        "Signature"
+    | Proof ->
+        "Proof"
+    | None_given ->
+        "None_given"
+
+  let of_string_exn = function
+    | "Signature" ->
+        Signature
+    | "Proof" ->
+        Proof
+    | "None_given" ->
+        None_given
+    | s ->
+        failwithf "String %s does not denote a control tag" s ()
 end
 
 let tag : t -> Tag.t = function
@@ -123,7 +106,7 @@ let dummy_of_tag : Tag.t -> t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
       let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
-      Proof { proof; verification_key_hash = Zkapp_account.dummy_vk_hash () }
+      Proof proof
   | Signature ->
       Signature Signature.dummy
   | None_given ->
@@ -136,12 +119,8 @@ let signature_deriver obj =
       (Fields_derivers_zkapps.except ~f:Signature.of_base58_check_exn `Signature)
 
 module As_record = struct
-  (* rather than group the proof and vk hash in a record, as in the type `t`, we
-     make them separate elements to simplify the deriver
-  *)
   type t =
     { proof : Pickles.Side_loaded.Proof.t option
-    ; verification_key_hash : Snark_params.Tick.Field.t option
     ; signature : Signature.t option
     }
   [@@deriving annot, fields]
@@ -151,25 +130,21 @@ module As_record = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
       ~proof:!.(option ~js_type:Or_undefined @@ proof @@ o ())
-      ~verification_key_hash:!.(option ~js_type:Or_undefined @@ field @@ o ())
       ~signature:!.(option ~js_type:Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 
 let to_record = function
-  | Proof { proof; verification_key_hash } ->
-      { As_record.proof = Some proof
-      ; verification_key_hash = Some verification_key_hash
-      ; signature = None
-      }
+  | Proof p ->
+      { As_record.proof = Some p; signature = None }
   | Signature s ->
-      { proof = None; verification_key_hash = None; signature = Some s }
+      { proof = None; signature = Some s }
   | None_given ->
-      { proof = None; verification_key_hash = None; signature = None }
+      { proof = None; signature = None }
 
 let of_record = function
-  | { As_record.proof = Some p; verification_key_hash = Some vk_hash; _ } ->
-      Proof { proof = p; verification_key_hash = vk_hash }
+  | { As_record.proof = Some p; _ } ->
+      Proof p
   | { signature = Some s; _ } ->
       Signature s
   | _ ->

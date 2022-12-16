@@ -62,12 +62,8 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                match p.authorization_kind with
                | None_given ->
                    Control.None_given
-               | Proof ->
-                   Control.Proof
-                     { proof = Mina_base.Proof.blockchain_dummy
-                     ; verification_key_hash =
-                         Mina_base.Zkapp_account.dummy_vk_hash ()
-                     }
+               | Proof _ ->
+                   Control.Proof Mina_base.Proof.blockchain_dummy
                | Signature ->
                    Control.Signature Signature.dummy
              in
@@ -140,7 +136,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
               let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_account_update ~use_full_commitment sk in
               return (Control.Signature signature)
-          | Proof { verification_key_hash; _ } -> (
+          | Proof _proof -> (
               match prover with
               | None ->
                   return authorization
@@ -153,7 +149,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
                   let%map (), (), proof =
                     prover ?handler:(Some handler) txn_stmt
                   in
-                  Control.Proof { proof; verification_key_hash } )
+                  Control.Proof proof )
           | None_given ->
               return authorization
         in

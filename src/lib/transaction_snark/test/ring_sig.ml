@@ -227,14 +227,9 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                     }
                 ; use_full_commitment = false
                 ; caller = Call
-                ; authorization_kind = Proof
+                ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; authorization =
-                Proof
-                  { proof = Mina_base.Proof.transaction_dummy
-                  ; verification_key_hash =
-                      Mina_base.Zkapp_account.dummy_vk_hash ()
-                  }
+            ; authorization = Proof Mina_base.Proof.transaction_dummy
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
@@ -303,11 +298,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               ; account_updates =
                   [ sender
                   ; { body = snapp_account_update_data.body
-                    ; authorization =
-                        Proof
-                          { proof = pi
-                          ; verification_key_hash = With_hash.hash vk
-                          }
+                    ; authorization = Proof pi
                     }
                   ]
               ; memo

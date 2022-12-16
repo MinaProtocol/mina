@@ -1482,7 +1482,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let is_proved (account_update : t) =
         match account_update.body.authorization_kind with
-        | Proof ->
+        | Proof _ ->
             true
         | Signature | None_given ->
             false
@@ -1491,7 +1491,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         match account_update.body.authorization_kind with
         | Signature ->
             true
-        | Proof | None_given ->
+        | Proof _ | None_given ->
             false
 
       module Update = struct

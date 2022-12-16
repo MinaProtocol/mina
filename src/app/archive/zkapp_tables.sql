@@ -81,10 +81,16 @@ CREATE TABLE zkapp_events
 , element_ids              int[]            NOT NULL
 );
 
+/* field elements derived from verification keys */
+CREATE TABLE zkapp_verification_key_hashes
+( id                                    serial          PRIMARY KEY
+, value                                 text            NOT NULL UNIQUE
+);
+
 CREATE TABLE zkapp_verification_keys
 ( id                       serial           PRIMARY KEY
 , verification_key         text             NOT NULL UNIQUE
-, hash                     text             NOT NULL UNIQUE
+, hash_id                  int              NOT NULL UNIQUE REFERENCES zkapp_verification_key_hashes(id)
 );
 
 CREATE TYPE zkapp_auth_required_type AS ENUM ('none', 'either', 'proof', 'signature', 'both', 'impossible');
@@ -250,6 +256,10 @@ CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof')
 
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array.
+
+   invariant: verification_key_hash_id is not NULL iff authorization_kind = Proof
+   in OCaml, the verification key hash is stored with the Proof authorization kind
+   here, they're kept separate so we can use an enum type
 */
 CREATE TABLE zkapp_account_update_body
 ( id                                    serial          PRIMARY KEY
@@ -261,11 +271,12 @@ CREATE TABLE zkapp_account_update_body
 , sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
-, zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
+, zkapp_network_precondition_id  int                    NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , caller                                call_type  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
+, verification_key_hash_id              int                       REFERENCES verification_key_hashes(id)
 );
 
 /* possible future enhancement: add NULLable authorization column for proofs and signatures */

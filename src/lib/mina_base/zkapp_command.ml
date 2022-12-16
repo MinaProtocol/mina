@@ -1325,15 +1325,18 @@ end
 
 let check_authorization (p : Account_update.t) : unit Or_error.t =
   match (p.authorization, p.body.authorization_kind) with
-  | None_given, None_given | Proof _, Proof | Signature _, Signature ->
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
       Ok ()
   | _ ->
       let err =
+        let expected =
+          Account_update.Authorization_kind.to_control_tag
+            p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
         Error.create "Authorization kind does not match the authorization"
-          [ ("expected", p.body.authorization_kind)
-          ; ("got", Control.tag p.authorization)
-          ]
-          [%sexp_of: (string * Account_update.Authorization_kind.t) list]
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
       in
       Error err
 

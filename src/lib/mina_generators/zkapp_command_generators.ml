@@ -819,7 +819,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
     | Signature ->
         Signature
     | Proof ->
-        Proof
+        Proof (With_hash.hash verification_key)
   in
   (* update account state table with all the changes*)
   (let add_balance_and_balance_change balance

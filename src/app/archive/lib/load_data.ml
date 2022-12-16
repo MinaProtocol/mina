@@ -151,25 +151,33 @@ let update_of_id pool update_id =
     |> Set_or_keep.of_option
   in
   let%bind verification_key =
-    let%map vk_opt =
+    let%bind vk_opt =
       Option.value_map verification_key_id ~default:(return None) ~f:(fun id ->
           let%map vk =
             query_db ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
           in
           Some vk )
     in
-    Set_or_keep.of_option
-      (Option.map vk_opt ~f:(fun { verification_key; hash } ->
-           match
-             Pickles.Side_loaded.Verification_key.of_base64 verification_key
-           with
-           | Ok vk ->
-               let data = vk in
-               let hash = Pickles.Backend.Tick.Field.of_string hash in
-               { With_hash.data; hash }
-           | Error err ->
-               failwithf "Could not Base64-decode verification key: %s"
-                 (Error.to_string_hum err) () ) )
+    match vk_opt with
+    | None ->
+        return Set_or_keep.Keep
+    | Some { verification_key; hash_id } -> (
+        match
+          Pickles.Side_loaded.Verification_key.of_base64 verification_key
+        with
+        | Ok vk ->
+            let data = vk in
+            let%bind hash =
+              let%map hash_str =
+                query_db ~f:(fun db ->
+                    Processor.Zkapp_verification_key_hashes.load db hash_id )
+              in
+              Pickles.Backend.Tick.Field.of_string hash_str
+            in
+            return @@ Set_or_keep.Set { With_hash.data; hash }
+        | Error err ->
+            failwithf "Could not Base64-decode verification key: %s"
+              (Error.to_string_hum err) () )
   in
   let%bind permissions =
     let%map perms_opt =
@@ -420,6 +428,7 @@ let get_account_update_body ~pool body_id =
            ; use_full_commitment
            ; caller
            ; authorization_kind
+           ; verification_key_hash_id
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
   in
@@ -587,8 +596,27 @@ let get_account_update_body ~pool body_id =
              } )
   in
   let caller = Account_update.Call_type.of_string caller in
-  let authorization_kind =
-    Account_update.Authorization_kind.of_string_exn authorization_kind
+  let%bind authorization_kind =
+    match Control.Tag.of_string_exn authorization_kind with
+    | Proof -> (
+        match verification_key_hash_id with
+        | Some id ->
+            let%map vk_hash_str =
+              Mina_caqti.query pool ~f:(fun db ->
+                  Processor.Zkapp_verification_key_hashes.load db id )
+            in
+            Account_update.Authorization_kind.Proof
+              (Zkapp_basic.F.of_string vk_hash_str)
+        | None ->
+            failwith
+              "Expected non-NULL verification_key_hash_id for Proof \
+               authorization kind" )
+    | Signature ->
+        assert (Option.is_none verification_key_hash_id) ;
+        return Account_update.Authorization_kind.Signature
+    | None_given ->
+        assert (Option.is_none verification_key_hash_id) ;
+        return Account_update.Authorization_kind.None_given
   in
   return
     ( { public_key
@@ -788,7 +816,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind verification_key =
           Option.value_map verification_key_id ~default:(return None)
             ~f:(fun id ->
-              let%map { verification_key; hash } =
+              let%bind { verification_key; hash_id } =
                 query_db ~f:(fun db ->
                     Processor.Zkapp_verification_keys.load db id )
               in
@@ -802,7 +830,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                     failwithf "Could not Base64-decode verification key: %s" err
                       ()
               in
-              let hash = Zkapp_basic.F.of_string hash in
+              let%map hash =
+                let%map hash_str =
+                  query_db ~f:(fun db ->
+                      Processor.Zkapp_verification_key_hashes.load db hash_id )
+                in
+                Zkapp_basic.F.of_string hash_str
+              in
               Some ({ data; hash } : _ With_hash.t) )
         in
         let zkapp_version =

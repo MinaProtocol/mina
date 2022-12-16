@@ -4142,8 +4142,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let account_update_proof (p : Account_update.t) =
       match p.authorization with
-      | Proof { proof = p; _ } ->
-          Some p
+      | Proof proof ->
+          Some proof
       | Signature _ | None_given ->
           None
 
@@ -4755,7 +4755,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       [@@deriving sexp]
 
-      let spec_of_t
+      let spec_of_t ~vk
           { fee
           ; sender
           ; fee_payer
@@ -4790,7 +4790,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Signature ->
                 Signature
             | Proof ->
-                Proof
+                Proof (With_hash.hash vk)
             | _ ->
                 Signature )
         }
@@ -4798,13 +4798,24 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
         ~constraint_constants (spec : Update_states_spec.t) =
+      let prover, vk =
+        match zkapp_prover_and_vk with
+        | Some (prover, vk) ->
+            (prover, vk)
+        | None ->
+            (* we don't always need this, but calculate it just once *)
+            let `VK vk, `Prover prover =
+              create_trivial_snapp ~constraint_constants ()
+            in
+            (prover, vk)
+      in
       let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
         create_zkapp_command ~constraint_constants
-          (Update_states_spec.spec_of_t spec)
+          (Update_states_spec.spec_of_t ~vk spec)
           ~update:spec.snapp_update
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
           ?empty_sender
@@ -4834,23 +4845,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (Snarky_backendless.Request.With { request; respond }) =
                   match request with _ -> respond Unhandled
                 in
-                let prover, vk =
-                  match zkapp_prover_and_vk with
-                  | Some (prover, vk) ->
-                      (prover, vk)
-                  | None ->
-                      let `VK vk, `Prover prover =
-                        create_trivial_snapp ~constraint_constants ()
-                      in
-                      (prover, vk)
-                in
                 let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
                     =
                   prover ~handler tx_statement
                 in
-                let verification_key_hash = With_hash.hash vk in
                 ( { body = simple_snapp_account_update.body
-                  ; authorization = Proof { proof = pi; verification_key_hash }
+                  ; authorization = Proof pi
                   }
                   : Account_update.Simple.t )
             | Signature ->
@@ -5074,13 +5074,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; caller = Call
-            ; authorization_kind = Proof
+            ; authorization_kind = Proof (With_hash.hash vk)
             }
-        ; authorization =
-            Proof
-              { proof = Mina_base.Proof.transaction_dummy
-              ; verification_key_hash = Mina_base.Zkapp_account.dummy_vk_hash ()
-              }
+        ; authorization = Proof Mina_base.Proof.transaction_dummy
         }
       in
       let memo = Signed_command_memo.empty in
@@ -5136,11 +5132,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       in
       let account_updates =
-        let verification_key_hash = With_hash.hash vk in
         [ sender
-        ; { body = snapp_account_update_data.body
-          ; authorization = Proof { proof = pi; verification_key_hash }
-          }
+        ; { body = snapp_account_update_data.body; authorization = Proof pi }
         ]
       in
       let zkapp_command : Zkapp_command.t =
