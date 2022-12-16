@@ -62,17 +62,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  (* Call [f] [n] times in sequence *)
-  let repeat_seq ~n ~f =
-    let open Malleable_error.Let_syntax in
-    let rec go n =
-      if n = 0 then return ()
-      else
-        let%bind () = f () in
-        go (n - 1)
-    in
-    go n
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -399,7 +388,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = untimed_node_b in
          let%bind sender_pub_key = pub_key_of_node sender in
-         let%bind () =
+         let%bind _ =
            (*
             To fill up a `small` transaction capacity with work delay of 1,
             there needs to be 12 total txns sent.
@@ -415,10 +404,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-           repeat_seq ~n:10 ~f:(fun () ->
-               Network.Node.must_send_payment ~logger sender ~sender_pub_key
-                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-               >>| ignore )
+           send_payments ~logger ~sender_pub_key ~receiver_pub_key
+             ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
