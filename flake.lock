@@ -97,11 +97,11 @@
     },
     "flockenzeit": {
       "locked": {
-        "lastModified": 1671180099,
-        "narHash": "sha256-mVFwzswQgpWNND6d0uhYEWMhz3IBie0lNep6PbyeULM=",
+        "lastModified": 1671184471,
+        "narHash": "sha256-oTsIo40BxHG8ZcMNwJybV68F8CLNdfY9HKFzEBzeJ6A=",
         "owner": "balsoft",
         "repo": "Flockenzeit",
-        "rev": "d20d9e484e3a11829ac92eda2dc0805c0baf66f4",
+        "rev": "0409dcd0cc87feebd211c529171d61b89f10d9b3",
         "type": "github"
       },
       "original": {
