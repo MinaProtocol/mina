@@ -339,28 +339,24 @@ module Zkapp_command_info = struct
                 ; _type = Operation_types.name `Zkapp_fee_payer_dec
                 ; amount =
                     Some
-                      (Amount_of.token (`Token_id Amount_of.Token_id.default)
-                         t.fee )
+                      (Amount_of.(negated @@ token (`Token_id Amount_of.Token_id.default)
+                         t.fee ))
                 ; coin_change = None
                 ; metadata = None
                 }
           | `Zkapp_account_update upd ->
               let status = Some (Operation_statuses.name upd.status) in
               let amount =
-                match
-                  (upd.status, String.chop_prefix upd.balance_change ~prefix:"-")
-                with
-                | `Failed, _ ->
-                    None
-                | `Success, Some amount ->
-                    Some
-                      Amount_of.(
-                        token upd.token
-                        @@ Unsigned_extended.UInt64.of_string amount)
-                | `Success, None ->
-                    Some
+                match String.chop_prefix ~prefix:"-" upd.balance_change with                
+                | Some amount ->
+                  Some
                       Amount_of.(
                         negated @@ token upd.token
+                        @@ Unsigned_extended.UInt64.of_string amount)
+                | None ->
+                  Some
+                      Amount_of.(
+                        token upd.token
                         @@ Unsigned_extended.UInt64.of_string upd.balance_change)
               in
               M.return
