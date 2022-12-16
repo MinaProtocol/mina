@@ -1,7 +1,4 @@
-use kimchi::circuits::{
-    expr::FeatureFlag,
-    lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
-};
+use kimchi::circuits::{expr::FeatureFlag, lookup::lookups::{LookupPattern, LookupFeatures, LookupPatterns}};
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;

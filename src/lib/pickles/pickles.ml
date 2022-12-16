@@ -705,8 +705,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       Timer.clock __LOC__ ;
       let wrap_requests, wrap_main =
-        let srs = Tick.Keypair.load_urs () in
-        Wrap_main.wrap_main ~srs full_signature prev_varss_length step_vks
+        Wrap_main.wrap_main full_signature prev_varss_length step_vks
           proofs_verifieds step_domains max_proofs_verified
       in
       Timer.clock __LOC__ ;

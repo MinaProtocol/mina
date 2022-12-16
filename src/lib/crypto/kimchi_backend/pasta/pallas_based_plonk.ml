@@ -34,17 +34,23 @@ end
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Pallas_constraint_system
 
-let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
-  let domain_size = Int.pow 2 domain_log2 in
-  Array.init domain_size ~f:(fun i ->
-      Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs domain_size i )
+let lagrange : int -> _ Kimchi_types.poly_comm array =
+  Memo.general ~hashable:Int.hashable (fun domain_log2 ->
+      Array.map
+        Precomputed.Lagrange_precomputations.(
+          pallas.(index_of_domain_log2 domain_log2))
+        ~f:(fun unshifted ->
+          { Kimchi_types.unshifted =
+              Array.map unshifted ~f:(fun (x, y) -> Kimchi_types.Finite (x, y))
+          ; shifted = None
+          } ) )
 
 let with_lagrange f (vk : Verification_key.t) =
-  f (lagrange vk.srs vk.domain.log_size_of_group) vk
+  f (lagrange vk.domain.log_size_of_group) vk
 
 let with_lagranges f (vks : Verification_key.t array) =
   let lgrs =
-    Array.map vks ~f:(fun vk -> lagrange vk.srs vk.domain.log_size_of_group)
+    Array.map vks ~f:(fun vk -> lagrange vk.domain.log_size_of_group)
   in
   f lgrs vks
 

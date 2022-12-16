@@ -360,12 +360,13 @@ struct
     with_label __LOC__ (fun () -> scalar_chal m1.alpha m2.alpha) ;
     with_label __LOC__ (fun () -> scalar_chal m1.zeta m2.zeta)
 
-  let lagrange_commitment ~domain srs i =
-    let d = Int.pow 2 (Domain.log2_size domain) in
-    match
-      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
-    with
-    | [| Finite g |] ->
+  let lagrange_commitment ~domain i =
+    let d =
+      Kimchi_pasta.Pasta.Precomputed.Lagrange_precomputations
+      .index_of_domain_log2 (Domain.log2_size domain)
+    in
+    match Precomputed.Lagrange_precomputations.pallas.(d).(i) with
+    | [| g |] ->
         Inner_curve.Constant.of_affine g
     | _ ->
         assert false
@@ -373,7 +374,7 @@ struct
   module O = One_hot_vector.Make (Impl)
   open Tuple_lib
 
-  let public_input_commitment_dynamic (type n) ~srs (which : n O.t)
+  let public_input_commitment_dynamic (type n) (which : n O.t)
       (domains : (Domains.t, n) Vector.t)
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array ) =
@@ -382,12 +383,14 @@ struct
       Vector.map ~f:(fun proofs_verified -> Common.wrap_domains ~proofs_verified)
         [ 0; 1 ; 2 ]
     in *)
+    let precomputations = Precomputed.Lagrange_precomputations.pallas in
     let lagrange_commitment (d : Domains.t) (i : int) : Inner_curve.Constant.t =
-      let d = Int.pow 2 (Domain.log2_size d.h) in
-      match
-        (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
-      with
-      | [| Finite g |] ->
+      let d =
+        Precomputed.Lagrange_precomputations.index_of_domain_log2
+          (Domain.log2_size d.h)
+      in
+      match precomputations.(d).(i) with
+      | [| g |] ->
           Inner_curve.Constant.of_affine g
       | _ ->
           assert false
@@ -494,13 +497,13 @@ struct
     x_hat
 
   let incrementally_verify_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
            _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
-         ) ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge ~sponge_after_index
+         ) ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -538,10 +541,10 @@ struct
               | `Known domain ->
                   multiscale_known
                     (Array.mapi public_input ~f:(fun i x ->
-                         (x, lagrange_commitment ~domain srs i) ) )
+                         (x, lagrange_commitment ~domain i) ) )
                   |> Inner_curve.negate
               | `Side_loaded which ->
-                  public_input_commitment_dynamic ~srs which
+                  public_input_commitment_dynamic which
                     (Vector.map
                        ~f:(fun proofs_verified ->
                          Common.wrap_domains ~proofs_verified )
@@ -1187,7 +1190,7 @@ struct
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
-      ~lookup_parameters ~(proof : Wrap_proof.Checked.t) ~srs ~wrap_domain
+      ~lookup_parameters ~(proof : Wrap_proof.Checked.t) ~wrap_domain
       ~wrap_verification_key statement
       (unfinalized :
         ( _
@@ -1221,8 +1224,8 @@ struct
     in
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
-      incrementally_verify_proof ~srs proofs_verified ~srs ~domain:wrap_domain
-        ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
+      incrementally_verify_proof proofs_verified ~domain:wrap_domain ~xi
+        ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
         ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
         ~proof ~plonk:unfinalized.deferred_values.plonk

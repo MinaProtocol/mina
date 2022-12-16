@@ -207,14 +207,14 @@ struct
   let lagrange (type n)
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) srs i =
+        , (domains : (Domains.t, n) Vector.t) ) i =
     Vector.map domains ~f:(fun d ->
-        let d = Int.pow 2 (Domain.log2_size d.h) in
-        match
-          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
-        with
-        | [| Finite g |] ->
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+        | [| g |] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.constant g
         | _ ->
@@ -227,14 +227,14 @@ struct
   let scaled_lagrange (type n) c
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) srs i =
+        , (domains : (Domains.t, n) Vector.t) ) i =
     Vector.map domains ~f:(fun d ->
-        let d = Int.pow 2 (Domain.log2_size d.h) in
-        match
-          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
-        with
-        | [| Finite g |] ->
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+        | [| g |] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.Constant.scale g c |> Inner_curve.constant
         | _ ->
@@ -247,7 +247,7 @@ struct
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) srs i : Inner_curve.t Double.t =
+        , (domains : (Domains.t, n) Vector.t) ) i : Inner_curve.t Double.t =
     with_label __LOC__ (fun () ->
         let actual_shift =
           (* TODO: num_bits should maybe be input_length - 1. *)
@@ -257,12 +257,12 @@ struct
           if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
         in
         let base_and_correction (h : Domain.t) =
-          let d = Int.pow 2 (Domain.log2_size h) in
-          match
-            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-              .unshifted
-          with
-          | [| Finite g |] ->
+          let d =
+            Precomputed.Lagrange_precomputations.index_of_domain_log2
+              (Domain.log2_size h)
+          in
+          match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+          | [| g |] ->
               let open Inner_curve.Constant in
               let g = of_affine g in
               ( Inner_curve.constant g
@@ -500,7 +500,7 @@ struct
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
-      ~actual_proofs_verified_mask ~step_domains ~srs
+      ~actual_proofs_verified_mask ~step_domains
       ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
@@ -556,13 +556,13 @@ struct
                     First
                       ( if Field.Constant.(equal zero) c then None
                       else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
+                        Some (lagrange ~domain i)
                       else
                         Some
                           (scaled_lagrange ~domain
                              (Inner_curve.Constant.Scalar.project
                                 (Field.Constant.unpack c) )
-                             srs i ) )
+                             i ) )
                 | `Field x ->
                     Second (i, x) )
           in
@@ -572,13 +572,12 @@ struct
                     match x with
                     | b, 1 ->
                         assert_ (Constraint.boolean (b :> Field.t)) ;
-                        `Cond_add
-                          (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
+                        `Cond_add (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
                     | x, n ->
                         `Add_with_correction
                           ( (x, n)
-                          , lagrange_with_correction ~input_length:n ~domain srs
-                              i ) )
+                          , lagrange_with_correction ~input_length:n ~domain i
+                          ) )
               in
               let correction =
                 with_label __LOC__ (fun () ->

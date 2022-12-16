@@ -23,7 +23,7 @@ let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-let verify_one ~srs
+let verify_one
     ({ app_state
      ; wrap_proof
      ; proof_state
@@ -86,7 +86,7 @@ let verify_one ~srs
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~srs
+        verify
           ~lookup_parameters:
             { use = d.step_uses_lookup
             ; zero =
@@ -379,7 +379,6 @@ let step_main :
           in
           go prevs previous_proof_statements
         in
-        let srs = Backend.Tock.Keypair.load_urs () in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
@@ -449,8 +448,8 @@ let step_main :
                           ()
                     in
                     let chals, v =
-                      verify_one ~srs p d messages_for_next_wrap_proof
-                        unfinalized should_verify
+                      verify_one p d messages_for_next_wrap_proof unfinalized
+                        should_verify
                     in
                     let chalss, vs =
                       go proofs datas messages_for_next_wrap_proofs unfinalizeds

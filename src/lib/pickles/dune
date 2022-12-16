@@ -47,6 +47,7 @@
    snarky_group_map
    sponge
    pickles.pseudo
+   pickles.precomputed
    pickles.limb_vector
    pickles_base
    kimchi_backend
