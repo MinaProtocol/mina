@@ -38,9 +38,11 @@
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
 
+  inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, ... }:
+    , nix-utils, flockenzeit, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -266,7 +268,10 @@
 
         checks = import ./nix/checks.nix inputs pkgs;
 
-        dockerImages = pkgs.callPackage ./nix/docker.nix { };
+        dockerImages = pkgs.callPackage ./nix/docker.nix {
+          inherit flockenzeit;
+          currentTime = self.sourceInfo.lastModified or 0;
+        };
 
         ocamlPackages = pkgs.ocamlPackages_mina;
 
