@@ -34,6 +34,15 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
+**warning for macOS users**: macOS updates will often break your nix installation. To prevent that, you can add the following to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+# avoid macOS updates to destroy nix
+if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+  source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+fi
+```
+
 ## 2. Enable Flakes (optional but recommended)
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
