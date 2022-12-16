@@ -772,7 +772,7 @@ SELECT zaub.account_identifier_id, zaub.id,
 FROM zkapp_commands zc
  INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
  INNER JOIN zkapp_account_update zau on zau.id = ANY(zc.zkapp_account_updates_ids)
- INNER JOIN zkapp_account_update_body zaub on zaub.update_id = zau.id
+ INNER JOIN zkapp_account_update_body zaub on zaub.id = zau.body_id
  INNER JOIN account_identifiers ai on ai.id = zaub.account_identifier_id
  INNER JOIN public_keys pk on ai.public_key_id = pk.id
 WHERE zc.id = ?
