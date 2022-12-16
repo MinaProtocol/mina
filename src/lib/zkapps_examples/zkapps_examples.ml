@@ -263,7 +263,11 @@ module Account_update_under_construction = struct
         ; use_full_commitment = Boolean.false_
         ; caller = t.caller
         ; authorization_kind =
-            { is_signed = Boolean.false_; is_proved = Boolean.true_ }
+            (* TODO: is there a valid vk hash available? *)
+            { is_signed = Boolean.false_
+            ; is_proved = Boolean.true_
+            ; verification_key_hash = Field.zero
+            }
         }
       in
       let calls =
@@ -586,11 +590,7 @@ let compile :
             let verification_key_hash = Zkapp_account.dummy_vk_hash () in
             let account_update : Account_update.t =
               { body = account_update
-              ; authorization =
-                  Proof
-                    { proof = Pickles.Side_loaded.Proof.of_proof proof
-                    ; verification_key_hash
-                    }
+              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
               }
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
