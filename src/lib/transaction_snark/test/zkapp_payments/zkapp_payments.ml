@@ -17,11 +17,7 @@ let%test_module "Zkapp payments tests" =
 
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) txn =
-      let slot_advancement = Mina_numbers.Global_slot.of_int 3 in
-      let global_slot =
-        Mina_numbers.Global_slot.(
-          add txn_state_view.global_slot_since_genesis slot_advancement)
-      in
+      let global_slot = txn_state_view.global_slot_since_genesis in
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
           ~constraint_constants:U.constraint_constants ~global_slot

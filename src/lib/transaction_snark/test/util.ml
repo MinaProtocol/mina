@@ -96,10 +96,11 @@ let apply_zkapp_command ledger zkapp_command =
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
+  let state_view = Mina_state.Protocol_state.Body.view genesis_state_body in
+  let global_slot = state_view.global_slot_since_genesis in
   let witnesses, final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~global_slot:Mina_numbers.Global_slot.(of_int 2)
-      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+      ~global_slot ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) zkapp_command
   in
   let open Impl in
