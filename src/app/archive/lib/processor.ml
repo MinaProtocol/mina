@@ -453,7 +453,7 @@ module Zkapp_verification_key_hashes = struct
 
   let typ = Caqti_type.string
 
-  let table_name = "verification_key_hashes"
+  let table_name = "zkapp_verification_key_hashes"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (verification_key_hash : Pickles.Backend.Tick.Field.t) =
