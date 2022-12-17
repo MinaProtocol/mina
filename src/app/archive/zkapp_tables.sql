@@ -276,7 +276,7 @@ CREATE TABLE zkapp_account_update_body
 , use_full_commitment                   boolean         NOT NULL
 , caller                                call_type  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
-, verification_key_hash_id              int                       REFERENCES verification_key_hashes(id)
+, verification_key_hash_id              int                       REFERENCES zkapp_verification_key_hashes(id)
 );
 
 /* possible future enhancement: add NULLable authorization column for proofs and signatures */
