@@ -327,6 +327,30 @@ struct
         t
     end
 
+    module Vk_refcount_table = struct
+      (* what's the right incantation of "field" here that is better than State_hash but will compile *)
+      type t = (int * Side_loaded_verification_key.t) State_hash.Table.t
+
+      let create () = State_hash.Table.create ()
+
+      let find t key =
+        State_hash.Table.find t key
+
+      let inc ~key ~value t =
+        State_hash.Table.update t key ~f:(function
+          | None ->
+              (1, value)
+          | Some (x, value) ->
+              (x + 1, value) )
+
+      let dec ~key ~value:_ t =
+        State_hash.Table.change t key ~f:(function
+          | None ->
+              None
+          | Some (x, value) ->
+              if Int.equal x 1 then None else Some (x - 1, value) )
+    end
+
     type t =
       { mutable pool : Indexed_pool.t
       ; recently_seen : (Lru_cache.t[@sexp.opaque])
@@ -335,7 +359,7 @@ struct
           , Time.t * [ `Batch of int ] )
           Hashtbl.t
             (** Commands generated on this machine, that are not included in the
-                current best tip, along with the time they were added. *)
+          current best tip, along with the time they were added. *)
       ; locally_generated_committed :
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t * [ `Batch of int ] )
@@ -348,6 +372,7 @@ struct
       ; batcher : Batcher.t
       ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
       ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
+      ; verification_key_table : (Vk_refcount_table.t[@sexp.opaque])
       }
     [@@deriving sexp_of]
 
@@ -731,6 +756,7 @@ struct
         ; best_tip_diff_relay = None
         ; recently_seen = Lru_cache.Q.create ()
         ; best_tip_ledger = None
+        ; verification_key_table = Vk_refcount_table.create ()
         }
       in
       don't_wait_for
@@ -972,6 +998,7 @@ struct
         | _ ->
             ()
 
+      (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool) (diff : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
         let open Deferred.Or_error.Let_syntax in
@@ -1052,17 +1079,43 @@ struct
                 "We don't have a transition frontier at the moment, so we're \
                  unable to verify any transactions."
         in
+
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               Or_error.try_with (fun () ->
                   Envelope.Incoming.map diff
                     ~f:
-                      (List.map ~f:(fun cmd ->
-                           User_command.to_verifiable ~ledger
-                             ~get:Base_ledger.get
-                             ~location_of_account:
-                               Base_ledger.location_of_account cmd
-                           |> Or_error.ok_exn ) ) ) )
+                      (List.fold_map ~init:State_hash.Map.empty
+                         ~f:(fun running_cache cmd ->
+                           let verified_cmd =
+                             User_command.to_verifiable
+                               ~find_vk:(fun vk_hash account_id ->
+                                 (* a little "or else" operator *)
+                                 let ( |- ) x y_thunk =
+                                   match x with
+                                   | Error _ ->
+                                       y_thunk ()
+                                   | Ok z -> Ok z
+                                 in
+                                 (* first we check if there's anything in the running cache within this diff so far *)
+                                 (State_hash.Map.find running_cache vk_hash |> Result.of_option ~error:(Error.create "Failed to find vk in running cache"))
+                                 |- (fun () ->
+                                      (* then we fall back to the vk table inside the mempool *)
+                                      Vk_refcount_table.find t.verification_key_table vk_hash |> Result.of_option ~error:(Error.create "Failed to find vk in refcount table")  )
+                                 |- fun () ->
+                                 (* finally we check the ledger *)
+                                 Zkapp_command.Verifiable.find_vk_via_ledger
+                                   ~ledger ~get:Base_ledger.get
+                                   ~location_of_account:
+                                     Base_ledger.location_of_account vk_hash account_id )
+                             |> Or_error.ok_exn
+                           in
+                           let running_cache' =
+                             let vk = extract_vk verified_cmd in
+                             State_hash.Map.set running_cache ~data:vk
+                               ~key:(Verification_key_wire.digest_vk vk)
+                           in
+                           (running_cache', verified_cmd) ) ) ) )
           |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
           |> Deferred.return
         in
@@ -1127,6 +1180,7 @@ struct
               in
               (Time.now (), `Batch batch_num) )
 
+      (* This must be synchronous, but you MAY modify state here (do not modify pool state in `verify` *)
       let apply t (diff : verified Envelope.Incoming.t) =
         let open Or_error.Let_syntax in
         let is_sender_local =
@@ -1200,6 +1254,13 @@ struct
               | Error err ->
                   (pool, Error (cmd, err)) )
         in
+        let added_cmds =
+          List.filter_map add_results ~f:(function
+            | Ok (cmd, _) ->
+                Some cmd
+            | Error _ ->
+                None )
+        in
         let dropped_for_add =
           List.filter_map add_results ~f:(function
             | Ok (_, dropped) ->
@@ -1217,6 +1278,18 @@ struct
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
+
+        (* apply changes to the vk-refcount-table here *)
+        let () =
+          let lift table_modify cmd = 
+            let vk = extract_vk cmd in
+            table_modify ~key:(Side_loaded_verification_key.digest vk) ~value:vk t.verification_key_table
+          in
+          (* add the cmds *)
+          List.iter added_cmds ~f:(lift Vk_refcount_table.inc);
+          (* drop vks we're losing *)
+          List.iter all_dropped_cmds ~f:(lift Vk_refcount_table.dec)
+        in
         let all_dropped_cmd_hashes =
           List.map all_dropped_cmds
             ~f:Transaction_hash.User_command_with_valid_signature.hash

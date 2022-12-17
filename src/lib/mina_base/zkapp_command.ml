@@ -1357,11 +1357,20 @@ module Verifiable : sig
     end
   end]
 
-  val create :
-       T.t
-    -> ledger:'a
+  val find_vk_via_ledger :
+       ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> State_hash.t
+    -> Account_id.t
+    -> (Verification_key_wire.t, Error.t) Result.t
+
+  val create :
+       T.t
+    -> find_vk:
+         (   State_hash.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
 end = struct
   [%%versioned
@@ -1383,6 +1392,20 @@ end = struct
     end
   end]
 
+  let find_vk_via_ledger ~ledger ~get ~location_of_account _vk_hash account_id =
+    match
+      let open Option.Let_syntax in
+      let%bind location = location_of_account ledger account_id in
+      let%bind (account : Account.t) = get ledger location in
+      let%bind zkapp = account.zkapp in
+      zkapp.verification_key
+    with
+    | Some vk ->
+        Ok vk
+    | None ->
+        Error (Error.create "No verification key found for proved account update"
+          ("account_id", account_id) [%sexp_of: string * Account_id.t])
+
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
    * account_id.
@@ -1391,27 +1414,9 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
-      ~location_of_account : t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t) ~find_vk :
+      t Or_error.t =
     With_return.with_return (fun { return } ->
-        let find_vk account_id =
-          match
-            let open Option.Let_syntax in
-            let%bind location = location_of_account ledger account_id in
-            let%bind (account : Account.t) = get ledger location in
-            let%bind zkapp = account.zkapp in
-            zkapp.verification_key
-          with
-          | Some vk ->
-              vk
-          | None ->
-              let err =
-                Error.create
-                  "No verification key found for proved account update"
-                  ("account_id", account_id) [%sexp_of: string * Account_id.t]
-              in
-              return (Error err)
-        in
         let tbl = Account_id.Table.create () in
         let vks_overridden =
           (* Keep track of the verification keys that have been set so far
@@ -1458,8 +1463,11 @@ end = struct
                       in
                       return (Error err)
                   | None ->
-                      (* we haven't set anything; lookup the vk in the ledger *)
-                      find_vk account_id
+                      (* we haven't set anything; lookup the vk in the fallback *)
+                      let vk_hash = failwith "TODO: Lookup the vk_hash inside this account update" in
+                      (match find_vk vk_hash account_id with
+                      | Error e -> return (Error e)
+                      | Ok vk -> vk)
                 in
                 Account_id.Table.update tbl account_id ~f:(fun _ ->
                     With_hash.hash prioritized_vk ) ;
@@ -1646,7 +1654,7 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t ~ledger ~get ~location_of_account
+    Verifiable.create t ~find_vk:(Verifiable.find_vk_via_ledger ~ledger ~get ~location_of_account)
     |> Or_error.bind ~f:of_verifiable
 end
 
