@@ -16,8 +16,10 @@ type nonrec 'caml_f random_oracles =
   ; v_chal : 'caml_f scalar_challenge
   ; u_chal : 'caml_f scalar_challenge
   }
+[@@boxed]
 
 type nonrec 'evals point_evaluations = { zeta : 'evals; zeta_omega : 'evals }
+[@@boxed]
 
 type nonrec 'caml_f lookup_evaluations =
   { sorted : 'caml_f array point_evaluations array
@@ -25,6 +27,7 @@ type nonrec 'caml_f lookup_evaluations =
   ; table : 'caml_f array point_evaluations
   ; runtime : 'caml_f array point_evaluations option
   }
+[@@boxed]
 
 type nonrec 'caml_f proof_evaluations =
   { w :
@@ -71,21 +74,26 @@ type nonrec 'caml_f proof_evaluations =
   ; generic_selector : 'caml_f array point_evaluations
   ; poseidon_selector : 'caml_f array point_evaluations
   }
+[@@boxed]
 
 type nonrec 'caml_g poly_comm =
   { unshifted : 'caml_g array; shifted : 'caml_g option }
+[@@boxed]
 
 type nonrec ('caml_g, 'caml_f) recursion_challenge =
   { chals : 'caml_f array; comm : 'caml_g poly_comm }
+[@@boxed]
 
 type nonrec ('g, 'f) opening_proof =
   { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
+[@@boxed]
 
 type nonrec 'caml_g lookup_commitments =
   { sorted : 'caml_g poly_comm array
   ; aggreg : 'caml_g poly_comm
   ; runtime : 'caml_g poly_comm option
   }
+[@@boxed]
 
 type nonrec 'caml_g prover_commitments =
   { w_comm :
@@ -108,6 +116,7 @@ type nonrec 'caml_g prover_commitments =
   ; t_comm : 'caml_g poly_comm
   ; lookup : 'caml_g lookup_commitments option
   }
+[@@boxed]
 
 type nonrec ('caml_g, 'caml_f) prover_proof =
   { commitments : 'caml_g prover_commitments
@@ -117,8 +126,9 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; public : 'caml_f array
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
+[@@boxed]
 
-type nonrec wire = { row : int; col : int }
+type nonrec wire = { row : int; col : int } [@@boxed]
 
 type nonrec gate_type =
   | Zero
@@ -155,6 +165,7 @@ type nonrec 'f circuit_gate =
   ; wires : wire * wire * wire * wire * wire * wire * wire
   ; coeffs : 'f array
   }
+[@@boxed]
 
 type nonrec curr_or_next = Curr | Next
 
@@ -164,6 +175,7 @@ type nonrec 'f oracles =
   ; opening_prechallenges : 'f array
   ; digest_before_evaluations : 'f
   }
+[@@boxed]
 
 module VerifierIndex = struct
   module Lookup = struct
@@ -182,6 +194,7 @@ module VerifierIndex = struct
       ; max_joint_size : int
       ; uses_runtime_tables : bool
       }
+    [@@boxed]
 
     type nonrec 't lookup_selectors = { lookup_gate : 't option } [@@boxed]
 
@@ -193,9 +206,11 @@ module VerifierIndex = struct
       ; lookup_info : lookup_info
       ; runtime_tables_selector : 'poly_comm option
       }
+    [@@boxed]
   end
 
   type nonrec 'fr domain = { log_size_of_group : int; group_gen : 'fr }
+  [@@boxed]
 
   type nonrec 'poly_comm verification_evals =
     { sigma_comm : 'poly_comm array
@@ -208,6 +223,7 @@ module VerifierIndex = struct
     ; endomul_scalar_comm : 'poly_comm
     ; chacha_comm : 'poly_comm array option
     }
+  [@@boxed]
 
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
     { domain : 'fr domain
@@ -220,4 +236,5 @@ module VerifierIndex = struct
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option
     }
+  [@@boxed]
 end
