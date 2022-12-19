@@ -102,7 +102,7 @@ let zkapp_event = create "MinaZkappEvent"
 
 let zkapp_events = create "MinaZkappEvents"
 
-let zkapp_sequence_events = create "MinaZkappSeqEvents"
+let zkapp_actions = create "MinaZkappSeqEvents"
 
 let zkapp_memo = create "MinaZkappMemo"
 

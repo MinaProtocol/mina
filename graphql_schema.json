@@ -2740,7 +2740,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -2966,7 +2966,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -7747,7 +7747,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
