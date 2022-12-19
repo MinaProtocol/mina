@@ -159,8 +159,7 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~find_vk :
-    Verifiable.t Or_error.t =
+let to_verifiable (t : t) ~find_vk : Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
       Ok (Signed_command c)

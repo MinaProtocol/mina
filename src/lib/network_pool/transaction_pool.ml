@@ -1098,7 +1098,8 @@ struct
               Or_error.try_with (fun () ->
                   Envelope.Incoming.map diff
                     ~f:
-                      (Fn.compose snd (* remove the helper cache we folded with *)
+                      (Fn.compose
+                         snd (* remove the helper cache we folded with *)
                          (List.fold_map ~init:State_hash.Map.empty
                             ~f:(fun running_cache cmd ->
                               let verified_cmd =

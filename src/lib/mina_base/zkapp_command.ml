@@ -1406,8 +1406,9 @@ end = struct
     | Some vk ->
         Ok vk
     | None ->
-        Error (Error.create "No verification key found for proved account update"
-          ("account_id", account_id) [%sexp_of: string * Account_id.t])
+        Error
+          (Error.create "No verification key found for proved account update"
+             ("account_id", account_id) [%sexp_of: string * Account_id.t] )
 
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
@@ -1465,12 +1466,17 @@ end = struct
                           [%sexp_of: string * Account_id.t]
                       in
                       return (Error err)
-                  | None ->
+                  | None -> (
                       (* we haven't set anything; lookup the vk in the fallback *)
-                      let vk_hash = failwith "TODO: Lookup the vk_hash inside this account update" in
-                      (match find_vk vk_hash account_id with
-                      | Error e -> return (Error e)
-                      | Ok vk -> vk)
+                      let vk_hash =
+                        failwith
+                          "TODO: Lookup the vk_hash inside this account update"
+                      in
+                      match find_vk vk_hash account_id with
+                      | Error e ->
+                          return (Error e)
+                      | Ok vk ->
+                          vk )
                 in
                 Account_id.Table.update tbl account_id ~f:(fun _ ->
                     With_hash.hash prioritized_vk ) ;
@@ -1657,7 +1663,8 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t ~find_vk:(Verifiable.find_vk_via_ledger ~ledger ~get ~location_of_account)
+    Verifiable.create t
+      ~find_vk:(Verifiable.find_vk_via_ledger ~ledger ~get ~location_of_account)
     |> Or_error.bind ~f:of_verifiable
 end
 
