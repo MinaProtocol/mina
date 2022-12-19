@@ -113,158 +113,138 @@ module Sql = struct
         (address, requested_block_height)
   end
 
-  (* TODO: either address will have to include a token id, or we pass the
-     token id separately, make it optional and use the default token if omitted
-  *)
-  let run (module Conn : Caqti_async.CONNECTION) account block_query address =
+  let compute_incremental_balance
+        (timing_info : Archive_lib.Processor.Timing_info.t)
+        ~start_slot
+        ~end_slot =
+    let open Unsigned in
+    let cliff_time =
+      UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
+    in
+    let cliff_amount =
+      MinaCurrency.Amount.of_string timing_info.cliff_amount
+    in
+    let vesting_period =
+      UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
+    in
+    let vesting_increment =
+      MinaCurrency.Amount.of_string
+        timing_info.vesting_increment
+    in
+    let initial_minimum_balance =
+      MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
+    in
+    Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
+      ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+      ~initial_minimum_balance
+
+  let find_current_balance
+        (module Conn : Caqti_async.CONNECTION)
+        ~requested_block_global_slot_since_genesis
+        ~last_relevant_command_info
+        address =
     let open Deferred.Result.Let_syntax in
+    let open Unsigned in
+    let (_, last_relevant_command_global_slot_since_genesis, last_relevant_command_balance, nonce) =
+      last_relevant_command_info
+    in
     let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
     let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
     match%bind Archive_lib.Processor.Account_identifiers.find_opt (module Conn) account_id |>
-                     Errors.Lift.sql ~context:"Finding account identifier" with
+           Errors.Lift.sql ~context:"Finding account identifier" with
     | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
     | Some account_identifier_id ->
-      let%bind timing_info_opt =
-        Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
-          (module Conn)
-          account_identifier_id
-        |> Errors.Lift.sql ~context:"Finding timing info"
-      in
-      (* First find the block referenced by the block identifier. Then
-         find the latest block no later than it that has a user or
-         internal command relevant to the address we're checking and
-         pull the balance from it. For non-vesting accounts that
-         balance will still be the balance at the block
-         identifier. For vesting accounts we'll also compute how much
-         extra balance has accumulated in between the blocks. *)
-      let%bind ( requested_block_height
-               , requested_block_global_slot_since_genesis
-               , requested_block_hash ) =
-        match%bind
-          Sql.Block.run (module Conn) block_query
-          |> Errors.Lift.sql ~context:"Finding specified block"
-        with
-        | None ->
-          Deferred.Result.fail (Errors.create @@ `Block_missing (Block_query.to_string block_query))
-        | Some (_block_id, block_info, _) ->
-          Deferred.Result.return
-            ( block_info.height
-            , block_info.global_slot_since_genesis
-            , block_info.state_hash )
-      in
-      let requested_block_identifier =
-        { Block_identifier.index= requested_block_height
-        ; hash= requested_block_hash }
-      in
-      let%bind last_relevant_command_info_opt =
-        Balance_from_last_relevant_command.run
-          (module Conn)
-          requested_block_height address
-        |> Errors.Lift.sql
-          ~context:
-            "Finding balance at last relevant internal or user command."
-      in
-      let open Unsigned in
-      let end_slot =
-        UInt32.of_int
-          (Int.of_int64_exn requested_block_global_slot_since_genesis)
-      in
-      let compute_incremental_balance
-          (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot =
-        let cliff_time =
-          UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
-        in
-        let cliff_amount =
-          MinaCurrency.Amount.of_string timing_info.cliff_amount
-        in
-        let vesting_period =
-          UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
-        in
-        let vesting_increment =
-          MinaCurrency.Amount.of_string
-            timing_info.vesting_increment
-        in
-        let initial_minimum_balance =
-          MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
-        in
-        Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
-          ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
-          ~initial_minimum_balance
-      in
-      let%bind (liquid_balance, nonce) =
-        match (last_relevant_command_info_opt, timing_info_opt) with
-        | None, None ->
-          (* We've never heard of this account, at least as of the
-             block_identifier provided This means they requested a
-             block from before account creation; this is ambiguous in
-             the spec but Coinbase confirmed we can return 0.
-             https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
-          Deferred.Result.return (0L, UInt64.zero)
-        | Some (_, _, last_relevant_command_balance, nonce), None ->
-          (* This account has no special vesting, so just use its last
-             known balance from the command.*)
-          Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-        | None, Some timing_info ->
-          (* This account hasn't seen any transactions but was in the
-             genesis ledger, so use the balance obtained from GraphQL. *)
-           let balance_at_genesis : int64 =
-             Get_balance.(Option.value
-               ~default:account.balance.total
-               account.balance.liquid)
-           |> Unsigned.UInt64.to_int64
-          in
-          let incremental_balance_since_genesis : UInt64.t =
-            compute_incremental_balance timing_info
-              ~start_slot:(UInt32.of_int 0)
-          in
-          Deferred.Result.return
-            ( UInt64.Infix.(
-                  UInt64.of_int64 balance_at_genesis
-                  + incremental_balance_since_genesis)
-              |> UInt64.to_int64, UInt64.zero)
-        | ( Some
-              (_, last_relevant_command_global_slot_since_genesis
-              , last_relevant_command_balance, nonce )
-          , Some timing_info ) ->
-          (* This block was in the genesis ledger and has been
-             involved in at least one user or internal command. We need *
-             to compute the change in its balance between the most recent
-             command and the start block (if it has vesting * it may have
-             changed). *)
-          let incremental_balance_between_slots =
-            compute_incremental_balance timing_info
-              ~start_slot:
+       let%bind timing_info_opt =
+         Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
+           (module Conn)
+           account_identifier_id
+         |> Errors.Lift.sql ~context:"Finding timing info"
+       in
+       let end_slot =
+         UInt32.of_int64 requested_block_global_slot_since_genesis
+       in
+       let%bind (liquid_balance, nonce) =
+         match timing_info_opt with
+         | None ->
+            (* This account has no special vesting, so just use its last
+               known balance from the command.*)
+            Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+         | Some timing_info ->
+            (* This block was in the genesis ledger and has been
+               involved in at least one user or internal command. We need *
+               to compute the change in its balance between the most recent
+               command and the start block (if it has vesting * it may have
+               changed). *)
+            let incremental_balance_between_slots =
+              compute_incremental_balance timing_info
+                ~start_slot:
                 (UInt32.of_int
                    (Int.of_int64_exn
                       last_relevant_command_global_slot_since_genesis))
-          in
-          Deferred.Result.return
-            ( UInt64.Infix.(
+                ~end_slot
+            in
+            Deferred.Result.return
+              ( UInt64.Infix.(
                   UInt64.of_int64 last_relevant_command_balance
                   + incremental_balance_between_slots)
-              |> UInt64.to_int64, UInt64.of_int64 nonce )
-      in
-      let total_balance =
-        match (last_relevant_command_info_opt, timing_info_opt) with
-        | None, None ->
-          (* We've never heard of this account, at least as of the
-             block_identifier provided. TODO: This means they
-             requested a block from before account creation. Should it
-             error instead? Need to clarify with Coinbase team. *)
-           0L
-        | Some (_, _, last_relevant_command_balance, _), _ ->
-          (* This account was involved in a command and we don't care
-             about its vesting, so just use the last known balance from
-             the command *)
-          last_relevant_command_balance
-        | None, Some _ ->
-          (* This account hasn't seen any transactions but was in the
-             genesis ledger, so use the balance obtained from GraphQL. *)
-           Get_balance.(account.balance.total)
-           |> Unsigned.UInt64.to_int64
-      in
-      let balance_info : Balance_info.t = {liquid_balance; total_balance} in
-      Deferred.Result.return (requested_block_identifier, balance_info, nonce)
+                |> UInt64.to_int64, UInt64.of_int64 nonce )
+       in
+       let total_balance = last_relevant_command_balance in
+       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
+       Deferred.Result.return (balance_info, nonce)
+
+  (* TODO: either address will have to include a token id, or we pass the
+     token id separately, make it optional and use the default token if omitted
+  *)
+  let run (module Conn : Caqti_async.CONNECTION) block_query address =
+    let open Deferred.Result.Let_syntax in
+    (* First find the block referenced by the block identifier. Then
+       find the latest block no later than it that has a user or
+       internal command relevant to the address we're checking and
+       pull the balance from it. For non-vesting accounts that
+       balance will still be the balance at the block
+       identifier. For vesting accounts we'll also compute how much
+       extra balance has accumulated in between the blocks. *)
+    let%bind ( requested_block_height
+             , requested_block_global_slot_since_genesis
+             , requested_block_hash ) =
+      match%bind
+              Sql.Block.run (module Conn) block_query
+           |> Errors.Lift.sql ~context:"Finding specified block"
+      with
+      | None ->
+         Deferred.Result.fail (Errors.create @@ `Block_missing (Block_query.to_string block_query))
+      | Some (_block_id, block_info, _) ->
+         Deferred.Result.return
+           ( block_info.height
+           , block_info.global_slot_since_genesis
+           , block_info.state_hash )
+    in
+    let%bind last_relevant_command_info_opt =
+      Balance_from_last_relevant_command.run
+        (module Conn)
+        requested_block_height address
+      |> Errors.Lift.sql
+           ~context:
+           "Finding balance at last relevant internal or user command."
+    in
+    let requested_block_identifier =
+      { Block_identifier.index= requested_block_height
+      ; hash= requested_block_hash }
+    in
+    let%bind (balance_info, nonce) =
+      match last_relevant_command_info_opt with
+      | None ->
+         let balance_info : Balance_info.t = { liquid_balance = 0L; total_balance = 0L } in
+         Deferred.Result.return (balance_info, Unsigned.UInt64.zero)
+      | Some last_relevant_command_info ->
+         find_current_balance
+           (module Conn)
+           ~requested_block_global_slot_since_genesis
+           ~last_relevant_command_info
+           address
+    in
+    Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
 
 module Balance = struct
@@ -301,13 +281,8 @@ module Balance = struct
               graphql_uri )
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
-            let open Deferred.Result.Let_syntax in
             let (module Conn : Caqti_async.CONNECTION) = db in
-            let%bind account_data = Graphql.query
-                  Get_balance.(make @@ makeVariables ~public_key:(`String address) ())
-                  graphql_uri
-            in
-            Sql.run (module Conn) (Option.value_exn account_data.account) block_query address )
+            Sql.run (module Conn) block_query address )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let dummy_block_identifier =

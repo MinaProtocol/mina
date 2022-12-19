@@ -19,8 +19,6 @@ val when_profiling : 'a -> 'a -> 'a
  *)
 val time : string -> (unit -> 'a) -> 'a
 
-val max_quot_size_int : int -> int
-
 val tick_shifts : log2_size:int -> Pasta_bindings.Fp.t array
 
 val tock_shifts : log2_size:int -> Pasta_bindings.Fq.t array
