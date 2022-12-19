@@ -319,19 +319,12 @@ module Zkapp_command_info = struct
                  { Op.label = `Zkapp_account_update upd; related_to = None } )
           )
         ~f:(fun ~related_operations ~operation_identifier op ->
-          let status =
-            match t.failure_reasons with
-            | [] ->
-                Some (Operation_statuses.name `Success)
-            | _ ->
-                Some (Operation_statuses.name `Failed)
-          in
           match op.label with
           | `Zkapp_fee_payer_dec ->
               M.return
                 { Operation.operation_identifier
                 ; related_operations
-                ; status
+                ; status=Some (Operation_statuses.name `Success)
                 ; account =
                     Some
                       (account_id t.fee_payer
@@ -347,7 +340,7 @@ module Zkapp_command_info = struct
           | `Zkapp_account_update upd ->
               let status = Some (Operation_statuses.name upd.status) in
               let amount =
-                match String.chop_prefix ~prefix:"-" upd.balance_change with                
+                match String.chop_prefix ~prefix:"-" upd.balance_change with
                 | Some amount ->
                   Some
                       Amount_of.(
