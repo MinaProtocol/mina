@@ -192,6 +192,9 @@ end]
 (**********Helpers*************)
 
 (* TODO *)
+let create_expected_statement ~constraint_constants:_ ~get_state:_ _ =
+  failwith "TODO"
+(*
 let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     { Transaction_with_witness.transaction_with_info
@@ -270,6 +273,7 @@ let create_expected_statement ~constraint_constants
   ; supply_increase
   ; sok_digest = ()
   }
+*)
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     Ledger_proof_with_sok_message.t Or_error.t =
@@ -471,7 +475,8 @@ struct
           in
           (acc_stmt, acc_pc)
     in
-    let check_base (acc_statement, acc_pc) transaction =
+    let check_base (acc_statement, acc_pc)
+        (transaction : Transaction_with_witness.t) =
       with_error "Bad base statement" ~f:(fun () ->
           let%bind expected_statement =
             match statement_check with
@@ -1014,11 +1019,8 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          let () =
-            let _ = second_pass_ledger_witness in
-            failwith "TODO (second_pass_ledger_witness unused)"
-          in
-          { Transaction_witness.ledger = first_pass_ledger_witness
+          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+          ; second_pass_ledger = second_pass_ledger_witness
           ; transaction
           ; protocol_state_body
           ; init_stack

@@ -849,8 +849,8 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('zkapp_command, 'field) t =
-        { zkapp_command : 'zkapp_command; memo_hash : 'field }
+      type ('account_updates, 'field) t =
+        { account_updates : 'account_updates; memo_hash : 'field }
       [@@deriving sexp, yojson]
     end
   end]
@@ -1050,13 +1050,13 @@ module Make (Inputs : Inputs_intf) = struct
         | `Compute start_data ->
             ( Stack_frame.if_ is_start'
                 ~then_:
-                  (Stack_frame.make ~calls:start_data.zkapp_command
+                  (Stack_frame.make ~calls:start_data.account_updates
                      ~caller:default_caller ~caller_caller:default_caller )
                 ~else_:local_state.stack_frame
             , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
         | `Yes start_data ->
-            ( Stack_frame.make ~calls:start_data.zkapp_command
+            ( Stack_frame.make ~calls:start_data.account_updates
                 ~caller:default_caller ~caller_caller:default_caller
             , Call_stack.empty () )
         | `No ->

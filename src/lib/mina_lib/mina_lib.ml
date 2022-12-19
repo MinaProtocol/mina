@@ -625,6 +625,8 @@ let get_snarked_ledger t state_hash_opt =
         Transition_frontier.root_snarked_ledger frontier
       in
       let ledger = Ledger.of_database root_snarked_ledger in
+      if true then failwith "TODO" ;
+      (*
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind _ =
         List.fold_until ~init:(Ok ()) path
@@ -671,6 +673,7 @@ let get_snarked_ledger t state_hash_opt =
             else Continue (Ok ()) )
           ~finish:Fn.id
       in
+      *)
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
         |> Mina_block.header |> Header.protocol_state
@@ -1692,11 +1695,6 @@ let create ?wallets (config : Config.t) =
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
@@ -1711,11 +1709,6 @@ let create ?wallets (config : Config.t) =
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr ) )
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff ()

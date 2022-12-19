@@ -349,7 +349,6 @@ let calculate_root_transition_diff t heir =
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
-  let open Context in
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -477,8 +476,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       (*TODO: get appropriate functions*)
-      let apply_first_pass = Ledger.apply_transaction ~constraint_constants in
-      let apply_second_pass = Ledger.apply_transaction ~constraint_constants in
+      let apply_first_pass ~txn_state_view:_ _ _ = failwith "TODO" in
+      let apply_second_pass ~txn_state_view:_ _ _ = failwith "TODO" in
       let get_protocol_state state_hash =
         match find_protocol_state t state_hash with
         | Some s ->

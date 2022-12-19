@@ -110,7 +110,8 @@ module Inputs = struct
                                   ~constraint_constants:M.constraint_constants
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
-                                  (`Sparse_ledger w.ledger)
+                                  (`Sparse_ledger
+                                    (failwith "TODO" (* w.ledger *)) )
                                   [ ( `Pending_coinbase_init_stack w.init_stack
                                     , `Pending_coinbase_of_statement
                                         { Transaction_snark
@@ -264,7 +265,8 @@ module Inputs = struct
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage
-                                   (Mina_ledger.Sparse_ledger.handler w.ledger) ) ) )
+                                   (Mina_ledger.Sparse_ledger.handler
+                                      (failwith "TODO" (* w.ledger *)) ) ) ) )
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->

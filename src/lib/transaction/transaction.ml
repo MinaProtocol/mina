@@ -97,10 +97,8 @@ let public_keys : t -> _ = function
 
 let accounts_accessed (t : t) (status : Transaction_status.t) =
   match t with
-  | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed cmd status
-  | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_accessed t status
+  | Command cmd ->
+      User_command.accounts_accessed cmd status
   | Fee_transfer ft ->
       assert (Transaction_status.equal Applied status) ;
       Fee_transfer.receivers ft
