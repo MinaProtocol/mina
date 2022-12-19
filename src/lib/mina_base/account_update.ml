@@ -58,8 +58,10 @@ module Authorization_kind = struct
 
     let to_input ({ is_signed; is_proved; verification_key_hash } : t) =
       let f x = if x then Field.one else Field.zero in
-      Random_oracle_input.Chunked.packeds
-        [| (f is_signed, 1); (f is_proved, 1); (verification_key_hash, 1) |]
+      Random_oracle_input.Chunked.append
+        (Random_oracle_input.Chunked.packeds
+           [| (f is_signed, 1); (f is_proved, 1) |] )
+        (Random_oracle_input.Chunked.field verification_key_hash)
 
     [%%ifdef consensus_mechanism]
 
@@ -73,8 +75,10 @@ module Authorization_kind = struct
 
       let to_input { is_signed; is_proved; verification_key_hash } =
         let f (x : Boolean.var) = (x :> Field.Var.t) in
-        Random_oracle_input.Chunked.packeds
-          [| (f is_signed, 1); (f is_proved, 1); (verification_key_hash, 1) |]
+        Random_oracle_input.Chunked.append
+          (Random_oracle_input.Chunked.packeds
+             [| (f is_signed, 1); (f is_proved, 1) |] )
+          (Random_oracle_input.Chunked.field verification_key_hash)
     end
 
     let typ =
