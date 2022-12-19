@@ -114,6 +114,8 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      ocaml-base-compiler = super.ocaml-base-compiler.overrideAttrs (_: { name = "dumb-ocaml-base-compiler"; });
+
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
