@@ -3826,7 +3826,7 @@ let%test_module "staged ledger tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in

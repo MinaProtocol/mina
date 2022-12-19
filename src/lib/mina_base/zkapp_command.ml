@@ -10,7 +10,7 @@ let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
     ; balance_change = p.balance_change
     ; increment_nonce = p.increment_nonce
     ; events = p.events
-    ; sequence_events = p.sequence_events
+    ; actions = p.actions
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
@@ -29,7 +29,7 @@ let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
     ; balance_change = p.balance_change
     ; increment_nonce = p.increment_nonce
     ; events = p.events
-    ; sequence_events = p.sequence_events
+    ; actions = p.actions
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
@@ -1157,7 +1157,7 @@ let to_simple (t : t) : Simple.t =
               ; balance_change = b.balance_change
               ; increment_nonce = b.increment_nonce
               ; events = b.events
-              ; sequence_events = b.sequence_events
+              ; actions = b.actions
               ; call_data = b.call_data
               ; preconditions = b.preconditions
               ; use_full_commitment = b.use_full_commitment
@@ -2069,20 +2069,20 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let all_updates, num_event_elements, num_sequence_event_elements =
+  let all_updates, num_event_elements, num_action_elements =
     Call_forest.fold t.account_updates
       ~init:([ Account_update.of_fee_payer (fee_payer_account_update t) ], 0, 0)
-      ~f:(fun (acc, num_event_elements, num_sequence_event_elements)
+      ~f:(fun (acc, num_event_elements, num_action_elements)
               (account_update : Account_update.t) ->
         let account_update_evs_elements =
           events_elements account_update.body.events
         in
         let account_update_seq_evs_elements =
-          events_elements account_update.body.sequence_events
+          events_elements account_update.body.actions
         in
         ( account_update :: acc
         , num_event_elements + account_update_evs_elements
-        , num_sequence_event_elements + account_update_seq_evs_elements ) )
+        , num_action_elements + account_update_seq_evs_elements ) )
     |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
@@ -2106,9 +2106,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
-  let max_sequence_event_elements =
-    genesis_constants.max_sequence_event_elements
-  in
+  let max_action_elements = genesis_constants.max_action_elements in
   (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
   let zkapp_cost_within_limit =
     Float.(
@@ -2118,12 +2116,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
       < cost_limit)
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
-  let valid_sequence_event_elements =
-    num_sequence_event_elements <= max_sequence_event_elements
-  in
-  if
-    zkapp_cost_within_limit && valid_event_elements
-    && valid_sequence_event_elements
+  let valid_action_elements = num_action_elements <= max_action_elements in
+  if zkapp_cost_within_limit && valid_event_elements && valid_action_elements
   then Ok ()
   else
     let proof_zkapp_command_err =
@@ -2137,16 +2131,16 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
           (sprintf "too many event elements (%d, max allowed is %d)"
              num_event_elements max_event_elements )
     in
-    let sequence_events_err =
-      if valid_sequence_event_elements then None
+    let actions_err =
+      if valid_action_elements then None
       else
         Some
           (sprintf "too many sequence event elements (%d, max allowed is %d)"
-             num_sequence_event_elements max_sequence_event_elements )
+             num_action_elements max_action_elements )
     in
     let err_msg =
       List.filter
-        [ proof_zkapp_command_err; events_err; sequence_events_err ]
+        [ proof_zkapp_command_err; events_err; actions_err ]
         ~f:Option.is_some
       |> List.map ~f:(fun opt -> Option.value_exn opt)
       |> String.concat ~sep:"; "
