@@ -177,6 +177,8 @@ module Transaction_applied : sig
   val transaction : t -> Transaction.t With_status.t
 
   val transaction_status : t -> Transaction_status.t
+
+  val zkapp_updates_applied : t -> bool
 end
 
 (** Raises if the ledger is full, or if an account already exists for the given

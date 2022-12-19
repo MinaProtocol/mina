@@ -246,6 +246,18 @@ module Transaction_applied = struct
         f.fee_transfer.status
     | Coinbase c ->
         c.coinbase.status
+
+  let zkapp_updates_applied : t -> bool =
+   fun { varying; _ } ->
+    match varying with
+    | Command (Zkapp_command c) -> (
+        match c.command.status with
+        | Transaction_status.Applied ->
+            true
+        | _ ->
+            false )
+    | _ ->
+        false
 end
 
 module type S = sig
@@ -326,6 +338,8 @@ module type S = sig
     val transaction : t -> Transaction.t With_status.t
 
     val transaction_status : t -> Transaction_status.t
+
+    val zkapp_updates_applied : t -> bool
   end
 
   module Global_state : sig

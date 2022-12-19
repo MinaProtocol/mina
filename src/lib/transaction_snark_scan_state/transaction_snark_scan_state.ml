@@ -213,6 +213,9 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
+  let zkapp_updates_applied =
+    Ledger.Transaction_applied.zkapp_updates_applied transaction_with_info
+  in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
@@ -269,6 +272,7 @@ let create_expected_statement ~constraint_constants
   ; fee_excess
   ; supply_increase
   ; sok_digest = ()
+  ; zkapp_updates_applied
   }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -301,6 +305,10 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
       in
+      (*Ignore [zkapp_updates_applied] in merge statements since we don't care
+        whether or not account updates were applied, just that the proofs are
+        valid and state transition is correct. Set to true always*)
+      let zkapp_updates_applied = true in
       let connecting_ledger_left = failwith "TODO merge rules" in
       let connecting_ledger_right = failwith "TODO merge rules" in
       let statement : Transaction_snark.Statement.t =
@@ -311,6 +319,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; supply_increase
         ; fee_excess
         ; sok_digest = ()
+        ; zkapp_updates_applied
         }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
@@ -621,6 +630,7 @@ struct
         ; connecting_ledger_right = _
         ; supply_increase = _
         ; sok_digest = ()
+        ; zkapp_updates_applied = _
         } ->
         let open Or_error.Let_syntax in
         let _connecting_ledger_left = failwith "TODO check connecting ledger" in

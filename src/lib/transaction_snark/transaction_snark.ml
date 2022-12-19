@@ -3034,6 +3034,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       in
       let%bind () =
+        Boolean.Assert.is_true (Boolean.not statement.zkapp_updates_applied)
+      in
+      let%bind () =
         [%with_label_ "local state check"] (fun () ->
             make_checked (fun () ->
                 Local_state.Checked.assert_equal statement.source.local_state
@@ -3163,6 +3166,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             Local_state.Checked.assert_equal s.target.local_state
               s2.target.local_state )
       in
+      (*Ignore [zkapp_updates_applied] in merge statements since we don't care
+        whether or not account updates were applied, just that the proofs are
+        valid and state transition is correct. Set to true always*)
+      let%bind () = Boolean.Assert.is_true s.zkapp_updates_applied in
       let valid_ledger =
         Statement.valid_ledgers_at_merge_checked
           (Statement.Statement_ledgers.of_statement s1)
@@ -3338,6 +3345,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~connecting_ledger_left:target_first_pass_ledger
         ~connecting_ledger_right:target_first_pass_ledger
+        ~zkapp_updates_applied:false
     in
     let open Tick in
     ignore
@@ -3408,7 +3416,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~target_second_pass_ledger:target_first_pass_ledger
         ~connecting_ledger_left:target_first_pass_ledger
         ~connecting_ledger_right:target_first_pass_ledger
-        ~pending_coinbase_stack_state
+        ~pending_coinbase_stack_state ~zkapp_updates_applied:false
     in
     let open Tick in
     let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
@@ -3836,6 +3844,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; supply_increase
             ; fee_excess
             ; sok_digest = Sok_message.Digest.default
+            ; zkapp_updates_applied = true (*Deepthi: TODO*)
             }
           in
           (w, spec, statement) :: witnesses )

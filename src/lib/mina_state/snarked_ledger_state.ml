@@ -16,14 +16,16 @@ module Make_sig (A : Wire_types.Types.S) = struct
                 , 'pending_coinbase
                 , 'fee_excess
                 , 'sok_digest
-                , 'local_state )
+                , 'local_state
+                , 'bool )
                 Poly.Stable.V2.t =
         ( 'ledger_hash
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
         , 'sok_digest
-        , 'local_state )
+        , 'local_state
+        , 'bool )
         A.Poly.V2.t
        and type Stable.V2.t = A.V2.t
        and type With_sok.Stable.V2.t = A.With_sok.V2.t
@@ -109,14 +111,16 @@ module Make_str (A : Wire_types.Concrete) = struct
              , 'pending_coinbase
              , 'fee_excess
              , 'sok_digest
-             , 'local_state )
+             , 'local_state
+             , 'bool )
              t =
               ( 'ledger_hash
               , 'amount
               , 'pending_coinbase
               , 'fee_excess
               , 'sok_digest
-              , 'local_state )
+              , 'local_state
+              , 'bool )
               A.Poly.V2.t =
           { source :
               ( 'ledger_hash
@@ -132,6 +136,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
           ; fee_excess : 'fee_excess
+          ; zkapp_updates_applied : 'bool
           ; sok_digest : 'sok_digest
           }
         [@@deriving compare, equal, hash, sexp, yojson, hlist]
@@ -142,10 +147,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger ~target_second_pass_ledger
         ~connecting_ledger_left ~connecting_ledger_right
-        ~pending_coinbase_stack_state : _ t =
+        ~pending_coinbase_stack_state ~zkapp_updates_applied : _ t =
       { supply_increase
       ; fee_excess
       ; sok_digest
+      ; zkapp_updates_applied
       ; connecting_ledger_left
       ; connecting_ledger_right
       ; source =
@@ -164,7 +170,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
 
     let typ ledger_hash amount pending_coinbase fee_excess sok_digest
-        local_state_typ =
+        local_state_typ zkapp_updates_applied =
       let registers =
         let open Registers in
         Tick.Typ.of_hlistable
@@ -179,6 +185,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; ledger_hash
         ; amount
         ; fee_excess
+        ; zkapp_updates_applied
         ; sok_digest
         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -194,7 +201,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit
-        , Local_state.Stable.V1.t )
+        , Local_state.Stable.V1.t
+        , bool )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -208,12 +216,14 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit
-    , Local_state.Checked.t )
+    , Local_state.Checked.t
+    , Tick.Boolean.var )
     Poly.t
 
   let typ : (var, t) Tick.Typ.t =
     Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
       Pending_coinbase.Stack.typ Fee_excess.typ Tick.Typ.unit Local_state.typ
+      Tick.Boolean.typ
 
   module With_sok = struct
     [%%versioned
@@ -225,7 +235,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
-          , Local_state.Stable.V1.t )
+          , Local_state.Stable.V1.t
+          , bool )
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -234,7 +245,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     type display =
-      (string, string, string, int, string, Local_state.display) Poly.t
+      (string, string, string, int, string, Local_state.display, bool) Poly.t
 
     let display _ = failwith "TODO"
 
@@ -253,6 +264,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; supply_increase = Currency.Amount.Signed.zero
       ; fee_excess = Fee_excess.empty
       ; sok_digest = Sok_message.Digest.default
+      ; zkapp_updates_applied = false
       }
 
     type var =
@@ -261,13 +273,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t
-      , Local_state.Checked.t )
+      , Local_state.Checked.t
+      , Tick.Boolean.var )
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
       Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
-        Local_state.typ
+        Local_state.typ Tick.Boolean.typ
 
     let to_input
         ({ source
@@ -277,6 +290,7 @@ module Make_str (A : Wire_types.Concrete) = struct
          ; supply_increase
          ; fee_excess
          ; sok_digest
+         ; zkapp_updates_applied
          } :
           t ) =
       let input =
@@ -288,6 +302,8 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; Frozen_ledger_hash.to_input connecting_ledger_right
            ; Amount.Signed.to_input supply_increase
            ; Fee_excess.to_input fee_excess
+           ; Random_oracle.Input.Chunked.packed
+               (Mina_base.Util.field_of_bool zkapp_updates_applied, 1)
           |]
       in
       if !top_hash_logging_enabled then
@@ -310,6 +326,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; supply_increase
            ; fee_excess
            ; sok_digest
+           ; zkapp_updates_applied
            } :
             t ) =
         let open Tick in
@@ -329,6 +346,8 @@ module Make_str (A : Wire_types.Concrete) = struct
              ; Frozen_ledger_hash.var_to_input connecting_ledger_right
              ; supply_increase
              ; fee_excess
+             ; Random_oracle.Input.Chunked.packed
+                 ((zkapp_updates_applied :> Tick.Field.Var.t), 1)
             |]
         in
         let%map () =
@@ -539,6 +558,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       Currency.Amount.Signed.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
     in
+    (*Ignore [zkapp_updates_applied] in merge statements since we don't care
+       whether or not account updates were applied, just that the proofs are
+       valid and state transition is correct*)
+    let zkapp_updates_applied = true in
     ( { source = s1.source
       ; target = s2.target
       ; connecting_ledger_left
@@ -546,6 +569,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; fee_excess
       ; supply_increase
       ; sok_digest = ()
+      ; zkapp_updates_applied
       }
       : t )
 
@@ -559,7 +583,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     and connecting_ledger_left = Frozen_ledger_hash.gen
     and connecting_ledger_right = Frozen_ledger_hash.gen
     and fee_excess = Fee_excess.gen
-    and supply_increase = Currency.Amount.Signed.gen in
+    and supply_increase = Currency.Amount.Signed.gen
+    and zkapp_updates_applied = Quickcheck.Generator.bool in
     ( { source
       ; target
       ; connecting_ledger_left
@@ -567,6 +592,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; fee_excess
       ; supply_increase
       ; sok_digest = ()
+      ; zkapp_updates_applied
       }
       : t )
 end

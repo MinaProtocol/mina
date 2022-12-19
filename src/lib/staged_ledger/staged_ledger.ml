@@ -574,6 +574,8 @@ module T = struct
       ; fee_excess
       ; supply_increase
       ; sok_digest = ()
+      ; zkapp_updates_applied =
+          Ledger.Transaction_applied.zkapp_updates_applied applied_txn
       }
     , { Stack_state_with_init_stack.pc =
           { source = pending_coinbase_target; target = pending_coinbase_target }

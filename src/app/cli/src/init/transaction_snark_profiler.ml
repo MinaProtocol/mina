@@ -520,7 +520,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
     Async.Deferred.List.fold transitions
       ~init:((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
       ~f:(fun ((max_span, sparse_ledger, coinbase_stack_source), proofs) t ->
-        let sparse_ledger', _applied =
+        let sparse_ledger', applied =
           Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
             sparse_ledger (Transaction.forget t)
           |> Or_error.ok_exn
@@ -558,6 +558,9 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
               ; fee_excess =
                   Transaction.fee_excess (Transaction.forget t)
                   |> Or_error.ok_exn
+              ; zkapp_updates_applied =
+                  Mina_ledger.Ledger.Transaction_applied.zkapp_updates_applied
+                    applied
               }
             ~init_stack:coinbase_stack_source
             { Transaction_protocol_state.Poly.transaction = t
