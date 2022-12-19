@@ -666,9 +666,13 @@ let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
     Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
   let%bind zkapp_command = zkapp_command_of_zkapp_command ~pool cmd in
+  let global_slot =
+    Mina_numbers.Global_slot.of_uint32
+    @@ Unsigned.UInt32.of_int64 cmd.global_slot_since_genesis
+  in
   match
-    Ledger.apply_zkapp_command_unchecked ~constraint_constants ~state_view
-      ledger zkapp_command
+    Ledger.apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+      ~state_view ledger zkapp_command
   with
   | Ok _ ->
       Deferred.unit
