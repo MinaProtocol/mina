@@ -9,7 +9,7 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal]
+type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal, hash]
 
 type var
 
@@ -26,3 +26,5 @@ val to_hex : t -> string
 val of_hex_exn : string -> t
 
 val to_raw_string : t -> string
+
+val of_blake2 : Blake2.t -> t

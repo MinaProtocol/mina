@@ -48,6 +48,8 @@
    network_pool
    mina_intf
    pipe_lib
+   mina_net2
+   file_system
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std)))

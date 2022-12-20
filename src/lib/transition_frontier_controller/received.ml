@@ -78,23 +78,25 @@ let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
   let log_bp = function
     | `No_body_preserved ->
         ()
-    | `Preserved_body ->
+    | `Preserved_body _ ->
         [%log' debug Context.logger] "Preserved body for $state_hash (state %s)"
           (Transition_state.State_functions.name st)
           ~metadata:[ ("state_hash", State_hash.to_yojson meta.state_hash) ]
   in
   match hint with
   | `Nop bp ->
-      log_bp bp
+      log_bp bp ; bp
   | `Mark_verifying_blockchain_proof_processed (bp, iv_header) ->
       log_bp bp ;
       Verifying_blockchain_proof.make_processed ~context ~actions
-        ~transition_states iv_header
+        ~transition_states iv_header ;
+      bp
   | `Start_processing_verifying_complete_works (bp, state_hash) ->
       log_bp bp ;
       Verifying_complete_works.make_independent ~context ~actions
-        ~transition_states state_hash
-  | `Mark_downloading_body_processed ivar_opt ->
+        ~transition_states state_hash ;
+      bp
+  | `Mark_downloading_body_processed (ivar_opt, body) ->
       ( match st with
       | Downloading_body { baton = true; _ } ->
           Downloading_body.pass_the_baton ~transition_states ~context
@@ -104,7 +106,8 @@ let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
           () ) ;
       Option.iter ivar_opt ~f:(Fn.flip Ivar.fill_if_empty ()) ;
       actions.Misc.mark_processed_and_promote
-        ~reason:"received gossip with body" [ meta.state_hash ]
+        ~reason:"received gossip with body" [ meta.state_hash ] ;
+      `Preserved_body body
 
 let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in
@@ -257,7 +260,10 @@ let rec pre_validate_and_add ~context ~actions ~sender ~state ?body hh =
   | Ok vh ->
       add_received ~context ~actions ~sender ~state ?body
         (Gossip.Pre_initial_valid vh) ;
-      Ok ()
+      Ok
+        (Option.value_map
+           ~f:(fun b -> `Preserved_body b)
+           ~default:`No_body_preserved body )
   | Error e ->
       let header = With_hash.data hh in
       let (module Context : CONTEXT) = context in
@@ -317,9 +323,9 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
           ~default:(st', `Nop `No_body_preserved)
           body
       in
-      handle_preserve_hint ~actions ~transition_states:state.transition_states
-        ~context hint ;
-      Ok ()
+      Ok
+        (handle_preserve_hint ~actions
+           ~transition_states:state.transition_states ~context hint )
   | None, Some hh -> (
       let relevance_status =
         Gossip.verify_header_is_relevant ~event_recording:false ~context ~sender
@@ -329,13 +335,13 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
       | `Relevant ->
           pre_validate_and_add ~context ~actions ~sender ~state ?body hh
       | _ ->
-          Ok () )
+          Ok `No_body_preserved )
   | None, None ->
       ignore
         ( State_hash.Table.add state.parents ~key:state_hash
             ~data:(transition_meta.parent_state_hash, sender)
           : [ `Duplicate | `Ok ] ) ;
-      Ok ()
+      Ok `No_body_preserved
 
 (** Launch retrieval of ancestry for a received header.
 
@@ -403,9 +409,15 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
 (** [upon_f] is a callback to be executed upon completion of retrieving ancestry
     (or a failure). *)
 and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
+  let (module Context : CONTEXT) = context in
   let f res (el, sender) =
     if Result.is_ok res then
       handle_retrieved_ancestor ~context ~actions ~state ~sender el
+      |> Result.map ~f:(function
+           | `No_body_preserved ->
+               ()
+           | `Preserved_body b ->
+               Context.record_event (`Preserved_body_for_retrieved_ancestor b) )
     else
       let error = Error.of_string "parent is invalid" in
       let transition_meta, _, _ = split_retrieve_chain_element ~context el in
@@ -422,7 +434,6 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
             ~transition_meta error ) ;
       res
   in
-  let (module Context : CONTEXT) = context in
   let on_error e =
     cancel_child_contexts () ;
     Transition_states.update' state.transition_states top_state_hash
@@ -639,20 +650,30 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
 let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
     gossip_header =
   let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
-  let body =
-    if is_some body then body else check_body_storage ~context header_with_hash
-  in
+  let body_from_storage = check_body_storage ~context header_with_hash in
+  let body = if is_some body then body else body_from_storage in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =
     Gossip.verify_header_is_relevant ~context ~sender
       ~transition_states:state.transition_states header_with_hash
   in
+  let preserved_if_not_in_storage = function
+    | `Preserved_body _ as pb when Option.is_none body_from_storage ->
+        pb
+    | _ ->
+        `No_body_preserved
+  in
+  preserved_if_not_in_storage
+  @@
   match relevance_status with
   | `Irrelevant ->
-      ()
+      `No_body_preserved
   | `Relevant ->
       add_received ~actions ~context ~sender ~state ~gossip_type ?vc ?body
-        (Initial_valid gossip_header)
+        (Initial_valid gossip_header) ;
+      Option.value_map
+        ~f:(fun b -> `Preserved_body b)
+        ~default:`No_body_preserved body
   | `Preserve_gossip_data ->
       let f =
         Fn.compose
@@ -661,7 +682,9 @@ let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
           (Gossip.preserve_relevant_gossip ?body ?vc ~context ~gossip_type
              ~gossip_header ~sender )
       in
-      Option.iter ~f (Transition_states.find state.transition_states state_hash)
+      Option.value_map ~f
+        (Transition_states.find state.transition_states state_hash)
+        ~default:`No_body_preserved
 
 (** [handle_collected_transition] adds a transition that was collected during bootstrap
     to the catchup state. *)
@@ -684,7 +707,8 @@ let handle_collected_transition ~context:(module Context : CONTEXT) ~actions
           [ ( "state_hash"
             , State_hash.to_yojson
                 (state_hash_of_header_with_validation header_with_validation) )
-          ]
+          ] ;
+      `No_body_preserved
   | Remote sender ->
       (* TODO: is it safe to add this as a gossip? Transition was received
          through gossip, but was potentially sent not within its slot
@@ -698,7 +722,7 @@ let handle_collected_transition ~context:(module Context : CONTEXT) ~actions
     to the catchup state. *)
 let handle_network_transition ~context:(module Context : CONTEXT) ~actions
     ~state (b_or_h, `Valid_cb vc) =
-  Option.value ~default:()
+  Option.value ~default:`No_body_preserved
   @@ let%map.Option sender, header_with_validation, body, gossip_type =
        let log_local_header hh =
          [%log' warn Context.logger]
@@ -732,3 +756,20 @@ let handle_network_transition ~context:(module Context : CONTEXT) ~actions
      handle_gossip
        ~context:(module Context)
        ~actions ~state ~sender ?body ?vc ~gossip_type header_with_validation
+
+let handle_downloaded_body ~context ~actions ~body_reference_to_state_hash
+    ~transition_states body_ref =
+  let (module Context : CONTEXT) = context in
+  let%bind.Option body = Context.check_body_in_storage body_ref in
+  let%bind.Option state_hash =
+    Body_ref_table.find body_reference_to_state_hash body_ref
+  in
+  [%log' info Context.logger] "Retrieved body $body_ref for $state_hash"
+    ~metadata:
+      [ ("body_ref", Consensus.Body_reference.to_yojson body_ref)
+      ; ("state_hash", State_hash.to_yojson state_hash)
+      ] ;
+  let%map.Option st = Transition_states.find transition_states state_hash in
+  ( state_hash
+  , Gossip.preserve_body st body
+    |> handle_preserve_hint ~actions ~transition_states ~context )

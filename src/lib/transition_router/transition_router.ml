@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller
@@ -97,7 +99,7 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller
+    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ?transition_writer_ref ~frontier_w frontier =
   let open Context in
@@ -128,16 +130,18 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   Transition_frontier_controller.run
     ~context:(module Context)
-    ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-    ~frontier ~network_transition_reader:transition_frontier_controller_reader
+    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
+    ~collected_transitions ~frontier
+    ~network_transition_reader:transition_frontier_controller_reader
     ~producer_transition_reader ~clear_reader ~verified_transition_writer ;
   transition_writer_ref
 
-let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~time_controller ~producer_transition_writer_ref
-    ~verified_transition_writer ~clear_reader ?transition_writer_ref
-    ~consensus_local_state ~frontier_w ~initial_root_transition ~persistent_root
-    ~persistent_frontier ~best_seen_transition ~catchup_mode =
+let start_bootstrap_controller ~context:(module Context : CONTEXT)
+    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ?transition_writer_ref ~consensus_local_state ~frontier_w
+    ~initial_root_transition ~persistent_root ~persistent_frontier
+    ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -180,7 +184,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~transition_writer_ref ~frontier_w
         new_frontier
@@ -353,11 +357,11 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
-    ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
-    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
-    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
+    ~network ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
+    ~frontier_w ~producer_transition_writer_ref ~clear_reader
+    ~verified_transition_writer ~most_recent_valid_block_writer ~persistent_root
+    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
   let%bind () =
     if is_demo_mode then return ()
@@ -384,7 +388,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
           with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
         >>| Result.ok_or_failwith
       in
-      start_bootstrap_controller
+      start_bootstrap_controller ~on_bitswap_update_ref
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller
         ~producer_transition_writer_ref ~verified_transition_writer
@@ -413,7 +417,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier
@@ -477,7 +481,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
       in
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller
+        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ?transition_writer_ref:None
         ~frontier_w frontier
@@ -528,7 +532,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~catchup_mode ~notify_online =
+    ~catchup_mode ~notify_online ~on_bitswap_update_ref =
   let open Context in
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
@@ -588,11 +592,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       let%map transition_writer_ref =
         initialize
           ~context:(module Context)
-          ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-          ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-          ~catchup_mode ~producer_transition_writer_ref ~clear_reader
-          ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~on_bitswap_update_ref ~network ~is_seed ~is_demo_mode ~verifier
+          ~trust_system ~persistent_frontier ~persistent_root ~time_controller
+          ~frontier_w ~catchup_mode ~producer_transition_writer_ref
+          ~clear_reader ~verified_transition_writer
+          ~most_recent_valid_block_writer ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =

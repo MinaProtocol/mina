@@ -24,7 +24,7 @@ import (
 )
 
 func newApp() *app {
-	outChan := make(chan *capnp.Message, 64)
+	outChan := make(chan *capnp.Message, 4096)
 	ctx := context.Background()
 	return &app{
 		P2p:                      nil,

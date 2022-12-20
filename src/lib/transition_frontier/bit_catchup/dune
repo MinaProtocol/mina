@@ -6,6 +6,8 @@
    base
    async_kernel
    core_kernel
+   sexplib0
+   base.base_internalhash_types
    ;; local libraries
    data_hash_lib
    network_peer
@@ -23,6 +25,7 @@
    consensus
    non_empty_list
    error_json
+   blake2
    mina_wire_types
    pickles.backend
    pickles
