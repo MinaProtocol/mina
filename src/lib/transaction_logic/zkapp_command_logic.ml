@@ -141,6 +141,14 @@ module type Timing_intf = sig
   val vesting_period : t -> global_slot
 end
 
+module type Verification_key_intf = sig
+  include Iffable
+
+  type hash
+
+  val get_hash : t -> hash
+end
+
 module type Token_id_intf = sig
   include Iffable
 
@@ -286,6 +294,8 @@ module type Account_update_intf = sig
 
   type bool
 
+  type verification_key_hash
+
   type call_forest
 
   type signed_amount
@@ -321,6 +331,12 @@ module type Account_update_intf = sig
   val use_full_commitment : t -> bool
 
   val increment_nonce : t -> bool
+
+  (* - the supplied verification key hash matches the one
+        in the Proof authorization kind, or
+     - the authorization kind is not Proof
+  *)
+  val verification_key_hash_matches : t -> verification_key_hash option -> bool
 
   val check_authorization :
        commitment:transaction_commitment
@@ -567,6 +583,10 @@ module type Account_intf = sig
 
   val verification_key : t -> verification_key
 
+  type verification_key_hash
+
+  val verification_key_hash : t -> verification_key_hash
+
   val set_verification_key : verification_key -> t -> t
 
   val last_sequence_slot : t -> global_slot
@@ -690,7 +710,10 @@ module type Inputs_intf = sig
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
-  module Verification_key : Iffable with type bool := Bool.t
+  module Verification_key :
+    Verification_key_intf
+      with type bool := Bool.t
+       and type hash := Field.t option
 
   module Zkapp_uri : Iffable with type bool := Bool.t
 
@@ -714,6 +737,7 @@ module type Inputs_intf = sig
        and type global_slot := Global_slot.t
        and type field := Field.t
        and type verification_key := Verification_key.t
+       and type verification_key_hash := Field.t option
        and type zkapp_uri := Zkapp_uri.t
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
@@ -729,6 +753,7 @@ module type Inputs_intf = sig
     (Account_update_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_precondition := Protocol_state_precondition.t
+       and type verification_key_hash := Field.t
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
@@ -1157,6 +1182,9 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
     in
+    assert_ ~pos:__POS__
+      (Account_update.verification_key_hash_matches account_update
+         (Account.verification_key_hash a) ) ;
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_

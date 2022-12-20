@@ -1212,6 +1212,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
       let if_ = value_if
+
+      let get_hash (t : t) = Option.map t ~f:With_hash.hash
     end
 
     module Actions = struct
@@ -1346,6 +1348,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let verification_key (a : t) = (get_zkapp a).verification_key
 
+      let verification_key_hash (a : t) =
+        Option.map (verification_key a) ~f:With_hash.hash
+
       let set_verification_key verification_key (a : t) =
         set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
 
@@ -1467,6 +1472,19 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       type transaction_commitment = Transaction_commitment.t
 
       let caller (p : t) = p.body.caller
+
+      let verification_key_hash_matches (t : t) account_vk_hash =
+        match t.body.authorization_kind with
+        | Proof vk_hash -> (
+            match account_vk_hash with
+            | None ->
+                (* account has no vk *)
+                false
+            | Some h ->
+                Snark_params.Tick.Field.equal vk_hash h )
+        | _ ->
+            (* not using a proof, doesn't matter whether/what the vk is in the account *)
+            true
 
       let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before

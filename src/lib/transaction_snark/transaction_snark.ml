@@ -1169,6 +1169,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+
+          let get_hash (t : t) : Field.t option =
+            let with_hash = As_prover.Ref.get @@ Data_as_hash.ref t.data in
+            (* hash is meaningful only if there's a verification key *)
+            Option.map (With_hash.data with_hash) ~f:(fun _ ->
+                Field.constant @@ With_hash.hash with_hash )
         end
 
         module Actions = struct
@@ -1304,6 +1310,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let verification_key (a : t) : Verification_key.t =
             a.data.zkapp.verification_key
+
+          let verification_key_hash (a : t) : Field.t option =
+            Verification_key.get_hash (verification_key a)
 
           let set_verification_key (verification_key : Verification_key.t)
               ({ data = a; hash } : t) : t =
@@ -1866,6 +1875,19 @@ module Make_str (A : Wire_types.Concrete) = struct
               t.account_update.data.use_full_commitment
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
+
+            let verification_key_hash_matches (t : t) account_vk_hash =
+              let body = With_hash.data t.account_update in
+              match account_vk_hash with
+              | None ->
+                  (* no vk in account *)
+                  Bool.if_ body.authorization_kind.is_proved ~then_:Bool.false_
+                    ~else_:Bool.true_
+              | Some h ->
+                  (* vk in account, does it match if Proof authorization? *)
+                  let vk_hash = body.authorization_kind.verification_key_hash in
+                  Bool.if_ body.authorization_kind.is_proved
+                    ~then_:(Field.equal vk_hash h) ~else_:Bool.true_
 
             let check_authorization ~commitment
                 ~calls:({ hash = calls; _ } : Call_forest.t)
