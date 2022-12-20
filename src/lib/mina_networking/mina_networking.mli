@@ -229,6 +229,15 @@ val get_transition_chain :
   -> State_hash.t list
   -> Mina_block.t list Deferred.Or_error.t
 
+val add_bitswap_resource :
+  t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit Deferred.t
+
+val download_bitswap_resource :
+     t
+  -> tag:Staged_ledger_diff.Body.Tag.t
+  -> ids:Consensus.Body_reference.t list
+  -> unit Deferred.t
+
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
@@ -286,6 +295,7 @@ val ban_notification_reader :
 
 val create :
      Config.t
+  -> on_bitswap_update:Mina_net2.on_bitswap_update_t
   -> sinks:Sinks.t
   -> get_some_initial_peers:
        (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t

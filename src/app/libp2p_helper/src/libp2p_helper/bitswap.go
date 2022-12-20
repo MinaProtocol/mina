@@ -3,6 +3,7 @@ package main
 import (
 	"codanet"
 	"context"
+	"errors"
 	ipc "libp2p_ipc"
 	"math"
 	"time"
@@ -140,13 +141,13 @@ func ClearRootDownloadState(bs BitswapState, root root) {
 	state.cancelF()
 }
 
-func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, root root) {
-	bs.SendResourceUpdates(type_, root)
+func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, tag BitswapDataTag, root root) {
+	bs.SendResourceUpdates(type_, tag, root)
 }
-func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, roots ...root) {
+func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, tag BitswapDataTag, roots ...root) {
 	// Non-blocking upcall sending
 	select {
-	case bs.outMsgChan <- mkResourceUpdatedUpcall(type_, roots):
+	case bs.outMsgChan <- mkResourceUpdatedUpcall(type_, tag, roots):
 	default:
 		for _, root := range roots {
 			bitswapLogger.Errorf("Failed to send resource update of type %d"+
@@ -242,25 +243,34 @@ func (bs *BitswapCtx) Loop() {
 			ClearRootDownloadState(bs, root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
-			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
+			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, cmd.tag)
+			// bitswapLogger.Errorf("Bitswap: add root cid %s", codanet.BlockHashToCidSuffix(root))
 			err := announceNewRootBlock(bs.ctx, bs.engine, bs.storage, blocks, root)
 			if err == nil {
-				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
+				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, cmd.tag, root)
 			} else {
 				bitswapLogger.Errorf("Failed to announce root cid %s (%s)", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
 			configuredCheck()
-			success := []root{}
+			success := map[BitswapDataTag][]root{}
 			for _, root := range cmd.rootIds {
-				err := bs.deleteRoot(root)
+				st := bs.rootDownloadStates[root]
+				var err error
+				if st == nil {
+					err = errors.New("root download state not found")
+				} else {
+					err = bs.deleteRoot(root)
+				}
 				if err == nil {
-					success = append(success, root)
+					success[st.tag] = append(success[st.tag], root)
 				} else {
 					bitswapLogger.Errorf("Error processing delete request for %s: %s", codanet.BlockHashToCidSuffix(root), err)
 				}
 			}
-			bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, success...)
+			for tag, roots := range success {
+				bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, tag, roots...)
+			}
 		case cmd := <-bs.downloadCmds:
 			configuredCheck()
 			// We put all ids to map to avoid
@@ -270,6 +280,7 @@ func (bs *BitswapCtx) Loop() {
 				m[root] = true
 			}
 			for root := range m {
+				// bitswapLogger.Errorf("Bitswap: request to download root cid %s", codanet.BlockHashToCidSuffix(root))
 				kickStartRootDownload(root, cmd.tag, bs)
 			}
 		case block := <-bs.blockSink:

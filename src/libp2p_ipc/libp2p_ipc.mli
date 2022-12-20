@@ -36,7 +36,7 @@ module Subscription_id : sig
   val create : unit -> t
 end
 
-val undefined_union : context:string -> int -> unit
+val undefined_union : context:string -> int -> 'a
 
 val unsafe_parse_peer_id : peer_id -> Peer.Id.t
 
@@ -96,6 +96,9 @@ val create_validation_push_message :
   -> push_message
 
 val create_add_resource_push_message : tag:int -> data:string -> push_message
+
+val create_download_resource_push_message :
+  tag:int -> ids:string list -> push_message
 
 val create_heartbeat_peer_push_message : peer_id:Peer.Id.t -> push_message
 

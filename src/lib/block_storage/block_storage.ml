@@ -55,7 +55,17 @@ let open_db dir =
     with Lmdb.Error _ -> None
   else None
 
-let with_db ~default ~f t =
+let mdb_map_resized = -30785
+
+let with_db ~default ~f:unwrapped_f t =
+  let rec f ({ env; _ } as db) =
+    try unwrapped_f db
+    with Lmdb.Error err_int as e ->
+      if err_int = mdb_map_resized then (
+        Lmdb.Env.set_map_size env 0 ;
+        f db )
+      else raise e
+  in
   match !(t.db) with
   | Some db ->
       f db
@@ -175,71 +185,102 @@ let%test_module "Block storage tests" =
 
     let verifier = verifier ()
 
-    let%test_unit "Write a block to db and read it" =
+    let with_helper ~writer f =
+      let handle_push_message _ msg =
+        ( match msg with
+        | Libp2p_ipc.Reader.DaemonInterface.PushMessage.ResourceUpdated m -> (
+            let open Libp2p_ipc.Reader.DaemonInterface.ResourceUpdate in
+            match (type_get m, ids_get_list m) with
+            | Added, [ id_ ] ->
+                let id = Libp2p_ipc.Reader.RootBlockId.blake2b_hash_get id_ in
+                Pipe.write_without_pushback writer id
+            | _ ->
+                () )
+        | _ ->
+            () ) ;
+        Deferred.unit
+      in
+      let open Mina_net2.For_tests in
+      Helper.test_with_libp2p_helper ~logger ~handle_push_message
+        (fun conf_dir helper ->
+          let%bind me = generate_random_keypair helper in
+          let maddr =
+            multiaddr_to_libp2p_ipc
+            @@ Mina_net2.Multiaddr.of_string "/ip4/127.0.0.1/tcp/12878"
+          in
+          let libp2p_config =
+            Libp2p_ipc.create_libp2p_config
+              ~private_key:(Mina_net2.Keypair.secret me)
+              ~statedir:conf_dir ~listen_on:[ maddr ] ~external_multiaddr:maddr
+              ~network_id:"s" ~unsafe_no_trust_ip:true ~flood:false
+              ~direct_peers:[] ~seed_peers:[] ~known_private_ip_nets:[]
+              ~peer_exchange:true ~peer_protection_ratio:0.2 ~min_connections:20
+              ~max_connections:40 ~validation_queue_size:250
+              ~gating_config:empty_libp2p_ipc_gating_config ?metrics_port:None
+              ~topic_config:[] ()
+          in
+          let%bind _ =
+            Helper.do_rpc helper
+              (module Libp2p_ipc.Rpcs.Configure)
+              (Libp2p_ipc.Rpcs.Configure.create_request ~libp2p_config)
+            >>| Or_error.ok_exn
+          in
+          f conf_dir helper )
+
+    let send_and_receive ~helper ~reader ~db breadcrumb =
+      let body = Breadcrumb.block breadcrumb |> Mina_block.body in
+      let body_ref = Staged_ledger_diff.Body.compute_reference body in
+      let data =
+        Staged_ledger_diff.Body.to_binio_bigstring body |> Bigstring.to_string
+      in
+      [%log info] "Sending add resource" ;
+      Mina_net2.For_tests.Helper.send_add_resource
+        ~tag:Staged_ledger_diff.Body.Tag.Body ~data helper ;
+      [%log info] "Waiting for push message" ;
+      let%map id_ = Pipe.read reader in
+      let id = match id_ with `Ok a -> a | _ -> failwith "unexpected" in
+      [%log info] "Push message received" ;
+      [%test_eq: String.t] (Consensus.Body_reference.to_raw_string body_ref) id ;
+      [%test_eq: Staged_ledger_diff.Body.t option] (Some body)
+        (read_body db body_ref)
+
+    let%test_unit "Write many blocks to reach mmap resize" =
+      let n = 300 in
+      Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1
+        ~f:(fun make_breadcrumb ->
+          let frontier = create_frontier () in
+          let root = Full_frontier.root frontier in
+          let reader, writer = Pipe.create () in
+          with_helper ~writer (fun conf_dir helper ->
+              let db =
+                open_ ~logger (String.concat ~sep:"/" [ conf_dir; "block-db" ])
+              in
+              let%bind () =
+                make_breadcrumb root >>= send_and_receive ~db ~helper ~reader
+              in
+              Quickcheck.test
+                (String.gen_with_length 1000000
+                   Base_quickcheck.quickcheck_generator_char ) ~trials:n
+                ~f:(fun data ->
+                  Mina_net2.For_tests.Helper.send_add_resource
+                    ~tag:Staged_ledger_diff.Body.Tag.Body ~data helper ) ;
+              match%bind Pipe.read_exactly reader ~num_values:n with
+              | `Exactly _ ->
+                  make_breadcrumb root >>= send_and_receive ~db ~helper ~reader
+              | _ ->
+                  failwith "unexpected" ) ;
+          clean_up_persistent_root ~frontier )
+
+    let%test_unit "Write a block body to db and read it" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
           let frontier = create_frontier () in
           let root = Full_frontier.root frontier in
-          let open Mina_net2.For_tests in
-          let res_updated_ivar = Ivar.create () in
-          let handle_push_message _ msg =
-            ( match msg with
-            | Libp2p_ipc.Reader.DaemonInterface.PushMessage.ResourceUpdated m
-              -> (
-                let open Libp2p_ipc.Reader.DaemonInterface.ResourceUpdate in
-                match (type_get m, ids_get_list m) with
-                | Added, [ id_ ] ->
-                    let id =
-                      Libp2p_ipc.Reader.RootBlockId.blake2b_hash_get id_
-                    in
-                    Ivar.fill_if_empty res_updated_ivar id
-                | _ ->
-                    () )
-            | _ ->
-                () ) ;
-            Deferred.unit
-          in
-          Helper.test_with_libp2p_helper ~logger ~handle_push_message
-            (fun conf_dir helper ->
-              let%bind me = generate_random_keypair helper in
-              let maddr =
-                multiaddr_to_libp2p_ipc
-                @@ Mina_net2.Multiaddr.of_string "/ip4/127.0.0.1/tcp/12878"
-              in
-              let libp2p_config =
-                Libp2p_ipc.create_libp2p_config
-                  ~private_key:(Mina_net2.Keypair.secret me)
-                  ~statedir:conf_dir ~listen_on:[ maddr ]
-                  ~external_multiaddr:maddr ~network_id:"s"
-                  ~unsafe_no_trust_ip:true ~flood:false ~direct_peers:[]
-                  ~seed_peers:[] ~known_private_ip_nets:[] ~peer_exchange:true
-                  ~peer_protection_ratio:0.2 ~min_connections:20
-                  ~max_connections:40 ~validation_queue_size:250
-                  ~gating_config:empty_libp2p_ipc_gating_config
-                  ?metrics_port:None ~topic_config:[] ()
-              in
-              let%bind _ =
-                Helper.do_rpc helper
-                  (module Libp2p_ipc.Rpcs.Configure)
-                  (Libp2p_ipc.Rpcs.Configure.create_request ~libp2p_config)
-                >>| Or_error.ok_exn
-              in
-              let%bind breadcrumb = make_breadcrumb root in
-              let body = Breadcrumb.block breadcrumb |> Mina_block.body in
-              let body_ref = Staged_ledger_diff.Body.compute_reference body in
-              [%log info] "Sending add resource" ;
-              Helper.send_add_resource ~tag:Staged_ledger_diff.Body.Tag.Body
-                ~body helper ;
-              [%log info] "Waiting for push message" ;
-              let%map id = Ivar.read res_updated_ivar in
-              [%log info] "Push message received" ;
-              [%test_eq: String.t]
-                (Consensus.Body_reference.to_raw_string body_ref)
-                id ;
+          let reader, writer = Pipe.create () in
+          with_helper ~writer (fun conf_dir helper ->
               let db =
                 open_ ~logger (String.concat ~sep:"/" [ conf_dir; "block-db" ])
               in
-              [%test_eq: Staged_ledger_diff.Body.t option] (Some body)
-                (read_body db body_ref) ) ;
+              make_breadcrumb root >>= send_and_receive ~db ~helper ~reader ) ;
           clean_up_persistent_root ~frontier )
   end )

@@ -80,6 +80,12 @@ type protocol_handler =
   ; handler : Libp2p_stream.t -> unit Deferred.t
   }
 
+type on_bitswap_update_t =
+     tag:Staged_ledger_diff.Body.Tag.t
+  -> [ `Added | `Removed | `Broken ]
+  -> Blake2.t list
+  -> unit
+
 type t =
   { conf_dir : string
   ; helper : Libp2p_helper.t
@@ -94,6 +100,7 @@ type t =
   ; mutable banned_ips : Unix.Inet_addr.t list
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
+  ; resource_update_callback : on_bitswap_update_t
   }
 
 let banned_ips t = t.banned_ips
@@ -537,13 +544,44 @@ let handle_push_message t push_message =
               [%log' error t.logger]
                 "streamReadComplete for stream we don't know about $stream_id"
                 ~metadata:[ ("stream_id", `String stream_id_str) ] )
-  | ResourceUpdated _ ->
-      [%log' error t.logger] "resourceUpdated upcall not supported yet"
+  | ResourceUpdated m ->
+      handle "handle_libp2p_helper_subprocess_push_resource_update" (fun () ->
+          let open ResourceUpdate in
+          let to_body_ref =
+            Fn.compose Blake2.of_raw_string RootBlockId.blake2b_hash_get
+          in
+          let tag = tag_get m in
+          let ids = List.map ~f:to_body_ref (ids_get_list m) in
+          let type_, type_str =
+            match type_get m with
+            | Added ->
+                (`Added, "added")
+            | Broken ->
+                (`Broken, "broken")
+            | Removed ->
+                (`Removed, "removed")
+            | Undefined n ->
+                Libp2p_ipc.undefined_union
+                  ~context:"DaemonInterface.PushMessage.ResourceUpdated" n
+          in
+          match Staged_ledger_diff.Body.Tag.of_enum tag with
+          | Some tag ->
+              t.resource_update_callback ~tag type_ ids
+          | _ ->
+              [%log' error t.logger]
+                "Unexpected %s bitswap resource tag for $ids: %d" type_str tag
+                ~metadata:
+                  [ ( "ids"
+                    , `List
+                        (List.map ~f:(fun id -> `String (Blake2.to_hex id)) ids)
+                    )
+                  ] )
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 
 let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
-    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected () =
+    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected ~on_bitswap_update
+    () =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -574,6 +612,7 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
     ; peer_disconnected_callback =
         (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id))
     ; protocol_handlers = Hashtbl.create (module String)
+    ; resource_update_callback = on_bitswap_update
     }
   in
   (push_message_handler := fun msg -> handle_push_message t msg) ;
@@ -605,3 +644,7 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
   Deferred.Or_error.return t
 
 let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper
+
+let add_bitswap_resource t = Libp2p_helper.send_add_resource t.helper
+
+let download_bitswap_resource t = Libp2p_helper.send_download_resource t.helper

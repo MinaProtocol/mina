@@ -108,12 +108,9 @@ module Make (Key : Hashtbl.Key) (D : Data) = struct
       let a_el = Array.get t.arr a in
       let b_el = Array.get t.arr b in
       Array.set t.arr b { b_el with parent = a; data = None } ;
-      if a_el.rank = b_el.rank then
-        Array.set t.arr a
-          { a_el with
-            rank = a_el.rank + 1
-          ; data = Option.map2 ~f:D.merge a_el.data b_el.data
-          }
+      let rank = if a_el.rank = b_el.rank then a_el.rank + 1 else a_el.rank in
+      Array.set t.arr a
+        { a_el with rank; data = Option.map2 ~f:D.merge a_el.data b_el.data }
     in
     if a <> b then
       if rank ~id:a t < rank ~id:b t then update b a else update a b

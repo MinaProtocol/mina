@@ -147,6 +147,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
                 ~sinks:
                   ( Transition_handler.Block_sink.void
                   , Network_pool.Transaction_pool.Remote_sink.void
@@ -165,6 +166,11 @@ let setup (type n) ~context:(module Context : CONTEXT)
         { peer; state; network } )
   in
   { fake_gossip_network; peer_networks }
+
+let with_temp_dir f =
+  File_system.with_temp_dir
+    (Filename.temp_dir_name ^/ "fake_network_get_ancestry")
+    ~f
 
 module Generator = struct
   open Quickcheck
@@ -248,15 +254,21 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
-              Deferred.return
-                (Sync_handler.Root.prove
-                   ~context:(module Context)
-                   ~frontier
-                   ( Envelope.Incoming.data query_env
-                   |> With_hash.map_hash ~f:(fun state_hash ->
-                          { State_hash.State_hashes.state_hash
-                          ; state_body_hash = None
-                          } ) ) ) )
+              with_temp_dir (fun conf_dir ->
+                  Deferred.return
+                    (Sync_handler.Root.prove
+                       ~context:
+                         ( module struct
+                           include Context
+
+                           let conf_dir = conf_dir
+                         end )
+                       ~frontier
+                       ( Envelope.Incoming.data query_env
+                       |> With_hash.map_hash ~f:(fun state_hash ->
+                              { State_hash.State_hashes.state_hash
+                              ; state_body_hash = None
+                              } ) ) ) ) )
     ; get_best_tip =
         ( match get_best_tip with
         | Some f ->

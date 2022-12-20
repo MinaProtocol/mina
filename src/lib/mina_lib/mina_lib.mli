@@ -28,6 +28,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
 exception Snark_worker_error of int

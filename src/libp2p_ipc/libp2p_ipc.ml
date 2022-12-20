@@ -265,6 +265,23 @@ let push_message_to_outgoing_message request =
     Builder.Libp2pHelperInterface.Message.(
       builder_op push_message_set_builder request)
 
+let create_download_resource_push_message ~tag ~ids =
+  let ids =
+    List.map ids ~f:(fun id ->
+        build'
+          (module Builder.RootBlockId)
+          Builder.RootBlockId.(op blake2b_hash_set id) )
+  in
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op download_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.DownloadResource)
+              Builder.Libp2pHelperInterface.DownloadResource.(
+                op tag_set_exn tag *> list_op ids_set_list ids) ))
+
 let create_add_resource_push_message ~tag ~data =
   build'
     (module Builder.Libp2pHelperInterface.PushMessage)

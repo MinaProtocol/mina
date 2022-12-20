@@ -59,7 +59,8 @@ let collect_unprocessed (type state_t) ~logger
         predicate.Substate.viewer subst
   in
   let top_state_hash = (F.transition_meta top_state).state_hash in
-  let get_next_unprocessed key =
+  let get_next_unprocessed meta =
+    let key = meta.Substate.state_hash in
     let%bind.Option ancestor = Dsu.get ~key dsu in
     let%bind.Option parent =
       Transition_states.find states ancestor.parent_state_hash
@@ -68,8 +69,10 @@ let collect_unprocessed (type state_t) ~logger
       Option.some_if (F.equal_state_levels top_state parent) ()
     in
     [%log trace]
-      "dsu: returning set leader for $state_hash: $ancestor_hash with parent \
-       $ancestor_parent_hash (for $top_state_hash)"
+      "dsu: returning set leader for $state_hash (length %d): $ancestor_hash \
+       (length %d) with parent $ancestor_parent_hash (for $top_state_hash)"
+      (Mina_numbers.Length.to_int meta.blockchain_length)
+      (Mina_numbers.Length.to_int ancestor.blockchain_length)
       ~metadata:
         [ ("state_hash", State_hash.to_yojson key)
         ; ("top_state_hash", State_hash.to_yojson top_state_hash)
@@ -85,10 +88,9 @@ let collect_unprocessed (type state_t) ~logger
     |> function
     | bottom_state :: rest_states
       when is_status_processed ~state_functions bottom_state ->
-        let bottom_hash = (F.transition_meta bottom_state).state_hash in
         Fn.compose
           (Option.value_map ~default:Fn.id ~f:go
-             (get_next_unprocessed bottom_hash) )
+             (get_next_unprocessed (F.transition_meta bottom_state)) )
           (List.cons rest_states)
     | collected ->
         List.cons collected

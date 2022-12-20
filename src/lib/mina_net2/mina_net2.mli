@@ -54,6 +54,12 @@ exception Libp2p_helper_died_unexpectedly
 (** Handle to all network functionality. *)
 type t
 
+type on_bitswap_update_t =
+     tag:Staged_ledger_diff.Body.Tag.t
+  -> [ `Added | `Removed | `Broken ]
+  -> Blake2.t list
+  -> unit
+
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol
@@ -139,6 +145,7 @@ val create :
   -> conf_dir:string
   -> on_peer_connected:(Peer.Id.t -> unit)
   -> on_peer_disconnected:(Peer.Id.t -> unit)
+  -> on_bitswap_update:on_bitswap_update_t
   -> unit
   -> t Deferred.Or_error.t
 
@@ -384,3 +391,12 @@ val connection_gating_config : t -> connection_gating
 val banned_ips : t -> Unix.Inet_addr.t list
 
 val send_heartbeat : t -> Peer.Id.t -> unit
+
+val download_bitswap_resource :
+     t
+  -> tag:Staged_ledger_diff.Body.Tag.t
+  -> ids:Consensus.Body_reference.t list
+  -> unit
+
+val add_bitswap_resource :
+  t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit

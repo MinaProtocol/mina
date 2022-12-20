@@ -12,7 +12,11 @@ module type S = sig
 
   include Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf and type t := t
 
-  type 't creator = Rpc_intf.rpc_handler list -> Message.sinks -> 't Deferred.t
+  type 't creator =
+       Rpc_intf.rpc_handler list
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
@@ -30,12 +34,16 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = rpc_handler list -> Message.sinks -> 't Deferred.t
+  type 't creator =
+       rpc_handler list
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
-  let create (Creatable ((module M), creator)) impls sinks =
-    let%map gossip_net = creator impls sinks in
+  let create (Creatable ((module M), creator)) impls ~on_bitswap_update sinks =
+    let%map gossip_net = creator impls ~on_bitswap_update sinks in
     Any ((module M), gossip_net)
 
   let peers (Any ((module M), t)) = M.peers t
@@ -86,4 +94,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
+
+  let add_bitswap_resource (Any ((module M), t)) = M.add_bitswap_resource t
+
+  let download_bitswap_resource (Any ((module M), t)) =
+    M.download_bitswap_resource t
 end

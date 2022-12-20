@@ -7,7 +7,8 @@ val create_in_mem_transition_states :
 
 val run :
      frontier:Transition_frontier.t
-  -> context:(module Transition_handler.Validator.CONTEXT)
+  -> on_bitswap_update_ref:Mina_net2.on_bitswap_update_t Core_kernel.ref
+  -> context:(module Context.MINI_CONTEXT)
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t

@@ -92,4 +92,13 @@ module type Gossip_net_intf = sig
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
+  val add_bitswap_resource :
+    t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit Deferred.t
+
+  val download_bitswap_resource :
+       t
+    -> tag:Staged_ledger_diff.Body.Tag.t
+    -> ids:Consensus.Body_reference.t list
+    -> unit Deferred.t
 end

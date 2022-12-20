@@ -100,8 +100,8 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   in
   let upon_f = upon_f ~logger:Context.logger ~transition_states ~state_hash in
   let processing_status =
-    controlling_verifier_bandwidth ~context ~actions ~transition_states
-      ~state_hash ~process_f ~upon_f
+    controlling_bandwidth ~priority:`High ~resource:`Verifier ~context ~actions
+      ~transition_states ~state_hash ~process_f ~upon_f
       (module I)
   in
   Substate.Processing

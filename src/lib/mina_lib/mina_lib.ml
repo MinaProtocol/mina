@@ -1298,9 +1298,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
-let context (config : Config.t) : (module CONTEXT) =
+let context (config : Config.t) =
   ( module struct
     let logger = config.logger
 
@@ -1309,7 +1311,9 @@ let context (config : Config.t) : (module CONTEXT) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
-  end )
+
+    let conf_dir = config.conf_dir
+  end : CONTEXT )
 
 let start t =
   let set_next_producer_timing timing consensus_state =
@@ -1370,11 +1374,13 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
+  let (module Context : CONTEXT) = context t.config in
   if
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    Block_producer.run ~context:(context t.config)
+    Block_producer.run
+      ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1426,8 +1432,10 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
+  let (module Context : CONTEXT) = context t.config in
   let%bind () =
-    Block_producer.run_precomputed ~context:(context t.config)
+    Block_producer.run_precomputed
+      ~context:(module Context)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
@@ -1869,9 +1877,29 @@ let create ?wallets (config : Config.t) =
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
+          let on_bitswap_update_ref =
+            ref (fun ~tag type_ ids ->
+                let type_str =
+                  match type_ with
+                  | `Added ->
+                      "added"
+                  | `Removed ->
+                      "removed"
+                  | `Broken ->
+                      "broken"
+                in
+                [%log' warn Context.logger]
+                  "Ignoring bitswap update (tag: %d, type: %s) for $ids"
+                  (Staged_ledger_diff.Body.Tag.to_enum tag)
+                  type_str
+                  ~metadata:
+                    [ ("ids", `List (List.map ~f:Blake2.to_yojson ids)) ] )
+          in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
                 Mina_networking.create config.net_config ~get_some_initial_peers
+                  ~on_bitswap_update:(fun ~tag type_ ids ->
+                    !on_bitswap_update_ref ~tag type_ ids )
                   ~sinks
                   ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
                                                                             ->
@@ -2045,7 +2073,7 @@ let create ?wallets (config : Config.t) =
               ~producer_transition_reader ~most_recent_valid_block
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~on_bitswap_update_ref ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

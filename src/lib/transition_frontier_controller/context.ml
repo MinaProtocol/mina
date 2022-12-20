@@ -19,10 +19,17 @@ type event_t =
     * [ `Invalid_delta_block_chain_proof
       | `Invalid_genesis_protocol_state
       | `Invalid_protocol_version
-      | `Mismatched_protocol_version ] ]
+      | `Mismatched_protocol_version ]
+  | `Preserved_body_for_retrieved_ancestor of Mina_block.Body.t ]
+
+module type MINI_CONTEXT = sig
+  include Transition_handler.Validator.CONTEXT
+
+  val conf_dir : string
+end
 
 module type CONTEXT = sig
-  include Transition_handler.Validator.CONTEXT
+  include MINI_CONTEXT
 
   val genesis_state_hash : State_hash.t
 
@@ -53,10 +60,12 @@ module type CONTEXT = sig
     -> (module Interruptible.F)
     -> Mina_block.Body.t Or_error.t Interruptible.t
 
-  val allocate_verifier_bandwidth :
-    unit -> [ `Start_immediately | `Wait of unit Async_kernel.Ivar.t ]
+  val allocate_bandwidth :
+       ?priority:[ `Low | `Medium | `High ]
+    -> [ `Verifier | `Download ]
+    -> [ `Start_immediately | `Wait of unit Async_kernel.Ivar.t ]
 
-  val deallocate_verifier_bandwidth : unit -> unit
+  val deallocate_bandwidth : [ `Verifier | `Download ] -> unit
 
   (** Build breadcrumb for the given transition and its parent *)
   val build_breadcrumb :
@@ -164,9 +173,9 @@ let interrupt_after_timeout ~timeout interrupt_ivar =
   Async_kernel.upon (Async.at timeout)
     (Async_kernel.Ivar.fill_if_empty interrupt_ivar)
 
-let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
-    ~transition_states ~state_hash ~actions ~upon_f ~process_f
-    (module I : Interruptible.F) =
+let controlling_bandwidth ?priority ~resource
+    ~context:(module Context : CONTEXT) ~transition_states ~state_hash ~actions
+    ~upon_f ~process_f (module I : Interruptible.F) =
   let mk_timeout span =
     let timeout = Time.(add @@ now ()) span in
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
@@ -174,7 +183,7 @@ let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
   in
   let start_action ~need_deallocate action =
     Async_kernel.Deferred.(upon @@ both actions (I.force action)) (fun res ->
-        if need_deallocate then Context.deallocate_verifier_bandwidth () ;
+        if need_deallocate then Context.deallocate_bandwidth resource ;
         upon_f res )
   in
   let late_start = I.return (Result.Error `Late_to_start) in
@@ -197,7 +206,7 @@ let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
     Transition_states.modify_substate transition_states state_hash
       ~f:{ ext_modifier }
   in
-  match Context.allocate_verifier_bandwidth () with
+  match Context.allocate_bandwidth ?priority resource with
   | `Start_immediately ->
       let action, timeout_span = process_f () in
       start_action ~need_deallocate:true action ;
@@ -209,9 +218,11 @@ let controlling_verifier_bandwidth ~context:(module Context : CONTEXT)
       in
       let handle_wait_ivar () =
         if Async_kernel.Ivar.is_full wait_ivar then
-          Context.deallocate_verifier_bandwidth ()
+          Context.deallocate_bandwidth resource
         else Async_kernel.Ivar.fill wait_ivar ()
       in
       let action' = I.finally action ~f:handle_wait_ivar in
       start_action ~need_deallocate:false action' ;
       Substate.Waiting
+
+module Body_ref_table = Hashtbl.Make (Consensus.Body_reference)

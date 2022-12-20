@@ -13,6 +13,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
 module type Transition_handler_validator_intf = sig
@@ -363,6 +365,7 @@ module type Transition_router_intf = sig
     -> catchup_mode:
          [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> on_bitswap_update_ref:Mina_net2.on_bitswap_update_t ref
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

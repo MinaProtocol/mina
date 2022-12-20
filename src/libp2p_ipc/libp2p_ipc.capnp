@@ -475,6 +475,7 @@ struct DaemonInterface {
   struct ResourceUpdate {
     type @0 :ResourceUpdateType;
     ids @1 :List(RootBlockId);
+    tag @2 :UInt8;
   }
 
   struct PushMessage {

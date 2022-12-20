@@ -326,6 +326,20 @@ let setup_daemon logger =
             %d)"
            Cli_lib.Default.max_connections )
       (optional int)
+  and pubsub_v0 =
+    flag "--pubsub-v0" ~aliases:[ "pubsub-v0" ]
+      ~doc:
+        ( Printf.sprintf
+            "Mode of using pubsub topic v0 ('r', 'rw' or 'none') (default: %s)"
+        @@ pubsub_topic_mode_to_string Cli_lib.Default.pubsub_v0 )
+      (optional pubsub_topic_mode)
+  and pubsub_v1 =
+    flag "--pubsub-v1" ~aliases:[ "pubsub-v1" ]
+      ~doc:
+        ( Printf.sprintf
+            "Mode of using pubsub topic v1 ('r', 'rw' or 'none') (default: %s)"
+        @@ pubsub_topic_mode_to_string Cli_lib.Default.pubsub_v1 )
+      (optional pubsub_topic_mode)
   and validation_queue_size =
     flag "--validation-queue-size"
       ~aliases:[ "validation-queue-size" ]
@@ -1169,15 +1183,13 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "max-connections"
               ~default:Cli_lib.Default.max_connections max_connections
           in
-          let pubsub_v1 = Gossip_net.Libp2p.N in
-          (* TODO uncomment after introducing Bitswap-based block retrieval *)
-          (* let pubsub_v1 =
-               or_from_config to_pubsub_topic_mode_option "pubsub-v1"
-                 ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
-             in *)
+          let pubsub_v1 =
+            or_from_config to_pubsub_topic_mode_option "pubsub-v1"
+              ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
+          in
           let pubsub_v0 =
             or_from_config to_pubsub_topic_mode_option "pubsub-v0"
-              ~default:Cli_lib.Default.pubsub_v0 None
+              ~default:Cli_lib.Default.pubsub_v0 pubsub_v0
           in
           let validation_queue_size =
             or_from_config YJ.Util.to_int_option "validation-queue-size"

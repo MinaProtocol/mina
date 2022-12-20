@@ -6,6 +6,8 @@
    base
    async_kernel
    core_kernel
+   sexplib0
+   base.base_internalhash_types
    ;; local libraries
    data_hash_lib
    network_peer
@@ -22,6 +24,7 @@
    transition_frontier_base
    consensus
    error_json
+   blake2
    mina_wire_types
    kimchi_bindings
    kimchi_backend.pasta

@@ -65,4 +65,5 @@
    async_unix
    transition_frontier_bit_catchup
    error_json
+   blake2
 ))

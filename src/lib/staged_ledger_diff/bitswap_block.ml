@@ -20,7 +20,7 @@ let link_size = Blake2.digest_size_in_bytes
 let absolute_max_links_per_block = Stdint.Uint16.(to_int max_int)
 
 (** A bitswap block schema consists of a series of branch-blocks and leaf-blocks.
- *  A branch-block contains both links to successive blocks, as well as data. A
+ *  A branch-block contains both links to successive blocks and data. A
  *  leaf-block contains only data, and no links. Of the branch-blocks, there will
  *  be either 0 or 1 block that has less links than the rest of the branch-blocks.
  *  We refer to this block as the partial-branch-block, and the other branch-blocks

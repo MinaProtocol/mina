@@ -1086,7 +1086,7 @@ let protocol_version_status t =
   in
   { valid_current; valid_next; matches_daemon }
 
-let create (config : Config.t) ~sinks
+let create (config : Config.t) ~on_bitswap_update ~sinks
     ~(get_some_initial_peers :
           Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
        -> Rpcs.Get_some_initial_peers.response Deferred.t )
@@ -1439,6 +1439,7 @@ let create (config : Config.t) ~sinks
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
+          ~on_bitswap_update
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   (* The node status RPC is implemented directly in go, serving a string which
@@ -1587,6 +1588,12 @@ let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
 let get_transition_chain ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
     ~label:"chain of transitions" t
+
+let add_bitswap_resource { gossip_net; _ } =
+  Gossip_net.Any.add_bitswap_resource gossip_net
+
+let download_bitswap_resource { gossip_net; _ } =
+  Gossip_net.Any.download_bitswap_resource gossip_net
 
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip

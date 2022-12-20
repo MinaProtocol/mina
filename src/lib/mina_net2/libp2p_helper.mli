@@ -34,8 +34,11 @@ val send_validation :
   -> unit
 
 val send_add_resource :
+  tag:Staged_ledger_diff.Body.Tag.t -> data:string -> t -> unit
+
+val send_download_resource :
      tag:Staged_ledger_diff.Body.Tag.t
-  -> body:Staged_ledger_diff.Body.t
+  -> ids:Consensus.Body_reference.t list
   -> t
   -> unit
 

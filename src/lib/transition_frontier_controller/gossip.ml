@@ -52,20 +52,20 @@ let preserve_body st body =
   match st with
   | Transition_state.Received ({ body_opt = None; _ } as r) ->
       ( Transition_state.Received { r with body_opt = Some body }
-      , `Nop `Preserved_body )
+      , `Nop (`Preserved_body body) )
   | Verifying_blockchain_proof ({ body_opt = None; _ } as r) ->
       ( Verifying_blockchain_proof { r with body_opt = Some body }
-      , `Nop `Preserved_body )
+      , `Nop (`Preserved_body body) )
   | Downloading_body
       ({ substate = { status = Processing (In_progress ctx); _ } as s; _ } as r)
     ->
       ( Downloading_body
           { r with substate = { s with status = Processing (Done body) } }
-      , `Mark_downloading_body_processed (Some ctx.interrupt_ivar) )
+      , `Mark_downloading_body_processed (Some ctx.interrupt_ivar, body) )
   | Downloading_body ({ substate = { status = Failed _; _ } as s; _ } as r) ->
       ( Downloading_body
           { r with substate = { s with status = Processing (Done body) } }
-      , `Mark_downloading_body_processed None )
+      , `Mark_downloading_body_processed (None, body) )
   | _ ->
       (st, `Nop `No_body_preserved)
 

@@ -18,6 +18,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -705,16 +707,26 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    module Context = struct
-      let logger = Logger.create ()
+    let with_temp_dir f =
+      File_system.with_temp_dir
+        (Filename.temp_dir_name ^/ "bootstrap_controller_test")
+        ~f
 
-      let precomputed_values = precomputed_values
+    let with_context f =
+      with_temp_dir (fun conf_dir ->
+          let module Context = struct
+            let logger = Logger.create ()
 
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+            let precomputed_values = precomputed_values
 
-      let consensus_constants = precomputed_values.consensus_constants
-    end
+            let constraint_constants =
+              Genesis_constants.Constraint_constants.for_unit_tests
+
+            let consensus_constants = precomputed_values.consensus_constants
+
+            let conf_dir = conf_dir
+          end in
+          f (module Context : CONTEXT) )
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -738,13 +750,13 @@ let%test_module "Bootstrap_controller tests" =
       downcast_transition ~sender
         (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
 
-    let make_non_running_bootstrap ~genesis_root ~network =
+    let make_non_running_bootstrap ~context ~genesis_root ~network =
       let transition =
         genesis_root
         |> Mina_block.Validation.reset_frontier_dependencies_validation
         |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
-      { context = (module Context)
+      { context
       ; trust_system
       ; verifier
       ; best_seen_transition = transition
@@ -787,56 +799,61 @@ let%test_module "Bootstrap_controller tests" =
           let sync_ledger_reader, sync_ledger_writer =
             Pipe_lib.Strict_pipe.create ~name:"sync_ledger_reader" Synchronous
           in
-          let bootstrap =
-            make_non_running_bootstrap ~genesis_root ~network:me.network
-          in
           let root_sync_ledger =
             Sync_ledger.Db.create
               (Transition_frontier.root_snarked_ledger me.state.frontier)
               ~logger ~trust_system
           in
+          let run_test context =
+            let bootstrap =
+              make_non_running_bootstrap ~genesis_root ~network:me.network
+                ~context
+            in
+            let sync_deferred =
+              sync_ledger bootstrap ~root_sync_ledger ~transition_graph
+                ~preferred:[] ~sync_ledger_reader
+                ~genesis_constants:Genesis_constants.compiled
+            in
+            let%bind () =
+              Deferred.List.iter branch ~f:(fun breadcrumb ->
+                  Strict_pipe.Writer.write sync_ledger_writer
+                    ( `Block (downcast_breadcrumb ~sender:other.peer breadcrumb)
+                    , `Valid_cb None ) )
+            in
+            Strict_pipe.Writer.close sync_ledger_writer ;
+            let%map () = sync_deferred in
+            let expected_transitions =
+              List.map branch
+                ~f:
+                  (Fn.compose
+                     (With_hash.map ~f:Mina_block.header)
+                     (Fn.compose Mina_block.Validation.block_with_hash
+                        (Fn.compose Mina_block.Validated.remember
+                           Transition_frontier.Breadcrumb.validated_transition ) ) )
+            in
+            let saved_transitions =
+              Transition_cache.data transition_graph
+              |> List.map ~f:(fun (x, _) ->
+                     Transition_cache.header_with_hash
+                     @@ Envelope.Incoming.data x )
+            in
+            let module E = struct
+              module T = struct
+                type t = Mina_block.Header.t State_hash.With_state_hashes.t
+                [@@deriving sexp]
+
+                let compare =
+                  external_transition_compare ~context:bootstrap.context
+              end
+
+              include Comparable.Make (T)
+            end in
+            [%test_result: E.Set.t]
+              (E.Set.of_list saved_transitions)
+              ~expect:(E.Set.of_list expected_transitions)
+          in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let sync_deferred =
-                sync_ledger bootstrap ~root_sync_ledger ~transition_graph
-                  ~preferred:[] ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
-              in
-              let%bind () =
-                Deferred.List.iter branch ~f:(fun breadcrumb ->
-                    Strict_pipe.Writer.write sync_ledger_writer
-                      ( `Block
-                          (downcast_breadcrumb ~sender:other.peer breadcrumb)
-                      , `Valid_cb None ) )
-              in
-              Strict_pipe.Writer.close sync_ledger_writer ;
-              sync_deferred ) ;
-          let expected_transitions =
-            List.map branch
-              ~f:
-                (Fn.compose
-                   (With_hash.map ~f:Mina_block.header)
-                   (Fn.compose Mina_block.Validation.block_with_hash
-                      (Fn.compose Mina_block.Validated.remember
-                         Transition_frontier.Breadcrumb.validated_transition ) ) )
-          in
-          let saved_transitions =
-            Transition_cache.data transition_graph
-            |> List.map ~f:(fun (x, _) ->
-                   Transition_cache.header_with_hash @@ Envelope.Incoming.data x )
-          in
-          let module E = struct
-            module T = struct
-              type t = Mina_block.Header.t State_hash.With_state_hashes.t
-              [@@deriving sexp]
-
-              let compare = external_transition_compare ~context:(module Context)
-            end
-
-            include Comparable.Make (T)
-          end in
-          [%test_result: E.Set.t]
-            (E.Set.of_list saved_transitions)
-            ~expect:(E.Set.of_list expected_transitions) )
+              with_context run_test ) )
 
     let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
       let open Fake_network in
@@ -855,13 +872,13 @@ let%test_module "Bootstrap_controller tests" =
         Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
       in
       [%log info] "bootstrap begin" ;
-      Block_time.Timeout.await_exn time_controller ~timeout_duration
-        (run
-           ~context:(module Context)
-           ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
-           ~consensus_local_state:my_net.state.consensus_local_state
-           ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition )
+      with_context (fun context ->
+          Block_time.Timeout.await_exn time_controller ~timeout_duration
+            (run ~context ~trust_system ~verifier ~network:my_net.network
+               ~preferred_peers:[]
+               ~consensus_local_state:my_net.state.consensus_local_state
+               ~transition_reader ~persistent_root ~persistent_frontier
+               ~catchup_mode:`Normal ~initial_root_transition ) )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
