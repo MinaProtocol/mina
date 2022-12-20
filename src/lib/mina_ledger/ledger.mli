@@ -133,6 +133,8 @@ module Transaction_applied : sig
       ; new_accounts : Account_id.t list
       }
     [@@deriving sexp]
+
+    val zkapp_updates_applied : t -> bool
   end
 
   module Command_applied : sig

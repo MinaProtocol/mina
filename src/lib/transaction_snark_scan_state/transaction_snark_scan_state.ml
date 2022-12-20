@@ -306,9 +306,11 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         else Or_error.error_string "Invalid pending coinbase stack state"
       in
       (*Ignore [zkapp_updates_applied] in merge statements since we don't care
-        whether or not account updates were applied, just that the proofs are
-        valid and state transition is correct. Set to true always*)
-      let zkapp_updates_applied = true in
+        whether or not account updates were applied, just that they were computed correctly.
+        If one of the updates fail, then none are applied*)
+      let zkapp_updates_applied =
+        s.target.local_state.success && s'.target.local_state.success
+      in
       let connecting_ledger_left = failwith "TODO merge rules" in
       let connecting_ledger_right = failwith "TODO merge rules" in
       let statement : Transaction_snark.Statement.t =
