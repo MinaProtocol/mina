@@ -103,11 +103,9 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
 in
 {
-  bookworm  = pipeline DebianVersions.DebVersion.Bookworm
-  , bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
   , stretch = pipeline DebianVersions.DebVersion.Stretch
-  , jammy   = pipeline DebianVersions.DebVersion.Jammy
   , focal   = pipeline DebianVersions.DebVersion.Focal
   , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }
