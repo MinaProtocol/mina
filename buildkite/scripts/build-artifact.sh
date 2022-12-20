@@ -34,14 +34,14 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/replayer/replayer.exe \
   src/app/swap_bad_balances/swap_bad_balances.exe \
   src/app/rosetta/rosetta_mainnet_signatures.exe \
-  src/app/rosetta/rosetta_testnet_signatures.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/app/rosetta/rosetta_testnet_signatures.exe \
+  src/app/test_executive/test_executive.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for mainnet and devnet"
 make deb
 
+make test_executive_deb
+
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
-
-echo "--- Copy artifacts to cloud"
-# buildkite-agent artifact upload occurs outside of docker after this script exits

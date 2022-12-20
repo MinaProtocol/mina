@@ -1,0 +1,76 @@
+ARG image=debian:stretch-slim
+FROM ${image}
+# Run with `docker build --build-arg deb_version=<version>`
+ARG deb_version
+ARG deb_release=unstable
+ARG deb_codename=stretch
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# Dependencies
+RUN apt-get -y update && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    jq \
+    libgmp10 \
+    libgomp1 \
+    libssl1.1 \
+    libpq-dev \
+    procps \
+    python3 \
+    tzdata && \
+  rm -rf /var/lib/apt/lists/*
+
+# --- Terraform tools
+RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
+    && unzip terraform.zip \
+    && sudo mv terraform /usr/bin \
+    && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+
+# --- Google Cloud tools
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
+    && sudo apt-get update -y \
+    && sudo apt-get install -y google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin
+
+# --- Helm tools
+RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && sudo apt-get update -y \
+    && sudo apt-get install -y helm
+
+# Get yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
+    && sudo apt update \
+    && sudo apt install -y nodejs yarn
+
+# Mina test executive package
+RUN echo "Building test_executive image with version $deb_version from repo $deb_release $deb_codename " \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update \
+  && apt-get install -y --allow-downgrades "mina-test-executive=$deb_version"
+
+# Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
+# for now stick to root for compatibility
+ARG UID=0
+
+## Reset workdir, USER, and ${UID} for root-owned version
+WORKDIR /root/
+USER 0
+
+# these env vars need to be overriden when the image is `docker run`
+ENV test_name=""
+ENV mina_image=""
+ENV archiver_image=""
+ENV debug_bool=true
+
+ENTRYPOINT ["/usr/bin/dumb-init", "mina-test-executive cloud $test_name --mina-image $mina_image --archive_image $archiver_image $( if [[ $debug_bool ]] ; then echo --debug ; fi ) | tee test.log | logproc -i inline -f '!(.level in ["Spam", "Debug"])'"]
