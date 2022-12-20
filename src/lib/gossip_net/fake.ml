@@ -17,6 +17,7 @@ module type S = sig
        network
     -> Peer.t
     -> Rpc_intf.rpc_handler list
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
     -> Message.sinks
     -> t Deferred.t
 end
@@ -289,6 +290,14 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let set_connection_gating t config =
       t.connection_gating := config ;
       Deferred.return config
+
+    let add_bitswap_resource _ ~tag:_ ~data:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
+    let download_bitswap_resource _ ~tag:_ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
   end
 
   type network = Network.t
@@ -299,6 +308,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let create_network = Network.create
 
-  let create_instance network local_ip impls sinks =
+  let create_instance network local_ip impls ~on_bitswap_update:_ sinks =
     Deferred.return (Instance.create network local_ip impls sinks)
 end

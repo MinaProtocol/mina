@@ -190,7 +190,7 @@ module Make (F : F) = struct
       match substate.status with
       | Processing ctx when reuse_ctx ->
           Some (Some ctx)
-      (* TODO check if the contetx below needs to be canceled *)
+      (* TODO check if the context below needs to be canceled *)
       | Processing _ | Failed _ ->
           Some None
       | _ ->
@@ -328,8 +328,8 @@ module Make (F : F) = struct
     let process_f () = F.verify ~context (module I) states in
     let upon_f = upon_f ~context ~transition_states ~state_hashes ~holder in
     let processing_status =
-      controlling_verifier_bandwidth ~context ~actions ~transition_states
-        ~state_hash:top_state_hash ~process_f ~upon_f
+      controlling_bandwidth ~resource:`Verifier ~context ~actions
+        ~transition_states ~state_hash:top_state_hash ~process_f ~upon_f
         (module I)
     in
     Substate.In_progress

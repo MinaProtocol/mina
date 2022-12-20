@@ -4,8 +4,9 @@ open Pipe_lib
 open Mina_block
 module Bit_catchup = Bit_catchup
 
-let run_with_normal_or_super_catchup
-    ~context:(module Context : Transition_handler.Validator.CONTEXT)
+module type CONTEXT = Context.MINI_CONTEXT
+
+let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~collected_transitions
     ~frontier ~network_transition_reader ~producer_transition_reader
     ~clear_reader ~verified_transition_writer =
@@ -148,9 +149,9 @@ let run_with_normal_or_super_catchup
          (Strict_pipe.Writer.write verified_transition_writer) )
   |> don't_wait_for
 
-let run ~frontier =
+let run ~on_bitswap_update_ref ~frontier =
   match Transition_frontier.catchup_state frontier with
   | Full _ | Hash _ ->
       run_with_normal_or_super_catchup ~frontier
   | Bit _ ->
-      Bit_catchup.run ~frontier
+      Bit_catchup.run ~on_bitswap_update_ref ~frontier

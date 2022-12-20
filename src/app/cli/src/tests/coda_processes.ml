@@ -11,10 +11,10 @@ type ports =
 let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
-        Mina_net2.create
-          ~pids:(Child_processes.Termination.create_pid_table ())
+        Mina_net2.create ~pids:(Child_processes.Termination.create_pid_table ())
           ~logger:(Logger.create ()) ~conf_dir:tmpd ~all_peers_seen_metric:false
           ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+          ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
       in
       let net = Or_error.ok_exn net in
       let ips =

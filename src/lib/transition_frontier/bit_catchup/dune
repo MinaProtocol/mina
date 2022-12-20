@@ -6,6 +6,8 @@
    base
    async_kernel
    core_kernel
+   sexplib0
+   base.base_internalhash_types
    ;; local libraries
    data_hash_lib
    network_peer
@@ -30,6 +32,7 @@
    kimchi_backend.pasta.basic
    non_empty_list
    error_json
+   blake2
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina)))

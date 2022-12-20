@@ -86,7 +86,9 @@ and upon_f ~context ~transition_states ~state_hash (actions_undeferred, res) =
         ~state_hash (Processing (Done body)) ;
       actions_undeferred.Misc.mark_processed_and_promote
         ~reason:"downloaded body" [ state_hash ]
-  | Result.Ok (Result.Error e) ->
+  | Result.Ok (Error `Late_to_start) ->
+      ()
+  | Result.Ok (Error (`Download_error e)) ->
       update_status_for_unprocessed ~context ~actions ~transition_states
         ~state_hash (Failed e)
 
@@ -101,30 +103,34 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
     ~context ~actions =
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_header_with_validation header in
+  let wrap_error = Result.map_error ~f:(fun e -> `Download_error e) in
   match body_opt with
   | Some body ->
       Substate.Done body
   | None ->
       let open Context in
       let module I = Interruptible.Make () in
-      let action =
-        Context.download_body
-          ~header:(Mina_block.Validation.header_with_hash header)
-          ~preferred_peers
-          (module I)
+      let upon_f = upon_f ~context ~transition_states ~state_hash in
+      let process_f () =
+        ( I.map ~f:wrap_error
+          @@ Context.download_body
+               ~header:(Mina_block.Validation.header_with_hash header)
+               ~preferred_peers
+               (module I)
+        , Time.Span.(bitwap_download_timeout + peer_download_timeout) )
       in
-      Async_kernel.Deferred.(upon @@ both actions (I.force action))
-        (upon_f ~context ~transition_states ~state_hash) ;
-      let span = Time.Span.(bitwap_download_timeout + peer_download_timeout) in
-      let timeout = Time.(add @@ now ()) span in
       let downto_ =
         Mina_block.Validation.header header
         |> Mina_block.Header.blockchain_length
       in
-      interrupt_after_timeout ~timeout I.interrupt_ivar ;
+      let processing_status =
+        controlling_bandwidth ~resource:`Download ~context ~actions
+          ~transition_states ~state_hash ~process_f ~upon_f
+          (module I)
+      in
       Substate.In_progress
         { interrupt_ivar = I.interrupt_ivar
-        ; processing_status = Executing { timeout }
+        ; processing_status
         ; downto_
         ; holder = ref state_hash
         }
