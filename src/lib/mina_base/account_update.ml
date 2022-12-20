@@ -123,7 +123,7 @@ module Authorization_kind = struct
         Signature
     | { is_signed = false; is_proved = true; verification_key_hash } ->
         Proof verification_key_hash
-    | { is_signed = true; is_proved = true } ->
+    | { is_signed = true; is_proved = true; _ } ->
         failwith "Invalid authorization kind"
 
   let gen =
