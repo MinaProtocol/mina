@@ -13,19 +13,6 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
-let dirtyWhen = [
-  S.strictlyStart (S.contains "src"),
-  S.strictlyStart (S.contains "automation"),
-  S.strictly (S.contains "Makefile"),
-  S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
-  S.exactly "buildkite/scripts/build-artifact" "sh",
-  S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Test"),
-  S.strictlyStart (S.contains "buildkite/src/Command"),
-  S.strictlyStart (S.contains "dockerfiles"),
-  S.strictlyStart (S.contains "scripts")
-]
-
 
 in
 
@@ -116,10 +103,11 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
 in
 {
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  bookworm  = pipeline DebianVersions.DebVersion.Bookworm
+  , bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
   , stretch = pipeline DebianVersions.DebVersion.Stretch
-  , bionic = pipeline DebianVersions.DebVersion.Bionic
+  , jammy   = pipeline DebianVersions.DebVersion.Jammy
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , dirtyWhen = dirtyWhen
+  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }

@@ -30,6 +30,18 @@ Pipeline.build
       },
     steps = [
 
+      -- mina-toolchain Debian Bookworm Toolchain
+      let toolchainBookwormSpec = DockerImage.ReleaseSpec::{
+        service="mina-toolchain",
+        deb_codename="bookworm",
+        extra_args="--no-cache",
+        step_key="toolchain-bookworm-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBookwormSpec,
+
       -- mina-toolchain Debian 11 "Bullseye" Toolchain
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
@@ -64,19 +76,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec,
-
-      -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
-      let toolchainFocalSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="focal",
-        extra_args="--no-cache",
-        step_key="toolchain-focal-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainFocalSpec
+      DockerImage.generateStep toolchainStretchSpec
 
     ]
   }
