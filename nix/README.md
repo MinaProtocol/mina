@@ -34,7 +34,9 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
-**warning for macOS users**: macOS updates will often break your nix installation. To prevent that, you can add the following to your `~/.bashrc` or `~/.zshrc`:
+**warning for macOS users**: macOS updates will often break your nix
+installation. To prevent that, you can add the following to your `~/.bashrc` or
+`~/.zshrc`:
 
 ```bash
 # avoid macOS updates to destroy nix
@@ -550,7 +552,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 Before running any `nix` commands.
 
-### Warning: ignoring untrusted substituter
+### `Warning: ignoring untrusted substituter`
 
 Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
@@ -561,3 +563,23 @@ trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct
 ```
 
 And then reload your `nix-daemon` service.
+
+### `gcc: Argument list too long`
+
+If you have a lot of big environment variables, especially on macOS, this might
+happen when you try to build anything inside the pure shell. It happens because
+the stack size for every process is limited, and it is shared between the
+current environment, the argument list, and some other things. Therefore, if
+your environment takes up too much space, not enough is left for the arguments.
+The way to fix the error is to unset some of the bigger enviornment variables,
+perhaps with
+
+```bash
+export XDG_DATA_DIRS= DIRENV_DIFF= <...>
+```
+
+Before running any `dune` commands.
+
+Alternatively, you can just run your commands inside `nix develop
+--ignore-environment mina`, which unsets all the outside environment variables,
+resulting in a more reproducible but less convenient environment.
