@@ -8,7 +8,7 @@ Checkout the "master" branch of the mina repository, ensure your Docker configur
 
 ```
 cat dockerfiles/stages/1-build-deps \
-    dockerfiles/stages/2-opam-deps \
+dockerfiles/stages/2-opam-deps \
     dockerfiles/stages/3-builder \
     dockerfiles/stages/4-production \
     | docker build -t mina-rosetta-ubuntu:v1.3.0 \
@@ -79,34 +79,12 @@ When `src/app/rosetta` is compiled it's also possible to run Rosetta natively,
 without using the docker image. This is more convenient in some cases, for
 instance when testing development changes to the Rosetta server.
 
-In order to work, Rosetta needs a PostgreSQL database containing an archive
-data collected from a Mina daemon. It also requires a connection to the Mina
-daemon itself in order to fetch some data directly from it.
-
-It might be convenient to set up the database inside a docker container anyway,
-for instance like so:
-
-```shell
-$ docker run -d --name pg-mina-archive \
-    -p 5432:5432 \
-    -e POSTGRES_PASSWORD='*******' \
-    -e POSTGRES_HOST_AUTH_METHOD=trust 
-    -e POSTGRES_DB=mina_archive \
-    -e POSTGRES_USER=pguser \
-    postgres:14.5
-```
-
-The `POSTGRES_HOST_AUTH_METHOD=trust` instructs the database not to require
-password for authentication. This is fine in development environments, but
-highly discouraged in production. Note that, whether you want to set auth
-method to `trust` or not, `POSTGRES_PASSWORD` is still required and must be
-set.
-
-Of course, it is also possible to set up the database natively, in which case
-the settings above should be replicated.
-
 For instructions on how to set up a daemon, see the `README-dev.md` file and
-follow instructions in there. 
+follow instructions in there. Additionally, Rosetta also relies on the archive
+to store the history of the blockchain (which the daemon does not remember for
+long due to its concise nature). See `src/app/archive/README.md` for more
+information on how to run it. Rosetta does not use the archive directly,
+though, but rather it connects to its database and queries it directly.
 
 Once this is done, the Rosetta server can be launched with the following
 command:
