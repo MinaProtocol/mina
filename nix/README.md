@@ -422,6 +422,25 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 
 ## Troubleshooting
 
+### Evaluation takes too long
+
+Evaluating any output of this flake for the first time can take a substantial
+amount of time. This is because Nix wants to ensure purity, and thus copies all
+submodules to the store and checks them out individually, even if you already
+have them checked out in your work tree.
+
+This is good for reproducibility, but can be inconvenient. Here are some steps
+you can take to circumvent this:
+
+- If you're using `direnv`, make sure to install and use `nix-direnv`. It has a
+  caching mechanism that significantly speeds up subsequent re-entries into the
+  environment. You might have to `direnv reload` manually once in a while as a
+  trade-off.
+- If you are trying to evaluate something from a clean checkout, it will take
+  longer, because Nix will try to ensure purity. You can circumvent this by
+  making the index dirty, e.g. by doing `touch foo; git add foo` . This will
+  make all Nix commands do a quick copy instead of checking everything out.
+
 ### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
 If you get an error like this:
