@@ -1579,6 +1579,12 @@ module type Valid_intf = sig
   val of_verifiable : Verifiable.t -> t Or_error.t
 
   val forget : t -> T.t
+
+  module For_tests : sig
+    val verification_keys : t -> (Account_id.t * Verification_key_hash.t) list
+
+    val replace_zkapp_command : t -> T.t -> t
+  end
 end
 
 module Valid :
@@ -1651,6 +1657,13 @@ struct
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
     Verifiable.create t ~ledger ~get ~location_of_account
     |> Or_error.bind ~f:of_verifiable
+
+  module For_tests = struct
+    let replace_zkapp_command (t : t) (zkapp_command : T.t) =
+      { t with zkapp_command }
+
+    let verification_keys (t : t) = t.verification_keys
+  end
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

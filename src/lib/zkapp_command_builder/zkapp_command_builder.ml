@@ -114,10 +114,10 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     { zkapp_command.fee_payer with authorization = fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
-  let%map account_updates_with_valid_signatures =
+  let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
       ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
-        let%map authorization_with_valid_signature =
+        let%map valid_authorization =
           match authorization with
           | Control.Signature _dummy ->
               let pk = body.public_key in
@@ -153,11 +153,9 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
           | None_given ->
               return authorization
         in
-        { Account_update.body
-        ; authorization = authorization_with_valid_signature
-        } )
+        { Account_update.body; authorization = valid_authorization } )
   in
   { zkapp_command with
     fee_payer = fee_payer_with_valid_signature
-  ; account_updates = account_updates_with_valid_signatures
+  ; account_updates = account_updates_with_valid_authorizations
   }
