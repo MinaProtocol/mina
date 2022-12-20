@@ -26,8 +26,9 @@ RUN apt-get -y update && \
     libpq-dev \
     procps \
     python3 \
+    tzdata \
     unzip \
-    tzdata && \
+    sudo && \
   rm -rf /var/lib/apt/lists/*
 
 # --- Terraform tools
