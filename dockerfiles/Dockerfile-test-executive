@@ -4,6 +4,7 @@ FROM ${image}
 ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=stretch
+ARG TERRAFORM_VERSION=0.14.11
 
 ENV DEBIAN_FRONTEND noninteractive
 
