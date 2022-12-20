@@ -20,7 +20,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = dirtyWhen,
+          dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
