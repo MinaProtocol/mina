@@ -1171,13 +1171,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
-        module Sequence_events = struct
-          type t = Zkapp_account.Sequence_events.var
+        module Actions = struct
+          type t = Zkapp_account.Actions.var
 
-          let is_empty x =
-            run_checked (Account_update.Sequence_events.is_empty_var x)
+          let is_empty x = run_checked (Account_update.Actions.is_empty_var x)
 
-          let push_events = Account_update.Sequence_events.push_events_checked
+          let push_events = Account_update.Actions.push_events_checked
         end
 
         module Zkapp_uri = struct
@@ -1933,8 +1932,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               let verification_key ({ account_update; _ } : t) =
                 account_update.data.update.verification_key
 
-              let sequence_events ({ account_update; _ } : t) =
-                account_update.data.sequence_events
+              let actions ({ account_update; _ } : t) =
+                account_update.data.actions
 
               let zkapp_uri ({ account_update; _ } : t) =
                 account_update.data.update.zkapp_uri
@@ -4280,7 +4279,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
         ; new_zkapp_account : bool
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -4341,7 +4340,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; new_zkapp_account
           ; zkapp_account_keypairs
           ; memo
-          ; sequence_events
+          ; actions
           ; events
           ; call_data
           ; preconditions
@@ -4401,7 +4400,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; balance_change
           ; increment_nonce = true
           ; events = []
-          ; sequence_events = []
+          ; actions = []
           ; call_data = Field.zero
           ; call_depth = 0
           ; preconditions = preconditions'
@@ -4461,7 +4460,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; balance_change = delta
                   ; increment_nonce = false
                   ; events
-                  ; sequence_events
+                  ; actions
                   ; call_data
                   ; call_depth = 0
                   ; preconditions =
@@ -4509,7 +4508,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; balance_change = Amount.Signed.of_unsigned amt
                 ; increment_nonce = false
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; preconditions = { preconditions' with account = Accept }
@@ -4636,7 +4635,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; sequence_events = []
+        ; actions = []
         ; events = []
         ; call_data = Tick.Field.zero
         ; preconditions
@@ -4748,7 +4747,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -4766,7 +4765,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; new_zkapp_account
           ; snapp_update = _
           ; current_auth
-          ; sequence_events
+          ; actions
           ; events
           ; call_data
           ; preconditions
@@ -4779,7 +4778,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; sequence_events
+        ; actions
         ; events
         ; call_data
         ; preconditions
@@ -4900,7 +4899,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -4917,7 +4916,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; memo
           ; new_zkapp_account
           ; snapp_update = _
-          ; sequence_events
+          ; actions
           ; events
           ; call_data
           ; preconditions
@@ -4930,7 +4929,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
-        ; sequence_events
+        ; actions
         ; events
         ; call_data
         ; preconditions
@@ -5042,7 +5041,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
             ; increment_nonce = true
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; call_data = Field.zero
             ; call_depth = 0
             ; preconditions =
@@ -5064,7 +5063,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; balance_change = Amount.Signed.(of_unsigned amount)
             ; increment_nonce = false
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; call_data = Field.zero
             ; call_depth = 0
             ; preconditions =

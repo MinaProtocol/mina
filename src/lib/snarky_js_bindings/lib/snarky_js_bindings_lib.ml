@@ -1200,7 +1200,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 

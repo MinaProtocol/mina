@@ -412,7 +412,7 @@ let get_account_update_body ~pool body_id =
            ; balance_change
            ; increment_nonce
            ; events_id
-           ; sequence_events_id
+           ; actions_id
            ; call_data_id
            ; call_depth
            ; zkapp_network_precondition_id
@@ -440,7 +440,7 @@ let get_account_update_body ~pool body_id =
     Currency.Amount.Signed.create ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
-  let%bind sequence_events = load_events pool sequence_events_id in
+  let%bind actions = load_events pool actions_id in
   let%bind call_data =
     let%map field_str =
       query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
@@ -597,7 +597,7 @@ let get_account_update_body ~pool body_id =
       ; balance_change
       ; increment_nonce
       ; events
-      ; sequence_events
+      ; actions
       ; call_data
       ; call_depth
       ; preconditions =

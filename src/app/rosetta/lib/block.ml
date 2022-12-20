@@ -491,7 +491,7 @@ WITH RECURSIVE chain AS (
         FROM internal_commands i
         INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
         INNER JOIN account_identifiers ai on ai.id = i.receiver_id
-        INNER JOIN accounts_created ac on ac.account_identifier_id = ai.id
+        LEFT JOIN accounts_created ac on ac.account_identifier_id = ai.id
         INNER JOIN public_keys pk ON pk.id = ai.public_key_id
         WHERE bic.block_id = ?
       |}
