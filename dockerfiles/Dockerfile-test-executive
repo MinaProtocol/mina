@@ -25,6 +25,7 @@ RUN apt-get -y update && \
     libpq-dev \
     procps \
     python3 \
+    unzip \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 
