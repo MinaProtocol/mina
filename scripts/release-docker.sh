@@ -132,7 +132,7 @@ tag-and-push() {
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
   docker push "${TAG}"
-  tag-and-push "${DOCKER_REGISTRY}/${SERVICE}:$GITHASH-${DEB_CODENAME##*=}-${NETWORK##*=}"
+  tag-and-push "${HASHTAG}"
   if [ "${DEB_RELEASE##*=}" -eq 'stable' ]; then
     tag-and-push "minaprotocol/${SERVICE}:${VERSION}"
   fi
