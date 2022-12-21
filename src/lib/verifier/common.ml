@@ -9,6 +9,8 @@ type invalid =
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Unexpected_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Mismatched_authorization_kind of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
 [@@deriving bin_io_unversioned, to_yojson]
 
@@ -27,6 +29,8 @@ let invalid_to_string (invalid : invalid) =
       sprintf "Missing_verification_key: [%s]" (keys_to_string keys)
   | `Unexpected_verification_key keys ->
       sprintf "Unexpected_verification_key: [%s]" (keys_to_string keys)
+  | `Mismatched_authorization_kind keys ->
+      sprintf "Mismatched_authorization_kind: [%s]" (keys_to_string keys)
   | `Invalid_proof ->
       "Invalid_proof"
 
@@ -89,13 +93,13 @@ let check :
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
                 in
-                match p.authorization with
-                | Signature s ->
+                match (p.authorization, p.body.authorization_kind) with
+                | Signature s, Signature ->
                     check_signature s p.body.public_key commitment ;
                     None
-                | None_given ->
+                | None_given, None_given ->
                     None
-                | Proof pi -> (
+                | Proof pi, Proof vk_hash -> (
                     match vk_opt with
                     | None ->
                         return
@@ -103,26 +107,26 @@ let check :
                             [ Account_id.public_key
                               @@ Account_update.account_id p
                             ] )
-                    | Some (vk : _ With_hash.t) -> (
-                        match p.body.authorization_kind with
-                        | Proof vk_hash ->
-                            if
-                              (* check that vk expected for proof is the one being used *)
-                              Snark_params.Tick.Field.equal vk_hash
-                                (With_hash.hash vk)
-                            then Some (vk.data, stmt, pi)
-                            else
-                              return
-                                (`Unexpected_verification_key
-                                  [ Account_id.public_key
-                                    @@ Account_update.account_id p
-                                  ] )
-                        | _ ->
-                            (* TODO: can this happen? *)
-                            failwith "Expected Proof authorization kind" ) ) )
+                    | Some (vk : _ With_hash.t) ->
+                        if
+                          (* check that vk expected for proof is the one being used *)
+                          Snark_params.Tick.Field.equal vk_hash
+                            (With_hash.hash vk)
+                        then Some (vk.data, stmt, pi)
+                        else
+                          return
+                            (`Unexpected_verification_key
+                              [ Account_id.public_key
+                                @@ Account_update.account_id p
+                              ] ) )
+                | _ ->
+                    return
+                      (`Mismatched_authorization_kind
+                        [ Account_id.public_key @@ Account_update.account_id p ]
+                        ) )
           in
           let v : User_command.Valid.t =
-            (*Verification keys should be present if it reaches here*)
+            (* Verification keys should be present if it reaches here *)
             let zkapp_command =
               Or_error.ok_exn
                 (Zkapp_command.Valid.of_verifiable zkapp_command_with_vk)

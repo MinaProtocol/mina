@@ -1041,7 +1041,8 @@ module T = struct
           | `Invalid_signature _
           | `Invalid_proof
           | `Missing_verification_key _
-          | `Unexpected_verification_key _ ) as invalid ->
+          | `Unexpected_verification_key _
+          | `Mismatched_authorization_kind _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string
@@ -3831,7 +3832,7 @@ let%test_module "staged ledger tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in

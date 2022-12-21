@@ -1880,7 +1880,7 @@ let%test_module _ =
         ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions =
             Some
               { Account_update.Preconditions.network =
@@ -1944,7 +1944,8 @@ let%test_module _ =
       in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
-        if n < num_cmds then
+        if n >= num_cmds then Quickcheck.Generator.return @@ List.rev cmds
+        else
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (zkapp_command : Zkapp_command.t) =
@@ -1983,23 +1984,84 @@ let%test_module _ =
                       } )
               }
             in
-            let zkapp_command =
+            let valid_zkapp_command =
               Or_error.ok_exn
                 (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
                    ~get:Mina_ledger.Ledger.get
                    ~location_of_account:Mina_ledger.Ledger.location_of_account
                    zkapp_command )
             in
-            User_command.Zkapp_command zkapp_command
+            let valid_zkapp_command_valid_vk_hashes =
+              Zkapp_command.Valid.For_tests.replace_zkapp_command
+                valid_zkapp_command
+                { (Zkapp_command.Valid.forget valid_zkapp_command) with
+                  account_updates =
+                    Zkapp_command.Call_forest.map zkapp_command.account_updates
+                      ~f:(fun (p : Account_update.t) ->
+                        { p with
+                          body =
+                            { p.body with
+                              authorization_kind =
+                                (* replace dummy vk hashes *)
+                                ( match p.body.authorization_kind with
+                                | Proof _vk_hash ->
+                                    let account_id =
+                                      Account_id.create p.body.public_key
+                                        p.body.token_id
+                                    in
+                                    let account =
+                                      match
+                                        Mina_ledger.Ledger.location_of_account
+                                          best_tip_ledger account_id
+                                      with
+                                      | Some loc -> (
+                                          match
+                                            Mina_ledger.Ledger.get
+                                              best_tip_ledger loc
+                                          with
+                                          | Some acct ->
+                                              acct
+                                          | None ->
+                                              failwith
+                                                "Expected to find account in \
+                                                 ledger" )
+                                      | None ->
+                                          failwith
+                                            "Expected to find local for \
+                                             account id in ledger"
+                                    in
+                                    let vk_hash =
+                                      match account.zkapp with
+                                      | Some zkapp -> (
+                                          match zkapp.verification_key with
+                                          | Some vk ->
+                                              With_hash.hash vk
+                                          | None ->
+                                              failwith
+                                                "Expected to find verification \
+                                                 key for Proof authorization \
+                                                 kind" )
+                                      | None ->
+                                          failwith
+                                            "Expected to find zkApp account \
+                                             for Proof authorization kind"
+                                    in
+                                    Proof vk_hash
+                                | ak ->
+                                    ak )
+                            }
+                        } )
+                }
+            in
+            User_command.Zkapp_command valid_zkapp_command_valid_vk_hashes
           in
           go (n + 1) (cmd :: cmds)
-        else Quickcheck.Generator.return @@ List.rev cmds
       in
-      let result =
+      let valid_zkapp_commands =
         Quickcheck.random_value ~seed:(`Deterministic "zkapp_command") (go 0 [])
       in
       replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
-        result
+        valid_zkapp_commands
 
     type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
     [@@deriving sexp, compare]
