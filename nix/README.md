@@ -34,7 +34,9 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
-**warning for macOS users**: macOS updates will often break your nix installation. To prevent that, you can add the following to your `~/.bashrc` or `~/.zshrc`:
+**warning for macOS users**: macOS updates will often break your nix
+installation. To prevent that, you can add the following to your `~/.bashrc` or
+`~/.zshrc`:
 
 ```bash
 # avoid macOS updates to destroy nix
@@ -420,6 +422,25 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 
 ## Troubleshooting
 
+### Evaluation takes too long
+
+Evaluating any output of this flake for the first time can take a substantial
+amount of time. This is because Nix wants to ensure purity, and thus copies all
+submodules to the store and checks them out individually, even if you already
+have them checked out in your work tree.
+
+This is good for reproducibility, but can be inconvenient. Here are some steps
+you can take to circumvent this:
+
+- If you're using `direnv`, make sure to install and use `nix-direnv`. It has a
+  caching mechanism that significantly speeds up subsequent re-entries into the
+  environment. You might have to `direnv reload` manually once in a while as a
+  trade-off.
+- If you are trying to evaluate something from a clean checkout, it will take
+  longer, because Nix will try to ensure purity. You can circumvent this by
+  making the index dirty, e.g. by doing `touch foo; git add foo` . This will
+  make all Nix commands do a quick copy instead of checking everything out.
+
 ### `Error: File unavailable:`, `Undefined symbols for architecture ...:`, `Compiler version mismatch`, missing dependency libraries, or incorrect dependency library versions
 
 If you get an error like this:
@@ -550,7 +571,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 Before running any `nix` commands.
 
-### Warning: ignoring untrusted substituter
+### `Warning: ignoring untrusted substituter`
 
 Update your `/etc/nix/nix.conf` with the following content (concatenating new
 values with possibly already existing):
@@ -561,3 +582,23 @@ trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct
 ```
 
 And then reload your `nix-daemon` service.
+
+### `gcc: Argument list too long`
+
+If you have a lot of big environment variables, especially on macOS, this might
+happen when you try to build anything inside the pure shell. It happens because
+the stack size for every process is limited, and it is shared between the
+current environment, the argument list, and some other things. Therefore, if
+your environment takes up too much space, not enough is left for the arguments.
+The way to fix the error is to unset some of the bigger enviornment variables,
+perhaps with
+
+```bash
+export XDG_DATA_DIRS= DIRENV_DIFF= <...>
+```
+
+Before running any `dune` commands.
+
+Alternatively, you can just run your commands inside `nix develop
+--ignore-environment mina`, which unsets all the outside environment variables,
+resulting in a more reproducible but less convenient environment.
