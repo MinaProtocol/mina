@@ -685,7 +685,8 @@ struct
         let (T max_n) = Nat.of_int max in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
         let log2_sizes =
-          (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
+          ( O.of_index log2_size ~length:(S max_n)
+          , Vector.init (S max_n) ~f:Fn.id )
         in
         let shifts = Pseudo.Domain.shifts log2_sizes ~shifts in
         let generator = Pseudo.Domain.generator log2_sizes ~domain_generator in
