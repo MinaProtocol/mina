@@ -73,7 +73,7 @@ let%test_module "Transaction union tests" =
               ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
-              ~pending_coinbase_stack_state
+              ~pending_coinbase_stack_state ~zkapp_updates_applied:false
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
 
@@ -121,11 +121,16 @@ let%test_module "Transaction union tests" =
               [ producer_id; receiver_id; other_id ]
           in
           let sparse_ledger_after, applied_transaction =
-            Sparse_ledger.apply_transaction
-              ~constraint_constants:U.constraint_constants sparse_ledger
-              ~txn_state_view:
-                (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
-              txn_in_block.transaction
+            Result.( >>= )
+              (Sparse_ledger.apply_transaction_phase_1
+                 ~constraint_constants:U.constraint_constants sparse_ledger
+                 ~txn_state_view:
+                   ( txn_in_block.block_data
+                   |> Mina_state.Protocol_state.Body.view )
+                 txn_in_block.transaction )
+              (fun (sparse_ledger, partially_applied) ->
+                Sparse_ledger.apply_transaction_phase_2 sparse_ledger
+                  partially_applied )
             |> Or_error.ok_exn
           in
           let supply_increase =
@@ -212,7 +217,7 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_signed_command ~constraint_constants
+              Transaction_snark.check_user_command ~constraint_constants
                 ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
