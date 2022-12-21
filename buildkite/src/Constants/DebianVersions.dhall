@@ -76,8 +76,8 @@ let minimalDirtyWhen = [
   S.exactly "buildkite/src/Command/MinaArtifact" "sh",
   S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
   S.strictlyStart (S.contains "dockerfiles/stages"),
-  S.exactly "scripts/rebuild-deb" "sh,
-  S.exactly "scripts/release-docker" "sh,
+  S.exactly "scripts/rebuild-deb" "sh",
+  S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh"
 ]
 
