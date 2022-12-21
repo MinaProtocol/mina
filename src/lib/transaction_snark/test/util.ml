@@ -121,10 +121,6 @@ let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_zkapp_command_with_merges_exn ?expected_failure:_
-    ?ignore_outside_snark:_ ?state_body:_ _ _ =
-  failwith "TODO"
-(*
 let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
     ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
@@ -166,10 +162,12 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    ; new_accounts = []
                    } )
             else
-              ( Ledger.apply_transaction ~constraint_constants
-                  ~txn_state_view:state_view ledger
-                  (Mina_transaction.Transaction.Command
-                     (Zkapp_command zkapp_command) )
+              ( Result.( >>= )
+                  (Ledger.apply_transaction_phase_1 ~constraint_constants
+                     ~txn_state_view:state_view ledger
+                     (Mina_transaction.Transaction.Command
+                        (Zkapp_command zkapp_command) ) )
+                  (Ledger.apply_transaction_phase_2 ledger)
               |> Or_error.ok_exn )
                 .varying
           in
@@ -253,7 +251,6 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                       else Async.Deferred.unit ) )
           | _ ->
               failwith "zkapp_command expected" ) )
-*)
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in

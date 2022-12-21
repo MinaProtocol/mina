@@ -1813,15 +1813,16 @@ module Make (L : Ledger_intf.S) :
     (sequence_state', last_sequence_slot')
 
   (* apply zkapp command fee payer's while stubbing out the second pass ledger *)
-  let apply_zkapp_command_phase_1 ~constraint_constants
+  let apply_zkapp_command_phase_1_aux (type user_acc) ~constraint_constants
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
       ?((* TODO: is the right? is it never used for zkapps? *)
         supply_increase = Amount.Signed.zero) (ledger : L.t)
-      (command : Zkapp_command.t) :
-      Transaction_partially_applied.Zkapp_command_partially_applied.t Or_error.t
-      =
+      (command : Zkapp_command.t) ~(init : user_acc) ~f :
+      ( Transaction_partially_applied.Zkapp_command_partially_applied.t
+      * user_acc )
+      Or_error.t =
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
     let original_account_states =
@@ -1860,6 +1861,7 @@ module Make (L : Ledger_intf.S) :
         ; failure_status_tbl = []
         } )
     in
+    let user_acc = f init initial_state in
     let account_updates = Zkapp_command.all_account_updates command in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
@@ -1869,14 +1871,32 @@ module Make (L : Ledger_intf.S) :
             }
             { perform } initial_state )
     in
-    { Transaction_partially_applied.Zkapp_command_partially_applied.command
-    ; previous_hash
-    ; original_account_states
-    ; constraint_constants
-    ; state_view
-    ; global_state
-    ; local_state
-    }
+    ( { Transaction_partially_applied.Zkapp_command_partially_applied.command
+      ; previous_hash
+      ; original_account_states
+      ; constraint_constants
+      ; state_view
+      ; global_state
+      ; local_state
+      }
+    , user_acc )
+
+  let apply_zkapp_command_phase_1 ~constraint_constants
+      ~(state_view : Zkapp_precondition.Protocol_state.View.t)
+      ?((* TODO: can this be ripped out from here? *)
+        fee_excess = Amount.Signed.zero)
+      ?((* TODO: is the right? is it never used for zkapps? *)
+        supply_increase = Amount.Signed.zero) (ledger : L.t)
+      (command : Zkapp_command.t) :
+      Transaction_partially_applied.Zkapp_command_partially_applied.t Or_error.t
+      =
+    let open Or_error.Let_syntax in
+    let%map partial_stmt, _user_acc =
+      apply_zkapp_command_phase_1_aux ~constraint_constants ~state_view
+        ~fee_excess ~supply_increase ledger command ~init:None
+        ~f:(fun _acc state -> Some state)
+    in
+    partial_stmt
 
   let apply_zkapp_command_phase_2_aux (type user_acc) ~(init : user_acc) ~f
       ledger
@@ -1890,6 +1910,10 @@ module Make (L : Ledger_intf.S) :
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
         (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
+      printf
+        !"Global state fee excess: %{sexp:Amount.Signed.t} \n\
+         \ local state excess: %{sexp: Amount.Signed.t}\n"
+        g_state.fee_excess l_state.excess ;
       if List.is_empty l_state.stack_frame.Stack_frame.calls then
         Ok (user_acc, l_state.failure_status_tbl)
       else
@@ -1996,9 +2020,10 @@ module Make (L : Ledger_intf.S) :
   let apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ~init
       ~f ?fee_excess ?supply_increase ledger command =
     let open Or_error.Let_syntax in
-    apply_zkapp_command_phase_1 ~constraint_constants ~state_view ?fee_excess
-      ?supply_increase ledger command
-    >>= apply_zkapp_command_phase_2_aux ~init ~f ledger
+    apply_zkapp_command_phase_1_aux ~constraint_constants ~state_view
+      ?fee_excess ?supply_increase ledger command ~init ~f
+    >>= fun (partial_stmt, user_acc) ->
+    apply_zkapp_command_phase_2_aux ~init:user_acc ~f ledger partial_stmt
 
   let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger
       command =
