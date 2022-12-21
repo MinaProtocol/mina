@@ -105,7 +105,7 @@ RUN git clone https://github.com/facebook/rocksdb \
   -b "${ROCKSDB_VERSION}" /tmp/rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
     && CXXFLAGS='' make -C /tmp/rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-    || CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' \
+    || CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' \
        make -C /tmp/rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && strip -S /tmp/rocksdb/librocksdb.a \
   && sudo cp /tmp/rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
