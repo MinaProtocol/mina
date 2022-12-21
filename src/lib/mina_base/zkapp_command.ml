@@ -1338,19 +1338,31 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
       Error err
 
 module Verifiable : sig
+  module Zkapp_command_with_vks : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = private
+          { fee_payer : Account_update.Fee_payer.Stable.V1.t
+          ; account_updates :
+              ( Side_loaded_verification_key.Stable.V2.t
+              , Zkapp_basic.F.Stable.V1.t )
+              With_hash.Stable.V1.t
+              option
+              Call_forest.With_hashes_and_data.Stable.V1.t
+          ; memo : Signed_command_memo.Stable.V1.t
+          }
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        val to_latest : t -> t
+      end
+    end]
+  end
+
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = private
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Side_loaded_verification_key.Stable.V2.t
-            , Zkapp_basic.F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            option
-            Call_forest.With_hashes_and_data.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
+      type t = Zkapp_command_with_vks.Stable.V1.t With_status.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       val to_latest : t -> t
@@ -1358,25 +1370,39 @@ module Verifiable : sig
   end]
 
   val create :
-       T.t
+       T.t With_status.t
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
     -> t Or_error.t
+
+  val fee_payer : t -> Account_update.Fee_payer.t
 end = struct
+  module Zkapp_command_with_vks = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { fee_payer : Account_update.Fee_payer.Stable.V1.t
+          ; account_updates :
+              ( Side_loaded_verification_key.Stable.V2.t
+              , Zkapp_basic.F.Stable.V1.t )
+              With_hash.Stable.V1.t
+              option
+              Call_forest.With_hashes_and_data.Stable.V1.t
+          ; memo : Signed_command_memo.Stable.V1.t
+          }
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Side_loaded_verification_key.Stable.V2.t
-            , Zkapp_basic.F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            option
-            Call_forest.With_hashes_and_data.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
+      type t = Zkapp_command_with_vks.Stable.V1.t With_status.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -1391,8 +1417,9 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
-      ~location_of_account : t Or_error.t =
+  let create
+      ({ With_status.data = { fee_payer; account_updates; memo }; status } :
+        T.t With_status.t ) ~ledger ~get ~location_of_account : t Or_error.t =
     With_return.with_return (fun { return } ->
         let find_vk account_id =
           match
@@ -1419,9 +1446,17 @@ end = struct
           *)
           ref Account_id.Map.empty
         in
+        let verify_proofs = match status with Applied -> true | _ -> false in
         let account_updates =
           Call_forest.map account_updates ~f:(fun p ->
               let account_id = Account_update.account_id p in
+              let () =
+                match check_authorization p with
+                | Ok () ->
+                    ()
+                | Error _ as err ->
+                    return err
+              in
               let vks_overriden' =
                 match Account_update.verification_key_update_to_option p with
                 | Zkapp_basic.Set_or_keep.Set vk_next ->
@@ -1430,14 +1465,9 @@ end = struct
                 | Zkapp_basic.Set_or_keep.Keep ->
                     !vks_overridden
               in
-              let () =
-                match check_authorization p with
-                | Ok () ->
-                    ()
-                | Error _ as err ->
-                    return err
-              in
-              if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
+              if
+                Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
+                && verify_proofs
               then (
                 let prioritized_vk =
                   (* only lookup _past_ vk setting, ie exclude the new one we
@@ -1470,13 +1500,19 @@ end = struct
                 vks_overridden := vks_overriden' ;
                 (p, None) ) )
         in
-        Ok { fee_payer; account_updates; memo } )
+        Ok
+          { With_status.data =
+              { Zkapp_command_with_vks.fee_payer; account_updates; memo }
+          ; status
+          } )
+
+  let fee_payer (t : t) = t.data.fee_payer
 end
 
 let of_verifiable (t : Verifiable.t) : t =
-  { fee_payer = t.fee_payer
-  ; account_updates = Call_forest.map t.account_updates ~f:fst
-  ; memo = t.memo
+  { fee_payer = t.With_status.data.fee_payer
+  ; account_updates = Call_forest.map t.data.account_updates ~f:fst
+  ; memo = t.data.memo
   }
 
 module Transaction_commitment = struct
@@ -1617,7 +1653,7 @@ struct
     let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.account_updates ~init:(Ok ())
+      Call_forest.fold t.data.account_updates ~init:(Ok ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
@@ -1646,7 +1682,9 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t ~ledger ~get ~location_of_account
+    Verifiable.create
+      { With_status.data = t; status = Transaction_status.Applied }
+      ~ledger ~get ~location_of_account
     |> Or_error.bind ~f:of_verifiable
 end
 
@@ -1739,12 +1777,13 @@ end) : sig
       ; spec : Input.spec
       ; state_before : state
       ; state_after : state
+      ; zkapp_updates_applied : bool
       }
   end
 
   val group_by_zkapp_command_rev :
        t list
-    -> (Input.global_state * Input.local_state) list list
+    -> (Input.global_state * Input.local_state * bool) list list
     -> Zkapp_command_intermediate_state.t list
 end = struct
   open Input
@@ -1757,6 +1796,7 @@ end = struct
       ; spec : spec
       ; state_before : state
       ; state_after : state
+      ; zkapp_updates_applied : bool
       }
   end
 
@@ -1782,15 +1822,20 @@ end = struct
       pair.
   *)
   let group_by_zkapp_command_rev (zkapp_commands : t list)
-      (stmtss : (global_state * local_state) list list) :
+      (stmtss : (global_state * local_state * bool) list list) :
       Zkapp_command_intermediate_state.t list =
-    let intermediate_state ~kind ~spec ~before ~after =
+    let intermediate_state ~fee_payer ~kind ~spec
+        ~before:(global_before, local_before, _)
+        ~after:(global_after, local_after, zkapp_updates_applied) =
       { Zkapp_command_intermediate_state.kind
       ; spec
-      ; state_before = { global = fst before; local = snd before }
-      ; state_after = { global = fst after; local = snd after }
+      ; state_before = { global = global_before; local = local_before }
+      ; state_after = { global = global_after; local = local_after }
+      ; zkapp_updates_applied =
+          (if fee_payer then true else zkapp_updates_applied)
       }
     in
+    let is_fee_payer = function `Fee_payer -> true | _ -> false in
     let zkapp_account_updatess =
       []
       :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
@@ -1811,22 +1856,23 @@ end = struct
       | ([] | [ [] ]), [ _ ] ->
           (* We've associated statements with all given zkapp_command. *)
           acc
-      | [ [ (_, { authorization = a1; _ }) ] ], [ [ before; after ] ] ->
+      | [ [ (update_type, { authorization = a1; _ }) ] ], [ [ before; after ] ]
+        ->
           (* There are no later zkapp_command to pair this one with. Prove it on its
              own.
           *)
           intermediate_state ~kind:`Same
             ~spec:(zkapp_segment_of_controls [ a1 ])
-            ~before ~after
+            ~before ~after ~fee_payer:(is_fee_payer update_type)
           :: acc
-      | [ []; [ (_, { authorization = a1; _ }) ] ], [ [ _ ]; [ before; after ] ]
-        ->
+      | ( [ []; [ (update_type, { authorization = a1; _ }) ] ]
+        , [ [ _ ]; [ before; after ] ] ) ->
           (* This account_update is part of a new transaction, and there are no later
              zkapp_command to pair it with. Prove it on its own.
           *)
           intermediate_state ~kind:`New
             ~spec:(zkapp_segment_of_controls [ a1 ])
-            ~before ~after
+            ~before ~after ~fee_payer:(is_fee_payer update_type)
           :: acc
       | ( ((`Fee_payer, { authorization = a1; _ }) :: zkapp_command)
           :: zkapp_commands
@@ -1837,7 +1883,7 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:true
             :: acc )
       | ( []
           :: ((`Fee_payer, { authorization = a1; _ }) :: zkapp_command)
@@ -1850,7 +1896,7 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:true
             :: acc )
       | ( ((_, { authorization = a1; _ }) :: ([] as zkapp_command))
           :: (((`Fee_payer, _) :: _) :: _ as zkapp_commands)
@@ -1863,9 +1909,23 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:true
             :: acc )
-      | ( ((_, { authorization = Proof _ as a1; _ }) :: zkapp_command)
+      | ( []
+          :: [ (`Zkapp_update, { authorization = a1; _ }) ]
+             :: ((`Fee_payer, { authorization = a2; _ }) :: _ as zkapp_command)
+                :: zkapp_commands
+        , [ _ ] :: (before :: (after :: _ as stmts)) :: (_ :: _ as stmtss) ) ->
+          (* The next two updates are in new transactions, the first is a zkapp update, and the second is a fee payer, don't pair them.
+            *)
+          group_by_zkapp_command_rev
+            ([] :: zkapp_command :: zkapp_commands)
+            (stmts :: stmtss)
+            ( intermediate_state ~kind:`New
+                ~spec:(zkapp_segment_of_controls [ a1 ])
+                ~before ~after ~fee_payer:false
+            :: acc )
+      | ( ((update_type, { authorization = Proof _ as a1; _ }) :: zkapp_command)
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update contains a proof, don't pair it with other account updates. *)
@@ -1874,10 +1934,11 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
       | ( []
-          :: ((_, { authorization = Proof _ as a1; _ }) :: zkapp_command)
+          :: ((update_type, { authorization = Proof _ as a1; _ })
+             :: zkapp_command )
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
@@ -1888,9 +1949,9 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
-      | ( ((_, { authorization = a1; _ })
+      | ( ((update_type, { authorization = a1; _ })
           :: ((_, { authorization = Proof _; _ }) :: _ as zkapp_command) )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1900,9 +1961,9 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
-      | ( ((_, { authorization = a1; _ }) :: ([] as zkapp_command))
+      | ( ((update_type, { authorization = a1; _ }) :: ([] as zkapp_command))
           :: (((_, { authorization = Proof _; _ }) :: _) :: _ as zkapp_commands)
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next account_update is in the next transaction and contains a proof,
@@ -1913,9 +1974,9 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
-      | ( ((_, { authorization = (Signature _ | None_given) as a1; _ })
+      | ( ((update_type, { authorization = (Signature _ | None_given) as a1; _ })
           :: (_, { authorization = (Signature _ | None_given) as a2; _ })
              :: zkapp_command )
           :: zkapp_commands
@@ -1930,10 +1991,10 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Same
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
       | ( []
-          :: ((_, { authorization = a1; _ })
+          :: ((update_type, { authorization = a1; _ })
              :: ((_, { authorization = Proof _; _ }) :: _ as zkapp_command) )
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1945,10 +2006,11 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:(is_fee_payer update_type)
             :: acc )
       | ( []
-          :: ((_, { authorization = (Signature _ | None_given) as a1; _ })
+          :: (( `Zkapp_update
+              , { authorization = (Signature _ | None_given) as a1; _ } )
              :: (_, { authorization = (Signature _ | None_given) as a2; _ })
                 :: zkapp_command )
              :: zkapp_commands
@@ -1963,10 +2025,13 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
-                ~before ~after
+                ~before ~after ~fee_payer:false
             :: acc )
-      | ( [ (_, { authorization = (Signature _ | None_given) as a1; _ }) ]
-          :: ((_, { authorization = (Signature _ | None_given) as a2; _ })
+      | ( [ ( `Zkapp_update
+            , { authorization = (Signature _ | None_given) as a1; _ } )
+          ]
+          :: (( `Zkapp_update
+              , { authorization = (Signature _ | None_given) as a2; _ } )
              :: zkapp_command )
              :: zkapp_commands
         , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
@@ -1981,26 +2046,27 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
-                ~before ~after
+                ~before ~after ~fee_payer:false
             :: acc )
       | ( []
-          :: ((_, { authorization = a1; _ }) :: zkapp_command)
-             :: ( ((_, { authorization = Proof _; _ }) :: _) :: _ as
+          :: [ (`Zkapp_update, { authorization = a1; _ }) ]
+             :: ( ((`Zkapp_update, { authorization = Proof _; _ }) :: _) :: _ as
                 zkapp_commands )
         , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
           (* The next transaction contains a proof, and this account_update is in a new
              transaction, don't pair it with the next account_update.
           *)
-          group_by_zkapp_command_rev
-            (zkapp_command :: zkapp_commands)
-            (stmts :: stmtss)
+          group_by_zkapp_command_rev ([] :: zkapp_commands) (stmts :: stmtss)
             ( intermediate_state ~kind:`New
                 ~spec:(zkapp_segment_of_controls [ a1 ])
-                ~before ~after
+                ~before ~after ~fee_payer:false
             :: acc )
       | ( []
-          :: [ (_, { authorization = (Signature _ | None_given) as a1; _ }) ]
-             :: ((_, { authorization = (Signature _ | None_given) as a2; _ })
+          :: [ ( `Zkapp_update
+               , { authorization = (Signature _ | None_given) as a1; _ } )
+             ]
+             :: (( `Zkapp_update
+                 , { authorization = (Signature _ | None_given) as a2; _ } )
                 :: zkapp_command )
                 :: zkapp_commands
         , [ _ ]
@@ -2017,22 +2083,23 @@ end = struct
             (stmts :: stmtss)
             ( intermediate_state ~kind:`Two_new
                 ~spec:(zkapp_segment_of_controls [ a1; a2 ])
-                ~before ~after
+                ~before ~after ~fee_payer:false
             :: acc )
-      | [ [ (_, { authorization = a1; _ }) ] ], (before :: after :: _) :: _ ->
+      | ( [ [ (update_type, { authorization = a1; _ }) ] ]
+        , (before :: after :: _) :: _ ) ->
           (* This account_update is the final account_update given. Prove it on its own. *)
           intermediate_state ~kind:`Same
             ~spec:(zkapp_segment_of_controls [ a1 ])
-            ~before ~after
+            ~before ~after ~fee_payer:(is_fee_payer update_type)
           :: acc
-      | ( [] :: [ (_, { authorization = a1; _ }) ] :: [] :: _
+      | ( [] :: [ (update_type, { authorization = a1; _ }) ] :: [] :: _
         , [ _ ] :: (before :: after :: _) :: _ ) ->
           (* This account_update is the final account_update given, in a new transaction. Prove it
              on its own.
           *)
           intermediate_state ~kind:`New
             ~spec:(zkapp_segment_of_controls [ a1 ])
-            ~before ~after
+            ~before ~after ~fee_payer:(is_fee_payer update_type)
           :: acc
       | _, [] ->
           failwith "group_by_zkapp_command_rev: No statements remaining"
@@ -2137,8 +2204,9 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   in
   let groups =
     Update_group.group_by_zkapp_command_rev [ t ]
-      ( [ ((), ()) ]
-      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
+      ( [ ((), (), true) ]
+      :: [ ((), (), true) :: List.map all_updates ~f:(fun _ -> ((), (), true)) ]
+      )
   in
   let proof_segments, signed_singles, signed_pairs =
     List.fold ~init:(0, 0, 0) groups

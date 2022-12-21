@@ -9,7 +9,8 @@ module Types = struct
              , 'pending_coinbase
              , 'fee_excess
              , 'sok_digest
-             , 'local_state )
+             , 'local_state
+             , 'bool )
              t =
           { source :
               ( 'ledger_hash
@@ -25,6 +26,7 @@ module Types = struct
           ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
           ; fee_excess : 'fee_excess
+          ; zkapp_updates_applied : 'bool
           ; sok_digest : 'sok_digest
           }
       end
@@ -37,7 +39,8 @@ module Types = struct
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V1.t
         , unit
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V1.t
+        , bool )
         Poly.V2.t
     end
 
@@ -49,7 +52,8 @@ module Types = struct
           , Mina_base.Pending_coinbase.Stack_versioned.V1.t
           , Mina_base.Fee_excess.V1.t
           , Mina_base.Sok_message.Digest.V1.t
-          , Mina_state_local_state.V1.t )
+          , Mina_state_local_state.V1.t
+          , bool )
           Poly.V2.t
       end
     end
@@ -64,7 +68,8 @@ module type Concrete = sig
            , 'pending_coinbase
            , 'fee_excess
            , 'sok_digest
-           , 'local_state )
+           , 'local_state
+           , 'bool )
            t =
         { source :
             ( 'ledger_hash
@@ -80,6 +85,7 @@ module type Concrete = sig
         ; connecting_ledger_right : 'ledger_hash
         ; supply_increase : 'amount
         ; fee_excess : 'fee_excess
+        ; zkapp_updates_applied : 'bool
         ; sok_digest : 'sok_digest
         }
     end
@@ -92,7 +98,8 @@ module type Concrete = sig
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V1.t
       , unit
-      , Mina_state_local_state.V1.t )
+      , Mina_state_local_state.V1.t
+      , bool )
       Poly.V2.t
   end
 
@@ -104,7 +111,8 @@ module type Concrete = sig
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V1.t
         , Mina_base.Sok_message.Digest.V1.t
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V1.t
+        , bool )
         Poly.V2.t
     end
   end
@@ -118,7 +126,8 @@ module M = struct
            , 'pending_coinbase
            , 'fee_excess
            , 'sok_digest
-           , 'local_state )
+           , 'local_state
+           , 'bool )
            t =
         { source :
             ( 'ledger_hash
@@ -134,6 +143,7 @@ module M = struct
         ; connecting_ledger_right : 'ledger_hash
         ; supply_increase : 'amount
         ; fee_excess : 'fee_excess
+        ; zkapp_updates_applied : 'bool
         ; sok_digest : 'sok_digest
         }
     end
@@ -146,7 +156,8 @@ module M = struct
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V1.t
       , unit
-      , Mina_state_local_state.V1.t )
+      , Mina_state_local_state.V1.t
+      , bool )
       Poly.V2.t
   end
 
@@ -158,7 +169,8 @@ module M = struct
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V1.t
         , Mina_base.Sok_message.Digest.V1.t
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V1.t
+        , bool )
         Poly.V2.t
     end
   end
