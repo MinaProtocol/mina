@@ -49,7 +49,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchainBuster
                   [ "CI=true"
-                  , "BASE_BRANCH_NAME=if \$BUILDKITE_PULL_REQUEST_BASE_BRANCH = \"\" then \$BASE_BRANCH_NAME else \$BUILDKITE_PULL_REQUEST_BASE_BRANCH fi"
+                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_types.sh"
             , label = "Fast lint steps; versions compatibility changes"
@@ -62,7 +62,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchainBuster
                   [ "CI=true"
-                  , "BASE_BRANCH_NAME=if \$BUILDKITE_PULL_REQUEST_BASE_BRANCH = \"\" then \$BASE_BRANCH_NAME else \$BUILDKITE_PULL_REQUEST_BASE_BRANCH fi"
+                  , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_binables.sh"
             , label = "Fast lint steps; binable compatibility changes"
