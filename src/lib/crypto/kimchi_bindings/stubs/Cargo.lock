@@ -507,7 +507,7 @@ dependencies = [
  "rand",
  "rand_core",
  "rayon",
- "rmp-serde 1.1.1",
+ "rmp-serde",
  "serde",
  "serde_with",
  "strum",
@@ -594,6 +594,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand",
  "serde",
 ]
 
@@ -714,9 +715,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml-gen"
-version = "0.1.0"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42eba625f5b0349ce7ebd5a93d9a9d46313501f84c58994f1d45df06e4b10611"
+checksum = "28dd9d697b36ebaab7c810ae59d8c6e522f431136b22b86fed46a79baae8003e"
 dependencies = [
  "const-random",
  "ocaml",
@@ -877,17 +878,6 @@ dependencies = [
  "byteorder",
  "num-traits",
  "paste",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "0.15.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
 ]
 
 [[package]]
@@ -1171,7 +1161,7 @@ dependencies = [
  "paste",
  "rand",
  "rayon",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "sprs",
 ]

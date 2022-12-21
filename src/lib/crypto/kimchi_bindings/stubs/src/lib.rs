@@ -53,6 +53,9 @@ pub mod pasta_fq_poseidon;
 /// Linearization helpers
 pub mod linearization;
 
+/// snarky
+pub mod snarky_constraint_system;
+
 /// Handy re-exports
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
