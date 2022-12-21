@@ -8,8 +8,9 @@ ARG deb_codename=stretch
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-RUN sudo apt-get -y update && \
-  sudo apt-get -y upgrade && \
+RUN apt-get -y update && \
+  apt-get -y upgrade && \
+  apt-get install sudo && \
   sudo apt-get -y install \
     apt-transport-https \
     ca-certificates \
@@ -26,8 +27,7 @@ RUN sudo apt-get -y update && \
     procps \
     python3 \
     tzdata \
-    unzip \
-    sudo && \
+    unzip && \
   rm -rf /var/lib/apt/lists/*
 
 # --- Terraform tools
