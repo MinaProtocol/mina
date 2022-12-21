@@ -256,7 +256,7 @@ let kanikoBuild
                       , "--destination=${image}"
                       , "--skip-unused-stages"
                       , "--use-new-run"
-                      , "--snapshotMode=redo"
+                      , "--snapshot-mode=redo"
                       , "--reproducible"
                       , "--log-timestamp"
                       , "--cleanup"
