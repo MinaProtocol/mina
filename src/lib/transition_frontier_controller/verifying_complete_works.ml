@@ -6,7 +6,7 @@ open Bit_catchup_state
 let max_works_per_batch =
   Option.value_map
     (Async.Sys.getenv "MINA_MAX_PROOFS_PER_BATCH")
-    ~default:30 ~f:Int.of_string
+    ~default:1000 ~f:Int.of_string
 
 (** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
 let body_exn = function

@@ -600,7 +600,7 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
 
     let ancestry_download_timeout = Time.Span.of_sec 300.
 
-    let transaction_snark_verification_timeout = Time.Span.of_sec 30.
+    let transaction_snark_verification_timeout = Time.Span.of_min 4.
 
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
       let body_reference =

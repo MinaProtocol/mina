@@ -174,8 +174,8 @@ let interrupt_after_timeout ~timeout interrupt_ivar =
     (Async_kernel.Ivar.fill_if_empty interrupt_ivar)
 
 let controlling_bandwidth ?priority ~resource
-    ~context:(module Context : CONTEXT) ~transition_states ~state_hash ~actions
-    ~upon_f ~process_f (module I : Interruptible.F) =
+    ~context:(module Context : CONTEXT) ~transition_states ~actions ~upon_f
+    ~process_f ~state_hash ~same_state_level (module I : Interruptible.F) =
   let mk_timeout span =
     let timeout = Time.(add @@ now ()) span in
     interrupt_after_timeout ~timeout I.interrupt_ivar ;
@@ -187,11 +187,12 @@ let controlling_bandwidth ?priority ~resource
         upon_f res )
   in
   let late_start = I.return (Result.Error `Late_to_start) in
-  let ext_modifier _ = function
+  let ext_modifier st = function
     | { Substate_types.status =
           Processing (In_progress ({ processing_status = Waiting; _ } as ctx))
       ; _
-      } as s ->
+      } as s
+      when same_state_level st ->
         let action, timeout_span = process_f () in
         let timeout = mk_timeout timeout_span in
         let status =
@@ -199,8 +200,8 @@ let controlling_bandwidth ?priority ~resource
             (In_progress { ctx with processing_status = Executing { timeout } })
         in
         ({ s with status }, action)
-    | st ->
-        (st, late_start)
+    | subst ->
+        (subst, late_start)
   in
   let build_after_state_update () =
     Transition_states.modify_substate transition_states state_hash

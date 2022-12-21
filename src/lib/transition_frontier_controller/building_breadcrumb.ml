@@ -102,6 +102,7 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   let processing_status =
     controlling_bandwidth ~priority:`High ~resource:`Verifier ~context ~actions
       ~transition_states ~state_hash ~process_f ~upon_f
+      ~same_state_level:(function Building_breadcrumb _ -> true | _ -> false)
       (module I)
   in
   Substate.Processing

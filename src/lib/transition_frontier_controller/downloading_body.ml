@@ -126,6 +126,7 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
       let processing_status =
         controlling_bandwidth ~resource:`Download ~context ~actions
           ~transition_states ~state_hash ~process_f ~upon_f
+          ~same_state_level:(function Downloading_body _ -> true | _ -> false)
           (module I)
       in
       Substate.In_progress
