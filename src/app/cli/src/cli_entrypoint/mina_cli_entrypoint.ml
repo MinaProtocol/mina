@@ -1678,6 +1678,9 @@ let internal_commands logger =
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
             ~doc:"sexp/json the format to parse input in"
+        and limit =
+          flag "--limit" ~aliases:[ "-limit" ] (optional int)
+            ~doc:"limit the number of proofs taken from the file"
         in
         fun () ->
           let open Async in
@@ -1707,7 +1710,7 @@ let internal_commands logger =
                   "Expected format flag to be one of sexp, json, got '%s'"
                   format ()
           in
-          let%bind input =
+          let%bind input_full =
             match format with
             | `Sexp -> (
                 let%map input_sexp =
@@ -1755,6 +1758,16 @@ let internal_commands logger =
                         `Blockchain input
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
+          in
+          let input =
+            let cap lst =
+              Option.value_map ~default:Fn.id ~f:(Fn.flip List.take) limit lst
+            in
+            match input_full with
+            | `Blockchain lst ->
+                `Blockchain (cap lst)
+            | `Transaction lst ->
+                `Transaction (cap lst)
           in
           let%bind verifier =
             Verifier.create ~logger
