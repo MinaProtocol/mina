@@ -8,9 +8,9 @@ ARG deb_codename=stretch
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-RUN apt-get -y update && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+RUN sudo apt-get -y update && \
+  sudo apt-get -y upgrade && \
+  sudo apt-get -y install \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -38,8 +38,8 @@ RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
     https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
     sudo tee /etc/apt/sources.list.d/hashicorp.list \
-    sudo apt update \
-    sudo apt install terraform
+    sudo apt-get update \
+    sudo apt-get install terraform
 
 # --- Google Cloud tools
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
@@ -57,14 +57,14 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
 RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && sudo apt update \
-    && sudo apt install -y nodejs yarn
+    && sudo apt-get update \
+    && sudo apt-get install -y nodejs yarn
 
 # Mina test executive package
 RUN echo "Building test_executive image with version $deb_version from repo $deb_release $deb_codename " \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update \
-  && apt-get install -y --allow-downgrades "mina-test-executive=$deb_version"
+  && sudo apt-get update \
+  && sudo apt-get install -y --allow-downgrades "mina-test-executive=$deb_version"
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
 # for now stick to root for compatibility
