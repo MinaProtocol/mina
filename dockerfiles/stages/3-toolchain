@@ -16,8 +16,7 @@ ARG DHALL_BASH_VERSION=1.0.40
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
-# location of external packages
-ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
+USER root
 
 # OS package dependencies
 # afaict this is the last python dependency of any kind in CI
@@ -78,20 +77,21 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
-RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
-    && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
-    && rm -f deb-s3-${DEBS3_VERSION}.gem
+RUN curl -sL https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem -o /tmp/deb-s3.gem \
+    && gem install /tmp/deb-s3.gem \
+    && rm -f /tmp/deb-s3.gem
 
 # --- Docker Daemon
-RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
-    && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
-    && mv /tmp/docker/* /usr/bin
+RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz -o /tmp/docker.tgz \
+    && tar -xz -C /tmp -f /tmp/docker.tgz \
+    && mv /tmp/docker/* /usr/bin \
+    && rm -f /tmp/docker.tgz
 
 # --- Terraform tools
-RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
-    && unzip terraform.zip \
-    && mv terraform /usr/bin \
-    && ln -s /usr/bin/terraform /usr/local/bin/terraform
+RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o /tmp/terraform.zip \
+    && unzip /tmp/terraform.zip -d /usr/bin \
+    && ln -s /usr/bin/terraform /usr/local/bin/terraform \
+    && rm /tmp/terraform.zip
 
 # Dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
