@@ -69,7 +69,7 @@ in
             ],
         label = "Build JS integration tests",
         key = "build-js-tests",
-        target = Size.XLarge,
+        target = Size.Integration,
         `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       },
 
@@ -89,7 +89,7 @@ in
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",
         key = "integration-test-${testName}",
-        target = Size.Medium,
+        target = Size.Integration,
         depends_on = dependsOn,
         `if` = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       }
