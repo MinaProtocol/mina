@@ -360,6 +360,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type error
 
+    val read : t -> Ledger_hash.t Tick.As_prover.t
+
     val if_ : bool -> then_:t -> else_:t -> t
 
     val all : bool list -> bool
@@ -379,6 +381,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     type bool = Tick.Boolean.var
 
     type error = unit Tick.Checked.t
+
+    let read = Tick.As_prover.read Frozen_ledger_hash.typ
 
     let if_ b ~then_ ~else_ =
       Tick.Run.run_checked (Frozen_ledger_hash.if_ b ~then_ ~else_)
@@ -400,6 +404,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type error = unit Or_error.t
 
+    let read = Tick.As_prover.return
+
     let if_ b ~then_ ~else_ = if b then then_ else else_
 
     let all = List.fold ~init:true ~f:( && )
@@ -408,7 +414,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let accumulate_failures bs =
       let constraints_failed =
-        List.filter_map bs ~f:(fun (b, str) -> if b then Some str else None)
+        List.filter_map bs ~f:(fun (b, str) -> if b then None else Some str)
       in
       if List.is_empty constraints_failed then Ok ()
       else
@@ -426,7 +432,37 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; connecting_ledger_left : 'a
       ; connecting_ledger_right : 'a
       }
-    [@@deriving compare, equal, hash, sexp, yojson]
+    [@@deriving compare, equal, hash, sexp, yojson, hlist]
+
+    (*
+    let typ ledger_hash s =
+      Tick.Typ.of_hlistable
+        [ ledger_hash s.first_pass_ledger_source
+        ; ledger_hash s.first_pass_ledger_target
+        ; ledger_hash s.second_pass_ledger_source
+        ; ledger_hash s.second_pass_ledger_target
+        ; ledger_hash s.connecting_ledger_left
+        ; ledger_hash s.connecting_ledger_right ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    *)
+
+    (*
+    let read ledger_hash s =
+      let open Tick.As_prover in
+      let%map first_pass_ledger_source = ledger_hash s.first_pass_ledger_source
+      and first_pass_ledger_target = ledger_hash s.first_pass_ledger_target
+      and second_pass_ledger_source = ledger_hash s.second_pass_ledger_source
+      and second_pass_ledger_target = ledger_hash s.second_pass_ledger_target
+      and connecting_ledger_left = ledger_hash s.connecting_ledger_left
+      and connecting_ledger_right = ledger_hash s.connecting_ledger_right
+      in
+      { first_pass_ledger_source
+      ; first_pass_ledger_target
+      ; second_pass_ledger_source
+      ; second_pass_ledger_target
+      ; connecting_ledger_left
+      ; connecting_ledger_right }
+    *)
 
     let of_statement (s : _ Poly.t) : _ t =
       { first_pass_ledger_source = s.source.first_pass_ledger
@@ -444,6 +480,15 @@ module Make_str (A : Wire_types.Concrete) = struct
          and type error = error
          and type bool = bool ) (s1 : a Statement_ledgers.t)
       (s2 : a Statement_ledgers.t) =
+    (*
+    Tick.Run.run_checked (
+      let open Tick in
+      as_prover
+        As_prover.(
+          let%bind s1' = Statement_ledgers.read L.read s1 in
+          let%map s2' = Statement_ledgers.read L.read s2 in
+          Format.eprintf !"Merging statements: @.%{sexp:Ledger_hash.t Statement_ledgers.t}@.%{sexp:Ledger_hash.t Statement_ledgers.t}@." s1' s2') ) ;
+    *)
     (*Check ledgers are valid based on the rules descibed in https://github.com/MinaProtocol/mina/discussions/12000*)
     let is_same_block_at_shared_boundary =
       (*First statement ends and the second statement starts in the same block. It could be within a single scan state tree or across two scan state trees*)
@@ -485,8 +530,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           s2.first_pass_ledger_source
     in
     let rule3 =
-      "First pass ledger of the statement on the right does not connect to the \
-       second pass ledger of the statement on the left"
+      "First pass ledger of the statement on the right connects to the second \
+       pass ledger of the statement on the left"
     in
     let res3 = L.equal s1.second_pass_ledger_target l3 in
     let failures =
@@ -503,6 +548,11 @@ module Make_str (A : Wire_types.Concrete) = struct
   let valid_ledgers_at_merge_unchecked
       (s1 : Frozen_ledger_hash.t Statement_ledgers.t)
       (s2 : Frozen_ledger_hash.t Statement_ledgers.t) =
+    Format.eprintf
+      !"Merging statements: @.%{sexp:Frozen_ledger_hash.t \
+        Statement_ledgers.t}@.%{sexp:Frozen_ledger_hash.t \
+        Statement_ledgers.t}@."
+      s1 s2 ;
     validate_ledgers_at_merge (module Ledger_hash_unchecked) s1 s2
 
   let merge (s1 : _ Poly.t) (s2 : _ Poly.t) =

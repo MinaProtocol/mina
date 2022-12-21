@@ -628,10 +628,12 @@ struct
         ; sok_digest = ()
         } ->
         let open Or_error.Let_syntax in
-        let _connecting_ledger_left = failwith "TODO check connecting ledger" in
-        let _connecting_ledger_right =
-          failwith "TODO check connecting ledger"
-        in
+        (* TODO TODO TODO
+           let _connecting_ledger_left = failwith "TODO check connecting ledger" in
+           let _connecting_ledger_right =
+             failwith "TODO check connecting ledger"
+           in
+        *)
         let%map () =
           Option.value_map ~default:(Ok ()) registers_begin
             ~f:(fun registers_begin -> check_registers registers_begin source)

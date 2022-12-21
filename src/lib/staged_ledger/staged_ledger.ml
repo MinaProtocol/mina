@@ -599,8 +599,8 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
-  let apply_single_transaction_phase_2 ledger state_and_body_hash
-      (pre_stmt : Pre_statement.t) =
+  let apply_single_transaction_phase_2 ~connecting_ledger_left ledger
+      state_and_body_hash (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
     let second_pass_ledger_source_hash = Ledger.merkle_root ledger in
@@ -637,35 +637,34 @@ module T = struct
           (Staged_ledger_error.Mismatched_statuses
              (txn_with_expected_status, actual_status) )
     in
-    let connecting_ledger_left = failwith "TODO" in
-    let connecting_ledger_right = failwith "TODO" in
-    let statement =
-      { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2.source =
-          { first_pass_ledger = pre_stmt.first_pass_ledger_source_hash
-          ; second_pass_ledger = second_pass_ledger_source_hash
-          ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_source
-          ; local_state = empty_local_state
-          }
-      ; target =
-          { first_pass_ledger = pre_stmt.first_pass_ledger_target_hash
-          ; second_pass_ledger = second_pass_ledger_target_hash
-          ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_target
-          ; local_state = empty_local_state
-          }
-      ; connecting_ledger_left
-      ; connecting_ledger_right
-      ; fee_excess = pre_stmt.fee_excess
-      ; supply_increase
-      ; sok_digest = ()
+    fun connecting_ledger_right ->
+      let statement =
+        { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2.source =
+            { first_pass_ledger = pre_stmt.first_pass_ledger_source_hash
+            ; second_pass_ledger = second_pass_ledger_source_hash
+            ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_source
+            ; local_state = empty_local_state
+            }
+        ; target =
+            { first_pass_ledger = pre_stmt.first_pass_ledger_target_hash
+            ; second_pass_ledger = second_pass_ledger_target_hash
+            ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_target
+            ; local_state = empty_local_state
+            }
+        ; connecting_ledger_left
+        ; connecting_ledger_right
+        ; fee_excess = pre_stmt.fee_excess
+        ; supply_increase
+        ; sok_digest = ()
+        }
+      in
+      { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
+      ; state_hash = state_and_body_hash
+      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
+      ; second_pass_ledger_witness = ledger_witness
+      ; init_stack = pre_stmt.init_stack
+      ; statement
       }
-    in
-    { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
-    ; state_hash = state_and_body_hash
-    ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
-    ; second_pass_ledger_witness = ledger_witness
-    ; init_stack = pre_stmt.init_stack
-    ; statement
-    }
 
   let apply_transactions_phase_1 ~constraint_constants ledger current_stack ts
       current_state_view state_body_hash =
@@ -695,8 +694,15 @@ module T = struct
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
   let apply_transactions_phase_2 ledger state_and_body_hash pre_stmts =
-    result_list_map pre_stmts ~f:(fun pre_stmt ->
-        apply_single_transaction_phase_2 ledger state_and_body_hash pre_stmt )
+    let open Result.Let_syntax in
+    let connecting_ledger_left = Ledger.merkle_root ledger in
+    let%map stmt_funcs =
+      result_list_map pre_stmts ~f:(fun pre_stmt ->
+          apply_single_transaction_phase_2 ~connecting_ledger_left ledger
+            state_and_body_hash pre_stmt )
+    in
+    let connecting_ledger_right = Ledger.merkle_root ledger in
+    List.map stmt_funcs ~f:(fun f -> f connecting_ledger_right)
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
