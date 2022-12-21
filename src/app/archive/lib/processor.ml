@@ -1447,7 +1447,7 @@ module Zkapp_account_update_body = struct
     ; balance_change : string
     ; increment_nonce : bool
     ; events_id : int
-    ; sequence_events_id : int
+    ; actions_id : int
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
@@ -1492,8 +1492,8 @@ module Zkapp_account_update_body = struct
     let%bind events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
-    let%bind sequence_events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
+    let%bind actions_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
@@ -1528,7 +1528,7 @@ module Zkapp_account_update_body = struct
       ; balance_change
       ; increment_nonce
       ; events_id
-      ; sequence_events_id
+      ; actions_id
       ; call_data_id
       ; call_depth
       ; zkapp_network_precondition_id
@@ -1541,7 +1541,7 @@ module Zkapp_account_update_body = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       ~tannot:(function
-        | "events_ids" | "sequence_events_ids" ->
+        | "events_ids" | "actions_ids" ->
             Some "int[]"
         | "caller" ->
             Some "call_type"

@@ -40,7 +40,7 @@ let mockedZkappCommand = {
         balanceChange: { magnitude: "0", sgn: "Positive" },
         incrementNonce: false,
         events: [],
-        sequenceEvents: [],
+        actions: [],
         callData: "0",
         callDepth: 0,
         preconditions: {

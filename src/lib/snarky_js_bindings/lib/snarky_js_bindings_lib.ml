@@ -1200,7 +1200,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 
@@ -2231,6 +2231,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants

@@ -222,7 +222,7 @@ module Network_config = struct
             ; zkapp_signed_pair_update_cost = None
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
-            ; max_sequence_event_elements = None
+            ; max_action_elements = None
             }
       ; genesis =
           Some

@@ -2770,7 +2770,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -2996,7 +2996,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -7793,7 +7793,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -11311,6 +11311,19 @@
                   "name": "AnnotatedBalance",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "genesis_balance",
+              "description":
+                "The amount of MINA owned by the account at Genesis",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "AnnotatedBalance",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null

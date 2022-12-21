@@ -1024,17 +1024,35 @@ module Types = struct
           , Permissions.t option
           , Zkapp_account.t option )
           Account.Poly.t
+      ; genesis_balance : AnnotatedBalance.t option
       ; locked : bool option
       ; is_actively_staking : bool
       ; path : string
       ; index : Account.Index.t option
       }
 
+    let genesis_balance mina public_key =
+      let gl = Mina_lib.genesis_ledger mina in
+      Ledger.fold_until (Lazy.force gl) ~init:()
+        ~f:(fun () a ->
+          if Account.Key.compare (Account.public_key a) public_key = 0 then
+            Stop
+              (Some
+                 AnnotatedBalance.
+                   { total = a.balance
+                   ; unknown = Balance.zero
+                   ; timing = a.timing
+                   ; breadcrumb = None
+                   } )
+          else Continue () )
+        ~finish:(Fun.const None)
+
     let lift mina pk account =
       let block_production_pubkeys = Mina_lib.block_production_pubkeys mina in
       let accounts = Mina_lib.wallets mina in
       let best_tip_ledger = Mina_lib.best_ledger mina in
       { account
+      ; genesis_balance = genesis_balance mina account.public_key
       ; locked = Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking =
           ( if Token_id.(equal default) account.token_id then
@@ -1179,6 +1197,10 @@ module Types = struct
                  ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
+             ; field "genesis_balance" ~typ:AnnotatedBalance.obj
+                 ~doc:"The amount of MINA owned by the account at Genesis"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ (b : t) -> b.genesis_balance)
              ; field "nonce" ~typ:account_nonce
                  ~doc:
                    "A natural number that increases with each transaction \
@@ -1284,6 +1306,8 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
+                       ; genesis_balance =
+                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -1315,6 +1339,8 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
+                       ; genesis_balance =
+                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -4188,6 +4214,7 @@ module Queries = struct
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account =
                Types.AccountObj.Partial_account.of_pk mina pk
+           ; genesis_balance = Types.AccountObj.genesis_balance mina pk
            ; locked = Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking =
                Public_key.Compressed.Set.mem block_production_pubkeys pk
