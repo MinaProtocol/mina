@@ -61,7 +61,7 @@ RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && sudo apt-get install -y nodejs yarn
 
 # Mina test executive package
-RUN echo "Building test_executive image with version $deb_version from repo $deb_release $deb_codename " \
+RUN echo "Installing mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && sudo apt-get update \
   && sudo apt-get install -y --allow-downgrades "mina-test-executive=$deb_version"
