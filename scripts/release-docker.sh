@@ -129,10 +129,10 @@ tag-and-push() {
   docker push "$1"
 }
 
-if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   docker push "${TAG}"
   tag-and-push "${HASHTAG}"
-  if [ "${DEB_RELEASE##*=}" -eq 'stable' ]; then
+  if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
     tag-and-push "minaprotocol/${SERVICE}:${VERSION}"
   fi
 fi
