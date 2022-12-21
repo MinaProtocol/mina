@@ -34,7 +34,8 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm
+Depends: python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, helm
+Recommends: terraform
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
