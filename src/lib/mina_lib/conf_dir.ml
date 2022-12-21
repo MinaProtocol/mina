@@ -15,7 +15,7 @@ let check_and_set_lockfile ~logger conf_dir =
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true lockfile ~f:(fun writer ->
                 let pid = Unix.getpid () in
-                return (Writer.writef writer "%d\n" (Pid.to_int pid))))
+                return (Writer.writef writer "%d\n" (Pid.to_int pid)) ) )
       with
       | Ok () ->
           [%log info] "Created daemon lockfile $lockfile"
@@ -26,7 +26,7 @@ let check_and_set_lockfile ~logger conf_dir =
               | `Yes ->
                   Unix.unlink lockfile
               | _ ->
-                  return ())
+                  return () )
       | Error exn ->
           Error.tag_arg (Error.of_exn exn)
             "Could not create the daemon lockfile" ("lockfile", lockfile)
@@ -72,7 +72,7 @@ let check_and_set_lockfile ~logger conf_dir =
                       [ ("lockfile", `String lockfile)
                       ; ("pid", `Int (Pid.to_int pid))
                       ] ;
-                  Unix.unlink lockfile )))
+                  Unix.unlink lockfile ) ) )
       with
       | Ok () ->
           ()
@@ -118,7 +118,7 @@ let get_hw_info () =
             | Error err ->
                 [ sprintf "Error: %s" (Error.to_string_hum err) ]
           in
-          return ((header :: output) @ [ "" ]))
+          return ((header :: output) @ [ "" ]) )
     in
     Some (Option.value_exn linux_info :: List.concat outputs)
   else (* TODO: Mac, other Unixes *)
@@ -157,7 +157,7 @@ let export_logs_to_tar ?basename ~conf_dir =
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true hw_info_file ~f:(fun writer ->
                 Deferred.List.map (Option.value_exn hw_info_opt) ~f:(fun line ->
-                    return (Writer.write_line writer line))))
+                    return (Writer.write_line writer line) ) ) )
       with
       | Ok _units ->
           Some hw_info
@@ -169,7 +169,7 @@ let export_logs_to_tar ?basename ~conf_dir =
   let base_files = "mina.version" :: log_files in
   let files =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
-        hw_file :: base_files)
+        hw_file :: base_files )
   in
   let tmp_dir = Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) "" in
   let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in

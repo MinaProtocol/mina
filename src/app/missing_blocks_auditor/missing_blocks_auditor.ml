@@ -71,7 +71,7 @@ let main ~archive_uri () =
               | Error msg ->
                   [%log error] "Error getting missing blocks gap"
                     ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
-                  Core_kernel.exit 1) )
+                  Core_kernel.exit 1 ) )
       in
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
@@ -91,7 +91,7 @@ let main ~archive_uri () =
         match%bind
           Caqti_async.Pool.use
             (fun db ->
-              Sql.Chain_status.run_count_pending_below db highest_canonical)
+              Sql.Chain_status.run_count_pending_below db highest_canonical )
             pool
         with
         | Ok count ->
@@ -119,8 +119,7 @@ let main ~archive_uri () =
       let%bind canonical_chain =
         match%bind
           Caqti_async.Pool.use
-            (fun db ->
-              Sql.Chain_status.run_canonical_chain db highest_canonical)
+            (fun db -> Sql.Chain_status.run_canonical_chain db highest_canonical)
             pool
         with
         | Ok chain ->
@@ -140,7 +139,7 @@ let main ~archive_uri () =
       let invalid_chain =
         List.filter canonical_chain
           ~f:(fun (_block_id, _state_hash, chain_status) ->
-            not (String.equal chain_status "canonical"))
+            not (String.equal chain_status "canonical") )
       in
       if List.is_empty invalid_chain then
         [%log info]
@@ -153,7 +152,7 @@ let main ~archive_uri () =
               [ ("block_id", `Int block_id)
               ; ("state_hash", `String state_hash)
               ; ("chain_status", `String chain_status)
-              ]) ;
+              ] ) ;
       Core.exit (get_exit_code ())
 
 let () =
@@ -169,4 +168,4 @@ let () =
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
          in
-         main ~archive_uri)))
+         main ~archive_uri )))

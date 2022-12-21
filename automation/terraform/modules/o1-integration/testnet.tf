@@ -36,7 +36,6 @@ module "kubernetes_testnet" {
   log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count
-  mina_archive_schema  = var.mina_archive_schema
 
   snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
     {
@@ -65,6 +64,11 @@ module "kubernetes_testnet" {
       archiveAddress         = element(local.archive_node_names, index)
     }
   ]
+
+  cpu_request = var.cpu_request
+  mem_request= var.mem_request
+  worker_cpu_request = var.worker_cpu_request
+  worker_mem_request= var.worker_mem_request
 
   #we don't use plain nodes in the intg test
   plain_node_configs = []

@@ -1,7 +1,5 @@
 open Core
 open Async
-open Signature_lib
-open Mina_base
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -42,28 +40,3 @@ let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
 let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
 let query_json_exn query_obj port = run_exn ~f:Client.query_json query_obj port
-
-module Signed_command = struct
-  type t =
-    { id : string
-    ; isDelegation : bool
-    ; nonce : int
-    ; from : Public_key.Compressed.t
-    ; to_ : Public_key.Compressed.t
-    ; amount : Currency.Amount.t
-    ; fee : Currency.Fee.t
-    ; memo : Signed_command_memo.t
-    }
-  [@@deriving yojson]
-
-  let of_obj x =
-    { id = x#id
-    ; isDelegation = x#isDelegation
-    ; nonce = x#nonce
-    ; from = x#from
-    ; to_ = x#to_
-    ; amount = x#amount
-    ; fee = x#fee
-    ; memo = x#memo
-    }
-end

@@ -7,15 +7,17 @@
   ;; opam libraries
   base.base_internalhash_types
   bin_prot.shape
-  ppx_version.runtime
   bitstring
   core_kernel
   sexplib0
   base.caml
   ppx_inline_test.config
   ;; local libraries
-  direction)
+  direction
+  ppx_version.runtime
+  test_util)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson bitstring.ppx))
+  (pps ppx_mina ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson
+       ppx_bitstring))
  (instrumentation (backend bisect_ppx))
  (synopsis "Address for merkle database representations"))

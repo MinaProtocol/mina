@@ -33,7 +33,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
     let key_data_pairs =
       List.map update_pairs ~f:(fun (key, data) ->
           ( Binable.to_bigstring (module Key) key
-          , Binable.to_bigstring (module Value) data ))
+          , Binable.to_bigstring (module Value) data ) )
     in
     let remove_keys =
       List.map remove_keys ~f:(Binable.to_bigstring (module Key))
@@ -46,7 +46,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
   let to_alist t =
     List.map (Database.to_alist t) ~f:(fun (key, value) ->
         ( Binable.of_bigstring (module Key) key
-        , Binable.of_bigstring (module Value) value ))
+        , Binable.of_bigstring (module Value) value ) )
 end
 
 (** Database Interface for storing heterogeneous key-value pairs. Similar to

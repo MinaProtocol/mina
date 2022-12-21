@@ -1,5 +1,3 @@
-module type Inputs = Intf.Wrap_main_inputs.S
-
 module S = Sponge
 open Backend
 open Core_kernel
@@ -10,34 +8,45 @@ open Plonk_types
 open Tuple_lib
 open Import
 
-(* given [chals], compute
-   \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
-let b_poly ~one ~add ~mul chals =
-  let ( + ) = add and ( * ) = mul in
-  stage (fun pt ->
-      let k = Array.length chals in
-      let pow_two_pows =
-        let res = Array.init k ~f:(fun _ -> pt) in
-        for i = 1 to k - 1 do
-          let y = res.(i - 1) in
-          res.(i) <- y * y
-        done ;
-        res
-      in
-      let prod f =
-        let r = ref (f 0) in
-        for i = 1 to k - 1 do
-          r := f i * !r
-        done ;
-        !r
-      in
-      prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))))
+module G = struct
+  let lookup_verification_enabled = false
+
+  (* given [chals], compute
+     \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
+  let challenge_polynomial ~one ~add ~mul chals =
+    let ( + ) = add and ( * ) = mul in
+    stage (fun pt ->
+        let k = Array.length chals in
+        let pow_two_pows =
+          let res = Array.init k ~f:(fun _ -> pt) in
+          for i = 1 to k - 1 do
+            let y = res.(i - 1) in
+            res.(i) <- y * y
+          done ;
+          res
+        in
+        let prod f =
+          let r = ref (f 0) in
+          for i = 1 to k - 1 do
+            r := f i * !r
+          done ;
+          !r
+        in
+        prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
+
+  let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
+
+  let all_possible_domains =
+    Memo.unit (fun () ->
+        Vector.init num_possible_domains ~f:(fun proofs_verified ->
+            (Common.wrap_domains ~proofs_verified).h ) )
+end
 
 module Make
-    (Inputs : Inputs
-                with type Impl.field = Tock.Field.t
-                 and type Impl.Bigint.t = Tock.Bigint.R.t
-                 and type Inner_curve.Constant.Scalar.t = Tick.Field.t) =
+    (Inputs : Intf.Wrap_main_inputs.S
+                with type Impl.field = Backend.Tock.Field.t
+                 and type Impl.Bigint.t = Backend.Tock.Bigint.t
+                 and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
   open Impl
@@ -70,6 +79,10 @@ struct
     end
   end
 
+  let num_possible_domains = G.num_possible_domains
+
+  let all_possible_domains = G.all_possible_domains
+
   let print_g lab (x, y) =
     if debug then
       as_prover
@@ -85,7 +98,7 @@ struct
       Array.iteri gs ~f:(fun i (fin, g) ->
           as_prover
             As_prover.(fun () -> printf "fin=%b %!" (read Boolean.typ fin)) ;
-          ksprintf print_g "%s[%d]" lab i g)
+          ksprintf print_g "%s[%d]" lab i g )
 
   let print_chal lab x =
     if debug then
@@ -100,7 +113,7 @@ struct
   let print_bool lab x =
     if debug then
       as_prover (fun () ->
-          printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+          printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
 
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
@@ -120,21 +133,27 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Step_inner_curve.scalar
 
+  let assert_n_bits ~n a =
+    (* Scalar_challenge.to_field_checked has the side effect of
+        checking that the input fits in n bits. *)
+    ignore
+      ( SC.to_field_checked
+          (module Impl)
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
+        : Field.t )
+
   let lowest_128_bits ~constrain_low_bits x =
-    let assert_128_bits a =
-      (* Scalar_challenge.to_field_checked has the side effect of
-         checking that the input fits in 128 bits. *)
-      ignore (scalar_to_field (SC.SC.create a) : Field.t)
-    in
+    let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (* I think you may not have to constrain these actually *)
       ~constrain_low_bits:true (Sponge.squeeze sponge)
 
-  let squeeze_scalar sponge : Field.t SC.SC.t =
+  let squeeze_scalar sponge : Field.t Import.Scalar_challenge.t =
     (* No need to boolean constrain scalar challenges. *)
-    SC.SC.create
+    Import.Scalar_challenge.create
       (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
@@ -142,13 +161,12 @@ struct
     let prechallenges =
       Array.map gammas ~f:(fun gammas_i ->
           absorb (PC :: PC) gammas_i ;
-          squeeze_scalar sponge)
+          squeeze_scalar sponge )
     in
     let term_and_challenge (l, r) pre =
       let left_term = Scalar_challenge.endo_inv l pre in
       let right_term = Scalar_challenge.endo r pre in
-      ( Ops.add_fast left_term right_term
-      , { Bulletproof_challenge.prechallenge = pre } )
+      (Ops.add_fast left_term right_term, Bulletproof_challenge.unpack pre)
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -185,6 +203,7 @@ struct
       |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
       |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
 
+  (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
       ~domain:
         ( (which_branch : n One_hot_vector.t)
@@ -199,7 +218,27 @@ struct
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.constant g
         | _ ->
-            assert false)
+            assert false )
+    |> Vector.map2
+         (which_branch :> (Boolean.var, n) Vector.t)
+         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
+    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+
+  let scaled_lagrange (type n) c
+      ~domain:
+        ( (which_branch : n One_hot_vector.t)
+        , (domains : (Domains.t, n) Vector.t) ) i =
+    Vector.map domains ~f:(fun d ->
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+        | [| g |] ->
+            let g = Inner_curve.Constant.of_affine g in
+            Inner_curve.Constant.scale g c |> Inner_curve.constant
+        | _ ->
+            assert false )
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
@@ -240,15 +279,15 @@ struct
               base_and_correction d.h
             else
               Vector.map domains ~f:(fun (ds : Domains.t) ->
-                  base_and_correction ds.h)
+                  base_and_correction ds.h )
               |> Vector.map2
                    (which_branch :> (Boolean.var, n) Vector.t)
                    ~f:(fun b pr ->
                      Double.map pr ~f:(fun (x, y) ->
-                         Field.((b :> t) * x, (b :> t) * y)))
+                         Field.((b :> t) * x, (b :> t) * y) ) )
               |> Vector.reduce_exn
                    ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
-              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))))
+              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))) )
 
   let h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -273,8 +312,8 @@ struct
             Field.(
               (x * x * x)
               + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b))
-        |> unstage)
+              + constant Inner_curve.Params.b) )
+        |> unstage )
     in
     fun x -> Lazy.force f x
 
@@ -323,16 +362,16 @@ struct
                        ~else_:
                          ((* In this branch, the accumulator was zero, so there is no harm in
                              putting the potentially junk underlying point here. *)
-                          Point.underlying p))
+                          Point.underlying p ) )
                   ~else_:acc.point)
             in
             let non_zero = Boolean.(keep &&& Point.finite p ||| acc.non_zero) in
-            { Curve_opt.non_zero; point })
+            { Curve_opt.non_zero; point } )
           ~xi
           ~init:(fun (keep, p) ->
             { non_zero = Boolean.(keep &&& Point.finite p)
             ; point = Point.underlying p
-            })
+            } )
           without_bound with_bound
       in
       Boolean.Assert.is_true non_zero ;
@@ -343,21 +382,23 @@ struct
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
       ~(xi : Scalar_challenge.t)
-      ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
-      ~(* Corresponds to y in figure 7 of WTS *)
-       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Types.Step.Openings.Bulletproof.Advice.t)
+      ~(advice :
+         Other_field.Packed.t Shifted_value.Type1.t
+         Types.Step.Bulletproof.Advice.t )
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
-        ({ lr; delta; z_1; z_2; sg } :
+        ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.Type1.t )
-          Openings.Bulletproof.t) =
+          Openings.Bulletproof.t ) =
     with_label __LOC__ (fun () ->
-        Other_field.Packed.absorb_shifted sponge combined_inner_product ;
-        (* a_hat should be equal to
+        Other_field.Packed.absorb_shifted sponge advice.combined_inner_product ;
+        (* combined_inner_product should be equal to
            sum_i < t, r^i pows(beta_i) >
-           = sum_i r^i < t, pows(beta_i) > *)
+           = sum_i r^i < t, pows(beta_i) >
+
+           That is checked later.
+        *)
         let u =
           let t = Sponge.squeeze_field sponge in
           group_map t
@@ -372,7 +413,7 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          let uc = scale_fast u combined_inner_product in
+          let uc = scale_fast u advice.combined_inner_product in
           combined_polynomial + uc
         in
         let q = p_prime + lr_prod in
@@ -385,13 +426,15 @@ struct
         in
         let rhs =
           let b_u = scale_fast u advice.b in
-          let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
+          let z_1_g_plus_b_u =
+            scale_fast (challenge_polynomial_commitment + b_u) z_1
+          in
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in
           z_1_g_plus_b_u + z2_h
         in
-        (`Success (equal_g lhs rhs), challenges))
+        (`Success (equal_g lhs rhs), challenges) )
 
   module Opt = struct
     include Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation)
@@ -401,7 +444,8 @@ struct
 
     (* No need to boolean constrain scalar challenges. *)
     let scalar_challenge (s : t) : Scalar_challenge.t =
-      SC.SC.create (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
+      Import.Scalar_challenge.create
+        (lowest_128_bits (squeeze s) ~constrain_low_bits:false)
   end
 
   (* TODO: This doesn't need to be an opt sponge *)
@@ -410,7 +454,7 @@ struct
       ~g1_to_field_elements:(fun (b, (x, y)) -> [ (b, x); (b, y) ])
       ~absorb_scalar:(fun x -> Opt.absorb sponge (Boolean.true_, x))
       ~mask_g1_opt:(fun ((finite : Boolean.var), (x, y)) ->
-        (Boolean.true_, Field.((finite :> t) * x, (finite :> t) * y)))
+        (Boolean.true_, Field.((finite :> t) * x, (finite :> t) * y)) )
       ty t
 
   module Pseudo = Pseudo.Make (Impl)
@@ -439,98 +483,135 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
-    chal beta_0 beta_1 ;
-    chal gamma_0 gamma_1 ;
-    scalar_chal alpha_0 alpha_1 ;
-    scalar_chal zeta_0 zeta_1
+    if G.lookup_verification_enabled then failwith "TODO" else () ;
+    with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
+    with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
+    with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
+    with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
-  let assert_eq_marlin
+  let assert_eq_plonk
       (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
-      ~scalar_chal:
-        (fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
-             ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
+      ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
+                        ({ inner = t2 } : Scalar_challenge.t) ->
+        Field.Assert.equal t1 t2 )
 
   let incrementally_verify_proof (type b)
-      (module Max_branching : Nat.Add.Intf with type n = b) ~step_widths
-      ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge
+      (module Max_proofs_verified : Nat.Add.Intf with type n = b)
+      ~actual_proofs_verified_mask ~step_domains
+      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
-         array) ~(sg_old : (_, Max_branching.n) Vector.t)
-      ~(combined_inner_product : _ Shifted_value.Type1.t) ~advice
-      ~(messages : _ Messages.t) ~which_branch ~openings_proof
+         array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
+      ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
       ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
-    let T = Max_branching.eq in
-    let public_input =
-      Array.concat_map public_input ~f:(function
-        | `Field (x, b) ->
-            [| (x, Field.size_in_bits); ((b :> Field.t), 1) |]
-        | `Packed_bits (x, n) ->
-            [| (x, n) |])
-    in
+    let T = Max_proofs_verified.eq in
     let sg_old =
       with_label __LOC__ (fun () ->
-          let actual_width =
-            Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
-          in
-          Vector.map2
-            (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
-            sg_old
-            ~f:(fun keep sg -> [| (keep, sg) |]))
+          Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
+              [| (keep, sg) |] ) )
     in
     with_label __LOC__ (fun () ->
         let sample () = Opt.challenge sponge in
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
+        let index_digest =
+          with_label "absorb verifier index" (fun () ->
+              let index_sponge = Sponge.create sponge_params in
+              Array.iter
+                (Types.index_to_field_elements
+                   ~g:(fun (z : Inputs.Inner_curve.t) ->
+                     List.to_array (Inner_curve.to_field_elements z) )
+                   m )
+                ~f:(fun x -> Sponge.absorb index_sponge x) ;
+              Sponge.squeeze_field index_sponge )
+        in
         let open Plonk_types.Messages in
+        let without = Type.Without_degree_bound in
+        let absorb_g gs =
+          absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
+        in
+        absorb sponge Field (Boolean.true_, index_digest) ;
+        Vector.iter ~f:(Array.iter ~f:(absorb sponge PC)) sg_old ;
         let x_hat =
+          let domain = (which_branch, step_domains) in
+          let public_input =
+            Array.concat_map public_input ~f:(function
+              | `Field (x, b) ->
+                  [| `Field (x, Field.size_in_bits)
+                   ; `Field ((b :> Field.t), 1)
+                  |]
+              | `Packed_bits (x, n) ->
+                  [| `Field (x, n) |] )
+          in
+          let constant_part, non_constant_part =
+            List.partition_map
+              Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
+              ~f:(fun (i, t) ->
+                match t with
+                | `Field (Constant c, _) ->
+                    First
+                      ( if Field.Constant.(equal zero) c then None
+                      else if Field.Constant.(equal one) c then
+                        Some (lagrange ~domain i)
+                      else
+                        Some
+                          (scaled_lagrange ~domain
+                             (Inner_curve.Constant.Scalar.project
+                                (Field.Constant.unpack c) )
+                             i ) )
+                | `Field x ->
+                    Second (i, x) )
+          in
           with_label __LOC__ (fun () ->
-              let domain = (which_branch, step_domains) in
               let terms =
-                with_label __LOC__ (fun () ->
-                    Array.mapi public_input ~f:(fun i x ->
-                        match x with
-                        | b, 1 ->
-                            assert_ (Constraint.boolean (b :> Field.t)) ;
-                            `Cond_add
-                              (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
-                        | x, n ->
-                            `Add_with_correction
-                              ( (x, n)
-                              , lagrange_with_correction ~input_length:n ~domain
-                                  i )))
+                List.map non_constant_part ~f:(fun (i, x) ->
+                    match x with
+                    | b, 1 ->
+                        assert_ (Constraint.boolean (b :> Field.t)) ;
+                        `Cond_add (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
+                    | x, n ->
+                        `Add_with_correction
+                          ( (x, n)
+                          , lagrange_with_correction ~input_length:n ~domain i
+                          ) )
               in
               let correction =
                 with_label __LOC__ (fun () ->
-                    Array.reduce_exn
-                      (Array.filter_map terms ~f:(function
+                    List.reduce_exn
+                      (List.filter_map terms ~f:(function
                         | `Cond_add _ ->
                             None
                         | `Add_with_correction (_, (_, corr)) ->
-                            Some corr))
-                      ~f:Ops.add_fast)
+                            Some corr ) )
+                      ~f:Ops.add_fast )
               in
               with_label __LOC__ (fun () ->
-                  Array.foldi terms ~init:correction ~f:(fun i acc term ->
+                  let init =
+                    List.fold
+                      (List.filter_map ~f:Fn.id constant_part)
+                      ~init:correction ~f:Ops.add_fast
+                  in
+                  List.foldi terms ~init ~f:(fun i acc term ->
                       match term with
                       | `Cond_add (b, g) ->
                           with_label __LOC__ (fun () ->
                               Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
-                                ~else_:acc)
+                                ~else_:acc )
                       | `Add_with_correction ((x, num_bits), (g, _)) ->
                           Ops.add_fast acc
                             (Ops.scale_fast2'
                                (module Other_field.With_top_bit0)
-                               g x ~num_bits))))
+                               g x ~num_bits ) ) ) )
           |> Inner_curve.negate
         in
-        let without = Type.Without_degree_bound in
-        let absorb_g gs =
-          absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
+        let x_hat =
+          with_label "x_hat blinding" (fun () ->
+              Ops.add_fast x_hat
+                (Inner_curve.constant (Lazy.force Generators.h)) )
         in
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
@@ -580,7 +661,7 @@ struct
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm)
+                ~verification_key:m ~plonk ~alpha ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -591,7 +672,7 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
-          let num_commitments_without_degree_bound = Nat.N26.n in
+          let num_commitments_without_degree_bound = Nat.N41.n in
           let without_degree_bound =
             (* sg_old
                x_hat
@@ -606,75 +687,59 @@ struct
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
                 :: [| m.psm_comm |]
                 :: Vector.append w_comm
-                     (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                     (snd (Columns.add Permuts_minus_1.n))
+                     (Vector.append
+                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
+                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                        (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
+                     (snd
+                        Plonk_types.(
+                          Columns.add (fst (Columns.add Permuts_minus_1.n))) )
               |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
-              (snd (Max_branching.add num_commitments_without_degree_bound))
+              (snd
+                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
           in
           check_bulletproof
             ~pcs_batch:
               (Common.dlog_pcs_batch
-                 (Max_branching.add num_commitments_without_degree_bound))
-            ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-            ~advice ~openings_proof
+                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
+            ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
               , [] )
         in
-        assert_eq_marlin
+        let joint_combiner =
+          if G.lookup_verification_enabled then failwith "TODO" else None
+        in
+        assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
+          ; joint_combiner
           }
-          { alpha; beta; gamma; zeta } ;
-        (sponge_digest_before_evaluations, bulletproof_challenges))
-
-  module Split_evaluations = struct
-    let combine_split_evaluations' s =
-      Pcs_batch.combine_split_evaluations s
-        ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
-        ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
-          Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc)
-        ~init:(fun (_, fx) -> fx)
-        ~shifted_pow:
-          (Pseudo.Degree_bound.shifted_pow
-             ~crs_max_degree:Common.Max_degree.wrap)
-  end
+          { alpha; beta; gamma; zeta; joint_combiner } ;
+        (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
       (choice : n One_hot_vector.t) (e : Field.t array Evals.t) :
       (Boolean.var * Field.t) array Evals.t =
     Evals.map2 lengths e ~f:(fun lengths e ->
-        Array.zip_exn (mask lengths choice) e)
-
-  let combined_evaluation (type b b_plus_26) b_plus_26 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_26) Vector.t), with_degree_bound)
-      ~max_quot_size =
-    let open Field in
-    with_label __LOC__ (fun () ->
-        Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
-          ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-          ~shifted_pow:
-            (Pseudo.Degree_bound.shifted_pow
-               ~crs_max_degree:Common.Max_degree.wrap)
-          ~init:Fn.id ~evaluation_point ~xi
-          (Common.dlog_pcs_batch b_plus_26)
-          without_degree_bound with_degree_bound)
+        Array.zip_exn (mask lengths choice) e )
 
   let compute_challenges ~scalar chals =
-    Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        scalar prechallenge)
+    Vector.map chals ~f:(fun prechallenge ->
+        scalar @@ Bulletproof_challenge.pack prechallenge )
 
-  let b_poly = Field.(b_poly ~add ~mul ~one)
+  let challenge_polynomial chals =
+    Field.(G.challenge_polynomial ~add ~mul ~one chals)
 
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
         let rec go acc i =
           if i = 0 then acc else go (Field.square acc) (i - 1)
         in
-        go pt n)
+        go pt n )
 
   let actual_evaluation (e : Field.t array) ~(pt_to_n : Field.t) : Field.t =
     with_label __LOC__ (fun () ->
@@ -683,30 +748,29 @@ struct
             List.fold ~init:e es ~f:(fun acc y ->
                 let acc' =
                   exists Field.typ ~compute:(fun () ->
-                      As_prover.read_var Field.(y + (pt_to_n * acc)))
+                      As_prover.read_var Field.(y + (pt_to_n * acc)) )
                 in
                 (* acc' = y + pt_n * acc *)
                 let pt_n_acc = Field.(pt_to_n * acc) in
-                let open Kimchi_backend_common.Plonk_constraint_system
-                         .Plonk_constraint in
+                let open
+                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
                 assert_
-                  [ { annotation = None
-                    ; basic =
-                        T
-                          (Basic
-                             { l = (one, y)
-                             ; r = (one, pt_n_acc)
-                             ; o = (negate one, acc')
-                             ; m = zero
-                             ; c = zero
-                             })
-                    }
-                  ] ;
-                acc')
+                  { annotation = None
+                  ; basic =
+                      T
+                        (Basic
+                           { l = (one, y)
+                           ; r = (one, pt_n_acc)
+                           ; o = (negate one, acc')
+                           ; m = zero
+                           ; c = zero
+                           } )
+                  } ;
+                acc' )
         | [] ->
-            failwith "empty list")
+            failwith "empty list" )
 
   let shift1 =
     Shifted_value.Type1.Shift.(
@@ -731,6 +795,9 @@ struct
     include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
   end
 
+  let field_array_if b ~then_ ~else_ =
+    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
+
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
@@ -741,57 +808,73 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~domain ~max_quot_size ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
         , _
         , _ Shifted_value.Type2.t
+        , _
         , _ )
-        Types.Step.Proof_state.Deferred_values.In_circuit.t)
-      { Plonk_types.All_evals.ft_eval1
-      ; evals =
-          ( { evals = evals1; public_input = x_hat1 }
-          , { evals = evals2; public_input = x_hat2 } )
-      } =
-    let T = Branching.eq in
+        Types.Step.Proof_state.Deferred_values.In_circuit.t )
+      { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    let T = Proofs_verified.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
-    let absorb_evals x_hat e =
-      with_label __LOC__ (fun () ->
-          let xs, ys = Evals.to_vectors e in
-          List.iter
-            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
-            ~f:(Array.iter ~f:(Sponge.absorb sponge)))
+    let plonk = map_plonk_to_field plonk in
+    let zetaw = Field.mul domain#generator plonk.zeta in
+    let sg_evals1, sg_evals2 =
+      let sg_olds =
+        Vector.map old_bulletproof_challenges ~f:(fun chals ->
+            unstage (challenge_polynomial (Vector.to_array chals)) )
+      in
+      let sg_evals pt = Vector.map sg_olds ~f:(fun f -> f pt) in
+      (sg_evals plonk.zeta, sg_evals zetaw)
     in
-    (* A lot of hashing. *)
-    absorb_evals x_hat1 evals1 ;
-    absorb_evals x_hat2 evals2 ;
-    Sponge.absorb sponge ft_eval1 ;
+    let sponge_state =
+      (* Absorb bulletproof challenges *)
+      let challenge_digest =
+        let sponge = Sponge.create sponge_params in
+        Vector.iter old_bulletproof_challenges
+          ~f:(Vector.iter ~f:(Sponge.absorb sponge)) ;
+        Sponge.squeeze sponge
+      in
+      Sponge.absorb sponge challenge_digest ;
+      Sponge.absorb sponge ft_eval1 ;
+      Sponge.absorb sponge (fst evals.public_input) ;
+      Sponge.absorb sponge (snd evals.public_input) ;
+      let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
+      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
+        ~f:(fun () (x1, x2) ->
+          let absorb = Array.iter ~f:(Sponge.absorb sponge) in
+          absorb x1 ; absorb x2 )
+        ~finish:(fun () -> Array.copy sponge.state)
+    in
+    sponge.state <- sponge_state ;
     let xi_actual = squeeze_scalar sponge in
     let r_actual = squeeze_challenge sponge in
     let xi_correct =
       with_label __LOC__ (fun () ->
-          let { SC.SC.inner = xi_actual } = xi_actual in
-          let { SC.SC.inner = xi } = xi in
+          let { Import.Scalar_challenge.inner = xi_actual } = xi_actual in
+          let { Import.Scalar_challenge.inner = xi } = xi in
           (* Sample new sg challenge point here *)
-          Field.equal xi_actual xi)
+          Field.equal xi_actual xi )
     in
     let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
-    let r = scalar_to_field (SC.SC.create r_actual) in
-    let plonk = map_plonk_to_field plonk in
-    let zetaw = Field.mul domain#generator plonk.zeta in
-    let plonk_minimal = Plonk.to_minimal plonk in
+    let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
+    let plonk_minimal =
+      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+    in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
       (* TODO: zeta_n is recomputed in [env] below *)
       let zeta_n = pow2pow plonk.zeta n in
       let zetaw_n = pow2pow zetaw n in
-      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
+      Evals.In_circuit.map evals.evals ~f:(fun (x0, x1) ->
+          ( actual_evaluation ~pt_to_n:zeta_n x0
+          , actual_evaluation ~pt_to_n:zetaw_n x1 ) )
     in
     let env =
       Plonk_checks.scalars_env
@@ -801,75 +884,92 @@ struct
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
           Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-          |> Kimchi_pasta.Pasta.Fq.of_bigint |> Field.constant)
-        ~domain (Plonk.to_minimal plonk) combined_evals
+          |> Kimchi_pasta.Pasta.Fq.of_bigint |> Field.constant )
+        ~domain plonk_minimal combined_evals
     in
     let combined_inner_product_correct =
+      let evals1, evals2 =
+        All_evals.With_public_input.In_circuit.factor evals
+      in
       with_label __LOC__ (fun () ->
           let ft_eval0 : Field.t =
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~env ~domain plonk_minimal combined_evals x_hat1)
+                  ~lookup_constant_term_part:None ~env ~domain plonk_minimal
+                  combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
-            let sg_olds =
-              Vector.map old_bulletproof_challenges ~f:(fun chals ->
-                  unstage (b_poly (Vector.to_array chals)))
-            in
-            let combine ~ft pt x_hat e =
-              let pi = Branching.add Nat.N26.n in
-              let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
+            let combine ~ft ~sg_evals x_hat
+                (e : (Field.t array, _) Evals.In_circuit.t) =
+              let a =
+                Evals.In_circuit.to_list e
+                |> List.map ~f:(function
+                     | None ->
+                         [||]
+                     | Some a ->
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                     | Maybe (b, a) ->
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+              in
               let sg_evals =
-                match actual_branching with
-                | None ->
-                    Vector.map sg_olds ~f:(fun f -> [| f pt |])
-                | Some branching ->
-                    let mask =
-                      ones_vector
-                        (module Impl)
-                        ~first_zero:branching (Vector.length sg_olds)
-                    in
-                    with_label __LOC__ (fun () ->
-                        Vector.map2 mask sg_olds ~f:(fun b f ->
-                            [| Field.((b :> t) * f pt) |]))
+                Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
+                |> Vector.to_list
+                (* TODO: This was the code before the wrap hack was put in
+                   match actual_proofs_verified with
+                   | None ->
+                       Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                   | Some proofs_verified ->
+                       let mask =
+                         ones_vector
+                           (module Impl)
+                           ~first_zero:proofs_verified (Vector.length sg_olds)
+                       in
+                       with_label __LOC__ (fun () ->
+                           Vector.map2 mask sg_olds ~f:(fun b f ->
+                               [| Field.((b :> t) * f pt) |] ) ) *)
               in
               let v =
-                Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
+                List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
               in
-              combined_evaluation pi ~xi ~evaluation_point:pt (v, b)
-                ~max_quot_size
+              Common.combined_evaluation (module Impl) ~xi v
             in
-            combine ~ft:ft_eval0 plonk.zeta x_hat1 evals1
-            + (r * combine ~ft:ft_eval1 zetaw x_hat2 evals2)
+            combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
+              evals1.evals
+            + r
+              * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
+                  evals2.evals
           in
           with_label __LOC__ (fun () ->
               equal
                 (Shifted_value.Type2.to_field
                    (module Field)
-                   ~shift:shift2 combined_inner_product)
-                actual_combined_inner_product))
+                   ~shift:shift2 combined_inner_product )
+                actual_combined_inner_product ) )
     in
     let bulletproof_challenges =
       with_label __LOC__ (fun () ->
-          compute_challenges ~scalar:scalar_to_field bulletproof_challenges)
+          compute_challenges ~scalar:scalar_to_field bulletproof_challenges )
     in
     let b_correct =
       with_label __LOC__ (fun () ->
-          let b_poly =
-            unstage (b_poly (Vector.to_array bulletproof_challenges))
+          let challenge_poly =
+            unstage
+              (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
-          let b_actual = b_poly plonk.zeta + (r * b_poly zetaw) in
+          let b_actual =
+            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+          in
           equal
             (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
-            b_actual)
+            b_actual )
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2 plonk combined_evals)
+            ~env ~shift:shift2 plonk combined_evals )
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
@@ -897,21 +997,12 @@ struct
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges
           ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            { Bulletproof_challenge.prechallenge = scalar r.prechallenge })
+            Bulletproof_challenge.map ~f:scalar r )
     ; xi = scalar xi
     ; b
     }
-
-  (* TODO: No need to hash the entire bulletproof challenges. Could
-     just hash the segment of the public input LDE corresponding to them
-     that we compute when verifying the previous proof. That is a commitment
-     to them. *)
-
-  let hash_me_only (type n) (_max_branching : n Nat.t)
-      (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
-    let sponge = Sponge.create sponge_params in
-    Array.iter ~f:(Sponge.absorb sponge)
-      (Types.Wrap.Proof_state.Me_only.to_field_elements
-         ~g1:Inner_curve.to_field_elements t) ;
-    Sponge.squeeze_field sponge
 end
+
+include Make (Wrap_main_inputs)
+
+let challenge_polynomial = G.challenge_polynomial

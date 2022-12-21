@@ -3,6 +3,6 @@
  (public_name random_oracle.permutation)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (libraries sponge kimchi_backend kimchi_backend.pasta)
+ (libraries sponge kimchi_backend kimchi_backend.pasta kimchi_backend.pasta.basic)
  (virtual_modules random_oracle_permutation)
  (default_implementation random_oracle.permutation.external))

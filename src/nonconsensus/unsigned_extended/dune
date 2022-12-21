@@ -20,9 +20,13 @@
    ppx_dhall_type
    snark_params_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare
+  (pps ppx_mina ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare
        ppx_inline_test ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Unsigned integer functions"))

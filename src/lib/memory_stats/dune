@@ -6,7 +6,6 @@
    ;; opam libraries
    async_unix
    core_kernel
-   jemalloc
    async_kernel
    core
    async
@@ -14,6 +13,6 @@
    ;; local libraries
    logger)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_let))
+  (pps ppx_snarky ppx_mina ppx_version ppx_let))
  (instrumentation (backend bisect_ppx))
- (synopsis "Memory statistics for OCaml and jemalloc"))
+ (synopsis "Memory statistics for OCaml"))

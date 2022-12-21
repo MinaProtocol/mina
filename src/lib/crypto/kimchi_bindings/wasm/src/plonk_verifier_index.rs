@@ -5,7 +5,9 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
-    constraints::{zk_polynomial, zk_w3, Shifts},
+    constraints::FeatureFlags,
+    polynomials::permutation::Shifts,
+    polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
 };
 use kimchi::linearization::expr_linearization;
@@ -222,7 +224,8 @@ macro_rules! impl_verification_key {
             pub struct [<Wasm $field_name:camel PlonkVerifierIndex>] {
                 pub domain: WasmDomain,
                 pub max_poly_size: i32,
-                pub max_quot_size: i32,
+                pub public_: i32,
+                pub prev_challenges: i32,
                 #[wasm_bindgen(skip)]
                 pub srs: $WasmSrs,
                 #[wasm_bindgen(skip)]
@@ -238,7 +241,8 @@ macro_rules! impl_verification_key {
                 pub fn new(
                     domain: &WasmDomain,
                     max_poly_size: i32,
-                    max_quot_size: i32,
+                    public_: i32,
+                    prev_challenges: i32,
                     srs: &$WasmSrs,
                     evals: &WasmPlonkVerificationEvals,
                     shifts: &WasmShifts,
@@ -246,7 +250,8 @@ macro_rules! impl_verification_key {
                     WasmPlonkVerifierIndex {
                         domain: domain.clone(),
                         max_poly_size,
-                        max_quot_size,
+                        public_,
+                        prev_challenges,
                         srs: srs.clone(),
                         evals: evals.clone(),
                         shifts: shifts.clone(),
@@ -284,7 +289,8 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
+                    public_: vi.public as i32,
+                    prev_challenges: vi.prev_challenges as i32,
                     srs: srs.into(),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: IntoIterator::into_iter(vi.sigma_comm).map(From::from).collect(),
@@ -324,7 +330,6 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.clone().into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
                     srs: srs.clone().into(),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: vi.sigma_comm.iter().map(From::from).collect(),
@@ -357,7 +362,8 @@ macro_rules! impl_verification_key {
 
             pub fn of_wasm(
                 max_poly_size: i32,
-                max_quot_size: i32,
+                public_: i32,
+                prev_challenges: i32,
                 log_size_of_group: i32,
                 srs: &$WasmSrs,
                 evals: &WasmPlonkVerificationEvals,
@@ -374,7 +380,18 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(domain, false, None);
+                let feature_flags =
+                    FeatureFlags {
+                        chacha: false,
+                        range_check: false,
+                        foreign_field_add: false,
+                        foreign_field_mul: false,
+                        rot: false,
+                        xor: false,
+                        lookup_configuration: None,
+                    };
+
+                let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
                 let index =
                     DlogVerifierIndex {
@@ -393,13 +410,27 @@ macro_rules! impl_verification_key {
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
                         chacha_comm: None,
-                        w: zk_w3(domain),
-                        fr_sponge_params: $FrSpongeParams::params(),
-                        fq_sponge_params: $FqSpongeParams::params(),
+                        range_check_comm: None,
+                        foreign_field_add_comm: None,
+                        foreign_field_mul_comm: None,
+                        rot_comm: None,
+                        xor_comm: None,
+
+                        foreign_field_modulus: None,
+                        w: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(zk_w3(domain)).unwrap();
+                            res
+                        },
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
-                        max_quot_size: max_quot_size as usize,
-                        zkpm: zk_polynomial(domain),
+                        public: public_ as usize,
+                        prev_challenges: prev_challenges as usize,
+                        zkpm: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(zk_polynomial(domain)).unwrap();
+                            res
+                        },
                         shift: [
                             shifts.s0.into(),
                             shifts.s1.into(),
@@ -409,7 +440,11 @@ macro_rules! impl_verification_key {
                             shifts.s5.into(),
                             shifts.s6.into()
                         ],
-                        srs: srs.0.clone(),
+                        srs: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(srs.0.clone()).unwrap();
+                            res
+                        },
                         linearization,
                         powers_of_alpha,
                         // TODO
@@ -422,7 +457,8 @@ macro_rules! impl_verification_key {
                 fn from(index: WasmPlonkVerifierIndex) -> Self {
                     of_wasm(
                         index.max_poly_size,
-                        index.max_quot_size,
+                        index.public_,
+                        index.prev_challenges,
                         index.domain.log_size_of_group,
                         &index.srs,
                         &index.evals,
@@ -439,15 +475,11 @@ macro_rules! impl_verification_key {
             ) -> Result<DlogVerifierIndex<$G>, JsValue> {
                 let path = Path::new(&path);
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-                let fq_sponge_params = $FqSpongeParams::params();
-                let fr_sponge_params = $FrSpongeParams::params();
                 DlogVerifierIndex::<$G>::from_file(
-                    srs.0.clone(),
+                    Some(srs.0.clone()),
                     path,
                     offset.map(|x| x as u64),
                     endo_q,
-                    fq_sponge_params,
-                    fr_sponge_params,
                 ).map_err(|e| JsValue::from_str(format!("read_raw: {}", e).as_str()))
             }
 
@@ -560,7 +592,8 @@ macro_rules! impl_verification_key {
                         group_gen: $F::one().into(),
                     },
                     max_poly_size: 0,
-                    max_quot_size: 0,
+                    public_: 0,
+                    prev_challenges: 0,
                     srs: $WasmSrs(Arc::new(SRS::create(0))),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: vec_comm(PERMUTS),
@@ -603,7 +636,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use crate::srs::fp::WasmFpSrs;
-    use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+    use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine};
 
     impl_verification_key!(
         caml_pasta_fp_plonk_verifier_index,
@@ -614,8 +647,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -627,7 +660,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use crate::srs::fq::WasmFqSrs;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+    use mina_curves::pasta::{Fq, Pallas as GAffine, Vesta as GAffineOther};
 
     impl_verification_key!(
         caml_pasta_fq_plonk_verifier_index,
@@ -638,8 +671,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );

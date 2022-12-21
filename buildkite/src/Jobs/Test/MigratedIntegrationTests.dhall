@@ -37,9 +37,7 @@ Pipeline.build
         , name = "MigratedIntegrationTests"
         }
     , steps =
-      [ one "Snarkless integration test (migrated)" "test_postake_snarkless" "./buildkite/scripts/old_integration_tests/test_postake_snarkless.sh"
-      , one "Split integration test (migrated)" "test_postake_split" "./buildkite/scripts/old_integration_tests/test_postake_split.sh"
-      , one "Bootstrap integration test (migrated)" "bootstrap_test" "./buildkite/scripts/old_integration_tests/test_bootstrap.sh"
-      , one "Shared state integration test (migrated)" "shared_state_test" "./buildkite/scripts/old_integration_tests/test_shared_state.sh"
+      [ 
+      one "Shared state integration test (migrated)" "shared_state_test" "./buildkite/scripts/old_integration_tests/test_shared_state.sh"
       ]
     }

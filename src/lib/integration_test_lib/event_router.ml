@@ -32,7 +32,7 @@ module Make (Engine : Intf.Engine.S) () :
       Event_type.Map.update !handlers event_type ~f:(fun registered_handlers ->
           registered_handlers |> Option.value ~default:[]
           |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
-                 not (List.mem ids registered_id ~equal:Event_handler_id.equal)))
+                 not (List.mem ids registered_id ~equal:Event_handler_id.equal) ) )
 
   let dispatch_event handlers node event =
     let open Event_type in
@@ -49,7 +49,7 @@ module Make (Engine : Intf.Engine.S) () :
                 ( handler_id
                 , handler_finished_ivar
                 , handler_type
-                , handler_callback )) =
+                , handler_callback ) ) =
             handler
           in
           match%map
@@ -60,7 +60,7 @@ module Make (Engine : Intf.Engine.S) () :
               None
           | `Stop result ->
               Ivar.fill handler_finished_ivar result ;
-              Some handler_id)
+              Some handler_id )
     in
     unregister_event_handlers_by_id handlers
       (Event_type.type_of_event event)
@@ -75,7 +75,7 @@ module Make (Engine : Intf.Engine.S) () :
                [ ("event", Event_type.event_to_yojson event)
                ; ("node", `String (Node.id node))
                ] ;
-           dispatch_event handlers node event)) ;
+           dispatch_event handlers node event ) ) ;
     { logger; handlers }
 
   let on t event_type ~f =

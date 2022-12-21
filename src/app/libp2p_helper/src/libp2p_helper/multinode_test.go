@@ -56,15 +56,11 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 	cancels := make([]context.CancelFunc, numNodes)
 	keys := make([]crypto.PrivKey, numNodes)
 	ids := make([]kb.ID, numNodes)
-	// We generate keys in such an awkward way to make dht not mark the peer ids as protected
-	for ni := 0; ni < numNodes; {
+	for ni := 0; ni < numNodes; ni++ {
 		keys[ni] = newTestKey(t)
 		pid, err := peer.IDFromPrivateKey(keys[ni])
 		require.NoError(t, err)
 		ids[ni] = kb.ConvertPeerID(pid)
-		if ni == 0 || kb.CommonPrefixLen(ids[ni], ids[0]) >= 2 {
-			ni++
-		}
 	}
 	errChan := make(chan error, numNodes)
 	topCtx, topCtxCancel := context.WithCancel(context.Background())
@@ -72,7 +68,7 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 		trap := newUpcallTrap(fmt.Sprintf("node %d", ni), 64, upcallMask)
 		ctx, cancelF := context.WithCancel(topCtx)
 		cancels[ni] = cancelF
-		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, false, nextPort(), ctx)
+		node := newTestAppWithMaxConnsAndCtx(t, keys[ni], nil, false, CONNS_LO, CONNS_HI, .2, nextPort(), ctx)
 		node.NoMDNS = true
 		node.P2p.Logger = logging.Logger(fmt.Sprintf("node%d", ni))
 		node.SetConnectionHandlers()

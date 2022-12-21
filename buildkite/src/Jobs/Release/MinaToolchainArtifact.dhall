@@ -23,7 +23,7 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/2-"),
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
-          S.strictly (S.contains "src/opam.export")
+          S.strictly (S.contains "opam.export")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"

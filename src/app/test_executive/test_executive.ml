@@ -11,7 +11,7 @@ type engine = string * (module Intf.Engine.S)
 module Make_test_inputs (Engine : Intf.Engine.S) () :
   Intf.Test.Inputs_intf
     with type Engine.Network_config.Cli_inputs.t =
-          Engine.Network_config.Cli_inputs.t = struct
+      Engine.Network_config.Cli_inputs.t = struct
   module Engine = Engine
 
   module Dsl = Dsl.Make (Engine) ()
@@ -20,7 +20,7 @@ end
 type test_inputs_with_cli_inputs =
   | Test_inputs_with_cli_inputs :
       (module Intf.Test.Inputs_intf
-         with type Engine.Network_config.Cli_inputs.t = 'cli_inputs)
+         with type Engine.Network_config.Cli_inputs.t = 'cli_inputs )
       * 'cli_inputs
       -> test_inputs_with_cli_inputs
 
@@ -28,13 +28,23 @@ type inputs =
   { test_inputs : test_inputs_with_cli_inputs
   ; test : test
   ; mina_image : string
-  ; archive_image : string
+  ; archive_image : string option
   ; debug : bool
   }
 
-let validate_inputs { mina_image; _ } =
-  if String.is_empty mina_image then
-    failwith "Mina image cannot be an empty string"
+let validate_inputs ~logger inputs (test_config : Test_config.t) :
+    unit Deferred.t =
+  if String.is_empty inputs.mina_image then (
+    [%log fatal] "mina-image argument cannot be an empty string" ;
+    exit 1 )
+  else if
+    test_config.num_archive_nodes > 0 && Option.is_none inputs.archive_image
+  then (
+    [%log fatal]
+      "This test uses archive nodes.  archive-image argument cannot be absent \
+       for this test" ;
+    exit 1 )
+  else Deferred.return ()
 
 let engines : engine list =
   [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
@@ -46,8 +56,8 @@ let tests : test list =
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
-  ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ( "opt-block-prod"
@@ -83,7 +93,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_eprintf
          (color_of_severity severity)
          "%s %s\n"
-         (category_prefix_of_severity severity))
+         (category_prefix_of_severity severity) )
   in
   let max_sev a b =
     match (a, b) with
@@ -118,62 +128,69 @@ let report_test_errors ~log_error_set ~internal_error_set =
               (color_of_severity severity)
               "        [%s] %s\n"
               (Time.to_string error_message.timestamp)
-              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))) ;
-        Print.eprintf "\n")
+              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message)) ) ;
+        Print.eprintf "\n" )
   in
   (* check invariants *)
-  if List.length log_errors.from_current_context > 0 then
-    failwith "all error logs should be contextualized by node id" ;
-  (* report log errors *)
-  Print.eprintf "\n" ;
-  ( match log_errors_severity with
-  | `None ->
-      ()
-  | `Soft ->
-      report_log_errors "Warning"
-  | `Hard ->
-      report_log_errors "Error" ) ;
-  (* report contextualized internal errors *)
-  color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
-  Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
-      print_category_header
-        (max_severity_of_list (List.map errors ~f:fst))
-        "%s" context ;
-      List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
+  match log_errors.from_current_context with
+  | _ :: _ ->
+      failwith "all error logs should be contextualized by node id"
+  | [] ->
+      (* report log errors *)
+      Print.eprintf "\n" ;
+      ( match log_errors_severity with
+      | `None ->
+          ()
+      | `Soft ->
+          report_log_errors "Warning"
+      | `Hard ->
+          report_log_errors "Error" ) ;
+      (* report contextualized internal errors *)
+      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
+          print_category_header
+            (max_severity_of_list (List.map errors ~f:fst))
+            "%s" context ;
+          List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
+              color_eprintf
+                (color_of_severity severity)
+                "    [%s] %s\n"
+                (Time.to_string occurrence_time)
+                (Error.to_string_hum error) ) ) ;
+      (* report non-contextualized internal errors *)
+      List.iter internal_errors.from_current_context
+        ~f:(fun (severity, { occurrence_time; error }) ->
           color_eprintf
             (color_of_severity severity)
-            "    [%s] %s\n"
+            "[%s] %s\n"
             (Time.to_string occurrence_time)
-            (Error.to_string_hum error))) ;
-  (* report non-contextualized internal errors *)
-  List.iter internal_errors.from_current_context
-    ~f:(fun (severity, { occurrence_time; error }) ->
-      color_eprintf
-        (color_of_severity severity)
-        "[%s] %s\n"
-        (Time.to_string occurrence_time)
-        (Error.to_string_hum error)) ;
-  (* determine if test is passed/failed and exit accordingly *)
-  let test_failed =
-    match (log_errors_severity, internal_errors_severity) with
-    | _, `Hard | _, `Soft ->
-        true
-    (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
-    | `Hard, _ | `Soft, _ | `None, `None ->
-        false
-  in
-  Print.eprintf "\n" ;
-  let result =
-    if test_failed then (
-      color_eprintf Bash_colors.red
-        "The test has failed. See the above errors for details.\n\n" ;
-      false )
-    else (
-      color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
-      true )
-  in
-  let%bind () = Writer.(flushed (Lazy.force stderr)) in
-  return result
+            (Error.to_string_hum error) ) ;
+      (* determine if test is passed/failed and exit accordingly *)
+      let test_failed =
+        match (log_errors_severity, internal_errors_severity) with
+        | _, `Hard | _, `Soft ->
+            true
+        (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
+        | `Hard, _ | `Soft, _ | `None, `None ->
+            false
+      in
+      Print.eprintf "\n" ;
+      let exit_code =
+        if test_failed then (
+          color_eprintf Bash_colors.red
+            "The test has failed. See the above errors for details.\n\n" ;
+          match (internal_error_set.exit_code, log_error_set.exit_code) with
+          | None, None ->
+              Some 1
+          | Some exit_code, _ | None, Some exit_code ->
+              Some exit_code )
+        else (
+          color_eprintf Bash_colors.green
+            "The test has completed successfully.\n\n" ;
+          None )
+      in
+      let%bind () = Writer.(flushed (Lazy.force stderr)) in
+      return exit_code
 
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
@@ -195,7 +212,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       let open Test_error.Set in
       combine [ test_error_set; of_hard_or_error log_engine_cleanup_result ]
     in
-    let%bind test_was_successful =
+    let%bind exit_code =
       report_test_errors ~log_error_set ~internal_error_set
     in
     let%bind () = pause_cleanup_func () in
@@ -203,7 +220,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       Option.value_map !net_manager_ref ~default:Deferred.unit
         ~f:network_cleanup_func
     in
-    if not test_was_successful then exit 1 else Deferred.unit
+    Deferred.Option.map ~f:exit (return exit_code) >>| ignore
   in
   match !cleanup_deferred_ref with
   | Some deferred ->
@@ -245,12 +262,14 @@ let main inputs =
   let logger = Logger.create () in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
-    ; archive_node = inputs.archive_image
+    ; archive_node =
+        Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
     ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
+  let%bind () = validate_inputs ~logger inputs T.config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
@@ -289,7 +308,7 @@ let main inputs =
       in
       don't_wait_for
         (f_dispatch_cleanup ~exit_reason:"signal received"
-           ~test_result:(Malleable_error.hard_error error))) ;
+           ~test_result:(Malleable_error.hard_error error) ) ) ;
   let%bind monitor_test_result =
     let on_fatal_error message =
       don't_wait_for
@@ -297,24 +316,26 @@ let main inputs =
            ~exit_reason:
              (sprintf
                 !"log engine fatal error: %s"
-                (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-           ~test_result:(Malleable_error.hard_error_string "fatal error"))
+                (Yojson.Safe.to_string (Logger.Message.to_yojson message)) )
+           ~test_result:(Malleable_error.hard_error_string "fatal error") )
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
-        let init_result =
-          let open Deferred.Or_error.Let_syntax in
-          let lift = Deferred.map ~f:Or_error.return in
+        let open Malleable_error.Let_syntax in
+        let%bind network, dsl =
+          let lift ?exit_code =
+            Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)
+          in
           [%log trace] "initializing network manager" ;
           let%bind net_manager =
-            lift @@ Engine.Network_manager.create ~logger network_config
+            Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
           [%log trace] "deploying network" ;
-          let%bind network =
-            lift @@ Engine.Network_manager.deploy net_manager
-          in
+          let%bind network = Engine.Network_manager.deploy net_manager in
           [%log trace] "initializing log engine" ;
-          let%map log_engine = Engine.Log_engine.create ~logger ~network in
+          let%map log_engine =
+            lift ~exit_code:6 (Engine.Log_engine.create ~logger ~network)
+          in
           log_engine_ref := Some log_engine ;
           let event_router =
             Dsl.Event_router.create ~logger
@@ -332,10 +353,6 @@ let main inputs =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
           (network, dsl)
-        in
-        let open Malleable_error.Let_syntax in
-        let%bind network, dsl =
-          Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
@@ -358,7 +375,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl)
+        T.run network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -376,7 +393,6 @@ let main inputs =
   exit 0
 
 let start inputs =
-  validate_inputs inputs ;
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
@@ -401,7 +417,7 @@ let archive_image_arg =
   let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
-      ( opt string "unused"
+      ( opt (some string) None
       & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
 
 let debug_arg =

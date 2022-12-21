@@ -1,5 +1,5 @@
 <a href="https://minaprotocol.com">
-	<img width="200" src="https://minaprotocol.com/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
+	<img width="200" src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" alt="Mina Logo" />
 </a>
 <hr/>
 
@@ -51,6 +51,12 @@ For the purposes of this README we are assuming the following:
 
 - You have Kubectl configured for the GKE cluster of your choice: https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl
   TL;DR: `gcloud container clusters get-credentials -region us-east1 coda-infra-east`
+
+- You have `jq` installed on your local machine. jq is a json processor that is used to create the testnet ledger
+
+- You have `node` version `14.x` installed to your machine. (Note that later releases of `node` and `npm` may cause compatibility issues with the `node-fetch` module used for certain scripts and ledger generation. The newer version of `node-fetch` has not been tested: https://github.com/node-fetch/node-fetch/blob/HEAD/docs/v3-UPGRADE-GUIDE.md)
+
+- You have installed and initialized the `yarn` build tool by running `yarn install` and `yarn build` from within the ./automation directory, before building your testnet
 
 # What is a Testnet
 
@@ -158,12 +164,14 @@ Once decided on a cluster/context to deploy, use the following command to retrie
 
 There is a testnet module variable which determines the *Kubernetes* context to deploy to. Reference the module's [variable definitions](./terraform/modules/kubernetes/testnet/variables.tf) for more details on how to properly configure.
 
-```variable "k8s_context" {
+```
+variable "k8s_context" {
   type = string
 
   description = "K8s resource provider context"
   default     = "gke_o1labs-192920_us-east1_coda-infra-east"
-}```
+}
+```
 
 #### Set Terraform Kubernetes provider configuration path
 
@@ -171,7 +179,7 @@ In order for Terraform to locate and identify the configured Kubernetes contexts
 
 ```
 export KUBE_CONFIG_PATH=~/.kube/config
-}```
+```
 
 ### Generate Keys and Genesis Ledger
 

@@ -18,7 +18,7 @@ let ip_service_result { uri; body_handler } ~logger =
     Monitor.try_with ~here:[%here] (fun () ->
         let%bind resp, body = Client.get (Uri.of_string uri) in
         let%map body = Body.to_string body in
-        match resp.status with `OK -> Some (body_handler body) | _ -> None)
+        match resp.status with `OK -> Some (body_handler body) | _ -> None )
   with
   | Ok v ->
       v

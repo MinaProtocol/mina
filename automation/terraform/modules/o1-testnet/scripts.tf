@@ -8,7 +8,7 @@ resource "null_resource" "block_producer_key_generation" {
 resource "null_resource" "block_producer_uploads" {
   provisioner "local-exec" {
     working_dir = "${path.module}/../../.."
-    command     = "./scripts/upload-keys-k8s.sh ${var.testnet_name}"
+    command     = "./scripts/upload-keys-k8s-simplified.sh ${var.testnet_name}"
     environment = {
       CLUSTER = var.k8s_context
     }

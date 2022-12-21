@@ -20,7 +20,7 @@ let read_input =
     Writer.write stdout prompt ;
     Thread_safe.block_on_async_exn (fun () ->
         let%bind () = Writer.flushed stdout in
-        go buffer len 0)
+        go buffer len 0 )
 
 let () =
   let config = Coda_lib.config coda in

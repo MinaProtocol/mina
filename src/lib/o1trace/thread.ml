@@ -78,7 +78,7 @@ module Fiber = struct
   let rec fiber_key name parent =
     name
     :: Option.value_map parent ~default:[] ~f:(fun p ->
-           fiber_key p.thread.name p.parent)
+           fiber_key p.thread.name p.parent )
 
   let register name parent =
     let key = fiber_key name parent in

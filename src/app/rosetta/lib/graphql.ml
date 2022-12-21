@@ -89,13 +89,3 @@ let query_and_catch query_obj uri =
   match res with
   | Ok r -> Ok (`Successful r)
   | Error e -> Ok (`Failed e)
-
-module Decoders = struct
-  let uint64 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
-
-  let int64 json = Yojson.Basic.Util.to_string json |> Int64.of_string
-
-  let uint32 json =
-    Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
-end

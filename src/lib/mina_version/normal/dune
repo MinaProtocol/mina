@@ -8,5 +8,8 @@
 
 (rule
  (targets mina_version.ml)
- (deps (:< gen.sh) (universe))
+ (deps
+   (sandbox none)
+   (:< gen.sh)
+   (universe))
  (action (run %{<} %{targets})))

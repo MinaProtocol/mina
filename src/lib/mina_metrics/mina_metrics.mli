@@ -58,11 +58,29 @@ module Cryptography : sig
 
   val snark_work_merge_time_sec : Snark_work_histogram.t
 
-  val snark_work_base_time_sec : Snark_work_histogram.t
+  val snark_work_zkapp_base_time_sec : Counter.t
+
+  val snark_work_base_time_sec : Counter.t
+
+  val snark_work_zkapp_base_submissions : Counter.t
+
+  val snark_work_base_submissions : Counter.t
+
+  val zkapp_transaction_length : Counter.t
+
+  val zkapp_proof_updates : Counter.t
 end
 
 module Bootstrap : sig
   val bootstrap_time_ms : Gauge.t
+
+  val staking_epoch_ledger_sync_ms : Counter.t
+
+  val next_epoch_ledger_sync_ms : Counter.t
+
+  val root_snarked_ledger_sync_ms : Counter.t
+
+  val num_of_root_snarked_ledger_retargeted : Gauge.t
 end
 
 module Transaction_pool : sig
@@ -71,6 +89,14 @@ module Transaction_pool : sig
   val pool_size : Gauge.t
 
   val transactions_added_to_pool : Counter.t
+
+  val zkapp_transactions_added_to_pool : Counter.t
+
+  val zkapp_transaction_size : Counter.t
+
+  val zkapp_updates : Counter.t
+
+  val zkapp_proof_updates : Counter.t
 end
 
 module Network : sig
@@ -96,6 +122,14 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Snark_work : sig
@@ -110,6 +144,14 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Transaction : sig
@@ -122,6 +164,14 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -288,6 +338,8 @@ module Snark_work : sig
 
   val snark_work_timed_out_rpc : Counter.t
 
+  val snark_work_failed_rpc : Counter.t
+
   val snark_pool_size : Gauge.t
 
   val pending_snark_work : Gauge.t
@@ -375,6 +427,8 @@ module Transition_frontier : sig
   val recently_finalized_staged_txns : Gauge.t
 
   val best_tip_user_txns : Gauge.t
+
+  val best_tip_zkapp_txns : Gauge.t
 
   val best_tip_coinbase : Gauge.t
 

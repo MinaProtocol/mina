@@ -17,7 +17,6 @@ Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
     dirtyWhen = [
-        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet"),
         S.strictlyStart (S.contains "buildkite/src/Command/DeployTestnet"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/DeployTestnetAndDestroy")
     ],

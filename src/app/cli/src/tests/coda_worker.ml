@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Pipe_lib
 open Init
@@ -111,7 +111,7 @@ module T = struct
     ; validated_transitions_keyswaptest :
         ( 'worker
         , unit
-        , External_transition.Validated.t Pipe.Reader.t )
+        , Mina_block.Validated.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     }
 
@@ -134,7 +134,7 @@ module T = struct
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker : unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest :
-        unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
+        unit -> Mina_block.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff : unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal : unit -> unit Pipe.Reader.t Deferred.t
     ; coda_new_block :
@@ -296,8 +296,7 @@ module T = struct
     let validated_transitions_keyswaptest =
       C.create_pipe ~name:"validated_transitions_keyswaptest"
         ~f:validated_transitions_keyswaptest_impl ~bin_input:Unit.bin_t
-        ~bin_output:
-          [%bin_type_class: External_transition.Validated.Stable.Latest.t] ()
+        ~bin_output:[%bin_type_class: Mina_block.Validated.Stable.Latest.t] ()
 
     let replace_snark_worker_key =
       C.create_rpc ~name:"replace_snark_worker_key"
@@ -362,13 +361,22 @@ module T = struct
         >>| Or_error.ok_exn
       in
       let constraint_constants = precomputed_values.constraint_constants in
+      let module Context = struct
+        let logger = logger
+
+        let precomputed_values = precomputed_values
+
+        let constraint_constants = precomputed_values.constraint_constants
+
+        let consensus_constants = precomputed_values.consensus_constants
+      end in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d)
+            Mina_tracing.start d )
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -387,12 +395,12 @@ module T = struct
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
                 List.nth_exn (Lazy.force Genesis_ledger.accounts) i
-                |> Genesis_ledger.keypair_of_account_record_exn)
+                |> Genesis_ledger.keypair_of_account_record_exn )
           in
           let block_production_keypairs =
             block_production_keypair
             |> Option.map ~f:(fun kp ->
-                   (kp, Public_key.compress kp.Keypair.public_key))
+                   (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let block_production_pubkeys =
@@ -401,11 +409,11 @@ module T = struct
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
-            Consensus.Data.Local_state.create block_production_pubkeys
-              ~genesis_ledger:Genesis_ledger.t
+            Consensus.Data.Local_state.create
+              ~context:(module Context)
+              block_production_pubkeys ~genesis_ledger:Genesis_ledger.t
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
-              ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -431,8 +439,8 @@ module T = struct
               ; pubsub_v0 = RW
               ; validation_queue_size = 150
               ; peer_exchange = true
-              ; mina_peer_exchange = true
-              ; keypair = Some libp2p_keypair
+              ; peer_protection_ratio = 0.2
+              ; keypair = libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
               ; time_controller
@@ -457,6 +465,7 @@ module T = struct
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            ; precomputed_values
             }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
@@ -474,7 +483,7 @@ module T = struct
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
-                      work_selection_method)
+                      work_selection_method )
                  ~snark_worker_config:
                    Mina_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key = snark_worker_key
@@ -486,28 +495,27 @@ module T = struct
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~epoch_ledger_location
                  ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
-                 ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~block_production_keypairs ~monitor ~consensus_local_state
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000
-                 ~precomputed_values ~start_time ~upload_blocks_to_gcloud:false
+                 ~snark_work_fee:Currency.Fee.zero ~block_production_keypairs
+                 ~monitor ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-                          { name = "dummy"; value = host_and_port }))
-                 ~log_precomputed_blocks:false ~stop_time:48 ())
+                          { name = "dummy"; value = host_and_port } ) )
+                 ~log_precomputed_blocks:false ~stop_time:48 () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger ~node_error_url:None
-            ~contact_info:None coda_ref ;
+          Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+            ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
-                Coda_run.setup_local_server coda ;
-                coda)
+                Mina_run.setup_local_server coda ;
+                coda )
               ()
           in
           [%log info] "Worker finish setting up coda" ;
@@ -537,7 +545,7 @@ module T = struct
                 ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
-                     (Keypair.of_private_key_exn sender_sk))
+                     (Keypair.of_private_key_exn sender_sk) )
                 ()
             in
             let payment_input = build_user_command_input amount sk pk fee in
@@ -574,11 +582,14 @@ module T = struct
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
+                   let block_with_hash = Mina_block.Validated.forget t in
                    let prev_state_hash =
-                     External_transition.Validated.parent_hash t
+                     With_hash.data block_with_hash
+                     |> Mina_block.header |> Header.protocol_state
+                     |> Mina_state.Protocol_state.previous_state_hash
                    in
                    let state_hash =
-                     (External_transition.Validated.state_hashes t).state_hash
+                     State_hash.With_state_hashes.state_hash block_with_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
@@ -588,7 +599,7 @@ module T = struct
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
                      (prev_state_hash, state_hash) ;
-                   Deferred.unit)) ;
+                   Deferred.unit ) ) ;
             return r.pipe
           in
           let coda_validated_transitions_keyswaptest () =
@@ -602,7 +613,7 @@ module T = struct
                      [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w diff)) ;
+                   Linear_pipe.write_if_open w diff ) ) ;
             return r.pipe
           in
           let coda_initialization_finish_signal () =
@@ -643,7 +654,7 @@ module T = struct
                       | Error json ->
                           failwith
                             (sprintf "Receiving sync status error: %s"
-                               (Yojson.Basic.to_string json)))
+                               (Yojson.Basic.to_string json) ) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->
@@ -676,7 +687,7 @@ module T = struct
           ; coda_replace_snark_worker_key =
               with_monitor coda_replace_snark_worker_key
           ; coda_stop_snark_worker = with_monitor coda_stop_snark_worker
-          })
+          } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

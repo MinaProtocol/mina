@@ -221,28 +221,39 @@ module Make (Inputs : Inputs_intf) = struct
         G.Affine.t * G.Affine.t =
       (g g1, g g2)
     in
-    let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
     { Pickles_types.Plonk_types.Openings.Bulletproof.lr =
         Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
     ; delta = g t.delta
-    ; sg = g t.sg
+    ; challenge_polynomial_commitment = g t.sg
+    }
+
+  let lookup_eval_of_backend
+      ({ sorted; aggreg; table; runtime } : 'f Kimchi_types.lookup_evaluations)
+      : _ Pickles_types.Plonk_types.Evals.Lookup.t =
+    { sorted; aggreg; table; runtime }
+
+  let eval_of_backend
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
+    { w = tuple15_to_vec w
+    ; coefficients = tuple15_to_vec coefficients
+    ; z
+    ; s = tuple6_to_vec s
+    ; generic_selector
+    ; poseidon_selector
+    ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
   let of_backend (t : Backend.t) : t =
     let proof = opening_proof_of_backend_exn t.proof in
     let evals =
-      (fst t.evals, snd t.evals)
-      |> Tuple_lib.Double.map ~f:(fun e ->
-             let open Evaluations_backend in
-             Pickles_types.Plonk_types.Evals.
-               { w = tuple15_to_vec e.w
-               ; z = e.z
-               ; s = tuple6_to_vec e.s
-               ; generic_selector = e.generic_selector
-               ; poseidon_selector = e.poseidon_selector
-               })
+      let evals_to_tuple
+          ({ zeta; zeta_omega } : _ Kimchi_types.point_evaluations) =
+        (zeta, zeta_omega)
+      in
+      Plonk_types.Evals.map ~f:evals_to_tuple (eval_of_backend t.evals)
     in
     let wo x : Inputs.Curve.Affine.t array =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -259,21 +270,37 @@ module Make (Inputs : Inputs_intf) = struct
         { w_comm
         ; z_comm = wo t.commitments.z_comm
         ; t_comm = wo t.commitments.t_comm
+        ; lookup =
+            Option.map t.commitments.lookup
+              ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
+                { sorted = Array.map ~f:wo l.sorted
+                ; aggreg = wo l.aggreg
+                ; runtime = Option.map ~f:wo l.runtime
+                } )
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
+  let lookup_eval_to_backend
+      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
+      : 'f Kimchi_types.lookup_evaluations =
+    { sorted; aggreg; table; runtime }
+
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
+      ; coefficients
       ; z
       ; s
       ; generic_selector
       ; poseidon_selector
+      ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
+    ; coefficients = tuple15_of_vec coefficients
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
+    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 
   let vec_to_array (type t elt)
@@ -282,33 +309,50 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages = { w_comm; z_comm; t_comm }
+      ({ messages = { w_comm; z_comm; t_comm; lookup }
        ; openings =
-           { proof = { lr; z_1; z_2; delta; sg }
-           ; evals = evals0, evals1
+           { proof = { lr; z_1; z_2; delta; challenge_polynomial_commitment }
+           ; evals
            ; ft_eval1
            }
        } :
-        t) : Backend.t =
+        t ) : Backend.t =
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
+    let evals_of_tuple (zeta, zeta_omega) : _ Kimchi_types.point_evaluations =
+      { zeta; zeta_omega }
+    in
     { commitments =
         { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
         ; t_comm = pcwo t_comm
+        ; lookup =
+            Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
+                { sorted = Array.map ~f:pcwo t.sorted
+                ; aggreg = pcwo t.aggreg
+                ; runtime = Option.map ~f:pcwo t.runtime
+                } )
         }
-    ; proof = { lr; delta = g delta; z1 = z_1; z2 = z_2; sg = g sg }
-    ; evals = (eval_to_backend evals0, eval_to_backend evals1)
+    ; proof =
+        { lr
+        ; delta = g delta
+        ; z1 = z_1
+        ; z2 = z_2
+        ; sg = g challenge_polynomial_commitment
+        }
+    ; evals = eval_to_backend (Plonk_types.Evals.map ~f:evals_of_tuple evals)
     ; ft_eval1
     ; public = primary_input
     ; prev_challenges =
         Array.of_list_map chal_polys
           ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
-            ( challenges
-            , { Kimchi_types.shifted = None
-              ; unshifted = [| Kimchi_types.Finite (x, y) |]
-              } ))
+            { Kimchi_types.chals = challenges
+            ; comm =
+                { Kimchi_types.shifted = None
+                ; unshifted = [| Kimchi_types.Finite (x, y) |]
+                }
+            } )
     }
 
   let to_backend chal_polys primary_input t =
@@ -320,13 +364,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let challenges =
       List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges)
+          challenges )
       |> Array.concat
     in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment))
+          G.Affine.to_backend (Finite commitment) )
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
     of_backend res
@@ -337,13 +381,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let challenges =
       List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges)
+          challenges )
       |> Array.concat
     in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment))
+          G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
       Backend.create_async pk primary auxiliary challenges commitments
@@ -355,7 +399,7 @@ module Make (Inputs : Inputs_intf) = struct
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
           let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
-          (vk, p))
+          (vk, p) )
     in
     Backend.batch_verify
       (Array.map ~f:fst vks_and_v)
@@ -368,5 +412,5 @@ module Make (Inputs : Inputs_intf) = struct
       (to_backend'
          (Option.value ~default:[] message)
          (vec_to_array (module Scalar_field.Vector) xs)
-         t)
+         t )
 end

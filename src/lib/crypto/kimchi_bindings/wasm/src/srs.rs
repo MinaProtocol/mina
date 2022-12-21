@@ -2,10 +2,7 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::WasmVector;
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use commitment_dlog::{
-    commitment::b_poly_coefficients,
-    srs::{endos, SRS},
-};
+use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
 use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -74,6 +71,17 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _add_lagrange_basis>](
+                srs: &[<Wasm $field_name:camel Srs>],
+                log2_size: i32,
+            ) {
+                let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                ptr.add_lagrange_basis(domain);
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _write>](
                 append: Option<bool>,
                 srs: &[<Wasm $field_name:camel Srs>],
@@ -108,14 +116,10 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
+                let srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
-
-                let (endo_q, endo_r) = endos::<$G>();
-                srs.endo_q = endo_q;
-                srs.endo_r = endo_r;
 
                 Ok(Some(Arc::new(srs).into()))
             }
@@ -177,6 +181,19 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _batch_accumulator_generate>](
+                srs: &[<Wasm $field_name:camel Srs>],
+                comms: i32,
+                chals: WasmFlatVector<$WasmF>,
+            ) -> WasmVector<$WasmG> {
+                crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
+                    &srs,
+                    comms as usize,
+                    &chals.into_iter().map(From::from).collect(),
+                ).into_iter().map(Into::into).collect()
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _h>](srs: &[<Wasm $field_name:camel Srs>]) -> $WasmG {
                 srs.h.into()
             }
@@ -192,14 +209,14 @@ pub mod fp {
     use super::*;
     use crate::arkworks::{WasmGVesta, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{Fp, Vesta};
 
     impl_srs!(
         caml_fp_srs,
         WasmPastaFp,
         WasmGVesta,
         Fp,
-        GAffine,
+        Vesta,
         WasmPolyComm,
         Fp
     );
@@ -209,7 +226,7 @@ pub mod fq {
     use super::*;
     use crate::arkworks::{WasmGPallas, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{Fq, Pallas as GAffine};
 
     impl_srs!(
         caml_fq_srs,

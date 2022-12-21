@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Blockchain_snark
 
 module type S = Intf.S
@@ -79,7 +79,7 @@ module Worker_state = struct
         let chain_state = Blockchain_snark.Blockchain.state chain in
         ( { source = reg chain_state
           ; target = reg next_state
-          ; supply_increase = Currency.Amount.zero
+          ; supply_increase = Currency.Amount.Signed.zero
           ; fee_excess = Fee_excess.zero
           ; sok_digest = Sok_message.Digest.default
           }
@@ -114,30 +114,32 @@ module Worker_state = struct
                    state_for_handler pending_coinbase =
                  let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                       let t = ledger_proof_opt chain next_state t in
-                       let%map.Async.Deferred proof =
+                       let txn_snark_statement, txn_snark_proof =
+                         ledger_proof_opt chain next_state t
+                       in
+                       let%map.Async.Deferred (), (), proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler
                                 ~constraint_constants state_for_handler
-                                ~pending_coinbase)
+                                ~pending_coinbase )
                            { transition = block
                            ; prev_state =
                                Blockchain_snark.Blockchain.state chain
+                           ; prev_state_proof =
+                               Blockchain_snark.Blockchain.proof chain
+                           ; txn_snark = txn_snark_statement
+                           ; txn_snark_proof
                            }
-                           [ ( Blockchain_snark.Blockchain.state chain
-                             , Blockchain_snark.Blockchain.proof chain )
-                           ; t
-                           ]
                            next_state
                        in
                        Blockchain_snark.Blockchain.create ~state:next_state
-                         ~proof)
+                         ~proof )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
                        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error") ;
+                       "Prover threw an error while extending block: $error" ) ;
                  res
 
                let verify state proof = B.Proof.verify [ (state, proof) ]
@@ -156,19 +158,22 @@ module Worker_state = struct
                      ~constraint_constants
                      { transition = block
                      ; prev_state = Blockchain_snark.Blockchain.state chain
+                     ; prev_state_proof = Mina_base.Proof.blockchain_dummy
+                     ; txn_snark = t
+                     ; txn_snark_proof = Mina_base.Proof.transaction_dummy
                      }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
-                          ~constraint_constants ~pending_coinbase)
-                     t (Protocol_state.hashes next_state).state_hash
+                          ~constraint_constants ~pending_coinbase )
+                     next_state
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Mina_base.Proof.blockchain_dummy)
+                            ~proof:Mina_base.Proof.blockchain_dummy )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
                        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error") ;
+                       "Prover threw an error while extending block: $error" ) ;
                  Async.Deferred.return res
 
                let verify _state _proof = Deferred.return true
@@ -183,13 +188,13 @@ module Worker_state = struct
                  @@ Ok
                       (Blockchain_snark.Blockchain.create
                          ~proof:Mina_base.Proof.blockchain_dummy
-                         ~state:next_state)
+                         ~state:next_state )
 
                let verify _ _ = Deferred.return true
              end : S )
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
-       m)
+       m )
 
   let get = Fn.id
 end
@@ -205,7 +210,7 @@ module Functions = struct
   let initialized =
     create bin_unit [%bin_type_class: [ `Initialized ]] (fun w () ->
         let (module W) = Worker_state.get w in
-        Deferred.return `Initialized)
+        Deferred.return `Initialized )
 
   let extend_blockchain =
     create Extend_blockchain_input.Stable.Latest.bin_t
@@ -222,14 +227,14 @@ module Functions = struct
       ->
         let (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state block ledger_proof prover_state
-          pending_coinbase)
+          pending_coinbase )
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t bin_bool (fun w chain ->
         let (module W) = Worker_state.get w in
         W.verify
           (Blockchain_snark.Blockchain.state chain)
-          (Blockchain_snark.Blockchain.proof chain))
+          (Blockchain_snark.Blockchain.proof chain) )
 end
 
 module Worker = struct
@@ -277,7 +282,7 @@ module Worker = struct
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
+               ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
         [%log info] "Prover started" ;
         Worker_state.create
           { conf_dir; logger; proof_level; constraint_constants }
@@ -302,7 +307,7 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { conf_dir; logger; proof_level; constraint_constants }
   in
   [%log info]
@@ -344,14 +349,14 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Prover stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Prover stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
 let initialized { connection; _ } =
@@ -401,7 +406,7 @@ let extend_blockchain { connection; logger; _ } chain next_state block
                 (Base64.encode_exn
                    (Binable.to_string
                       (module Extend_blockchain_input.Stable.Latest)
-                      input)) )
+                      input ) ) )
           ; ("error", Error_json.error_to_yojson e)
           ]
         "Prover failed: $error" ;
@@ -431,9 +436,10 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   let constraint_constants = genesis_inputs.constraint_constants in
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
+    let open Staged_ledger_diff in
     Protocol_state.negative_one ~genesis_ledger
       ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =
     match genesis_inputs.genesis_epoch_data with
@@ -443,10 +449,13 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
         data.staking.ledger
   in
   let open Pickles_types in
-  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
+  let blockchain_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+  in
   let snark_transition =
+    let open Staged_ledger_diff in
     Snark_transition.genesis ~constraint_constants ~consensus_constants
-      ~genesis_ledger
+      ~genesis_ledger ~genesis_body_reference
   in
   let pending_coinbase =
     { Mina_base.Pending_coinbase_witness.pending_coinbases =

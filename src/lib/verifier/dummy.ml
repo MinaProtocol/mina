@@ -48,7 +48,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       | `Invalid_proof ->
           `Invalid_proof
       | `Missing_verification_key keys ->
-          `Missing_verification_key keys)
+          `Missing_verification_key keys )
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =
@@ -62,7 +62,7 @@ let verify_transaction_snarks _ ts =
       let msg_digest = Sok_message.digest message in
       let sok_digest = Transaction_snark.sok_digest proof in
       Sok_message.Digest.(equal sok_digest default)
-      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest)
+      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
   |> Deferred.Or_error.return
 
 let get_blockchain_verification_key { proof_level; constraint_constants } =
@@ -79,4 +79,4 @@ let get_blockchain_verification_key { proof_level; constraint_constants } =
 
         let proof_level = proof_level
       end) in
-      Deferred.return @@ Lazy.force B.Proof.verification_key)
+      Deferred.return @@ Lazy.force B.Proof.verification_key )

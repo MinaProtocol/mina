@@ -489,7 +489,7 @@ module SendStream = struct
           (build
              (module StreamMessage)
              ( reader_op StreamMessage.stream_id_set_reader stream_id
-             *> op StreamMessage.data_set data )))
+             *> op StreamMessage.data_set data ) ))
 end
 
 module SetNodeStatus = struct
@@ -576,12 +576,12 @@ module TestDecodeBitswapBlocks = struct
                  (module Builder.BlockWithId)
                  ( op Builder.BlockWithId.blake2b_hash_set
                      (Blake2.to_raw_string hash)
-                 *> op Builder.BlockWithId.block_set block )))
+                 *> op Builder.BlockWithId.block_set block ) ) )
       *> builder_op Request.root_block_id_set_builder
            (build'
               (module Builder.RootBlockId)
               (op Builder.RootBlockId.blake2b_hash_set
-                 (Blake2.to_raw_string root_block_hash))) )
+                 (Blake2.to_raw_string root_block_hash) ) ) )
 end
 
 module TestEncodeBitswapBlocks = struct

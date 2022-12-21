@@ -66,7 +66,7 @@ module Stable = struct
                List.Assoc.find ls "libp2p_port" ~equal:String.equal >>= lift_int
              in
              let host = Unix.Inet_addr.of_string host_str in
-             { host; peer_id; libp2p_port })
+             { host; peer_id; libp2p_port } )
       | _ ->
           Error "expected object"
   end

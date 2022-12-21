@@ -19,7 +19,7 @@ let on_disk to_string read write prefix =
     | `No | `Unknown ->
         return
           (Or_error.errorf "directory %s does not exist or cannot be read"
-             prefix)
+             prefix )
     | `Yes ->
         write key v (path key)
   in
@@ -53,7 +53,7 @@ let s3 to_string read ~bucket_prefix ~install_path =
                      [ ("url", `String uri_string)
                      ; ("local_file_path", `String file_path)
                      ] ;
-                 err))
+                 err ) )
     in
     [%log trace] "Downloaded key to key cache"
       ~metadata:
@@ -97,7 +97,7 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
       | S3 { bucket_prefix; install_path } ->
           let%bind.Deferred () = Unix.mkdir ~p:() install_path in
           let%map res = (s3 to_string r ~bucket_prefix ~install_path).read k in
-          (res, `Cache_hit))
+          (res, `Cache_hit) )
 
 let write spec { Disk_storable.to_string; read = r; write = w } k v =
   let%map errs =
@@ -112,6 +112,6 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
           | S3 { bucket_prefix = _; install_path = _ } ->
               Deferred.Or_error.return ()
         in
-        match%map res with Error e -> Some e | Ok () -> None)
+        match%map res with Error e -> Some e | Ok () -> None )
   in
   match errs with [] -> Ok () | errs -> Error (Error.of_list errs)

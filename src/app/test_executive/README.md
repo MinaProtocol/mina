@@ -27,7 +27,7 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 gcloud auth login --no-launch-browser <gcloud-acct-login-username>
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-gcloud auth activate-service-account --key-file=<path-to-service-account-key-file>
+gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path-to-service-account-key-file>
 ```
 
 When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
@@ -146,3 +146,15 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
     - structured log events are not an integration test construct, they are defined in various places around the protocol code.  For example, the  `Rejecting_command_for_reason` structured event is defined in `network_pool/transaction_pool.ml`.
     - The structured log events that matter to the integration test are in `src/lib/integration_test_lib/event_type.ml`.  The events integration-test-side will trigger based on logic defined in each event type's `parse` function, which parses messages from the logs, often trying to match for exact strings
 - Please bear in mind that the nodes on GCP run the image that you link in your argument, it does NOT run whatever code you have locally.  Only that which relates to the test executive is run from local.  If you make a change in the protocol code, first this needs to be pushed to CI, where CI will bake a fresh image, and that image can be obtained to run on one's nodes.
+
+# Exit codes
+
+- Exit code `4` will be returned if not all pods were assigned to nodes and ready in time.
+- Exit code `5` will be returned if some pods could not be found.
+- Exit code `6` will be returned if Subscriptions, Topics, or Log sinks could not be created
+- Exit code `7` will be returned if the capacity check reports that the integration test cluster is out of capacity and no further tests can be run
+- Exit code `10` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.  This exit code is the general case of such errors, there are subsequent exit codes which are preferred in more specific cases
+- Exit code `11` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script in a container
+- Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container
+- Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
+- Exit code `20` will be returned if any testnet nodes hard timed-out on initialization

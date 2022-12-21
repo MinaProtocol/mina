@@ -44,7 +44,7 @@ def compare_items (item_kind,fn,original,modified) :
             mod = None
         if not (mod is None or mod == orig) :
             print ('In file: ' + fn)
-            print ('  ' + item_kind + ' changed at module path: ' + path)
+            print ('  ' + item_kind + ' changed at path: ' + path)
             print ('  Was: ' + orig)
             print ('  Now: ' + mod)
             global exit_code

@@ -12,7 +12,22 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ('public_key, 'amount) t =
+            ( 'public_key
+            , 'amount )
+            Mina_wire_types.Mina_base.Payment_payload.Poly.V2.t =
         { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
+      [@@deriving equal, sexp, hash, yojson, compare, hlist]
+    end
+
+    module V1 = struct
+      [@@@with_all_version_tags]
+
+      type ('public_key, 'token_id, 'amount) t =
+        { source_pk : 'public_key
+        ; receiver_pk : 'public_key
+        ; token_id : 'token_id
+        ; amount : 'amount
+        }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
     end
   end]
@@ -26,6 +41,20 @@ module Stable = struct
     [@@deriving equal, sexp, hash, compare, yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V1 = struct
+    [@@@with_all_version_tags]
+
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Token_id.Stable.V1.t
+      , Amount.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving equal, sexp, hash, compare, yojson]
+
+    (* don't need to coerce old payments to new ones *)
+    let to_latest _ = failwith "Not implemented"
   end
 end]
 
@@ -48,7 +77,7 @@ let var_of_t ({ source_pk; receiver_pk; amount } : t) : var =
 
 [%%endif]
 
-let gen_aux ?source_pk ~max_amount =
+let gen_aux ?source_pk max_amount =
   let open Quickcheck.Generator.Let_syntax in
   let%bind source_pk =
     match source_pk with
@@ -61,6 +90,6 @@ let gen_aux ?source_pk ~max_amount =
   let%map amount = Amount.gen_incl Amount.zero max_amount in
   Poly.{ source_pk; receiver_pk; amount }
 
-let gen ?source_pk ~max_amount = gen_aux ?source_pk ~max_amount
+let gen ?source_pk max_amount = gen_aux ?source_pk max_amount
 
-let gen_default_token ?source_pk ~max_amount = gen_aux ?source_pk ~max_amount
+let gen_default_token ?source_pk max_amount = gen_aux ?source_pk max_amount

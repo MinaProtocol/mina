@@ -6,7 +6,9 @@ open Signature_lib
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
+    [@@@with_all_version_tags]
+
+    type t = Mina_wire_types.Mina_base.Stake_delegation.V1.t =
       | Set_delegate of
           { delegator : Public_key.Compressed.Stable.V1.t
           ; new_delegate : Public_key.Compressed.Stable.V1.t
@@ -31,7 +33,7 @@ let source = function
 
 let gen_with_delegator delegator =
   Quickcheck.Generator.map Public_key.Compressed.gen ~f:(fun k ->
-      Set_delegate { delegator; new_delegate = k })
+      Set_delegate { delegator; new_delegate = k } )
 
 let gen =
   Quickcheck.Generator.bind ~f:gen_with_delegator Public_key.Compressed.gen

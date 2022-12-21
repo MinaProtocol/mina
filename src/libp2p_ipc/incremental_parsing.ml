@@ -109,7 +109,7 @@ module Decoders = struct
             in
             Bytes.unsafe_blit ~src:buf ~src_pos:start ~dst:result ~dst_pos:i
               ~len ;
-            i + len)
+            i + len )
         = size ) ;
       result
     in
@@ -167,7 +167,7 @@ module Decoders = struct
           { size = elt_size
           ; initial_state = elt_initial_state
           ; read = read_elt
-          }) =
+          } ) =
       element
     in
     let open struct
@@ -229,7 +229,7 @@ module Decoders = struct
                ; current_elt_state
                ; remaining_elements
                ; accumulator
-               })
+               } )
     in
     match advance elements [] with
     | None ->
@@ -333,7 +333,7 @@ let%test_module "decoder tests" =
             |> Stdlib.Bytes.unsafe_of_string
           in
           let result = unsafe_decode (bytes size) view in
-          [%test_eq: bytes] result expected)
+          [%test_eq: bytes] result expected )
 
     let%test_unit "uint32 decoder" =
       let gen_serialized_uint32 =
@@ -359,7 +359,7 @@ let%test_module "decoder tests" =
             |> Stdlib.Bytes.unsafe_of_string
           in
           let result = unsafe_decode (bytes size) view in
-          [%test_eq: bytes] result expected)
+          [%test_eq: bytes] result expected )
   end )
 
 module Fragment_stream = struct
@@ -386,7 +386,7 @@ module Fragment_stream = struct
         if remaining' <= 0 then (
           t.outstanding_read_request <- None ;
           Ivar.fill signal () )
-        else t.outstanding_read_request <- Some (remaining', signal))
+        else t.outstanding_read_request <- Some (remaining', signal) )
 
   let read_now_exn t amount_to_read =
     (* IMPORTANT: maintain tail recursion *)

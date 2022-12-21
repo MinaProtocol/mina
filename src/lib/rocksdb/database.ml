@@ -13,11 +13,11 @@ let create directory =
   { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
 
 let create_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () ;
   create dir
 
 let make_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ()
 
 let get_uuid t = t.uuid
 
@@ -38,7 +38,7 @@ let set_batch t ?(remove_keys = [])
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
-      Rocks.WriteBatch.put batch key data) ;
+      Rocks.WriteBatch.put batch key data ) ;
   (* Delete any key pairs *)
   List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
   (* commit batch *)
@@ -100,7 +100,7 @@ let%test_unit "get_batch" =
           assert ([%equal: Bigstring.t option] res1 (Some data)) ;
           assert ([%equal: Bigstring.t option] res2 None) ;
           assert ([%equal: Bigstring.t option] res3 (Some data)) ;
-          Async.Deferred.unit))
+          Async.Deferred.unit ) )
 
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
@@ -127,7 +127,7 @@ let%test_unit "to_alist (of_alist l) = l" =
               [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
                 alist ;
               close db ;
-              Async.Deferred.unit))
+              Async.Deferred.unit ) )
 
 let%test_unit "checkpoint read" =
   let open Async in
@@ -149,7 +149,7 @@ let%test_unit "checkpoint read" =
           in
           let db = create db_dir in
           Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
-              set db ~key:(to_bigstring key) ~data:(to_bigstring data)) ;
+              set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
           let cp = create_checkpoint db cp_dir in
           match
             ( Hashtbl.add db_hashtbl ~key:"db_key" ~data:"db_data"
@@ -186,4 +186,4 @@ let%test_unit "checkpoint read" =
               close cp ;
               Deferred.unit
           | _ ->
-              Deferred.unit ))
+              Deferred.unit ) )

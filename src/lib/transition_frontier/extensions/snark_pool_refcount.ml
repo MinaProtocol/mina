@@ -41,7 +41,7 @@ module T = struct
               count + 1
           | None ->
               res := true ;
-              1)) ;
+              1 ) ) ;
     !res
 
   (** Returns true if this update changed which elements are in the table
@@ -56,7 +56,7 @@ module T = struct
           | Some count ->
               Some (count - 1)
           | None ->
-              failwith "Removed a breadcrumb we didn't know about")) ;
+              failwith "Removed a breadcrumb we didn't know about" ) ) ;
     !res
 
   let add_scan_state_to_ref_table table scan_state : bool =
@@ -112,7 +112,7 @@ module T = struct
                     then 1
                     else 0
                   in
-                  acc + delta)
+                  acc + delta )
             in
             { num_removed = num_removed + extra_num_removed; is_added }
         | E (Best_tip_changed new_best_tip_hash, _) ->
@@ -135,7 +135,7 @@ module T = struct
             let num_blocks_to_include = 3 in
             Hash_set.clear t.best_tip_table ;
             update_best_tip_table num_blocks_to_include new_best_tip_hash ;
-            { num_removed; is_added = true })
+            { num_removed; is_added = true } )
     in
     if num_removed > 0 || is_added then
       Some

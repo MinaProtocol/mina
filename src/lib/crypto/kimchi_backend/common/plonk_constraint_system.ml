@@ -18,7 +18,7 @@ module type Gate_vector_intf = sig
 
   val get : t -> int -> field Kimchi_types.circuit_gate
 
-  val digest : t -> bytes
+  val digest : int -> t -> bytes
 end
 
 (** A row indexing in a constraint system. *)
@@ -50,7 +50,7 @@ module Position = struct
 
   (** Generates a full row of positions that each points to itself. *)
   let create_cols (row : 'row) : _ t array =
-    Array.init Constants.permutation_cols (fun i -> { row; col = i })
+    Array.init Constants.permutation_cols ~f:(fun i -> { row; col = i })
 
   (** Given a number of columns, 
       append enough column wires to get an entire row.
@@ -62,7 +62,7 @@ module Position = struct
     assert (padding_offset <= Constants.permutation_cols) ;
     let padding_len = Constants.permutation_cols - padding_offset in
     let padding =
-      Array.init padding_len (fun i -> { row; col = i + padding_offset })
+      Array.init padding_len ~f:(fun i -> { row; col = i + padding_offset })
     in
     Array.append cols padding
 
@@ -273,6 +273,8 @@ type ('f, 'rust_gates) t =
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
+  ; (* The number of previous recursion challenges. *)
+    prev_challenges : int Core_kernel.Set_once.t
   ; (* Whatever is not public input. *)
     mutable auxiliary_input_size : int
   ; (* Queue (of size 1) of generic gate. *)
@@ -295,6 +297,15 @@ type ('f, 'rust_gates) t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
+let get_public_input_size sys = sys.public_input_size
+
+let get_rows_len sys = List.length sys.rows_rev
+
+let get_prev_challenges sys = sys.prev_challenges
+
+let set_prev_challenges sys challenges =
+  Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -309,8 +320,62 @@ module Make
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
-    end) =
-struct
+    end) : sig
+  open Core_kernel
+
+  type nonrec t = (Fp.t, Gates.t) t
+
+  val create : unit -> t
+
+  val get_public_input_size : t -> int Set_once.t
+
+  val get_primary_input_size : t -> int
+
+  val set_primary_input_size : t -> int -> unit
+
+  val get_auxiliary_input_size : t -> int
+
+  val set_auxiliary_input_size : t -> int -> unit
+
+  val get_prev_challenges : t -> int option
+
+  val set_prev_challenges : t -> int -> unit
+
+  val get_rows_len : t -> int
+
+  val next_row : t -> int
+
+  val add_constraint :
+       ?label:string
+    -> t
+    -> ( Fp.t Snarky_backendless.Cvar.t
+       , Fp.t )
+       Snarky_backendless.Constraint.basic
+    -> unit
+
+  val compute_witness : t -> (int -> Fp.t) -> Fp.t array array
+
+  val finalize : t -> unit
+
+  val finalize_and_get_gates : t -> Gates.t
+
+  val digest : t -> Md5.t
+
+  val to_json :
+       t
+    -> ([ `Null
+        | `Bool of bool
+        | `Int of int
+        | `Intlit of string
+        | `Float of float
+        | `String of string
+        | `Assoc of (string * 'json) list
+        | `List of 'json list
+        | `Tuple of 'json list
+        | `Variant of string * 'json option ]
+        as
+        'json )
+end = struct
   open Core_kernel
   open Pickles_types
 
@@ -339,13 +404,13 @@ struct
               Relative_position.Hash_set.of_list data
           | Some ps ->
               List.iter ~f:(Hash_set.add ps) data ;
-              ps)) ;
+              ps ) ) ;
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
         let ps = Hash_set.to_list ps in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
+            Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
 
   (** Compute the witness, given the constraint system `sys` 
@@ -360,7 +425,7 @@ struct
     let num_rows = public_input_size + sys.next_row in
     let res =
       Array.init Constants.columns ~f:(fun _ ->
-          Array.create ~len:num_rows Fp.zero)
+          Array.create ~len:num_rows Fp.zero )
     in
     (* Public input *)
     for i = 0 to public_input_size - 1 do
@@ -383,7 +448,7 @@ struct
             | Internal x ->
                 find internal_values x
           in
-          Fp.(acc + (s * x)))
+          Fp.(acc + (s * x)) )
     in
     (* Update the witness table with the value of the variables from each row. *)
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input cols ->
@@ -398,13 +463,13 @@ struct
                 let lc = find sys.internal_vars var in
                 let value = compute lc in
                 res.(col_idx).(row_idx) <- value ;
-                Hashtbl.set internal_values ~key:var ~data:value)) ;
+                Hashtbl.set internal_values ~key:var ~data:value ) ) ;
     (* Return the witness. *)
     res
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
-        Union_find.create v)
+        Union_find.create v )
 
   (** Creates an internal variable and assigns it the value lc and constant. *)
   let create_internal ?constant sys lc : V.t =
@@ -416,6 +481,7 @@ struct
   (* Initializes a constraint system. *)
   let create () : t =
     { public_input_size = Set_once.create ()
+    ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev = []
@@ -436,12 +502,25 @@ struct
   (** Returns the number of public inputs. *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
+  (** Returns the number of previous challenges. *)
+  let get_prev_challenges t = Set_once.get t.prev_challenges
+
   (* Non-public part of the witness. *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
   (** Sets the number of public-input. It must and can only be called once. *)
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
+
+  (** Sets the number of previous challenges. It must and can only be called once. *)
+  let set_prev_challenges (sys : t) num_prev_challenges =
+    Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
+
+  let get_public_input_size (sys : t) = get_public_input_size sys
+
+  let get_rows_len (sys : t) = get_rows_len sys
+
+  let next_row (sys : t) = sys.next_row
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
@@ -469,7 +548,7 @@ struct
         let num_vars = min Constants.permutation_cols (Array.length vars) in
         let vars_for_perm = Array.slice vars 0 num_vars in
         Array.iteri vars_for_perm ~f:(fun col x ->
-            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col) ) ;
         (* Add to gates. *)
         let open Position in
         sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
@@ -522,7 +601,7 @@ struct
           { gate with
             wired_to =
               Array.init Constants.permutation_cols ~f:(fun col ->
-                  permutation { row; col })
+                  permutation { row; col } )
           }
         in
 
@@ -531,7 +610,7 @@ struct
         let public_gates =
           List.mapi public_gates ~f:(fun absolute_row gate ->
               update_gate_with_permutation_info (Row.Public_input absolute_row)
-                gate)
+                gate )
         in
 
         (* construct all the other gates (except zero-knowledge rows) *)
@@ -539,7 +618,7 @@ struct
         let gates =
           List.mapi gates ~f:(fun relative_row gate ->
               update_gate_with_permutation_info
-                (Row.After_public_input relative_row) gate)
+                (Row.After_public_input relative_row) gate )
         in
 
         (* concatenate and convert to absolute rows *)
@@ -551,13 +630,13 @@ struct
         let add_gates gates =
           List.iter gates ~f:(fun g ->
               let g = to_absolute_row g in
-              Gates.add rust_gates (Gate_spec.to_rust_gate g))
+              Gates.add rust_gates (Gate_spec.to_rust_gate g) )
         in
         add_gates public_gates ;
         add_gates gates ;
 
         (* compute the circuit's digest *)
-        let digest = Gates.digest rust_gates in
+        let digest = Gates.digest public_input_size rust_gates in
         let md5_digest = Md5.digest_bytes digest in
 
         (* drop the gates, we don't need them anymore *)
@@ -590,7 +669,7 @@ struct
     List.fold terms ~init:Int.Map.empty ~f:(fun acc (x, i) ->
         Map.change acc i ~f:(fun y ->
             let res = match y with None -> x | Some y -> Fp.add x y in
-            if Fp.(equal zero res) then None else Some res))
+            if Fp.(equal zero res) then None else Some res ) )
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
@@ -610,7 +689,7 @@ struct
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     Some (terms_list, Map.length terms, has_constant_term)
 
@@ -677,7 +756,7 @@ struct
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     match (constant, Map.is_empty terms) with
     | Some c, true ->
@@ -725,7 +804,7 @@ struct
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
-        Snarky_backendless.Constraint.basic) =
+        Snarky_backendless.Constraint.basic ) =
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -849,7 +928,7 @@ struct
                 add_generic_constraint ~l:x1
                   [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x1 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x1 )
         | `Constant, `Var x2 -> (
             (* s1 = s2 * x2
                x2 = s1 / s2
@@ -862,7 +941,7 @@ struct
                 add_generic_constraint ~r:x2
                   [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x2 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
@@ -1165,7 +1244,7 @@ struct
         Array.iter state
           ~f:
             (Fn.compose add_endoscale_scalar_round
-               (Endoscale_scalar_round.map ~f:reduce_to_v))
+               (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

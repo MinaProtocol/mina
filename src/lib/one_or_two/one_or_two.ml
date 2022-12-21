@@ -46,7 +46,7 @@ let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
           | None ->
               Some (`One a, Sequence.empty)
           | Some (b, rest_2) ->
-              Some (`Two (a, b), rest_2) ))
+              Some (`Two (a, b), rest_2) ) )
 
 let group_list : 'a list -> 'a t list =
  fun xs -> xs |> Sequence.of_list |> group_sequence |> Sequence.to_list

@@ -102,18 +102,14 @@ module Message = struct
            ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
 
-  let data_spec
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-    let open Tick.Data_spec in
-    [ Global_slot.typ
-    ; Mina_base.Epoch_seed.typ
-    ; Mina_base.Account.Index.Unpacked.typ
-        ~ledger_depth:constraint_constants.ledger_depth
-    ]
-
-  let typ ~constraint_constants : (var, value) Tick.Typ.t =
+  let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
+      (var, value) Tick.Typ.t =
     Tick.Typ.of_hlistable
-      (data_spec ~constraint_constants)
+      [ Global_slot.typ
+      ; Mina_base.Epoch_seed.typ
+      ; Mina_base.Account.Index.Unpacked.typ
+          ~ledger_depth:constraint_constants.ledger_depth
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
@@ -136,7 +132,7 @@ module Message = struct
       Tick.make_checked (fun () ->
           Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
             (Random_oracle.Checked.pack_input input)
-          |> Group_map.Checked.to_group)
+          |> Group_map.Checked.to_group )
   end
 
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -177,7 +173,7 @@ module Output = struct
                   sprintf
                     "Error decoding vrf output in \
                      Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
-                    err)
+                    err )
           | _ ->
               Error
                 "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a string"
@@ -204,7 +200,7 @@ module Output = struct
       Typ.array ~length:length_in_bits Boolean.typ
       |> Typ.transport
            ~there:(fun s ->
-             Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits)
+             Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits )
            ~back:Blake2.bits_to_string
 
     let dummy =
@@ -259,7 +255,7 @@ module Output = struct
       Tick.make_checked (fun () ->
           Random_oracle.Checked.Digest.to_bits ~length:Truncated.length_in_bits
             x
-          |> Array.of_list)
+          |> Array.of_list )
 
     let hash msg (x, y) =
       let msg = Message.Checked.to_input msg in
@@ -268,7 +264,7 @@ module Output = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Checked in
-          hash ~init:Hash_prefix_states.vrf_output (pack_input input))
+          hash ~init:Hash_prefix_states.vrf_output (pack_input input) )
   end
 
   let%test_unit "hash unchecked vs. checked equality" =
@@ -294,7 +290,7 @@ module Output = struct
              * Snark_params.Tick.Inner_curve.typ)
            typ
            (fun (msg, g) -> Checked.hash msg g)
-           (fun (msg, g) -> hash ~constraint_constants msg g))
+           (fun (msg, g) -> hash ~constraint_constants msg g) )
 end
 
 module Threshold = struct
@@ -357,19 +353,19 @@ module Threshold = struct
                  ~top:
                    (Integer.create
                       ~value:(Balance.pack_var my_stake)
-                      ~upper_bound:balance_upper_bound)
+                      ~upper_bound:balance_upper_bound )
                  ~bottom:
                    (Integer.create
                       ~value:(Amount.pack_var total_stake)
-                      ~upper_bound:amount_upper_bound)
-                 ~top_is_less_than_bottom:())
+                      ~upper_bound:amount_upper_bound )
+                 ~top_is_less_than_bottom:() )
           in
           let vrf_output = Array.to_list (vrf_output :> Boolean.var array) in
           let lhs = c_bias vrf_output in
           Floating_point.(
             le ~m
               (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
-              rhs))
+              rhs) )
   end
 end
 
@@ -412,7 +408,7 @@ module Evaluation_hash = struct
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
               ~init:Mina_base.Hash_prefix.vrf_evaluation
-              (Random_oracle.Checked.pack_input input))
+              (Random_oracle.Checked.pack_input input) )
       in
       (* This isn't great cryptographic practice.. *)
       Tick.Field.Checked.unpack_full tick_output
@@ -426,8 +422,8 @@ module Output_hash = struct
 
     module V1 = struct
       module T = struct
-        type t = Snark_params.Tick.Field.t
-        [@@deriving sexp, compare, hash, version { asserted }]
+        type t = (Snark_params.Tick.Field.t[@version_asserted])
+        [@@deriving sexp, compare, hash]
       end
 
       include T
@@ -456,24 +452,25 @@ end) =
 struct
   open Constraint_constants
 
-  include Vrf_lib.Standalone.Make (Tick) (Tick.Inner_curve.Scalar) (Group)
-            (struct
-              include Message
+  include
+    Vrf_lib.Standalone.Make (Tick) (Tick.Inner_curve.Scalar) (Group)
+      (struct
+        include Message
 
-              let typ = typ ~constraint_constants
+        let typ = typ ~constraint_constants
 
-              let hash_to_group = hash_to_group ~constraint_constants
-            end)
-            (struct
-              include Output_hash
+        let hash_to_group = hash_to_group ~constraint_constants
+      end)
+      (struct
+        include Output_hash
 
-              let hash = hash ~constraint_constants
-            end)
-            (struct
-              include Evaluation_hash
+        let hash = hash ~constraint_constants
+      end)
+      (struct
+        include Evaluation_hash
 
-              let hash_for_proof = hash_for_proof ~constraint_constants
-            end)
+        let hash_for_proof = hash_for_proof ~constraint_constants
+      end)
 end
 
 type evaluation =
@@ -646,4 +643,4 @@ let%test_unit "Standalone and integrates vrfs are consistent" =
       let standalone_vrf =
         Standalone.Evaluation.verified_output standalone_eval context
       in
-      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf)
+      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf )

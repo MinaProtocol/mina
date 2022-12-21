@@ -1,5 +1,7 @@
 (executable
  (name gen_scalars)
+ (modes native)
+ (link_flags (-linkall))
  (libraries
    ;; opam libraries
    core_kernel

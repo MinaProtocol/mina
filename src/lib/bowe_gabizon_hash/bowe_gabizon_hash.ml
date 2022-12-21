@@ -19,6 +19,6 @@ module Make (Inputs : Inputs_intf.S) = struct
          ; g1 c
          ; g2 delta_prime
          ; Option.value ~default:[||] message
-         ])
+         ] )
     |> group_map |> G1.of_affine
 end

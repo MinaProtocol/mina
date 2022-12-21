@@ -3,7 +3,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
 open Pipe_lib
 open Signature_lib
 
@@ -30,13 +29,6 @@ module Proof_data = struct
     }
   [@@deriving bin_io_unversioned]
 end
-
-let external_transition_of_breadcrumb breadcrumb =
-  let { With_hash.data = external_transition; _ }, _ =
-    Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    |> External_transition.Validated.erase
-  in
-  external_transition
 
 let sign_blake2_hash ~private_key s =
   let module Field = Snark_params.Tick.Field in
@@ -93,7 +85,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                Cohttp_async.Client.post ~headers
                  ~body:
                    (Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-                 url))
+                 url ) )
       with
       | Ok ({ status; _ }, body) ->
           let status_code = Cohttp.Code.code_of_status status in
@@ -197,11 +189,11 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   make_interruptible (go 1)
 
 let block_base64_of_breadcrumb breadcrumb =
-  let external_transition = external_transition_of_breadcrumb breadcrumb in
+  let external_transition =
+    breadcrumb |> Transition_frontier.Breadcrumb.block
+  in
   let block_string =
-    Binable.to_string
-      (module External_transition.Raw.Stable.Latest)
-      external_transition
+    Binable.to_string (module Mina_block.Stable.Latest) external_transition
   in
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
@@ -216,7 +208,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     make_interruptible
       (with_timeout
          (Time.Span.of_min timeout_min)
-         (Bvar.wait block_produced_bvar))
+         (Bvar.wait block_produced_bvar) )
   with
   | `Timeout ->
       [%log error]
@@ -256,16 +248,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ~prover:(Public_key.compress submitter_keypair.public_key)
       in
       let best_tip = Transition_frontier.best_tip tf in
-      let external_transition =
-        Transition_frontier.Breadcrumb.validated_transition best_tip
-        |> External_transition.Validation.forget_validation
-      in
+      let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
-          (External_transition.transactions
+          (Mina_block.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled
-             external_transition)
+               Genesis_constants.Constraint_constants.compiled best_tip_block )
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -293,9 +281,9 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                     (Error.createf
                        "Could not find state_hash %s in transition frontier \
                         for uptime service"
-                       (State_hash.to_base58_check state_hash))
+                       (State_hash.to_base58_check state_hash) )
               | Some protocol_state ->
-                  Ok protocol_state)
+                  Ok protocol_state )
         with
         | Error e ->
             [%log error]
@@ -326,10 +314,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                    | Snark_work_lib.Work.Single.Spec.Transition _ ->
                        true
                    | Merge _ ->
-                       false)
+                       false )
             in
             let staged_ledger_hash =
-              Transition_frontier.Breadcrumb.blockchain_state best_tip
+              Mina_block.header best_tip_block
+              |> Mina_block.Header.protocol_state
+              |> Mina_state.Protocol_state.blockchain_state
               |> Mina_state.Blockchain_state.staged_ledger_hash
             in
             match
@@ -341,7 +331,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)
-                      failwith "Expected Transition work, not Merge")
+                      failwith "Expected Transition work, not Merge" )
             with
             | None ->
                 [%log info]
@@ -363,7 +353,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                 match%bind
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
-                       (message, single_spec))
+                       (message, single_spec) )
                 with
                 | Error e ->
                     (* error in submitting to process *)
@@ -425,7 +415,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
       let four_slots_span = make_slots_span 4.0 in
       let wait_until_iteration_start block_tm =
         let now = Block_time.now time_controller in
-        if Block_time.( < ) now block_tm then at (Block_time.to_time block_tm)
+        if Block_time.( < ) now block_tm then
+          at (Block_time.to_time_exn block_tm)
         else (
           [%log warn]
             "In uptime service, current block time is past desired start of \
@@ -458,14 +449,15 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      uptime service" ;
                   None
               | Produce prod_tm | Produce_now prod_tm ->
-                  Some (Block_time.to_time prod_tm.time) )
+                  Some (Block_time.to_time_exn prod_tm.time) )
         in
         [%log trace]
           "Waiting for next 5-slot boundary to start work in uptime service"
           ~metadata:
             [ ("boundary_block_time", Block_time.to_yojson next_block_tm)
             ; ( "boundary_time"
-              , `String (Block_time.to_time next_block_tm |> Time.to_string) )
+              , `String (Block_time.to_time_exn next_block_tm |> Time.to_string)
+              )
             ] ;
         (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in
@@ -511,7 +503,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     *)
                     let four_slots_from_start =
                       Block_time.add next_block_tm four_slots_span
-                      |> Block_time.to_time
+                      |> Block_time.to_time_exn
                     in
                     if Time.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)

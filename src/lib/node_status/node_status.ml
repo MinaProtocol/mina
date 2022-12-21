@@ -20,4 +20,4 @@ let get_node_status_from_peers (net : Mina_networking.t)
           Deferred.return
             (List.map peers ~f:(fun _ ->
                  Or_error.error_string
-                   "Could not parse peers in node status request")) )
+                   "Could not parse peers in node status request" ) ) )

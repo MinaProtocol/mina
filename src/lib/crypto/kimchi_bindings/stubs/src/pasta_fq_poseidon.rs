@@ -1,6 +1,6 @@
 use crate::field_vector::fq::CamlFqVector;
-use mina_curves::pasta::fq::Fq;
-use oracle::{
+use mina_curves::pasta::Fq;
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher,
     poseidon::ArithmeticSpongeParams,
 };
@@ -20,7 +20,7 @@ ocaml::custom!(CamlPastaFqPoseidonParams {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_poseidon_params_create() -> CamlPastaFqPoseidonParams {
-    CamlPastaFqPoseidonParams(oracle::pasta::fq_kimchi::params())
+    CamlPastaFqPoseidonParams(mina_poseidon::pasta::fq_kimchi::params())
 }
 
 #[ocaml::func]

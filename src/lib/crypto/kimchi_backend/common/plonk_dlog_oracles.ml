@@ -47,6 +47,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let zeta (t : t) = t.o.zeta_chal
 
+  let joint_combiner_chal (t : t) = Option.map ~f:fst t.o.joint_combiner
+
+  let joint_combiner (t : t) = Option.map ~f:snd t.o.joint_combiner
+
   let digest_before_evaluations (t : t) = t.digest_before_evaluations
 
   let v (t : t) = t.o.v_chal

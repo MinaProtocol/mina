@@ -15,7 +15,7 @@ module T = struct
         | E (New_node (Full breadcrumb), _) ->
             Some breadcrumb
         | _ ->
-            None)
+            None )
     in
     Option.some_if (not @@ List.is_empty new_nodes) new_nodes
 end

@@ -13,7 +13,7 @@
    consensus
    precomputed_values
    genesis_constants
-   mina_transition
+   mina_block
    proof_carrying_data
    cache_lib
    mina_base

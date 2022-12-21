@@ -8,7 +8,7 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el)
+      f acc el )
 
 let get_metadata (message : Logger.Message.t) key =
   match String.Map.find message.metadata key with
@@ -19,7 +19,7 @@ let get_metadata (message : Logger.Message.t) key =
 
 let parse id (m : Logger.Message.t) =
   Or_error.try_with (fun () ->
-      Structured_log_events.parse_exn id (Map.to_alist m.metadata))
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
 
 let bad_parse = Or_error.error_string "bad parse"
 
@@ -127,7 +127,7 @@ module Transition_frontier_diff_application = struct
                 Or_error.error_string "unexpected transition frontier diff name"
             )
         | _ ->
-            Or_error.error_string "unexpected transition frontier diff format")
+            Or_error.error_string "unexpected transition frontier diff format" )
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -244,6 +244,19 @@ module Breadcrumb_added = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
+module Persisted_frontier_loaded = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Persisted_frontier_loaded"
+
+  let structured_event_id =
+    Transition_frontier.persisted_frontier_loaded_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
 module Gossip = struct
   open Or_error.Let_syntax
 
@@ -329,6 +342,24 @@ module Gossip = struct
   end
 end
 
+module Snark_work_failed = struct
+  type t = unit [@@deriving yojson]
+
+  let name = "Snark_work_failed"
+
+  let id = Snark_worker.generating_snark_work_failed_structured_events_id
+
+  let parse_func message =
+    let open Or_error.Let_syntax in
+    match%bind parse id message with
+    | Snark_worker.Generating_snark_work_failed ->
+        Ok ()
+    | _ ->
+        bad_parse
+
+  let parse = From_daemon_log (id, parse_func)
+end
+
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
@@ -340,6 +371,8 @@ type 'a t =
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
+  | Snark_work_failed : Snark_work_failed.t t
+  | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -362,6 +395,10 @@ let existential_to_string = function
       "Snark_work_gossip"
   | Event_type Transactions_gossip ->
       "Transactions_gossip"
+  | Event_type Snark_work_failed ->
+      "Snark_work_failed"
+  | Event_type Persisted_frontier_loaded ->
+      "Persisted_frontier_loaded"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -384,6 +421,10 @@ let existential_of_string_exn = function
       Event_type Snark_work_gossip
   | "Transactions_gossip" ->
       Event_type Transactions_gossip
+  | "Snark_work_failed" ->
+      Event_type Snark_work_failed
+  | "Persisted_frontier_loaded" ->
+      Event_type Persisted_frontier_loaded
   | _ ->
       failwith "invalid event type string"
 
@@ -424,6 +465,8 @@ let all_event_types =
   ; Event_type Block_gossip
   ; Event_type Snark_work_gossip
   ; Event_type Transactions_gossip
+  ; Event_type Snark_work_failed
+  ; Event_type Persisted_frontier_loaded
   ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
@@ -446,6 +489,10 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Gossip.Snark_work)
   | Transactions_gossip ->
       (module Gossip.Transactions)
+  | Snark_work_failed ->
+      (module Snark_work_failed)
+  | Persisted_frontier_loaded ->
+      (module Persisted_frontier_loaded)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
@@ -462,7 +509,7 @@ let structured_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_structured_event_id t in
-         (Structured_log_events.string_of_id event_id, t))
+         (Structured_log_events.string_of_id event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_structured_event_id id =
@@ -479,7 +526,7 @@ let puppeteer_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_puppeteer_event_string t in
-         (event_id, t))
+         (event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
@@ -540,7 +587,7 @@ let parse_puppeteer_event (message : Puppeteer_message.t) =
            "the events emitting from the puppeteer script are either not \
             formatted correctly, or are trying to emit an event_type which is \
             not actually recognized by the integration test framework.  this \
-            should not happen and is a programmer error")
+            should not happen and is a programmer error" )
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->
@@ -564,7 +611,12 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
       h e
   | Transactions_gossip, Transactions_gossip ->
       h e
+  | Snark_work_failed, Snark_work_failed ->
+      h e
+  | Persisted_frontier_loaded, Persisted_frontier_loaded ->
+      h e
   | _ ->
-      failwith "TODO: better error message :)"
+      failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
+        ()
 
 (* TODO: tests on sexp and dispatch (etc) against all_event_types *)

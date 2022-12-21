@@ -3,7 +3,7 @@ use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::ToBytes;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
+use mina_curves::pasta::{fields::fq::FqParameters as Fq_params, Fq};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{
@@ -281,8 +281,11 @@ pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> CamlBigInteger256 {
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Error> {
     Fq::from_repr(x.0).map(CamlFq).ok_or_else(|| {
-        println!("invalid?: {:?}", CamlBigInteger256::to_string(&x));
-        ocaml::Error::Message("caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256")
+        let err = format!(
+            "caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256: {}",
+            x.0
+        );
+        ocaml::Error::Error(err.into())
     })
 }
 

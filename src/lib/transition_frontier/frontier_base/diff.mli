@@ -1,5 +1,5 @@
 open Mina_base
-open Mina_transition
+open Mina_block
 
 type full = Full
 
@@ -27,14 +27,14 @@ module Node : sig
     module V3 : sig
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : External_transition.Validated.Stable.V3.t -> lite t
+        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
     end
   end]
 end
 
 module Node_list : sig
   type full_node =
-    { transition : External_transition.Validated.t
+    { transition : Mina_block.Validated.t
     ; scan_state : Staged_ledger.Scan_state.t
     }
 
@@ -135,7 +135,7 @@ module Lite : sig
   module E : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t = E : (lite, 'mutant) diff -> t
       end
     end]

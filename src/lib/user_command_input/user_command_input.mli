@@ -70,7 +70,7 @@ val to_user_command :
      ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
   -> get_current_nonce:
        (   Account_id.t
-        -> ([ `Min of Account_nonce.t ] * Account_nonce.t, string) Result.t)
+        -> ([ `Min of Account_nonce.t ] * Account_nonce.t, string) Result.t )
   -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> logger:Logger.t
@@ -82,7 +82,7 @@ val to_user_commands :
      ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
   -> get_current_nonce:
        (   Account_id.t
-        -> ([ `Min of Account_nonce.t ] * Account_nonce.t, string) Result.t)
+        -> ([ `Min of Account_nonce.t ] * Account_nonce.t, string) Result.t )
   -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> logger:Logger.t

@@ -21,6 +21,7 @@
    snark_params
    pickles
    fields_derivers
+   sgn
    unsigned_extended
    with_hash
  )

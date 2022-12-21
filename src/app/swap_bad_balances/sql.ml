@@ -33,7 +33,7 @@ module Receiver_balances = struct
                           WHERE public_key_id = $1
                           AND balance = $2
                           LIMIT 1
-                    |sql})
+                    |sql} )
         (pk, balance)
     with
     | Some id ->
@@ -44,7 +44,7 @@ module Receiver_balances = struct
              Caqti_type.(tup2 int int64)
              Caqti_type.int
              "INSERT INTO balances (public_key_id,balance) VALUES ($1,$2) \
-              RETURNING id")
+              RETURNING id" )
           (pk, balance)
 
   let load (module Conn : Caqti_async.CONNECTION) id =
@@ -55,7 +55,7 @@ module Receiver_balances = struct
          {sql| SELECT public_key_id,balance
             FROM balances
             WHERE id = $1
-      |sql})
+      |sql} )
       id
 
   let query_swap_in_new_balance =

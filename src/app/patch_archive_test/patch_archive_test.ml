@@ -57,7 +57,7 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
             block
         | Error err ->
             failwithf "Could not parse extensional block in file %s, error: %s"
-              fn err ())
+              fn err () )
   in
   let%bind original_blocks = blocks_in_dir original_blocks_dir in
   let%bind copy_blocks = blocks_in_dir copy_blocks_dir in
@@ -86,7 +86,7 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
         then (
           [%log error] "Original, copied blocks differ in file %s" block_file ;
           true )
-        else acc)
+        else acc )
   in
   if found_difference then (
     [%log fatal]
@@ -177,7 +177,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
       let indexes_to_delete =
         Quickcheck.random_value
           (Quickcheck.Generator.list_with_length num_blocks_to_patch
-             (Int.gen_uniform_incl 0 (Array.length state_hash_array - 1)))
+             (Int.gen_uniform_incl 0 (Array.length state_hash_array - 1)) )
       in
       let%bind () =
         Deferred.List.iter indexes_to_delete ~f:(fun ndx ->
@@ -204,7 +204,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
               ~metadata:[ ("state_hash", `String state_hash) ] ;
             query_db pool
               ~f:(fun db -> Sql.Block.run_delete db ~state_hash)
-              ~item:"state hash of block to delete")
+              ~item:"state hash of block to delete" )
       in
       (* patch the copy with precomputed or extensional blocks, using the archive_blocks tool *)
       [%log info] "Patching the copy with supplied blocks" ;
@@ -281,4 +281,4 @@ let () =
              ~doc:"Blocks are in extensional format"
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
-           ~extract_blocks_path ~precomputed ~extensional ~files)))
+           ~extract_blocks_path ~precomputed ~extensional ~files )))

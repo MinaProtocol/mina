@@ -40,7 +40,7 @@ module Make (Key : Hashable.S) (Data : Data_intf with type key := Key.t) :
       | None ->
           Some (Data.copy data, 1)
       | Some (d, n) ->
-          Some (d, n))
+          Some (d, n) )
 
   let free t key =
     Key.Table.change t key ~f:(function
@@ -49,7 +49,7 @@ module Make (Key : Hashable.S) (Data : Data_intf with type key := Key.t) :
       | Some (_, 1) ->
           None
       | Some (d, n) ->
-          Some (d, n - 1))
+          Some (d, n - 1) )
 
   let find t key = Key.Table.find t key |> Option.map ~f:fst
 end

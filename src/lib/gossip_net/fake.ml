@@ -29,7 +29,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   module Network = struct
     type rpc_hook =
       { hook :
-          'q 'r.    Peer.Id.t -> ('q, 'r) rpc -> 'q
+          'q 'r.
+             Peer.Id.t
+          -> ('q, 'r) rpc
+          -> 'q
           -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
       }
 
@@ -43,14 +46,14 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let nodes = Hashtbl.create (module Peer.Id) in
       List.iter peers ~f:(fun peer ->
           Hashtbl.add_multi nodes ~key:peer.Peer.peer_id
-            ~data:{ peer; interface = None }) ;
+            ~data:{ peer; interface = None } ) ;
       { nodes }
 
     let get_initial_peers { nodes } local_ip =
       Hashtbl.data nodes |> List.concat
       |> List.filter_map ~f:(fun node ->
              if Unix.Inet_addr.equal node.peer.host local_ip then None
-             else Some node.peer)
+             else Some node.peer )
 
     let lookup_node t peer =
       let error = Error.of_string "peer does not exist" in
@@ -91,8 +94,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     send_f intf.sinks
                       ( msg
                       , Mina_net2.Validation_callback.create_without_expiration
-                          () ))
-                  ~init:Deferred.unit))
+                          () ) )
+                  ~init:Deferred.unit ) )
 
     let call_rpc :
         type q r.
@@ -151,7 +154,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->
-                  f sender ~version:latest_version query))
+                  f sender ~version:latest_version query ) )
         with
         | None ->
             failwith "fake gossip net error: rpc not implemented"
@@ -166,7 +169,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let initial_peers = Network.get_initial_peers network me.Peer.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
-          Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer) ;
+          Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
       let ban_notification_reader, ban_notification_writer =
         Linear_pipe.create ()
       in
@@ -246,7 +249,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               | Connected x ->
                   x.data
               | Failed_to_connect e ->
-                  return (Network_peer.Rpc_intf.Failed_to_connect e))
+                  return (Network_peer.Rpc_intf.Failed_to_connect e) )
             |> Or_error.all
           in
           let sender =
@@ -254,7 +257,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               (Hashtbl.find t.peer_table peer)
               ~error:(Error.createf "failed to find peer %s in peer_table" peer)
           in
-          Connected (Envelope.Incoming.wrap_peer ~data ~sender))
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
 
     let query_random_peers _ = failwith "TODO stub"
 
@@ -265,21 +268,21 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
           M.Block_sink.push sink_block
-            (`Transition env, `Time_received time, `Valid_cb vc))
+            (`Transition env, `Time_received time, `Valid_cb vc) )
 
     let broadcast_snark_pool_diff ?origin_topic t diff =
       ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
-          M.Snark_sink.push sink_snark_work)
+          M.Snark_sink.push sink_snark_work )
 
     let broadcast_transaction_pool_diff ?origin_topic t diff =
       ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in
-          M.Tx_sink.push sink_tx)
+          M.Tx_sink.push sink_tx )
 
     let connection_gating t = Deferred.return !(t.connection_gating)
 

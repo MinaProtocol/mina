@@ -44,10 +44,6 @@ Pipeline.build
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                   , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive"
-                  , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql"
-                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , "make libp2p_helper"
-                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:coda-archive-processor-test'"
                   ])
             , label = "Archive node unit tests"
             , key = "archive-unit-tests"

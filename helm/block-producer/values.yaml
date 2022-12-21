@@ -20,6 +20,8 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 userAgent:
   image: ""
@@ -49,7 +51,6 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
-    libp2pSecret: "libp2pYolo"
     enableArchive: true
     archiveAddress: archive-1:3086
   - name: "test-2"
@@ -59,7 +60,6 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
-    libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
   - name: "test-3"

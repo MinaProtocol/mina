@@ -7,20 +7,20 @@ ARG image=ubuntu:focal
 FROM ${image} AS build-deps
 
 # Ocaml Version
-ARG OCAML_VERSION=4.11
-ARG OCAML_REVISION=.2
+ARG OCAML_VERSION=4.14
+ARG OCAML_REVISION=.0
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.16.5
+ARG GO_VERSION=1.18.2
 
 # Go Capnp Version (for capnpc dependency)
-ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
+ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.58.1
+ARG RUST_VERSION=1.63.0
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -39,6 +39,8 @@ RUN apt-get update \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
+    liblmdb-dev \
+    liblmdb0 \
     libpq-dev \
     libprocps-dev \
     libsodium-dev \

@@ -4,6 +4,14 @@ open Signature_lib
 module Epoch = Mina_numbers.Length
 module Global_slot = Mina_numbers.Global_slot
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (*Slot number within an epoch*)
 module Slot = Mina_numbers.Global_slot
 
@@ -71,6 +79,17 @@ module Worker_state = struct
     }
   [@@deriving bin_io_unversioned]
 
+  let context_of_config
+      ({ constraint_constants; consensus_constants; logger; conf_dir = _ } :
+        init_arg ) : (module CONTEXT) =
+    ( module struct
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = consensus_constants
+
+      let logger = logger
+    end )
+
   type t =
     { config : init_arg
     ; mutable last_checked_slot_and_epoch :
@@ -89,7 +108,7 @@ module Worker_state = struct
     let last_checked_slot_and_epoch = Table.create () in
     List.iter new_keys ~f:(fun (_, pk) ->
         let data = Option.value (Table.find old_table pk) ~default in
-        Table.add_exn last_checked_slot_and_epoch ~key:pk ~data) ;
+        Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
     last_checked_slot_and_epoch
 
   let seen_slot last_checked_slot_and_epoch epoch slot =
@@ -107,7 +126,7 @@ module Worker_state = struct
                Some pk
              else (
                Table.set last_checked_slot_and_epoch ~key:pk ~data:(epoch, slot) ;
-               Some pk ))
+               Some pk ) )
     in
     match unseens with
     | [] ->
@@ -122,6 +141,8 @@ module Worker_state = struct
         ; epoch_data = interrupt_ivar, epoch_data
         ; _
         } as t ) : (unit, unit) Interruptible.t =
+    let (module Context) = context_of_config config in
+    let open Context in
     match epoch_data with
     | None ->
         Interruptible.return ()
@@ -131,22 +152,19 @@ module Worker_state = struct
           Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
         in
         let module Slot = Mina_numbers.Global_slot in
-        let logger = config.logger in
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
           ~metadata:[ ("epoch", Epoch.to_yojson epoch) ] ;
         let keypairs = block_producer_keys in
-        let logger = config.logger in
         let start_global_slot = epoch_data.global_slot in
         let start_global_slot_since_genesis =
           epoch_data.global_slot_since_genesis
         in
-        let constants = config.consensus_constants in
         let delegatee_table = epoch_data.delegatee_table in
         (*slot in the epoch*)
         let start_consensus_time =
           Consensus.Data.Consensus_time.(
-            of_global_slot ~constants start_global_slot)
+            of_global_slot ~constants:consensus_constants start_global_slot)
         in
         let total_stake = epoch_data.epoch_ledger.total_currency in
         let evaluate_vrf ~consensus_time =
@@ -184,13 +202,12 @@ module Worker_state = struct
                     ] ;
                 match%bind
                   Consensus.Data.Vrf.check
-                    ~constraint_constants:config.constraint_constants
+                    ~context:(module Context)
                     ~global_slot ~seed:epoch_data.epoch_seed
                     ~get_delegators:
                       (Public_key.Compressed.Table.find delegatee_table)
                     ~producer_private_key:keypair.private_key
                     ~producer_public_key:public_key_compressed ~total_stake
-                    ~logger
                 with
                 | None ->
                     go keypairs
@@ -289,7 +306,7 @@ module Functions = struct
               [%log info]
                 "Received epoch data for current epoch $epoch. Skipping "
                 ~metadata:[ ("epoch", Epoch.to_yojson e.epoch) ] ;
-              Deferred.unit ))
+              Deferred.unit ) )
 
   let slots_won_so_far =
     create Unit.bin_t Vrf_evaluation_result.Stable.Latest.bin_t (fun w () ->
@@ -305,7 +322,7 @@ module Functions = struct
           | None ->
               Completed
         in
-        return Vrf_evaluation_result.{ slots_won; evaluator_status })
+        return Vrf_evaluation_result.{ slots_won; evaluator_status } )
 
   let update_block_producer_keys =
     create Block_producer_keys.Stable.Latest.bin_t Unit.bin_t (fun w e ->
@@ -313,7 +330,7 @@ module Functions = struct
         [%log info] "Updating block producer keys" ;
         w.block_producer_keys <- e ;
         (*TODO: Interrupt the evaluation here when we handle key updated*)
-        Deferred.unit)
+        Deferred.unit )
 end
 
 module Worker = struct
@@ -363,7 +380,7 @@ module Worker = struct
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:init_arg.conf_dir
-               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate) ;
+               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate ) ;
         [%log info] "Vrf_evaluator started" ;
         return (Worker_state.create init_arg)
 
@@ -391,7 +408,7 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
   [%log info] "Starting a new vrf-evaluator process" ;
   let%bind connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { constraint_constants; consensus_constants; conf_dir; logger }
   in
   [%log info]
@@ -410,14 +427,14 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Vrf_evaluator stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Vrf_evaluator stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   let t = { connection; process } in
   let%map _ = update_block_producer_keys ~keypairs t in
   t

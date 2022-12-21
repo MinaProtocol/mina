@@ -70,6 +70,10 @@ module type S = sig
 
     val to_bits : t -> bool list
 
+    val to_base58_check : t -> string
+
+    val of_base58_check_exn : string -> t
+
     val gen : t Quickcheck.Generator.t
   end
 
@@ -160,7 +164,12 @@ module type S = sig
   end
 
   module State_stack : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
   end
 
   module Update : sig

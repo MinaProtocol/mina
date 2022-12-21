@@ -24,7 +24,7 @@ let get_path { path; cache } public_key =
              Option.return file
          | Hd_account _ ->
              Option.return
-               (Public_key.Compressed.to_base58_check public_key ^ ".index"))
+               (Public_key.Compressed.to_base58_check public_key ^ ".index") )
     |> Option.value ~default:(get_privkey_filename public_key)
   in
   path ^/ filename
@@ -62,7 +62,7 @@ let reload ~logger { cache; path } : unit Deferred.t =
                 |> Option.iter ~f:(fun pk ->
                        ignore
                        @@ Public_key.Compressed.Table.add cache ~key:pk
-                            ~data:(Locked sk_filename))
+                            ~data:(Locked sk_filename) )
             | _ ->
                 () )
         | None -> (
@@ -77,11 +77,12 @@ let reload ~logger { cache; path } : unit Deferred.t =
                            @@ Public_key.Compressed.Table.add cache ~key:pk
                                 ~data:
                                   (Hd_account
-                                     (Mina_numbers.Hd_index.of_string hd_index)))
+                                     (Mina_numbers.Hd_index.of_string hd_index)
+                                  ) )
                 | _ ->
                     () )
             | None ->
-                return () ))
+                return () ) )
   in
   Unix.chmod path ~perm:0o700
 
@@ -107,11 +108,11 @@ let import_keypair_helper t keypair write_keypair =
 
 let import_keypair t keypair ~password =
   import_keypair_helper t keypair (fun privkey_path ->
-      Secret_keypair.write_exn keypair ~privkey_path ~password)
+      Secret_keypair.write_exn keypair ~privkey_path ~password )
 
 let import_keypair_terminal_stdin t keypair =
   import_keypair_helper t keypair (fun privkey_path ->
-      Secret_keypair.Terminal_stdin.write_exn keypair ~privkey_path)
+      Secret_keypair.Terminal_stdin.write_exn keypair ~privkey_path )
 
 (** Generates a new private key file and a keypair *)
 let generate_new t ~password : Public_key.Compressed.t Deferred.t =
@@ -143,7 +144,7 @@ let delete ({ cache; _ } as t : t) (pk : Public_key.Compressed.t) :
     (unit, [ `Not_found ]) Deferred.Result.t =
   Hashtbl.remove cache pk ;
   Deferred.Or_error.try_with ~here:[%here] (fun () ->
-      Unix.remove (get_path t pk))
+      Unix.remove (get_path t pk) )
   |> Deferred.Result.map_error ~f:(fun _ -> `Not_found)
 
 let pks ({ cache; _ } : t) = Public_key.Compressed.Table.keys cache
@@ -156,7 +157,7 @@ let find_unlocked ({ cache; _ } : t) ~needle =
        | Unlocked (_, kp) ->
            Some kp
        | Hd_account _ ->
-           None)
+           None )
 
 let find_identity ({ cache; _ } : t) ~needle =
   Public_key.Compressed.Table.find cache needle
@@ -166,7 +167,7 @@ let find_identity ({ cache; _ } : t) ~needle =
        | Unlocked (_, kp) ->
            Some (`Keypair kp)
        | Hd_account index ->
-           Some (`Hd_index index))
+           Some (`Hd_index index) )
 
 let check_locked { cache; _ } ~needle =
   Public_key.Compressed.Table.find cache needle
@@ -176,7 +177,7 @@ let check_locked { cache; _ } ~needle =
        | Unlocked _ ->
            false
        | Hd_account _ ->
-           true)
+           true )
 
 let unlock { cache; path } ~needle ~password =
   let unlock_keypair = function
@@ -185,7 +186,7 @@ let unlock { cache; path } ~needle ~password =
         |> Deferred.Result.map_error ~f:(fun e -> `Key_read_error e)
         |> Deferred.Result.map ~f:(fun kp ->
                Public_key.Compressed.Table.set cache ~key:needle
-                 ~data:(Unlocked (file, kp)))
+                 ~data:(Unlocked (file, kp)) )
         |> Deferred.Result.ignore_m
     | Unlocked _ ->
         Deferred.Result.return ()
@@ -202,7 +203,7 @@ let lock { cache; _ } ~needle =
     | Some (Unlocked (file, _)) ->
         Some (Locked file)
     | k ->
-        k)
+        k )
 
 let get_tracked_keypair ~logger ~which ~read_from_env_exn ~conf_dir pk =
   let%bind wallets = load ~logger ~disk_location:(conf_dir ^/ "wallets") in
@@ -224,7 +225,7 @@ let%test_module "wallets" =
               let%map pk = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
               assert (Set.mem keys pk) ;
-              assert (find_unlocked wallets ~needle:pk |> Option.is_some)))
+              assert (find_unlocked wallets ~needle:pk |> Option.is_some) ) )
 
     let%test_unit "get from existing file system not-scratch" =
       Backtrace.elide := false ;
@@ -238,7 +239,7 @@ let%test_module "wallets" =
               (* Get wallets again from scratch *)
               let%map wallets = load ~logger ~disk_location:path in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys pk1 && Set.mem keys pk2)))
+              assert (Set.mem keys pk1 && Set.mem keys pk2) ) )
 
     let%test_unit "create wallet then delete it" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -253,7 +254,7 @@ let%test_module "wallets" =
                     Option.is_none
                     @@ Public_key.Compressed.Table.find wallets.cache pk )
               | Error _ ->
-                  failwith "unexpected"))
+                  failwith "unexpected" ) )
 
     let%test_unit "Unable to find wallet" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -263,5 +264,5 @@ let%test_module "wallets" =
               let%map result =
                 delete wallets (Public_key.compress @@ keypair.public_key)
               in
-              assert (Result.is_error result)))
+              assert (Result.is_error result) ) )
   end )

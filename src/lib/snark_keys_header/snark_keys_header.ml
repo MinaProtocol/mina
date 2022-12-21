@@ -22,7 +22,7 @@ module UInt64 = struct
                sprintf
                  "Snark_keys_header.UInt64.of_yojson: Could not parse string \
                   as UInt64: %s"
-                 (Error.to_string_hum err))
+                 (Error.to_string_hum err) )
     | _ ->
         Error "Snark_keys_header.UInt64.of_yojson: Expected a string"
 
@@ -118,7 +118,7 @@ module Constraint_constants = struct
     ; fork :
         (Fork_config.t option
         [@to_yojson Fork_config.opt_to_yojson]
-        [@of_yojson Fork_config.opt_of_yojson])
+        [@of_yojson Fork_config.opt_of_yojson] )
     }
   [@@deriving yojson, sexp, ord, equal]
 end
@@ -152,7 +152,7 @@ let parse_prefix (lexbuf : Lexing.lexbuf) =
   let open Or_error.Let_syntax in
   Result.map_error ~f:(fun err ->
       Error.tag_arg err "Could not read prefix" ("prefix", prefix)
-        [%sexp_of: string * string])
+        [%sexp_of: string * string] )
   @@ Or_error.try_with_join (fun () ->
          (* This roughly mirrors the behavior of [Yojson.Safe.read_ident],
             except that we have a known fixed length to parse, and that it is a
@@ -202,7 +202,7 @@ let parse_prefix (lexbuf : Lexing.lexbuf) =
            ; pos_cnum = lexbuf.lex_curr_p.pos_cnum + prefix_len
            } ;
          (* This matches the action given by [Yojson.Safe.read_ident]. *)
-         lexbuf.lex_last_action <- 1)
+         lexbuf.lex_last_action <- 1 )
 
 let parse_lexbuf (lexbuf : Lexing.lexbuf) =
   let open Or_error.Let_syntax in
@@ -214,7 +214,7 @@ let parse_lexbuf (lexbuf : Lexing.lexbuf) =
             'greedy' parsing that will attempt to continue and read the file's
             contents beyond the header.
          *)
-         Yojson.Safe.read_t yojson_parsebuffer lexbuf)
+         Yojson.Safe.read_t yojson_parsebuffer lexbuf )
 
 let%test_module "Check parsing of header" =
   ( module struct
@@ -334,7 +334,7 @@ let%test_module "Check parsing of header" =
                         Bytes.From_string.blit ~src:str ~src_pos:!offset
                           ~dst:buffer ~dst_pos:0 ~len ;
                         offset := !offset + len ;
-                        len ))
+                        len ) )
             in
             (* Load the initial content into the buffer *)
             lexbuf.refill_buff lexbuf ;
@@ -391,7 +391,7 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
       (* Newline, to allow [head -n 2 path/to/file | tail -n 1] to easily
          extract the header.
       *)
-      Out_channel.output_char out_channel '\n') ;
+      Out_channel.output_char out_channel '\n' ) ;
   append_data filename ;
   (* Core doesn't let us open a file without appending or truncating, so we use
      stdlib instead.
@@ -455,4 +455,4 @@ let read_with_header ~read_data filename =
             [%sexp_of: (string * int) * (string * int)]
       in
       let%map data = Or_error.try_with (fun () -> read_data ~offset filename) in
-      (header, data))
+      (header, data) )

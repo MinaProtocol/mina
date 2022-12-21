@@ -26,4 +26,4 @@ let insert :
       | None ->
           Some (Set.singleton comparator v)
       | Some set ->
-          Some (Set.add set v))
+          Some (Set.add set v) )

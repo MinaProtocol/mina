@@ -117,8 +117,8 @@ module Body = struct
     , Boolean.var )
     t_
 
-  let spec =
-    Data_spec.
+  let typ =
+    Typ.of_hlistable
       [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
@@ -126,9 +126,7 @@ module Body = struct
       ; Currency.Amount.typ
       ; Boolean.typ
       ]
-
-  let typ =
-    Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
+      ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
@@ -149,7 +147,7 @@ module Body = struct
       and () =
         make_checked (fun () ->
             Token_id.Checked.Assert.equal token_id
-              (Token_id.Checked.constant Token_id.default))
+              (Token_id.Checked.constant Token_id.default) )
       in
       let token_id = Signed_command_payload.Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -258,7 +256,7 @@ type payload = t [@@deriving sexp]
 
 let of_user_command_payload
     ({ common = { memo; fee; fee_payer_pk; nonce; valid_until }; body } :
-      Signed_command_payload.t) : t =
+      Signed_command_payload.t ) : t =
   { common =
       { fee
       ; fee_token = Token_id.default
@@ -311,7 +309,7 @@ end
 let to_input_legacy ({ common; body } : t) =
   Random_oracle.Input.Legacy.append
     (Signed_command_payload.Common.to_input_legacy
-       (Payload_common.to_signed_command_payload_common common))
+       (Payload_common.to_signed_command_payload_common common) )
     (Body.to_input_legacy body)
 
 let excess (payload : t) : Amount.Signed.t =
@@ -342,7 +340,7 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   | Coinbase ->
       Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
-let supply_increase (payload : payload) =
+let expected_supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->

@@ -2,13 +2,12 @@ import Client from "mina-signer";
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
-  compile,
+  Mina,
   deploy,
-  call,
   isReady,
   shutdown,
   signFeePayer,
@@ -39,7 +38,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
@@ -47,41 +46,36 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
+await SimpleZkapp.compile();
 toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, {
-  zkappKey,
-  verificationKey,
-});
+let zkappCommandJsonDeploy = await deploy(SimpleZkapp, { zkappKey });
 toc();
 
 // update transaction
 tic("create update transaction (with proof)");
-let partiesJsonUpdate = await call(
-  SimpleZkapp,
-  zkappAddress,
-  "update",
-  [Field(3)],
-  provers
-);
+let zkappCommandJsonUpdate = await Mina.transaction(() =>
+  new SimpleZkapp(zkappAddress).update(Field(3))
+)
+  .then(async (tx) => {
+    await tx.prove();
+    return tx;
+  })
+  .then((tx) => tx.toJSON());
 toc();
 
 // PART 2: mina-signer
 let client = new Client({ network: "testnet" });
-
-// TODO create new random sender keypair (with mina-signer, in string format)
-let feePayerKey = "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
-let feePayerAddress = client.derivePublicKey(feePayerKey);
+let { privateKey: feePayerKey, publicKey: feePayerAddress } = client.genKeys();
 
 // sign deploy txn
 tic("sign deploy transaction");
 let feePayerNonce = 0;
 let signedDeploy = client.signTransaction(
   {
-    parties: JSON.parse(partiesJsonDeploy),
+    zkappCommand: JSON.parse(zkappCommandJsonDeploy),
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
@@ -94,13 +88,13 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = await signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(zkappCommandJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
 if (
   JSON.parse(signedDeploySnarkyJs).feePayer.authorization !==
-  JSON.parse(signedDeploy.data.parties).feePayer.authorization
+  JSON.parse(signedDeploy.data.zkappCommand).feePayer.authorization
 )
   throw Error("Inconsistent fee payer signature");
 toc();
@@ -111,7 +105,7 @@ feePayerNonce++;
 tic("sign update transaction");
 let signedUpdate = client.signTransaction(
   {
-    parties: JSON.parse(partiesJsonUpdate),
+    zkappCommand: JSON.parse(zkappCommandJsonUpdate),
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
@@ -124,13 +118,13 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign update transaction (snarkyjs, for consistency check)");
-let signedUpdateSnarkyJs = await signFeePayer(partiesJsonUpdate, feePayerKey, {
+let signedUpdateSnarkyJs = signFeePayer(zkappCommandJsonUpdate, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
 if (
   JSON.parse(signedUpdateSnarkyJs).feePayer.authorization !==
-  JSON.parse(signedUpdate.data.parties).feePayer.authorization
+  JSON.parse(signedUpdate.data.zkappCommand).feePayer.authorization
 )
   throw Error("Inconsistent fee payer signature");
 toc();

@@ -24,6 +24,8 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
+    cpuRequest = var.cpu_request
+    memRequest= var.mem_request
   }
 
   healthcheck_vars = {
@@ -64,7 +66,7 @@ locals {
         name             = config.name
         class            = config.class
         libp2pSecret     = config.libp2p_secret
-        privateKeySecret = config.private_key_secret
+        # privateKeySecret = config.private_key_secret
         externalPort     = config.external_port
         externalIp       = config.external_ip
         enableArchive    = config.enableArchive
@@ -108,7 +110,7 @@ locals {
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
         privateKeySecret     = config.private_key_secret
-        libp2pSecret         = config.libp2p_secret
+        # libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
         enableArchive        = config.enableArchive
@@ -118,45 +120,45 @@ locals {
   }
 
   archive_vars = [for item in var.archive_configs : {
-      testnetName = var.testnet_name
-      mina        = {
-        image         = var.mina_image
-        useCustomEntrypoint  = var.use_custom_entrypoint
-        customEntrypoint     = var.custom_entrypoint
-        seedPeers     = local.peers
-        runtimeConfig = local.daemon.runtimeConfig
-        seedPeersURL  = var.seed_peers_url
+    testnetName = var.testnet_name
+    mina        = {
+      image         = var.mina_image
+      useCustomEntrypoint  = var.use_custom_entrypoint
+      customEntrypoint     = var.custom_entrypoint
+      seedPeers     = local.peers
+      runtimeConfig = local.daemon.runtimeConfig
+      seedPeersURL  = var.seed_peers_url
+    }
+    healthcheck = local.healthcheck_vars
+    archive     = item
+    postgresql = {
+      persistence = {
+        enabled      = item["persistenceEnabled"]
+        size         = item["persistenceSize"]
+        storageClass = item["persistenceStorageClass"]
+        accessModes  = item["persistenceAccessModes"]
       }
-      healthcheck = local.healthcheck_vars
-      archive     = item
-      postgresql = {
-        persistence = {
-          enabled      = item["persistenceEnabled"]
-          size         = item["persistenceSize"]
-          storageClass = item["persistenceStorageClass"]
-          accessModes  = item["persistenceAccessModes"]
-        }
-        primary = {
-          affinity = {
-            nodeAffinity = {
-              requiredDuringSchedulingIgnoredDuringExecution = {
-                nodeSelectorTerms = [
-                  {
-                    matchExpressions = [
-                      {
-                        key = "cloud.google.com/gke-preemptible"
-                        operator = item["preemptibleAllowed"] ? "In" : "NotIn"
-                        values = ["true"]
-                      }
-                    ]
-                  }
-                ]
-              }
+      primary = {
+        affinity = {
+          nodeAffinity = {
+            requiredDuringSchedulingIgnoredDuringExecution = {
+              nodeSelectorTerms = [
+                {
+                  matchExpressions = [
+                    {
+                      key = "cloud.google.com/gke-spot"
+                      operator = item["spotAllowed"] ? "In" : "NotIn"
+                      values = ["true"]
+                    }
+                  ]
+                }
+              ]
             }
           }
         }
       }
-    }]
+    }
+  }]
 
   snark_vars = [
     for i, snark in var.snark_coordinators: {
@@ -173,6 +175,9 @@ locals {
       publicKey =snark.snark_worker_public_key
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
+
+      workerCpuRequest = var.worker_cpu_request
+      workerMemRequest= var.worker_mem_request
     }
   ]
 

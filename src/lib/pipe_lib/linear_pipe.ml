@@ -77,7 +77,8 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
            let%bind () = f v in
            run_reader ()
      in
-     Deferred.all_unit (List.init max_concurrency ~f:(fun _ -> run_reader ())))
+     Deferred.all_unit (List.init max_concurrency ~f:(fun _ -> run_reader ()))
+    )
 
 let drain r = iter r ~f:(fun _ -> Deferred.unit)
 
@@ -131,10 +132,10 @@ let transfer_id reader writer =
 let merge_unordered rs =
   let merged_reader, merged_writer = create () in
   List.iter rs ~f:(fun reader ->
-      don't_wait_for (iter reader ~f:(fun x -> Pipe.write merged_writer x))) ;
+      don't_wait_for (iter reader ~f:(fun x -> Pipe.write merged_writer x)) ) ;
   don't_wait_for
     (let%map () = Deferred.List.iter rs ~f:closed in
-     Pipe.close merged_writer) ;
+     Pipe.close merged_writer ) ;
   merged_reader
 
 (* TODO following are all more efficient with iter',
@@ -148,10 +149,10 @@ let fork reader n =
     (iter reader ~f:(fun x ->
          Deferred.List.iter writers ~f:(fun writer ->
              if not (Pipe.is_closed writer) then Pipe.write writer x
-             else return ()))) ;
+             else return () ) ) ) ;
   don't_wait_for
     (let%map () = Deferred.List.iter readers ~f:closed in
-     close_read reader) ;
+     close_read reader ) ;
   readers
 
 let fork2 reader =
@@ -185,10 +186,10 @@ let partition_map2 reader ~f =
          | `Fst x ->
              Pipe.write writer_a x
          | `Snd x ->
-             Pipe.write writer_b x)) ;
+             Pipe.write writer_b x ) ) ;
   don't_wait_for
     (let%map () = closed reader_a and () = closed reader_b in
-     close_read reader) ;
+     close_read reader ) ;
   (reader_a, reader_b)
 
 let partition_map3 reader ~f =
@@ -203,22 +204,23 @@ let partition_map3 reader ~f =
          | `Snd x ->
              Pipe.write writer_b x
          | `Trd x ->
-             Pipe.write writer_c x)) ;
+             Pipe.write writer_c x ) ) ;
   don't_wait_for
     (let%map () = closed reader_a
      and () = closed reader_b
      and () = closed reader_c in
-     close_read reader) ;
+     close_read reader ) ;
   (reader_a, reader_b, reader_c)
 
 let filter_map_unordered ~max_concurrency t ~f =
   let reader, writer = create () in
   don't_wait_for
     (iter_unordered ~max_concurrency t ~f:(fun x ->
-         match%bind f x with Some y -> Pipe.write writer y | None -> return ())) ;
+         match%bind f x with Some y -> Pipe.write writer y | None -> return () )
+    ) ;
   don't_wait_for
     (let%map () = closed reader in
-     close_read t) ;
+     close_read t ) ;
   reader
 
 let latest_ref t ~initial =

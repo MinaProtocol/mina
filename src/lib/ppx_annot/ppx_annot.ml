@@ -15,7 +15,8 @@ let extract_string_attrs (attributes : attributes) =
       | PStr
           [ { pstr_desc =
                 Pstr_eval
-                  ({ pexp_desc = Pexp_constant (Pconst_string (str, _)); _ }, _)
+                  ( { pexp_desc = Pexp_constant (Pconst_string (str, _, _)); _ }
+                  , _ )
             ; _
             }
           ] ->
@@ -23,7 +24,7 @@ let extract_string_attrs (attributes : attributes) =
       | PStr [] ->
           Some (attr.attr_name.txt, None)
       | _ ->
-          None)
+          None )
 
 let get_record_fields_exn (type_decl : type_declaration) =
   match type_decl.ptype_kind with
@@ -49,7 +50,7 @@ let annot_str :
         Ppxlib.Ast_builder.Default.pexp_tuple ~loc
           [ Ppxlib.Ast_builder.Default.estring ~loc a
           ; lift_optional_string ~loc b
-          ])
+          ] )
   in
   let type_decl = expect_single_decl ~loc type_decls in
   let loc = type_decl.ptype_loc in
@@ -65,7 +66,7 @@ let annot_str :
           ~guard:None
           ~rhs:
             (Ppxlib.Ast_builder.Default.elist ~loc
-               (lift_string_tuples string_attributes ~loc)))
+               (lift_string_tuples string_attributes ~loc) ) )
   in
   let field_branches =
     field_branches
@@ -76,12 +77,12 @@ let annot_str :
   in
   [%str
     let ([%p Ppxlib.Ast_builder.Default.pvar ~loc fields_name] :
-          string -> (string * string option) list) =
+          string -> (string * string option) list ) =
      fun str ->
       [%e Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str] field_branches]
 
     let ([%p Ppxlib.Ast_builder.Default.pvar ~loc toplevel_name] :
-          unit -> (string * string option) list) =
+          unit -> (string * string option) list ) =
      fun () ->
       [%e
         Ppxlib.Ast_builder.Default.elist ~loc
@@ -100,11 +101,11 @@ let annot_sig :
   [ psig_value ~loc
       (value_description ~loc
          ~name:(Located.mk ~loc fields_name)
-         ~type_:[%type: string -> (string * string option) list] ~prim:[])
+         ~type_:[%type: string -> (string * string option) list] ~prim:[] )
   ; psig_value ~loc
       (value_description ~loc
          ~name:(Located.mk ~loc toplevel_name)
-         ~type_:[%type: unit -> (string * string option) list] ~prim:[])
+         ~type_:[%type: unit -> (string * string option) list] ~prim:[] )
   ]
 
 let ann =

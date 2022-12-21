@@ -16,5 +16,5 @@ struct
     |> Typ.transport
          ~there:(fun x -> Field.Constant.project (Constant.to_bits x))
          ~back:(fun x ->
-           Constant.of_bits (List.take (Field.Constant.unpack x) length))
+           Constant.of_bits (List.take (Field.Constant.unpack x) length) )
 end

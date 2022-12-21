@@ -126,7 +126,7 @@ module Evals = struct
   module type S = sig
     type n
 
-    val n : n Vector.nat
+    val n : n Nat.t
 
     include Binable.S1 with type 'a t = ('a, n) Vector.t
 
@@ -277,7 +277,7 @@ module Step_main_inputs = struct
           with module Field := Impl.Field
            and module State := Sponge_lib.State
            and type input :=
-                [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
+            [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
            and type digest := Impl.Field.t
            and type t = Impl.Field.t Sponge_lib.t
 

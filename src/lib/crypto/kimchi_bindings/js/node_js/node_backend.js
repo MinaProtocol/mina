@@ -34,6 +34,16 @@ var wasm_ready = function(wasm) {
     wasm.wbg_rayon_start_worker(worker_threads.workerData.receiver);
 };
 
+// This function was previously exported by JSOO but was removed.
+// It is now copied here.
+// Provides: caml_js_export_var
+function caml_js_export_var (){
+  if(typeof module !== 'undefined' && module && module.exports)
+    return module.exports
+  else
+    return globalThis;
+}
+
 // Provides: startWorkers
 // Requires: worker_threads, _workers, caml_js_export_var
 var startWorkers = (function() {
@@ -106,7 +116,7 @@ var plonk_wasm = (function() {
     // global scope, yet not attached to the global object, so we can't access
     // it differently.
     if (worker_threads.isMainThread) {
-        plonk_wasm.initThreadPool(3, __filename);
+        plonk_wasm.initThreadPool(require('os').cpus().length - 1, __filename);
     } else {
         wasm_ready(plonk_wasm);
     }

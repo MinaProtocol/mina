@@ -11,7 +11,7 @@ module Aux (Impl : Snarky_backendless.Snark_intf.Run) = struct
   let sqrt_exn x =
     let y =
       exists Field.typ ~compute:(fun () ->
-          Field.Constant.sqrt (As_prover.read_var x))
+          Field.Constant.sqrt (As_prover.read_var x) )
     in
     assert_square y x ; y
 
@@ -31,7 +31,7 @@ module Aux (Impl : Snarky_backendless.Snark_intf.Run) = struct
     *)
     let is_square =
       exists Boolean.typ ~compute:(fun () ->
-          Field.Constant.is_square (As_prover.read_var x))
+          Field.Constant.is_square (As_prover.read_var x) )
     in
     let m = Lazy.force non_residue in
     (sqrt_exn (Field.if_ is_square ~then_:x ~else_:(Field.scale x m)), is_square)
@@ -52,7 +52,7 @@ let wrap (type f) ((module Impl) : f Snarky_backendless.Snark0.m) ~potential_xs
       and x2_is_first = (Boolean.((not b1) && b2) :> Field.t)
       and x3_is_first = (Boolean.((not b1) && (not b2) && b3) :> Field.t) in
       ( Field.((x1_is_first * x1) + (x2_is_first * x2) + (x3_is_first * x3))
-      , Field.((x1_is_first * y1) + (x2_is_first * y2) + (x3_is_first * y3)) ))
+      , Field.((x1_is_first * y1) + (x2_is_first * y2) + (x3_is_first * y3)) ) )
 
 module Make
     (M : Snarky_backendless.Snark_intf.Run) (P : sig
@@ -69,5 +69,5 @@ struct
       (wrap
          (module M)
          ~potential_xs
-         ~y_squared:Field.(fun ~x -> (x * x * x) + scale x a + constant b))
+         ~y_squared:Field.(fun ~x -> (x * x * x) + scale x a + constant b) )
 end

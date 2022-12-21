@@ -32,7 +32,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger_file_system.dumb_logrotate ~directory ~log_filename ~max_size
-           ~num_rotate) ;
+           ~num_rotate ) ;
     run_test ~last_size:0 ~rotations:0 ~rotation_expected:false
   with exn ->
     ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) ;

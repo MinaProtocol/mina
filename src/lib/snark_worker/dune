@@ -9,6 +9,7 @@
    sexplib0
    async_kernel
    base
+   base.caml
    async
    core
    core_kernel.hash_heap
@@ -42,11 +43,12 @@
    mina_compile_config
    mina_state
    transaction_protocol_state
+   ppx_version_runtime
  )
  (preprocess
   (pps
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_here
     ppx_custom_printf
     ppx_deriving_yojson

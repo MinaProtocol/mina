@@ -155,7 +155,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
                 [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
                 ; ("error", Error_json.error_to_yojson e)
                 ] ;
-            Pipe.close outgoing_w)
+            Pipe.close outgoing_w )
     (* TODO implement proper stream closing *)
     (* >>= ( fun () ->
        match%map Libp2p_helper.do_rpc helper
@@ -175,7 +175,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
       let (`Stream_should_be_released should_release) =
         stream_closed ~logger ~who_closed:Us t
       in
-      if should_release then release_stream t.id) ;
+      if should_release then release_stream t.id ) ;
   t
 
 (* TODO: should we really even be parsing the peer back from the client here?

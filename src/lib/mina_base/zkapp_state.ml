@@ -69,5 +69,6 @@ let to_input (t : _ V.t) ~f =
 let deriver inner obj =
   let open Fields_derivers_zkapps.Derivers in
   iso ~map:V.of_list_exn ~contramap:V.to_list
-    ((list @@ inner @@ o ()) (o ()))
+    ((list ~static_length:(Nat.to_int Max_state_size.n) @@ inner @@ o ())
+       (o ()) )
     obj

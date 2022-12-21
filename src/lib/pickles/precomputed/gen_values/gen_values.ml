@@ -3,7 +3,8 @@ open Asttypes
 open Parsetree
 open Longident
 open Core_kernel
-open Kimchi_pasta.Pasta
+open Kimchi_pasta
+open Pasta
 open Pickles_types
 
 let () =
@@ -36,9 +37,8 @@ let vesta =
           ksprintf time "vesta %d" i (fun () ->
               Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
-                domain_size i)
-          |> Kimchi_pasta.Pasta.Fp_poly_comm.of_backend_without_degree_bound
-          |> unwrap))
+                domain_size i )
+          |> Basic.Fp_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let pallas =
   let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
@@ -51,9 +51,8 @@ let pallas =
           ksprintf time "pallas %d" i (fun () ->
               Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
-                domain_size i)
-          |> Kimchi_pasta.Pasta.Fq_poly_comm.of_backend_without_degree_bound
-          |> unwrap))
+                domain_size i )
+          |> Basic.Fq_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -62,7 +61,7 @@ let mk xss ~f =
   let open E in
   pexp_array
     (List.map xss ~f:(fun xs ->
-         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f)))))
+         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ) )
 
 let structure =
   let loc = Ppxlib.Location.none in

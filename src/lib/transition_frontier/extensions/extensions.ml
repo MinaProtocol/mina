@@ -81,7 +81,7 @@ let notify (t : t) ~frontier ~diffs_with_mutants =
        ~transition_registry:(update (module Transition_registry.Broadcasted))
        ~ledger_table:(update (module Ledger_table.Broadcasted))
        ~new_breadcrumbs:(update (module New_breadcrumbs.Broadcasted))
-       ~identity:(update (module Identity.Broadcasted)))
+       ~identity:(update (module Identity.Broadcasted)) )
 
 type ('ext, 'view) access =
   | Root_history : (Root_history.t, Root_history.view) access
@@ -99,7 +99,7 @@ type ('ext, 'view) broadcasted_extension =
       (module Intf.Broadcasted_extension_intf
          with type t = 't
           and type extension = 'ext
-          and type view = 'view)
+          and type view = 'view )
       * 't
       -> ('ext, 'view) broadcasted_extension
 

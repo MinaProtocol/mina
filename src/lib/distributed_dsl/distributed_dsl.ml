@@ -28,7 +28,7 @@ module Time_queue = struct
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
         Ivar.fill_if_empty ivar () ;
-        t.on_new_action <- None) ;
+        t.on_new_action <- None ) ;
     Pairing_heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
 
   let create ~now =
@@ -82,7 +82,7 @@ module Time_queue = struct
   let%test_unit "time_queue_empty_returns" =
     Async.Thread_safe.block_on_async_exn (fun () ->
         let t = create ~now:Time.Span.zero in
-        tick_forwards t ~f:(fun _ -> return (assert false)))
+        tick_forwards t ~f:(fun _ -> return (assert false)) )
 
   let%test_unit "time_queue_handles_in_order" =
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -91,7 +91,7 @@ module Time_queue = struct
           let%map () =
             tick_forwards t ~f:(fun next ->
                 Char.Table.add_exn table ~key:next ~data:() ;
-                return ())
+                return () )
           in
           if Char.Table.length table <> List.length actions then
             failwithf
@@ -109,7 +109,7 @@ module Time_queue = struct
         handle_in_future t ~after:(Time.Span.of_int_sec 10) 'c' ;
         handle_in_future t ~after:(Time.Span.of_int_sec 10) 'd' ;
         let%bind () = tick_assert_sees t [ 'c'; 'd' ] in
-        tick_assert_sees t [ 'a' ])
+        tick_assert_sees t [ 'a' ] )
 end
 
 module type Temporal_intf = sig
@@ -189,7 +189,7 @@ struct
                 ()
           | Some (r, w) ->
               Linear_pipe.write_or_exn ~capacity:1024 w r m ;
-              Linear_pipe.values_available r >>| Fn.const () ))
+              Linear_pipe.values_available r >>| Fn.const () ) )
 
   let wait t ts =
     let tok = Ident.next () in
@@ -213,7 +213,7 @@ struct
         return
           (Or_error.error_string
              (Printf.sprintf "Unknown recipient %s"
-                (Peer.sexp_of_t recipient |> Sexp.to_string_hum)))
+                (Peer.sexp_of_t recipient |> Sexp.to_string_hum) ) )
     | Some (_r, _w) ->
         Time_queue.handle_in_future t.q
           ~after:(Message_delay.delay message)
@@ -351,7 +351,7 @@ struct
       | Delete ident ->
           Identifier.Table.remove t.nodes ident
       | Add n ->
-          Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n)
+          Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n )
 
   let rec loop t ~stop ~max_iters =
     match max_iters with
@@ -395,7 +395,7 @@ struct
           let any_ready : MyNode.t Deferred.t =
             Deferred.any
               (List.map (Identifier.Table.data t.nodes) ~f:(fun n ->
-                   MyNode.next_ready n >>| Fn.const n))
+                   MyNode.next_ready n >>| Fn.const n ) )
           in
           any_ready
           >>| fun n ->
@@ -408,7 +408,7 @@ struct
                 | None, x when MyNode.is_ready x ->
                     Some x
                 | None, _ ->
-                    acc)
+                    acc )
           in
           Option.value maybe_real ~default:n
         in
@@ -445,16 +445,16 @@ struct
           let messages = Timer_transport.listen timer ~me:i in
           let msg_commands, handle_commands = cmds_per_node i in
           MyNode.make_node ~logger:(Logger.create ()) ~transport:timer ~me:i
-            ~messages ~initial_state ~timer msg_commands handle_commands)
+            ~messages ~initial_state ~timer msg_commands handle_commands )
     in
     (* Schedule cleanup *)
     don't_wait_for
       (let%map () = stop in
        List.iter nodes ~f:(fun n ->
-           Timer_transport.stop_listening timer ~me:(MyNode.ident n))) ;
+           Timer_transport.stop_listening timer ~me:(MyNode.ident n) ) ) ;
     (* Fill table *)
     List.iter nodes ~f:(fun n ->
-        Identifier.Table.add_exn table ~key:(MyNode.ident n) ~data:n) ;
+        Identifier.Table.add_exn table ~key:(MyNode.ident n) ~data:n ) ;
     { nodes = table; timer }
 end
 
@@ -466,7 +466,7 @@ let%test_module "Distributed_dsl" =
           | `Success ->
               ()
           | `Failure s ->
-              failwith s)
+              failwith s )
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
@@ -542,16 +542,20 @@ let%test_module "Distributed_dsl" =
                               (List.init (count - 1) ~f:(fun i -> i + 1))
                             (Msg 10)
                         in
-                        Sent_msg) ;
-                    return Wait_msg)
+                        Sent_msg ) ;
+                    return Wait_msg )
               ] )
           in
           let specRest =
             let open Machine.MyNode in
             ( [ msg Send_msg
                   (Fn.const (Fn.const true))
-                  ~f:(fun _t (Msg i) -> function Wait_msg -> return (Got_msg i)
-                    | m -> return m)
+                  ~f:
+                    (fun _t (Msg i) -> function
+                      | Wait_msg ->
+                          return (Got_msg i)
+                      | m ->
+                          return m )
               ]
             , [ on Init
                   (function Start -> true | _ -> false)
@@ -561,8 +565,8 @@ let%test_module "Distributed_dsl" =
                   ~f:(fun t state ->
                     timeout' t Timeout_message (Time.Span.of_sec 20.)
                       ~f:(fun _t -> function
-                      | Got_msg _ as m -> return m | _ -> return Timeout) ;
-                    return state)
+                      | Got_msg _ as m -> return m | _ -> return Timeout ) ;
+                    return state )
               ; on Failure_case
                   (function
                     | Timeout ->
@@ -570,17 +574,17 @@ let%test_module "Distributed_dsl" =
                     | Got_msg i when i <= 5 ->
                         true
                     | _ ->
-                        false)
+                        false )
                   ~f:(fun _ _ ->
                     failwith
                       "All nodes should have received a message containing a \
-                       number more than five")
+                       number more than five" )
               ; on Bigger_than_five
                   (function Got_msg i -> i > 5 | _ -> false)
                   ~f:(fun t state ->
                     cancel t Timeout_message ;
                     Ivar.fill_if_empty finish_ivar `Success ;
-                    return state)
+                    return state )
               ] )
           in
           let machine =
@@ -593,5 +597,5 @@ let%test_module "Distributed_dsl" =
                  ~max_iters:(Some 10000)
              in
              Ivar.fill_if_empty finish_ivar
-               (`Failure "Stopped looping without getting to success state")))
+               (`Failure "Stopped looping without getting to success state") ) )
   end )

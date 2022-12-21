@@ -16,7 +16,7 @@ module Make (M : Storage_intf.With_checksum_intf) :
       | `IO_error e ->
           e
       | `No_exist ->
-          Error.of_string "No_exist")
+          Error.of_string "No_exist" )
     |> Error.of_list
 
   let first_success ~f =

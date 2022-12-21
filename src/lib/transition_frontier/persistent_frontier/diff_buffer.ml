@@ -35,13 +35,13 @@ module Timer = struct
       t.timeout <-
         Some
           (Timeout.create t.time_controller t.span ~f:(fun _ ->
-               t.f () ; run_timeout t))
+               t.f () ; run_timeout t ) )
     in
     run_timeout t
 
   let stop t =
     Option.iter t.timeout ~f:(fun timeout ->
-        Timeout.cancel t.time_controller timeout ()) ;
+        Timeout.cancel t.time_controller timeout () ) ;
     t.timeout <- None
 
   let reset t = stop t ; start t

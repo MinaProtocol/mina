@@ -47,7 +47,7 @@ struct
               in
               match stuff with None -> return () | _ -> go (i + 1)
             in
-            go 0))
+            go 0 ) )
 
   let%test_unit "Reassign work after the wait time" =
     Backtrace.elide := false ;
@@ -75,7 +75,7 @@ struct
               Async.after (Time.Span.of_ms (Float.of_int reassignment_wait))
             in
             let work_sent_again = send_work work_state in
-            assert (List.length work_sent = List.length work_sent_again)))
+            assert (List.length work_sent = List.length work_sent_again) ) )
 
   let gen_snark_pool (works : ('a, 'b) Lib.Work_spec.t One_or_two.t list) fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -99,7 +99,7 @@ struct
 
   let%test_unit "selector shouldn't get work that it cannot outbid" =
     Backtrace.elide := false ;
-    let my_fee = Currency.Fee.of_int 2 in
+    let my_fee = Currency.Fee.of_nanomina_int_exn 2 in
     let p = 50 in
     let logger = Logger.null () in
     let g =
@@ -110,9 +110,9 @@ struct
           ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
                 Ok
                   (Lazy.force precomputed_values).protocol_state_with_hashes
-                    .data)
+                    .data )
           |> Or_error.ok_exn )
-          (Currency.Fee.of_int 2)
+          (Currency.Fee.of_nanomina_int_exn 2)
       in
       (sl, pool)
     in
@@ -139,8 +139,8 @@ struct
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee
-                       (One_or_two.map job ~f:Lib.Work_spec.statement)) ;
+                       (One_or_two.map job ~f:Lib.Work_spec.statement) ) ;
                   go (i + 1)
             in
-            go 0))
+            go 0 ) )
 end

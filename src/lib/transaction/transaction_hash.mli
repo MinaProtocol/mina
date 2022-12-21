@@ -26,6 +26,13 @@ val hash_fee_transfer : Fee_transfer.Single.t -> t
 
 val hash_coinbase : Coinbase.t -> t
 
+(** the input string can be either a Base58Check encoding of a
+    Signed command.Stable.V1.t instance, or, the Base64 encoding
+    of a later version of a signed command or
+    any version of a zkApp command
+*)
+val hash_of_transaction_id : string -> t Or_error.t
+
 include Comparable.S with type t := t
 
 module User_command_with_valid_signature : sig

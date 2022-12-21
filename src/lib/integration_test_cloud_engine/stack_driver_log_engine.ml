@@ -22,13 +22,13 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el)
+      f acc el )
 
 let or_error_list_map ls ~f =
   let open Or_error.Let_syntax in
   or_error_list_fold ls ~init:[] ~f:(fun t el ->
       let%map h = f el in
-      h :: t)
+      h :: t )
 
 let log_filter_of_event_type ev_existential =
   let open Event_type in
@@ -59,7 +59,7 @@ let all_event_types_log_filter =
   let disjunction =
     event_filters
     |> List.map ~f:(fun filter ->
-           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND "))
+           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND ") )
     |> String.concat ~sep:" OR "
   in
   [ disjunction ]
@@ -152,7 +152,13 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration=3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
@@ -265,7 +272,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
            (Or_error.errorf
               "failed to find node by pod id \"%s\"; known pod ids = [%s]"
               pod_id
-              (Kubernetes_network.all_pod_ids network |> String.concat ~sep:"; "))
+              (Kubernetes_network.all_pod_ids network |> String.concat ~sep:"; ") )
   in
   let%bind payload = find json log_entry [ "jsonPayload" ] in
   let%map event =
@@ -286,7 +293,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
       [%log spam] "parsing daemon structured event, event_id = %s"
         (Option.value
            (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
-           ~default:"<NONE>") ;
+           ~default:"<NONE>" ) ;
       match msg.event_id with
       | Some _ ->
           Event_type.parse_daemon_event msg
@@ -302,10 +309,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
+    ( match log_entries with
+    | [] ->
+        [%log spam] "No logs were pulled"
+    | log_entries ->
+        [%log spam] "Parsing events from $n logs"
+          ~metadata:[ ("n", `Int (List.length log_entries)) ] ) ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           ( match log_entry |> parse_event_from_log_entry ~logger ~network with
@@ -314,7 +323,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
           | Error e ->
               [%log warn] "Error parsing log $error"
                 ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-          Deferred.unit)
+          Deferred.unit )
     in
     let%bind () = after (Time.Span.of_ms 10000.0) in
     pull_subscription_in_background ~logger ~network ~event_writer ~subscription

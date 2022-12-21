@@ -1,0 +1,20 @@
+(library
+ (name snark_params_unix)
+ (public_name snark_params.unix)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   graphql
+   yojson
+   ppx_inline_test.config
+   core_kernel
+   sexplib0
+   base
+   ;; local libraries
+   graphql_basic_scalars
+   snark_params
+ )
+ (preprocess (pps ppx_jane ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))

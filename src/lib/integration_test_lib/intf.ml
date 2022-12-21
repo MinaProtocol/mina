@@ -84,7 +84,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
@@ -98,7 +97,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
@@ -108,7 +106,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -117,7 +114,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
@@ -125,7 +121,7 @@ module Engine = struct
       val send_zkapp :
            logger:Logger.t
         -> t
-        -> parties:Mina_base.Parties.t
+        -> zkapp_command:Mina_base.Zkapp_command.t
         -> string Deferred.Or_error.t
 
       val must_send_test_payments :
@@ -150,7 +146,7 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> account_data Async_kernel.Deferred.Or_error.t
+        -> account_data Deferred.Or_error.t
 
       val must_get_account_data :
            logger:Logger.t
@@ -171,12 +167,10 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Party.Update.t Deferred.Or_error.t
+        -> Mina_base.Account_update.Update.t Deferred.Or_error.t
 
       val get_peer_id :
-           logger:Logger.t
-        -> t
-        -> (string * string list) Async_kernel.Deferred.Or_error.t
+        logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
 
       val must_get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
@@ -185,7 +179,7 @@ module Engine = struct
            ?max_length:int
         -> logger:Logger.t
         -> t
-        -> best_chain_block list Async_kernel.Deferred.Or_error.t
+        -> best_chain_block list Deferred.Or_error.t
 
       val must_get_best_chain :
            ?max_length:int
@@ -196,14 +190,15 @@ module Engine = struct
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
+      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
+
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
 
-      val get_metrics :
-        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
+      val get_metrics : logger:Logger.t -> t -> metrics_t Deferred.Or_error.t
     end
 
     type t
@@ -242,11 +237,11 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
 
-    val deploy : t -> Network.t Deferred.t
+    val deploy : t -> Network.t Malleable_error.t
 
-    val destroy : t -> unit Deferred.t
+    val destroy : t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end
@@ -352,6 +347,18 @@ module Dsl = struct
 
     type t
 
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+      | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
+
+    val wait_condition_id : t -> wait_condition_id
+
     val with_timeouts :
          ?soft_timeout:Network_time_span.t
       -> ?hard_timeout:Network_time_span.t
@@ -364,6 +371,8 @@ module Dsl = struct
 
     val blocks_to_be_produced : int -> t
 
+    val block_height_growth : height_growth:int -> t
+
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val signed_command_to_be_included_in_frontier :
@@ -373,52 +382,10 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
 
-    val snapp_to_be_included_in_frontier :
-      has_failures:bool -> parties:Mina_base.Parties.t -> t
-  end
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
 
-  module type Util_intf = sig
-    module Engine : Engine.S
-
-    val pub_key_of_node :
-         Engine.Network.Node.t
-      -> Signature_lib.Public_key.Compressed.t Malleable_error.t
-
-    val priv_key_of_node :
-      Engine.Network.Node.t -> Signature_lib.Private_key.t Malleable_error.t
-
-    val check_common_prefixes :
-         tolerance:int
-      -> logger:Logger.t
-      -> string list list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Async_kernel.Deferred.t
-
-    val fetch_connectivity_data :
-         logger:Logger.t
-      -> Engine.Network.Node.t list
-      -> ( (Engine.Network.Node.t * (string * string list)) list
-           Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_completely_connected :
-         (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_cant_be_partitioned :
-         max_disconnections:int
-      -> (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
   end
 
   module type S = sig
@@ -437,8 +404,6 @@ module Dsl = struct
          and module Event_router := Event_router
          and module Network_state := Network_state
 
-    module Util : Util_intf with module Engine := Engine
-
     type t
 
     val section_hard : string -> 'a Malleable_error.t -> 'a Malleable_error.t
@@ -446,6 +411,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
@@ -466,7 +433,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

@@ -2,7 +2,7 @@ use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::circuits::scalars::RandomOracles;
 use kimchi::proof::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
 // use crate::wasm_flat_vector::WasmFlatVector;
-use ark_ff::Zero;
+use ark_ff::{One, Zero};
 
 //
 // CamlOracles
@@ -36,13 +36,13 @@ macro_rules! impl_oracles {
 
         paste! {
             use crate::wasm_flat_vector::WasmFlatVector;
-            use oracle::sponge::ScalarChallenge;
+            use mina_poseidon::sponge::ScalarChallenge;
 
             #[wasm_bindgen]
             #[derive(Clone, Copy)]
             pub struct [<Wasm $field_name:camel RandomOracles>] {
-                pub joint_combiner_chal: $WasmF,
-                pub joint_combiner: $WasmF,
+                pub joint_combiner_chal: Option<$WasmF>,
+                pub joint_combiner: Option<$WasmF>,
                 pub beta: $WasmF,
                 pub gamma: $WasmF,
                 pub alpha_chal: $WasmF,
@@ -60,8 +60,8 @@ macro_rules! impl_oracles {
             impl [<Wasm $field_name:camel RandomOracles>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
-                    joint_combiner_chal: $WasmF,
-                    joint_combiner: $WasmF,
+                    joint_combiner_chal: Option<$WasmF>,
+                    joint_combiner: Option<$WasmF>,
                     beta: $WasmF,
                     gamma: $WasmF,
                     alpha_chal: $WasmF,
@@ -93,8 +93,8 @@ macro_rules! impl_oracles {
             {
                 fn from(ro: RandomOracles<$F>) -> Self {
                     Self {
-                        joint_combiner_chal: ro.joint_combiner.0.0.into(),
-                        joint_combiner: ro.joint_combiner.1.into(),
+                        joint_combiner_chal: ro.joint_combiner.as_ref().map(|x| x.0.0.into()),
+                        joint_combiner: ro.joint_combiner.as_ref().map(|x| x.1.into()),
                         beta: ro.beta.into(),
                         gamma: ro.gamma.into(),
                         alpha_chal: ro.alpha_chal.0.into(),
@@ -112,8 +112,15 @@ macro_rules! impl_oracles {
             impl Into<RandomOracles<$F>> for WasmRandomOracles
             {
                 fn into(self) -> RandomOracles<$F> {
+                    let joint_combiner =
+                        match (self.joint_combiner_chal, self.joint_combiner) {
+                            (Some(joint_combiner_chal), Some(joint_combiner)) => {
+                                Some((ScalarChallenge(joint_combiner_chal.into()), joint_combiner.into()))
+                            },
+                            _ => None
+                        };
                     RandomOracles {
-                        joint_combiner: (ScalarChallenge(self.joint_combiner_chal.into()), self.joint_combiner.into()),
+                        joint_combiner,
                         beta: self.beta.into(),
                         gamma: self.gamma.into(),
                         alpha_chal: ScalarChallenge(self.alpha_chal.into()),
@@ -188,6 +195,16 @@ macro_rules! impl_oracles {
                         .map(|s: $F| -s)
                         .collect::<Vec<_>>(),
                 );
+                let p_comm = {
+                    index
+                        .srs()
+                        .mask_custom(
+                            p_comm.clone(),
+                            &p_comm.map(|_| $F::one()),
+                        )
+                        .unwrap()
+                        .commitment
+                };
 
                 let proof: ProverProof<$G> = proof.into();
 
@@ -197,7 +214,7 @@ macro_rules! impl_oracles {
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
@@ -252,10 +269,7 @@ pub mod fp {
         plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::vesta::WasmFpPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fp::Fp,
-        vesta::{Affine as GAffine, VestaParameters},
-    };
+    use mina_curves::pasta::{Fp, Vesta as GAffine, VestaParameters};
 
     impl_oracles!(
         WasmPastaFp,
@@ -277,10 +291,7 @@ pub mod fq {
         plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::pallas::WasmFqPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fq::Fq,
-        pallas::{Affine as GAffine, PallasParameters},
-    };
+    use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters};
 
     impl_oracles!(
         WasmPastaFq,

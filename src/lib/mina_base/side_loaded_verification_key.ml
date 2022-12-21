@@ -54,15 +54,16 @@ module Stable = struct
     let of_repr { Repr.Stable.V2.step_data; max_width; wrap_index = c } =
       { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some () }
 
-    include Binable.Of_binable
-              (R.Stable.V2)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (R.Stable.V2)
+        (struct
+          type nonrec t = t
 
-                let to_binable = to_repr
+          let to_binable = to_repr
 
-                let of_binable = of_repr
-              end)
+          let of_binable = of_repr
+        end)
 
     let sexp_of_t t = R.sexp_of_t (to_repr t)
 
@@ -97,7 +98,7 @@ let dummy : t =
        ; mul_comm = g
        ; emul_comm = g
        ; endomul_scalar_comm = g
-       })
+       } )
   ; wrap_vk = None
   }
 

@@ -118,10 +118,6 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -147,10 +143,6 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -176,10 +168,6 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -214,10 +202,6 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -251,10 +235,6 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -298,10 +278,6 @@ module Versioned_v2 = struct
       end
 
       module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V2.t

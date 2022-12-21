@@ -1,6 +1,6 @@
 (* test_signatures.ml -- generate signatures for some transactions,
     for comparison against signatures generated in client SDK
- *)
+*)
 
 open Core_kernel
 open Snark_params.Tick
@@ -31,7 +31,7 @@ let new_delegate =
     "B62qkfHpLpELqpMK6ZvUTJ5wRqKDRF3UHyJ4Kv3FU79Sgs4qpBnx5RR"
 
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
-  let fee = Currency.Fee.of_int fee in
+  let fee = Currency.Fee.of_nanomina_int_exn fee in
   let nonce = Account.Nonce.of_int nonce in
   let valid_until = Mina_numbers.Global_slot.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
@@ -41,7 +41,7 @@ let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
 let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
     ~valid_until memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
-  let amount = Currency.Amount.of_int amount in
+  let amount = Currency.Amount.of_nanomina_int_exn amount in
   let body =
     Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount }
   in
@@ -121,26 +121,26 @@ let main () =
                 Signed_command.t}\n\
                 %!"
               i signature ;
-            exit 1 )) ;
+            exit 1 ) ) ;
       List.iteri string_signatures ~f:(fun i signature ->
           if
             not
               (String_sign.verify ~signature_kind signature keypair.public_key
-                 (List.nth_exn strings i))
+                 (List.nth_exn strings i) )
           then (
             eprintf
               !"Signature (%d) failed to verify for string: %s\n%!"
               i (List.nth_exn strings i) ;
-            exit 1 )) ;
+            exit 1 ) ) ;
       printf "[\n" ;
       List.iter txn_signatures ~f:(fun signature ->
           let Signed_command.Poly.{ signature = field, scalar; _ } =
             (signature :> Signed_command.t)
           in
-          print_signature field scalar) ;
+          print_signature field scalar ) ;
       List.iter string_signatures ~f:(fun signature ->
           let field, scalar = signature in
-          print_signature field scalar) ;
-      printf "]\n")
+          print_signature field scalar ) ;
+      printf "]\n" )
 
 let _ = main ()

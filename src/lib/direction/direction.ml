@@ -33,4 +33,4 @@ let shrinker =
         | Left ->
             None
         | Right ->
-            Some (Left, Left)))
+            Some (Left, Left) ) )

@@ -11,10 +11,78 @@ end
 
 let high_entropy_bits = 128
 
-module Make (Field : Kimchi_backend.Field.S) = struct
+module type S = sig
+  module Inputs : sig
+    include module type of Rounds
+
+    module Field : Kimchi_backend_common.Field.S
+
+    type field := Field.t
+
+    val to_the_alpha : field -> field
+
+    val alpha : int
+
+    module Operations : Sponge.Intf.Operations with type Field.t = field
+  end
+
+  type field := Inputs.Field.t
+
+  (* The name does not really reflect the behavior *and* is somewhat confusing w.r.t
+     Inputs.Field. This is almost Sponge.Intf.Sponge *)
+  module Field : sig
+    type f := Sponge.Poseidon(Inputs).Field.t
+
+    type params := f Sponge.Params.t
+
+    type state := f Sponge.State.t
+
+    type t = f Sponge.t (* TODO: Make this type abstract *)
+
+    val create : ?init:state -> params -> t
+
+    val make :
+      state:state -> params:params -> sponge_state:Sponge.sponge_state -> t
+
+    val absorb : t -> f -> unit
+
+    val squeeze : t -> f
+
+    val copy : t -> t
+
+    val state : t -> state
+  end
+
+  (* TODO: Resuce module types of Sponge.Intf.Sponge *)
+  module Bits : sig
+    type t
+
+    val create : ?init:field Sponge.State.t -> field Sponge.Params.t -> t
+
+    val absorb : t -> field -> unit
+
+    val squeeze : t -> length:int -> bool list
+
+    val copy : t -> t
+
+    val state : t -> field Sponge.State.t
+
+    val squeeze_field : t -> field
+  end
+
+  val digest :
+       field Sponge.Params.t
+    -> Inputs.Field.t Core_kernel.Array.t
+    -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+end
+
+module Make (Field : Kimchi_backend.Field.S) :
+  S with module Inputs.Field = Field = struct
   module Inputs = struct
     include Rounds
     module Field = Field
+
+    let alpha = 7
 
     (* x^7 *)
     let to_the_alpha x =
@@ -31,6 +99,8 @@ module Make (Field : Kimchi_backend.Field.S) = struct
       res
 
     module Operations = struct
+      module Field = Field
+
       let add_assign ~state i x = Field.(state.(i) += x)
 
       let apply_affine_map (matrix, constants) v =
@@ -68,12 +138,10 @@ module Make (Field : Kimchi_backend.Field.S) = struct
     Bits.squeeze_field sponge |> Inputs.Field.to_bits |> D.Constant.of_bits
 end
 
-module T (M : Sponge.Intf.T) = M
-
 module Test
     (Impl : Snarky_backendless.Snark_intf.Run)
     (S_constant : Sponge.Intf.Sponge
-                    with module Field := T(Impl.Field.Constant)
+                    with module Field := Impl.Field.Constant
                      and module State := Sponge.State
                      and type input := Impl.field
                      and type digest := Impl.field)
@@ -98,10 +166,10 @@ struct
               S_checked.create (Sponge.Params.map ~f:Field.constant params)
             in
             Array.iter a ~f:(S_checked.absorb s) ;
-            S_checked.squeeze s))
+            S_checked.squeeze s ) )
       (fun a ->
         let s = S_constant.create params in
         Array.iter a ~f:(S_constant.absorb s) ;
-        S_constant.squeeze s)
+        S_constant.squeeze s )
       a
 end

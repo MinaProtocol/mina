@@ -25,7 +25,7 @@ module Make (V : Comparable.S) = struct
   let choose (g : G.t) : V.t option =
     with_return (fun { return } ->
         Map.iteri g ~f:(fun ~key ~data:_ -> return (Some key)) ;
-        None)
+        None )
 
   let connected (g : G.t) : bool =
     match choose g with
@@ -65,7 +65,7 @@ module Make (V : Comparable.S) = struct
           ( lazy
             (Nat.min
                (List.map (Map.keys g) ~f:(fun v ->
-                    connectivity (remove_vertex g v)))) ) )
+                    connectivity (remove_vertex g v) ) ) ) ) )
 end
 
 let connectivity (type a) (module V : Comparable.S with type t = a)

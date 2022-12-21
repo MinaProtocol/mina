@@ -2,7 +2,7 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 
 type input = Diff.Lite.E.t list
@@ -67,7 +67,7 @@ module Worker = struct
       Result.map_error result ~f:(fun err ->
           [%log' error t.logger] "error applying %s diff: %s" diff_type_name
             (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type)
+          `Apply_diff diff_type )
     in
     match diff with
     | New_node (Lite transition) -> (
@@ -86,8 +86,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (External_transition.Validated.state_hashes transition)
-                           .state_hash) )
+                         (Mina_block.Validated.state_hash transition) ) )
                 ; ("parent", `String (State_hash.to_base58_check h))
                 ] ;
             Ok ()
@@ -125,23 +124,25 @@ module Worker = struct
         deferred_result_list_fold t ~init ~f
 
   let perform t input =
-    match%map
-      [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
-        (List.length input) ;
-      (* Iterating over the diff application in this way
-         * effectively allows the scheduler to scheduler
-         * other tasks in between diff applications.
-         * If implemented otherwise, all diffs would be
-         * applied during the same scheduler cycle.
-      *)
-      deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-          Deferred.return (handle_diff t diff))
-    with
-    | Ok () ->
-        ()
-    (* TODO: log the diff that failed *)
-    | Error (`Apply_diff _) ->
-        failwith "Failed to apply a diff to the persistent transition frontier"
+    O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
+        match%map
+          [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
+            (List.length input) ;
+          (* Iterating over the diff application in this way
+             * effectively allows the scheduler to scheduler
+             * other tasks in between diff applications.
+             * If implemented otherwise, all diffs would be
+             * applied during the same scheduler cycle.
+          *)
+          deferred_result_list_fold input ~init:() ~f:(fun () diff ->
+              Deferred.return (handle_diff t diff) )
+        with
+        | Ok () ->
+            ()
+        (* TODO: log the diff that failed *)
+        | Error (`Apply_diff _) ->
+            failwith
+              "Failed to apply a diff to the persistent transition frontier" )
 end
 
 include Worker_supervisor.Make (Worker)

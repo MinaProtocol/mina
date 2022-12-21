@@ -51,7 +51,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
               ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
           in
           Field.Assert.equal x (Field.project res) ;
-          res)
+          res )
   end
 
   let () = assert (Field.size_in_bits < 64 * Nat.to_int Limbs.n)

@@ -13,7 +13,7 @@ type invalid =
 let invalid_to_string (invalid : invalid) =
   let keys_to_string keys =
     List.map keys ~f:(fun key ->
-        Signature_lib.Public_key.Compressed.to_base58_check key)
+        Signature_lib.Public_key.Compressed.to_base58_check key )
     |> String.concat ~sep:";"
   in
   match invalid with
@@ -40,17 +40,21 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; memo } ->
+  | Zkapp_command ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
+    ->
       with_return (fun { return } ->
-          let other_parties_hash = Parties.Call_forest.hash other_parties in
+          let account_updates_hash =
+            Zkapp_command.Call_forest.hash account_updates
+          in
           let tx_commitment =
-            Parties.Transaction_commitment.create ~other_parties_hash
+            Zkapp_command.Transaction_commitment.create ~account_updates_hash
           in
           let full_tx_commitment =
-            Parties.Transaction_commitment.create_complete tx_commitment
+            Zkapp_command.Transaction_commitment.create_complete tx_commitment
               ~memo_hash:(Signed_command_memo.hash memo)
               ~fee_payer_hash:
-                (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+                (Zkapp_command.Digest.Account_update.create
+                   (Account_update.of_fee_payer fee_payer) )
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -61,22 +65,22 @@ let check :
                   not
                     (Signature_lib.Schnorr.Chunked.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
-                       (Random_oracle_input.Chunked.field msg))
+                       (Random_oracle_input.Chunked.field msg) )
                 then
                   return
-                    (`Invalid_signature
-                      [ Signature_lib.Public_key.compress pk ])
+                    (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
           check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
-          let parties_with_hashes_list =
-            Parties.Call_forest.With_hashes.to_parties_with_hashes_list
-              other_parties
+          let zkapp_command_with_hashes_list =
+            account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+            |> Zkapp_command.Call_forest.With_hashes_and_data
+               .to_zkapp_command_with_hashes_list
           in
           let valid_assuming =
-            List.filter_map parties_with_hashes_list
-              ~f:(fun ((p, vk_opt), at_party) ->
+            List.filter_map zkapp_command_with_hashes_list
+              ~f:(fun ((p, (vk_opt, stmt)), _at_account_update) ->
                 let commitment =
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
@@ -92,25 +96,22 @@ let check :
                     | None ->
                         return
                           (`Missing_verification_key
-                            [ Account_id.public_key @@ Party.account_id p ])
-                    | Some vk ->
-                        let stmt =
-                          { Zkapp_statement.Poly.transaction = commitment
-                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
-                          }
-                        in
-                        Some (vk, stmt, pi) ))
+                            [ Account_id.public_key
+                              @@ Account_update.account_id p
+                            ] )
+                    | Some (vk : _ With_hash.t) ->
+                        Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
-            User_command.Poly.Parties
-              { Parties.fee_payer
-              ; other_parties =
-                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
-              ; memo
-              }
+            (*Verification keys should be present if it reaches here*)
+            let zkapp_command =
+              Or_error.ok_exn
+                (Zkapp_command.Valid.of_verifiable zkapp_command_with_vk)
+            in
+            User_command.Poly.Zkapp_command zkapp_command
           in
           match valid_assuming with
           | [] ->
               `Valid v
           | _ :: _ ->
-              `Valid_assuming (v, valid_assuming))
+              `Valid_assuming (v, valid_assuming) )

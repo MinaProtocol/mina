@@ -1,0 +1,24 @@
+(library
+ (name mina_block_unix)
+ (public_name mina_block.unix)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   graphql
+   yojson
+   core_kernel
+   core
+   sexplib0
+   ppx_inline_test.config
+   ;; local libraries
+   graphql_basic_scalars
+   mina_block
+   mina_base
+   pickles
+   pickles_types
+ )
+ (preprocess (pps ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))
