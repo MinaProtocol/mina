@@ -43,6 +43,9 @@ ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/rosetta/rose
 ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
 ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
+# Frequency (in seconds) at which payment operations will be sent
+TRANSACTION_FREQUENCY=60
+
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
 mina-dev libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
@@ -52,12 +55,16 @@ echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} 
 mkdir -p $MINA_KEYS_PATH
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
+mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/faucet.key
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
+FAUCET_PK=$(cat $MINA_KEYS_PATH/faucet.key.pub)
+FAUCET_SK=$(mina-dev advanced dump-keypair --privkey-path $MINA_KEYS_PATH/faucet.key | grep "Private key" | sed -e "s/Private key: //")
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
+cp $MINA_KEYS_PATH/faucet.key $MINA_CONFIG_DIR/wallets/store/$FAUCET_PK
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF > "$MINA_CONFIG_FILE"
 {
@@ -67,7 +74,8 @@ cat <<EOF > "$MINA_CONFIG_FILE"
     "name": "${MINA_NETWORK}",
     "accounts": [
       { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
+      { "pk": "${FAUCET_PK}", "balance": "1000000000000000", "delegate": null, "sk": null }
     ]
   }
 }
@@ -93,6 +101,7 @@ done
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
+mina-dev accounts import --privkey-path $MINA_KEYS_PATH/faucet.key --config-directory $MINA_CONFIG_DIR
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -137,7 +146,8 @@ mina-dev daemon \
   --proof-level none \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
-  --seed
+  --seed \
+  --demo-mode  
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
@@ -154,6 +164,43 @@ done
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
 mina-dev accounts unlock --public-key $BLOCK_PRODUCER_PK
 mina-dev accounts unlock --public-key $SNARK_PRODUCER_PK
+mina-dev accounts unlock --public-key $FAUCET_PK
+
+# Start sending payments
+send_payments() {
+  mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+  while true; do
+    sleep $TRANSACTION_FREQUENCY
+    mina-dev client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+  done
+}
+send_payments &
+
+# Deploy zkApps
+for zkapp_path in {}; do # TODO: what's the best way to bundle the zkapps here?
+  mkdir -p "$zkapp_path/keys"
+  chmod -R 0700 "$zkapp_path/keys"
+  key_file="$zkapp_path/keys/account"
+  mina-dev advanced generate-keypair --privkey-path $key_file
+  zkapp_key=$(mina-dev advanced dump-keypair --privkey-path "$key_file" | grep "Private key" | sed -e "s/Private key: //")
+  cd "$zkapp_path"
+  npm run build
+  node build/src/deploy.js http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key $FAUCET_SK
+  cd -
+done
+
+# Start calling zkApp methods
+for zkapp_path in {}; do
+  cd "$zkapp_path"
+  npm run build
+  ./interact.sh http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key
+  cd -
+done
+
+# Wait until X block have been produced
+while [ $(mina-dev client status --json | jq .blockchain_length) -lt 5 ]; do
+  sleep 15
+done
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
