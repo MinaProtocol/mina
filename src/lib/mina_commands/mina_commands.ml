@@ -455,6 +455,13 @@ let get_status ~flag t =
       ; transactions_added_to_pool =
           Float.to_int
           @@ Counter.value Transaction_pool.transactions_added_to_pool
+      ; snark_pool_diff_received =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_received
+      ; snark_pool_diff_broadcasted =
+          Float.to_int @@ Gauge.value Network.snark_pool_diff_broadcasted
+      ; snark_pool_size = Float.to_int @@ Gauge.value Snark_work.snark_pool_size
+      ; pending_snark_work =
+          Float.to_int @@ Gauge.value Snark_work.pending_snark_work
       }
   in
   { Daemon_rpcs.Types.Status.num_accounts
