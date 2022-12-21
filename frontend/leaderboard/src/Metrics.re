@@ -177,6 +177,9 @@ let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
          |> resolve
        });
 
+  Js.log("Public Keys:")
+  users |> then_(users => {Js.log(users); resolve(users)});
+
   let blocksChallenge =
     getPromisifiedChallenge(
       users,

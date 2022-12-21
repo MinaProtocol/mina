@@ -6,7 +6,7 @@
     "build": "bsb -make-world",
     "clean": "bsb -clean-world",
     "reformat": "bsrefmt --in-place src/**/*.re",
-    "start": "node ./lib/js/src/Main.bs.js"
+    "start": "npm run build && node ./lib/js/src/Main.bs.js"
   },
   "license": "ISC",
   "dependencies": {
