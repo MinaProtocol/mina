@@ -71,12 +71,14 @@ let dependsOn = \(debVersion : DebVersion) ->
 -- so they don't need to be triggered by dirtyWhen on every change
 -- these files representing changing the logic of the job, in which case test every platform
 let minimalDirtyWhen = [
-  S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
-  S.exactly "buildkite/scripts/build-artifact" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Constants"),
-  S.strictlyStart (S.contains "buildkite/src/Command"),
-  S.strictlyStart (S.contains "dockerfiles"),
-  S.strictlyStart (S.contains "scripts")
+  S.exactly "buildkite/src/Constants/DebianVersions" "dhall",
+  S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
+  S.exactly "buildkite/src/Command/MinaArtifact" "sh",
+  S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
+  S.strictlyStart (S.contains "dockerfiles/stages"),
+  S.exactly "scripts/rebuild-deb" "sh,
+  S.exactly "scripts/release-docker" "sh,
+  S.exactly "buildkite/scripts/build-artifact" "sh"
 ]
 
 -- The default debian version (Bullseye) is used in all downstream CI jobs
