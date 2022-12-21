@@ -27,7 +27,6 @@ RUN apt-get update --yes \
     apt-utils \
     awscli \
     cmake \
-    fakeroot \
     gnupg2 \
     jq \
     libboost-dev \
@@ -52,8 +51,7 @@ RUN apt-get update --yes \
     perl \
     pkg-config \
     rubygems \
-    zlib1g-dev \
-  && rm -rf /var/lib/apt/lists/*
+    zlib1g-dev
 
 # -- Debian Bullseye python dependencies (largely installed above from apt)
 # Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
@@ -64,6 +62,19 @@ RUN test "$deb_codename" = "bullseye" \
           python3-sexpdata \
       && pip install readchar \
       || exit 0
+
+# --- Google Cloud tools
+# --- Helm tools
+# Get yarn + nodejs
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && curl https://baltocdn.com/helm/signing.asc | apt-key add - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && apt-get update --yes \
+    && apt-get install --yes google-cloud-sdk kubectl helm nodejs yarn
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
@@ -81,28 +92,6 @@ RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terra
     && unzip terraform.zip \
     && mv terraform /usr/bin \
     && ln -s /usr/bin/terraform /usr/local/bin/terraform
-
-# --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && apt-get update --yes \
-    && apt-get install --yes --no-install-recommends helm \
-    && rm -rf /var/lib/apt/lists/*
-
-# Get yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
-    && apt update \
-    && apt install --yes --no-install-recommends nodejs yarn \
-    && rm -rf /var/lib/apt/lists/*
 
 # Dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
