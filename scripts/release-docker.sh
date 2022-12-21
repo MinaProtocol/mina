@@ -85,7 +85,7 @@ mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
   ;;
 mina-test-executive)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-test-executive"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-executive"
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
