@@ -330,6 +330,7 @@ module Make (F : F) = struct
     let processing_status =
       controlling_bandwidth ~resource:`Verifier ~context ~actions
         ~transition_states ~state_hash:top_state_hash ~process_f ~upon_f
+        ~same_state_level:(Fn.compose Option.is_some F.to_data)
         (module I)
     in
     Substate.In_progress

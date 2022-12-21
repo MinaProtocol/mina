@@ -1019,10 +1019,9 @@ module T = struct
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let cs =
+      let open Ledger in
       List.map cs
-        ~f:
-          (let open Ledger in
-          User_command.to_verifiable ~ledger ~get ~location_of_account)
+        ~f:(User_command.to_verifiable ~ledger ~get ~location_of_account)
     in
     let open Deferred.Or_error.Let_syntax in
     let%map xs = Verifier.verify_commands verifier cs in
