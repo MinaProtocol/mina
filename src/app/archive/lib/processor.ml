@@ -3547,12 +3547,49 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
     [%log info]
       "Populating token owners table for block with state hash $state_hash"
       ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    List.iter tokens_used ~f:(fun (token_id, owner) ->
-        match owner with
-        | None ->
-            ()
-        | Some acct_id ->
-            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
+    let module Node = struct
+      type t = Token_id.t * Account_id.t option
+      [@@deriving equal, compare, hash, sexp]
+    end in
+    (* there's an edge from token A to token B if the B's token owner, an account identifier,
+       has A as its token; token A is added before token B
+    *)
+    let token_edges =
+      List.filter_map tokens_used
+        ~f:(fun ((token_id, acct_id_opt) as token_and_owner) ->
+          match acct_id_opt with
+          | None ->
+              assert (Token_id.equal token_id Token_id.default) ;
+              (* no edge to default token *)
+              None
+          | Some acct_id -> (
+              let token_id' = Account_id.token_id acct_id in
+              match
+                List.find tokens_used ~f:(fun (tokid, _) ->
+                    Token_id.equal token_id' tokid )
+              with
+              | Some token_and_owner' ->
+                  Some
+                    ( { from = token_and_owner'; to_ = token_and_owner }
+                      : (Token_id.t * Account_id.t option)
+                        Topological_sort.Edge.t )
+              | None ->
+                  (* no other token refers to this token *)
+                  None ) )
+    in
+    ( match Topological_sort.sort (module Node) tokens_used token_edges with
+    | Ok sorted_tokens ->
+        List.iter sorted_tokens ~f:(fun (token_id, owner) ->
+            match owner with
+            | None ->
+                ()
+            | Some acct_id ->
+                Token_owners.add_if_doesn't_exist token_id acct_id )
+    | Error err ->
+        (* a cycle, should never happen *)
+        [%log fatal] "Fatal error when sorting tokens: $error"
+          ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+        ignore (exit 1 : int) ) ;
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =
