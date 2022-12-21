@@ -127,7 +127,6 @@ let prune_by_length ~state root_length =
     Transition_states.fold ~init:[]
       ~f:(fun st acc ->
         let meta = Transition_state.State_functions.transition_meta st in
-        ignore (Transition_state.shutdown_in_progress st : Transition_state.t) ;
         if Mina_numbers.Length.(meta.blockchain_length <= root_length) then
           meta.state_hash :: acc
         else acc )
