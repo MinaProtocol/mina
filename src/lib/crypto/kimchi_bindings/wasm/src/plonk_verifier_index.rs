@@ -416,7 +416,6 @@ macro_rules! impl_verification_key {
                         rot_comm: None,
                         xor_comm: None,
 
-                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();

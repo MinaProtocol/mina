@@ -127,8 +127,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             foreign_field_mul_comm: None,
             rot_comm: None,
 
-            foreign_field_modulus: None,
-
             shift,
             zkpm: {
                 let res = once_cell::sync::OnceCell::new();

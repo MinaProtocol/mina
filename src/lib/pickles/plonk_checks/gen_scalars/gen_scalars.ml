@@ -101,8 +101,6 @@ module Env = struct
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
     ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
-    ; foreign_field_modulus : int -> 'a
-    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -137,8 +135,6 @@ module Tick : S = struct
        ; gamma = _
        ; unnormalized_lagrange_basis = _
        ; enabled_if =_
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -177,8 +173,6 @@ let () =
        ; gamma = _
        ; unnormalized_lagrange_basis = _
        ; enabled_if
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -228,8 +222,6 @@ module Tock : S = struct
        ; gamma = _
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -268,8 +260,6 @@ let () =
        ; gamma = _
        ; unnormalized_lagrange_basis = _
        ; enabled_if
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -317,8 +307,6 @@ module Tick_with_lookup : S = struct
        ; gamma
        ; unnormalized_lagrange_basis
        ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -357,8 +345,6 @@ let () =
        ; gamma
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -406,8 +392,6 @@ module Tock_with_lookup : S = struct
        ; gamma
        ; unnormalized_lagrange_basis
        ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -446,8 +430,6 @@ let () =
        ; gamma
        ; unnormalized_lagrange_basis = _
        ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
