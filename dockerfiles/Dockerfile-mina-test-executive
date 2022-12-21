@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND noninteractive
 # Dependencies
 RUN apt-get -y update && \
   apt-get -y upgrade && \
-  apt-get install sudo && \
+  apt-get install -y sudo && \
   sudo apt-get -y install \
     apt-transport-https \
     ca-certificates \
