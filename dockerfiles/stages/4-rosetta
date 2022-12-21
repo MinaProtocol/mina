@@ -13,8 +13,9 @@ ARG MINA_CONFIG_DIR=/data/.mina-config
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
 # --- Dependencies across many platforms
-RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get upgrade --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
     apt-utils \
     curl \
     ca-certificates \
@@ -28,12 +29,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     postgresql-contrib \
     tzdata \
     jq \
-    sudo
+    sudo \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
-     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps7 \
          libffi6 \
@@ -41,8 +43,8 @@ RUN test "$deb_codename" = "buster" \
 
 # --- Debian 9 "Stretch" Dependencies
 RUN test "$deb_codename" = "stretch" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
-     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
          libjemalloc1 \
          libprocps6 \
          libffi6 \
@@ -50,8 +52,8 @@ RUN test "$deb_codename" = "stretch" \
 
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update -y \
-     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps8 \
          libffi7 \

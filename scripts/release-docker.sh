@@ -100,6 +100,24 @@ if [ -n "${extraArgs[*]}" ]; then
 else
   EXTRA=""
 fi
+
+# Determine the proper image for ubuntu or debian
+case "${DEB_CODENAME##*=}" in
+  bionic|focal|impish|jammy)
+    IMAGE="ubuntu:${DEB_CODENAME##*=}"
+  ;;
+  stretch|buster|bullseye|bookworm|sid)
+    IMAGE="debian:${DEB_CODENAME##*=}-slim"
+  ;;
+esac
+IMAGE="--build-arg image=${IMAGE}"
+
+# Debug prints for visability
+# Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
+echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
+echo ${EXTRA}
+echo "docker image: ${IMAGE}"
+
 # Verify Required Parameters are Present
 if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
@@ -150,6 +168,11 @@ dhall="
        $EXTRA
        }
 "
+DOCKER_REGISTRY="gcr.io/o1labs-192920"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
+# friendly, predictable tag
+GITHASH=$(git rev-parse --short=7 HEAD)
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
 if [[ $FUNCTION == cloudBuild ]]; then
     dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
