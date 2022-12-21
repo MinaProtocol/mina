@@ -1023,7 +1023,6 @@ module T = struct
       Or_error.try_with (fun () ->
           List.map cs ~f:(fun cmd ->
               let open Ledger in
-              (* TODO: what are we supposed to do here? *)
               User_command.to_verifiable
                 ~find_vk:
                   (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get

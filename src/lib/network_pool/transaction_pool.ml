@@ -327,27 +327,71 @@ struct
         t
     end
 
+    module F = struct
+      module T = struct
+        type t = Zkapp_basic.F.t [@@deriving sexp, yojson, equal, compare, hash]
+      end
+
+      include Hashable.Make (T)
+      include Comparable.Make (T)
+    end
+
+    let extract_vks : User_command.t -> Verification_key_wire.t List.t =
+      function
+      | User_command.Signed_command _ ->
+          []
+      | Zkapp_command cmd ->
+          Zkapp_command.account_updates cmd
+          |> Zkapp_command.Call_forest.fold ~init:[]
+               ~f:(fun acc (p : Account_update.t) ->
+                 match Account_update.verification_key_update_to_option p with
+                 | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+                     vk :: acc
+                 | _ ->
+                     acc )
+
     module Vk_refcount_table = struct
-      (* what's the right incantation of "field" here that is better than State_hash but will compile *)
-      type t = (int * Verification_key_wire.t) State_hash.Table.t
+      type t = (int * Verification_key_wire.t) F.Table.t
 
-      let create () = State_hash.Table.create ()
+      let create () = F.Table.create ()
 
-      let find t key = State_hash.Table.find t key
+      let find t key = F.Table.find t key
 
       let inc ~key ~value t =
-        State_hash.Table.update t key ~f:(function
+        F.Table.update t key ~f:(function
           | None ->
               (1, value)
           | Some (x, value) ->
-              (x + 1, value) )
+              (x + 1, value) ) ;
+        Mina_metrics.(
+          Gauge.set Transaction_pool.vk_refcount_table_size
+            (Float.of_int (F.Table.length t)))
 
       let dec ~key ~value:_ t =
-        State_hash.Table.change t key ~f:(function
+        F.Table.change t key ~f:(function
           | None ->
               None
           | Some (x, value) ->
-              if Int.equal x 1 then None else Some (x - 1, value) )
+              if x = 1 then None else Some (x - 1, value) ) ;
+        Mina_metrics.(
+          Gauge.set Transaction_pool.vk_refcount_table_size
+            (Float.of_int (F.Table.length t)))
+
+       let lift_common t table_modify cmd =
+         extract_vks cmd
+          |> List.iter ~f:(fun vk ->
+                   table_modify ~key:vk.hash ~value:vk t)
+
+       let lift1 t table_modify cmd =
+            Transaction_hash.User_command_with_valid_signature.forget_check cmd
+            |> With_hash.data
+            |> lift_common t table_modify
+
+       let lift2 t table_modify (cmd : User_command.Valid.t With_status.t) =
+            With_status.data cmd
+            |> User_command.forget_check
+            |> lift_common t table_modify
+
     end
 
     type t =
@@ -485,7 +529,12 @@ struct
          The locally generated commands need to move from
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
+
+         Don't forget to modify the refcount table as well as remove from the
+         index pool.
       *)
+      let vk_table_lift1 = Vk_refcount_table.lift1 t.verification_key_table in
+      let vk_table_lift2 = Vk_refcount_table.lift2 t.verification_key_table in
       let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
@@ -501,6 +550,8 @@ struct
               ]
             @ metadata )
       in
+      List.iter new_commands ~f:(vk_table_lift2 Vk_refcount_table.inc);
+      List.iter removed_commands ~f:(vk_table_lift2 Vk_refcount_table.dec);
       [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
@@ -565,6 +616,7 @@ struct
                        Transaction_hash.User_command_with_valid_signature
                        .to_yojson locally_generated_dropped ) )
             ] ;
+      List.iter locally_generated_dropped ~f:(vk_table_lift1 Vk_refcount_table.dec) ;
       let pool'', dropped_commands =
         let accounts_to_check =
           List.fold (new_commands @ removed_commands) ~init:Account_id.Set.empty
@@ -625,6 +677,7 @@ struct
             |> Option.is_some )
       in
       if not @@ List.is_empty commit_conflicts_locally_generated then
+        List.iter commit_conflicts_locally_generated ~f:(vk_table_lift1 Vk_refcount_table.dec) ;
         [%log' info t.logger]
           "Locally generated commands $cmds dropped because they conflicted \
            with a committed command."
@@ -650,6 +703,7 @@ struct
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
+            vk_table_lift1 Vk_refcount_table.dec cmd;
             assert (
               Option.is_some
               @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
@@ -706,6 +760,7 @@ struct
                             , Transaction_hash.User_command_with_valid_signature
                               .to_yojson cmd )
                           ] ;
+                      vk_table_lift1 Vk_refcount_table.inc cmd;
                       Mina_metrics.(
                         Gauge.set Transaction_pool.pool_size
                           (Float.of_int (Indexed_pool.size pool'''))) ;
@@ -724,6 +779,7 @@ struct
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd )
               ] ;
+          vk_table_lift1 Vk_refcount_table.dec cmd ;
           ignore
             ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
               : (Time.t * [ `Batch of int ]) option ) ) ;
@@ -997,19 +1053,6 @@ struct
         | _ ->
             ()
 
-      let extract_vks : User_command.t -> Verification_key_wire.t List.t =
-        function
-        | User_command.Signed_command _ ->
-            []
-        | Zkapp_command cmd ->
-            Zkapp_command.account_updates cmd
-            |> Zkapp_command.Call_forest.fold ~init:[]
-                 ~f:(fun acc (p : Account_update.t) ->
-                   match Account_update.verification_key_update_to_option p with
-                   | Zkapp_basic.Set_or_keep.Set (Some vk) ->
-                       vk :: acc
-                   | _ ->
-                       acc )
 
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool) (diff : t Envelope.Incoming.t) :
@@ -1100,7 +1143,7 @@ struct
                     ~f:
                       (Fn.compose
                          snd (* remove the helper cache we folded with *)
-                         (List.fold_map ~init:State_hash.Map.empty
+                         (List.fold_map ~init:F.Map.empty
                             ~f:(fun running_cache cmd ->
                               let verified_cmd =
                                 User_command.to_verifiable cmd
@@ -1114,7 +1157,7 @@ struct
                                           Ok z
                                     in
                                     (* first we check if there's anything in the running cache within this diff so far *)
-                                    State_hash.Map.find running_cache vk_hash
+                                    F.Map.find running_cache vk_hash
                                     |> Result.of_option
                                          ~error:
                                            (Error.create
@@ -1142,7 +1185,7 @@ struct
                               let running_cache' =
                                 List.fold (extract_vks cmd) ~init:running_cache
                                   ~f:(fun acc vk ->
-                                    State_hash.Map.set acc ~data:vk
+                                    F.Map.set acc ~data:vk
                                       ~key:(With_hash.hash vk) )
                               in
                               (running_cache', verified_cmd) ) ) ) ) )
@@ -1311,15 +1354,8 @@ struct
 
         (* apply changes to the vk-refcount-table here *)
         let () =
-          let lift table_modify cmd =
-            Transaction_hash.User_command_with_valid_signature.forget_check cmd
-            |> With_hash.data |> extract_vks
-            |> List.iter ~f:(fun vk ->
-                   table_modify ~key:vk.hash ~value:vk t.verification_key_table )
-          in
-          (* add the cmds *)
+          let lift = Vk_refcount_table.lift1 t.verification_key_table in
           List.iter added_cmds ~f:(lift Vk_refcount_table.inc) ;
-          (* drop vks we're losing *)
           List.iter all_dropped_cmds ~f:(lift Vk_refcount_table.dec)
         in
         let all_dropped_cmd_hashes =

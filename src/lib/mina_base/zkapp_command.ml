@@ -1364,14 +1364,14 @@ module Verifiable : sig
        ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
-    -> State_hash.t
+    -> Zkapp_basic.F.t
     -> Account_id.t
     -> (Verification_key_wire.t, Error.t) Result.t
 
   val create :
        T.t
     -> find_vk:
-         (   State_hash.t
+         (   Zkapp_basic.F.t
           -> Account_id.t
           -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
@@ -1395,7 +1395,7 @@ end = struct
     end
   end]
 
-  let find_vk_via_ledger ~ledger ~get ~location_of_account _vk_hash account_id =
+  let find_vk_via_ledger ~ledger ~get ~location_of_account _expected_vk_hash account_id =
     match
       let open Option.Let_syntax in
       let%bind location = location_of_account ledger account_id in
@@ -1446,47 +1446,44 @@ end = struct
                 | Error _ as err ->
                     return err
               in
-              if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
-              then (
-                let prioritized_vk =
-                  (* only lookup _past_ vk setting, ie exclude the new one we
-                   * potentially set in this account_update (use the non-'
-                   * vks_overrided) . *)
-                  match Account_id.Map.find !vks_overridden account_id with
-                  | Some (Some vk) ->
-                      vk
-                  | Some None ->
-                      (* we explicitly have erased the key *)
-                      let err =
-                        Error.create
-                          "No verification key found for proved account \
-                           update: the verification key was removed by a \
-                           previous account update"
-                          ("account_id", account_id)
-                          [%sexp_of: string * Account_id.t]
-                      in
-                      return (Error err)
-                  | None -> (
-                      (* we haven't set anything; lookup the vk in the fallback *)
-                      let vk_hash =
-                        failwith
-                          "TODO: Lookup the vk_hash inside this account update"
-                      in
-                      match find_vk vk_hash account_id with
-                      | Error e ->
-                          return (Error e)
-                      | Ok vk ->
-                          vk )
-                in
-                Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash prioritized_vk ) ;
-                (* return the updated overrides *)
-                vks_overridden := vks_overriden' ;
-                (p, Some prioritized_vk) )
-              else (
-                vks_overridden := vks_overriden' ;
-                (p, None) ) )
+              match p.body.authorization_kind with
+              | Proof vk_hash ->
+                  let prioritized_vk =
+                    (* only lookup _past_ vk setting, ie exclude the new one we
+                     * potentially set in this account_update (use the non-'
+                     * vks_overrided) . *)
+                    match Account_id.Map.find !vks_overridden account_id with
+                    | Some (Some vk) ->
+                        vk
+                    | Some None ->
+                        (* we explicitly have erased the key *)
+                        let err =
+                          Error.create
+                            "No verification key found for proved account \
+                             update: the verification key was removed by a \
+                             previous account update"
+                            ("account_id", account_id)
+                            [%sexp_of: string * Account_id.t]
+                        in
+                        return (Error err)
+                    | None -> (
+                        (* we haven't set anything; lookup the vk in the fallback *)
+                        match find_vk vk_hash account_id with
+                        | Error e ->
+                            return (Error e)
+                        | Ok vk ->
+                            vk )
+                  in
+                  Account_id.Table.update tbl account_id ~f:(fun _ ->
+                      With_hash.hash prioritized_vk ) ;
+                  (* return the updated overrides *)
+                  vks_overridden := vks_overriden' ;
+                  (p, Some prioritized_vk)
+              | _ ->
+                  vks_overridden := vks_overriden' ;
+                  (p, None) )
         in
+
         Ok { fee_payer; account_updates; memo } )
 end
 
