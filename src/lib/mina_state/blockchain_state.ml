@@ -181,7 +181,7 @@ type display =
   , string
   , string
   , string
-  , int
+  , string
   , string )
   Poly.t
 [@@deriving yojson]

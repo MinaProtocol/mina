@@ -234,9 +234,33 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     type display =
-      (string, string, string, int, string, Local_state.display) Poly.t
+      (string, string, string, string, string, Local_state.display) Poly.t
 
-    let display _ = failwith "TODO"
+    let display (t : t) : display =
+      let display_ledger_hash t =
+        Visualization.display_prefix_of_string
+        @@ Frozen_ledger_hash.to_base58_check t
+      in
+      let display_register (t : _ Registers.t) =
+        { Registers.first_pass_ledger = display_ledger_hash t.first_pass_ledger
+        ; second_pass_ledger = display_ledger_hash t.second_pass_ledger
+        ; pending_coinbase_stack =
+            Pending_coinbase.Stack.to_yojson t.pending_coinbase_stack
+            |> Yojson.Safe.to_string
+        ; local_state = Local_state.display t.local_state
+        }
+      in
+      { Poly.source = display_register t.source
+      ; target = display_register t.target
+      ; connecting_ledger_left = display_ledger_hash t.connecting_ledger_left
+      ; connecting_ledger_right = display_ledger_hash t.connecting_ledger_right
+      ; supply_increase =
+          Currency.Amount.Signed.to_yojson t.supply_increase
+          |> Yojson.Safe.to_string
+      ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
+      ; sok_digest =
+          Sok_message.Digest.to_yojson t.sok_digest |> Yojson.Safe.to_string
+      }
 
     let genesis ~genesis_ledger_hash : t =
       let registers =

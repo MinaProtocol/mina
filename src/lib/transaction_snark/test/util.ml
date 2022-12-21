@@ -441,9 +441,6 @@ let check_balance pk balance ledger =
   [%test_eq: Balance.t] acc.balance (Balance.of_nanomina_int_exn balance)
 
 (** Test legacy transactions*)
-let test_transaction_union ?expected_failure:_ ?txn_global_slot:_ _ _ =
-  failwith "TODO"
-(*
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
@@ -523,8 +520,10 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   in
   let expect_snark_failure, applied_transaction =
     match
-      Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
-        txn_unchecked
+      Result.( >>= )
+        (Ledger.apply_transaction_phase_1 ledger ~constraint_constants
+           ~txn_state_view txn_unchecked )
+        (Ledger.apply_transaction_phase_2 ledger)
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
@@ -585,4 +584,3 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)
-*)

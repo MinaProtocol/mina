@@ -169,7 +169,7 @@ module type Full = sig
     end]
 
     type display =
-      (string, string, string, int, string, Local_state.display) Poly.t
+      (string, string, string, string, string, Local_state.display) Poly.t
 
     val display : Stable.Latest.t -> display
 
