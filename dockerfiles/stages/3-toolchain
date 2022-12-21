@@ -129,6 +129,7 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
     && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}" \
+    && rustup target add --toolchain "nightly-${RUST_NIGHTLY}" wasm32-unknown-unknown \
     && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 USER opam
