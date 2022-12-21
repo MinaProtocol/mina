@@ -12,9 +12,14 @@ path=$2
 
 source ~/.profile
 
+export MINA_LIBP2P_PASS="naughty blue worm"
+
 echo "--- Make build"
-export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
+export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
 time make build
+
+echo "--- Build all targets"
+dune build "${path}" --profile="${profile}" -j16
 
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will

@@ -1,1 +1,0 @@
-../../lib/mina_base/new_account_payload.ml

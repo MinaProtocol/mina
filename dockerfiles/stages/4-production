@@ -12,6 +12,8 @@ ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
+ARG ROSETTA_CLI_VERSION=v0.10.1
+
 ENV DEBIAN_FRONTEND noninteractive
 
 # --- Dependencies across many platforms
@@ -60,7 +62,7 @@ RUN test "$deb_codename" = "focal" \
      || exit 0
 
 # --- Install the latest version of rosetta-cli
-RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
+RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
@@ -77,6 +79,9 @@ COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
+COPY --from=builder /home/opam/mina/src/app/archive/*.sql /archive/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 # --- Set up postgres

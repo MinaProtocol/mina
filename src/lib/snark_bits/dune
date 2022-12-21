@@ -5,16 +5,17 @@
  (inline_tests)
  (libraries
    ;; opam libraries
-   core_kernel
-   integers
-   base
-   ;; local libraries
-   fold_lib
-   snarky.backendless
-   tuple_lib
-   bitstring_lib
-   snarky.intf
-   )
+  core_kernel
+  integers
+  base
+  ;; local libraries
+  fold_lib
+  snarky.backendless
+  tuple_lib
+  bitstring_lib
+  snarky.intf
+  mina_stdlib
+  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_snarky ppx_optcomp ppx_let ppx_inline_test ppx_compare))
