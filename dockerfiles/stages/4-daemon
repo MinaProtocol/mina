@@ -38,7 +38,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
     tzdata
 
 # Mina daemon package, copied from the builder container
-COPY --from=builder /home/mina/debs/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
+COPY --from=builder /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
 # And then installed along with any missing dependencies
 RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
   && dpkg -i /root/mina-daemon-package.deb \

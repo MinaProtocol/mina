@@ -13,7 +13,6 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 set +u
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
-set -u
 
 # Alternative to BUILDKITE_BRANCH
 if [[ -n "${MINA_BRANCH}" ]]; then
@@ -22,7 +21,6 @@ fi
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 # Allow overriding the script env variables with docker build arguments
-set +u
 if [[ -n "${deb_codename}" ]]; then
   MINA_DEB_CODENAME="${deb_codename}"
 fi
