@@ -768,7 +768,7 @@ let has_locked_tokens ~global_slot (account : t) =
 let has_permission ~control ~to_ (account : t) =
   match to_ with
   | `Access ->
-      Permissions.Auth_required.check account.permissions.send control
+      Permissions.Auth_required.check account.permissions.access control
   | `Send ->
       Permissions.Auth_required.check account.permissions.send control
   | `Receive ->
