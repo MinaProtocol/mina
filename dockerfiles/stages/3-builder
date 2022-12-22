@@ -58,7 +58,7 @@ RUN echo "--- Build all major tagets required for packaging from Commit SHA: ${M
     src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/ocaml-signer/signer.exe \
    && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1}" \
-   && BUILDKITE_BRANCH=${MINA_BRANCH} ./scripts/rebuild-deb.sh \
+   && ./scripts/rebuild-deb.sh \
    && mkdir ${HOME}/debs/ \
    && cp _build/mina-*.deb ${HOME}/debs/ \
    && rm -rf _build
