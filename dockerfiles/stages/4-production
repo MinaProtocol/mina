@@ -7,6 +7,8 @@ ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
 
+ARG psql_version=13
+
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
@@ -20,19 +22,27 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update -y \
   && apt-get install -y \
     apt-utils \
+    apt-transport-https \
     curl \
     ca-certificates \
     dnsutils \
     dumb-init \
     gettext \
+    gnupg2 \
     libgmp10 \
     libgomp1 \
     libssl1.1 \
-    postgresql \
-    postgresql-contrib \
     tzdata \
     jq \
     sudo
+
+# --- Install Postgresql
+RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update -y \
+    && apt-get install -y \
+       postgresql-"$psql_version" \
+       postgresql-client-"$psql_version"
 
 # --- Debian 11 "Bullseye" Dependencies
 RUN test "$deb_codename" = "bullseye" \
