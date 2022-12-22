@@ -9,16 +9,16 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../_build"
 
 # Alternative to BUILDKITE_BRANCH
-if [[ -n "${MINA_BRANCH}" ]]; then
+if [[ -n "${MINA_BRANCH:=}" ]]; then
   BUILDKITE_BRANCH="${MINA_BRANCH}"
 fi
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 # Allow overriding the script env variables with docker build arguments
-if [[ -n "${deb_codename}" ]]; then
+if [[ -n "${deb_codename:=}" ]]; then
   MINA_DEB_CODENAME="${deb_codename}"
 fi
-if [[ -n "${deb_version}" ]]; then
+if [[ -n "${deb_version:=}" ]]; then
   MINA_DEB_VERSION="${deb_version}"
 fi
 
