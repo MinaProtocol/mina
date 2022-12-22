@@ -50,11 +50,10 @@ RUN echo "Building image with version $deb_version from compiled debian package 
 WORKDIR /root/
 USER 0
 
-COPY --chown=${UID} scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
-COPY --chown=${UID} scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
-COPY --chown=${UID} scripts/daemon-entrypoint.sh /entrypoint.sh
-# Solve this by marking scripts executable in git
-COPY --chown=${UID} ./auxiliary_entrypoints /entrypoint.d
+COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+COPY scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+COPY scripts/daemon-entrypoint.sh /entrypoint.sh
+COPY ./auxiliary_entrypoints /entrypoint.d
 
 ENV MINA_TIME_OFFSET 0
 
