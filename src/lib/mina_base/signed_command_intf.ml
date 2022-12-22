@@ -198,8 +198,12 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  (** account ids accessed, given a transaction status *)
-  val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+  (** account ids accessed, given a transaction status;
+      returned status same as input status, except always
+      `Applied` for fee payer
+  *)
+  val accounts_accessed :
+    t -> Transaction_status.t -> (Account_id.t * Transaction_status.t) list
 
   (** all account ids mentioned in a command *)
   val accounts_referenced : t -> Account_id.t list
@@ -245,7 +249,8 @@ module type Full = sig
 
       include Hashable.S with type t := t
 
-      val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+      val accounts_accessed :
+        t -> Transaction_status.t -> (Account_id.t * Transaction_status.t) list
 
       val accounts_referenced : t -> Account_id.t list
     end

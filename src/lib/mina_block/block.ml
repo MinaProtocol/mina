@@ -121,4 +121,5 @@ let account_ids_accessed t =
   List.map transactions ~f:(fun { data = txn; status } ->
       Mina_transaction.Transaction.accounts_accessed txn status )
   |> List.concat
-  |> List.dedup_and_sort ~compare:Account_id.compare
+  |> List.dedup_and_sort
+       ~compare:[%compare: Account_id.t * Transaction_status.t]

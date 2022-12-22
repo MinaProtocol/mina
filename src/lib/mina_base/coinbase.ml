@@ -48,9 +48,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let fee_transfer t = t.fee_transfer
 
-  let accounts_accessed t =
-    receiver t
-    :: List.map ~f:Fee_transfer.receiver (Option.to_list t.fee_transfer)
+  let accounts_accessed t status =
+    let account_ids =
+      receiver t
+      :: List.map ~f:Fee_transfer.receiver (Option.to_list t.fee_transfer)
+    in
+    List.map account_ids ~f:(fun acct_id -> (acct_id, status))
+
+  let accounts_referenced t =
+    List.map (accounts_accessed t Transaction_status.Applied)
+      ~f:(fun (acct_id, _status) -> acct_id)
 
   let is_valid { amount; fee_transfer; _ } =
     match fee_transfer with

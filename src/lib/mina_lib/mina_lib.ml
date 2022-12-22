@@ -1481,13 +1481,13 @@ let create ?wallets (config : Config.t) =
                       (fun exn ->
                         let err = Error.of_exn ~backtrace:`Get exn in
                         [%log' fatal config.logger]
-                          "unhandled exception from uptime service SNARK \
-                           worker: $exn, terminating daemon"
+                          "unhandled exception when creating uptime service \
+                           SNARK worker: $exn, terminating daemon"
                           ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
-                    O1trace.thread "manage_uptimer_snark_worker_subprocess"
+                    O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
                           ~logger:config.logger ~pids:config.pids ) )

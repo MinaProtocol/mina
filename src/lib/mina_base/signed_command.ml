@@ -71,7 +71,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let accounts_accessed ({ payload; _ } : t) status =
         Payload.accounts_accessed payload status
 
-      let accounts_referenced (t : t) = accounts_accessed t Applied
+      let accounts_referenced (t : t) =
+        List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) ->
+            acct_id )
     end
 
     module V1 = struct

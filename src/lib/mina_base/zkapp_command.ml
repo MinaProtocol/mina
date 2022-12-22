@@ -1238,17 +1238,15 @@ let zkapp_command_list (t : t) : Account_update.t list =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
+(* returned statuses same as input status, except always `Applied` for fee payer *)
 let accounts_accessed (t : t) (status : Transaction_status.t) =
-  match status with
-  | Applied ->
-      Call_forest.fold t.account_updates
-        ~init:[ fee_payer t ]
-        ~f:(fun acc p -> Account_update.account_id p :: acc)
-      |> List.rev |> List.stable_dedup
-  | Failed _ ->
-      [ fee_payer t ]
+  let init = [ (fee_payer t, Transaction_status.Applied) ] in
+  Call_forest.fold t.account_updates ~init ~f:(fun acc p ->
+      (Account_update.account_id p, status) :: acc )
+  |> List.rev |> List.stable_dedup
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 

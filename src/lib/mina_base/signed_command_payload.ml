@@ -354,9 +354,12 @@ let fee_excess (t : t) =
 let accounts_accessed (t : t) (status : Transaction_status.t) =
   match status with
   | Applied ->
-      [ fee_payer t; source t; receiver t ]
+      List.map
+        [ fee_payer t; source t; receiver t ]
+        ~f:(fun acct_id -> (acct_id, status))
   | Failed _ ->
-      [ fee_payer t ]
+      (fee_payer t, Applied)
+      :: List.map [ source t; receiver t ] ~f:(fun acct_id -> (acct_id, status))
 
 let dummy : t =
   { common =

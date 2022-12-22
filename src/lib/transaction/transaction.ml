@@ -82,18 +82,19 @@ let expected_supply_increase = function
   | Coinbase t ->
       Coinbase.expected_supply_increase t
 
-let public_keys : t -> _ = function
-  | Command (Signed_command cmd) ->
-      [ Signed_command.fee_payer_pk cmd
-      ; Signed_command.source_pk cmd
-      ; Signed_command.receiver_pk cmd
-      ]
-  | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_referenced t |> List.map ~f:Account_id.public_key
-  | Fee_transfer ft ->
-      Fee_transfer.receiver_pks ft
-  | Coinbase cb ->
-      Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
+let public_keys (t : t) =
+  let account_ids =
+    match t with
+    | Command (Signed_command cmd) ->
+        Signed_command.accounts_referenced cmd
+    | Command (Zkapp_command t) ->
+        Zkapp_command.accounts_referenced t
+    | Fee_transfer ft ->
+        Fee_transfer.receivers ft
+    | Coinbase cb ->
+        Coinbase.accounts_referenced cb
+  in
+  List.map account_ids ~f:Account_id.public_key
 
 let accounts_accessed (t : t) (status : Transaction_status.t) =
   match t with
@@ -103,11 +104,12 @@ let accounts_accessed (t : t) (status : Transaction_status.t) =
       Zkapp_command.accounts_accessed t status
   | Fee_transfer ft ->
       assert (Transaction_status.equal Applied status) ;
-      Fee_transfer.receivers ft
+      List.map (Fee_transfer.receivers ft) ~f:(fun acct_id -> (acct_id, status))
   | Coinbase cb ->
-      Coinbase.accounts_accessed cb
+      Coinbase.accounts_accessed cb status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
 let fee_payer_pk (t : t) =
   match t with

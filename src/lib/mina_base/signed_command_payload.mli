@@ -215,7 +215,11 @@ val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
-val accounts_accessed : t -> Transaction_status.t -> Account_id.t list
+(* the returned statuses are the same as the input status, except the fee payer
+   is always `Applied`, even for a failing transaction
+*)
+val accounts_accessed :
+  t -> Transaction_status.t -> (Account_id.t * Transaction_status.t) list
 
 val tag : t -> Transaction_union_tag.t
 
