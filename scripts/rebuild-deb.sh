@@ -16,7 +16,8 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 set -u
 
 # Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+#source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+# In CI, expect these variables to be passed in. Locally, you shouldn't be building deb packages :)
 
 cd "${SCRIPTPATH}/../_build"
 
