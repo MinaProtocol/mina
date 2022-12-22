@@ -52,6 +52,8 @@ end)
 module Answer = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
@@ -62,11 +64,21 @@ module Answer = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* unused `rec` flag warning *)
+  [@@@warning "-39"]
+
+  (* TODO: generate this in ppx_version: issue #12111 *)
+  type t = (Ledger_hash.t, Account.t) Syncable_ledger.Answer.t
+    constraint t = Stable.Latest.t
+  [@@deriving sexp, to_yojson]
 end
 
 module Query = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
@@ -75,4 +87,12 @@ module Query = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* unused `rec` flag warning *)
+  [@@@warning "-39"]
+
+  (* TODO: generate this in ppx_version: issue #12111 *)
+  type t = Ledger.Location.Addr.t Syncable_ledger.Query.t
+    constraint t = Stable.Latest.t
+  [@@deriving sexp, to_yojson, hash, compare]
 end

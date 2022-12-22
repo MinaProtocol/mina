@@ -904,7 +904,6 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -916,7 +915,6 @@ module Types = struct
           ; zkapp
           } =
         let open Option.Let_syntax in
-        let%bind token_permissions = token_permissions in
         let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
@@ -924,7 +922,6 @@ module Types = struct
         let%map permissions = permissions in
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions
         ; token_symbol
         ; nonce
         ; balance = balance.AnnotatedBalance.total
@@ -939,7 +936,6 @@ module Types = struct
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -952,7 +948,6 @@ module Types = struct
           } =
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions = Some token_permissions
         ; token_symbol = Some token_symbol
         ; nonce = Some nonce
         ; balance =
@@ -988,7 +983,6 @@ module Types = struct
             Account.
               { Poly.public_key = Account_id.public_key account_id
               ; token_id = Account_id.token_id account_id
-              ; token_permissions = None
               ; token_symbol = None
               ; nonce = None
               ; delegate = None
@@ -1013,7 +1007,6 @@ module Types = struct
       { account :
           ( Public_key.Compressed.t
           , Token_id.t
-          , Token_permissions.t option
           , Account.Token_symbol.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
@@ -1024,17 +1017,35 @@ module Types = struct
           , Permissions.t option
           , Zkapp_account.t option )
           Account.Poly.t
+      ; genesis_balance : AnnotatedBalance.t option
       ; locked : bool option
       ; is_actively_staking : bool
       ; path : string
       ; index : Account.Index.t option
       }
 
+    let genesis_balance mina public_key =
+      let gl = Mina_lib.genesis_ledger mina in
+      Ledger.fold_until (Lazy.force gl) ~init:()
+        ~f:(fun () a ->
+          if Account.Key.compare (Account.public_key a) public_key = 0 then
+            Stop
+              (Some
+                 AnnotatedBalance.
+                   { total = a.balance
+                   ; unknown = Balance.zero
+                   ; timing = a.timing
+                   ; breadcrumb = None
+                   } )
+          else Continue () )
+        ~finish:(Fun.const None)
+
     let lift mina pk account =
       let block_production_pubkeys = Mina_lib.block_production_pubkeys mina in
       let accounts = Mina_lib.wallets mina in
       let best_tip_ledger = Mina_lib.best_ledger mina in
       { account
+      ; genesis_balance = genesis_balance mina account.public_key
       ; locked = Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking =
           ( if Token_id.(equal default) account.token_id then
@@ -1175,6 +1186,10 @@ module Types = struct
                  ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
+             ; field "genesis_balance" ~typ:AnnotatedBalance.obj
+                 ~doc:"The amount of MINA owned by the account at Genesis"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ (b : t) -> b.genesis_balance)
              ; field "nonce" ~typ:account_nonce
                  ~doc:
                    "A natural number that increases with each transaction \
@@ -1280,6 +1295,8 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
+                       ; genesis_balance =
+                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -1311,6 +1328,8 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
+                       ; genesis_balance =
+                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -1349,26 +1368,16 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool
+             ; field "isTokenOwner" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       true
-                   | Not_owned _ ->
-                       false )
-             ; field "isDisabled" ~typ:bool
+                 ~resolve:(fun _ _ -> None)
+             ; field "isDisabled" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:
                    "True if this account has been disabled by the owner of the \
                     associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       false
-                   | Not_owned { account_disabled } ->
-                       account_disabled )
+                 ~resolve:(fun _ _ -> None)
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \
@@ -1396,6 +1405,15 @@ module Types = struct
                    account.Account.Poly.zkapp
                    |> Option.map ~f:(fun zkapp_account ->
                           zkapp_account.app_state |> Zkapp_state.V.to_list ) )
+             ; field "provedState" ~typ:bool
+                 ~doc:
+                   "Boolean indicating whether all 8 fields on zkAppState were \
+                    last set by a proof-authorized account update"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.zkapp
+                   |> Option.map ~f:(fun zkapp_account ->
+                          zkapp_account.proved_state ) )
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"
                  ~args:Arg.[]
@@ -4175,6 +4193,7 @@ module Queries = struct
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account =
                Types.AccountObj.Partial_account.of_pk mina pk
+           ; genesis_balance = Types.AccountObj.genesis_balance mina pk
            ; locked = Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking =
                Public_key.Compressed.Set.mem block_production_pubkeys pk

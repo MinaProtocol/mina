@@ -9,6 +9,7 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
+use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
@@ -28,7 +29,6 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
                 group_gen: CamlFp(vi.domain.group_gen),
             },
             max_poly_size: vi.max_poly_size as isize,
-            max_quot_size: vi.max_quot_size as isize,
             public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
             srs: CamlFpSrs(vi.srs.get().expect("have an srs").clone()),
@@ -83,13 +83,22 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        let feature_flags = FeatureFlags {
+            chacha: false,
+            range_check: false,
+            foreign_field_add: false,
+            foreign_field_mul: false,
+            rot: false,
+            xor: false,
+            lookup_configuration: None,
+        };
+
         // TODO chacha, dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(false, false, None, false, false);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Vesta> {
             domain,
             max_poly_size: index.max_poly_size as usize,
-            max_quot_size: index.max_quot_size as usize,
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
@@ -115,6 +124,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
 
             range_check_comm: None,
             foreign_field_add_comm: None,
+            foreign_field_mul_comm: None,
+            rot_comm: None,
 
             foreign_field_modulus: None,
 
@@ -226,7 +237,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             group_gen: Fp::one().into(),
         },
         max_poly_size: 0,
-        max_quot_size: 0,
         public: 0,
         prev_challenges: 0,
         srs: CamlFpSrs::new(SRS::create(0)),

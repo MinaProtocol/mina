@@ -93,7 +93,7 @@ val zkapp_event : Field.t State.t
 
 val zkapp_events : Field.t State.t
 
-val zkapp_sequence_events : Field.t State.t
+val zkapp_actions : Field.t State.t
 
 val zkapp_memo : Field.t State.t
 

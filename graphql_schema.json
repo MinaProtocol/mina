@@ -1692,78 +1692,6 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "BlockTimeIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
           "name": "GlobalSlotIntervalInput",
           "description": null,
           "fields": [
@@ -2146,18 +2074,6 @@
               "deprecationReason": null
             },
             {
-              "name": "timestamp",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BlockTimeIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "blockchainLength",
               "description": null,
               "args": [],
@@ -2188,18 +2104,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "CurrencyAmountIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -2258,16 +2162,6 @@
               "defaultValue": null
             },
             {
-              "name": "timestamp",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BlockTimeIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
               "name": "blockchainLength",
               "description": null,
               "type": {
@@ -2293,16 +2187,6 @@
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "CurrencyAmountIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "GlobalSlotIntervalInput",
                 "ofType": null
               },
               "defaultValue": null
@@ -2856,7 +2740,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -3082,7 +2966,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -7088,49 +6972,6 @@
         },
         {
           "kind": "OBJECT",
-          "name": "BlockTimeInterval",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
           "name": "NetworkPrecondition",
           "description": null,
           "fields": [
@@ -7139,18 +6980,6 @@
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "timestamp",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "BlockTimeInterval",
-                "ofType": null
-              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -7185,18 +7014,6 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "CurrencyAmountInterval",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "GlobalSlotInterval",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -7930,7 +7747,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -11437,6 +11254,19 @@
               "deprecationReason": null
             },
             {
+              "name": "genesis_balance",
+              "description":
+                "The amount of MINA owned by the account at Genesis",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "AnnotatedBalance",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "nonce",
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
@@ -11607,7 +11437,7 @@
               "description": "True if this account owns its associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
@@ -11616,7 +11446,7 @@
                 "True if this account has been disabled by the owner of the associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
@@ -11655,6 +11485,15 @@
                   }
                 }
               },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "provedState",
+              "description":
+                "Boolean indicating whether all 8 fields on zkAppState were last set by a proof-authorized account update",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },

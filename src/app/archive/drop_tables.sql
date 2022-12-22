@@ -42,6 +42,8 @@ DROP TABLE zkapp_account_update_body;
 
 DROP TYPE call_type;
 
+DROP TYPE authorization_kind_type;
+
 DROP TABLE zkapp_updates;
 
 DROP TABLE zkapp_network_precondition;
@@ -80,13 +82,9 @@ DROP TABLE zkapp_global_slot_bounds;
 
 DROP TABLE zkapp_nonce_bounds;
 
-DROP TABLE zkapp_timestamp_bounds;
-
 DROP TABLE zkapp_token_id_bounds;
 
 DROP TYPE zkapp_auth_required_type;
-
-DROP TYPE zkapp_authorization_kind_type;
 
 DROP TYPE zkapp_precondition_type;
 

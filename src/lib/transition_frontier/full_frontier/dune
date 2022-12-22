@@ -29,7 +29,7 @@
    data_hash_lib
    precomputed_values
    with_hash
-   non_empty_list
+   mina_stdlib
    staged_ledger_diff
    mina_numbers
    debug_assert

@@ -121,10 +121,6 @@ let%test_module "transaction_status" =
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~logger ~frontier_broadcast_pipe
-          ~expiry_ns:
-            (Time_ns.Span.of_hr
-               (Float.of_int
-                  precomputed_values.genesis_constants.transaction_expiry_hr ) )
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for
@@ -196,7 +192,7 @@ let%test_module "transaction_status" =
         let%map tail_user_commands =
           Quickcheck.Generator.list_with_length 10 gen_user_command
         in
-        Non_empty_list.init head_user_command tail_user_commands
+        Mina_stdlib.Nonempty_list.init head_user_command tail_user_commands
       in
       Quickcheck.test ~trials:1
         (Quickcheck.Generator.tuple2 gen_frontier user_commands_generator)
@@ -209,7 +205,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let unknown_user_command, pool_user_commands =
-                Non_empty_list.uncons user_commands
+                Mina_stdlib.Nonempty_list.uncons user_commands
               in
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer

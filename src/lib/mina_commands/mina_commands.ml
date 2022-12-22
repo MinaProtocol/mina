@@ -217,7 +217,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
   let account = Option.value_exn account in
   let resulting_receipt = account.Account.Poly.receipt_chain_hash in
   let open Or_error.Let_syntax in
-  let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
+  let%bind (_ : Receipt.Chain_hash.t Mina_stdlib.Nonempty_list.t) =
     Result.of_option
       (Receipt_chain_verifier.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")

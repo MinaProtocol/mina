@@ -45,9 +45,20 @@ process-creation facility from a fork of the Jane Street
 There are a number of flags to `start_custom` to control how processes
 are managed.
 
+### Multiple instances flag
+
+Ordinarily, we want to run exactly one instance of an executable.  The
+optional `allow_multiple_instances` flag defaults to `false` to
+enforce that invariant. When a process starts, a lock file is
+written. If another instance is started, any existing process that
+holds the lock is killed. The flag can be set to `true` to allow
+multiple instances to run, for example, in tests. In that case, no
+lock file is read or written
+
 ### Output handling flags
 
-The flags `~stdout` and `~stderr` specify how output should be directed. Both flags take a triple:
+The flags `~stdout` and `~stderr` specify how output should be directed.
+Both flags take a triple:
 
 - whether to issue process output as logs at a specific level, or not
 - whether to make output available via a pipe, or not

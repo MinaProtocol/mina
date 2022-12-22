@@ -18,7 +18,7 @@ module type Gate_vector_intf = sig
 
   val get : t -> int -> field Kimchi_types.circuit_gate
 
-  val digest : t -> bytes
+  val digest : int -> t -> bytes
 end
 
 (** A row indexing in a constraint system. *)
@@ -636,7 +636,7 @@ end = struct
         add_gates gates ;
 
         (* compute the circuit's digest *)
-        let digest = Gates.digest rust_gates in
+        let digest = Gates.digest public_input_size rust_gates in
         let md5_digest = Md5.digest_bytes digest in
 
         (* drop the gates, we don't need them anymore *)

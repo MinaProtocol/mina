@@ -1,8 +1,35 @@
-{ lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
-, coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip, gnused, cacert, writeShellScript, doas
-, less, shadow }:
+{ lib
+, dockerTools
+, buildEnv
+, ocamlPackages_mina
+, runCommand
+, dumb-init
+, coreutils
+, bashInteractive
+, python3
+, libp2p_helper
+, procps
+, postgresql
+, curl
+, jq
+, stdenv
+, rsync
+, bash
+, gnutar
+, gzip
+, gnused
+, cacert
+, writeShellScript
+, doas
+, less
+, shadow
+, currentTime
+, flockenzeit
+}:
+
 let
+  created = flockenzeit.lib.ISO-8601 currentTime;
+
   mkdir = name:
     runCommand "mkdir-${name}" { } "mkdir -p $out${lib.escapeShellArg name}";
 
@@ -94,42 +121,48 @@ let
   };
 
   mkFullImage = name: packages: extraArgs:
-    dockerTools.streamLayeredImage (lib.recursiveUpdate {
-      name = "${name}-full";
-      contents = [
-        dumb-init
-        coreutils
-        bashInteractive
-        python3
-        libp2p_helper
-        procps
-        curl
-        jq
-      ] ++ packages;
-      extraCommands = ''
-        mkdir root tmp
-        chmod 777 tmp
-      '';
-      config = {
-        env = [ "MINA_TIME_OFFSET=0" ];
-        WorkingDir = "/root";
-        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-      };
-    } extraArgs);
+    dockerTools.streamLayeredImage (lib.recursiveUpdate
+      {
+        name = "${name}-full";
+        contents = [
+          dumb-init
+          coreutils
+          bashInteractive
+          python3
+          libp2p_helper
+          procps
+          curl
+          jq
+        ] ++ packages;
+        extraCommands = ''
+          mkdir root tmp
+          chmod 777 tmp
+        '';
+        config = {
+          env = [ "MINA_TIME_OFFSET=0" ];
+          WorkingDir = "/root";
+          cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+        };
+      }
+      extraArgs);
 
-in {
+in
+{
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";
+    inherit created;
     contents = [ ocamlPackages_mina.mina.out ];
   };
-  mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [
-    mina-build-config
-    mina-daemon-scripts
+  mina-image-full = mkFullImage "mina"
+    (with ocamlPackages_mina; [
+      mina-build-config
+      mina-daemon-scripts
 
-    mina.out
-    mina.mainnet
-    mina.genesis
-  ]) { };
+      mina.out
+      mina.mainnet
+      mina.genesis
+    ])
+    { };
   mina-archive-image-full = mkFullImage "mina-archive"
     (with ocamlPackages_mina; [
       mina-archive-scripts
@@ -137,7 +170,8 @@ in {
       gzip
 
       mina.archive
-    ]) { };
+    ])
+    { };
   mina-rosetta-image-full = mkFullImage "mina-rosetta"
     (with ocamlPackages_mina; [
       mina-rosetta-scripts
@@ -154,7 +188,8 @@ in {
       mina.rosetta
       mina.archive
       mina.mainnet
-    ]) {
+    ])
+    {
       config = {
         cmd = [ "/bin/dumb-init" "/rosetta/docker-start.sh" ];
         WorkingDir = "/rosetta";
