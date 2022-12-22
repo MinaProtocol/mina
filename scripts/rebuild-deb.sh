@@ -2,15 +2,6 @@
 
 # Script collects binaries and keys and builds deb archives.
 
-set -euo pipefail
-
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../_build"
-
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
-
-set +u
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
@@ -27,7 +18,14 @@ fi
 if [[ -n "${deb_version}" ]]; then
   MINA_DEB_VERSION="${deb_version}"
 fi
-set -u
+
+set -euo pipefail
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+cd "${SCRIPTPATH}/../_build"
+
+GITHASH=$(git rev-parse --short=7 HEAD)
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 cd "${SCRIPTPATH}/../_build"
 
