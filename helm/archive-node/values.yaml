@@ -42,7 +42,7 @@ postgresql:
   primary:
     name: "archive"
     persistence:
-      enabled: false
+      enabled: true
     initdb:
       user: "mina"
       password: "zo3moong7moog4Iep7eNgo3iecaesahH"
@@ -55,7 +55,7 @@ nodeSelector:
   preemptible: true
 
 healthcheck:
-  enabled: true
+  enabled: false
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30

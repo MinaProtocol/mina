@@ -83,7 +83,7 @@ locals {
     remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
     
     persistenceEnabled      = true
-    persistenceSize         = "8Gi"
+    persistenceSize         = "100Gi"
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
     spotAllowed      = "false"

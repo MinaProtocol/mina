@@ -132,13 +132,13 @@ locals {
       healthcheck = local.healthcheck_vars
       archive     = item
       postgresql = {
-        persistence = {
+        primary = {
+          persistence = {
           enabled      = item["persistenceEnabled"]
           size         = item["persistenceSize"]
           storageClass = item["persistenceStorageClass"]
           accessModes  = item["persistenceAccessModes"]
-        }
-        primary = {
+          }
           affinity = {
             nodeAffinity = {
               requiredDuringSchedulingIgnoredDuringExecution = {
