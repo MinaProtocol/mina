@@ -21,6 +21,8 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 ARG RUST_VERSION=1.63.0
+# Nightly Rust Version used for WebAssembly builds
+ARG RUST_NIGHTLY=2022-09-12
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -88,15 +90,19 @@ RUN curl -sL \
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
+# --- Additionally, install RUST_NIGHTLY via rustup and wasm-pack via curl/tar
+# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
+# As opposed to introducing another shell script here (that mostly just determines the platform)
+# we just download the binary for the only platform we care about in this docker environment
 USER opam
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --components rust-src clippy rustfmt --target wasm32-unknown-unkown \
-  && rm /tmp/rustup-init
-# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
-# As opposed to introducing another shell script here (that mostly just determines the platform)
-# we just download the binary for the only platform we care about in this docker environment
+  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src clippy rustfmt --target wasm32-unknown-unkown \
+  && rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src clippy rustfmt --toolchain wasm32-unknown-unknown \
+  && rm /tmp/rustup-init \
+  && curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+  | tar --extract --gzip --strip-components=1 --directory=/usr/bin --file=-
 
 # --- RocksDB Installation of a given ROCKSDB_VERSION
 USER root
