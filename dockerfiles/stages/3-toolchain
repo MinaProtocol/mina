@@ -82,7 +82,7 @@ RUN test "$deb_codename" = "bullseye" \
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
 RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
-    && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
+    && gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
@@ -128,7 +128,10 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
 
 USER opam
 
+ARG WASM_PACK_VERSION=v0.10.3
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src clippy rustfmt \
     && rustup target add --toolchain "nightly-${RUST_NIGHTLY}" wasm32-unknown-unknown \
-    && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    && curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz -o /tmp/wasm-pack.tar.gz \
+    && tar -xz -C /tmp -f /tmp/wasm-pack.tar.gz \
+    && /tmp/wasm-pack
