@@ -261,7 +261,7 @@ let kanikoBuild
                       , "--log-timestamp"
                       , "--cleanup"
                       , "--cache=true"
-                      , "--cache-ttl=2w"
+                      , "--cache-ttl=336h"
                       ]
                     # mkArgs image desc serviceDesc
                   )
