@@ -332,6 +332,80 @@ let compute_statuses
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~diff
     ~coinbase_receiver ~coinbase_amount ~txn_state_view ~ledger =
   let open Result.Let_syntax in
+  (* project transactions into a sequence of transactions *)
+  let project_transactions ~coinbase_parts ~commands ~completed_works =
+    let%map { Transaction_data.commands; coinbases; fee_transfers } =
+      get_transaction_data ~constraint_constants coinbase_parts
+        ~receiver:coinbase_receiver ~coinbase_amount commands completed_works
+        ~to_user_command:User_command.forget_check
+    in
+    List.map commands ~f:(fun t ->
+        Transaction.Command (User_command.forget_check t) )
+    @ List.map coinbases ~f:(fun t -> Transaction.Coinbase t)
+    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+  in
+  let project_transactions_pre_diff_two (p : _ Pre_diff_two.t) =
+    let coinbase_parts =
+      match p.coinbase with Zero -> `Zero | One x -> `One x | Two x -> `Two x
+    in
+    project_transactions ~coinbase_parts ~commands:p.commands
+      ~completed_works:p.completed_works
+  in
+  let project_transactions_pre_diff_one (p : _ Pre_diff_one.t) =
+    let coinbase_parts =
+      match p.coinbase with Zero -> `Zero | One x -> `One x
+    in
+    project_transactions ~coinbase_parts ~commands:p.commands
+      ~completed_works:p.completed_works
+  in
+  (* partition a sequence of transactions with statuses into user commands with statuses and internal command statuses *)
+  let split_transaction_statuses txns_with_statuses =
+    List.partition_map txns_with_statuses ~f:(fun txn_applied ->
+        let { With_status.data = txn; status } =
+          Transaction_snark.Transaction_validator.Transaction_applied
+          .transaction txn_applied
+        in
+        match txn with
+        | Transaction.Command cmd ->
+            (* this is safe because the commands we applied to the ledger were valid before *)
+            let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd') =
+              User_command.to_valid_unsafe cmd
+            in
+            Either.First { With_status.data = cmd'; status }
+        | Transaction.Fee_transfer _ | Transaction.Coinbase _ ->
+            Either.Second status )
+  in
+  let p1, p2 = diff in
+  let%bind num_p1_txns, txns =
+    let%map p1_txns = project_transactions_pre_diff_two p1
+    and p2_txns =
+      Option.value_map ~f:project_transactions_pre_diff_one ~default:(Ok []) p2
+    in
+    (List.length p1_txns, p1_txns @ p2_txns)
+  in
+  let%map txns_with_statuses =
+    Transaction_snark.Transaction_validator.apply_transactions
+      ~constraint_constants ~txn_state_view ledger txns
+    |> Result.map_error ~f:(fun err -> Error.Unexpected err)
+  in
+  let p1_txns_with_statuses, p2_txns_with_statuses =
+    List.split_n txns_with_statuses num_p1_txns
+  in
+  let p1' =
+    let commands, internal_command_statuses =
+      split_transaction_statuses p1_txns_with_statuses
+    in
+    { p1 with commands; internal_command_statuses }
+  in
+  let p2' =
+    Option.map p2 ~f:(fun p ->
+        let commands, internal_command_statuses =
+          split_transaction_statuses p2_txns_with_statuses
+        in
+        { p with commands; internal_command_statuses } )
+  in
+  (p1', p2')
+(*
   let compute_statuses_of_sequence ~coinbase_parts ~commands ~completed_works =
     let%bind { Transaction_data.commands; coinbases; fee_transfers } =
       get_transaction_data ~constraint_constants coinbase_parts
@@ -400,6 +474,7 @@ let compute_statuses
       ~default:(Ok None)
   in
   (p1, p2)
+  *)
 
 let get' (type c)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
