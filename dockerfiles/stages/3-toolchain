@@ -21,6 +21,7 @@ ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
 # Rust nightly toolchain for WebAssembly builds
 ARG RUST_NIGHTLY=2022-09-12
+ARG WASM_PACK_VERSION=v0.10.3
 
 ENV PATH "$PATH:$HOME/.cargo/bin"
 
@@ -86,9 +87,8 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
-RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
-    && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
-    && mv /tmp/docker/* /usr/bin
+RUN curl -sL -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Terraform tools
 RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
@@ -128,9 +128,8 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
 
 USER opam
 
-ARG WASM_PACK_VERSION=v0.10.3
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src clippy rustfmt --toolchain wasm32-unknown-unknown \
-    && curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz -o /tmp/wasm-pack.tar.gz \
-    && tar -xz -C /tmp -f /tmp/wasm-pack.tar.gz \
+    && curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+    | tar --extract --gzip --strip-components=1 --directory=/tmp --file=- \
     && /tmp/wasm-pack
