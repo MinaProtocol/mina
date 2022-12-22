@@ -1247,29 +1247,31 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Compute the change to the account balance. *)
     let local_state, actual_balance_change =
-      let local_delta =
-        Amount.Signed.negate (Account_update.balance_change account_update)
-      in
-      let local_delta_for_creation, `Overflow creation_overflow =
+      let balance_change = Account_update.balance_change account_update in
+      let neg_creation_fee =
         let open Amount.Signed in
-        add_flagged local_delta (of_unsigned account_creation_fee)
+        negate (of_unsigned account_creation_fee)
+      in
+      let balance_change_for_creation, `Overflow creation_overflow =
+        let open Amount.Signed in
+        add_flagged balance_change neg_creation_fee
       in
       let pay_creation_fee =
         Bool.(account_is_new &&& implicit_account_creation_fee)
       in
       let creation_overflow = Bool.(pay_creation_fee &&& creation_overflow) in
-      let local_delta =
-        Amount.Signed.if_ pay_creation_fee ~then_:local_delta_for_creation
-          ~else_:local_delta
+      let balance_change =
+        Amount.Signed.if_ pay_creation_fee ~then_:balance_change_for_creation
+          ~else_:balance_change
       in
       let local_state =
         Local_state.add_check local_state Amount_insufficient_to_create_account
           Bool.(
             not
               ( pay_creation_fee
-              &&& (creation_overflow ||| Amount.Signed.is_neg local_delta) ))
+              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ))
       in
-      (local_state, local_delta)
+      (local_state, balance_change)
     in
     (* Apply balance change. *)
     let a, local_state =
