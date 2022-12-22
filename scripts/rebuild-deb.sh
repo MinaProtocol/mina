@@ -22,12 +22,14 @@ fi
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 # Allow overriding the script env variables with docker build arguments
+set +u
 if [[ -n "${deb_codename}" ]]; then
   MINA_DEB_CODENAME="${deb_codename}"
 fi
 if [[ -n "${deb_version}" ]]; then
   MINA_DEB_VERSION="${deb_version}"
 fi
+set -u
 
 cd "${SCRIPTPATH}/../_build"
 

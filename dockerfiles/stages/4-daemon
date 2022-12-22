@@ -1,7 +1,7 @@
 ARG image=debian:stretch-slim
 FROM ${image} AS daemon
 # Run with `docker build --build-arg deb_version=<version>`
-ARG deb_version
+ARG deb_version=1.3.1.2
 ARG network=mainnet
 
 # We do not install the below platform-specific dependencies,

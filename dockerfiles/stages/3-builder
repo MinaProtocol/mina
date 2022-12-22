@@ -17,6 +17,10 @@ ARG MINA_REPO=https://github.com/MinaProtocol/mina
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
+# Version codenames and string to use for the debian package builds
+ARG deb_codename=bullseye
+ARG deb_version=1.3.1.2
+
 WORKDIR $HOME
 
 ARG MINA_COMMIT=25388a0fed9695e8e9d04f75f50c2bae1c9c80db # 1.3.1.2 Stable Release (latest master at time of writing)
