@@ -23,6 +23,8 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 ARG RUST_VERSION=1.63.0
 # Nightly Rust Version used for WebAssembly builds
 ARG RUST_NIGHTLY=2022-09-12
+# wasm-pack version
+ARG WASM_PACK_VERSION=v0.10.3
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -123,7 +125,7 @@ RUN git clone https://github.com/facebook/rocksdb \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
 # Clear CXXFLAGS afterwards to avoid affecting other code
-ENV CXXFLAGS ""
+ENV CXXFLAGS=""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
@@ -132,7 +134,7 @@ ENV CXXFLAGS ""
 # Set up environment for running as opam user
 WORKDIR /home/opam
 USER opam
-ENV HOME /home/opam
+ENV HOME=/home/opam
 
 # --- Create the following user directory configs as the Opam user:
 ## Add go + rust to the path, unlimit the opam user,
@@ -143,6 +145,8 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> ~/.bashrc \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+
+ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
