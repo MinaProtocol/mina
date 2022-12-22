@@ -232,6 +232,7 @@ installed: [
   "time_now.v0.14.0"
   "timezone.v0.14.0"
   "topkg.1.0.3"
+  "topological_sort.v0.14.0"
   "trie.1.0.0"
   "typerep.v0.14.0"
   "tyxml.4.5.0"
