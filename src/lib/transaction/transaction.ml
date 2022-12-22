@@ -96,20 +96,22 @@ let public_keys (t : t) =
   in
   List.map account_ids ~f:Account_id.public_key
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : t) (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed cmd status
+      Signed_command.account_access_statuses cmd status
   | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_accessed t status
+      Zkapp_command.account_access_statuses t status
   | Fee_transfer ft ->
       assert (Transaction_status.equal Applied status) ;
-      List.map (Fee_transfer.receivers ft) ~f:(fun acct_id -> (acct_id, status))
+      List.map (Fee_transfer.receivers ft) ~f:(fun acct_id ->
+          (acct_id, `Accessed) )
   | Coinbase cb ->
-      Coinbase.accounts_accessed cb status
+      Coinbase.account_access_statuses cb status
 
 let accounts_referenced (t : t) =
-  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
+  List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
+      acct_id )
 
 let fee_payer_pk (t : t) =
   match t with

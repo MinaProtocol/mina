@@ -68,12 +68,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Comparable.Make (T)
       include Hashable.Make (T)
 
-      let accounts_accessed ({ payload; _ } : t) status =
-        Payload.accounts_accessed payload status
+      let account_access_statuses ({ payload; _ } : t) status =
+        Payload.account_access_statuses payload status
 
       let accounts_referenced (t : t) =
-        List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) ->
-            acct_id )
+        List.map (account_access_statuses t Applied)
+          ~f:(fun (acct_id, _status) -> acct_id)
     end
 
     module V1 = struct

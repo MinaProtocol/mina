@@ -78,9 +78,9 @@ module Builder = struct
     let accounts_accessed =
       List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
           match status with
-          | Failed _ ->
+          | `Not_accessed ->
               None
-          | Applied ->
+          | `Accessed ->
               (* an accessed account may not be in the ledger *)
               let%bind.Option index =
                 Option.try_with (fun () ->

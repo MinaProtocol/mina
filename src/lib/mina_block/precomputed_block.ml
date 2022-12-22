@@ -107,9 +107,9 @@ let of_block ~logger
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
         match status with
-        | Failed _ ->
+        | `Not_accessed ->
             None
-        | Applied -> (
+        | `Accessed -> (
             try
               let index =
                 Mina_ledger.Ledger.index_of_account_exn ledger acct_id
