@@ -124,19 +124,6 @@ module Json_layout = struct
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
-      module Token_permissions = struct
-        type t =
-          { token_owned : bool [@default false]
-          ; account_disabled : bool [@default false]
-          ; disable_new_accounts : bool [@default false]
-          }
-        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
-
-        let fields = Fields.names |> Array.of_list
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
-      end
-
       module Zkapp_account = struct
         module Field = struct
           type t = Snark_params.Tick.Field.t
@@ -210,7 +197,6 @@ module Json_layout = struct
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
         ; token : string option [@default None]
-        ; token_permissions : Token_permissions.t option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
         ; receipt_chain_hash : string option [@default None]
@@ -232,7 +218,6 @@ module Json_layout = struct
         ; delegate = None
         ; timing = None
         ; token = None
-        ; token_permissions = None
         ; nonce = Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash = None
         ; voting_for = None
@@ -427,7 +412,6 @@ module Accounts = struct
     end
 
     module Permissions = Json_layout.Accounts.Single.Permissions
-    module Token_permissions = Json_layout.Accounts.Single.Token_permissions
     module Zkapp_account = Json_layout.Accounts.Single.Zkapp_account
 
     type t = Json_layout.Accounts.Single.t =
@@ -437,7 +421,6 @@ module Accounts = struct
       ; delegate : string option
       ; timing : Timed.t option
       ; token : string option
-      ; token_permissions : Token_permissions.t option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
       ; voting_for : string option
@@ -467,7 +450,6 @@ module Accounts = struct
     ; delegate : string option
     ; timing : Single.Timed.t option
     ; token : string option
-    ; token_permissions : Single.Token_permissions.t option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
     ; voting_for : string option
