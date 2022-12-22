@@ -96,7 +96,7 @@ module "berkeley" {
 
   archive_node_count            = 3
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/0b63498e271575dbffe2b31f3ab8be293490b1ac/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/0b63498e271575dbffe2b31f3ab8be293490b1ac/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/05c2f73d0f6e4f1341286843814ce02dcb3919e0/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/05c2f73d0f6e4f1341286843814ce02dcb3919e0/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
