@@ -34,12 +34,11 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, helm
-Recommends: terraform
+Depends: libjemalloc2, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
-Description: Utility to run automated tests against a full mina testnet with multiple nodes.
+Description: Tool to run automated tests against a full mina testnet with multiple nodes.
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
@@ -60,4 +59,44 @@ find "${BUILDDIR}"
 # Build the package
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-test-executive-${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+
+
+##################################### GENERATE LOGPROC PACKAGE #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-logproc
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size:
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility to filter and prettify log output coming out of the mina daemon and mina-test-executive
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-logproc-${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb

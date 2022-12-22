@@ -15,6 +15,7 @@ RUN apt-get -y update && \
     apt-transport-https \
     ca-certificates \
     curl \
+    wget \
     dnsutils \
     dumb-init \
     gettext \
@@ -27,18 +28,15 @@ RUN apt-get -y update && \
     procps \
     python3 \
     tzdata \
+    libjemalloc2 \
     unzip && \
   rm -rf /var/lib/apt/lists/*
 
 # --- Terraform tools
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
-    gpg --dearmor | \
-    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
-    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-    https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-    sudo tee /etc/apt/sources.list.d/hashicorp.list \
-    sudo apt-get update \
+RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint && \
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list && \
+    sudo apt-get update && \
     sudo apt-get install terraform
 
 # --- Google Cloud tools
@@ -66,7 +64,7 @@ RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
 RUN echo "Installing mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && sudo apt-get update \
-  && sudo apt-get install -y --allow-downgrades "mina-test-executive=$deb_version"
+  && sudo apt-get install -y --allow-downgrades "mina-test-executive=$deb_version" "logproc=$deb_version"
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
 # for now stick to root for compatibility
@@ -96,4 +94,4 @@ gcloud config set project o1labs-192920 && \
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1 && \
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1 && \
 gcloud auth activate-service-account automated-validation@o1labs-192920.iam.gserviceaccount.com --key-file=$GOOGLE_CLOUD_KEYFILE_JSON && \
-mina-test-executive cloud $test_name --mina-image $mina_image --archive_image $archive_image $( if [[ $debug_bool ]] ; then echo --debug ; fi ) | tee test.log | logproc -i inline -f '!(.level in ["Spam", "Debug"])'"]
+mina-test-executive cloud $test_name --mina-image $mina_image --archive-image $archive_image $( if [[ $debug_bool ]] ; then echo --debug ; fi ) | tee test.log | logproc -i inline -f '!(.level in ["Spam", "Debug"])'"]
