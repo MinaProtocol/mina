@@ -44,6 +44,15 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
        postgresql-"$psql_version" \
        postgresql-client-"$psql_version"
 
+# --- Debian 11 "Bullseye" Dependencies
+RUN test "$deb_codename" = "bullseye" \
+     && apt-get update -y \
+     && apt-get install -y \
+         libjemalloc2 \
+         libprocps8 \
+         libffi7 \
+     || exit 0
+
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
      && apt-get update -y \
@@ -69,6 +78,15 @@ RUN test "$deb_codename" = "focal" \
          libjemalloc2 \
          libprocps8 \
          libffi7 \
+     || exit 0
+
+# --- Ubuntu 18.04 "Bionic Beaver" Dependencies
+RUN test "$deb_codename" = "bionic" \
+     && apt-get update -y \
+     && apt-get install -y \
+         libjemalloc1 \
+         libprocps6 \
+         libffi6 \
      || exit 0
 
 # --- Install the latest version of rosetta-cli
