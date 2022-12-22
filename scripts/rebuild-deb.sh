@@ -5,6 +5,9 @@
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+cd "${SCRIPTPATH}/../_build"
+
 # Alternative to BUILDKITE_BRANCH
 if [[ -n "${MINA_BRANCH}" ]]; then
   BUILDKITE_BRANCH="${MINA_BRANCH}"
@@ -20,9 +23,6 @@ if [[ -n "${deb_version}" ]]; then
 fi
 
 set -euo pipefail
-
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
@@ -274,6 +274,4 @@ done
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
-# Build mina block producer sidecar 
-../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb
