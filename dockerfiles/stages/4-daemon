@@ -36,9 +36,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
     libpq-dev \
     procps \
     tzdata \
-    (libjemalloc1|libjemalloc2) \
-    (libffi6|libffi7|libffi8) \
-    (libprocps6|libprocps7|libprocps8)
+    'libjemalloc.$' \
+    'libffi.$' \
+    'libprocps.$'
 
 # Mina daemon package, copied from the builder container
 COPY --from=builder /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb

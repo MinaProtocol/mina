@@ -30,34 +30,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
     tzdata \
     jq \
     sudo \
+    'libjemalloc.$' \
+    'libffi.$' \
+    'libprocps.$' \
   && rm -rf /var/lib/apt/lists/*
-
-# --- Debian 10 "Buster" Dependencies
-RUN test "$deb_codename" = "buster" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
-     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps7 \
-         libffi6 \
-     || exit 0
-
-# --- Debian 9 "Stretch" Dependencies
-RUN test "$deb_codename" = "stretch" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
-     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc1 \
-         libprocps6 \
-         libffi6 \
-     || exit 0
-
-# --- Ubuntu 20.04 "Focal Fossa" Dependencies
-RUN test "$deb_codename" = "focal" \
-     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
-     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps8 \
-         libffi7 \
-     || exit 0
 
 # --- Install the latest version of rosetta-cli
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
