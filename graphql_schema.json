@@ -8908,6 +8908,22 @@
               "deprecationReason": null
             },
             {
+              "name": "memoVerbatim",
+              "description": "A short message from the sender (not encoded)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "isDelegation",
               "description":
                 "If true, this command represents a delegation of stake",
@@ -9292,6 +9308,22 @@
               "deprecationReason": null
             },
             {
+              "name": "memoVerbatim",
+              "description": "A short message from the sender (not encoded)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "isDelegation",
               "description":
                 "If true, this command represents a delegation of stake",
@@ -9589,6 +9621,23 @@
             {
               "name": "memo",
               "description": "Short arbitrary message provided by the sender",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "memoVerbatim",
+              "description":
+                "Short arbitrary message provided by the sender (not encoded)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
