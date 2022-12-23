@@ -28,7 +28,7 @@ RUN apt-get -y update && \
     procps \
     python3 \
     tzdata \
-    libjemalloc2 \
+    'libjemalloc.$' \
     unzip && \
   rm -rf /var/lib/apt/lists/*
 
