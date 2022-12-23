@@ -36,7 +36,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep daemonDevnetSpec,
+        DockerImage.generateStep minaBuilderSpec,
 
         -- daemon devnet image
         let daemonDevnetSpec = DockerImage.ReleaseSpec::{
