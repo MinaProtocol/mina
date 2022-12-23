@@ -93,15 +93,21 @@ let bullseyeDirtyWhen = [
 
 in
 
+let zeroDirtyWhen = [
+  S.strictlyStart (S.contains "BUILD_ALL"),
+]
+
+in
+
 let dirtyWhen = \(debVersion : DebVersion) ->
   merge {
-    Bookworm = minimalDirtyWhen
+    Bookworm = zeroDirtyWhen
     , Bullseye = bullseyeDirtyWhen
-    , Buster = minimalDirtyWhen
-    , Stretch = minimalDirtyWhen
-    , Jammy = minimalDirtyWhen
-    , Focal = minimalDirtyWhen
-    , Bionic = minimalDirtyWhen
+    , Buster = zeroDirtyWhen
+    , Stretch = zeroDirtyWhen
+    , Jammy = zeroDirtyWhen
+    , Focal = zeroDirtyWhen
+    , Bionic = zeroDirtyWhen
   } debVersion
 
 in

@@ -1,12 +1,12 @@
-ARG image=debian:bullseye-slim
+# The container to pull artifacts from, expected to be from stage 3-builder
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
 ARG MINA_BUILDER_STAGE=builder
+FROM ${MINA_BUILDER_STAGE} as prebuilt-stage
+ARG image=debian:bullseye-slim
 # Mina daemon docker image, built and packaged via the staged dockerfiles directly into a clean production container
 FROM ${image} AS daemon
 ARG deb_version=1.3.1.2
 ARG network=mainnet
-# The container to pull artifacts from, expected to be from stage 3-builder
-# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
-ARG MINA_BUILDER_STAGE=builder
 
 # Dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
@@ -29,7 +29,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
     'libprocps.$'
 
 # Mina daemon package, copied from the builder container
-COPY --from=builder /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
+COPY --from=prebuilt-stage /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
 # And then installed
 RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
   && dpkg -i /root/mina-daemon-package.deb \
