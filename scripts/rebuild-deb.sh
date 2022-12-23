@@ -14,6 +14,7 @@ if [[ -n "${MINA_BRANCH:=}" ]]; then
 fi
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+set +x
 # Allow overriding the script env variables with docker build arguments
 if [[ -n "${deb_codename:=}" ]]; then
   MINA_DEB_CODENAME="${deb_codename}"
@@ -237,6 +238,7 @@ rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 # NOTE: Moving the keys from /tmp because of storage constraints. This is OK
 # because building deb is the last step and therefore keys, genesis ledger, and
 # proof are not required in /tmp
+
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
