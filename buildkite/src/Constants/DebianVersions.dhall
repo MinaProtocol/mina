@@ -94,7 +94,7 @@ let bullseyeDirtyWhen = [
 in
 
 let zeroDirtyWhen = [
-  S.strictlyStart (S.contains "BUILD_ALL"),
+  S.strictlyStart (S.contains "BUILD_ALL")
 ]
 
 in
