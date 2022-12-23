@@ -15,7 +15,7 @@ in
 let one = \(label : Text) -> \(key : Text) -> \(script : Text) ->
   Command.build
     Command.Config::
-      { commands = RunInToolchain.runInToolchainBuster ([] : List Text) script
+      { commands = RunInToolchain.runInToolchain ([] : List Text) script
       , label = label
       , key = key
       , target = Size.Large
