@@ -68,6 +68,8 @@ function usage() {
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
+  echo "      --opam-deps           The Opam Deps stage to re-use dependencies from"
+  echo "      --builder             The Builder stage to re-use dependencies from"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -90,6 +92,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) DEB_RELEASE=", debRelease = Some \"$2\""; shift;;
   --deb-version) DEB_VERSION=", debVersion = Some \"$2\""; shift;;
   --logs-bucket) LOGS_BUCKET=", logsBucket = Some \"$2\""; shift;;
+  --opam-deps) OPAM_DEPS_STAGE=", opamDeps = Some \"$2\""; shift;;
+  --builder) BUILDER_STAGE=", builder = Some \"$2\""; shift;;
   --local) FUNCTION=dockerBuild ;;
   --extra-arg) extraArgs+=("\"$2\""); shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -165,6 +169,8 @@ dhall="
        $DEB_RELEASE
        $DEB_VERSION
        $LOGS_BUCKET
+       $OPAM_DEPS_STAGE
+       $BUILDER_STAGE
        $EXTRA
        }
 "

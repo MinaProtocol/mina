@@ -87,6 +87,8 @@ let ServiceDescription =
           , debRelease : Optional Text
           , debVersion : Optional Text
           , logsBucket : Optional Text
+          , opamDeps : Optional Text
+          , builder : Optional Text
           , extraArgs : List Text
           }
       , default =
@@ -99,6 +101,8 @@ let ServiceDescription =
         , debRelease = None Text
         , debVersion = None Text
         , logsBucket = None Text
+        , opamDeps = None Text
+        , builder = None Text
         , extraArgs = [] : List Text
         }
       }
@@ -138,6 +142,8 @@ let mkArgs
         # optionalBuildArg "network" serviceDesc.network
         # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
         # optionalBuildArg "MINA_COMMIT" serviceDesc.commit
+        # optionalBuildArg "MINA_OPAM_DEPS_STAGE" serviceDesc.opamDeps
+        # optionalBuildArg "MINA_BUILDER_STAGE" serviceDesc.builder
         # optionalBuildArg
             "deb_codename"
             (debInfo_ serviceDesc.debCodename).debCodename
@@ -309,54 +315,34 @@ let services =
       { mina-archive = DockerfileDescription::{
         , service = "mina-archive"
         , targetStage = Some "archive"
-        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
+        , dockerfilePaths = [ "dockerfiles/stages/4-archive" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
         , targetStage = Some "daemon"
-        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
-        , dockerContext = Some "dockerfiles"
-        }
-      , mina-daemon-puppet = DockerfileDescription::{
-        , service = "mina-daemon-puppet"
-        , targetStage = Some "daemon-puppet"
-        , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-builder"
-          , "dockerfiles/stages/4-daemon"
-          , "dockerfiles/stages/5-daemon-puppet"
-          ]
+        , dockerfilePaths = [ "dockerfiles/stages/4-daemon" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
         , service = "mina-toolchain"
         , targetStage = Some "toolchain"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-toolchain"
-          ]
+          [ "dockerfiles/stages/3-toolchain" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-builder = DockerfileDescription::{
         , service = "mina-builder"
         , targetStage = Some "builder"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-builder"
-          ]
+          [ "dockerfiles/stages/3-builder" ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
         , targetStage = Some "rosetta"
         , dockerfilePaths =
-          [ "dockerfiles/stages/1-build-deps"
-          , "dockerfiles/stages/2-opam-deps"
-          , "dockerfiles/stages/3-rosetta-builder"
+          [ "dockerfiles/stages/3-rosetta-builder"
           , "dockerfiles/stages/4-rosetta"
           ]
         , dockerContext = Some "dockerfiles"

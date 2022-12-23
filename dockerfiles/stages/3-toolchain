@@ -2,9 +2,12 @@
 # The "toolchain" Stage
 # - installs optional tools that are required in our CI/CD but are not required to build mina
 #################################################################################################
-FROM opam-deps AS toolchain
+# The container to pull artifacts from, expected to be from stage 2-opam-deps
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_OPAM_DEPS_STAGE=opam-deps
+FROM ${MINA_OPAM_DEPS_STAGE} AS toolchain
 
-ARG deb_codename=focal
+ARG deb_codename=bullseye
 
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
@@ -21,7 +24,7 @@ USER root
 # OS package dependencies
 # afaict this is the last python dependency of any kind in CI
 RUN apt-get update --yes \
-  && apt-get install --yes \
+  && apt-get install --ignore-missing --yes \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -50,17 +53,9 @@ RUN apt-get update --yes \
     perl \
     pkg-config \
     rubygems \
-    zlib1g-dev
-
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
-# but debian stretch does not have this package, so only install in bullseye
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get update --yes \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
-      && pip install readchar \
-      || exit 0
+    zlib1g-dev \
+    python3-sexpdata \
+    && pip install readchar
 
 # --- Google Cloud tools
 # --- Helm tools

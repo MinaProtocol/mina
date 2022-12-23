@@ -2,7 +2,10 @@
 # The "builder" Stage
 # - builds mina and any other binaries required to run `make deb`
 #################################################################################################
-FROM opam-deps AS builder
+# The container to pull artifacts from, expected to be from stage 2-opam-deps
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_OPAM_DEPS_STAGE=opam-deps
+FROM ${MINA_OPAM_DEPS_STAGE} AS builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet

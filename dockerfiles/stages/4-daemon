@@ -1,30 +1,17 @@
-ARG image=debian:stretch-slim
+ARG image=debian:bullseye-slim
+# Mina daemon docker image, built and packaged via the staged dockerfiles directly into a clean production container
 FROM ${image} AS daemon
-# Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version=1.3.1.2
 ARG network=mainnet
-
-# We do not install the below platform-specific dependencies,
-# and instead assume that apt will install the proper deps based on the package definition.
-# The packages are noted here just for clarity/documentation.
-# Stretch-only Deps:
-#    libffi6
-#    libprocps6
-#    libjemalloc1
-# Buster-only Deps:
-#    libffi7
-#    libprocps7
-#    libjemalloc2
-# Focal-only Deps:
-#    libffi7
-#    libprocps8
-#    libjemalloc2
-
+# The container to pull artifacts from, expected to be from stage 3-builder
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_BUILDER_STAGE=builder
 
 # Dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    apt-transport-https \
     curl \
     dnsutils \
     dumb-init \
@@ -41,7 +28,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
     'libprocps.$'
 
 # Mina daemon package, copied from the builder container
-COPY --from=builder /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
+COPY --from=${MINA_BUILDER_STAGE} /home/opam/mina/_build/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
 # And then installed
 RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
   && dpkg -i /root/mina-daemon-package.deb \
@@ -56,5 +43,26 @@ COPY scripts/daemon-entrypoint.sh /entrypoint.sh
 COPY ./auxiliary_entrypoints /entrypoint.d
 
 ENV MINA_TIME_OFFSET 0
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
+
+# Additional stage daemon-puppet with tools used in minaprotocol/mina CI/CD to test and orchestrate the container, but are not strictly required to run mina
+# Build with --target daemon in docker to skip this stage
+FROM daemon AS daemon-puppet
+
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && DEBIAN_FRONTEND=noninteractive apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    google-cloud-sdk \
+    kubectl \
+    apt-transport-https \
+    ca-certificates \
+    jq \
+    python3 && \
+  rm -rf /var/lib/apt/lists/*
+
+COPY puppeteer-context/* /
+RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

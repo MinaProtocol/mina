@@ -19,9 +19,9 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "dockerfiles/stages/1-"),
-          S.strictlyStart (S.contains "dockerfiles/stages/2-"),
-          S.strictlyStart (S.contains "dockerfiles/stages/3-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/1-build-deps"),
+          S.strictlyStart (S.contains "dockerfiles/stages/2-opam-deps"),
+          S.strictlyStart (S.contains "dockerfiles/stages/3-toolchain"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
           S.strictly (S.contains "opam.export")
         ],
@@ -34,34 +34,49 @@ Pipeline.build
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="bullseye",
-        step_key="toolchain-bullseye-docker-image"
+        step_key="toolchain-bullseye-image",
+        version="bullseye-\\\${BUILDKITE_COMMIT}"
       }
 
       in
 
       DockerImage.generateStep toolchainBullseyeSpec,
 
-      -- mina-toolchain Debian 10 "Buster" Toolchain
-      let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="buster",
-        step_key="toolchain-buster-docker-image"
+      -- mina-opam-deps Debian 11 "Bullseye" Opam Deps
+      let opamBullseyeSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="bullseye",
+        step_key="opam-bullseye-image",
+        version="bullseye-\\\${BUILDKITE_COMMIT}",
       }
 
       in
 
-      DockerImage.generateStep toolchainBusterSpec,
+      DockerImage.generateStep opamBullseyeSpec,
 
-      -- mina-toolchain Debian 9 "Stretch" Toolchain
-      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
+      -- mina-toolchain Debian 10 "Buster" Toolchain
+      let opamBusterSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="buster",
+        step_key="opam-buster-image",
+        version="buster-\\\${BUILDKITE_COMMIT}",
+      }
+
+      in
+
+      DockerImage.generateStep opamBusterSpec,
+
+      -- mina-opam-deps Debian 9 "Stretch" Toolchain
+      let opamStretchSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="stretch",
-        step_key="toolchain-stretch-docker-image"
+        step_key="opam-stretch-image"
+        version="stretch-\\\${BUILDKITE_COMMIT}"
       }
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep opamStretchSpec
 
     ]
   }
