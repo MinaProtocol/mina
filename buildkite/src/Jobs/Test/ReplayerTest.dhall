@@ -7,7 +7,7 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
 let dependsOn =
-      [ { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" } ]
+      [ { name = "MinaArtifactBullseye", key = "archive-bullseye" } ]
 
 in  Pipeline.build
       Pipeline.Config::{

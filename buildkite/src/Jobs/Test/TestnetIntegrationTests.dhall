@@ -7,8 +7,8 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
-    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
+    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye" },
+    { name = "MinaArtifactBullseye", key = "archive-bullseye" }
 ]
 
 in Pipeline.build Pipeline.Config::{
