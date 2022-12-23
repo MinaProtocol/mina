@@ -668,16 +668,10 @@ module T = struct
       ; statement
       }
 
-  let apply_transactions_phase_1 ~constraint_constants ledger current_stack ts
-      current_state_view state_body_hash =
+  let apply_transactions_phase_1 ~constraint_constants ledger
+      init_pending_coinbase_stack_state ts current_state_view =
     let open Result.Let_syntax in
-    let current_stack_with_state = push_state current_stack state_body_hash in
     let%map res_rev, pending_coinbase_stack_state =
-      let init_pending_coinbase_stack_state : Stack_state_with_init_stack.t =
-        { pc = { source = current_stack; target = current_stack_with_state }
-        ; init_stack = current_stack
-        }
-      in
       result_list_fold ts ~init:([], init_pending_coinbase_stack_state)
         ~f:(fun (acc, pending_coinbase_stack_state) t ->
           match
@@ -711,9 +705,14 @@ module T = struct
     let open Result.Let_syntax in
     let state_body_hash = snd state_and_body_hash in
     let current_stack_with_state = push_state current_stack state_body_hash in
+    let init_pending_coinbase_stack_state : Stack_state_with_init_stack.t =
+      { pc = { source = current_stack; target = current_stack_with_state }
+      ; init_stack = current_stack
+      }
+    in
     let%bind pre_stmts, updated_stack =
       apply_transactions_phase_1 ~constraint_constants ledger
-        current_stack_with_state ts current_state_view state_body_hash
+        init_pending_coinbase_stack_state ts current_state_view
     in
     let%map txns_with_witnesses =
       apply_transactions_phase_2 ledger state_and_body_hash pre_stmts
