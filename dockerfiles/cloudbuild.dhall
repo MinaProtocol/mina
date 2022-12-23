@@ -323,13 +323,19 @@ let services =
       , mina-archive = DockerfileDescription::{
         , service = "mina-archive"
         , targetStage = Some "archive"
-        , dockerfilePaths = [ "dockerfiles/stages/4-archive" ]
+        , dockerfilePaths =
+          [ "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-archive"
+          ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-daemon = DockerfileDescription::{
         , service = "mina-daemon"
         , targetStage = Some "daemon"
-        , dockerfilePaths = [ "dockerfiles/stages/4-daemon" ]
+        , dockerfilePaths =
+          [ "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-daemon"
+          ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-toolchain = DockerfileDescription::{
