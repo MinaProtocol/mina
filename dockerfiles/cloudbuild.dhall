@@ -115,7 +115,7 @@ let DockerfileDescription =
           , targetStage : Optional Text
           , timeout : Optional Text
           }
-      , default = { dockerContext = None Text, targetStage = None Text, timeout = Some "3600s" }
+      , default = { dockerContext = None Text, targetStage = None Text, timeout = Some "7200s" }
       }
 
 let optionalBuildArg
