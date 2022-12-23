@@ -85,7 +85,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep rosettaSpec,
+        DockerImage.generateStep rosettaSpec
 
       ]
     }
