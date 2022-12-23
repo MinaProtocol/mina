@@ -30,7 +30,7 @@ Pipeline.build
           commands = [
             Cmd.run "chmod -R 777 frontend/client_sdk",
             Cmd.runInDocker
-              Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).minaToolchainBullseye}
+              Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).minaToolchain}
               "cd frontend/client_sdk && yarn install"
           ]
           , label = "Install Yarn dependencies"
