@@ -51,7 +51,7 @@ trap cleanup EXIT
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'mina-deb-builder' 'mina-daemon-deb' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'mina-builder' 'mina-opam-deps' 'delegation-backend' 'delegation-backend-toolchain')
 
 ROOT="$(cd -- "$(dirname "$( dirname -- "${BASH_SOURCE[0]}" )")" &> /dev/null && pwd )"
 

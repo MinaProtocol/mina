@@ -19,10 +19,10 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictly (S.contains "dockerfiles/stages/1-build-deps"),
-          S.strictly (S.contains "dockerfiles/stages/2-opam-deps"),
-          S.strictly (S.contains "dockerfiles/stages/3-toolchain"),
-          S.strictly (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
+          S.strictlyStart (S.contains "dockerfiles/stages/1-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/2-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/3-"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
           S.strictly (S.contains "opam.export")
         ],
         path = "Release",
@@ -47,7 +47,7 @@ Pipeline.build
         service="mina-opam-deps",
         deb_codename="bullseye",
         step_key="opam-bullseye-image",
-        version="bullseye-\\\${BUILDKITE_COMMIT}",
+        version="bullseye-\\\${BUILDKITE_COMMIT}"
       }
 
       in
@@ -59,7 +59,7 @@ Pipeline.build
         service="mina-opam-deps",
         deb_codename="buster",
         step_key="opam-buster-image",
-        version="buster-\\\${BUILDKITE_COMMIT}",
+        version="buster-\\\${BUILDKITE_COMMIT}"
       }
 
       in
