@@ -1679,6 +1679,9 @@ module Types = struct
                  transaction"
           ; abstract_field "memo" ~typ:(non_null string) ~args:[]
               ~doc:"Short arbitrary message provided by the sender"
+          ; abstract_field "memoVerbatim" ~typ:(non_null string) ~args:[]
+              ~doc:
+                "Short arbitrary message provided by the sender (not encoded)"
           ; abstract_field "isDelegation" ~typ:(non_null bool) ~args:[]
               ~doc:
                 "If true, this represents a delegation of stake, otherwise it \
@@ -1784,6 +1787,12 @@ module Types = struct
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
             |> Signed_command_memo.to_base58_check )
+      ; field_no_status "memoVerbatim" ~typ:(non_null string) ~args:[]
+          ~doc:"A short message from the sender (not encoded)"
+          ~resolve:(fun _ payment ->
+            Signed_command_payload.memo
+            @@ Signed_command.payload payment.With_hash.data
+            |> Signed_command_memo.to_string_hum )
       ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
