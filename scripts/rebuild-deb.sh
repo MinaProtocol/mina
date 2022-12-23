@@ -144,7 +144,6 @@ sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/mina-seed-lists/
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
 # Genesis Ledger/proof/epoch ledger Copy
