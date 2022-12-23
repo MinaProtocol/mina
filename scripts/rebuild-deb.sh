@@ -244,7 +244,7 @@ mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
 for key in ${compile_keys[*]}
 do
-    echo -n "Looking for keys matching: ${key} -- "
+    echo "-- Looking for keys matching: ${key} --"
 
     # Awkward, you can't do a filetest on a wildcard - use loops
     for f in  /tmp/s3_cache_dir/${key}*; do

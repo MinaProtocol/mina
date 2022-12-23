@@ -263,9 +263,16 @@ let kanikoBuild
                       , "--skip-unused-stages"
                       , "--use-new-run"
                       , "--snapshot-mode=time"
-                      , "--reproducible"
-                      , "--log-timestamp"
+                      , "--single-snapspot=true"
+                      , "--push-retry=3"
+                      , "--image-fs-extract-retry=3"
+                      , "--reproducible=true"
+                      , "--log-timestamp=true"
+                      , "--cleanup"
                       , "--cache=true"
+                      , "--cache-run-layers=true"
+                      , "--cache-copy-layers=true"
+                      , "--cache-repo=gcr.io/o1labs-192920/cache"
                       , "--cache-ttl=336h"
                       ]
                     # mkArgs image desc serviceDesc
