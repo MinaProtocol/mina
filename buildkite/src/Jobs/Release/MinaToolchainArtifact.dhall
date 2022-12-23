@@ -19,10 +19,10 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "dockerfiles/stages/1-build-deps"),
-          S.strictlyStart (S.contains "dockerfiles/stages/2-opam-deps"),
-          S.strictlyStart (S.contains "dockerfiles/stages/3-toolchain"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
+          S.strictly (S.contains "dockerfiles/stages/1-build-deps"),
+          S.strictly (S.contains "dockerfiles/stages/2-opam-deps"),
+          S.strictly (S.contains "dockerfiles/stages/3-toolchain"),
+          S.strictly (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
           S.strictly (S.contains "opam.export")
         ],
         path = "Release",
@@ -54,7 +54,7 @@ Pipeline.build
 
       DockerImage.generateStep opamBullseyeSpec,
 
-      -- mina-toolchain Debian 10 "Buster" Toolchain
+      -- mina-toolchain Debian 10 "Buster" Opam Deps
       let opamBusterSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="buster",
@@ -66,11 +66,11 @@ Pipeline.build
 
       DockerImage.generateStep opamBusterSpec,
 
-      -- mina-opam-deps Debian 9 "Stretch" Toolchain
+      -- mina-opam-deps Debian 9 "Stretch" Opam Deps
       let opamStretchSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
+        service="mina-opam-deps",
         deb_codename="stretch",
-        step_key="opam-stretch-image"
+        step_key="opam-stretch-image",
         version="stretch-\\\${BUILDKITE_COMMIT}"
       }
 
