@@ -263,7 +263,7 @@ let kanikoBuild
                       , "--skip-unused-stages"
                       , "--use-new-run"
                       , "--snapshot-mode=time"
-                      , "--single-snapspot=true"
+                      , "--single-snapshot=true"
                       , "--push-retry=3"
                       , "--image-fs-extract-retry=3"
                       , "--reproducible=true"
