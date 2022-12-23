@@ -52,7 +52,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep opamBullseyeSpec,
+      DockerImage.generateStep opamBookwormSpec,
 
       -- mina-opam-deps Debian 11 "Bullseye" Opam Deps
       let opamBullseyeSpec = DockerImage.ReleaseSpec::{
