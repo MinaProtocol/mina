@@ -312,7 +312,16 @@ let dockerBuild
         in  script
 
 let services =
-      { mina-archive = DockerfileDescription::{
+      { mina-opam-deps = DockerfileDescription::{
+        , service = "mina-opam-deps"
+        , targetStage = Some "opam-deps"
+        , dockerfilePaths =
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          ]
+        , dockerContext = Some "dockerfiles"
+        }
+      , mina-archive = DockerfileDescription::{
         , service = "mina-archive"
         , targetStage = Some "archive"
         , dockerfilePaths = [ "dockerfiles/stages/4-archive" ]
