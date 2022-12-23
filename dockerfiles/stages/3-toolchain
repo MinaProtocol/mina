@@ -54,8 +54,7 @@ RUN apt-get update --yes \
     pkg-config \
     rubygems \
     zlib1g-dev \
-    python3-sexpdata \
-    && pip install readchar
+    python3-sexpdata
 
 # --- Google Cloud tools
 # --- Helm tools

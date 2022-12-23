@@ -42,6 +42,18 @@ Pipeline.build
 
       DockerImage.generateStep toolchainBullseyeSpec,
 
+      -- mina-opam-deps Debian 12 "Bookworm" Opam Deps
+      let opamBookwormSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="bookworm",
+        step_key="opam-bookworm-image",
+        version="bookworm-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamBullseyeSpec,
+
       -- mina-opam-deps Debian 11 "Bullseye" Opam Deps
       let opamBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
@@ -76,7 +88,43 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep opamStretchSpec
+      DockerImage.generateStep opamStretchSpec,
+
+      -- mina-opam-deps Ubuntu 22.04 LTS "Jammy" Jellyfish Opam Deps
+      let opamJammySpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="jammy",
+        step_key="opam-jammy-image",
+        version="jammy-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamJammySpec,
+
+      -- mina-toolchain Ubuntu 20.04 LTS "Focal" Fossa Opam Deps
+      let opamFocalSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="focal",
+        step_key="opam-focal-image",
+        version="focal-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamFocalSpec,
+
+      -- mina-opam-deps Ubuntu 18.04 LTS "Bionic" Beaver Opam Deps
+      let opamBionicSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="bionic",
+        step_key="opam-bionic-image",
+        version="bionic-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamBionicSpec
 
     ]
   }
