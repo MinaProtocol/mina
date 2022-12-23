@@ -19,8 +19,9 @@ ARG ROSETTA_CLI_VERSION=v0.10.1
 ENV DEBIAN_FRONTEND noninteractive
 
 # --- Dependencies across many platforms
-RUN apt-get update -y \
-  && apt-get install -y \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-utils \
     apt-transport-https \
     curl \
@@ -34,7 +35,8 @@ RUN apt-get update -y \
     libssl1.1 \
     tzdata \
     jq \
-    sudo
+    sudo \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- Install Postgresql
 RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
@@ -55,8 +57,8 @@ RUN test "$deb_codename" = "bullseye" \
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps7 \
          libffi6 \
@@ -64,8 +66,8 @@ RUN test "$deb_codename" = "buster" \
 
 # --- Debian 9 "Stretch" Dependencies
 RUN test "$deb_codename" = "stretch" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc1 \
          libprocps6 \
          libffi6 \
@@ -73,8 +75,8 @@ RUN test "$deb_codename" = "stretch" \
 
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
-     && apt-get update -y \
-     && apt-get install -y \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps8 \
          libffi7 \
