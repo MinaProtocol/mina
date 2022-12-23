@@ -271,7 +271,6 @@ let kanikoBuild
                       , "--cleanup"
                       , "--cache=true"
                       , "--cache-run-layers=true"
-                      , "--cache-copy-layers=true"
                       , "--cache-repo=gcr.io/o1labs-192920/cache"
                       , "--cache-ttl=336h"
                       ]
