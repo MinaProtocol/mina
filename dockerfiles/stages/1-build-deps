@@ -44,6 +44,7 @@ RUN apt-get update --quiet \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
+    adduser \
     build-essential \
     ca-certificates \
     capnproto \
