@@ -3,7 +3,7 @@
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
   minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:1c585094900f574d7d63bf1f87dc3c23c961b9ecd00d2f9765a9d2e4b06fbd21",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:b90422fb481d197187e09c34712f776f2fd2f81acf35041840a833c641c59fc5",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:4ee914f12545d98a948ebf7f1124e184674b60a711891602c9e0d380f7d2cb5d",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:1ac7d98fdf6e48da9b3ab2056d5f16eaa587db44670b7c30c48683802b6a1be1",
   minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:9d4ce90350f02c23a71f422e7db36e2010f6e1c04a8c25aec11f142cf5297c02",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
