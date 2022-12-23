@@ -265,7 +265,6 @@ let kanikoBuild
                       , "--snapshot-mode=time"
                       , "--reproducible"
                       , "--log-timestamp"
-                      , "--cleanup"
                       , "--cache=true"
                       , "--cache-ttl=336h"
                       ]
