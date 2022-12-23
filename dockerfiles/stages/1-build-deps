@@ -52,7 +52,7 @@ RUN apt-get update --quiet \
     fakeroot \
     file \
     git \
-    '(^lld-10$|^lld-11$|lld-14$)' \
+    '^lld-(10|11|12|13|14)$' \
     m4 \
     pkg-config \
     rsync \
@@ -61,7 +61,11 @@ RUN apt-get update --quiet \
     zlib1g-dev
 
 # Symlink image-specific lld version to a single lld executable
-RUN ln -sf $(which ld.lld-*) /usr/bin/ld.lld; fi
+RUN if command -v ld.lld-10 &> /dev/null; then ln -sf $(which ld.lld-10) /usr/bin/ld.lld; fi \
+  && if command -v ld.lld-11 &> /dev/null; then ln -sf $(which ld.lld-11) /usr/bin/ld.lld; fi \
+  && if command -v ld.lld-12 &> /dev/null; then ln -sf $(which ld.lld-12) /usr/bin/ld.lld; fi \
+  && if command -v ld.lld-13 &> /dev/null; then ln -sf $(which ld.lld-13) /usr/bin/ld.lld; fi \
+  && if command -v ld.lld-14 &> /dev/null; then ln -sf $(which ld.lld-14) /usr/bin/ld.lld; fi
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
