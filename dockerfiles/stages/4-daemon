@@ -1,4 +1,5 @@
 ARG image=debian:bullseye-slim
+ARG MINA_BUILDER_STAGE=builder
 # Mina daemon docker image, built and packaged via the staged dockerfiles directly into a clean production container
 FROM ${image} AS daemon
 ARG deb_version=1.3.1.2
