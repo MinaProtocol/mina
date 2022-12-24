@@ -3,15 +3,28 @@
 # This script makes a .deb archive for the Mina Archive process
 # and releases it to the AWS .deb repository packages.o1test.net
 
-set -euo pipefail
+BUILD_NUM=${BUILDKITE_BUILD_NUM}
+BUILD_URL=${BUILDKITE_BUILD_URL}
 
-# Set up variables for build
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../.."
+cd "${SCRIPTPATH}/../_build"
 
-source "buildkite/scripts/export-git-env-vars.sh"
+# Alternative to BUILDKITE_BRANCH
+if [[ -n "${MINA_BRANCH:=}" ]]; then
+  BUILDKITE_BRANCH="${MINA_BRANCH}"
+fi
+# Load in env vars for githash/branch/etc.
+source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+set +x
+# Allow overriding the script env variables with docker build arguments
+if [[ -n "${deb_codename:=}" ]]; then
+  MINA_DEB_CODENAME="${deb_codename}"
+fi
+if [[ -n "${deb_version:=}" ]]; then
+  MINA_DEB_VERSION="${deb_version}"
+fi
 
-cd _build
+set -euo pipefail
 
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgomp1, libpq-dev, "
