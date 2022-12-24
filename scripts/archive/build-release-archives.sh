@@ -26,6 +26,9 @@ fi
 
 set -euo pipefail
 
+GITHASH=$(git rev-parse --short=7 HEAD)
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
+
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgomp1, libpq-dev, "
 case "${MINA_DEB_CODENAME}" in
