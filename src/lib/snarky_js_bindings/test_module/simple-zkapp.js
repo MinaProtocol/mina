@@ -6,12 +6,12 @@ import {
   State,
   PrivateKey,
   SmartContract,
-  deploy,
   isReady,
   shutdown,
   addCachedAccount,
   Mina,
   verify,
+  AccountUpdate,
 } from "snarkyjs";
 
 await isReady;
@@ -26,8 +26,8 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy(args) {
-    super.deploy(args);
+  init() {
+    super.init();
     this.x.set(initialState);
   }
 
@@ -58,24 +58,27 @@ let zkappAddress = zkappKey.toPublicKey();
 if (command === "deploy") {
   // snarkyjs part
   let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
+  let feePayerAddress = feePayerKey.toPublicKey();
   addCachedAccount({
     publicKey: feePayerKey.toPublicKey(),
     nonce: feePayerNonce,
   });
 
   let { verificationKey } = await SimpleZkapp.compile();
-  let zkappCommandJson = await deploy(SimpleZkapp, {
-    zkappKey,
-    verificationKey,
-    initialBalance,
-    feePayer: feePayerKey,
+  let tx = await Mina.transaction(() => {
+    let senderUpdate = AccountUpdate.fundNewAccount(feePayerAddress);
+    let zkapp = new SimpleZkapp(zkappAddress);
+    zkapp.deploy({ verificationKey });
+    senderUpdate.send({ to: zkapp, amount: initialBalance });
   });
+  tx.sign([zkappKey, feePayerKey]); // TODO: signing with the fee payer key has to be fully handled by mina-signer
+  let zkappCommandJson = tx.toJSON();
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
-  let feePayerAddress = client.derivePublicKey(feePayerKeyBase58);
+  let feePayerAddressBase58 = client.derivePublicKey(feePayerKeyBase58);
   let feePayer = {
-    feePayer: feePayerAddress,
+    feePayer: feePayerAddressBase58,
     fee: transactionFee,
     nonce: feePayerNonce,
   };
