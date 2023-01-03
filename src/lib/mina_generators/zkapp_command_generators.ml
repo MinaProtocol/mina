@@ -600,7 +600,7 @@ module Account_update_body_components = struct
         ; account = t.account_precondition
         }
     ; use_full_commitment = t.use_full_commitment
-    ; implicit_account_creation_fee = Token_id.(equal default t.token_id)
+    ; implicit_account_creation_fee = false
     ; caller = t.caller
     ; authorization_kind = t.authorization_kind
     }
