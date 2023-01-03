@@ -407,7 +407,12 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
   let%bind set_voting_for = auth_required_gen in
-  let%bind access = auth_required_gen in
+  let%bind access =
+    (* Access permission is significantly more restrictive, do not arbitrarily
+       set it when tests may not be intending to exercise it.
+    *)
+    Auth_required.gen_for_none_given_authorization
+  in
   return
     { Poly.edit_state
     ; send
