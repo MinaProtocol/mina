@@ -9,6 +9,7 @@ use kimchi::circuits::{
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
+    lookup::lookups::{LookupFeatures, LookupPatterns},
 };
 use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
@@ -388,7 +389,17 @@ macro_rules! impl_verification_key {
                         foreign_field_mul: false,
                         rot: false,
                         xor: false,
-                        lookup_configuration: None,
+                        lookup_features:
+                        LookupFeatures {
+                            patterns: LookupPatterns {
+                                xor: false,
+                                chacha_final: false,
+                                lookup: false,
+                                range_check: false,
+                                foreign_field_mul: false, },
+                            joint_lookup_used:false,
+                            uses_runtime_tables: false,
+                        },
                     };
 
                 let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
