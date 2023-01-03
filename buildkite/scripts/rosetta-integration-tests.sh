@@ -55,12 +55,12 @@ echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} 
 mkdir -p $MINA_KEYS_PATH
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
-mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/faucet.key
+for zkapp_path in {}; do # TODO: what's the best way to bundle the zkapps here?
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp_path}.key
+done
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
-FAUCET_PK=$(cat $MINA_KEYS_PATH/faucet.key.pub)
-FAUCET_SK=$(mina-dev advanced dump-keypair --privkey-path $MINA_KEYS_PATH/faucet.key | grep "Private key" | sed -e "s/Private key: //")
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
@@ -80,6 +80,12 @@ cat <<EOF > "$MINA_CONFIG_FILE"
   }
 }
 EOF
+for zkapp_path in {}; do # TODO: 
+  zkapp_pk=$(cat $MINA_KEYS_PATH/zkapp-$zkapp_path.key)
+  line="[{ \"pk\": \"${zkapp_pk}\", \"balance\": \"1000000000000\", \"delegate\": null, \"sk\": null }]"
+  jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE > ${MINA_CONFIG_FILE}.tmp
+  mv ${MINA_CONFIG_FILE}.tmp $MINA_CONFIG_FILE
+done
 cat $MINA_CONFIG_FILE | jq .
 
 # Substitute placeholders in rosetta-cli configuration
@@ -101,7 +107,6 @@ done
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
-mina-dev accounts import --privkey-path $MINA_KEYS_PATH/faucet.key --config-directory $MINA_CONFIG_DIR
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -164,7 +169,6 @@ done
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
 mina-dev accounts unlock --public-key $BLOCK_PRODUCER_PK
 mina-dev accounts unlock --public-key $SNARK_PRODUCER_PK
-mina-dev accounts unlock --public-key $FAUCET_PK
 
 # Start sending payments
 send_payments() {
@@ -178,14 +182,24 @@ send_payments &
 
 # Deploy zkApps
 for zkapp_path in {}; do # TODO: what's the best way to bundle the zkapps here?
-  mkdir -p "$zkapp_path/keys"
-  chmod -R 0700 "$zkapp_path/keys"
-  key_file="$zkapp_path/keys/account"
-  mina-dev advanced generate-keypair --privkey-path $key_file
-  zkapp_key=$(mina-dev advanced dump-keypair --privkey-path "$key_file" | grep "Private key" | sed -e "s/Private key: //")
+  zkapp_pk=$(cat ${MINA_KEYS_PATH}/${zkapp_path}.pub)
+  zkapp_sk=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/${zkapp_path}" | sed -ne "s/Private key: //p")
+  echo -e "{\n    \"privateKey\": \"${zkapp_sk}\",\n    \"publicKey\": \"${zkapp_pk}\"\n}" > "${zkapp_path}/keys/sandbox.json"
+  cat <<EOF > "${zkapp_path}/config.json"
+{
+  "version": 1,
+  "networks": {
+    "sandbox": {
+      "url": "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql",
+      "keyPath": "keys/sandbox.json",
+      "fee": "1"
+    }
+  }
+}
+EOF
   cd "$zkapp_path"
   npm run build
-  node build/src/deploy.js http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key $FAUCET_SK
+  zk deploy sandbox -y
   cd -
 done
 
