@@ -1297,12 +1297,12 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let local_state =
           Local_state.add_check local_state Local_excess_overflow
-            Bool.(not (account_is_new &&& excess_update_failed))
+            Bool.(not (pay_creation_fee_from_excess &&& excess_update_failed))
         in
         { local_state with
           excess =
-            Amount.Signed.if_ account_is_new ~then_:excess_minus_creation_fee
-              ~else_:local_state.excess
+            Amount.Signed.if_ pay_creation_fee_from_excess
+              ~then_:excess_minus_creation_fee ~else_:local_state.excess
         }
       in
       let local_state =
