@@ -27,7 +27,7 @@ module T = struct
           | Some ls ->
               ivar :: ls
           | None ->
-              [ivar] ) )
+              [ ivar ] ) )
 
   let handle_diffs transition_registry _ diffs_with_mutants =
     List.iter diffs_with_mutants ~f:(function

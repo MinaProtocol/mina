@@ -3,7 +3,8 @@ open Asttypes
 open Parsetree
 open Longident
 open Core_kernel
-open Zexe_backend.Pasta
+open Kimchi_pasta
+open Pasta
 open Pickles_types
 
 let () =
@@ -34,11 +35,10 @@ let vesta =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "vesta %d" i (fun () ->
-              Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
+              Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
-                ~domain_size i )
-          |> Zexe_backend.Pasta.Fp_poly_comm.of_backend_without_degree_bound
-          |> unwrap ) )
+                domain_size i )
+          |> Basic.Fp_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let pallas =
   let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
@@ -49,11 +49,10 @@ let pallas =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "pallas %d" i (fun () ->
-              Marlin_plonk_bindings.Pasta_fq_urs.lagrange_commitment
+              Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
-                ~domain_size i )
-          |> Zexe_backend.Pasta.Fq_poly_comm.of_backend_without_degree_bound
-          |> unwrap ) )
+                domain_size i )
+          |> Basic.Fq_poly_comm.of_backend_without_degree_bound |> unwrap ) )
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -82,7 +81,7 @@ let structure =
 
       let max_public_input_size = 150
 
-      open Zexe_backend.Pasta
+      open Kimchi_backend.Pasta.Basic
 
       let vesta =
         let f s = Fq.of_bigint (Bigint256.of_hex_string s) in

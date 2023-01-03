@@ -43,8 +43,7 @@ let main () =
     Pipe.iter new_block_pipe ~f:(fun transition ->
         let completed_works =
           Staged_ledger_diff.completed_works @@ Body.staged_ledger_diff
-          @@ Mina_block.Validated.body
-          @@ External_transition.Validated.lower transition
+          @@ Mina_block.Validated.body transition
         in
         if
           List.exists completed_works

@@ -1,0 +1,21 @@
+opam-version: "2.0"
+name: "ppx_version"
+authors: "opensource@o1labs.org"
+homepage: "https://github.com/o1-labs/ppx_version"
+bug-reports: "opensource@o1labs.org"
+version: "0.1"
+descr: """
+Ocaml extension point (ppx) meant to assure the stability of types and their Bin_prot serializations
+
+See the readme at https://github.com/o1-labs/ppx_version/README.md for more information.
+"""
+dev-repo: "git+https://github.com/o1-labs/ppx_version.git"
+maintainer: "opensource@o1labs.org"
+depends: [
+  "ocaml" {= "4.11.2"}
+  "ppxlib" {>= "0.25.0"}
+  "ppx_bin_prot"
+  "core_kernel" {< "v0.15"}
+  "dune" {>= "2.5"}
+]
+build: ["dune" "build" "-p" name "-j" jobs]

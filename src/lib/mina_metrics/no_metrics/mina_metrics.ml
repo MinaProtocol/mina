@@ -68,7 +68,17 @@ module Cryptography = struct
 
   let snark_work_merge_time_sec : Snark_work_histogram.t = ()
 
-  let snark_work_base_time_sec : Snark_work_histogram.t = ()
+  let snark_work_zkapp_base_time_sec : Counter.t = ()
+
+  let snark_work_base_time_sec : Counter.t = ()
+
+  let snark_work_zkapp_base_submissions : Counter.t = ()
+
+  let snark_work_base_submissions : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
+
+  let zkapp_transaction_length : Counter.t = ()
 end
 
 module Bootstrap = struct
@@ -89,6 +99,14 @@ module Transaction_pool = struct
   let pool_size : Gauge.t = ()
 
   let transactions_added_to_pool : Counter.t = ()
+
+  let zkapp_transactions_added_to_pool : Counter.t = ()
+
+  let zkapp_transaction_size : Counter.t = ()
+
+  let zkapp_updates : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
 end
 
 module Network = struct
@@ -297,6 +315,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -329,6 +349,8 @@ module Snark_work = struct
   let snark_work_assigned_rpc : Counter.t = ()
 
   let snark_work_timed_out_rpc : Counter.t = ()
+
+  let snark_work_failed_rpc : Counter.t = ()
 
   let snark_pool_size : Gauge.t = ()
 
@@ -418,6 +440,8 @@ module Transition_frontier = struct
 
   let best_tip_user_txns : Gauge.t = ()
 
+  let best_tip_zkapp_txns : Gauge.t = ()
+
   let best_tip_coinbase : Gauge.t = ()
 
   let longest_fork : Gauge.t = ()
@@ -483,6 +507,14 @@ module Block_latency = struct
   end
 
   module Inclusion_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
+
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()

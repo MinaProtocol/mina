@@ -48,6 +48,10 @@ module Uri : sig
 end
 
 module Port : sig
+  val default_client : int
+
+  val default_libp2p : int
+
   module Daemon : sig
     val external_ : int Types.with_name_and_displayed_default Command.Param.t
 

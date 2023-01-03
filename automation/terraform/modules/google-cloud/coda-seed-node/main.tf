@@ -1,5 +1,5 @@
 locals {
-  container_command = format("mina daemon -log-level Info -config-directory /root/.mina-config -client-port 8301 -rest-port 8304 -external-port 10001 -metrics-port 10000 -discovery-keypair %s -seed %s -config-file /root/daemon.json | tee log.txt", var.discovery_keypair, var.seed_peers)
+  container_command = format("mina daemon -log-level Info -config-directory /root/.mina-config -client-port 8301 -rest-port 8304 -external-port 10001 -metrics-port 10000 -libp2p-keypair %s -seed %s -config-file /root/daemon.json | tee log.txt", var.discovery_keypair, var.seed_peers)
 }
 
 resource "google_compute_address" "external_ip" {
