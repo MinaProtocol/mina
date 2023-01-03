@@ -560,7 +560,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       type 'bool t =
         { predicate_failed : 'bool (* User commands *)
         ; source_not_present : 'bool (* User commands *)
-        ; receiver_not_present : 'bool (* Delegate, Mint_tokens *)
+        ; receiver_not_present : 'bool (* Delegate *)
         ; amount_insufficient_to_create : 'bool (* Payment only *)
         ; token_cannot_create : 'bool (* Payment only, token<>default *)
         ; source_insufficient_balance : 'bool (* Payment only *)
@@ -622,10 +622,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let any t = Boolean.any (to_list t)
 
       (** Compute which -- if any -- of the failure cases will be hit when
-        evaluating the given user command, and indicate whether the fee-payer
-        would need to pay the account creation fee if the user command were to
-        succeed (irrespective or whether it actually will or not).
-    *)
+          evaluating the given user command, and indicate whether the fee-payer
+          would need to pay the account creation fee if the user command were to
+          succeed (irrespective or whether it actually will or not).
+      *)
       let compute_unchecked
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~txn_global_slot ~(fee_payer_account : Account.t)
@@ -665,8 +665,6 @@ module Make_str (A : Wire_types.Concrete) = struct
               then false
               else
                 match payload.body.tag with
-                | Create_account | Mint_tokens ->
-                    assert false
                 | Payment | Stake_delegation ->
                     (* TODO(#4554): Hook account_precondition evaluation in here once
                        implemented.
@@ -789,9 +787,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; source_insufficient_balance
                 ; source_minimum_balance_violation
                 ; source_bad_timing
-                }
-            | Mint_tokens | Create_account ->
-                assert false )
+                } )
 
       let%snarkydef_ compute_as_prover ~constraint_constants ~txn_global_slot
           (txn : Transaction_union.var) =
@@ -2423,12 +2419,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (* Compute transaction kind. *)
       let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
-      let is_mint_tokens = Transaction_union.Tag.Unpacked.is_mint_tokens tag in
       let is_stake_delegation =
         Transaction_union.Tag.Unpacked.is_stake_delegation tag
-      in
-      let is_create_account =
-        Transaction_union.Tag.Unpacked.is_create_account tag
       in
       let is_fee_transfer =
         Transaction_union.Tag.Unpacked.is_fee_transfer tag
@@ -2443,21 +2435,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind token_default =
         make_checked (fun () ->
             Token_id.(Checked.equal token (Checked.constant default)) )
-      in
-      let%bind () =
-        Checked.all_unit
-          [ [%with_label_
-              "Token_locked value is compatible with the transaction kind"]
-              (fun () ->
-                Boolean.Assert.any
-                  [ Boolean.not payload.body.token_locked; is_create_account ] )
-          ; [%with_label_ "Token_locked cannot be used with the default token"]
-              (fun () ->
-                Boolean.Assert.any
-                  [ Boolean.not payload.body.token_locked
-                  ; Boolean.not token_default
-                  ] )
-          ]
       in
       let%bind () = Boolean.Assert.is_true token_default in
       let%bind () =
@@ -2483,7 +2460,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Assert.any
                         [ is_payment
                         ; is_stake_delegation
-                        ; is_create_account
                         ; is_fee_transfer
                         ; is_coinbase
                         ])
@@ -2595,10 +2571,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Boolean.(
             fun () -> Assert.any [ is_user_command; not user_command_fails ])
       in
-      let predicate_deferred =
-        (* Account_precondition check is to be performed later if this is true. *)
-        is_create_account
-      in
       let%bind predicate_result =
         let%bind is_own_account =
           Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
@@ -2613,9 +2585,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind () =
         [%with_label_ "Check account_precondition failure against predicted"]
           (fun () ->
-            let%bind predicate_failed =
-              Boolean.((not predicate_result) &&& not predicate_deferred)
-            in
+            let predicate_failed = Boolean.(not predicate_result) in
             assert_r1cs
               (predicate_failed :> Field.Var.t)
               (is_user_command :> Field.Var.t)
@@ -2656,8 +2626,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (* this account is:
                    - the fee-payer for payments
                    - the fee-payer for stake delegation
-                   - the fee-payer for account creation
-                   - the fee-payer for token minting
                    - the fee-receiver for a coinbase
                    - the second receiver for a fee transfer
                 *)
@@ -2710,15 +2678,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   *)
                   Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
                 in
-                let%bind should_pay_to_create =
-                  (* Coinbases and fee transfers may create, or we may be creating
-                     a new token account. These are mutually exclusive, so we can
-                     encode this as a boolean.
-                  *)
-                  let%bind is_create_account =
-                    Boolean.(is_create_account &&& not user_command_fails)
-                  in
-                  Boolean.(is_empty_and_writeable ||| is_create_account)
+                let should_pay_to_create =
+                  (* Coinbases and fee transfers may create. *)
+                  is_empty_and_writeable
                 in
                 let%bind amount =
                   [%with_label_ "Compute fee payer amount"] (fun () ->
@@ -2803,7 +2765,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 { Account.Poly.balance
                 ; public_key
                 ; token_id
-                ; token_permissions = account.token_permissions
                 ; token_symbol = account.token_symbol
                 ; nonce = next_nonce
                 ; receipt_chain_hash
@@ -2817,16 +2778,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind receiver_increase =
         (* - payments:         payload.body.amount
            - stake delegation: 0
-           - account creation: 0
-           - token minting:    payload.body.amount
            - coinbase:         payload.body.amount - payload.common.fee
            - fee transfer:     payload.body.amount
         *)
         [%with_label_ "Compute receiver increase"] (fun () ->
             let%bind base_amount =
-              let%bind zero_transfer =
-                Boolean.any [ is_stake_delegation; is_create_account ]
-              in
+              let zero_transfer = is_stake_delegation in
               Amount.Checked.if_ zero_transfer
                 ~then_:(Amount.var_of_t Amount.zero)
                 ~else_:payload.body.amount
@@ -2850,8 +2807,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (* this account is:
                    - the receiver for payments
                    - the delegated-to account for stake delegation
-                   - the created account for an account creation
-                   - the receiver for minted tokens
                    - the receiver for a coinbase
                    - the first receiver for a fee transfer
                 *)
@@ -2870,9 +2825,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 receiver_balance_update_permitted := permitted_to_receive ;
                 let%bind is_empty_failure =
-                  let%bind must_not_be_empty =
-                    Boolean.(is_stake_delegation ||| is_mint_tokens)
-                  in
+                  let must_not_be_empty = is_stake_delegation in
                   Boolean.(is_empty_and_writeable &&& must_not_be_empty)
                 in
                 let%bind () =
@@ -2884,9 +2837,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%bind is_empty_and_writeable =
                   Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
                 in
-                let%bind should_pay_to_create =
-                  Boolean.(is_empty_and_writeable &&& not is_create_account)
-                in
+                let should_pay_to_create = is_empty_and_writeable in
                 let%bind () =
                   [%with_label_
                     "Check whether creation fails due to a non-default token"]
@@ -3017,20 +2968,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   make_checked (fun () ->
                       Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                         ~else_:account.token_id )
-                and token_owner =
-                  (* TODO: Delete token permissions *)
-                  Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
-                    ~else_:account.token_permissions.token_owner
-                and token_locked =
-                  Boolean.if_ is_empty_and_writeable
-                    ~then_:payload.body.token_locked
-                    ~else_:account.token_permissions.token_locked
                 in
                 { Account.Poly.balance
                 ; public_key
                 ; token_id
-                ; token_permissions =
-                    { Token_permissions.token_owner; token_locked }
                 ; token_symbol = account.token_symbol
                 ; nonce = account.nonce
                 ; receipt_chain_hash = account.receipt_chain_hash
@@ -3059,8 +3000,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (* this account is:
                    - the source for payments
                    - the delegator for stake delegation
-                   - the token owner for account creation
-                   - the token owner for token minting
                    - the fee-receiver for a coinbase
                    - the second receiver for a fee transfer
                 *)
@@ -3192,7 +3131,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 { Account.Poly.balance
                 ; public_key = account.public_key
                 ; token_id = account.token_id
-                ; token_permissions = account.token_permissions
                 ; token_symbol = account.token_symbol
                 ; nonce = account.nonce
                 ; receipt_chain_hash = account.receipt_chain_hash
@@ -3206,8 +3144,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind fee_excess =
         (* - payments:         payload.common.fee
            - stake delegation: payload.common.fee
-           - account creation: payload.common.fee
-           - token minting:    payload.common.fee
            - coinbase:         0 (fee already paid above)
            - fee transfer:     - payload.body.amount - payload.common.fee
         *)
