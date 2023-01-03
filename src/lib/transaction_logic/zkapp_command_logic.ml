@@ -1275,6 +1275,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Apply balance change. *)
     let a, local_state =
+      let pay_creation_fee_from_excess =
+        Bool.(account_is_new &&& not implicit_account_creation_fee)
+      in
       let balance, `Overflow failed1 =
         Balance.add_signed_amount_flagged (Account.balance a)
           actual_balance_change

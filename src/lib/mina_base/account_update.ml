@@ -1191,7 +1191,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
-    ; implicit_account_creation_fee = false
+    ; implicit_account_creation_fee = true
     ; caller = Call
     ; call_depth = 0
     ; authorization_kind = Signature
