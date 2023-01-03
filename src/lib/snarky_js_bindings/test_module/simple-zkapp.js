@@ -65,7 +65,7 @@ if (command === "deploy") {
   });
 
   let { verificationKey } = await SimpleZkapp.compile();
-  let tx = await Mina.transaction(() => {
+  let tx = await Mina.transaction(feePayerAddress, () => {
     let senderUpdate = AccountUpdate.fundNewAccount(feePayerAddress);
     let zkapp = new SimpleZkapp(zkappAddress);
     zkapp.deploy({ verificationKey });
