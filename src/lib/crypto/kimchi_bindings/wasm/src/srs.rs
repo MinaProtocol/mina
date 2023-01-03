@@ -137,8 +137,9 @@ macro_rules! impl_srs {
                 {
                     // We're single-threaded, so it's safe to grab this pointer as mutable.
                     // Do not try this at home.
-                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
-                    srs.add_lagrange_basis(x_domain);
+                    let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                    ptr.add_lagrange_basis(x_domain);
                 }
 
                 Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
