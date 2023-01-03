@@ -267,7 +267,6 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
-                  ; receiver_is_new = _
                   } =
                 spec
               in

@@ -627,7 +627,7 @@ let%test_unit "zkapp_command payment test" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            account_update_send ~constraint_constants ~use_full_commitment s )
+            account_update_send ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->

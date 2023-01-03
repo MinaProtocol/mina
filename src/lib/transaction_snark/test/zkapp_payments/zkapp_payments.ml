@@ -138,9 +138,7 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command =
-                account_update_send ~constraint_constants (List.hd_exn specs)
-              in
+              let zkapp_command = account_update_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ignore
                 ( U.apply_zkapp_command ledger [ zkapp_command ]
@@ -156,8 +154,7 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    account_update_send ~constraint_constants
-                      ~use_full_commitment s )
+                    account_update_send ~use_full_commitment s )
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;

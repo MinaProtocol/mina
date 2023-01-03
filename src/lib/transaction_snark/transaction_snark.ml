@@ -4998,7 +4998,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _
-          ; receiver_is_new = _
           ; amount
           } =
         spec
