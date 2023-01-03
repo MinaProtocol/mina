@@ -2740,7 +2740,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -2966,7 +2966,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -7747,7 +7747,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -11254,6 +11254,19 @@
               "deprecationReason": null
             },
             {
+              "name": "genesis_balance",
+              "description":
+                "The amount of MINA owned by the account at Genesis",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "AnnotatedBalance",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "nonce",
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
@@ -11424,7 +11437,7 @@
               "description": "True if this account owns its associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
@@ -11433,7 +11446,7 @@
                 "True if this account has been disabled by the owner of the associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {

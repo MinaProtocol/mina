@@ -49,7 +49,7 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|sid)
+  stretch|buster|bullseye|bookworm|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac
@@ -110,12 +110,11 @@ if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
-MINAPROTOCOL="minaprotocol"
-TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
-
+DOCKER_REGISTRY="gcr.io/o1labs-192920"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-${DEB_CODENAME##*=}-${NETWORK##*=}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -127,12 +126,13 @@ fi
 
 tag-and-push() {
   docker tag "${TAG}" "$1"
-  docker tag "${TAG}" "${HASHTAG}"
   docker push "$1"
-  docker push "${HASHTAG}"
 }
 
-if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   docker push "${TAG}"
-  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
+  tag-and-push "${HASHTAG}"
+  if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
+    tag-and-push "minaprotocol/${SERVICE}:${VERSION}"
+  fi
 fi

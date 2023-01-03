@@ -226,9 +226,10 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 - `docker-standalone-start.sh` is the most straightforward, it starts only the mina-rosetta API endpoint and any flags passed into the script go to mina-rosetta. Use this for the "offline" part of the Construction API.
 - `docker-demo-start.sh` launches a mina node with a very simple 1-address genesis ledger as a sandbox for developing and playing around in. This script starts the full suite of tools (a mina node, mina-archive, a postgresql DB, and mina-rosetta), but for a demo network with all operations occuring inside this container and no external network activity.
 - The default, `docker-start.sh`, which connects the mina node to our [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network and initializes the archive database from publicly-availible nightly O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. The script also periodically checks for blocks that may be missing between the nightly backup and the tip of the chain and will fill in those gaps by walking back the linked list of blocks in the canonical chain and importing them one at a time. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/rosetta-v16/src/app/rosetta/docker-start.sh) for more information about what you can configure and how.
-- Finally, the previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
+- The previous default, `docker-devnet-start.sh`, which connects the mina node to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network with the archive database initalized in a similar way to docker-start.sh. As with `docker-demo-start.sh`, this script runs a mina node, mina-archive, a postgresql DB, and mina-rosetta. `docker-devnet-start.sh` is now just a special case of `docker-start.sh` so inspect the source there for more detailed configuration.
+- Finally, the `docker-berkeley-start.sh`, which connects the mina node to our Berkeley network. The Berkeley network is the antichamber of the Mainnet network. It is actively used to test Beta releases. It runs the same components as all the previous cases but initializes its archive database with the Berkeley network backups
 
-For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
+For example, to run the `docker-devnet-start.sh` and connect to the live Devnet network [Release 1.3.1.2]:
 
 ```
 docker run -it --rm --name rosetta \
@@ -237,13 +238,28 @@ docker run -it --rm --name rosetta \
     minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
-Note: It will take 20min-1hr for your node to sync
-
 * Port 10101 is the default P2P port and must be exposed to the open internet
 * The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
-* PostgreSQL runs on port 3086
+* Archive node runs on port 3086
 * Rosetta runs on port 3087
+
+To run the `docker-berkeley-start.sh` and connect to the live Berkeley network [Beta Release 2.0]:
+
+```
+docker run -it --rm --name rosetta \
+    --entrypoint=./docker-devnet-start.sh \
+    -p 8302:8302 -p 3085:3085 -p 3086:3086 -p 3087:3087 -p 3088:3088 \
+    minaprotocol/mina-rosetta:1.3.2beta2-release-2.0.0-0b63498-focal
+```
+
+* Port 8302 is the default libp2p port and must be exposed to the open internet
+* The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
+* Archive node runs on port 3086
+* Rosetta runs on port 3087 (offline) and 3088 (online)
+* 1.3.2beta2-release-2.0.0-0b63498-<codename> is the [latest Beta release](https://github.com/MinaProtocol/mina/discussions/categories/berkeley) available
+
+Note: Both examples will take 20min-1hr for your node to sync
 
 Examples queries via Rosetta:
 
@@ -328,7 +344,7 @@ If the data in postgresql is really stale (>24 hours), it would likely be better
 
 ### Network names
 
-Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
+Networks supported are `rosetta-demo`, `devnet`, `berkeley`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Similar to Devnet, use the `docker-berkeley-start.sh` endpoint to connect to Berkeley. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
 
 ### Operation Statuses
 
