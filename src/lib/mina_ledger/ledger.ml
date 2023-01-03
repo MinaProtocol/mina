@@ -641,8 +641,18 @@ let%test_unit "zkapp_command payment test" =
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
-                    apply_zkapp_command_unchecked l2 t ~constraint_constants
-                      ~state_view:view )
+                    let%bind res, _ =
+                      apply_zkapp_command_unchecked l2 t ~constraint_constants
+                        ~state_view:view
+                    in
+                    match res.command.status with
+                    | Transaction_status.Applied ->
+                        Ok ()
+                    | Transaction_status.Failed failure ->
+                        Or_error.error_string
+                          (Yojson.Safe.pretty_to_string
+                             (Transaction_status.Failure.Collection.to_yojson
+                                failure ) ) )
               in
               let accounts =
                 List.concat_map ~f:Zkapp_command.accounts_referenced ts2

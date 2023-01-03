@@ -2460,8 +2460,8 @@ module For_tests = struct
 
   let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
       (l1 : L.t) (l2 : L.t) =
-    Or_error.try_with (fun () ->
-        List.iter accounts ~f:(fun a ->
+    List.map accounts ~f:(fun a ->
+        Or_error.try_with (fun () ->
             let mismatch () =
               failwithf
                 !"One ledger had the account %{sexp:Account_id.t} but the \
@@ -2485,6 +2485,7 @@ module For_tests = struct
                 | Some a1, Some a2 ->
                     [%test_eq: Account_without_receipt_chain_hash.t]
                       (hide_rc a1) (hide_rc a2) ) ) )
+    |> Or_error.combine_errors_unit
 
   let txn_global_slot = Global_slot.zero
 
