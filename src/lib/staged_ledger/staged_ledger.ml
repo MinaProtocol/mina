@@ -2549,9 +2549,12 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid zkapp_command_with_auths ~ledger
-                    ~get:Ledger.get
-                    ~location_of_account:Ledger.location_of_account
+                  Zkapp_command.Valid.to_valid
+                    ~find_vk:
+                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                         ~get:Ledger.get
+                         ~location_of_account:Ledger.location_of_account )
+                    zkapp_command_with_auths
                 with
                 | Ok ps ->
                     ps
@@ -3872,9 +3875,11 @@ let%test_module "staged ledger tests" =
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
-                         ~get:Ledger.get
-                         ~location_of_account:Ledger.location_of_account
+                      (Zkapp_command.Valid.to_valid
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger
+                              ~ledger:valid_against_ledger ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
                          zkapp_command )
                   in
                   ignore

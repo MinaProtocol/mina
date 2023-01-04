@@ -1592,9 +1592,10 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
-    -> ledger:'a
-    -> get:('a -> 'b -> Account.t option)
-    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
 
   val of_verifiable : Verifiable.t -> t Or_error.t
@@ -1675,10 +1676,8 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t
-      ~find_vk:(Verifiable.find_vk_via_ledger ~ledger ~get ~location_of_account)
-    |> Or_error.bind ~f:of_verifiable
+  let to_valid (t : T.t) ~find_vk : t Or_error.t =
+    Verifiable.create t ~find_vk |> Or_error.bind ~f:of_verifiable
 
   module For_tests = struct
     let replace_zkapp_command (t : t) (zkapp_command : T.t) =
