@@ -384,7 +384,7 @@ let%test "xor finalization" =
   let srs =
     Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
   in
-  let index, public_input, proof =
+  let index, (public_input_1, public_input_2), proof =
     Kimchi_bindings.Protocol.Proof.Fp.example_with_xor srs true
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
@@ -410,8 +410,9 @@ let%test "xor finalization" =
   in
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-      ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
-      ~actual_proofs_verified:Nat.N0.n
+      ~prev_challenges:[] ~step_vk:vk
+      ~public_input:[ public_input_1; public_input_2 ]
+      ~proof ~actual_proofs_verified:Nat.N0.n
   in
   let deferred_values_typ =
     let open Impls.Step in
