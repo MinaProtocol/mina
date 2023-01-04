@@ -202,7 +202,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
@@ -226,7 +226,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     ; account = Full Zkapp_precondition.Account.accept
                     }
                 ; use_full_commitment = false
-                ; caller = Call
+                ; call_type = Call
                 ; authorization_kind = Proof
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
@@ -246,9 +246,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
           let tx_statement : Zkapp_statement.t =
             { account_update =
                 Account_update.Body.digest
-                  (Zkapp_command.add_caller_simple snapp_account_update_data
-                     Token_id.default )
-                    .body
+                  (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
           in

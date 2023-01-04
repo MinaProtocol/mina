@@ -10,8 +10,8 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body authorization_kind caller kp token_id balance_change
-    : Account_update.Body.Simple.t =
+let mk_account_update_body authorization_kind call_type kp token_id
+    balance_change : Account_update.Body.Simple.t =
   let open Signature_lib in
   { update = Account_update.Update.noop
   ; public_key = Public_key.compress kp.Keypair.public_key
@@ -31,7 +31,7 @@ let mk_account_update_body authorization_kind caller kp token_id balance_change
       ; account = Account_update.Account_precondition.Accept
       }
   ; use_full_commitment = true
-  ; caller
+  ; call_type
   ; authorization_kind
   }
 
@@ -56,8 +56,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
   ; account_updates =
       account_updates
       |> Zkapp_command.Call_forest.map
-           ~f:(fun (p : Account_update.Body.Simple.t) : Account_update.Simple.t
-              ->
+           ~f:(fun (p : Account_update.Body.Simple.t) : Account_update.t ->
              let authorization =
                match p.authorization_kind with
                | None_given ->
@@ -67,8 +66,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                | Signature ->
                    Control.Signature Signature.dummy
              in
-             { body = p; authorization } )
-      |> Zkapp_command.Call_forest.add_callers_simple
+             { body = Account_update.Body.of_simple p; authorization } )
       |> Zkapp_command.Call_forest.accumulate_hashes_predicated
   }
 

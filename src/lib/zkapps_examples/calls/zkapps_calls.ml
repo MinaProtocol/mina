@@ -112,7 +112,7 @@ end
 (** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
   | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
-  | Caller : Token_id.t Snarky_backendless.Request.t
+  | Call_type : Account_update.Call_type.t Snarky_backendless.Request.t
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
   | (* TODO: Tweak pickles so this can be an explicit input. *)
       Get_call_input :
@@ -120,7 +120,7 @@ type _ Snarky_backendless.Request.t +=
   | Increase_amount : Field.Constant.t Snarky_backendless.Request.t
   | Delegate_call : bool Snarky_backendless.Request.t
   | Execute_call :
-      (Token_id.t * Call_data.Input.Constant.t)
+      (Account_update.Call_type.t * Call_data.Input.Constant.t)
       -> ( Call_data.Output.Constant.t
          * Zkapp_call_forest.account_update
          * Zkapp_call_forest.t )
@@ -131,7 +131,7 @@ type _ Snarky_backendless.Request.t +=
     The particular details of the called account update are determined by the handler
     for the [Execute_call] request.
 *)
-let execute_call ~caller account_update old_state =
+let execute_call ~call_type account_update old_state =
   let call_inputs = { Call_data.Input.Circuit.old_state } in
   let call_outputs, called_account_update, sub_calls =
     exists
@@ -139,9 +139,9 @@ let execute_call ~caller account_update old_state =
          (Zkapp_call_forest.Checked.account_update_typ ())
          Zkapp_call_forest.typ )
       ~request:(fun () ->
-        let caller = As_prover.read Token_id.typ caller in
+        let call_type = As_prover.read Account_update.Call_type.typ call_type in
         let input = As_prover.read Call_data.Input.typ call_inputs in
-        Execute_call (caller, input) )
+        Execute_call (call_type, input) )
   in
   let () =
     (* Check that previous account update's call data is consistent. *)
@@ -152,9 +152,10 @@ let execute_call ~caller account_update old_state =
       called_account_update.account_update.data.call_data
   in
   let () =
-    (* Check that the caller is the one that we specified *)
-    Token_id.Checked.Assert.equal caller
-      called_account_update.account_update.data.caller
+    (* Check that the call_type is the one that we specified *)
+    run_checked
+    @@ Account_update.Call_type.Checked.assert_equal call_type
+         called_account_update.account_update.data.call_type
   in
   account_update#register_call called_account_update sub_calls ;
   call_outputs.new_state
@@ -212,7 +213,7 @@ module Rules = struct
     let handler (public_key : Public_key.Compressed.t)
         (old_state : Field.Constant.t) (call_kind : Account_update.Call_type.t)
         (execute_call :
-             Token_id.t
+             Account_update.Call_type.t
           -> Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
              * Zkapp_call_forest.account_update
@@ -228,8 +229,8 @@ module Rules = struct
             match call_kind with Call -> false | Delegate_call -> true
           in
           respond (Provide delegate_call)
-      | Execute_call (caller, input) ->
-          respond (Provide (execute_call caller input))
+      | Execute_call (call_type, input) ->
+          respond (Provide (execute_call call_type input))
       | _ ->
           respond Unhandled
 
@@ -239,22 +240,14 @@ module Rules = struct
       in
       Zkapps_examples.wrap_main ~public_key
         (fun account_update ->
-          let caller =
-            let self_caller =
-              Account_id.Checked.derive_token_id
-                ~owner:
-                  (Account_id.Checked.create public_key
-                     Token_id.(Checked.constant default) )
-            in
+          let call_type =
             let delegate_call =
               exists Boolean.typ ~request:(fun () -> Delegate_call)
             in
-            Token_id.Checked.if_ delegate_call
-              ~then_:Token_id.(Checked.constant default)
-              ~else_:self_caller
+            Account_update.Call_type.Checked.from_delegate_call delegate_call
           in
           let old_state = exists Field.typ ~request:(fun () -> Old_state) in
-          let new_state = execute_call ~caller account_update old_state in
+          let new_state = execute_call ~call_type account_update old_state in
           account_update#assert_state_proved ;
           account_update#set_state 0 new_state ;
           None )
@@ -281,7 +274,8 @@ module Rules = struct
   module Add = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
-        (call_input : Call_data.Input.Constant.t) (caller : Token_id.t)
+        (call_input : Call_data.Input.Constant.t)
+        (call_type : Account_update.Call_type.t)
         (increase_amount : Field.Constant.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -291,17 +285,19 @@ module Rules = struct
           respond (Provide call_input)
       | Increase_amount ->
           respond (Provide increase_amount)
-      | Caller ->
-          respond (Provide caller)
+      | Call_type ->
+          respond (Provide call_type)
       | _ ->
           respond Unhandled
 
     let main input =
-      let caller = exists Token_id.typ ~request:(fun () -> Caller) in
+      let call_type =
+        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+      in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
-      Zkapps_examples.wrap_main ~public_key ~caller
+      Zkapps_examples.wrap_main ~public_key ~call_type
         (fun account_update ->
           let input =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
@@ -344,10 +340,11 @@ module Rules = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (add_and_call_input : Call_data.Input.Constant.t)
-        (increase_amount : Field.Constant.t) (caller : Token_id.t)
+        (increase_amount : Field.Constant.t)
+        (call_type : Account_update.Call_type.t)
         (call_kind : Account_update.Call_type.t)
         (execute_call :
-             Token_id.t
+             Account_update.Call_type.t
           -> Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
              * Zkapp_call_forest.account_update
@@ -360,10 +357,10 @@ module Rules = struct
           respond (Provide add_and_call_input)
       | Increase_amount ->
           respond (Provide increase_amount)
-      | Execute_call (caller, input) ->
-          respond (Provide (execute_call caller input))
-      | Caller ->
-          respond (Provide caller)
+      | Execute_call (call_type, input) ->
+          respond (Provide (execute_call call_type input))
+      | Call_type ->
+          respond (Provide call_type)
       | Delegate_call ->
           let delegate_call =
             match call_kind with Call -> false | Delegate_call -> true
@@ -373,11 +370,13 @@ module Rules = struct
           respond Unhandled
 
     let main input =
-      let caller = exists Token_id.typ ~request:(fun () -> Caller) in
+      let call_type =
+        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+      in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
-      Zkapps_examples.wrap_main ~public_key ~caller
+      Zkapps_examples.wrap_main ~public_key ~call_type
         (fun account_update ->
           let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
@@ -389,20 +388,14 @@ module Rules = struct
             exists Field.typ ~request:(fun () -> Increase_amount)
           in
           let intermediate_state = Field.add old_state increase_amount in
-          let caller =
-            let self_caller =
-              Account_id.Checked.derive_token_id
-                ~owner:
-                  (Account_id.Checked.create public_key
-                     Token_id.(Checked.constant default) )
-            in
+          let call_type =
             let delegate_call =
               exists Boolean.typ ~request:(fun () -> Delegate_call)
             in
-            Token_id.Checked.if_ delegate_call ~then_:caller ~else_:self_caller
+            Account_update.Call_type.Checked.from_delegate_call delegate_call
           in
           let new_state =
-            execute_call ~caller account_update intermediate_state
+            execute_call ~call_type account_update intermediate_state
           in
           let call_outputs =
             { Call_data.Output.Circuit.blinding_value; new_state }

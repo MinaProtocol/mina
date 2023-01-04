@@ -195,7 +195,7 @@ let%test_module "Protocol state precondition tests" =
                             ; account = Nonce (Account.Nonce.succ sender_nonce)
                             }
                         ; use_full_commitment = false
-                        ; caller = Call
+                        ; call_type = Call
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
@@ -227,7 +227,7 @@ let%test_module "Protocol state precondition tests" =
                                 Account_update.Account_precondition.Accept
                             }
                         ; use_full_commitment = true
-                        ; caller = Call
+                        ; call_type = Call
                         ; authorization_kind = Signature
                         }
                     ; authorization =
@@ -605,7 +605,7 @@ let%test_module "Account precondition tests" =
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; call_type = Call
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
@@ -634,7 +634,7 @@ let%test_module "Account precondition tests" =
                         ; account = Account_update.Account_precondition.Accept
                         }
                     ; use_full_commitment = true
-                    ; caller = Call
+                    ; call_type = Call
                     ; authorization_kind = Signature
                     }
                 ; authorization =

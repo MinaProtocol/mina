@@ -418,7 +418,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
-           ; caller
+           ; call_type
            ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
@@ -586,7 +586,7 @@ let get_account_update_body ~pool body_id =
              ; is_new
              } )
   in
-  let caller = Account_update.Call_type.of_string caller in
+  let call_type = Account_update.Call_type.of_string call_type in
   let authorization_kind =
     Account_update.Authorization_kind.of_string_exn authorization_kind
   in
@@ -605,7 +605,7 @@ let get_account_update_body ~pool body_id =
           ; account = account_precondition
           }
       ; use_full_commitment
-      ; caller
+      ; call_type
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )

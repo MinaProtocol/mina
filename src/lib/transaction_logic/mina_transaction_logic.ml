@@ -1466,7 +1466,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let caller (p : t) = p.body.caller
+      let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
 
       let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
@@ -2381,7 +2381,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment
                 ; authorization_kind = Signature
                 }
@@ -2409,7 +2409,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment = false
                 ; authorization_kind = None_given
                 }

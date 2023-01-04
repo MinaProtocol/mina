@@ -126,7 +126,9 @@ module Call_type = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Call | Delegate_call
+      type t = Mina_wire_types.Mina_base.Account_update.Call_type.V1.t =
+        | Call
+        | Delegate_call
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -150,12 +152,46 @@ module Call_type = struct
     | s ->
         failwithf "Invalid call type: %s" s ()
 
+  let is_delegate_call = function Call -> false | Delegate_call -> true
+
+  let from_delegate_call = function false -> Call | true -> Delegate_call
+
   let quickcheck_generator =
-    Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
-      | false ->
-          Call
-      | true ->
-          Delegate_call )
+    Quickcheck.Generator.map ~f:from_delegate_call Bool.quickcheck_generator
+
+  let deriver obj =
+    let open Fields_derivers_zkapps in
+    iso_string ~name:"CallType" ~js_type:(Custom "CallType") ~to_string
+      ~of_string obj
+
+  let to_input x =
+    Random_oracle_input.Chunked.packed (field_of_bool (is_delegate_call x), 1)
+
+  module Checked = struct
+    type t = Is_delegate_call of Boolean.var
+
+    let is_delegate_call = function Is_delegate_call b -> b
+
+    let from_delegate_call b = Is_delegate_call b
+
+    let call = from_delegate_call Boolean.false_
+
+    let delegate_call = from_delegate_call Boolean.true_
+
+    let to_input x =
+      Random_oracle_input.Chunked.packed ((is_delegate_call x :> Field.Var.t), 1)
+
+    let equal (Is_delegate_call x) (Is_delegate_call y) = Boolean.equal x y
+
+    let assert_equal (Is_delegate_call x) (Is_delegate_call y) =
+      Boolean.Assert.( = ) x y
+  end
+
+  let typ : (Checked.t, t) Typ.t =
+    Boolean.typ
+    |> Typ.transport ~there:is_delegate_call ~back:from_delegate_call
+    |> Typ.transport_var ~there:Checked.is_delegate_call
+         ~back:Checked.from_delegate_call
 end
 
 module Update = struct
@@ -842,60 +878,6 @@ module Body = struct
     end]
   end
 
-  module Wire = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V1.t
-          ; balance_change :
-              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-          ; increment_nonce : bool
-          ; events : Events'.Stable.V1.t
-          ; actions : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; preconditions : Preconditions.Stable.V1.t
-          ; use_full_commitment : bool
-          ; caller : Call_type.Stable.V1.t
-          ; authorization_kind : Authorization_kind.Stable.V1.t
-          }
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    let gen =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map public_key = Public_key.Compressed.gen
-      and token_id = Token_id.gen
-      and update = Update.gen ()
-      and balance_change = Currency.Amount.Signed.gen
-      and increment_nonce = Quickcheck.Generator.bool
-      and events = return []
-      and actions = return []
-      and call_data = Field.gen
-      and preconditions = Preconditions.gen
-      and use_full_commitment = Quickcheck.Generator.bool
-      and caller = Call_type.gen
-      and authorization_kind = Authorization_kind.gen in
-      { public_key
-      ; token_id
-      ; update
-      ; balance_change
-      ; increment_nonce
-      ; events
-      ; actions
-      ; call_data
-      ; preconditions
-      ; use_full_commitment
-      ; caller
-      ; authorization_kind
-      }
-  end
-
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
@@ -913,7 +895,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Token_id.Stable.V2.t
+          ; call_type : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -930,7 +912,7 @@ module Body = struct
         ~increment_nonce:!.bool ~events:!.Events.deriver
         ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
-        ~caller:!.Token_id.deriver ~call_depth:!.int
+        ~call_type:!.Call_type.deriver ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
@@ -946,7 +928,7 @@ module Body = struct
       ; call_depth = 0
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
-      ; caller = Token_id.default
+      ; call_type = Call
       ; authorization_kind = None_given
       }
   end
@@ -968,7 +950,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Call_type.Stable.V1.t
+          ; call_type : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -993,7 +975,7 @@ module Body = struct
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
-        ; caller : Token_id.Stable.V2.t
+        ; call_type : Call_type.Stable.V1.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -1002,7 +984,7 @@ module Body = struct
     end
   end]
 
-  let to_wire (p : t) caller : Wire.t =
+  let of_simple (p : Simple.t) : t =
     { public_key = p.public_key
     ; token_id = p.token_id
     ; update = p.update
@@ -1013,7 +995,7 @@ module Body = struct
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
-    ; caller
+    ; call_type = p.call_type
     ; authorization_kind = p.authorization_kind
     }
 
@@ -1028,7 +1010,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; call_type
        ; call_depth = _
        ; authorization_kind
        } :
@@ -1043,7 +1025,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; call_type
     ; authorization_kind
     }
 
@@ -1058,7 +1040,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; call_type
        ; authorization_kind
        } :
         t ) ~call_depth : Graphql_repr.t =
@@ -1072,7 +1054,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; call_type
     ; call_depth
     ; authorization_kind
     }
@@ -1151,7 +1133,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
-    ; caller = Token_id.default
+    ; call_type = Call
     ; authorization_kind = Signature
     }
 
@@ -1177,7 +1159,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
-    ; caller = Call
+    ; call_type = Call
     ; call_depth = 0
     ; authorization_kind = Signature
     }
@@ -1193,7 +1175,7 @@ module Body = struct
         ; call_data = _
         ; preconditions
         ; use_full_commitment = _
-        ; caller = _
+        ; call_type = _
         ; authorization_kind = _
         } =
       t
@@ -1241,7 +1223,7 @@ module Body = struct
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
-      ; caller : Token_id.Checked.t
+      ; call_type : Call_type.Checked.t
       ; authorization_kind : Authorization_kind.Checked.t
       }
     [@@deriving annot, hlist, fields]
@@ -1257,7 +1239,7 @@ module Body = struct
          ; call_data
          ; preconditions
          ; use_full_commitment
-         ; caller
+         ; call_type
          ; authorization_kind
          } :
           t ) =
@@ -1275,7 +1257,7 @@ module Body = struct
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
-        ; Token_id.Checked.to_input caller
+        ; Call_type.Checked.to_input call_type
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
@@ -1296,7 +1278,7 @@ module Body = struct
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
-      ; Token_id.typ
+      ; Call_type.typ
       ; Authorization_kind.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -1313,7 +1295,7 @@ module Body = struct
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
-    ; caller = Token_id.default
+    ; call_type = Call
     ; authorization_kind = None_given
     }
 
@@ -1335,7 +1317,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; call_type
        ; authorization_kind
        } :
         t ) =
@@ -1350,7 +1332,7 @@ module Body = struct
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
-      ; Token_id.to_input caller
+      ; Call_type.to_input call_type
       ; Authorization_kind.to_input authorization_kind
       ]
 
@@ -1365,7 +1347,7 @@ module Body = struct
     end
   end
 
-  let gen caller =
+  let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map public_key = Public_key.Compressed.gen
     and token_id = Token_id.gen
@@ -1377,6 +1359,7 @@ module Body = struct
     and call_data = Field.gen
     and preconditions = Preconditions.gen
     and use_full_commitment = Quickcheck.Generator.bool
+    and call_type = Call_type.gen
     and authorization_kind = Authorization_kind.gen in
     { public_key
     ; token_id
@@ -1388,7 +1371,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; call_type
     ; authorization_kind
     }
 end
@@ -1433,33 +1416,6 @@ module T = struct
     end]
   end
 
-  module Wire = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { body : Body.Wire.Stable.V1.t; authorization : Control.Stable.V2.t }
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    let gen : t Quickcheck.Generator.t =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map body = Body.Wire.gen
-      and authorization = Control.gen_with_dummies in
-      { body; authorization }
-
-    let quickcheck_generator : t Quickcheck.Generator.t = gen
-
-    let quickcheck_observer : t Quickcheck.Observer.t =
-      Quickcheck.Observer.of_hash (module Stable.Latest)
-
-    let quickcheck_shrinker : t Quickcheck.Shrinker.t =
-      Quickcheck.Shrinker.empty ()
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1479,14 +1435,21 @@ module T = struct
       =
     { authorization; body = Body.to_graphql_repr ~call_depth body }
 
-  let gen caller : t Quickcheck.Generator.t =
+  let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
-    let%map body = Body.gen caller
-    and authorization = Control.gen_with_dummies in
+    let%map body = Body.gen and authorization = Control.gen_with_dummies in
     { body; authorization }
 
-  let to_wire (p : t) caller : Wire.t =
-    { body = Body.to_wire p.body caller; authorization = p.authorization }
+  let quickcheck_generator : t Quickcheck.Generator.t = gen
+
+  let quickcheck_observer : t Quickcheck.Observer.t =
+    Quickcheck.Observer.of_hash (module Stable.Latest)
+
+  let quickcheck_shrinker : t Quickcheck.Shrinker.t =
+    Quickcheck.Shrinker.empty ()
+
+  let of_simple (p : Simple.t) : t =
+    { body = Body.of_simple p.body; authorization = p.authorization }
 
   let digest (t : t) = Body.digest t.body
 
