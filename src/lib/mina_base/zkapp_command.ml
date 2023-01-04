@@ -1384,6 +1384,31 @@ module Verifiable : sig
           -> Account_id.t
           -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
+
+  module Any : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits _any_ vks that have been seen earlier in the list. *)
+    val create_all :
+         T.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t list Or_error.t
+  end
+
+  module Last : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits only the _last_ vk that has been seen earlier in the
+        list. *)
+    val create_all :
+         T.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t list Or_error.t
+  end
 end = struct
   [%%versioned
   module Stable = struct
@@ -1502,8 +1527,80 @@ end = struct
                   vks_overridden := vks_overriden' ;
                   (p, None) )
         in
-
         Ok { fee_payer; account_updates; memo } )
+
+  module Map_cache = struct
+    type 'a t = 'a Zkapp_basic.F_map.Map.t
+
+    let empty = Zkapp_basic.F_map.Map.empty
+
+    let find = Zkapp_basic.F_map.Map.find
+
+    let set = Zkapp_basic.F_map.Map.set
+  end
+
+  module Singleton_cache = struct
+    type 'a t = (Zkapp_basic.F.t * 'a) option
+
+    let empty = None
+
+    let find t key =
+      match t with
+      | None ->
+          None
+      | Some (k, v) ->
+          if Zkapp_basic.F.equal key k then Some v else None
+
+    let set _ ~key ~data = Some (key, data)
+  end
+
+  module Make_create_all (Cache : sig
+    type 'a t
+
+    val empty : 'a t
+
+    val find : 'a t -> Zkapp_basic.F.t -> 'a option
+
+    val set : 'a t -> key:Zkapp_basic.F.t -> data:'a -> 'a t
+  end) =
+  struct
+    let create_all (cmds : T.t list)
+        ~(find_vk :
+              Zkapp_basic.F.t
+           -> Account_id.t
+           -> (Verification_key_wire.t, Error.t) Result.t ) : t list Or_error.t
+        =
+      Or_error.try_with (fun () ->
+          snd (* remove the helper cache we folded with *)
+            (List.fold_map cmds ~init:Cache.empty
+               ~f:(fun (running_cache : Verification_key_wire.t Cache.t) cmd ->
+                 let verified_cmd : t =
+                   create cmd ~find_vk:(fun vk_hash account_id ->
+                       (* first we check if there's anything in the running
+                          cache within this chunk so far *)
+                       match Cache.find running_cache vk_hash with
+                       | None ->
+                           (* before falling back to the find_vk *)
+                           find_vk vk_hash account_id
+                       | Some vk ->
+                           Ok vk )
+                   |> Or_error.ok_exn
+                 in
+                 let running_cache' =
+                   List.fold (extract_vks cmd) ~init:running_cache
+                     ~f:(fun acc vk ->
+                       Cache.set acc ~key:(With_hash.hash vk) ~data:vk )
+                 in
+                 (running_cache', verified_cmd) ) ) )
+  end
+
+  module Any = struct
+    include Make_create_all (Map_cache)
+  end
+
+  module Last = struct
+    include Make_create_all (Singleton_cache)
+  end
 end
 
 let of_verifiable (t : Verifiable.t) : t =

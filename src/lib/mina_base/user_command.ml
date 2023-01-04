@@ -167,6 +167,55 @@ let to_verifiable (t : t) ~find_vk : Verifiable.t Or_error.t =
       Zkapp_command.Verifiable.create ~find_vk cmd
       |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
+module Make_to_all_verifiable (Strategy : sig
+  val create_all :
+       Zkapp_command.t list
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
+    -> Zkapp_command.Verifiable.t list Or_error.t
+end) =
+struct
+  let to_all_verifiable (ts : t list) ~find_vk : Verifiable.t list Or_error.t =
+    let open Or_error.Let_syntax in
+    (* First we tag everything with its index *)
+    let its = List.mapi ts ~f:(fun i x -> (i, x)) in
+    (* then we partition out the zkapp commands *)
+    let izk_cmds, is_cmds =
+      List.partition_map its ~f:(fun (i, cmd) ->
+          match cmd with
+          | Zkapp_command c ->
+              First (i, c)
+          | Signed_command c ->
+              Second (i, c) )
+    in
+    (* then unzip the indices *)
+    let ixs, zk_cmds = List.unzip izk_cmds in
+    (* then we verify the zkapp commands *)
+    let%map vzk_cmds =
+      Zkapp_command.Verifiable.Any.create_all ~find_vk zk_cmds
+    in
+    (* rezip indices *)
+    let ivzk_cmds = List.zip_exn ixs vzk_cmds in
+    (* Put them back in with a sort by index (un-partition) *)
+    let ivs =
+      List.map is_cmds ~f:(fun (i, cmd) -> (i, Signed_command cmd))
+      @ List.map ivzk_cmds ~f:(fun (i, cmd) -> (i, Zkapp_command cmd))
+      |> List.sort ~compare:(fun (i, _) (j, _) -> i - j)
+    in
+    (* Drop the indices *)
+    List.unzip ivs |> snd
+end
+
+module Any = struct
+  include Make_to_all_verifiable (Zkapp_command.Verifiable.Any)
+end
+
+module Last = struct
+  include Make_to_all_verifiable (Zkapp_command.Verifiable.Last)
+end
+
 let of_verifiable (t : Verifiable.t) : t =
   match t with
   | Signed_command x ->

@@ -1020,15 +1020,10 @@ module T = struct
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
-      Or_error.try_with (fun () ->
-          List.map cs ~f:(fun cmd ->
-              let open Ledger in
-              User_command.to_verifiable
-                ~find_vk:
-                  (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get
-                     ~location_of_account )
-                cmd
-              |> Or_error.ok_exn ) )
+      User_command.Last.to_all_verifiable cs
+        ~find_vk:
+          (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get:Ledger.get
+             ~location_of_account:Ledger.location_of_account )
       |> Deferred.return
     in
     let%map xs = Verifier.verify_commands verifier cs in

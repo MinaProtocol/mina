@@ -327,41 +327,32 @@ struct
         t
     end
 
-    module F = struct
-      module T = struct
-        type t = Zkapp_basic.F.t [@@deriving sexp, yojson, equal, compare, hash]
-      end
-
-      include Hashable.Make (T)
-      include Comparable.Make (T)
-    end
-
     module Vk_refcount_table = struct
-      type t = (int * Verification_key_wire.t) F.Table.t
+      type t = (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
 
-      let create () = F.Table.create ()
+      let create () = Zkapp_basic.F_map.Table.create ()
 
-      let find t key = F.Table.find t key
+      let find t key = Zkapp_basic.F_map.Table.find t key
 
       let inc ~key ~value t =
-        F.Table.update t key ~f:(function
+        Zkapp_basic.F_map.Table.update t key ~f:(function
           | None ->
               (1, value)
           | Some (x, value) ->
               (x + 1, value) ) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (F.Table.length t)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t)))
 
       let dec ~key ~value:_ t =
-        F.Table.change t key ~f:(function
+        Zkapp_basic.F_map.Table.change t key ~f:(function
           | None ->
               None
           | Some (x, value) ->
               if x = 1 then None else Some (x - 1, value) ) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (F.Table.length t)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t)))
 
       let lift_common t table_modify cmd =
         User_command.extract_vks cmd
@@ -1121,57 +1112,22 @@ struct
 
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              Or_error.try_with (fun () ->
-                  Envelope.Incoming.map diff
-                    ~f:
-                      (Fn.compose
-                         snd (* remove the helper cache we folded with *)
-                         (List.fold_map ~init:F.Map.empty
-                            ~f:(fun running_cache cmd ->
-                              let verified_cmd =
-                                User_command.to_verifiable cmd
-                                  ~find_vk:(fun vk_hash account_id ->
-                                    (* a little "or else" operator *)
-                                    let ( |- ) x y_thunk =
-                                      match x with
-                                      | Error _ ->
-                                          y_thunk ()
-                                      | Ok z ->
-                                          Ok z
-                                    in
-                                    (* first we check if there's anything in the running cache within this diff so far *)
-                                    F.Map.find running_cache vk_hash
-                                    |> Result.of_option
-                                         ~error:
-                                           (Error.create
-                                              "Failed to find vk in running \
-                                               cache" )
-                                    |- (fun () ->
-                                         (* then we fall back to the vk table inside the mempool *)
-                                         Vk_refcount_table.find
-                                           t.verification_key_table vk_hash
-                                         |> Option.map ~f:snd
-                                         |> Result.of_option
-                                              ~error:
-                                                (Error.create
-                                                   "Failed to find vk in \
-                                                    refcount table" ) )
-                                    |- fun () ->
-                                    (* finally we check the ledger *)
-                                    Zkapp_command.Verifiable.find_vk_via_ledger
-                                      ~ledger ~get:Base_ledger.get
-                                      ~location_of_account:
-                                        Base_ledger.location_of_account vk_hash
-                                      account_id )
-                                |> Or_error.ok_exn
-                              in
-                              let running_cache' =
-                                List.fold (User_command.extract_vks cmd) ~init:running_cache
-                                  ~f:(fun acc vk ->
-                                    F.Map.set acc ~data:vk
-                                      ~key:(With_hash.hash vk) )
-                              in
-                              (running_cache', verified_cmd) ) ) ) ) )
+              Envelope.Incoming.map diff
+                ~f:
+                  (User_command.Any.to_all_verifiable
+                     ~find_vk:(fun vk_hash account_id ->
+                       match
+                         Vk_refcount_table.find t.verification_key_table vk_hash
+                       with
+                       | Some (_, vk) ->
+                           Ok vk
+                       | None ->
+                           Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                             ~get:Base_ledger.get
+                             ~location_of_account:
+                               Base_ledger.location_of_account vk_hash
+                             account_id ) ) )
+          |> Envelope.Incoming.sequence_error
           |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
           |> Deferred.return
         in
