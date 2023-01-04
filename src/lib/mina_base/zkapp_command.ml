@@ -1395,7 +1395,8 @@ end = struct
     end
   end]
 
-  let find_vk_via_ledger ~ledger ~get ~location_of_account _expected_vk_hash account_id =
+  let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
+      account_id =
     match
       let open Option.Let_syntax in
       let%bind location = location_of_account ledger account_id in
@@ -1404,7 +1405,16 @@ end = struct
       zkapp.verification_key
     with
     | Some vk ->
-        Ok vk
+        if not @@ Zkapp_basic.F.equal (With_hash.hash vk) expected_vk_hash then
+          Error
+            (Error.create "Expected vk hash doesn't match hash in account"
+               ( [ ("expected_vk_hash", expected_vk_hash)
+                 ; ("got_vk_hash", With_hash.hash vk)
+                 ]
+               , ("account_id", account_id) )
+               [%sexp_of:
+                 (string * Zkapp_basic.F.t) list * (string * Account_id.t)] )
+        else Ok vk
     | None ->
         Error
           (Error.create "No verification key found for proved account update"
