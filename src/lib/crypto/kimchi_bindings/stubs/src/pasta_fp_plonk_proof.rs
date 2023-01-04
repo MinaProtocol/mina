@@ -225,9 +225,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     // circuit
     // public inputs
     let mut gates = vec![];
-    for _ in 0..num_inputs {
+    for row in 0..num_inputs {
         gates.push(CircuitGate::<Fp>::create_generic_gadget(
-            Wire::for_row(0),
+            Wire::for_row(row),
             GenericGateSpec::Pub,
             None,
         ));
