@@ -206,16 +206,16 @@ module As_prover_circuits = struct
     if as_prover then
       Impl.as_prover (fun _ ->
           let f acc e =
-            let var = Snarky_backendless.Cvar.(Var e) in
-            (* let u = Impl.Field.Constant.(random ()) in *)
+            let var = Snarky_backendless.Cvar.Unsafe.of_index e in
             let v = Impl.As_prover.read_var var in
             Impl.Field.Constant.(acc + v)
           in
-          let l = 1 -- vars in
+          let l = List.range 1 (vars + 1) in
           let total : Impl.field =
             List.fold l ~init:Impl.Field.Constant.one ~f
           in
           assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
+          assert (not Impl.Field.Constant.(equal total one)) ;
           () ) ;
     Impl.Field.Assert.non_zero abc ;
 
@@ -235,7 +235,7 @@ module As_prover_circuits = struct
 
       ()
 
-    (* test that all variables can be accesed*)
+    (* test that all variables can be accessed*)
     let generate_witness_fails () =
       let f (inputs : Impl.Proof_inputs.t) _ = inputs in
       let compiled =
@@ -247,7 +247,7 @@ module As_prover_circuits = struct
 
       ()
 
-    (* test that accesing non existent vars fails*)
+    (* test that accessing non existent vars fails*)
     let generate_witness_fails () =
       Alcotest.(
         check_raises "should fail accesing non existent var"
