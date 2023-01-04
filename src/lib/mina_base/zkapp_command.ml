@@ -1227,6 +1227,15 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
+let extract_vks (t : t) : Verification_key_wire.t List.t =
+  account_updates t
+  |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
+         match Account_update.verification_key_update_to_option p with
+         | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+             vk :: acc
+         | _ ->
+             acc )
+
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 

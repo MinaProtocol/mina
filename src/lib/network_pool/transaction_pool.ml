@@ -336,20 +336,6 @@ struct
       include Comparable.Make (T)
     end
 
-    let extract_vks : User_command.t -> Verification_key_wire.t List.t =
-      function
-      | User_command.Signed_command _ ->
-          []
-      | Zkapp_command cmd ->
-          Zkapp_command.account_updates cmd
-          |> Zkapp_command.Call_forest.fold ~init:[]
-               ~f:(fun acc (p : Account_update.t) ->
-                 match Account_update.verification_key_update_to_option p with
-                 | Zkapp_basic.Set_or_keep.Set (Some vk) ->
-                     vk :: acc
-                 | _ ->
-                     acc )
-
     module Vk_refcount_table = struct
       type t = (int * Verification_key_wire.t) F.Table.t
 
@@ -378,7 +364,7 @@ struct
             (Float.of_int (F.Table.length t)))
 
       let lift_common t table_modify cmd =
-        extract_vks cmd
+        User_command.extract_vks cmd
         |> List.iter ~f:(fun vk -> table_modify ~key:vk.hash ~value:vk t)
 
       let lift1 t table_modify cmd =
@@ -1180,7 +1166,7 @@ struct
                                 |> Or_error.ok_exn
                               in
                               let running_cache' =
-                                List.fold (extract_vks cmd) ~init:running_cache
+                                List.fold (User_command.extract_vks cmd) ~init:running_cache
                                   ~f:(fun acc vk ->
                                     F.Map.set acc ~data:vk
                                       ~key:(With_hash.hash vk) )
