@@ -77,8 +77,8 @@ let%test_module "Tokens test" =
 
     module Account_updates = struct
       let deploy ~balance_change =
-        Zkapps_examples.Deploy_account_update.full ~balance_change pk token_id
-          vk
+        Zkapps_examples.Deploy_account_update.full ~balance_change
+          ~access:Either pk token_id vk
 
       let initialize =
         let account_update, () =
@@ -360,6 +360,62 @@ let%test_module "Tokens test" =
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
+      in
+      ignore account
+
+    let%test_unit "Initialize, mint, transfer two and non-token without auth \
+                   fails" =
+      let subtree =
+        []
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-1)) ~token_id:owned_token_id
+                   ~caller:owned_token_id
+             }
+        (* This account update should be ignored by the token zkApp. *)
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true
+                   ~balance_change:(int_to_amount (-30))
+                   ~token_id:Token_id.default ~caller:owned_token_id
+             }
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true ~balance_change:(int_to_amount 1)
+                   ~token_id:owned_token_id ~caller:owned_token_id
+             }
+      in
+      let account =
+        []
+        (* This account update should bring the total balance back to 0,
+           counteracting the effect of the ignored update above.
+        *)
+        |> Zkapp_command.Call_forest.cons
+             { Account_update.authorization = Control.Signature Signature.dummy
+             ; body =
+                 Zkapps_examples.mk_update_body (fst mint_to_keys)
+                   ~use_full_commitment:true ~balance_change:(int_to_amount 30)
+                   ~token_id:Token_id.default ~caller:Token_id.default
+             }
+        |> Zkapp_command.Call_forest.cons ~calls:subtree
+             { Account_update.authorization = Control.None_given
+             ; body =
+                 Zkapps_examples.mk_update_body pk
+                   ~authorization_kind:None_given
+             }
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
+        |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
+        |> Zkapp_command.Call_forest.cons
+             (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
+        |> test_zkapp_command ~expected_failure:Update_not_permitted_access
+             ~fee_payer_pk:pk ~signers ~initialize_ledger ~finalize_ledger
       in
       ignore account
   end )

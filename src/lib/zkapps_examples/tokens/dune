@@ -20,6 +20,7 @@
    pasta_bindings
    pickles
    pickles.backend
+   pickles_base
    pickles_types
    random_oracle
    random_oracle_input
