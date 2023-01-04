@@ -26,12 +26,15 @@ module Authorization_kind = struct
     module V1 = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
-        | None_given
         | Signature
         | Proof
+        | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      (* control tags are the same thing *)
+      let _f () : (t, Control.Tag.t) Type_equal.t = Type_equal.T
     end
   end]
 
@@ -492,7 +495,7 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
-      ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
+      ; Set_or_keep.to_input permissions ~dummy:Permissions.empty
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
@@ -533,7 +536,7 @@ module Update = struct
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    } ) )
-      ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
              ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
@@ -604,7 +607,7 @@ module Update = struct
 end
 
 module Events = Zkapp_account.Events
-module Sequence_events = Zkapp_account.Sequence_events
+module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned
@@ -851,7 +854,7 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
@@ -872,7 +875,7 @@ module Body = struct
       and balance_change = Currency.Amount.Signed.gen
       and increment_nonce = Quickcheck.Generator.bool
       and events = return []
-      and sequence_events = return []
+      and actions = return []
       and call_data = Field.gen
       and preconditions = Preconditions.gen
       and use_full_commitment = Quickcheck.Generator.bool
@@ -884,7 +887,7 @@ module Body = struct
       ; balance_change
       ; increment_nonce
       ; events
-      ; sequence_events
+      ; actions
       ; call_data
       ; preconditions
       ; use_full_commitment
@@ -905,7 +908,7 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
@@ -925,7 +928,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
         ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
         ~increment_nonce:!.bool ~events:!.Events.deriver
-        ~sequence_events:!.Sequence_events.deriver ~call_data:!.field
+        ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
         ~caller:!.Token_id.deriver ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
@@ -938,7 +941,7 @@ module Body = struct
       ; balance_change = Amount.Signed.zero
       ; increment_nonce = false
       ; events = []
-      ; sequence_events = []
+      ; actions = []
       ; call_data = Field.zero
       ; call_depth = 0
       ; preconditions = Preconditions.accept
@@ -960,7 +963,7 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
@@ -986,7 +989,7 @@ module Body = struct
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
-        ; sequence_events : Events'.Stable.V1.t
+        ; actions : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
@@ -1006,7 +1009,7 @@ module Body = struct
     ; balance_change = p.balance_change
     ; increment_nonce = p.increment_nonce
     ; events = p.events
-    ; sequence_events = p.sequence_events
+    ; actions = p.actions
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
@@ -1021,7 +1024,7 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
@@ -1036,7 +1039,7 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
@@ -1051,7 +1054,7 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
@@ -1065,7 +1068,7 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
@@ -1115,7 +1118,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:`Or_undefined @@ uint32 @@ o ())
+              option ~js_type:Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
 
@@ -1134,7 +1137,7 @@ module Body = struct
         { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; call_data = Field.zero
     ; preconditions =
         { Preconditions.network =
@@ -1152,6 +1155,33 @@ module Body = struct
     ; authorization_kind = Signature
     }
 
+  let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
+    { public_key = t.public_key
+    ; token_id = Token_id.default
+    ; update = Update.noop
+    ; balance_change =
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
+    ; increment_nonce = true
+    ; events = []
+    ; actions = []
+    ; call_data = Field.zero
+    ; preconditions =
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
+        ; account = Account_precondition.Nonce t.nonce
+        }
+    ; use_full_commitment = true
+    ; caller = Call
+    ; call_depth = 0
+    ; authorization_kind = Signature
+    }
+
   let to_fee_payer_exn (t : t) : Fee_payer.t =
     let { public_key
         ; token_id = _
@@ -1159,7 +1189,7 @@ module Body = struct
         ; balance_change
         ; increment_nonce = _
         ; events = _
-        ; sequence_events = _
+        ; actions = _
         ; call_data = _
         ; preconditions
         ; use_full_commitment = _
@@ -1207,7 +1237,7 @@ module Body = struct
       ; balance_change : Amount.Signed.var
       ; increment_nonce : Boolean.var
       ; events : Events.var
-      ; sequence_events : Sequence_events.var
+      ; actions : Actions.var
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
@@ -1223,7 +1253,7 @@ module Body = struct
          ; balance_change
          ; increment_nonce
          ; events
-         ; sequence_events
+         ; actions
          ; call_data
          ; preconditions
          ; use_full_commitment
@@ -1240,7 +1270,7 @@ module Body = struct
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
-        ; Sequence_events.var_to_input sequence_events
+        ; Actions.var_to_input actions
         ; Random_oracle_input.Chunked.field call_data
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
@@ -1262,7 +1292,7 @@ module Body = struct
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
-      ; Sequence_events.typ
+      ; Actions.typ
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
@@ -1279,7 +1309,7 @@ module Body = struct
     ; balance_change = Amount.Signed.zero
     ; increment_nonce = false
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
@@ -1301,7 +1331,7 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
@@ -1316,7 +1346,7 @@ module Body = struct
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
-      ; Sequence_events.to_input sequence_events
+      ; Actions.to_input actions
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
@@ -1343,7 +1373,7 @@ module Body = struct
     and balance_change = Currency.Amount.Signed.gen
     and increment_nonce = Quickcheck.Generator.bool
     and events = return []
-    and sequence_events = return []
+    and actions = return []
     and call_data = Field.gen
     and preconditions = Preconditions.gen
     and use_full_commitment = Quickcheck.Generator.bool
@@ -1354,7 +1384,7 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
@@ -1534,6 +1564,10 @@ include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
+
+let verification_key_update_to_option (t : t) :
+    Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
+  Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }

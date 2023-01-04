@@ -418,6 +418,11 @@ end = struct
        we'll requeue the address and it'll be overwritten. *)
     MT.set_all_accounts_rooted_at_exn t.tree addr content ;
     Addr.Table.remove t.waiting_content addr ;
+    [%log' trace t.logger]
+      ~metadata:
+        [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
+      "Found content addr $address, with hash $hash, removing from waiting \
+       content" ;
     let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
@@ -537,8 +542,8 @@ end = struct
         -> unit Deferred.t =
      fun (root_hash, query, env) ->
       (* NOTE: think about synchronization here. This is deferred now, so
-          the t and the underlying ledger can change while processing is
-          happening. *)
+         the t and the underlying ledger can change while processing is
+         happening. *)
       let already_done =
         match Ivar.peek t.validity_listener with Some `Ok -> true | _ -> false
       in

@@ -107,17 +107,7 @@ pub mod plonk_proof;
 /// Poseidon
 pub mod poseidon;
 
-/*
-/// Handy re-exports
-pub use {
-    commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
-    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
-    kimchi::circuits::{
-        expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
-        gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
-        nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
-        wires::caml::CamlWire,
-    },
-    mina_poseidon::sponge::caml::CamlScalarChallenge,
-};
-*/
+// exposes circuit for inspection
+pub mod circuit;
+
+pub mod wasm_ocaml_serde;

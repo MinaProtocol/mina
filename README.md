@@ -15,8 +15,9 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 ### Mina Walkthrough
 
 - [Docs](https://minaprotocol.com/docs/)
-- [Connecting](https://docs.minaprotocol.com/en/node-operators/connecting)
-- [Become a Node Operator](https://docs.minaprotocol.com/en/node-operators/getting-started)
+- [Using a 3rd Party wallet] (https://docs.minaprotocol.com/using-mina/install-a-wallet)
+- [Sending a Payment using Mina's CLI](https://docs.minaprotocol.com/node-operators/sending-a-payment)
+- [Become a Node Operator](https://minaprotocol.com/docs/getting-started/)
 
 ### Technical Papers
 
@@ -28,17 +29,17 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 
 ## Contributing
 
-Read the [Contributing Guide](https://docs.minaprotocol.com/en/node-developers/contributing) for information on how to make both technical and non-technical contributions.
+Read the [Contributing Guide](https://docs.minaprotocol.com/node-developers/contributing) for information on how to make both technical and non-technical contributions.
 
 ## Developers
 
-The [Developer docs](https://docs.minaprotocol.com/en/node-developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
+The [Developer docs](https://docs.minaprotocol.com/node-developers) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
 
 #### Quick Links:
 
 - [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
-- [Lifecycle of a payment](https://docs.minaprotocol.com/en/node-operators/lifecycle-payment)
+- [Lifecycle of a payment](https://docs.minaprotocol.com/node-operators/lifecycle-of-a-payment)
 
 ## Community
 

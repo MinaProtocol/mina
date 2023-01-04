@@ -177,6 +177,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -193,6 +194,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -323,11 +325,9 @@ let protocol_state_precondition_of_id pool id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
   let%bind ({ snarked_ledger_hash_id
-            ; timestamp_id
             ; blockchain_length_id
             ; min_window_density_id
             ; total_currency_id
-            ; curr_global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data_id
             ; next_epoch_data_id
@@ -346,41 +346,19 @@ let protocol_state_precondition_of_id pool id =
     in
     Or_ignore.of_option hash_opt
   in
-  let%bind timestamp =
-    let%map ts_db_opt =
-      Option.value_map timestamp_id ~default:(return None) ~f:(fun id ->
-          let%map ts =
-            query_db ~f:(fun db -> Processor.Zkapp_timestamp_bounds.load db id)
-          in
-          Some ts )
-    in
-    let ts_opt =
-      Option.map ts_db_opt
-        ~f:(fun { timestamp_lower_bound; timestamp_upper_bound } ->
-          let lower = Block_time.of_string_exn timestamp_lower_bound in
-          let upper = Block_time.of_string_exn timestamp_upper_bound in
-          ({ lower; upper } : Block_time.t Zkapp_precondition.Closed_interval.t) )
-    in
-    Or_ignore.of_option ts_opt
-  in
   let%bind blockchain_length = get_length_bounds pool blockchain_length_id in
   let%bind min_window_density = get_length_bounds pool min_window_density_id in
   let%bind total_currency = get_amount_bounds pool total_currency_id in
-  let%bind global_slot_since_hard_fork =
-    get_global_slot_bounds pool curr_global_slot_since_hard_fork
-  in
   let%bind global_slot_since_genesis =
     get_global_slot_bounds pool global_slot_since_genesis
   in
   let%bind staking_epoch_data = staking_data_of_id pool staking_epoch_data_id in
   let%map next_epoch_data = staking_data_of_id pool next_epoch_data_id in
   ( { snarked_ledger_hash
-    ; timestamp
     ; blockchain_length
     ; min_window_density
     ; last_vrf_output = ()
     ; total_currency
-    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; staking_epoch_data
     ; next_epoch_data
@@ -436,7 +414,7 @@ let get_account_update_body ~pool body_id =
            ; balance_change
            ; increment_nonce
            ; events_id
-           ; sequence_events_id
+           ; actions_id
            ; call_data_id
            ; call_depth
            ; zkapp_network_precondition_id
@@ -464,7 +442,7 @@ let get_account_update_body ~pool body_id =
     Currency.Amount.Signed.create ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
-  let%bind sequence_events = load_events pool sequence_events_id in
+  let%bind actions = load_events pool actions_id in
   let%bind call_data =
     let%map field_str =
       query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
@@ -621,7 +599,7 @@ let get_account_update_body ~pool body_id =
       ; balance_change
       ; increment_nonce
       ; events
-      ; sequence_events
+      ; actions
       ; call_data
       ; call_depth
       ; preconditions =
@@ -738,6 +716,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -752,6 +731,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key
@@ -868,8 +848,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let account =
     ( { public_key
       ; token_id
-      ; token_permissions =
-          Token_permissions.Not_owned { account_disabled = false }
       ; token_symbol
       ; balance
       ; nonce

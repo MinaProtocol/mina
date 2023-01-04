@@ -65,12 +65,21 @@ Note: the database name `archive` should be identical to
 
 ```shell
 $ "_build/default/src/app/archive/archive.exe" run \
+    --config-file daemon.json \
     --postgres-uri "postgres://localhost:5432/archive" \
     --server-port 3086
 ```
 Note that the `--server-port` param should be equal to the one we set
 previously for the node. As the node starts producing blocks, we
 should see those blocks appear in archive's logs too.
+
+`daemon.json` should be replaced with the path to the daemon's
+(see above) configuration file. When provided with this file,
+the archive will load the genesis ledger from it into its own
+database. This is strictly necessary for Rosetta – without the
+genesis ledger it will return wrong balances for genesis accounts
+when asked for blocks before the first transaction involving
+such an account was made.
 
 Also note that archive can only know about the blocks that were
 produced when it was running. This limitation also applies to
@@ -149,3 +158,15 @@ The tests can be run with the following command:
 ```shell
 $ rosetta-cli --configuration-file config.json check:data
 ```
+
+This command investigates block after block checks:
+1. whether Rosetta returns well formed information about
+   each block;
+2. tracks balances of all the accounts it can discover
+   and compares them to the balances returned by Rosetta;
+   fails in case of finding a discrepancy.
+   
+**NOTE**: this check will never stop unless `"end_conditions"` field
+is specified in the `config.json`, in `data` section (see the
+example mentioned above). For example an end condition:
+`"index": 50` will make `rosetta-cli to check first 50 blocks. 

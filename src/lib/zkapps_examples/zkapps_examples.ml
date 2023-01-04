@@ -159,23 +159,22 @@ module Account_update_under_construction = struct
           ~f:(Fn.flip Zkapp_account.Events.push_to_data_as_hash)
     end
 
-    module Sequence_events = struct
-      type t = { sequence_events : Field.t array list }
+    module Actions = struct
+      type t = { actions : Field.t array list }
 
-      let create () = { sequence_events = [] }
+      let create () = { actions = [] }
 
-      let add_sequence_events t sequence_events : t =
-        { sequence_events = t.sequence_events @ sequence_events }
+      let add_actions t actions : t = { actions = t.actions @ actions }
 
-      let to_zkapp_command_sequence_events ({ sequence_events } : t) :
-          Zkapp_account.Sequence_events.var =
+      let to_zkapp_command_actions ({ actions } : t) : Zkapp_account.Actions.var
+          =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
-          exists ~compute:(fun () -> []) Zkapp_account.Sequence_events.typ
+          exists ~compute:(fun () -> []) Zkapp_account.Actions.typ
         in
-        (* matches fold_right in Zkapp_account.Sequence_events.hash *)
-        List.fold_right sequence_events ~init:empty_var
-          ~f:(Fn.flip Zkapp_account.Sequence_events.push_to_data_as_hash)
+        (* matches fold_right in Zkapp_account.Actions.hash *)
+        List.fold_right actions ~init:empty_var
+          ~f:(Fn.flip Zkapp_account.Actions.push_to_data_as_hash)
     end
 
     module Calls_kind = struct
@@ -198,7 +197,7 @@ module Account_update_under_construction = struct
       ; calls : Calls_kind.t
       ; call_data : Field.t option
       ; events : Events.t
-      ; sequence_events : Sequence_events.t
+      ; actions : Actions.t
       ; authorization_kind : Account_update.Authorization_kind.Checked.t
       }
 
@@ -214,7 +213,7 @@ module Account_update_under_construction = struct
       ; calls = No_calls
       ; call_data = None
       ; events = Events.create ()
-      ; sequence_events = Sequence_events.create ()
+      ; actions = Actions.create ()
       ; authorization_kind =
           { is_signed = Boolean.false_; is_proved = Boolean.true_ }
       }
@@ -238,18 +237,15 @@ module Account_update_under_construction = struct
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
-        ; sequence_events =
-            Sequence_events.to_zkapp_command_sequence_events t.sequence_events
+        ; actions = Actions.to_zkapp_command_actions t.actions
         ; preconditions =
             { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
                   { snarked_ledger_hash = Ignore
-                  ; timestamp = Ignore
                   ; blockchain_length = Ignore
                   ; min_window_density = Ignore
                   ; last_vrf_output = ()
                   ; total_currency = Ignore
-                  ; global_slot_since_hard_fork = Ignore
                   ; global_slot_since_genesis = Ignore
                   ; staking_epoch_data =
                       { ledger =
@@ -338,11 +334,8 @@ module Account_update_under_construction = struct
     let add_events events (t : t) =
       { t with events = Events.add_events t.events events }
 
-    let add_sequence_events sequence_events (t : t) =
-      { t with
-        sequence_events =
-          Sequence_events.add_sequence_events t.sequence_events sequence_events
-      }
+    let add_actions actions (t : t) =
+      { t with actions = Actions.add_actions t.actions actions }
 
     let set_balance_change balance_change (t : t) = { t with balance_change }
 
@@ -397,10 +390,10 @@ class account_update ~public_key ?token_id ?caller =
         Account_update_under_construction.In_circuit.add_events events
           account_update
 
-    method add_sequence_events sequence_events =
+    method add_actions actions =
       account_update <-
-        Account_update_under_construction.In_circuit.add_sequence_events
-          sequence_events account_update
+        Account_update_under_construction.In_circuit.add_actions actions
+          account_update
 
     method set_balance_change balance_change =
       account_update <-
@@ -661,7 +654,7 @@ let compile :
 let mk_update_body ?(token_id = Token_id.default)
     ?(update = Account_update.Update.dummy)
     ?(balance_change = Amount.Signed.zero) ?(increment_nonce = false)
-    ?(events = []) ?(sequence_events = []) ?(call_data = Field.Constant.zero)
+    ?(events = []) ?(actions = []) ?(call_data = Field.Constant.zero)
     ?(preconditions = Account_update.Preconditions.accept)
     ?(use_full_commitment = false) ?(caller = Token_id.default)
     ?(authorization_kind = Account_update.Authorization_kind.Signature)
@@ -672,7 +665,7 @@ let mk_update_body ?(token_id = Token_id.default)
   ; balance_change
   ; increment_nonce
   ; events
-  ; sequence_events
+  ; actions
   ; call_data
   ; preconditions
   ; use_full_commitment
@@ -682,7 +675,8 @@ let mk_update_body ?(token_id = Token_id.default)
 
 module Deploy_account_update = struct
   let body ?(balance_change = Account_update.Body.dummy.balance_change)
-      public_key token_id vk : Account_update.Body.t =
+      ?(access = Permissions.Auth_required.None) public_key token_id vk :
+      Account_update.Body.t =
     { Account_update.Body.dummy with
       public_key
     ; balance_change
@@ -711,6 +705,7 @@ module Deploy_account_update = struct
               ; set_token_symbol = Proof
               ; increment_nonce = Proof
               ; set_voting_for = Proof
+              ; access
               }
         }
     ; use_full_commitment = true
@@ -722,9 +717,9 @@ module Deploy_account_update = struct
     ; authorization_kind = Signature
     }
 
-  let full ?balance_change public_key token_id vk : Account_update.t =
+  let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    { body = body ?balance_change public_key token_id vk
+    { body = body ?balance_change ?access public_key token_id vk
     ; authorization = Signature Signature.dummy
     }
 end

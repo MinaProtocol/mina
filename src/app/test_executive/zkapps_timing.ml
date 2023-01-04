@@ -40,8 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
-    let%bind fee_payer_pk = Util.pub_key_of_node node in
-    let%bind fee_payer_sk = Util.priv_key_of_node node in
+    let%bind fee_payer_pk = pub_key_of_node node in
+    let%bind fee_payer_sk = priv_key_of_node node in
     let (keypair : Signature_lib.Keypair.t) =
       { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
       ; private_key = fee_payer_sk
@@ -149,15 +149,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "zkApp transfer, timed account"
       in
       let sender_keypair = timed_account_keypair in
-      let receiver_key =
-        keypair.public_key |> Signature_lib.Public_key.compress
-      in
+      let receiver = keypair.public_key |> Signature_lib.Public_key.compress in
       let (zkapp_command_spec
             : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = [ (receiver_key, amount) ]
+        ; receivers = [ (receiver, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo
@@ -165,7 +163,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -182,15 +180,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "Invalid transfer, timed account"
       in
       let sender_keypair = timed_account_keypair in
-      let receiver_key =
-        keypair.public_key |> Signature_lib.Public_key.compress
-      in
+      let receiver = keypair.public_key |> Signature_lib.Public_key.compress in
       let (zkapp_command_spec
             : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = [ (receiver_key, amount) ]
+        ; receivers = [ (receiver, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo
@@ -198,7 +194,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -240,7 +236,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in

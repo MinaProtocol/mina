@@ -1,6 +1,6 @@
 module Authorization_kind = struct
   module V1 = struct
-    type t = None_given | Signature | Proof
+    type t = Signature | Proof | None_given
   end
 end
 
@@ -85,7 +85,7 @@ module Body = struct
           (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       ; increment_nonce : bool
       ; events : Events'.V1.t
-      ; sequence_events : Events'.V1.t
+      ; actions : Events'.V1.t
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool

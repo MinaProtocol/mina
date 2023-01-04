@@ -29,7 +29,7 @@ module Ledger_inner = struct
     Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "coda_key_value_db"
+    let key_value_db_dir = "mina_key_value_db"
   end
 
   module Hash = struct
@@ -76,13 +76,6 @@ module Ledger_inner = struct
         let empty = Account.empty
 
         let token = Account.Poly.token_id
-
-        let token_owner ({ token_permissions; _ } : t) =
-          match token_permissions with
-          | Token_owned _ ->
-              true
-          | Not_owned _ ->
-              false
       end
     end]
 

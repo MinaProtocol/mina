@@ -152,9 +152,10 @@ macro_rules! impl_gate_vector {
 
             #[wasm_bindgen]
             pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_digest>](
+                public_input_size: usize,
                 v: &WasmGateVector
             ) -> Box<[u8]> {
-                Circuit(&(v.0)).digest().to_vec().into_boxed_slice()
+                Circuit::new(public_input_size, &(v.0)).digest().to_vec().into_boxed_slice()
             }
         }
     };

@@ -514,6 +514,7 @@ module Zkapp_permissions = struct
     { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
+    ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
@@ -538,6 +539,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
+      ; auth_required_typ
       ]
 
   let table_name = "zkapp_permissions"
@@ -547,6 +549,7 @@ module Zkapp_permissions = struct
       { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
+      ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key
@@ -1336,11 +1339,9 @@ end
 module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
     ; total_currency_id : int option
-    ; curr_global_slot_since_hard_fork : int option
     ; global_slot_since_genesis : int option
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
@@ -1350,16 +1351,7 @@ module Zkapp_network_precondition = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; int
-        ; int
-        ]
+        [ option int; option int; option int; option int; option int; int; int ]
 
   let table_name = "zkapp_network_precondition"
 
@@ -1370,11 +1362,6 @@ module Zkapp_network_precondition = struct
       Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
-    in
-    let%bind timestamp_id =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
-        ps.timestamp
     in
     let%bind blockchain_length_id =
       Mina_caqti.add_if_zkapp_check
@@ -1391,11 +1378,6 @@ module Zkapp_network_precondition = struct
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
-    let%bind curr_global_slot_since_hard_fork =
-      Mina_caqti.add_if_zkapp_check
-        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
-        ps.global_slot_since_hard_fork
-    in
     let%bind global_slot_since_genesis =
       Mina_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
@@ -1409,11 +1391,9 @@ module Zkapp_network_precondition = struct
     in
     let value =
       { snarked_ledger_hash_id
-      ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
       ; total_currency_id
-      ; curr_global_slot_since_hard_fork
       ; global_slot_since_genesis
       ; staking_epoch_data_id
       ; next_epoch_data_id
@@ -1467,7 +1447,7 @@ module Zkapp_account_update_body = struct
     ; balance_change : string
     ; increment_nonce : bool
     ; events_id : int
-    ; sequence_events_id : int
+    ; actions_id : int
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
@@ -1512,8 +1492,8 @@ module Zkapp_account_update_body = struct
     let%bind events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
-    let%bind sequence_events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
+    let%bind actions_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
@@ -1548,7 +1528,7 @@ module Zkapp_account_update_body = struct
       ; balance_change
       ; increment_nonce
       ; events_id
-      ; sequence_events_id
+      ; actions_id
       ; call_data_id
       ; call_depth
       ; zkapp_network_precondition_id
@@ -1561,7 +1541,7 @@ module Zkapp_account_update_body = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       ~tannot:(function
-        | "events_ids" | "sequence_events_ids" ->
+        | "events_ids" | "actions_ids" ->
             Some "int[]"
         | "caller" ->
             Some "call_type"
@@ -1580,33 +1560,10 @@ module Zkapp_account_update_body = struct
 end
 
 module Zkapp_account_update = struct
-  type t = { body_id : int; authorization_kind : Control.Tag.t }
-  [@@deriving fields, hlist]
-
-  let authorization_kind_typ =
-    let encode = function
-      | Control.Tag.Proof ->
-          "proof"
-      | Control.Tag.Signature ->
-          "signature"
-      | Control.Tag.None_given ->
-          "none_given"
-    in
-    let decode = function
-      | "proof" ->
-          Result.return Control.Tag.Proof
-      | "signature" ->
-          Result.return Control.Tag.Signature
-      | "none_given" ->
-          Result.return Control.Tag.None_given
-      | _ ->
-          Result.failf "Failed to decode authorization_kind_typ"
-    in
-    Caqti_type.enum "zkapp_authorization_kind_type" ~encode ~decode
+  type t = { body_id : int } [@@deriving fields, hlist]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; authorization_kind_typ ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
 
   let table_name = "zkapp_account_update"
 
@@ -1618,8 +1575,7 @@ module Zkapp_account_update = struct
         (module Conn)
         account_update.body
     in
-    let authorization_kind = Control.tag account_update.authorization in
-    let value = { body_id; authorization_kind } in
+    let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -3547,12 +3503,49 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
     [%log info]
       "Populating token owners table for block with state hash $state_hash"
       ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    List.iter tokens_used ~f:(fun (token_id, owner) ->
-        match owner with
-        | None ->
-            ()
-        | Some acct_id ->
-            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
+    let module Node = struct
+      type t = Token_id.t * Account_id.t option
+      [@@deriving equal, compare, hash, sexp]
+    end in
+    (* there's an edge from token A to token B if the B's token owner, an account identifier,
+       has A as its token; token A is added before token B
+    *)
+    let token_edges =
+      List.filter_map tokens_used
+        ~f:(fun ((token_id, acct_id_opt) as token_and_owner) ->
+          match acct_id_opt with
+          | None ->
+              assert (Token_id.equal token_id Token_id.default) ;
+              (* no edge to default token *)
+              None
+          | Some acct_id -> (
+              let token_id' = Account_id.token_id acct_id in
+              match
+                List.find tokens_used ~f:(fun (tokid, _) ->
+                    Token_id.equal token_id' tokid )
+              with
+              | Some token_and_owner' ->
+                  Some
+                    ( { from = token_and_owner'; to_ = token_and_owner }
+                      : (Token_id.t * Account_id.t option)
+                        Topological_sort.Edge.t )
+              | None ->
+                  (* no other token refers to this token *)
+                  None ) )
+    in
+    ( match Topological_sort.sort (module Node) tokens_used token_edges with
+    | Ok sorted_tokens ->
+        List.iter sorted_tokens ~f:(fun (token_id, owner) ->
+            match owner with
+            | None ->
+                ()
+            | Some acct_id ->
+                Token_owners.add_if_doesn't_exist token_id acct_id )
+    | Error err ->
+        (* a cycle, should never happen *)
+        [%log fatal] "Fatal error when sorting tokens: $error"
+          ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+        ignore (exit 1 : int) ) ;
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =

@@ -353,7 +353,7 @@ module type S = sig
 
   val update_sequence_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-    -> Zkapp_account.Sequence_events.t
+    -> Zkapp_account.Actions.t
     -> txn_global_slot:Global_slot.t
     -> last_sequence_slot:Global_slot.t
     -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
@@ -773,7 +773,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if Account.has_permission ~to_:`Send fee_payer_account then Ok ()
+      if
+        Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+          fee_payer_account
+        && Account.has_permission ~control:Control.Tag.Signature ~to_:`Send
+             fee_payer_account
+      then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
@@ -804,8 +809,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger source |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Set_delegate source_account then
-              Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Set_delegate source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
@@ -840,7 +849,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Receive receiver_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.None_given
+                ~to_:`Access receiver_account
+              && Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_account =
@@ -898,7 +912,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             else ret
           in
           let%bind () =
-            if Account.has_permission ~to_:`Send source_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Send source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
@@ -1214,12 +1233,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
-    module Sequence_events = struct
-      type t = Zkapp_account.Sequence_events.t
+    module Actions = struct
+      type t = Zkapp_account.Actions.t
 
       let is_empty = List.is_empty
 
-      let push_events = Account_update.Sequence_events.push_events
+      let push_events = Account_update.Actions.push_events
     end
 
     module Zkapp_uri = struct
@@ -1238,6 +1257,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Account
 
       module Permissions = struct
+        let access : t -> Controller.t = fun a -> a.permissions.access
+
         let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
 
         let send : t -> Controller.t = fun a -> a.permissions.send
@@ -1509,8 +1530,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let sequence_events (account_update : t) =
-          account_update.body.sequence_events
+        let actions (account_update : t) = account_update.body.actions
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri
@@ -1691,10 +1711,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module M = Zkapp_command_logic.Make (Inputs)
 
-  let update_sequence_state sequence_state sequence_events ~txn_global_slot
+  let update_sequence_state sequence_state actions ~txn_global_slot
       ~last_sequence_slot =
     let sequence_state', last_sequence_slot' =
-      M.update_sequence_state sequence_state sequence_events ~txn_global_slot
+      M.update_sequence_state sequence_state actions ~txn_global_slot
         ~last_sequence_slot
     in
     (sequence_state', last_sequence_slot')
@@ -1860,7 +1880,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ( init_account
         , `Added
         , `Has_permission_to_receive
-            (Account.has_permission ~to_:`Receive init_account) )
+            (Account.has_permission ~control:Control.Tag.None_given
+               ~to_:`Receive init_account ) )
     | Some loc -> (
         match get ledger loc with
         | None ->
@@ -1869,7 +1890,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ( receiver_account
             , `Existed
             , `Has_permission_to_receive
-                (Account.has_permission ~to_:`Receive receiver_account) ) )
+                (Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account ) ) )
 
   let no_failure = []
 
@@ -2167,7 +2189,6 @@ module For_tests = struct
     type t =
       ( Public_key.Compressed.t
       , Token_id.t
-      , Token_permissions.t
       , Account.Token_symbol.t
       , Balance.t
       , Account_nonce.t
@@ -2375,7 +2396,7 @@ module For_tests = struct
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
                 ; increment_nonce = not use_full_commitment
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
                 ; preconditions =
@@ -2403,7 +2424,7 @@ module For_tests = struct
                       else amount )
                 ; increment_nonce = false
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
                 ; preconditions =
@@ -2506,12 +2527,10 @@ module For_tests = struct
       }
     in
     { snarked_ledger_hash = h
-    ; timestamp = Block_time.zero
     ; blockchain_length = len
     ; min_window_density = len
     ; last_vrf_output = ()
     ; total_currency = a
-    ; global_slot_since_hard_fork = txn_global_slot
     ; global_slot_since_genesis = txn_global_slot
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data

@@ -1152,6 +1152,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 (Lazy.force precomputed_values.constraint_system_digests)
               ~protocol_major_version
           in
+          [%log info] "Daemon will use chain id %s" chain_id ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1408,7 +1409,8 @@ let replay_blocks logger =
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
-           "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
+           "Daemon is ready, replayed precomputed blocks. Clients can now \
+            connect" ;
          Async.never () ) )
 
 let dump_type_shapes =
@@ -1750,9 +1752,9 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_shared_state_test)
-        ; (module Coda_transitive_peers_test)
-        ; (module Coda_change_snark_worker_test)
+      ( [ (* (module Coda_shared_state_test)
+             ; (module Coda_transitive_peers_test) *)
+          (module Coda_change_snark_worker_test)
         ]
         : (module Integration_test) list )
   in

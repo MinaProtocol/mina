@@ -121,7 +121,7 @@ module Rules = struct
           in
           account_update#register_call destination_account_update
             destination_account_calls ;
-          account_update#add_sequence_events
+          account_update#add_actions
             [ [| Currency.Amount.Checked.to_field amount_to_mint |] ] ;
           account_update#assert_state_proved )
         input
