@@ -84,8 +84,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
     { Transaction_snark.Pending_coinbase_stack_state.source =
         pending_coinbase_init_stack
     ; target =
-        Pendipending_coinbase_state_stackng_coinbase.Stack.push_state
-          state_body_hash global_slot pending_coinbase_init_stack
+        Pending_coinbase.Stack.push_state state_body_hash global_slot
+          pending_coinbase_init_stack
     }
   in
   let witnesses, _final_ledger =
