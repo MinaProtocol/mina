@@ -170,10 +170,7 @@ let expand_feature_flags (type boolean)
     (* Lookup has max_lookups_per_row = 3 *)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
   in
-  let lookups_per_row_2 =
-    (* ForeignFieldMul has max_lookups_per_row = 2 *)
-    lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
-  in
+  let lookups_per_row_2 = lookups_per_row_3 in
   { lookup_tables
   ; table_width_1
   ; table_width_2
@@ -391,19 +388,16 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         in
         let b = get_feature_flag feature_flags feature in
         if_ b ~then_:e1 ~else_:e2 )
-      (* These are going away.. Just hard-code as zero *)
-  ; foreign_field_modulus = (fun _ -> F.zero)
-  ; neg_foreign_field_modulus = (fun _ -> F.zero)
   }
 
 (* TODO: not true anymore if lookup is used *)
 
-(** The offset of the powers of alpha for the permutation. 
+(** The offset of the powers of alpha for the permutation.
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
-  (** Computes the ft evaluation at zeta. 
+  (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
@@ -555,10 +549,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
 
   (** Check that computed proof scalars match the expected ones,
     using the native field.
-    Note that the expected scalars are used to check 
-    the linearization in a proof over the other field 
-    (where those checks are more efficient), 
-    but we deferred the arithmetic checks until here 
+    Note that the expected scalars are used to check
+    the linearization in a proof over the other field
+    (where those checks are more efficient),
+    but we deferred the arithmetic checks until here
     so that we have the efficiency of the native field.
   *)
   let checked (type t)
