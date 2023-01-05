@@ -354,7 +354,7 @@ module type S = sig
 
   val update_sequence_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-    -> Zkapp_account.Sequence_events.t
+    -> Zkapp_account.Actions.t
     -> txn_global_slot:Global_slot.t
     -> last_sequence_slot:Global_slot.t
     -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
@@ -1218,12 +1218,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
-    module Sequence_events = struct
-      type t = Zkapp_account.Sequence_events.t
+    module Actions = struct
+      type t = Zkapp_account.Actions.t
 
       let is_empty = List.is_empty
 
-      let push_events = Account_update.Sequence_events.push_events
+      let push_events = Account_update.Actions.push_events
     end
 
     module Zkapp_uri = struct
@@ -1517,8 +1517,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let sequence_events (account_update : t) =
-          account_update.body.sequence_events
+        let actions (account_update : t) = account_update.body.actions
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri
@@ -1705,10 +1704,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module M = Zkapp_command_logic.Make (Inputs)
 
-  let update_sequence_state sequence_state sequence_events ~txn_global_slot
+  let update_sequence_state sequence_state actions ~txn_global_slot
       ~last_sequence_slot =
     let sequence_state', last_sequence_slot' =
-      M.update_sequence_state sequence_state sequence_events ~txn_global_slot
+      M.update_sequence_state sequence_state actions ~txn_global_slot
         ~last_sequence_slot
     in
     (sequence_state', last_sequence_slot')
@@ -2190,7 +2189,6 @@ module For_tests = struct
     type t =
       ( Public_key.Compressed.t
       , Token_id.t
-      , Token_permissions.t
       , Account.Token_symbol.t
       , Balance.t
       , Account_nonce.t
@@ -2398,7 +2396,7 @@ module For_tests = struct
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
                 ; increment_nonce = not use_full_commitment
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
                 ; preconditions =
@@ -2427,7 +2425,7 @@ module For_tests = struct
                       else amount )
                 ; increment_nonce = false
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
                 ; preconditions =

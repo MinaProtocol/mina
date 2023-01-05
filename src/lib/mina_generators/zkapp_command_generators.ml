@@ -560,7 +560,7 @@ module Account_update_body_components = struct
     ; balance_change : 'amount
     ; increment_nonce : 'bool
     ; events : 'events
-    ; sequence_events : 'events
+    ; actions : 'events
     ; call_data : 'call_data
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
@@ -594,7 +594,7 @@ module Account_update_body_components = struct
     ; balance_change = t.balance_change
     ; increment_nonce = t.increment_nonce
     ; events = t.events
-    ; sequence_events = t.sequence_events
+    ; actions = t.actions
     ; call_data = t.call_data
     ; call_depth = t.call_depth
     ; preconditions =
@@ -773,9 +773,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
     Quickcheck.Generator.list_with_length list_len array_gen
   in
   let%bind events = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
-  let%bind sequence_events =
-    field_array_list_gen ~max_array_len:2 ~max_list_len:1
-  in
+  let%bind actions = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
   let%bind call_data = Snark_params.Tick.Field.gen in
   let first_use_of_account =
     let account_id = Account_id.create public_key token_id in
@@ -902,7 +900,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
              in
              let sequence_state, _last_sequence_slot =
                Mina_ledger.Ledger.update_sequence_state zk.sequence_state
-                 sequence_events ~txn_global_slot ~last_sequence_slot
+                 actions ~txn_global_slot ~last_sequence_slot
              in
              sequence_state
            in
@@ -959,7 +957,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; balance_change
   ; increment_nonce = account_update_increment_nonce
   ; events
-  ; sequence_events
+  ; actions
   ; call_data
   ; call_depth
   ; protocol_state_precondition

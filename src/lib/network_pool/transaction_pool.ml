@@ -1775,7 +1775,7 @@ let%test_module _ =
         ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions =
             Some
               { Account_update.Preconditions.network =

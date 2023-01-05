@@ -205,7 +205,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -277,7 +277,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -366,7 +366,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Permissions.Auth_required.None
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in

@@ -315,7 +315,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Zkapp_account.Sequence_events.empty_state_element
+          ; default = Zkapp_account.Actions.empty_state_element
           ; to_input = field
           ; to_input_checked = field
           }
@@ -692,7 +692,7 @@ module Account = struct
       ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ Field.typ
-          ~ignore:Zkapp_account.Sequence_events.empty_state_element
+          ~ignore:Zkapp_account.Actions.empty_state_element
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ]

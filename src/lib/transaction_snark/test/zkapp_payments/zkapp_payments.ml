@@ -67,7 +67,7 @@ let%test_module "Zkapp payments tests" =
                       Amount.Signed.(of_unsigned receiver_amount |> negate)
                   ; increment_nonce = true
                   ; events = []
-                  ; sequence_events = []
+                  ; actions = []
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
@@ -89,7 +89,7 @@ let%test_module "Zkapp payments tests" =
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
                   ; increment_nonce = false
                   ; events = []
-                  ; sequence_events = []
+                  ; actions = []
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
@@ -204,7 +204,7 @@ let%test_module "Zkapp payments tests" =
                     ; snapp_update = Account_update.Update.dummy
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions = None
                     }
                   in
@@ -270,7 +270,7 @@ let%test_module "Zkapp payments tests" =
                     ; snapp_update = Account_update.Update.dummy
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions = None
                     }
                   in

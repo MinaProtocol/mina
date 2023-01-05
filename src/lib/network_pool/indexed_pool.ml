@@ -1813,7 +1813,7 @@ let%test_module _ =
                         Amount.Signed.(negate @@ of_unsigned amount)
                     ; increment_nonce = double_increment_sender
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =
@@ -1836,7 +1836,7 @@ let%test_module _ =
                     ; balance_change = Amount.Signed.of_unsigned amount
                     ; increment_nonce = increment_receiver
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =

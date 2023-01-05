@@ -73,7 +73,7 @@ let%test_module "Protocol state precondition tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network =
@@ -117,7 +117,7 @@ let%test_module "Protocol state precondition tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network = network_precondition
@@ -188,7 +188,7 @@ let%test_module "Protocol state precondition tests" =
                             Amount.(Signed.(negate (of_unsigned amount)))
                         ; increment_nonce = true
                         ; events = []
-                        ; sequence_events = []
+                        ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
@@ -220,7 +220,7 @@ let%test_module "Protocol state precondition tests" =
                                            .account_creation_fee ) ) ))
                         ; increment_nonce = false
                         ; events = []
-                        ; sequence_events = []
+                        ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
@@ -415,7 +415,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -484,7 +484,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -537,7 +537,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -603,7 +603,7 @@ let%test_module "Account precondition tests" =
                         Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =
@@ -633,7 +633,7 @@ let%test_module "Account precondition tests" =
                         |> Amount.Signed.of_unsigned
                     ; increment_nonce = false
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =

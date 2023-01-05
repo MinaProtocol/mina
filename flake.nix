@@ -38,9 +38,11 @@
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
 
+  inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, ... }:
+    , nix-utils, flockenzeit, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -266,7 +268,10 @@
 
         checks = import ./nix/checks.nix inputs pkgs;
 
-        dockerImages = pkgs.callPackage ./nix/docker.nix { };
+        dockerImages = pkgs.callPackage ./nix/docker.nix {
+          inherit flockenzeit;
+          currentTime = self.sourceInfo.lastModified or 0;
+        };
 
         ocamlPackages = pkgs.ocamlPackages_mina;
 
@@ -285,7 +290,7 @@
             mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs client_sdk snarky_js leaderboard
-            mina-signer validation trace-tool;
+            mina-signer validation trace-tool zkapp-cli;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full;
           mina-deb = debianPackages.mina;
@@ -350,9 +355,20 @@
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep
           ];
-          MARLIN_PLONK_STUBS = "n";
-          PLONK_WASM_WEB = "n";
-          PLONK_WASM_NODEJS = "n";
+        });
+
+        # A shell from which we can compile snarky_js and use zkapp-cli to write and deploy zkapps
+        devShells.zkapp-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-zkapp-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
+            pkgs.git
+            pkgs.nodejs
+            pkgs.zkapp-cli
+            pkgs.binaryen # provides wasm-opt
+          ];
         });
 
         inherit checks;

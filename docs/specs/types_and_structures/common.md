@@ -25,13 +25,13 @@ An enum with variants `OK(T)` for success and `Err(E)` for failure, see [`std::r
 
 Variable length vector of type `T`
 
-| Field     | Type  | Description |
-| - | - | - |
-| `length`  | `u64` | Number of elements `N` |
-| `e0`      | `T`   | 0th element |
-| `e1`      | `T`   | 1st element |
-| ...       | ...   | ... |
-| `eN`      | `T`   | Nth element|
+| Field    | Type  | Description            |
+| -------- | ----- | ---------------------- |
+| `length` | `u64` | Number of elements `N` |
+| `e0`     | `T`   | 0th element            |
+| `e1`     | `T`   | 1st element            |
+| ...      | ...   | ...                    |
+| `eN`     | `T`   | Nth element            |
 
 ### `GAffine`
 
@@ -40,25 +40,25 @@ Variable length vector of type `T`
 ### `PolyComm<T>`
 
 | Field       | Type        | Description |
-| - | - | - |
-| `unshifted` | `Vector<T>` | |
-| `shifted`   | `Option<T>` | |
+| ----------- | ----------- | ----------- |
+| `unshifted` | `Vector<T>` |             |
+| `shifted`   | `Option<T>` |             |
 
 ### `CamlPlonkDomain<Fr>`
 
-| Field       | Type        | Description |
-| - | - | - |
-| `log_size_of_group` | `ocaml::Int` | |
+| Field               | Type         | Description     |
+| ------------------- | ------------ | --------------- |
+| `log_size_of_group` | `ocaml::Int` |                 |
 | `group_gen`         | `Fr`         | Generator point |
 
 ### `SRS<G: CommitmentCurve>`
 
 The in-memory verifier index structure contains the verifier key and is defined as follows.
 
-| Field    | Type             | Description |
-| - | -    | - |
-| `g`      | `Vector<G>`      | For committing polynomials |
-| `h`      | `G`              | Blinding factor |
+| Field    | Type             | Description                      |
+| -------- | ---------------- | -------------------------------- |
+| `g`      | `Vector<G>`      | For committing polynomials       |
+| `h`      | `G`              | Blinding factor                  |
 | `endo_r` | `G::ScalarField` | Curve endomorphism coefficient r |
 | `endo_q` | `G::BaseField`   | Curve endomorphism coefficient q |
 
@@ -73,32 +73,32 @@ pub type CamlPastaFpUrs = CamlPointer<Rc<SRS<GAffine>>>;
 
 ### `CamlPlonkVerificationEvals<PolyComm>`
 
-| Field | Type  | Description |
-| - | - | - |
-| `sigma_comm0` | `PolyComm` | Permutation commitment |
-| `sigma_comm1` | `PolyComm` | Permutation commitment |
-| `sigma_comm2` | `PolyComm` | Permutation commitment |
-| `ql_comm`     | `PolyComm` | Left input wire commitment |
-| `qr_comm`     | `PolyComm` | Right input wire commitment |
-| `qo_comm`     | `PolyComm` | Output selector poly commitment |
-| `qm_comm`     | `PolyComm` | Multiplication commitment |
-| `qc_comm`     | `PolyComm` | Constant wire commitment |
-| `rcm_comm0`   | `PolyComm` | Round constant polynomial commitment |
-| `rcm_comm1`   | `PolyComm` | Round constant polynomial commitment |
-| `rcm_comm2`   | `PolyComm` | Round constant polynomial commitment |
-| `psm_comm`    | `PolyComm` | Poseidon constraint selector polynomial commitment |
-| `add_comm`    | `PolyComm` | EC addition selector polynomial commitment |
+| Field         | Type       | Description                                                           |
+| ------------- | ---------- | --------------------------------------------------------------------- |
+| `sigma_comm0` | `PolyComm` | Permutation commitment                                                |
+| `sigma_comm1` | `PolyComm` | Permutation commitment                                                |
+| `sigma_comm2` | `PolyComm` | Permutation commitment                                                |
+| `ql_comm`     | `PolyComm` | Left input wire commitment                                            |
+| `qr_comm`     | `PolyComm` | Right input wire commitment                                           |
+| `qo_comm`     | `PolyComm` | Output selector poly commitment                                       |
+| `qm_comm`     | `PolyComm` | Multiplication commitment                                             |
+| `qc_comm`     | `PolyComm` | Constant wire commitment                                              |
+| `rcm_comm0`   | `PolyComm` | Round constant polynomial commitment                                  |
+| `rcm_comm1`   | `PolyComm` | Round constant polynomial commitment                                  |
+| `rcm_comm2`   | `PolyComm` | Round constant polynomial commitment                                  |
+| `psm_comm`    | `PolyComm` | Poseidon constraint selector polynomial commitment                    |
+| `add_comm`    | `PolyComm` | EC addition selector polynomial commitment                            |
 | `mul1_comm`   | `PolyComm` | EC variable base scalar multiplication selector polynomial commitment |
 | `mul2_comm`   | `PolyComm` | EC variable base scalar multiplication selector polynomial commitment |
-| `emul1_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment |
-| `emul2_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment |
-| `emul3_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment |
+| `emul1_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment                 |
+| `emul2_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment                 |
+| `emul3_comm`  | `PolyComm` | Endoscalar muplication selector polynomial commitment                 |
 
 ### `CamlPlonkVerificationShifts<Fr>`
 
-| Field | Type | Description |
-| - | - | - |
-| `r`   | `Fr` | Right wires shift |
+| Field | Type | Description        |
+| ----- | ---- | ------------------ |
+| `r`   | `Fr` | Right wires shift  |
 | `o`   | `Fr` | Output wires shift |
 
 ### `CamlPastaFpPlonkVerifierIndex`
@@ -110,11 +110,10 @@ pub type CamlPastaFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<Fp, CamlPastaFpUrs, PolyComm<GAffine>>;
 ```
 
-| Field           | Type                  | Description |
-| - | - | - |
-| `domain`        | `CamlPlonkDomain<Fp>` | |
-| `max_poly_size` | `ocaml::Int` | |
-| `max_quot_size` | `ocaml::Int` | |
-| `urs`           | `CamlPastaFpUrs` | |
-| `evals`         | `CamlPlonkVerificationEvals<PolyComm<GAffine>>` | |
-| `shifts`        | `CamlPlonkVerificationShifts<Fp>` | |
+| Field           | Type                                            | Description |
+| --------------- | ----------------------------------------------- | ----------- |
+| `domain`        | `CamlPlonkDomain<Fp>`                           |             |
+| `max_poly_size` | `ocaml::Int`                                    |             |
+| `urs`           | `CamlPastaFpUrs`                                |             |
+| `evals`         | `CamlPlonkVerificationEvals<PolyComm<GAffine>>` |             |
+| `shifts`        | `CamlPlonkVerificationShifts<Fp>`               |             |

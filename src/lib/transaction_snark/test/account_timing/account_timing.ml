@@ -922,7 +922,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -991,7 +991,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1072,7 +1072,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1286,7 +1286,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1373,7 +1373,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1448,7 +1448,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1524,7 +1524,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1605,7 +1605,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1678,7 +1678,7 @@ let%test_module "account timing check" =
             ; snapp_update = Account_update.Update.dummy
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1820,7 +1820,7 @@ let%test_module "account timing check" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -1901,7 +1901,7 @@ let%test_module "account timing check" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in

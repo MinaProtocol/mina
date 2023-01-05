@@ -152,11 +152,11 @@ module Events = struct
         failwithf "Error from run_and_check: %s" (Error.to_string_hum err) ()
 end
 
-module Sequence_events = struct
+module Actions = struct
   include Make_events (struct
     let salt_phrase = "MinaZkappSequenceEmpty"
 
-    let hash_prefix = Hash_prefix_states.zkapp_sequence_events
+    let hash_prefix = Hash_prefix_states.zkapp_actions
 
     let deriver_name = "SequenceEvents"
   end)
@@ -175,7 +175,7 @@ module Sequence_events = struct
   [%%ifdef consensus_mechanism]
 
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
-    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_sequence_events
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
 
   [%%endif]
@@ -432,7 +432,7 @@ let default : _ Poly.t =
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
-      (let empty = Sequence_events.empty_state_element in
+      (let empty = Actions.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
   ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
