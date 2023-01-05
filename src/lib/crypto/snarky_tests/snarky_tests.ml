@@ -192,17 +192,18 @@ let generate_witness () =
   ()
 
 module As_prover_circuits = struct
-  let ( -- ) i j =
-    let rec aux n acc = if n < i then acc else aux (n - 1) (n :: acc) in
-    aux j []
-
   let input_typ = Impl.Typ.tuple3 Impl.Field.typ Impl.Field.typ Impl.Field.typ
 
   let return_typ = Impl.Typ.unit
 
+  let get_id =
+    Snarky_backendless.Cvar.(
+      function Var v -> v | _ -> failwith "should have been a var")
+
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
     let abc = Impl.Field.(b1 + b2 + b3) in
+    assert (get_id b1 = 1) ;
     if as_prover then
       Impl.as_prover (fun _ ->
           let f acc e =
