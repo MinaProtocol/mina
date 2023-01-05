@@ -3393,14 +3393,22 @@ end
 let test =
   let module Signed_command = Mina_base.Signed_command in
   let module Signed_command_payload = Mina_base.Signed_command_payload in
-  let open Ppx_deriving_yojson_runtime.Result in
   let ok_exn result =
-    match result with Ok c -> c | Error _ -> failwith "not ok"
+    let open Ppx_deriving_yojson_runtime.Result in
+    match result with Ok c -> c | Error e -> failwith ("not ok: " ^ e)
   in
   let keypair () = Signature_lib.Keypair.create () in
   object%js
     val transactionHash =
       object%js
+        method hashPayment (command : Js.js_string Js.t) =
+          let command : Signed_command.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.of_yojson |> ok_exn
+          in
+          Mina_transaction.Transaction_hash.(
+            command |> hash_signed_command |> to_base58_check |> Js.string)
+
         method serializeCommon (command : Js.js_string Js.t) =
           let command : Signed_command_payload.Common.t =
             command |> Js.to_string |> Yojson.Safe.from_string
