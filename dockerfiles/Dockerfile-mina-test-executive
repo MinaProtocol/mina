@@ -30,6 +30,7 @@ RUN apt-get -y update && \
     python3 \
     tzdata \
     'libjemalloc.$' \
+    git \
     unzip && \
   rm -rf /var/lib/apt/lists/*
 
