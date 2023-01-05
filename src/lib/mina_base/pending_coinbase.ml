@@ -321,7 +321,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Random_oracle.hash ~init:Hash_prefix.protocol_state
             [| (t.curr :> Field.t)
              ; (state_body_hash :> Field.t)
-             ; Field.project (Mina_numbers.Global_slot.to_bits global_slot)
+             ; Mina_numbers.Global_slot.to_field global_slot
             |]
           |> Stack_hash.of_hash
       }
