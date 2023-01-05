@@ -376,7 +376,7 @@ let%test "lookup finalization" =
       Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
   |> Or_error.ok_exn
 
-let%test "xor finalization" =
+let%test "rot finalization" =
   let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
@@ -384,8 +384,8 @@ let%test "xor finalization" =
   let srs =
     Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
   in
-  let index, (public_input_1, public_input_2), proof =
-    Kimchi_bindings.Protocol.Proof.Fp.example_with_xor srs true
+  let index, [ public_input_1; public_input_2 ], proof =
+    Kimchi_bindings.Protocol.Proof.Fp.example_with_rot srs true
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
   let proof = Backend.Tick.Proof.of_backend proof in
@@ -395,8 +395,8 @@ let%test "xor finalization" =
     ; range_check = No
     ; foreign_field_add = No
     ; foreign_field_mul = No
-    ; xor = Yes
-    ; rot = No
+    ; xor = No
+    ; rot = Yes
     ; lookup = Maybe
     ; runtime_tables = Maybe
     }

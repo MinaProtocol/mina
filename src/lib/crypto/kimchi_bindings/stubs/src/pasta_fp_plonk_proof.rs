@@ -202,7 +202,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_example_with_xor(
+pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     srs: CamlFpSrs,
     indexed: bool,
 ) -> (
@@ -216,45 +216,43 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
         polynomial::COLUMNS,
-        polynomials::{generic::GenericGateSpec, xor},
+        polynomials::{
+            generic::GenericGateSpec,
+            rot::{self, RotMode},
+        },
         wires::Wire,
     };
 
+    // Includes the actual input of the rotation and a row with the zero value
     let num_inputs = 2;
 
     // circuit
-    // public inputs
-    let mut gates = vec![];
-    for row in 0..num_inputs {
-        gates.push(CircuitGate::<Fp>::create_generic_gadget(
-            Wire::for_row(row),
-            GenericGateSpec::Pub,
-            None,
-        ));
-    }
-    // 1 XOR of 128 bits. This will create 8 Xor16 gates and a Generic final gate with all zeros.
-    let (_, xor_gates) = CircuitGate::<Fp>::create_xor_gadget(2, 128);
-    gates.extend_from_slice(&xor_gates);
-    // connect public inputs to the inputs of the XOR
+    // public input
+    let mut gates = vec![CircuitGate::<Fp>::create_generic_gadget(
+        Wire::for_row(0),
+        GenericGateSpec::Pub,
+        None,
+    )];
+
+    // 1 ROT of 32 to the left
+    let rot = 32;
+    let mode = RotMode::Left;
+    let (_, rot_gates) = CircuitGate::<Fp>::create_rot(1, rot, mode);
+    gates.extend_from_slice(&rot_gates);
+    // connect first public input to the input of the ROT
     gates.connect_cell_pair((0, 0), (2, 0));
-    gates.connect_cell_pair((1, 0), (2, 1));
 
     // witness
     let witness = {
-        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); num_inputs]);
+        // create one row for the public word
+        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
 
-        // initialize the 2 inputs
-        let input1 = 0xDC811727DAF22EC15927D6AA275F406Bu128;
-        let input2 = 0xA4F4417AF072DF9016A1EAB458DA80D1u128;
-        let output = input1 ^ input2;
-        cols[0][0] = input1.into();
-        cols[0][1] = input2.into();
+        // initialize the public input containing the word to be rotated
+        let input = 0xDC811727DAF22EC1u64;
+        let output = input.rotate_left(32);
+        cols[0][0] = input.into();
+        rot::extend_rot::<Fp>(&mut cols, input, rot, mode);
 
-        xor::extend_xor_rows::<Fp>(
-            &mut cols,
-            128,
-            (input1.into(), input2.into(), output.into()),
-        );
         cols
     };
 
