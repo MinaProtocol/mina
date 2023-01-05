@@ -2,7 +2,7 @@ use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
-    srs::{endos, SRS},
+    srs::SRS,
 };
 use paste::paste;
 use serde::{Deserialize, Serialize};
@@ -62,14 +62,10 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
+                let srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
-
-                let (endo_q, endo_r) = endos::<$G>();
-                srs.endo_q = endo_q;
-                srs.endo_r = endo_r;
 
                 Ok(Some($name::new(srs)))
             }

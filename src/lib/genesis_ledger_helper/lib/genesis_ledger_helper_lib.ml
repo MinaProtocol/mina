@@ -88,13 +88,6 @@ module Accounts = struct
             ; set_voting_for = auth_required set_voting_for
             }
       in
-      let token_permissions =
-        Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
-            if token_owned then
-              Mina_base.Token_permissions.Token_owned { disable_new_accounts }
-            else Not_owned { account_disabled } )
-      in
       let%bind token_symbol =
         try
           let token_symbol =
@@ -178,7 +171,6 @@ module Accounts = struct
         ; delegate =
             (if Option.is_some delegate then delegate else account.delegate)
         ; token_id
-        ; token_permissions
         ; nonce = Account.Nonce.of_uint32 t.nonce
         ; receipt_chain_hash =
             Option.value_map t.receipt_chain_hash
@@ -209,22 +201,6 @@ module Accounts = struct
               ; cliff_amount = t.cliff_amount
               ; vesting_period = t.vesting_period
               ; vesting_increment = t.vesting_increment
-              }
-      in
-      let token_permissions =
-        match account.token_permissions with
-        | Mina_base.Token_permissions.Token_owned { disable_new_accounts } ->
-            Some
-              { Runtime_config.Accounts.Single.Token_permissions.token_owned =
-                  true
-              ; disable_new_accounts
-              ; account_disabled = false
-              }
-        | Not_owned { account_disabled } ->
-            Some
-              { token_owned = false
-              ; disable_new_accounts = false
-              ; account_disabled
               }
       in
       let permissions =
@@ -310,7 +286,6 @@ module Accounts = struct
             account.delegate
       ; timing
       ; token = Some (Mina_base.Token_id.to_string account.token_id)
-      ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =
           Some
@@ -602,9 +577,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; max_event_elements =
       Option.value ~default:default.max_event_elements
         (config.daemon >>= fun cfg -> cfg.max_event_elements)
-  ; max_sequence_event_elements =
-      Option.value ~default:default.max_sequence_event_elements
-        (config.daemon >>= fun cfg -> cfg.max_sequence_event_elements)
+  ; max_action_elements =
+      Option.value ~default:default.max_action_elements
+        (config.daemon >>= fun cfg -> cfg.max_action_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -647,9 +622,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
                   .zkapp_transaction_cost_limit
           ; max_event_elements =
               Some precomputed_values.genesis_constants.max_event_elements
-          ; max_sequence_event_elements =
-              Some
-                precomputed_values.genesis_constants.max_sequence_event_elements
+          ; max_action_elements =
+              Some precomputed_values.genesis_constants.max_action_elements
           }
     ; genesis =
         Some

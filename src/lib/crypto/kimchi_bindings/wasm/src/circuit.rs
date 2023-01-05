@@ -1,10 +1,8 @@
 use ark_ff::PrimeField;
 use kimchi::circuits::constraints::ConstraintSystem;
-use kimchi::circuits::gate::{CircuitGate, GateType};
-use kimchi::circuits::wires::GateWires;
+use kimchi::circuits::gate::CircuitGate;
 use mina_curves::pasta::Fp;
 use serde::Serialize;
-use serde_with::serde_as;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;

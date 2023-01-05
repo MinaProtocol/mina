@@ -1752,9 +1752,9 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_shared_state_test)
-        ; (module Coda_transitive_peers_test)
-        ; (module Coda_change_snark_worker_test)
+      ( [ (* (module Coda_shared_state_test)
+             ; (module Coda_transitive_peers_test) *)
+          (module Coda_change_snark_worker_test)
         ]
         : (module Integration_test) list )
   in

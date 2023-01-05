@@ -41,7 +41,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -68,7 +68,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -94,7 +94,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -124,7 +124,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
