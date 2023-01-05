@@ -2076,9 +2076,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%bind state_body_hash =
               Mina_state.Protocol_state.Body.hash_checked state_body
             in
+            let global_slot =
+              Mina_state.Protocol_state.Body.consensus_state state_body
+              |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
+            in
             let%bind computed_pending_coinbase_stack_after =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
-                pending_coinbase_stack_init
+                global_slot pending_coinbase_stack_init
             in
             [%with_label_ "Check pending coinbase stack"] (fun () ->
                 let%bind correct_coinbase_target_stack =
@@ -2561,7 +2565,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             let%bind pending_coinbase_stack_with_state =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
-                pending_coinbase_stack_init
+                current_global_slot pending_coinbase_stack_init
             in
             let%bind computed_pending_coinbase_stack_after =
               let coinbase =

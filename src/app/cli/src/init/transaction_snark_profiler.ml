@@ -132,7 +132,7 @@ module Transaction_key = struct
               ; target =
                   Pending_coinbase.Stack.push_state
                     Transaction_snark_tests.Util.genesis_state_body_hash
-                    Pending_coinbase.Stack.empty
+                    Mina_numbers.Global_slot.zero Pending_coinbase.Stack.empty
               }
           , p )
         ]
@@ -495,7 +495,10 @@ let state_body_hash = Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
-    Pending_coinbase.Stack.(push_state (Lazy.force state_body_hash) stack)
+    Pending_coinbase.Stack.(
+      push_state
+        (Lazy.force state_body_hash)
+        (Lazy.force curr_state_view).global_slot_since_genesis stack)
   in
   let target =
     match t with

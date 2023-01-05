@@ -215,7 +215,8 @@ let create_expected_statement ~constraint_constants
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
     let pending_coinbase_with_state =
-      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_before
+      Pending_coinbase.Stack.push_state state_body_hash block_global_slot
+        pending_coinbase_before
     in
     match transaction with
     | Coinbase c ->

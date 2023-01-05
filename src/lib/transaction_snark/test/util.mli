@@ -30,6 +30,7 @@ val init_stack : Pending_coinbase.Stack_versioned.t
 
 val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
 val apply_zkapp_command : Ledger.t -> Zkapp_command.t list -> Sparse_ledger.t
@@ -107,6 +108,7 @@ val permissions_from_update :
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t
   -> State_hash.t
+  -> Mina_numbers.Global_slot.t
   -> Pending_coinbase.Stack.t
   -> Pending_coinbase.Stack.t
 

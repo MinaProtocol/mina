@@ -185,7 +185,8 @@ let%test_module "Fee payer tests" =
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
                             (U.pending_coinbase_state_stack
-                               ~state_body_hash:U.genesis_state_body_hash )
+                               ~state_body_hash:U.genesis_state_body_hash
+                               ~global_slot:Mina_numbers.Global_slot.zero )
                         , zkapp_command )
                       ] )
               with

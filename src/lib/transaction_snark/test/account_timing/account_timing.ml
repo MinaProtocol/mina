@@ -377,7 +377,8 @@ let%test_module "account timing check" =
       let coinbase_stack_target =
         let stack_with_state =
           Pending_coinbase.Stack.(
-            push_state state_body_hash Pending_coinbase.Stack.empty)
+            push_state state_body_hash txn_global_slot
+              Pending_coinbase.Stack.empty)
         in
         match transaction with
         | Coinbase c ->

@@ -105,12 +105,12 @@ let%test_module "Transaction union tests" =
       let source_stack =
         if carryforward then
           Pending_coinbase.Stack.(
-            push_state state_body_hash pending_coinbase_init)
+            push_state state_body_hash global_slot pending_coinbase_init)
         else pending_coinbase_init
       in
       let pending_coinbase_stack_target =
         U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
-          pending_coinbase_init
+          Mina_numbers.Global_slot.zero pending_coinbase_init
       in
       let txn_in_block =
         { Transaction_protocol_state.Poly.transaction
@@ -201,7 +201,7 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
                 U.pending_coinbase_stack_target (Command (Signed_command t1))
-                  state_body_hash pending_coinbase_stack
+                  state_body_hash current_global_slot pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -381,7 +381,15 @@ let%test_module "Transaction union tests" =
           (*let state_body = Lazy.force state_body in
             let state_body_hash = Lazy.force state_body_hash in*)
           let state_body_hash1, state_body1 = state_hash_and_body1 in
+          let global_slot1 =
+            Mina_state.Protocol_state.Body.consensus_state state_body1
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           let state_body_hash2, state_body2 = state_hash_and_body2 in
+          let global_slot2 =
+            Mina_state.Protocol_state.Body.consensus_state state_body2
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
@@ -425,7 +433,8 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack_state1 =
                 (* No coinbase to add to the stack. *)
                 let stack_with_state =
-                  Pending_coinbase.Stack.push_state state_body_hash1 init_stack1
+                  Pending_coinbase.Stack.push_state state_body_hash1
+                    global_slot1 init_stack1
                 in
                 (* Since protocol state body is added once per block, the
                    source would already have the state if [carryforward=true]
@@ -461,7 +470,7 @@ let%test_module "Transaction union tests" =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
                 let stack_with_state2 =
                   Pending_coinbase.Stack.(
-                    push_state state_body_hash2 previous_stack)
+                    push_state state_body_hash2 global_slot2 previous_stack)
                 in
                 (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =

@@ -464,8 +464,8 @@ module T = struct
     | _ ->
         current_stack
 
-  let push_state current_stack state_body_hash =
-    Pending_coinbase.Stack.push_state state_body_hash current_stack
+  let push_state current_stack state_body_hash global_slot =
+    Pending_coinbase.Stack.push_state state_body_hash global_slot current_stack
 
   module Stack_state_with_init_stack = struct
     type t =
@@ -614,7 +614,7 @@ module T = struct
       current_stack ts current_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let current_stack_with_state =
-      push_state current_stack (snd state_and_body_hash)
+      push_state current_stack (snd state_and_body_hash) global_slot
     in
     let%map res_rev, pending_coinbase_stack_state =
       let pending_coinbase_stack_state : Stack_state_with_init_stack.t =
@@ -3268,7 +3268,7 @@ let%test_module "staged ledger tests" =
                 proofs_available sl test_mask `Many_provers ) )
 
     let check_pending_coinbase ~supercharge_coinbase proof ~sl_before ~sl_after
-        (_state_hash, state_body_hash) pc_update ~is_new_stack =
+        (_state_hash, state_body_hash) global_slot pc_update ~is_new_stack =
       let pending_coinbase_before = Sl.pending_coinbase_collection sl_before in
       let root_before = Pending_coinbase.merkle_root pending_coinbase_before in
       let unchecked_root_after =
@@ -3291,9 +3291,12 @@ let%test_module "staged ledger tests" =
         in
         let supercharge_coinbase = Boolean.var_of_value supercharge_coinbase in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
+        let global_slot_var =
+          Mina_numbers.Global_slot.Checked.constant global_slot
+        in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
           root_after_popping pc_update_var ~coinbase_receiver
-          ~supercharge_coinbase state_body_hash_var
+          ~supercharge_coinbase state_body_hash_var global_slot_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
@@ -3349,8 +3352,9 @@ let%test_module "staged ledger tests" =
                    (List.take work_list proofs_available_this_iter)
                    provers )
             in
+            let global_slot = current_state_view.global_slot_since_genesis in
             check_pending_coinbase proof ~supercharge_coinbase ~sl_before
-              ~sl_after:!sl state_body_hash pc_update ~is_new_stack ;
+              ~sl_after:!sl state_body_hash global_slot pc_update ~is_new_stack ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff

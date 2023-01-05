@@ -310,7 +310,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
       { Poly.init; curr }
 
-    let push (t : t) (state_body_hash : State_body_hash.t) : t =
+    let push (t : t) (state_body_hash : State_body_hash.t)
+        (global_slot : Mina_numbers.Global_slot.t) : t =
       (* this is the same computation for combining state hashes and state body hashes as
          `Protocol_state.hash_abstract', not available here because it would create
          a module dependency cycle
@@ -318,7 +319,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       { t with
         curr =
           Random_oracle.hash ~init:Hash_prefix.protocol_state
-            [| (t.curr :> Field.t); (state_body_hash :> Field.t) |]
+            [| (t.curr :> Field.t)
+             ; (state_body_hash :> Field.t)
+             ; Field.project (Mina_numbers.Global_slot.to_bits global_slot)
+            |]
           |> Stack_hash.of_hash
       }
 
@@ -329,12 +333,14 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Checked = struct
       type t = var
 
-      let push (t : t) (state_body_hash : State_body_hash.var) =
+      let push (t : t) (state_body_hash : State_body_hash.var)
+          (global_slot : Mina_numbers.Global_slot.Checked.var) =
         make_checked (fun () ->
             let curr =
               Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
                 [| Stack_hash.var_to_hash_packed t.curr
                  ; State_body_hash.var_to_hash_packed state_body_hash
+                 ; Mina_numbers.Global_slot.Checked.to_field global_slot
                 |]
               |> Stack_hash.var_of_hash_packed
             in
@@ -678,8 +684,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let data = Coinbase_stack.push t.Poly.data cb in
         { t with data }
 
-      let push_state (state_body_hash : State_body_hash.t) (t : t) =
-        { t with state = State_stack.push t.state state_body_hash }
+      let push_state (state_body_hash : State_body_hash.t)
+          (global_slot : Mina_numbers.Global_slot.t) (t : t) =
+        { t with state = State_stack.push t.state state_body_hash global_slot }
 
       let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
           var Tick0.Checked.t =
@@ -699,8 +706,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%map data = Coinbase_stack.Checked.push t.data coinbase in
           { t with data }
 
-        let push_state (state_body_hash : State_body_hash.var) (t : t) =
-          let%map state = State_stack.Checked.push t.state state_body_hash in
+        let push_state (state_body_hash : State_body_hash.var)
+            (global_slot : Mina_numbers.Global_slot.Checked.var) (t : t) =
+          let%map state =
+            State_stack.Checked.push t.state state_body_hash global_slot
+          in
           { t with state }
 
         let check_merge ~transition1:((s, t) : t * t)
@@ -838,7 +848,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%snarkydef_ add_coinbase
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ({ action; coinbase_amount = amount } : Update.var) ~coinbase_receiver
-          ~supercharge_coinbase state_body_hash =
+          ~supercharge_coinbase state_body_hash global_slot =
         let depth = constraint_constants.pending_coinbase_depth in
         let%bind addr1, addr2 =
           request_witness
@@ -857,7 +867,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let stack_initialized = { stack with state = previous_state_stack } in
           let%bind stack_with_state_hash =
-            Stack.Checked.push_state state_body_hash stack_initialized
+            Stack.Checked.push_state state_body_hash global_slot
+              stack_initialized
           in
           (*Always update the state body hash unless there are no transactions in this block*)
           Stack.Checked.if_ no_update ~then_:stack ~else_:stack_with_state_hash
@@ -927,7 +938,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let%bind stack =
             let%bind stack_with_state =
-              Stack.Checked.push_state state_body_hash
+              Stack.Checked.push_state state_body_hash global_slot
                 { stack0 with
                   state =
                     State_stack.create ~init:init_stack.Stack.Poly.state.curr
@@ -1142,8 +1153,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     let add_coinbase ~depth t ~coinbase ~is_new_stack =
       update_stack' ~depth t ~f:(Stack.push_coinbase coinbase) ~is_new_stack
 
-    let add_state ~depth t state_body_hash ~is_new_stack =
-      update_stack' ~depth t ~f:(Stack.push_state state_body_hash) ~is_new_stack
+    let add_state ~depth t state_body_hash global_slot ~is_new_stack =
+      update_stack' ~depth t
+        ~f:(Stack.push_state state_body_hash global_slot)
+        ~is_new_stack
 
     let update_coinbase_stack ~depth (t : t) stack ~is_new_stack =
       update_stack' ~depth t ~f:(fun _ -> stack) ~is_new_stack
@@ -1318,13 +1331,19 @@ module Make_str (A : Wire_types.Concrete) = struct
       depth:int -> t -> coinbase:Coinbase.t -> is_new_stack:bool -> t Or_error.t
 
     val add_state :
-      depth:int -> t -> State_body_hash.t -> is_new_stack:bool -> t Or_error.t
+         depth:int
+      -> t
+      -> State_body_hash.t
+      -> Mina_numbers.Global_slot.t
+      -> is_new_stack:bool
+      -> t Or_error.t
   end
 
   let add_coinbase_with_zero_checks (type t)
       (module T : Pending_coinbase_intf with type t = t) (t : t)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~coinbase ~supercharged_coinbase ~state_body_hash ~is_new_stack =
+      ~coinbase ~supercharged_coinbase ~state_body_hash ~global_slot
+      ~is_new_stack =
     let depth = constraint_constants.pending_coinbase_depth in
     if Amount.equal coinbase.Coinbase.amount Amount.zero then t
     else
@@ -1343,7 +1362,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         |> Or_error.ok_exn
       in
       let t_with_state =
-        T.add_state ~depth t state_body_hash ~is_new_stack |> Or_error.ok_exn
+        T.add_state ~depth t state_body_hash global_slot ~is_new_stack
+        |> Or_error.ok_exn
       in
       (*add coinbase to the same stack*)
       let interim_tree =
@@ -1387,11 +1407,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     let depth = constraint_constants.pending_coinbase_depth in
     let pending_coinbases = create ~depth () |> Or_error.ok_exn in
     test ~trials:20
-      (Generator.tuple2
+      (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen )
+         State_body_hash.gen Mina_numbers.Global_slot.gen )
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash ) ->
+              , state_body_hash
+              , global_slot ) ->
         let amount = coinbase.amount in
         let is_new_stack, action =
           Currency.Amount.(
@@ -1402,7 +1423,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
-            ~supercharged_coinbase
+            ~global_slot ~supercharged_coinbase
         in
         (* inside the `open' below, Checked means something else, so define this function *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1420,6 +1441,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             let state_body_hash_var =
               State_body_hash.var_of_t state_body_hash
             in
+            let global_slot_var =
+              Mina_numbers.Global_slot.Checked.constant global_slot
+            in
             let%map result =
               handle
                 (fun () ->
@@ -1430,7 +1454,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
-                    state_body_hash_var )
+                    state_body_hash_var global_slot_var )
                 (unstage (handler ~depth pending_coinbases ~is_new_stack))
             in
             As_prover.read Hash.typ result
@@ -1446,11 +1470,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let depth = constraint_constants.pending_coinbase_depth in
     test ~trials:20
-      (Generator.tuple2
+      (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen )
+         State_body_hash.gen Mina_numbers.Global_slot.gen )
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash ) ->
+              , state_body_hash
+              , global_slot ) ->
         let pending_coinbases = create ~depth () |> Or_error.ok_exn in
         let amount = coinbase.amount in
         let action =
@@ -1462,7 +1487,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
-            ~supercharged_coinbase
+            ~global_slot ~supercharged_coinbase
         in
         (* inside the `open' below, Checked means something else, so define these functions *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1481,6 +1506,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             let state_body_hash_var =
               State_body_hash.var_of_t state_body_hash
             in
+            let global_slot_var =
+              Mina_numbers.Global_slot.Checked.constant global_slot
+            in
             let%map result =
               handle
                 (fun () ->
@@ -1491,7 +1519,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
-                    state_body_hash_var )
+                    state_body_hash_var global_slot_var )
                 (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
             in
             As_prover.read Hash.typ result
@@ -1541,10 +1569,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> Or_error.ok_exn
           in
           (Pending_coinbase.Stack.empty, t')
-      | ((initial_coinbase, _supercharged_coinbase), state_body_hash)
+      | ( (initial_coinbase, _supercharged_coinbase)
+        , state_body_hash
+        , global_slot )
         :: coinbases ->
           let t' =
-            Pending_coinbase.add_state ~depth t state_body_hash
+            Pending_coinbase.add_state ~depth t state_body_hash global_slot
               ~is_new_stack:true
             |> Or_error.ok_exn
             |> Pending_coinbase.add_coinbase ~depth ~coinbase:initial_coinbase
@@ -1556,12 +1586,13 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~f:(fun
                    pending_coinbases
                    ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-                   , state_body_hash )
+                   , state_body_hash
+                   , global_slot )
                  ->
                 add_coinbase_with_zero_checks ~constraint_constants
                   (module Pending_coinbase)
                   pending_coinbases ~coinbase ~is_new_stack:false
-                  ~state_body_hash ~supercharged_coinbase )
+                  ~state_body_hash ~global_slot ~supercharged_coinbase )
           in
           let new_stack =
             Or_error.ok_exn
@@ -1613,9 +1644,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       Quickcheck.Generator.(
         list
           (list
-             (Generator.tuple2
+             (Generator.tuple3
                 (Coinbase.Gen.gen ~constraint_constants)
-                State_body_hash.gen ) ))
+                State_body_hash.gen Mina_numbers.Global_slot.gen ) ))
     in
     test ~trials:100 coinbase_lists_gen ~f:add_remove_check
 end

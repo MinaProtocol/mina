@@ -57,9 +57,10 @@ let genesis_state_body_hash =
 
 let init_stack = Pending_coinbase.Stack.empty
 
-let pending_coinbase_state_stack ~state_body_hash =
+let pending_coinbase_state_stack ~state_body_hash ~global_slot =
   { Transaction_snark.Pending_coinbase_stack_state.source = init_stack
-  ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
+  ; target =
+      Pending_coinbase.Stack.push_state state_body_hash global_slot init_stack
   }
 
 let apply_zkapp_command ledger zkapp_command =
@@ -71,7 +72,8 @@ let apply_zkapp_command ledger zkapp_command =
         [ ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
+                 ~state_body_hash:genesis_state_body_hash
+                 ~global_slot:Mina_numbers.Global_slot.zero )
           , ps )
         ]
     | ps1 :: ps2 :: rest ->
@@ -79,11 +81,13 @@ let apply_zkapp_command ledger zkapp_command =
           ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
+                 ~state_body_hash:genesis_state_body_hash
+                 ~global_slot:Mina_numbers.Global_slot.zero )
           , ps1 )
         in
         let pending_coinbase_state_stack =
           pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
+            ~global_slot:Mina_numbers.Global_slot.zero
         in
         let unchanged_stack_state ps =
           ( `Pending_coinbase_init_stack init_stack
@@ -138,7 +142,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
               ~fee_excess:Amount.Signed.zero (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
-                    (pending_coinbase_state_stack ~state_body_hash)
+                    (pending_coinbase_state_stack ~state_body_hash
+                       ~global_slot:state_view.global_slot_since_genesis )
                 , zkapp_command )
               ] )
       with
@@ -419,14 +424,16 @@ end
 
 (** Each transaction pushes the previous protocol state (used to validate
     the transaction) to the pending coinbase stack of protocol states*)
-let pending_coinbase_state_update state_body_hash stack =
-  Pending_coinbase.Stack.(push_state state_body_hash stack)
+let pending_coinbase_state_update state_body_hash global_slot stack =
+  Pending_coinbase.Stack.(push_state state_body_hash global_slot stack)
 
 (** Push protocol state and coinbase if it is a coinbase transaction to the
       pending coinbase stacks (coinbase stack and state stack)*)
 let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
-    state_body_hash stack =
-  let stack_with_state = pending_coinbase_state_update state_body_hash stack in
+    state_body_hash global_slot stack =
+  let stack_with_state =
+    pending_coinbase_state_update state_body_hash global_slot stack
+  in
   match t with
   | Coinbase c ->
       Pending_coinbase.(Stack.push_coinbase c stack_with_state)
@@ -491,8 +498,12 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     Mina_state.Protocol_state.Body.view state_body
   in
   let mentioned_keys, pending_coinbase_stack_target =
+    let global_slot =
+      Option.value txn_global_slot ~default:Mina_numbers.Global_slot.zero
+    in
     let pending_coinbase_stack =
-      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_stack
+      Pending_coinbase.Stack.push_state state_body_hash global_slot
+        pending_coinbase_stack
     in
     match txn_unchecked with
     | Command (Signed_command uc) ->
