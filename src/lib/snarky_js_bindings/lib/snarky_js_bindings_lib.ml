@@ -3409,6 +3409,14 @@ let test =
           Mina_transaction.Transaction_hash.(
             command |> hash_signed_command |> to_base58_check |> Js.string)
 
+        method hashPaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          Mina_transaction.Transaction_hash.(
+            command |> hash_signed_command_v1 |> to_base58_check |> Js.string)
+
         method serializeCommon (command : Js.js_string Js.t) =
           let command : Signed_command_payload.Common.t =
             command |> Js.to_string |> Yojson.Safe.from_string
@@ -3424,6 +3432,13 @@ let test =
             |> Signed_command.of_yojson |> ok_exn
           in
           Binable.to_bigstring (module Signed_command.Stable.Latest) command
+
+        method serializePaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          Signed_command.Base58_check_v1.to_base58_check command |> Js.string
 
         method examplePayment =
           let kp = keypair () in
