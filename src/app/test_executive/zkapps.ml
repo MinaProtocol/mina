@@ -396,7 +396,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = Account_update.Update.dummy
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions =
             Some
               { network = Zkapp_precondition.Protocol_state.accept
