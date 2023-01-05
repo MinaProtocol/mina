@@ -6,10 +6,10 @@ use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
     constraints::FeatureFlags,
+    lookup::lookups::{LookupFeatures, LookupPatterns},
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
-    lookup::lookups::{LookupFeatures, LookupPatterns},
 };
 use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
@@ -427,7 +427,6 @@ macro_rules! impl_verification_key {
                         rot_comm: None,
                         xor_comm: None,
 
-                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();

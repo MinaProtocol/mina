@@ -106,8 +106,6 @@ module Env = struct
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
-    ; foreign_field_modulus : int -> 'a
-    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -142,8 +140,6 @@ module Tick : S = struct
        ; gamma
        ; unnormalized_lagrange_basis
        ; if_feature
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -182,8 +178,6 @@ let () =
        ; gamma
        ; unnormalized_lagrange_basis = _
        ; if_feature
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -233,8 +227,6 @@ module Tock : S = struct
        ; gamma
        ; unnormalized_lagrange_basis
        ; if_feature
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -273,8 +265,6 @@ let () =
        ; gamma
        ; unnormalized_lagrange_basis = _
        ; if_feature
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
