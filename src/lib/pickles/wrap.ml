@@ -387,10 +387,10 @@ module Tests = struct
         }
       ~example:Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup
 
-  (* let%test "range check finalization" =
-   *   runtest
-   *     ~feature_flags:{ Plonk_types.Features.none with range_check = Yes }
-   *     ~example:Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check *)
+  let%test "range check finalization" =
+    runtest
+      ~feature_flags:{ Plonk_types.Features.none with range_check = Yes }
+      ~example:Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
 end
 
 module Step_acc = Tock.Inner_curve.Affine
