@@ -99,3 +99,4 @@ Cargo.lock
 .env
 .envrc
 .direnv/
+*gcloud-keyfile.json
