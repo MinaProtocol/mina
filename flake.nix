@@ -40,9 +40,20 @@
 
   inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, ... }:
+  outputs =
+    inputs@{ self
+    , nixpkgs
+    , utils
+    , mix-to-nix
+    , nix-npm-buildPackage
+    , opam-nix
+    , opam-repository
+    , nixpkgs-mozilla
+    , flake-buildkite-pipeline
+    , nix-utils
+    , flockenzeit
+    , ...
+    }:
     let
       inherit (nixpkgs) lib;
 
@@ -52,18 +63,24 @@
           (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
 
       # Warn about missing submodules
-      requireSubmodules = let
-        ref = r: "[34;1m${r}[31;1m";
-        command = c: "[37;1m${c}[31;1m";
-      in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
+      requireSubmodules =
+        let
+          ref = r: "[34;1m${r}[31;1m";
+          command = c: "[37;1m${c}[31;1m";
+        in
+        lib.warnIf
+          (
+            !builtins.all (x: x)
+              (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)
+          ) ''
           Some submodules are missing, you may get errors. Consider one of the following:
           - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
           - use "${ref "git+file://$PWD?submodules=1"}";
           - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
           - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
         '';
-    in {
+    in
+    {
       overlays = {
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
@@ -83,70 +100,72 @@
       # Taken from docs/demo.md
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = let
-          PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
-          wallet = {
-            box_primitive = "xsalsa20poly1305";
-            ciphertext =
-              "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
-            nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
-            pw_primitive = "argon2i";
-            pwdiff = [ 134217728 6 ];
-            pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
-          };
-          wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
-          wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
-        in [
-          self.nixosModules.mina
-          {
-            boot.isContainer = true;
-            networking.useDHCP = false;
-            networking.firewall.enable = false;
+        modules =
+          let
+            PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
+            wallet = {
+              box_primitive = "xsalsa20poly1305";
+              ciphertext =
+                "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
+              nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
+              pw_primitive = "argon2i";
+              pwdiff = [ 134217728 6 ];
+              pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
+            };
+            wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
+            wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
+          in
+          [
+            self.nixosModules.mina
+            {
+              boot.isContainer = true;
+              networking.useDHCP = false;
+              networking.firewall.enable = false;
 
-            services.mina = {
-              enable = true;
-              config = {
-                "ledger" = {
-                  "name" = "mina-demo";
-                  "accounts" = [{
-                    "pk" = PK;
-                    "balance" = "66000";
-                    "sk" = null;
-                    "delegate" = null;
-                  }];
+              services.mina = {
+                enable = true;
+                config = {
+                  "ledger" = {
+                    "name" = "mina-demo";
+                    "accounts" = [{
+                      "pk" = PK;
+                      "balance" = "66000";
+                      "sk" = null;
+                      "delegate" = null;
+                    }];
+                  };
+                };
+                waitForRpc = false;
+                external-ip = "0.0.0.0";
+                generate-genesis-proof = true;
+                seed = true;
+                block-producer-key = "/var/lib/mina/wallets/store/${PK}";
+                extraArgs = [
+                  "--demo-mode"
+                  "--proof-level"
+                  "none"
+                  "--run-snark-worker"
+                  "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
+                  "-insecure-rest-server"
+                ];
+              };
+
+              systemd.services.mina = {
+                preStart = ''
+                  printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
+                '';
+                environment = {
+                  MINA_TIME_OFFSET = "0";
+                  MINA_PRIVKEY_PASS = "";
                 };
               };
-              waitForRpc = false;
-              external-ip = "0.0.0.0";
-              generate-genesis-proof = true;
-              seed = true;
-              block-producer-key = "/var/lib/mina/wallets/store/${PK}";
-              extraArgs = [
-                "--demo-mode"
-                "--proof-level"
-                "none"
-                "--run-snark-worker"
-                "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
-                "-insecure-rest-server"
+
+              systemd.tmpfiles.rules = [
+                "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
+                "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
               ];
-            };
-
-            systemd.services.mina = {
-              preStart = ''
-                printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
-              '';
-              environment = {
-                MINA_TIME_OFFSET = "0";
-                MINA_PRIVKEY_PASS = "";
-              };
-            };
-
-            systemd.tmpfiles.rules = [
-              "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
-              "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
-            ];
-          }
-        ];
+            }
+          ];
       };
       # Buildkite pipeline for the Nix CI
       pipeline = with flake-buildkite-pipeline.lib;
@@ -212,7 +231,7 @@
                 '';
               label = "Run ${test} integration test";
               depends_on = [ "push_mina-image-full" ]
-                ++ lib.optional with-archive "push_mina-archive-image-full";
+              ++ lib.optional with-archive "push_mina-archive-image-full";
               "if" = ''build.pull_request.labels includes "nix-integration-tests"'';
               retry = {
                 automatic = [
@@ -223,15 +242,18 @@
                 ];
               };
             };
-        in {
-          steps = flakeSteps {
-            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
-            reproduceRepo = "mina";
-            commonExtraStepConfig = {
-              agents = [ "nix" ];
-              plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            };
-          } self ++ [
+        in
+        {
+          steps = flakeSteps
+            {
+              derivationCache = "https://storage.googleapis.com/mina-nix-cache";
+              reproduceRepo = "mina";
+              commonExtraStepConfig = {
+                agents = [ "nix" ];
+                plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+              };
+            }
+            self ++ [
             (pushToRegistry "mina-image-slim")
             (pushToRegistry "mina-image-full")
             (pushToRegistry "mina-archive-image-full")
@@ -250,127 +272,132 @@
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
-      let
-        # nixpkgs with all relevant overlays applied
-        pkgs = nixpkgs.legacyPackages.${system}.extend
-          (nixpkgs.lib.composeManyExtensions ([
-            (import nixpkgs-mozilla)
-            nix-npm-buildPackage.overlays.default
-            (final: prev: {
-              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
-              mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-              nix-npm-buildPackage =
-                pkgs.callPackage inputs.nix-npm-buildPackage {
-                  nodejs = pkgs.nodejs-16_x;
-                };
-            })
-          ] ++ builtins.attrValues self.overlays));
+    let
+      # nixpkgs with all relevant overlays applied
+      pkgs = nixpkgs.legacyPackages.${system}.extend
+        (nixpkgs.lib.composeManyExtensions ([
+          (import nixpkgs-mozilla)
+          nix-npm-buildPackage.overlays.default
+          (final: prev: {
+            rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
+            mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
+            nix-npm-buildPackage =
+              pkgs.callPackage inputs.nix-npm-buildPackage {
+                nodejs = pkgs.nodejs-16_x;
+              };
+          })
+        ] ++ builtins.attrValues self.overlays));
 
-        checks = import ./nix/checks.nix inputs pkgs;
+      checks = import ./nix/checks.nix inputs pkgs;
 
-        dockerImages = pkgs.callPackage ./nix/docker.nix {
-          inherit flockenzeit;
-          currentTime = self.sourceInfo.lastModified or 0;
-        };
+      dockerImages = pkgs.callPackage ./nix/docker.nix {
+        inherit flockenzeit;
+        currentTime = self.sourceInfo.lastModified or 0;
+      };
 
-        ocamlPackages = pkgs.ocamlPackages_mina;
+      ocamlPackages = pkgs.ocamlPackages_mina;
 
-        # Nix-built `dpkg` archives with Mina in them
-        debianPackages = pkgs.callPackage ./nix/debian.nix { };
+      # Nix-built `dpkg` archives with Mina in them
+      debianPackages = pkgs.callPackage ./nix/debian.nix { };
 
-        # Packages for the development environment that are not needed to build mina-dev.
-        # For instance dependencies for tests.
-        devShellPackages = [ pkgs.rosetta-cli ];
-      in {
-        inherit ocamlPackages;
+      # Packages for the development environment that are not needed to build mina-dev.
+      # For instance dependencies for tests.
+      devShellPackages = [ pkgs.rosetta-cli ];
+    in
+    {
+      inherit ocamlPackages;
 
-        # Main user-facing binaries.
-        packages = rec {
-          inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
-          inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs client_sdk snarky_js leaderboard
-            mina-signer validation trace-tool zkapp-cli;
-          inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
-          mina-deb = debianPackages.mina;
-          default = mina;
-        };
+      # Main user-facing binaries.
+      packages = rec {
+        inherit (ocamlPackages)
+          mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+        inherit (pkgs)
+          libp2p_helper kimchi_bindings_stubs client_sdk snarky_js leaderboard
+          mina-signer validation trace-tool zkapp-cli;
+        inherit (dockerImages)
+          mina-image-slim mina-image-full mina-archive-image-full;
+        mina-deb = debianPackages.mina;
+        default = mina;
+      };
 
-        # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
-        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
-          buildInputs = oa.buildInputs ++ devShellPackages;
-          shellHook = ''
-            ${oa.shellHook}
-            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
-          '';
-        });
-        devShells.default = self.devShell.${system};
-
-        # Shell with an LSP server available in it. You can start your editor from this shell, and tell it to look for LSP in PATH.
-        devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
-          name = "mina-with-lsp";
-          buildInputs = oa.buildInputs ++ devShellPackages;
-          nativeBuildInputs = oa.nativeBuildInputs
-            ++ [ ocamlPackages.ocaml-lsp-server ];
-          shellHook = ''
-            ${oa.shellHook}
-            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
-            # TODO: dead code doesn't allow us to have nice things
-          '';
-        });
-
-        devShells.operations = pkgs.mkShell {
-          name = "mina-operations";
-          packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
-        };
-
-        # TODO: think about rust toolchain in the dev shell
-        devShells.integration-tests = pkgs.mkShell {
-          name = "mina-integration-tests";
-          shellHook = ''
-            export MINA_BRANCH=$()
-          '';
-          buildInputs = [
-            self.packages.${system}.test_executive
-            pkgs.kubectl
-            pkgs.google-cloud-sdk
-            pkgs.terraform
-            pkgs.curl
-          ];
-        };
-        packages.impure-shell =
-          (import ./nix/impure-shell.nix pkgs).inputDerivation;
-
-        # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
-        devShells.impure = import ./nix/impure-shell.nix pkgs;
-
-        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
-        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
-        # However, this is a useful balance between purity and convenience for Rust development.
-        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
-          name = "mina-rust-shell";
-          buildInputs = oa.buildInputs ++ devShellPackages;
-          nativeBuildInputs = oa.nativeBuildInputs ++ [
-            pkgs.rustup
-            pkgs.libiconv # needed on macOS for one of the rust dep
-          ];
-        });
-
-        # A shell from which we can compile snarky_js and use zkapp-cli to write and deploy zkapps
-        devShells.zkapp-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
-          name = "mina-zkapp-shell";
-          buildInputs = oa.buildInputs ++ devShellPackages;
-          nativeBuildInputs = oa.nativeBuildInputs ++ [
-            pkgs.rustup
-            pkgs.libiconv # needed on macOS for one of the rust dep
-            pkgs.git
-            pkgs.nodejs
-            pkgs.zkapp-cli
-            pkgs.binaryen # provides wasm-opt
-          ];
-        });
-
-        inherit checks;
+      # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
+      devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ devShellPackages;
+        shellHook = ''
+          ${oa.shellHook}
+          unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+        '';
       });
+      devShells.default = self.devShell.${system};
+
+      # Shell with an LSP server available in it. You can start your editor from this shell, and tell it to look for LSP in PATH.
+      devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+        name = "mina-with-lsp";
+        buildInputs = oa.buildInputs ++ devShellPackages;
+        nativeBuildInputs = oa.nativeBuildInputs
+        ++ [ ocamlPackages.ocaml-lsp-server ];
+        shellHook = ''
+          ${oa.shellHook}
+          unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          # TODO: dead code doesn't allow us to have nice things
+        '';
+      });
+
+      devShells.operations = pkgs.mkShell {
+        name = "mina-operations";
+        packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
+      };
+
+      # TODO: think about rust toolchain in the dev shell
+      devShells.integration-tests = pkgs.mkShell {
+        name = "mina-integration-tests";
+        shellHook = ''
+          export MINA_BRANCH=$()
+        '';
+        buildInputs = [
+          self.packages.${system}.test_executive
+          pkgs.kubectl
+          pkgs.google-cloud-sdk
+          pkgs.terraform
+          pkgs.curl
+        ];
+      };
+      packages.impure-shell =
+        (import ./nix/impure-shell.nix pkgs).inputDerivation;
+
+      packages.ppx-lint = pkgs.writeScriptBin "ppx-lint" ''
+        ${pkgs.python39.withPackages (ps: with ps; [ GitPython docker ])}/bin/python3.9 ${./scripts/lint_ppx.py} $@
+      '';
+
+      # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
+      devShells.impure = import ./nix/impure-shell.nix pkgs;
+
+      # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+      # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+      # However, this is a useful balance between purity and convenience for Rust development.
+      devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+        name = "mina-rust-shell";
+        buildInputs = oa.buildInputs ++ devShellPackages;
+        nativeBuildInputs = oa.nativeBuildInputs ++ [
+          pkgs.rustup
+          pkgs.libiconv # needed on macOS for one of the rust dep
+        ];
+      });
+
+      # A shell from which we can compile snarky_js and use zkapp-cli to write and deploy zkapps
+      devShells.zkapp-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+        name = "mina-zkapp-shell";
+        buildInputs = oa.buildInputs ++ devShellPackages;
+        nativeBuildInputs = oa.nativeBuildInputs ++ [
+          pkgs.rustup
+          pkgs.libiconv # needed on macOS for one of the rust dep
+          pkgs.git
+          pkgs.nodejs
+          pkgs.zkapp-cli
+          pkgs.binaryen # provides wasm-opt
+        ];
+      });
+
+      inherit checks;
+    });
 }
