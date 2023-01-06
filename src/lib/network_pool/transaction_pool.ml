@@ -1964,6 +1964,67 @@ let%test_module _ =
                       } )
               }
             in
+            let zkapp_command_valid_vk_hashes =
+              { zkapp_command with
+                account_updates =
+                  Zkapp_command.Call_forest.map zkapp_command.account_updates
+                    ~f:(fun (p : Account_update.t) ->
+                      { p with
+                        body =
+                          { p.body with
+                            authorization_kind =
+                              (* replace dummy vk hashes *)
+                              ( match p.body.authorization_kind with
+                              | Proof _vk_hash ->
+                                  let account_id =
+                                    Account_id.create p.body.public_key
+                                      p.body.token_id
+                                  in
+                                  let account =
+                                    match
+                                      Mina_ledger.Ledger.location_of_account
+                                        best_tip_ledger account_id
+                                    with
+                                    | Some loc -> (
+                                        match
+                                          Mina_ledger.Ledger.get best_tip_ledger
+                                            loc
+                                        with
+                                        | Some acct ->
+                                            acct
+                                        | None ->
+                                            failwith
+                                              "Expected to find account in \
+                                               ledger" )
+                                    | None ->
+                                        failwith
+                                          "Expected to find local for account \
+                                           id in ledger"
+                                  in
+
+                                  let vk_hash =
+                                    match account.zkapp with
+                                    | Some zkapp -> (
+                                        match zkapp.verification_key with
+                                        | Some vk ->
+                                            With_hash.hash vk
+                                        | None ->
+                                            failwith
+                                              "Expected to find verification \
+                                               key for Proof authorization \
+                                               kind" )
+                                    | None ->
+                                        failwith
+                                          "Expected to find zkApp account for \
+                                           Proof authorization kind"
+                                  in
+                                  Proof vk_hash
+                              | ak ->
+                                  ak )
+                          }
+                      } )
+              }
+            in
             let valid_zkapp_command =
               Or_error.ok_exn
                 (Zkapp_command.Valid.to_valid
@@ -1972,71 +2033,9 @@ let%test_module _ =
                         ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
                         ~location_of_account:
                           Mina_ledger.Ledger.location_of_account )
-                   zkapp_command )
+                   zkapp_command_valid_vk_hashes )
             in
-            let valid_zkapp_command_valid_vk_hashes =
-              Zkapp_command.Valid.For_tests.replace_zkapp_command
-                valid_zkapp_command
-                { (Zkapp_command.Valid.forget valid_zkapp_command) with
-                  account_updates =
-                    Zkapp_command.Call_forest.map zkapp_command.account_updates
-                      ~f:(fun (p : Account_update.t) ->
-                        { p with
-                          body =
-                            { p.body with
-                              authorization_kind =
-                                (* replace dummy vk hashes *)
-                                ( match p.body.authorization_kind with
-                                | Proof _vk_hash ->
-                                    let account_id =
-                                      Account_id.create p.body.public_key
-                                        p.body.token_id
-                                    in
-                                    let account =
-                                      match
-                                        Mina_ledger.Ledger.location_of_account
-                                          best_tip_ledger account_id
-                                      with
-                                      | Some loc -> (
-                                          match
-                                            Mina_ledger.Ledger.get
-                                              best_tip_ledger loc
-                                          with
-                                          | Some acct ->
-                                              acct
-                                          | None ->
-                                              failwith
-                                                "Expected to find account in \
-                                                 ledger" )
-                                      | None ->
-                                          failwith
-                                            "Expected to find local for \
-                                             account id in ledger"
-                                    in
-                                    let vk_hash =
-                                      match account.zkapp with
-                                      | Some zkapp -> (
-                                          match zkapp.verification_key with
-                                          | Some vk ->
-                                              With_hash.hash vk
-                                          | None ->
-                                              failwith
-                                                "Expected to find verification \
-                                                 key for Proof authorization \
-                                                 kind" )
-                                      | None ->
-                                          failwith
-                                            "Expected to find zkApp account \
-                                             for Proof authorization kind"
-                                    in
-                                    Proof vk_hash
-                                | ak ->
-                                    ak )
-                            }
-                        } )
-                }
-            in
-            User_command.Zkapp_command valid_zkapp_command_valid_vk_hashes
+            User_command.Zkapp_command valid_zkapp_command
           in
           go (n + 1) (cmd :: cmds)
       in
