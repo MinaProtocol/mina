@@ -34,6 +34,19 @@ export MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:=''}
 export MINA_CONFIG_FILE=$HOME/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=$HOME/.mina-config}"
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
+export MINA_SNARKYJS_VERSION=${MINA_SNARKYJS_VERSION:=main}
+
+# Nodejs variables
+export NVM_VERSION=0.39.3
+export NODE_VERSION=16
+
+# zkApps variables
+export ZKAPP_PATH=$HOME/zkapps # TODO: replace paths in the file with this variable
+
+# Install npm
+curl -Lo- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash
+source ~/.bashrc
+nvm install $NODE_VERSION
 
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
@@ -46,6 +59,10 @@ ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 # Frequency (in seconds) at which payment operations will be sent
 TRANSACTION_FREQUENCY=60
 
+# Fetch zkApps
+curl -Ls https://github.com/MinaProtocol/rosetta-integration-test-zkapps/tarball/$MINA_SNARKYJS_VERSION | tar xz -C /tmp
+mv /tmp/MinaProtocol-rosetta-integration-test-zkapps-* $ZKAPP_PATH
+
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
 mina-dev libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
@@ -55,16 +72,12 @@ echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} 
 mkdir -p $MINA_KEYS_PATH
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
 mina-dev advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
-for zkapp_path in {}; do # TODO: what's the best way to bundle the zkapps here?
-  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp_path}.key
-done
 chmod -R 0700 $MINA_KEYS_PATH
 BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
 SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
 cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
-cp $MINA_KEYS_PATH/faucet.key $MINA_CONFIG_DIR/wallets/store/$FAUCET_PK
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF > "$MINA_CONFIG_FILE"
 {
@@ -74,15 +87,17 @@ cat <<EOF > "$MINA_CONFIG_FILE"
     "name": "${MINA_NETWORK}",
     "accounts": [
       { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
-      { "pk": "${FAUCET_PK}", "balance": "1000000000000000", "delegate": null, "sk": null }
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
     ]
   }
 }
 EOF
-for zkapp_path in {}; do # TODO: 
-  zkapp_pk=$(cat $MINA_KEYS_PATH/zkapp-$zkapp_path.key)
-  line="[{ \"pk\": \"${zkapp_pk}\", \"balance\": \"1000000000000\", \"delegate\": null, \"sk\": null }]"
+for zkapp_path in ${ZKAPP_PATH}/*/; do
+  zkapp_path=${zkapp_path%/}
+  zkapp=$(basename $zkapp_path)
+  mina-dev advanced generate-keypair --privkey-path ${MINA_KEYS_PATH}/zkapp-${zkapp}.key
+  zkapp_pk=$(cat $MINA_KEYS_PATH/zkapp-${zkapp}.key.pub)
+  line="[{ \"pk\": \"${zkapp_pk}\", \"balance\": \"10000\", \"delegate\": null, \"sk\": null }]"
   jq ".ledger.accounts |= . + ${line}" $MINA_CONFIG_FILE > ${MINA_CONFIG_FILE}.tmp
   mv ${MINA_CONFIG_FILE}.tmp $MINA_CONFIG_FILE
 done
@@ -107,6 +122,11 @@ done
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
 mina-dev accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
+for zkapp_path in ${ZKAPP_PATH}/*/; do
+  zkapp_path=${zkapp_path%/}
+  zkapp=$(basename $zkapp_path)
+  mina-dev accounts import --privkey-path $MINA_KEYS_PATH/zkapp-${zkapp}.key --config-directory $MINA_CONFIG_DIR
+done
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -145,6 +165,7 @@ mina-dev daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PK" \
+  --config-directory ${MINA_CONFIG_DIR} \
   --config-file ${MINA_CONFIG_FILE} \
   --libp2p-keypair ${MINA_LIBP2P_KEYPAIR_PATH} \
   --log-level ${LOG_LEVEL} \
@@ -161,7 +182,7 @@ until [ $daemon_status == "Synced" ]
 do
   [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1  || ((retries_left--))
   sleep 15
-  daemon_status=$(mina client status --json | jq -r .sync_status 2> /dev/null || echo "Pending")
+  daemon_status=$(mina-dev client status --json | jq -r .sync_status 2> /dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
 done
 
@@ -181,10 +202,19 @@ send_payments() {
 send_payments &
 
 # Deploy zkApps
-for zkapp_path in {}; do # TODO: what's the best way to bundle the zkapps here?
-  zkapp_pk=$(cat ${MINA_KEYS_PATH}/${zkapp_path}.pub)
-  zkapp_sk=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/${zkapp_path}" | sed -ne "s/Private key: //p")
-  echo -e "{\n    \"privateKey\": \"${zkapp_sk}\",\n    \"publicKey\": \"${zkapp_pk}\"\n}" > "${zkapp_path}/keys/sandbox.json"
+echo "==================== DEPLOYING ZKAPPS ======================"
+for zkapp_path in ${ZKAPP_PATH}/*/; do
+  zkapp_path=${zkapp_path%/}
+  zkapp=$(basename $zkapp_path)
+
+  zkapp_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}.key.pub)
+  zkapp_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}.key" | sed -ne "s/Private key: //p")
+
+  mina-dev accounts unlock --public-key $zkapp_pk
+
+  mkdir -p ${zkapp_path}/keys
+  echo -e "{\n    \"privateKey\": \"${zkapp_privkey}\",\n    \"publicKey\": \"${zkapp_pk}\"\n}" > "${zkapp_path}/keys/sandbox.json"
+
   cat <<EOF > "${zkapp_path}/config.json"
 {
   "version": 1,
@@ -204,7 +234,8 @@ EOF
 done
 
 # Start calling zkApp methods
-for zkapp_path in {}; do
+for zkapp_path in ${ZKAPP_PATH}/*/; do
+  zkapp_path=${zkapp_path%/}
   cd "$zkapp_path"
   npm run build
   ./interact.sh http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key
