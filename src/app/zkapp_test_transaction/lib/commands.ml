@@ -90,7 +90,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let witnesses, _final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+      (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , zkapp_command )
@@ -186,7 +187,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   in
   let witnesses, _final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+      (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , zkapp_command )
