@@ -50,12 +50,12 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBuster
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_types.sh"
-            , label = "Fast lint steps; versions compatibility changes"
+            , label = "Versions compatibility linter"
             , key = "lint-types"
             , target = Size.Medium
             , docker = None Docker.Type
@@ -63,12 +63,12 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBuster
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_binables.sh"
-            , label = "Fast lint steps; binable compatibility changes"
+            , label = "Binable compatibility linter"
             , key = "lint-binable"
             , target = Size.Medium
             , docker = None Docker.Type
