@@ -9,14 +9,12 @@ ARG branch=compatible
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-RUN apt-get -y update && \
-  apt-get -y upgrade && \
-  apt-get install -y sudo && \
-  sudo apt-get -y install \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     curl \
-    wget \
     dnsutils \
     dumb-init \
     gettext \
@@ -29,23 +27,30 @@ RUN apt-get -y update && \
     procps \
     python3 \
     tzdata \
-    'libjemalloc.$' \
     git \
+    wget \
+    sudo \
     unzip && \
-  rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
+
+#'libjemalloc.$' \
+
 
 # --- Terraform tools
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
-    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint && \
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $deb_codename main" | sudo tee /etc/apt/sources.list.d/hashicorp.list && \
-    sudo apt-get update && \
-    sudo apt-get install terraform
+RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
+    && gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
+    && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $deb_codename main" | sudo tee /etc/apt/sources.list.d/hashicorp.list \
+    && apt-get update --quiet --yes \
+    && apt-get install --quiet --yes terraform \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin
+
+# Install google-cloud-sdk for GCLOUD_UPLOAD feature
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
@@ -62,12 +67,11 @@ RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && sudo apt-get update \
     && sudo apt-get install -y nodejs yarn
 
-# Mina test executive package
-RUN echo "Installing mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
+# Mina daemon and mina test executive packages
+RUN echo "Installing both mina and mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && sudo apt-get update \
-  && sudo apt-get install -y --allow-downgrades "mina-test-executive=$deb_version" 
-  #"mina-logproc=$deb_version"
+  && apt-get update --quiet --yes \
+  && sudo apt-get install --quiet -y --allow-downgrades "mina-$network=$deb_version" "mina-test-executive=$deb_version" "mina-logproc=$deb_version"
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
 # for now stick to root for compatibility

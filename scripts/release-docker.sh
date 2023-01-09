@@ -124,15 +124,19 @@ else
   docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-tag-and-push() {
-  docker tag "${TAG}" "$1"
-  docker push "$1"
-}
-
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
+  
+  # push to GCR
   docker push "${TAG}"
-  tag-and-push "${HASHTAG}"
+
+  # retag and push again to GCR
+  docker tag "${TAG}" "${HASHTAG}"
+  docker push "${HASHTAG}"
+
   if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
-    tag-and-push "minaprotocol/${SERVICE}:${VERSION}"
+
+    # tag and push to dockerhub
+    docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
+    docker push "minaprotocol/${SERVICE}:${VERSION}"
   fi
 fi

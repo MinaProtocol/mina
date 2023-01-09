@@ -24,6 +24,8 @@ BUILDDIR="deb_build"
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 
+rm -rf "${BUILDDIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
