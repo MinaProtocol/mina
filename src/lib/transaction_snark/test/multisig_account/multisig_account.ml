@@ -333,7 +333,7 @@ let%test_module "multisig_account" =
                         Currency.Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =
@@ -357,7 +357,7 @@ let%test_module "multisig_account" =
                         Currency.Amount.Signed.(of_unsigned amount)
                     ; increment_nonce = false
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =

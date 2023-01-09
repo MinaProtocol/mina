@@ -20,7 +20,7 @@ let%test_module "Sequence events test" =
     let ( tag
         , _
         , p_module
-        , Pickles.Provers.[ initialize_prover; add_sequence_events_prover ] ) =
+        , Pickles.Provers.[ initialize_prover; add_actions_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
@@ -30,8 +30,8 @@ let%test_module "Sequence events test" =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self:_ ->
-          [ Zkapps_sequence_events.initialize_rule pk_compressed
-          ; Zkapps_sequence_events.update_sequence_events_rule pk_compressed
+          [ Zkapps_actions.initialize_rule pk_compressed
+          ; Zkapps_actions.update_actions_rule pk_compressed
           ] )
 
     module P = (val p_module)
@@ -81,19 +81,17 @@ let%test_module "Sequence events test" =
         Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
-    module Add_sequence_events = struct
-      let sequence_events =
-        let open Zkapps_sequence_events in
+    module Add_actions = struct
+      let actions =
+        let open Zkapps_actions in
         List.init num_events ~f:(fun outer ->
             Array.init event_length ~f:(fun inner ->
                 Snark_params.Tick.Field.of_int (outer + inner) ) )
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
-          (add_sequence_events_prover
-             ~handler:
-               (Zkapps_sequence_events.update_sequence_events_handler
-                  sequence_events ) )
+          (add_actions_prover
+             ~handler:(Zkapps_actions.update_actions_handler actions) )
     end
 
     let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
@@ -197,7 +195,7 @@ let%test_module "Sequence events test" =
       in
       (* we haven't added any sequence events *)
       List.iter account_updates ~f:(fun account_update ->
-          assert (List.is_empty account_update.body.sequence_events) )
+          assert (List.is_empty account_update.body.actions) )
 
     let%test_unit "Initialize and add sequence events" =
       let zkapp_command0, account0 =
@@ -212,7 +210,7 @@ let%test_module "Sequence events test" =
         Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
       in
       List.iter account_updates0 ~f:(fun account_update ->
-          assert (List.is_empty account_update.body.sequence_events) ) ;
+          assert (List.is_empty account_update.body.actions) ) ;
       assert (Option.is_some account0) ;
       (* sequence state unmodified *)
       let seq_state_elts0, last_seq_slot0 =
@@ -221,14 +219,13 @@ let%test_module "Sequence events test" =
       List.iter seq_state_elts0 ~f:(fun elt ->
           assert (
             Impl.Field.Constant.equal elt
-              Zkapp_account.Sequence_events.empty_state_element ) ) ;
+              Zkapp_account.Actions.empty_state_element ) ) ;
       (* last seq slot is 0 *)
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
       let zkapp_command1, account1 =
         let ledger = create_ledger () in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -239,9 +236,8 @@ let%test_module "Sequence events test" =
         Zkapp_command.Call_forest.to_list zkapp_command1.account_updates
       in
       List.iteri account_updates1 ~f:(fun i account_update ->
-          if i > 1 then
-            assert (not @@ List.is_empty account_update.body.sequence_events)
-          else assert (List.is_empty account_update.body.sequence_events) ) ;
+          if i > 1 then assert (not @@ List.is_empty account_update.body.actions)
+          else assert (List.is_empty account_update.body.actions) ) ;
       let seq_state_elts1, last_seq_slot1 =
         seq_state_elts_of_account account1
       in
@@ -251,11 +247,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_state_element )
+                   Zkapp_account.Actions.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_state_element ) ) ;
+                Zkapp_account.Actions.empty_state_element ) ) ;
       (* last seq slot still 0 *)
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
 
@@ -274,8 +270,7 @@ let%test_module "Sequence events test" =
       let _zkapp_command0, account0 =
         let state_body = make_state_body slot1 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
@@ -295,19 +290,18 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_state_element )
+                   Zkapp_account.Actions.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_state_element ) ) ;
+                Zkapp_account.Actions.empty_state_element ) ) ;
       (* seq slot is 1 *)
       assert (Mina_numbers.Global_slot.equal slot1 last_seq_slot0) ;
       let slot2 = Mina_numbers.Global_slot.of_int 2 in
       let _zkapp_command1, account1 =
         let state_body = make_state_body slot2 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
@@ -322,11 +316,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_state_element )
+                   Zkapp_account.Actions.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_state_element ) ) ;
+                Zkapp_account.Actions.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
         let last_elt = List.nth_exn seq_state_elts0 (i - 1) in
@@ -339,8 +333,7 @@ let%test_module "Sequence events test" =
       let _zkapp_command2, account2 =
         let state_body = make_state_body slot3 in
         []
-        |> Zkapp_command.Call_forest.cons_tree
-             Add_sequence_events.account_update
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> test_zkapp_command ~state_body ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;
@@ -355,11 +348,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_state_element )
+                   Zkapp_account.Actions.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_state_element ) ) ;
+                Zkapp_account.Actions.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
         let last_elt = List.nth_exn seq_state_elts1 (i - 1) in
