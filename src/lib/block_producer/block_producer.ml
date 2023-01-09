@@ -880,7 +880,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values ~verifier
-                            ~trust_system ~parent:crumb ~transition
+                            ~get_completed_work:(Fn.const None) ~trust_system
+                            ~parent:crumb ~transition
                             ~sender:None (* Consider skipping `All here *)
                             ~skip_staged_ledger_verification:`Proofs
                             ~transition_receipt_time () )
@@ -1383,7 +1384,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~trust_system ~parent:crumb ~transition ~sender:None
+                  ~get_completed_work:(Fn.const None) ~trust_system
+                  ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
