@@ -202,6 +202,124 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
+    srs: CamlFpSrs,
+) -> (
+    CamlPastaFpPlonkIndex,
+    CamlFp,
+    CamlProverProof<CamlGVesta, CamlFp>,
+) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{
+            foreign_field_add::witness::{create_chain, FFOps},
+            generic::GenericGateSpec,
+            range_check,
+        },
+        wires::Wire,
+    };
+    use num_bigint::BigUint;
+
+    // Includes a row to store value 1
+    let num_inputs = 1;
+    let operation = &[FFOps::Add];
+    let modulus = BigUint::from_bytes_be(&[
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF,
+        0xFC, 0x2F,
+    ]);
+
+    // circuit
+    let gates = {
+        // Public input row
+        let mut gates = vec![CircuitGate::<Fp>::create_generic_gadget(
+            Wire::for_row(0),
+            GenericGateSpec::Pub,
+            None,
+        )];
+
+        let mut curr_row = num_inputs;
+        // Foreign field addition and bound check
+        CircuitGate::<Fp>::extend_chain_ffadd(
+            &mut gates,
+            0,
+            &mut curr_row,
+            operation,
+            &modulus.clone(),
+        );
+
+        // Extend rangechecks of left input, right input, result, and bound
+        for _ in 0..4 {
+            CircuitGate::extend_multi_range_check(&mut gates, &mut curr_row);
+        }
+        // Connect the witnesses of the addition to the corresponding range checks
+        gates.connect_ffadd_range_checks(1, Some(4), Some(8), 12);
+        // Connect the bound check range checks
+        gates.connect_ffadd_range_checks(2, None, None, 16);
+
+        gates
+    };
+
+    // witness
+    let witness = {
+        // create row for the public value 1
+        let mut witness: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
+        witness[0][0] = Fp::one();
+        // create inputs to the addition
+        let left = modulus.clone() - BigUint::from_bytes_be(&[1]);
+        let right = modulus.clone() - BigUint::from_bytes_be(&[1]);
+        // create a chain of 1 addition
+        let add_witness = create_chain::<Fp>(&vec![left, right], operation, modulus);
+        for col in 0..COLUMNS {
+            witness[col].extend(add_witness[col].iter());
+        }
+        // extend range checks for all of left, right, output, and bound
+        let left = (witness[0][1], witness[1][1], witness[2][1]);
+        range_check::witness::extend_multi(&mut witness, left.0, left.1, left.2);
+        let right = (witness[3][1], witness[4][1], witness[5][1]);
+        range_check::witness::extend_multi(&mut witness, right.0, right.1, right.2);
+        let output = (witness[0][2], witness[1][2], witness[2][2]);
+        range_check::witness::extend_multi(&mut witness, output.0, output.1, output.2);
+        let bound = (witness[0][3], witness[1][3], witness[2][3]);
+        range_check::witness::extend_multi(&mut witness, bound.0, bound.1, bound.2);
+        witness
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let public_input = witness[0][0];
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        public_input.into(),
+        proof.into(),
+    )
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
