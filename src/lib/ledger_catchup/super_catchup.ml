@@ -1370,7 +1370,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
-        ~build_func:Transition_frontier.Breadcrumb.build )
+        ~build_func:
+          (Transition_frontier.Breadcrumb.build
+             ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
 

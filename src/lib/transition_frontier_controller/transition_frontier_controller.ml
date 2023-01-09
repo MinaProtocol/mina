@@ -14,8 +14,8 @@ module type CONTEXT = sig
 end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader =
+    ~time_controller ~collected_transitions ~frontier ~get_completed_work
+    ~network_transition_reader ~producer_transition_reader ~clear_reader =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -120,7 +120,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let clean_up_catchup_scheduler = Ivar.create () in
   Transition_handler.Processor.run
     ~context:(module Context)
-    ~time_controller ~trust_system ~verifier ~frontier
+    ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
     ~primary_transition_reader ~producer_transition_reader
     ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
     ~catchup_breadcrumbs_writer ~processed_transition_writer ;
