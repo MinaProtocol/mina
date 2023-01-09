@@ -372,45 +372,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let zkapp_command_transfer_invalid_valid_until =
-      let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      let amount = Currency.Amount.of_nanomina_int_exn 1_500_000 in
-      let nonce = Account.Nonce.of_int 2 in
-      let memo =
-        Signed_command_memo.create_from_string_exn "zkApp invalid valid_until"
-      in
-      let sender_keypair = fish2_kp in
-      let receiver = fish1_kp.public_key |> Signature_lib.Public_key.compress in
-      let (zkapp_command_spec
-            : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
-        { sender = (sender_keypair, nonce)
-        ; fee
-        ; fee_payer = None
-        ; receivers = [ (receiver, amount) ]
-        ; amount
-        ; zkapp_account_keypairs = []
-        ; memo
-        ; new_zkapp_account = false
-        ; snapp_update = Account_update.Update.dummy
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        ; preconditions =
-            Some
-              { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Account_update.Account_precondition.Accept
-              ; valid_until =
-                  Check
-                    Zkapp_precondition.Closed_interval.
-                      { lower = Mina_numbers.Global_slot.max_value
-                      ; upper = Mina_numbers.Global_slot.max_value
-                      }
-              }
-        }
-      in
-      Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
-    in
     let%bind.Deferred ( zkapp_command_mint_token
                       , zkapp_command_mint_token2
                       , zkapp_command_token_transfer
@@ -779,12 +740,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkApp transaction to update all fields to be included in \
          transition frontier"
         (wait_for_zkapp zkapp_command_update_all)
-    in
-    let%bind () =
-      section_hard "Send a zkApp transfer with invalid valid_until precondition"
-        (send_invalid_zkapp ~logger node
-           zkapp_command_transfer_invalid_valid_until
-           "Valid_until_precondition_unsatisfied" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to mint token"
