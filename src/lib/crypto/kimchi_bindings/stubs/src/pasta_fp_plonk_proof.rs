@@ -200,12 +200,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     )
 }
 
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -214,78 +212,41 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     use ark_ff::Zero;
     use commitment_dlog::srs::{endos, SRS};
     use kimchi::circuits::{
-        constraints::ConstraintSystem,
-        gate::{CircuitGate, GateType},
-        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg, RuntimeTableSpec},
-        polynomial::COLUMNS,
+        constraints::ConstraintSystem, gate::CircuitGate, polynomials::foreign_field_mul,
         wires::Wire,
     };
+    use num_bigint::BigUint;
+    use num_bigint::RandBigInt;
+    use o1_utils::FieldHelpers;
+    use rand::{rngs::StdRng, SeedableRng};
 
-    let num_gates = 1000;
-    let num_tables = 5;
+    let foreign_field_modulus = Fq::modulus_biguint();
 
-    let mut runtime_tables_setup = vec![];
-    for table_id in 0..num_tables {
-        let cfg = if indexed {
-            RuntimeTableCfg::Indexed(RuntimeTableSpec {
-                id: table_id as i32,
-                len: 5,
-            })
-        } else {
-            RuntimeTableCfg::Custom {
-                id: table_id as i32,
-                first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
-            }
-        };
-        runtime_tables_setup.push(cfg);
+    // Layout
+    //      0    ForeignFieldMul (foreign field multiplication gadget)
+    //      1    Zero (foreign field multiplication gadget)
+
+    // Create foreign field multiplication gates
+    let (mut next_row, mut gates) =
+        CircuitGate::<Fp>::create_foreign_field_mul(0, &foreign_field_modulus);
+
+    let rng = &mut StdRng::from_seed([2u8; 32]);
+    let left_input = rng.gen_biguint_range(&BigUint::zero(), &foreign_field_modulus);
+    let right_input = rng.gen_biguint_range(&BigUint::zero(), &foreign_field_modulus);
+
+    // Compute multiplication witness
+    let (mut witness, external_checks) =
+        foreign_field_mul::witness::create(&left_input, &right_input, &foreign_field_modulus);
+
+    // Temporary workaround for lookup-table/domain-size issue
+    for _ in 0..(1 << 13) {
+        gates.push(CircuitGate::zero(Wire::for_row(next_row)));
+        next_row += 1;
     }
 
-    let data: Vec<Fp> = [0u32, 2, 3, 4, 5].into_iter().map(Into::into).collect();
-    let runtime_tables: Vec<RuntimeTable<Fp>> = runtime_tables_setup
-        .iter()
-        .map(|cfg| RuntimeTable {
-            id: cfg.id(),
-            data: data.clone(),
-        })
-        .collect();
-
-    // circuit
-    let mut gates = vec![];
-    for row in 0..num_gates {
-        gates.push(CircuitGate {
-            typ: GateType::Lookup,
-            wires: Wire::for_row(row),
-            coeffs: vec![],
-        });
-    }
-
-    // witness
-    let witness = {
-        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); gates.len()]);
-
-        // only the first 7 registers are used in the lookup gate
-        let (lookup_cols, _rest) = cols.split_at_mut(7);
-
-        for row in 0..num_gates {
-            // the first register is the table id
-            lookup_cols[0][row] = 0u32.into();
-
-            // create queries into our runtime lookup table
-            let lookup_cols = &mut lookup_cols[1..];
-            for chunk in lookup_cols.chunks_mut(2) {
-                chunk[0][row] = if indexed { 1u32.into() } else { 9u32.into() }; // index
-                chunk[1][row] = 2u32.into(); // value
-            }
-        }
-        cols
-    };
-
-    let public_inputs = 1;
-
-    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    // Create constraint system
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .runtime(Some(runtime_tables_setup))
-        .public(public_inputs)
+        .lookup(vec![foreign_field_mul::gadget::lookup_table()])
         .build()
         .unwrap();
 
@@ -299,7 +260,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
         witness,
-        &runtime_tables,
+        &vec![],
         &index,
         vec![],
         None,

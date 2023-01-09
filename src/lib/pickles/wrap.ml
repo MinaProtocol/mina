@@ -376,9 +376,8 @@ let%test "lookup finalization" =
       Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
   |> Or_error.ok_exn
 
-
 let%test "foreign field multiplication finalization" =
-  printf "FFMUL TESTS\n";
+  printf "FFMUL TESTS\n" ;
   let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
@@ -387,16 +386,16 @@ let%test "foreign field multiplication finalization" =
     Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
   in
   let index, public_input, proof =
-    Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs true
+    Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
   let proof = Backend.Tick.Proof.of_backend proof in
   let feature_flags =
     let open Plonk_types.Opt.Flag in
     { Plonk_types.Features.chacha = No
-    ; range_check = No
+    ; range_check = Maybe
     ; foreign_field_add = No
-    ; foreign_field_mul = No
+    ; foreign_field_mul = Yes
     ; xor = No
     ; rot = No
     ; lookup = Maybe
