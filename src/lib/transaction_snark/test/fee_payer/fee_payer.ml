@@ -179,14 +179,18 @@ let%test_module "Fee payer tests" =
               (*Sparse ledger application fails*)
               match
                 Or_error.try_with (fun () ->
+                    let global_slot =
+                      txn_state_view.global_slot_since_genesis
+                    in
                     Transaction_snark.zkapp_command_witnesses_exn
-                      ~constraint_constants ~state_body:U.genesis_state_body
+                      ~constraint_constants ~global_slot
+                      ~state_body:U.genesis_state_body
                       ~fee_excess:Amount.Signed.zero (`Ledger ledger)
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
                             (U.pending_coinbase_state_stack
                                ~state_body_hash:U.genesis_state_body_hash
-                               ~global_slot:Mina_numbers.Global_slot.zero )
+                               ~global_slot )
                         , zkapp_command )
                       ] )
               with
