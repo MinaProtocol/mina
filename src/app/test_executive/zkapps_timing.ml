@@ -154,7 +154,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let nonce = Account.Nonce.of_int 4 in
       let memo =
         Signed_command_memo.create_from_string_exn
-          "zkApp create account with timing"
+          "zkApp, 3rd account with timing"
       in
       let zkapp_keypair = Signature_lib.Keypair.create () in
       let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
@@ -458,8 +458,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let global_slot = Mina_numbers.Global_slot.of_int after_balance_int in
       let nonce = Account.Nonce.zero in
       let memo =
-        Signed_command_memo.create_from_string_exn
-          "zkApp transfer, third timed account"
+        Signed_command_memo.create_from_string_exn "transfer, 3rd timed account"
       in
       let sender_keypair = third_timed_account_keypair in
       let receiver = keypair.public_key |> Signature_lib.Public_key.compress in
