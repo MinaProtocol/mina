@@ -30,7 +30,7 @@ RUN apt-get update --quiet --yes \
     git \
     wget \
     sudo \
-    unzip && \
+    unzip \
   && rm -rf /var/lib/apt/lists/*
 
 #'libjemalloc.$' \
