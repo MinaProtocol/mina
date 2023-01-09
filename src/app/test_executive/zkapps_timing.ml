@@ -142,13 +142,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
            zkapp_command_spec
     in
-    let%bind ( zkapp_command_create_third_account_with_timing
-             , third_timed_account_id
-             , third_timed_account_keypair ) =
+    (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
+       This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
+    *)
+    let ( zkapp_command_create_third_account_with_timing
+        , third_timed_account_id
+        , third_timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
-      let nonce = Account.Nonce.of_int 0 in
+      let nonce = Account.Nonce.of_int 4 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp create account with timing"
@@ -166,11 +169,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update =
             (let timing =
                Zkapp_basic.Set_or_keep.Set
-                 ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 0
+                 ( { initial_minimum_balance =
+                       Currency.Balance.of_mina_int_exn 100
                    ; cliff_time = Mina_numbers.Global_slot.of_int 0
-                   ; cliff_amount = Currency.Amount.of_mina_int_exn 1
+                   ; cliff_amount = Currency.Amount.of_mina_int_exn 0
                    ; vesting_period = Mina_numbers.Global_slot.of_int 1
-                   ; vesting_increment = Currency.Amount.of_mina_int_exn 0
+                   ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                    }
                    : Account_update.Update.Timing_info.value )
              in
@@ -184,11 +188,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-      return
-        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            zkapp_command_spec
-        , timing_account_id
-        , zkapp_keypair )
+      ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          zkapp_command_spec
+      , timing_account_id
+      , zkapp_keypair )
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in
@@ -256,7 +259,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 4 in
+      let nonce = Account.Nonce.of_int 6 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, invalid update timing"
@@ -433,6 +436,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    (Currency.Amount.to_string fee)
                    (Currency.Amount.to_string diff) ) )
     in
+    (* This is for the test of edge case of timed accounts. It depends on
+        a timed account (`third_timed_account`) with initial liquid balance being zero, and
+        vesting 1 mina each slot. Here we just make a transfer that would
+        use all the liquid after 1 slot.
+    *)
     let%bind { liquid_balance_opt = before_balance; _ } =
       Network.Node.must_get_account_data ~logger node
         ~account_id:third_timed_account_id
@@ -441,10 +449,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Currency.Balance.to_mina_int @@ Option.value_exn before_balance
     in
     let after_balance_int = before_balance_int + 1 in
+    let fee_int = 1 in
+    let amount_int = after_balance_int - fee_int in
     let zkapp_command_transfer_from_third_timed_account =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      let amount = Currency.Amount.of_mina_int_exn after_balance_int in
+      let fee = Currency.Fee.of_mina_int_exn fee_int in
+      let amount = Currency.Amount.of_mina_int_exn amount_int in
       let global_slot = Mina_numbers.Global_slot.of_int after_balance_int in
       let nonce = Account.Nonce.zero in
       let memo =

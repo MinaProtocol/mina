@@ -139,7 +139,6 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (t, previous_state_hash, previous_blockchain_proof_input, body)
   in
-
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
         Consensus_state_hooks.next_state_checked ~constraint_constants

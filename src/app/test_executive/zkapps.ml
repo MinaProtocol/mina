@@ -378,8 +378,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let amount = Currency.Amount.of_nanomina_int_exn 1_500_000 in
       let nonce = Account.Nonce.of_int 2 in
       let memo =
-        Signed_command_memo.create_from_string_exn
-          "zkApp transfer, invalid valid_until"
+        Signed_command_memo.create_from_string_exn "zkApp invalid valid_until"
       in
       let sender_keypair = fish2_kp in
       let receiver = fish1_kp.public_key |> Signature_lib.Public_key.compress in
