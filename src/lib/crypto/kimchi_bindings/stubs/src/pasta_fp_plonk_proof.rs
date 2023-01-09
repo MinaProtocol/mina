@@ -247,6 +247,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         gates.connect_ffadd_range_checks(1, Some(4), Some(8), 12);
         // Connect the bound check range checks
         gates.connect_ffadd_range_checks(2, None, None, 16);
+
+        gates
     };
 
     // witness
@@ -298,7 +300,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     .unwrap();
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
-        public_input,
+        public_input.into(),
         proof.into(),
     )
 }
