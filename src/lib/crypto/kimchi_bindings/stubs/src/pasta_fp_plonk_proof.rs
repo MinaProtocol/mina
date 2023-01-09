@@ -261,6 +261,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         // Connect the bound check range checks
         gates.connect_ffadd_range_checks(2, None, None, 16);
 
+        // Temporary workaround for lookup-table/domain-size issue
+        for _ in 0..(1 << 13) {
+            gates.push(CircuitGate::zero(Wire::for_row(curr_row)));
+            curr_row += 1;
+        }
+
         gates
     };
 

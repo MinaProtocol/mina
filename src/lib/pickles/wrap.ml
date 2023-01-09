@@ -385,7 +385,7 @@ let%test "ffadd finalization" =
     Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
   in
   let index, public_input, proof =
-    Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs true
+    Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
   let proof = Backend.Tick.Proof.of_backend proof in
