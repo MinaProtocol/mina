@@ -46,11 +46,6 @@ let initialize_rule public_key : _ Pickles.Inductive_rule.t =
 let update_actions_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Update sequence events"
   ; prevs = []
-<<<<<<< HEAD:src/lib/zkapps_examples/sequence_events/zkapps_sequence_events.ml
-  ; main = update_sequence_events public_key
-  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-=======
   ; main = update_actions public_key
   ; uses_lookup = false
->>>>>>> origin:src/lib/zkapps_examples/actions/zkapps_actions.ml
   }
