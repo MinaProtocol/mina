@@ -204,7 +204,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -216,7 +215,11 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
         polynomial::COLUMNS,
-        polynomials::{foreign_field_add, generic::GenericGateSpec},
+        polynomials::{
+            foreign_field_add::witness::{create_chain, FFOps},
+            generic::GenericGateSpec,
+            range_check,
+        },
         wires::Wire,
     };
     use num_bigint::BigUint;
@@ -224,7 +227,11 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     // Includes a row to store value 1
     let num_inputs = 1;
     let operation = &[FFOps::Add];
-    let modulus = BigUint::from_bytes_be(&secp256k1::constants::FIELD_SIZE);
+    let modulus = BigUint::from_bytes_be(&[
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF,
+        0xFC, 0x2F,
+    ]);
 
     // circuit
     let gates = {
@@ -237,7 +244,13 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
 
         let mut curr_row = num_inputs;
         // Foreign field addition and bound check
-        CircuitGate::<F>::extend_chain_ffadd(&mut gates, 0, &mut curr_row, operation);
+        CircuitGate::<Fp>::extend_chain_ffadd(
+            &mut gates,
+            0,
+            &mut curr_row,
+            operation,
+            &modulus.clone(),
+        );
 
         // Extend rangechecks of left input, right input, result, and bound
         for _ in 0..4 {
@@ -255,12 +268,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     let witness = {
         // create row for the public value 1
         let mut witness: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
-        cols[0][0] = Fp::one();
+        witness[0][0] = Fp::one();
         // create inputs to the addition
-        let left = modulus - 1u64.into();
-        let right = modulus - 1u64.into();
+        let left = modulus.clone() - BigUint::from_bytes_be(&[1]);
+        let right = modulus.clone() - BigUint::from_bytes_be(&[1]);
         // create a chain of 1 addition
-        let add_witness = witness::create_chain::<F>(&[left, right], operation, modulus);
+        let add_witness = create_chain::<Fp>(&vec![left, right], operation, modulus);
         for col in 0..COLUMNS {
             witness[col].extend(add_witness[col].iter());
         }
