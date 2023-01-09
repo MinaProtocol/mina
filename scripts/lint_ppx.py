@@ -49,7 +49,7 @@ def get_container_output(container):
 docker_client = doc.from_env()
 repo = Repo('.')
 lint_command = 'mina internal dump-type-shapes -max-depth 5'
-branches = ['ppx-lint-script']
+branches = ['ppx-lint-script', 'ppx-lint-dummy1', 'ppx-lint-dummy2']
 lint_result = {}
 for branch in branches:
   lint_result[branch] = {}
