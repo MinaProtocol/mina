@@ -250,6 +250,9 @@ val reset_frontier_dependencies_validation :
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> precomputed_values:Genesis_proof.t
   -> verifier:Verifier.t
   -> parent_staged_ledger:Staged_ledger.t
