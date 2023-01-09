@@ -366,7 +366,7 @@
         (import ./nix/impure-shell.nix pkgs).inputDerivation;
 
       packages.ppx-lint = pkgs.writeScriptBin "ppx-lint" ''
-        ${pkgs.python39.withPackages (ps: with ps; [ GitPython docker ])}/bin/python3.9 ${./scripts/lint_ppx.py} $@
+        ${pkgs.python39.withPackages (ps: with ps; [ GitPython ])}/bin/python3.9 ${./scripts/lint_ppx.py} $@
       '';
 
       # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
