@@ -2145,6 +2145,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; account_update_index =
                 statement.source.local_state.account_update_index
             ; failure_status_tbl = ()
+            ; will_succeed = statement.source.local_state.will_succeed
             }
           in
           (g, l)
@@ -2186,6 +2187,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                               Field.Constant.zero
                           | `Start p ->
                               p.memo_hash )
+                  ; will_succeed =
+                      exists Boolean.typ ~compute:(fun () ->
+                          match V.get v with
+                          | `Skip ->
+                              false
+                          | `Start p ->
+                              p.will_succeed )
                   }
                 in
                 let global_state, local_state =
@@ -3717,11 +3725,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, _, states_rev =
-      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [])
+    let _, _, _, will_succeeds_rev, states_rev =
+      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [], [])
         zkapp_commands
         ~f:(fun
-             (fee_excess, supply_increase, sparse_ledger, statess_rev)
+             ( fee_excess
+             , supply_increase
+             , sparse_ledger
+             , will_succeeds_rev
+             , statess_rev )
              (_, _, zkapp_command)
            ->
           let _, states =
@@ -3730,15 +3742,17 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~supply_increase zkapp_command
             |> Or_error.ok_exn
           in
-          let final_state =
-            let global_state, _local_state = List.last_exn states in
-            global_state
+          let final_state, will_succeed =
+            let global_state, local_state = List.last_exn states in
+            (global_state, local_state.success)
           in
           ( final_state.fee_excess
           , final_state.supply_increase
           , final_state.ledger
+          , will_succeed :: will_succeeds_rev
           , states :: statess_rev ) )
     in
+    let will_succeeds = List.rev will_succeeds_rev in
     let states = List.rev states_rev in
     let states_rev =
       Account_update_group.group_by_zkapp_command_rev
@@ -3755,17 +3769,19 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let remaining_zkapp_command =
       let zkapp_commands =
-        List.map zkapp_commands
+        List.map2_exn zkapp_commands will_succeeds
           ~f:(fun
                ( pending_coinbase_init_stack
                , pending_coinbase_stack_state
                , zkapp_command )
+               will_succeed
              ->
             ( pending_coinbase_init_stack
             , pending_coinbase_stack_state
             , { Mina_transaction_logic.Zkapp_command_logic.Start_data
                 .zkapp_command
               ; memo_hash = Signed_command_memo.hash zkapp_command.memo
+              ; will_succeed
               } ) )
       in
       ref zkapp_commands

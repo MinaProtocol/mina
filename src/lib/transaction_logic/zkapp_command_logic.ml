@@ -205,6 +205,7 @@ module Local_state = struct
         ; success : 'bool
         ; account_update_index : 'length
         ; failure_status_tbl : 'failure_status_tbl
+        ; will_succeed : 'bool
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
@@ -224,6 +225,7 @@ module Local_state = struct
       ; bool
       ; length
       ; failure_status_tbl
+      ; bool
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -845,8 +847,11 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('zkapp_command, 'field) t =
-        { zkapp_command : 'zkapp_command; memo_hash : 'field }
+      type ('zkapp_command, 'field, 'bool) t =
+        { zkapp_command : 'zkapp_command
+        ; memo_hash : 'field
+        ; will_succeed : 'bool
+        }
       [@@deriving sexp, yojson]
     end
   end]
@@ -1028,12 +1033,23 @@ module Make (Inputs : Inputs_intf) = struct
       | `Compute _ ->
           is_start'
     in
+    let will_succeed =
+      match is_start with
+      | `Compute start_data ->
+          Bool.if_ is_start' ~then_:start_data.will_succeed
+            ~else_:local_state.will_succeed
+      | `Yes start_data ->
+          start_data.will_succeed
+      | `No ->
+          local_state.will_succeed
+    in
     let local_state =
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
             ~then_:(Inputs.Global_state.ledger global_state)
             ~else_:local_state.ledger
+      ; will_succeed
       }
     in
     let ( (account_update, remaining, call_stack)

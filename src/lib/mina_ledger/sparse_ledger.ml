@@ -93,11 +93,27 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
       ( { GS.ledger = !ledger; fee_excess; supply_increase; protocol_state }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
-  |> Result.map ~f:(fun (account_update_applied, states) ->
-         (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the zkapp_command that generated the states.
-         *)
-         (account_update_applied, List.rev states) )
+  |> Result.map ~f:(fun (account_update_applied, rev_states) ->
+         let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
+         in
+         let will_succeed =
+           match rev_states with
+           | [] ->
+               false
+           | (_, local_state) :: _ ->
+               not local_state.LS.success
+         in
+         let states =
+           (* We perform a [List.rev] here to ensure that the states are in order
+              wrt. the zkapp_command that generated the states.
+           *)
+           List.rev_map rev_states ~f:(fun (global_state, local_state) ->
+               (* Override the local state's [will_succeed] value using our
+                  knowledge of the final state of the transaction.
+               *)
+               (global_state, { local_state with LS.will_succeed }) )
+         in
+         (account_update_applied, states) )
 
 let apply_transaction_logic f t x =
   let open Or_error.Let_syntax in

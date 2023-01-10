@@ -1698,6 +1698,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     (sequence_state', last_sequence_slot')
 
+  (** Apply a single zkApp transaction from beginning to end, applying an
+      accumulation function over the state for each account update.
+
+      CAUTION: If you use the local states, you MUST update the [will_succeed]
+      field to reflect the value of the [success] field in the final local
+      state.
+  *)
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
@@ -1746,6 +1753,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; success = true
         ; account_update_index = Inputs.Index.zero
         ; failure_status_tbl = []
+        ; will_succeed = true
         } )
     in
     let user_acc = f init initial_state in
@@ -1753,7 +1761,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let zkapp_command = Zkapp_command.zkapp_command c in
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
-            { zkapp_command; memo_hash = Signed_command_memo.hash c.memo }
+            { zkapp_command
+            ; memo_hash = Signed_command_memo.hash c.memo
+            ; will_succeed =
+                (* It's always valid to set this value to true, and it will
+                   have no effect outside of the snark.
+                *)
+                true
+            }
             { perform } initial_state )
     in
     let account_states_after_fee_payer =
@@ -1843,7 +1858,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ~init:None ~f:(fun _acc (global_state, local_state) ->
         Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
-           (account_update_applied, Option.value_exn state_res) )
+           let (local_state : _ Zkapp_command_logic.Local_state.t), fee_excess =
+             Option.value_exn state_res
+           in
+           let local_state =
+             { local_state with will_succeed = local_state.success }
+           in
+           (account_update_applied, (local_state, fee_excess)) )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
