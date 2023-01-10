@@ -22,6 +22,8 @@ cd "${SCRIPTPATH}/../_build"
 
 BUILDDIR="deb_build"
 
+rm -rf "${BUILDDIR}"
+
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 
 mkdir -p "${BUILDDIR}/DEBIAN"
@@ -47,8 +49,8 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
-rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
 
 

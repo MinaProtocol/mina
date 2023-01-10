@@ -86,6 +86,8 @@ ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
+##################################### GENERATE MINA MAINNET PACKAGE #######################################
+
 ###### deb without the proving keys
 echo "------------------------------------------------------------"
 echo "Building mainnet deb without keys:"
@@ -127,7 +129,7 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+# cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
@@ -170,6 +172,10 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA MAINNET PACKAGE #######################################
+
+##################################### GENERATE MINA DEVNET PACKAGE #######################################
 
 ###### deb with testnet signatures
 echo "------------------------------------------------------------"
@@ -219,6 +225,8 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA DEVNET PACKAGE #######################################
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
