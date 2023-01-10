@@ -6,6 +6,7 @@
   minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:a85ae4a9c413626c448349e14962424ad0581e041ceaa0a7b5e960eadee1176a",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
   minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
+  minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:9d4ce90350f02c23a71f422e7db36e2010f6e1c04a8c25aec11f142cf5297c02",
   minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
