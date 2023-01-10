@@ -17,6 +17,8 @@ type nonrec 'caml_f random_oracles =
   ; u_chal : 'caml_f scalar_challenge
   }
 
+type nonrec 'evals point_evaluations = { zeta : 'evals; zeta_omega : 'evals }
+
 type nonrec 'caml_f lookup_evaluations =
   { sorted : 'caml_f array point_evaluations array
   ; aggreg : 'caml_f array point_evaluations
