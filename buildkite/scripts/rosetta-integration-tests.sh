@@ -232,6 +232,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 }
 EOF
   cd "$zkapp_path"
+  npm install --no-progress src/lib/snarky_js_bindings/snarkyjs
   npm install --no-progress
   zk deploy sandbox -y
   cd -

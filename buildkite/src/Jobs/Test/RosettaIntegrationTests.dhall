@@ -8,6 +8,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let DockerImage = ../../Command/DockerImage.dhall
@@ -33,8 +34,10 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-             Cmd.run ("export MINA_DEB_CODENAME=focal && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}")
-            ,Cmd.runInDocker Cmd.Docker::{image="gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}", entrypoint=" --entrypoint buildkite/scripts/rosetta-integration-tests.sh"} "bash"
+             Cmd.run ("export MINA_DEB_CODENAME=focal && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}") ]
+            # RunInToolchain.runInToolchainFocal ([] : List Text) "./buildkite/scripts/build-snarkyjs-bindings.sh"
+            # [
+            Cmd.runInDocker Cmd.Docker::{image="gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}", entrypoint=" --entrypoint buildkite/scripts/rosetta-integration-tests.sh"} "bash"
           ],
           label = "Rosetta integration tests Focal"
           , key = "rosetta-integration-tests-focal"
