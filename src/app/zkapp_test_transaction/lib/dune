@@ -1,0 +1,57 @@
+(library
+ (name zkapp_test_transaction_lib)
+ (public_name zkapp_test_transaction_lib)
+ (libraries
+   ;;opam libraries
+   async_unix
+   graphql_parser
+   splittable_random
+   result
+   async
+   async_kernel
+   core
+   core_kernel
+   base
+   sexplib0
+   base_quickcheck
+   ppx_inline_test.config
+   graphql-async
+   ;;local libraries
+   pickles
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   random_oracle
+   coda_runtime_config
+   transaction_witness
+   transaction_protocol_state
+   coda_genesis_ledger
+   pickles_types
+   mina_numbers
+   random_oracle_input
+   genesis_ledger_helper
+   mina_state
+   mina_generators
+   mina_base
+   currency
+   mina_ledger
+   mina_graphql
+   genesis_constants
+   secrets
+   transaction_snark
+   signature_lib
+   data_hash_lib
+   consensus
+   with_hash
+   genesis_ledger_helper.lib
+   snark_params
+   pickles.backend
+   kimchi_backend
+   mina_base.import
+   mina_transaction_logic
+   staged_ledger_diff
+   mina_wire_types
+ )
+ (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_custom_printf ppx_mina ppx_version ppx_let ppx_sexp_conv
+                  ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx ppx_inline_test)))

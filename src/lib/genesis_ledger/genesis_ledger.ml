@@ -2,6 +2,7 @@ open Core_kernel
 open Currency
 open Signature_lib
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
@@ -10,11 +11,13 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
       Account.create account_id balance
   | Timed t ->
       let initial_minimum_balance =
-        Currency.Balance.of_int t.initial_minimum_balance
+        Currency.Balance.of_nanomina_int_exn t.initial_minimum_balance
       in
       let cliff_time = Mina_numbers.Global_slot.of_int t.cliff_time in
-      let cliff_amount = Currency.Amount.of_int t.cliff_amount in
-      let vesting_increment = Currency.Amount.of_int t.vesting_increment in
+      let cliff_amount = Currency.Amount.of_nanomina_int_exn t.cliff_amount in
+      let vesting_increment =
+        Currency.Amount.of_nanomina_int_exn t.vesting_increment
+      in
       let vesting_period = Mina_numbers.Global_slot.of_int t.vesting_period in
       Account.create_timed account_id balance ~initial_minimum_balance
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
@@ -28,7 +31,7 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
     let%map accounts = accounts in
     List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_formatted_string (Int.to_string balance) in
+        let balance = Balance.of_mina_string_exn (Int.to_string balance) in
         (Some sk, account_with_timing account_id balance timing) )
 end
 
@@ -40,7 +43,7 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
     let%map accounts = Accounts.accounts in
     List.map accounts ~f:(fun { pk; balance; delegate; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_int balance in
+        let balance = Balance.of_nanomina_int_exn balance in
         let base_acct = account_with_timing account_id balance timing in
         (None, { base_acct with delegate = Option.value ~default:pk delegate }) )
 end
@@ -57,7 +60,7 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Mina_base.Sample_keypairs.keypairs in
+      and keypairs = Key_gen.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
           { balance = b
           ; pk = fst keypairs.(i)

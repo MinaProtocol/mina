@@ -4,7 +4,7 @@ The faucet service is a simple Discord bot that listens for requests for `CODA` 
 
 ## Usage
 
-First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://docs.minaprotocol.com/en/getting-started) for instructions on getting a node, then run the following command:
+First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://docs.minaprotocol.com/en/node-operators/getting-started) for instructions on getting a node, then run the following command:
 
 ```
 $ mina daemon -rest-port 49370 -peer beta.o1test.net:8303

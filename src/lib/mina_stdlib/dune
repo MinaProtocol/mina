@@ -1,0 +1,26 @@
+(library
+ (name mina_stdlib)
+ (public_name mina_stdlib)
+ (modules_without_implementation
+  sigs)
+ (flags
+  (:standard -w a -warn-error +a)
+  -open Core_kernel)
+ (libraries
+   ; opam libraries
+   base.caml
+   core_kernel
+   async_kernel
+   sexplib0
+   bin_prot.shape
+   ; local libraries
+   ppx_version.runtime)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane
+       ppx_version
+       ppx_deriving.std
+       ppx_mina ppx_compare))
+ (synopsis "Mina standard library"))
+

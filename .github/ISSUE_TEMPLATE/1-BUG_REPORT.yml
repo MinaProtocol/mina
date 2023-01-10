@@ -1,0 +1,122 @@
+name: "🐛 Bug report"
+description: Something isn't working as expected? Report your bugs here.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Welcome 👋
+
+        Thanks for taking the time to fill out this bug report.
+        Please fill out each section below. This info allows Mina maintainers to diagnose (and fix!) your issue as quickly as possible. Otherwise we might need to close the issue without e.g. clear reproduction steps.
+
+        Bug reports also should not be used for support requests about a specific problem in your deployments, please use GitHub Discussions for that.
+
+        Useful Links:
+        - Documentation: https://docs.minaprotocol.com/
+        - Developer README file: `README-dev.md`
+        - Contributing: check `CONTRIBUTING.md`
+  - type: checkboxes
+    attributes:
+      label: Preliminary Checks
+      description: Please make sure that you verify each checkbox and follow the instructions for them.
+      options:
+        - label: "This issue is not a duplicate. Before opening a new issue, please search existing issues: https://github.com/MinaProtocol/mina/issues"
+          required: true
+        - label: "This issue is not a question, feature request, RFC, or anything other than a bug report. Please post those things in GitHub Discussions: https://github.com/MinaProtocol/mina/discussions"
+          required: true
+  - type: textarea
+    attributes:
+      label: Description
+      description: Describe the issue that you're seeing.
+      placeholder: Be as precise as you can. Feel free to share screenshots, videos, or logs.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Clear steps describing how to reproduce the issue.
+      value: |
+        1.
+        2.
+        3.
+        ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected Result
+      description: Describe what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual Result
+      description: Describe what actually happened.
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    validations:
+      required: true
+    attributes:
+      label: How frequently do you see this issue?
+      multiple: false
+      options:
+        - Rarely
+        - Sometimes
+        - Frequently
+        - Always
+  - type: dropdown
+    id: impact
+    validations:
+      required: true
+    attributes:
+      label: What is the impact of this issue on your ability to run a node?
+      multiple: false
+      options:
+        - Low
+        - Medium
+        - High
+        - Blocker
+  - type: textarea
+    attributes:
+      label: Status
+      render: shell
+      description: Run "mina client status" in your project directory and paste the output here.
+      placeholder: |
+        You'll get an output similar to this:
+
+        Mina daemon status
+        -----------------------------------
+
+        Global number of accounts:                     25865
+        Block height:                                  41391
+        ...
+        Consensus time now:                            epoch=8, slot=1416
+        Consensus mechanism:                           proof_of_stake
+        Consensus configuration:
+        	Delta:                     0
+        	k:                         290
+        	Slots per epoch:           7140
+        	Slot duration:             3m
+        	Epoch duration:            14d21h
+        	Chain start timestamp:     2021-03-17 00:00:00.000000Z
+        	Acceptable network delay:  3m
+
+        ...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## Sharing logs 📋
+
+        We are currently developing a new service to safely enable our community upload their logs using this form, in the meanwhile please send your logs to our e-mail:
+        - Run "mina client export-logs";
+        - Upload the resulting tar.gz file to a hosting service (Google Drive, Dropbox, etc.);
+        - Share the link where we can download your logs with logs@o1labs.org;
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: Tell us anything else you think we should know.

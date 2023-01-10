@@ -49,7 +49,7 @@ let%test_module "network pool test" =
         { Priced_proof.proof =
             One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
-            { fee = Currency.Fee.of_int 0
+            { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
             }
         }
@@ -101,7 +101,7 @@ let%test_module "network pool test" =
               { proof =
                   One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
-                  { fee = Currency.Fee.of_int 0
+                  { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty
                   }
               } )

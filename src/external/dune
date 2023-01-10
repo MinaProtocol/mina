@@ -1,1 +1,3 @@
 (dirs :standard \ async_kernel)
+
+(vendored_dirs ocaml-rocksdb ocaml-sodium prometheus ppx_optcomp)

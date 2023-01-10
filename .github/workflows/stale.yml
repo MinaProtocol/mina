@@ -1,0 +1,21 @@
+name: 'Stale issue handler'
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@main
+        id: stale
+        with:
+          debug-only: true
+          stale-issue-message: 'This issue is stale because it has been open 30 days with no activity. Remove the stale label or comment or this will be considered for closing.'
+          days-before-stale: 30
+          days-before-close: -1
+          exempt-issue-labels: 'blocked,must,should,keep'
+          exempt-assignees: 'bkase,imeckler,deepthiskumar,nholland94,psteckler,mrmr1993,ghost-not-in-the-shell,crispthoughts,aneesharaines,bijanshahrokhi,QuiteStochastic,lk86,MartinMinkov,jspada,mimoo,A-Manning,georgeee,joseandro,iregina,samuelarogbonlo,es92'
+      - name: Print outputs
+        run: echo ${{ join(steps.stale.outputs.*, ',') }}

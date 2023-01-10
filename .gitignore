@@ -82,11 +82,11 @@ automation/services/watchdog/check_libp2p/check_libp2p
 *.backup
 
 *.terraform.lock.hcl
+*gcloud-keyfile.json*
 _opam
 
 target
 release
-Cargo.lock
 .vscode
 
 ### IntelliJ IDEA ###
@@ -99,3 +99,7 @@ Cargo.lock
 .env
 .envrc
 .direnv/
+
+# pipenv
+Pipfile
+Pipfile.lock
