@@ -22,6 +22,19 @@ cd "${SCRIPTPATH}/../_build"
 
 BUILDDIR="deb_build"
 
+case "${MINA_DEB_CODENAME}" in
+  bookworm|jammy|bullseye|focal|buster)
+    DEPS="libjemalloc2"
+    ;;
+  stretch|bionic)
+    DEPS="libjemalloc1"
+    ;;
+  *)
+    echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
+    ;;
+esac
+
+
 rm -rf "${BUILDDIR}"
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
@@ -36,7 +49,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: libjemalloc2, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm
+Depends: ${DEPS}, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/

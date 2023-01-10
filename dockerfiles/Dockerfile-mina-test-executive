@@ -28,13 +28,12 @@ RUN apt-get update --quiet --yes \
     procps \
     python3 \
     tzdata \
+    'libjemalloc.$' \
     git \
     wget \
     sudo \
     unzip \
   && rm -rf /var/lib/apt/lists/*
-
-#'libjemalloc.$' \
 
 
 # --- Terraform tools
