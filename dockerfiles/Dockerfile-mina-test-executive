@@ -72,7 +72,7 @@ RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
 RUN echo "Installing both mina and mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --yes \
-  && apt-get install --yes --allow-downgrades "mina-$network=$deb_version" "mina-test-executive=$deb_version" "mina-logproc"
+  && apt-get install --yes --allow-downgrades "mina-test-executive=$deb_version" "mina-logproc"
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
 # for now stick to root for compatibility

@@ -24,8 +24,6 @@ BUILDDIR="deb_build"
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 
-rm -rf "${BUILDDIR}/usr/local/bin"
-mkdir -p "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
@@ -49,6 +47,7 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
 
