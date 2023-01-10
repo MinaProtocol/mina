@@ -53,6 +53,9 @@ module Protocol = struct
 
         external digest : int -> t -> bytes
           = "caml_pasta_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fp_plonk_circuit_serialize"
       end
 
       module Fq = struct
@@ -71,6 +74,9 @@ module Protocol = struct
 
         external digest : int -> t -> bytes
           = "caml_pasta_fq_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fq_plonk_circuit_serialize"
       end
     end
   end
@@ -451,9 +457,4 @@ module Protocol = struct
            Kimchi_types.prover_proof = "caml_pasta_fq_plonk_proof_deep_copy"
     end
   end
-end
-
-module Utils = struct
-  external gate_to_asm : int -> Protocol.Gates.Vector.Fp.t -> string
-    = "gate_to_asm"
 end
