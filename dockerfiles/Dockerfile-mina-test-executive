@@ -85,24 +85,24 @@ RUN git clone https://github.com/MinaProtocol/mina.git --branch $MINA_BRANCH --d
 
 WORKDIR /root/mina
 
-# these env vars need to be overriden when the image is `docker run`
-#test vars
+# these env vars need to be overriden when the image is `docker run`.  listed here for documentation sake if nothing else
+# test vars
 ENV test_name=""
 ENV mina_image=""
 ENV archive_image=""
 ENV debug_bool=False
-#environment configuration vars
-ENV GCP_LOGIN_ACCT_USERNAME=""
-ENV KUBE_CONFIG_PATH=/root/.kube/config
-ENV GCLOUD_API_KEY=""
-ENV GOOGLE_CLOUD_KEYFILE_JSON=""
+
+# environment configuration vars, these need to be overriden
+ENV GOOGLE_CLOUD_KEYFILE_JSON_PATH=""
 ENV AWS_ACCESS_KEY_ID=""
 ENV AWS_SECRET_ACCESS_KEY=""
 ENV AWS_DEFAULT_REGION=us-west-2
 
-ENTRYPOINT ["/usr/bin/dumb-init", "gcloud auth login --no-launch-browser $GCP_LOGIN_ACCT_USERNAME && \
+# this var needs to be present but it won't change and doesn't need to be overriden
+ENV KUBE_CONFIG_PATH=/root/.kube/config
+
+ENTRYPOINT ["/usr/bin/dumb-init", "gcloud auth activate-service-account automated-validation@o1labs-192920.iam.gserviceaccount.com --key-file=$GOOGLE_CLOUD_KEYFILE_JSON_PATH && \
 gcloud config set project o1labs-192920 && \
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1 && \
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1 && \
-gcloud auth activate-service-account automated-validation@o1labs-192920.iam.gserviceaccount.com --key-file=$GOOGLE_CLOUD_KEYFILE_JSON && \
 mina-test-executive cloud $test_name --mina-image $mina_image --archive-image $archive_image $( if [[ $debug_bool ]] ; then echo --debug ; fi ) | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'"]
