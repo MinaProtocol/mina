@@ -87,10 +87,10 @@ WORKDIR /root/mina
 
 # these env vars need to be overriden when the image is `docker run`.  listed here for documentation sake if nothing else
 # test vars
-ENV test_name=""
-ENV mina_image=""
-ENV archive_image=""
-ENV debug_bool=False
+ENV TEST_NAME=""
+ENV MINA_IMAGE=""
+ENV ARCHIVE_IMAGE=""
+ENV DEBUG_BOOL=False
 
 # environment configuration vars, these need to be overriden
 ENV GOOGLE_CLOUD_KEYFILE_JSON_PATH=""
@@ -101,8 +101,7 @@ ENV AWS_DEFAULT_REGION=us-west-2
 # this var needs to be present but it won't change and doesn't need to be overriden
 ENV KUBE_CONFIG_PATH=/root/.kube/config
 
-ENTRYPOINT ["/usr/bin/dumb-init", "gcloud auth activate-service-account automated-validation@o1labs-192920.iam.gserviceaccount.com --key-file=$GOOGLE_CLOUD_KEYFILE_JSON_PATH && \
-gcloud config set project o1labs-192920 && \
-gcloud container clusters get-credentials --region us-west1 mina-integration-west1 && \
-kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1 && \
-mina-test-executive cloud $test_name --mina-image $mina_image --archive-image $archive_image $( if [[ $debug_bool ]] ; then echo --debug ; fi ) | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'"]
+COPY --chown=${UID} scripts/run_test_executive.sh /run_test_executive.sh
+RUN chmod +x /run_test_executive.sh
+
+ENTRYPOINT ["/bin/bash", "-c","/run_test_executive.sh"]
