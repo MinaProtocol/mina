@@ -571,7 +571,7 @@ let%test "rot finalization" =
   let srs =
     Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
   in
-  let index, [ public_input_1; public_input_2 ], proof =
+  let index, (public_input_1, public_input_2), proof =
     Kimchi_bindings.Protocol.Proof.Fp.example_with_rot srs
   in
   let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
