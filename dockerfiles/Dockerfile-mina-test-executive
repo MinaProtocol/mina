@@ -4,8 +4,7 @@ FROM ${image}
 ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=stretch
-# ARG network=mainnet
-ARG branch=compatible
+ARG branch
 
 ENV DEBIAN_FRONTEND noninteractive
 
