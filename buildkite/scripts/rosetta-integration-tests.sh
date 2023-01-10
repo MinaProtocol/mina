@@ -41,12 +41,16 @@ export NVM_VERSION=0.39.3
 export NODE_VERSION=16
 
 # zkApps variables
-export ZKAPP_PATH=$HOME/zkapps # TODO: replace paths in the file with this variable
+export ZKAPP_PATH=$HOME/zkapps
 
-# Install npm
-curl -Lo- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash
+echo "=========================== INSTALLING NPM ==========================="
+curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash &> /dev/null
 source ~/.bashrc
-nvm install $NODE_VERSION
+nvm install --no-progress $NODE_VERSION
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+export PATH=~/.npm-global/bin:$PATH
+npm install --no-progress --global zkapp-cli
 
 # Rosetta CLI variables
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
@@ -228,7 +232,7 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 }
 EOF
   cd "$zkapp_path"
-  npm run build
+  npm install --no-progress
   zk deploy sandbox -y
   cd -
 done
