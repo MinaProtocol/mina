@@ -414,6 +414,92 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_rot(
+    srs: CamlFpSrs,
+) -> (
+    CamlPastaFpPlonkIndex,
+    (CamlFp, CamlFp),
+    CamlProverProof<CamlGVesta, CamlFp>,
+) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{
+            generic::GenericGateSpec,
+            rot::{self, RotMode},
+        },
+        wires::Wire,
+    };
+
+    // Includes the actual input of the rotation and a row with the zero value
+    let num_inputs = 2;
+    // 1 ROT of 32 to the left
+    let rot = 32;
+    let mode = RotMode::Left;
+
+    // circuit
+    // public input
+    let mut gates = {
+        let mut gates = 
+            vec![CircuitGate::<Fp>::create_generic_gadget(
+        Wire::for_row(0),
+        GenericGateSpec::Pub,
+        None,
+        )];
+        CircuitGate::<Fp>::extend_rot(&mut gates, rot, mode);
+        // connect first public input to the input of the ROT
+        gates.connect_cell_pair((0, 0), (2, 0));
+        gates
+    }
+
+    // witness
+    let witness = {
+        // create one row for the public word
+        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
+
+        // initialize the public input containing the word to be rotated
+        let input = 0xDC811727DAF22EC1u64;
+        let output = input.rotate_left(32);
+        cols[0][0] = input.into();
+        rot::extend_rot::<Fp>(&mut cols, input, rot, mode);
+
+        cols
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let public_input = (witness[0][0], witness[0][1]);
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (public_input.0.into(), public_input.1.into()),
+        proof.into(),
+    )
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
