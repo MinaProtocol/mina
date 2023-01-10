@@ -23,7 +23,7 @@ let mk_account_update_body authorization_kind caller kp token_id balance_change
         ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
   ; increment_nonce = false
   ; events = []
-  ; sequence_events = []
+  ; actions = []
   ; call_data = Pickles.Impls.Step.Field.Constant.zero
   ; call_depth = 0
   ; preconditions =

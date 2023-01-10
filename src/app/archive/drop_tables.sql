@@ -82,8 +82,6 @@ DROP TABLE zkapp_global_slot_bounds;
 
 DROP TABLE zkapp_nonce_bounds;
 
-DROP TABLE zkapp_timestamp_bounds;
-
 DROP TABLE zkapp_token_id_bounds;
 
 DROP TYPE zkapp_auth_required_type;

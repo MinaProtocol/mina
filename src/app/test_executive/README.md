@@ -27,7 +27,7 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 gcloud auth login --no-launch-browser <gcloud-acct-login-username>
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-gcloud auth activate-service-account --key-file=<path-to-service-account-key-file>
+gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path-to-service-account-key-file>
 ```
 
 When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.

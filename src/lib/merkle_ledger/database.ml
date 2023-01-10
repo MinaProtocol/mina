@@ -558,13 +558,10 @@ module Make (Inputs : Inputs_intf) :
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
         addresses_and_accounts ;
       let token_owner_changes =
-        List.filter_map addresses_and_accounts ~f:(fun (_, account) ->
-            if Account.token_owner account then
-              let aid = Account.identifier account in
-              Some
-                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, aid) )
-            else None )
+        List.map addresses_and_accounts ~f:(fun (_, account) ->
+            let aid = Account.identifier account in
+            Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+              (Account_id.derive_token_id ~owner:aid, aid) )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes

@@ -121,7 +121,7 @@ let zkapp_event = salt zkapp_event
 
 let zkapp_events = salt zkapp_events
 
-let zkapp_sequence_events = salt zkapp_sequence_events
+let zkapp_actions = salt zkapp_actions
 
 let zkapp_memo = salt zkapp_memo
 

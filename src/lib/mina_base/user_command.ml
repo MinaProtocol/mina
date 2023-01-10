@@ -159,28 +159,14 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Account_update.t) =
-    let ( ! ) x = Option.value_exn x in
-    let id = Account_update.account_id p in
-    Option.try_with (fun () ->
-        let account : Account.t =
-          !(get ledger !(location_of_account ledger id))
-        in
-        !(!(account.zkapp).verification_key) )
-  in
+let to_verifiable (t : t) ~ledger ~get ~location_of_account :
+    Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
-      Signed_command c
-  | Zkapp_command { fee_payer; account_updates; memo } ->
-      Zkapp_command
-        { fee_payer
-        ; account_updates =
-            account_updates
-            |> Zkapp_command.Call_forest.map ~f:(fun account_update ->
-                   (account_update, find_vk account_update) )
-        ; memo
-        }
+      Ok (Signed_command c)
+  | Zkapp_command cmd ->
+      Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd
+      |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with
@@ -200,14 +186,17 @@ let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+(* always `Accessed` for fee payer *)
+let accounts_accessed (t : t) (status : Transaction_status.t) :
+    (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x status
+      Signed_command.account_access_statuses x status
   | Zkapp_command ps ->
-      Zkapp_command.accounts_accessed ps status
+      Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
 let fee_payer (t : t) =
   match t with
@@ -245,8 +234,12 @@ let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Zkapp_command _ ->
-      Mina_numbers.Global_slot.max_value
+  | Zkapp_command { fee_payer; _ } -> (
+      match fee_payer.Account_update.Fee_payer.body.valid_until with
+      | Some valid_until ->
+          valid_until
+      | None ->
+          Mina_numbers.Global_slot.max_value )
 
 module Valid = struct
   [%%versioned
@@ -265,12 +258,16 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t Or_error.t =
   match t with
-  | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Signed_command x -> (
+      match Signed_command.check x with
+      | Some c ->
+          Ok (Signed_command c)
+      | None ->
+          Or_error.error_string "Invalid signature" )
   | Zkapp_command p ->
-      Option.map
+      Or_error.map
         (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
         ~f:(fun p -> Zkapp_command p)
 

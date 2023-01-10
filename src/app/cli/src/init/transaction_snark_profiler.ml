@@ -262,7 +262,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
     Quickcheck.Generator.list_with_length list_len array_gen
   in
   let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-  let sequence_events =
+  let actions =
     Quickcheck.random_value (field_array_list_gen ~array_len:1 ~list_len:2)
   in
   let snapp_update =
@@ -299,7 +299,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
       ; current_auth = Permissions.Auth_required.Proof
       ; call_data = Snark_params.Tick.Field.zero
       ; events = []
-      ; sequence_events
+      ; actions
       ; preconditions = None
       } )
   in
@@ -611,6 +611,7 @@ let profile_zkapps ~verifier ledger zkapp_commands =
             [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
                 ~location_of_account:Mina_ledger.Ledger.location_of_account
                 (Zkapp_command zkapp_command)
+              |> Or_error.ok_exn
             ]
         in
         let proof_count, signature_count =
