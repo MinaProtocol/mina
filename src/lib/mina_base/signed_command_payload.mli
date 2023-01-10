@@ -95,7 +95,7 @@ module Common : sig
         , Mina_numbers.Global_slot.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash]
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
 
     module V1 : sig
