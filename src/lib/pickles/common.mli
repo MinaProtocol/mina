@@ -1,5 +1,8 @@
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
+val actual_wrap_domain_size :
+  log_2_domain_size:int -> Pickles_base.Proofs_verified.t
+
 (** [when_profiling profiling default] returns [profiling] when environment
     variable [PICKLES_PROFILING] is set to anything else than [0] or [false],
     [default] otherwise.
@@ -15,8 +18,6 @@ val when_profiling : 'a -> 'a -> 'a
     Otherwise, it just runs [f].
  *)
 val time : string -> (unit -> 'a) -> 'a
-
-val max_quot_size_int : int -> int
 
 val tick_shifts : log2_size:int -> Pasta_bindings.Fp.t array
 

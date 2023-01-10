@@ -61,8 +61,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
-    let%bind my_pk = Util.pub_key_of_node node in
-    let%bind my_sk = Util.priv_key_of_node node in
+    let%bind my_pk = pub_key_of_node node in
+    let%bind my_sk = priv_key_of_node node in
     let my_account_id =
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in

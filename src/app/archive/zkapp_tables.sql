@@ -171,7 +171,7 @@ CREATE TABLE zkapp_account_precondition
 CREATE TABLE zkapp_accounts
 ( id                   serial  PRIMARY KEY
 , app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
-, verification_key_id  int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+, verification_key_id  int               REFERENCES zkapp_verification_keys(id)
 , zkapp_version        bigint  NOT NULL
 , sequence_state_id    int     NOT NULL  REFERENCES zkapp_sequence_states(id)
 , last_sequence_slot   bigint  NOT NULL
@@ -183,12 +183,6 @@ CREATE TABLE zkapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
 , token_id_lower_bound     text             NOT NULL
 , token_id_upper_bound     text             NOT NULL
-);
-
-CREATE TABLE zkapp_timestamp_bounds
-( id                        serial          PRIMARY KEY
-, timestamp_lower_bound     text            NOT NULL
-, timestamp_upper_bound     text            NOT NULL
 );
 
 CREATE TABLE zkapp_length_bounds
@@ -230,18 +224,16 @@ CREATE TABLE zkapp_epoch_data
 CREATE TABLE zkapp_network_precondition
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
-, timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
 , blockchain_length_id             int                            REFERENCES zkapp_length_bounds(id)
 , min_window_density_id            int                            REFERENCES zkapp_length_bounds(id)
 /* omitting 'last_vrf_output' for now, it's the unit value in OCaml */
 , total_currency_id                int                            REFERENCES zkapp_amount_bounds(id)
-, curr_global_slot_since_hard_fork int                            REFERENCES zkapp_global_slot_bounds(id)
 , global_slot_since_genesis        int                            REFERENCES zkapp_global_slot_bounds(id)
 , staking_epoch_data_id            int                            REFERENCES zkapp_epoch_data(id)
 , next_epoch_data_id               int                            REFERENCES zkapp_epoch_data(id)
 );
 
-/* events_ids and sequence_events_ids indicate a list of ids in
+/* events_ids and actions_ids indicate a list of ids in
    zkapp_state_data_array.
 */
 CREATE TABLE zkapp_fee_payer_body
@@ -256,7 +248,7 @@ CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
-/* events_ids and sequence_events_ids indicate a list of ids in
+/* events_ids and actions_ids indicate a list of ids in
    zkapp_state_data_array.
 */
 CREATE TABLE zkapp_account_update_body
@@ -266,7 +258,7 @@ CREATE TABLE zkapp_account_update_body
 , balance_change                        text            NOT NULL
 , increment_nonce                       boolean         NOT NULL
 , events_id                             int             NOT NULL  REFERENCES zkapp_events(id)
-, sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
+, actions_id                            int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
 , zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)

@@ -88,13 +88,6 @@ module Accounts = struct
             ; set_voting_for = auth_required set_voting_for
             }
       in
-      let token_permissions =
-        Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
-            if token_owned then
-              Mina_base.Token_permissions.Token_owned { disable_new_accounts }
-            else Not_owned { account_disabled } )
-      in
       let%bind token_symbol =
         try
           let token_symbol =
@@ -121,6 +114,13 @@ module Accounts = struct
             ; proved_state
             ; zkapp_uri
             } ->
+            let%bind () =
+              let zkapp_uri_length = String.length zkapp_uri in
+              if zkapp_uri_length > Zkapp_account.Zkapp_uri.max_length then
+                Or_error.errorf "zkApp URI \"%s\" exceeds max length: %d > %d"
+                  zkapp_uri zkapp_uri_length Zkapp_account.Zkapp_uri.max_length
+              else Or_error.return ()
+            in
             let%bind app_state =
               if
                 Mina_stdlib.List.Length.Compare.(
@@ -145,7 +145,7 @@ module Accounts = struct
               then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
               else
                 Or_error.errorf
-                  !"Snap account sequence_state has invalid length %{sexp: \
+                  !"zkApp account sequence_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t
                   (List.length sequence_state)
@@ -171,7 +171,6 @@ module Accounts = struct
         ; delegate =
             (if Option.is_some delegate then delegate else account.delegate)
         ; token_id
-        ; token_permissions
         ; nonce = Account.Nonce.of_uint32 t.nonce
         ; receipt_chain_hash =
             Option.value_map t.receipt_chain_hash
@@ -202,22 +201,6 @@ module Accounts = struct
               ; cliff_amount = t.cliff_amount
               ; vesting_period = t.vesting_period
               ; vesting_increment = t.vesting_increment
-              }
-      in
-      let token_permissions =
-        match account.token_permissions with
-        | Mina_base.Token_permissions.Token_owned { disable_new_accounts } ->
-            Some
-              { Runtime_config.Accounts.Single.Token_permissions.token_owned =
-                  true
-              ; disable_new_accounts
-              ; account_disabled = false
-              }
-        | Not_owned { account_disabled } ->
-            Some
-              { token_owned = false
-              ; disable_new_accounts = false
-              ; account_disabled
               }
       in
       let permissions =
@@ -303,7 +286,6 @@ module Accounts = struct
             account.delegate
       ; timing
       ; token = Some (Mina_base.Token_id.to_string account.token_id)
-      ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =
           Some
@@ -580,9 +562,6 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
-  ; transaction_expiry_hr =
-      Option.value ~default:default.transaction_expiry_hr
-        (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
   ; zkapp_proof_update_cost =
       Option.value ~default:default.zkapp_proof_update_cost
         (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
@@ -598,9 +577,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; max_event_elements =
       Option.value ~default:default.max_event_elements
         (config.daemon >>= fun cfg -> cfg.max_event_elements)
-  ; max_sequence_event_elements =
-      Option.value ~default:default.max_sequence_event_elements
-        (config.daemon >>= fun cfg -> cfg.max_sequence_event_elements)
+  ; max_action_elements =
+      Option.value ~default:default.max_action_elements
+        (config.daemon >>= fun cfg -> cfg.max_action_elements)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -627,8 +606,6 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
-          ; transaction_expiry_hr =
-              Some precomputed_values.genesis_constants.transaction_expiry_hr
           ; zkapp_proof_update_cost =
               Some precomputed_values.genesis_constants.zkapp_proof_update_cost
           ; zkapp_signed_single_update_cost =
@@ -645,9 +622,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
                   .zkapp_transaction_cost_limit
           ; max_event_elements =
               Some precomputed_values.genesis_constants.max_event_elements
-          ; max_sequence_event_elements =
-              Some
-                precomputed_values.genesis_constants.max_sequence_event_elements
+          ; max_action_elements =
+              Some precomputed_values.genesis_constants.max_action_elements
           }
     ; genesis =
         Some

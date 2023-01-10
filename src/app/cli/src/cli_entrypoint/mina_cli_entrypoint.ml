@@ -1152,6 +1152,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 (Lazy.force precomputed_values.constraint_system_digests)
               ~protocol_major_version
           in
+          [%log info] "Daemon will use chain id %s" chain_id ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1751,9 +1752,9 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_shared_state_test)
-        ; (module Coda_transitive_peers_test)
-        ; (module Coda_change_snark_worker_test)
+      ( [ (* (module Coda_shared_state_test)
+             ; (module Coda_transitive_peers_test) *)
+          (module Coda_change_snark_worker_test)
         ]
         : (module Integration_test) list )
   in

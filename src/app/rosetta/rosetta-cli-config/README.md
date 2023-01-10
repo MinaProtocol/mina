@@ -65,12 +65,21 @@ Note: the database name `archive` should be identical to
 
 ```shell
 $ "_build/default/src/app/archive/archive.exe" run \
+    --config-file daemon.json \
     --postgres-uri "postgres://localhost:5432/archive" \
     --server-port 3086
 ```
 Note that the `--server-port` param should be equal to the one we set
 previously for the node. As the node starts producing blocks, we
 should see those blocks appear in archive's logs too.
+
+`daemon.json` should be replaced with the path to the daemon's
+(see above) configuration file. When provided with this file,
+the archive will load the genesis ledger from it into its own
+database. This is strictly necessary for Rosetta – without the
+genesis ledger it will return wrong balances for genesis accounts
+when asked for blocks before the first transaction involving
+such an account was made.
 
 Also note that archive can only know about the blocks that were
 produced when it was running. This limitation also applies to

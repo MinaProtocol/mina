@@ -23,7 +23,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
-  bullseye)
+  bookworm|jammy)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8"
+    ;;
+  bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   buster)
@@ -31,9 +34,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
-    ;;
-  focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1

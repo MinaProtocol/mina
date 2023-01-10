@@ -28,7 +28,13 @@ spec:
         --port {{ .Values.archive.ports.postgres }}
         --dbname {{ .Values.postgresql.auth.database }}
         -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
-        && rm -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql'
+        && rm -f {{ .Values.testnetName }}-archive-dump-$(date -Idate)_0000.sql
+        && psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
       {{- else }}
       - name: import-schema
         image: gcr.io/o1labs-192920/postgresql-curl:latest
@@ -49,7 +55,13 @@ spec:
         --port {{ .Values.archive.ports.postgres }}
         --dbname {{ .Values.postgresql.auth.database }}
         -f /tmp/{{ .Values.archive.remoteSchemaFile }}
-        && rm -f /tmp/*.sql'
+        && rm -f /tmp/*.sql
+        && psql
+        --username {{ .Values.postgresql.auth.username }}
+        --host {{ tpl .Values.archive.postgresHost . }}
+        --port {{ .Values.archive.ports.postgres }}
+        --dbname {{ .Values.postgresql.auth.database }}
+        -c "ALTER DATABASE {{ .Values.postgresql.auth.database }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;"'
       {{- end }}
       restartPolicy: Never
   backoffLimit: 10

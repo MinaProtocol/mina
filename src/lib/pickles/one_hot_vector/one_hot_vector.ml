@@ -33,12 +33,9 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         { typ with
           check =
             (fun x ->
-              Impl.Internal_Basic.make_checked_ast
-              @@ Impl.Internal_Basic.Checked.bind
-                   (Impl.Internal_Basic.run_checked_ast @@ typ.check x)
-                   ~f:(fun () ->
-                     make_checked (fun () ->
-                         Boolean.Assert.exactly_one (Vector.to_list x) ) ) )
+              Impl.Internal_Basic.Checked.bind (typ.check x) ~f:(fun () ->
+                  make_checked (fun () ->
+                      Boolean.Assert.exactly_one (Vector.to_list x) ) ) )
         }
     in
     Typ.transport typ

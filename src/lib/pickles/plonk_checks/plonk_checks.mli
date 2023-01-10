@@ -13,6 +13,8 @@ module type Field_intf = sig
 
   val size_in_bits : int
 
+  val zero : t
+
   val one : t
 
   val of_int : int -> t

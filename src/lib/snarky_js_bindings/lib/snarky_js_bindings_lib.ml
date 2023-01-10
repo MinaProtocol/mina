@@ -221,6 +221,11 @@ module Keypair = Impl.Keypair
 module Verification_key = Impl.Verification_key
 module Typ = Impl.Typ
 
+(* helper functions *)
+
+external prover_to_json :
+  Kimchi_bindings.Protocol.Index.Fp.t -> Js.js_string Js.t = "prover_to_json"
+
 let singleton_array (type a) (x : a) : a Js.js_array Js.t =
   let arr = new%js Js.array_empty in
   arr##push x |> ignore ;
@@ -1195,7 +1200,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 
@@ -1223,6 +1228,8 @@ and proof_class =
 class type keypair_class =
   object
     method value : Keypair.t Js.prop
+
+    method constraintSystemJSON : unit -> Js.js_string Js.t Js.meth
   end
 
 let keypair_class : < .. > Js.t =
@@ -1547,7 +1554,7 @@ module Circuit = struct
         ~return_typ:Snark_params.Tick.Typ.unit (fun () -> main)
     in
     let rows =
-      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len
+      Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len cs
     in
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
@@ -1628,7 +1635,14 @@ let () =
   in
   method_ "verificationKey"
     (fun (this : keypair_class Js.t) : verification_key_class Js.t ->
-      new%js verification_key_constr (Keypair.vk this##.value) )
+      new%js verification_key_constr (Keypair.vk this##.value) ) ;
+  method_ "_constraintSystemJSON"
+    (fun (this : keypair_class Js.t) : Js.js_string Js.t ->
+      let wrapper_prover_index : Backend.Keypair.t = Keypair.pk this##.value in
+      let prover_index : Kimchi_bindings.Protocol.Index.Fp.t =
+        wrapper_prover_index.index
+      in
+      prover_to_json prover_index )
 
 (* TODO: add verificationKey.toString / fromString *)
 let () =
@@ -2217,6 +2231,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants
@@ -2898,8 +2913,13 @@ module Ledger = struct
           (Zkapp_command.Call_forest.hash account_update.elt.calls :> Impl.field)
     end
 
-  let sign_field_element (x : field_class Js.t) (key : private_key) =
-    Signature_lib.Schnorr.Chunked.sign (private_key key)
+  let sign_field_element (x : field_class Js.t) (key : private_key)
+      (is_mainnet : bool Js.t) =
+    let network_id =
+      Mina_signature_kind.(if Js.to_bool is_mainnet then Mainnet else Testnet)
+    in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind:network_id
+      (private_key key)
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
 
@@ -3214,6 +3234,8 @@ module Ledger = struct
     |> Array.map ~f:to_js_field_unchecked
     |> Js.array
 
+  (* global *)
+
   let () =
     let static name thing = Js.Unsafe.set ledger_class (Js.string name) thing in
     let static_method name f =
@@ -3368,6 +3390,8 @@ module Ledger = struct
     method_ "addAccount" add_account ;
     method_ "applyJsonTransaction" apply_json_transaction
 end
+
+(* export stuff *)
 
 let export () =
   Js.export "Field" field_class ;
