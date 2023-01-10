@@ -14,19 +14,22 @@ end)
 
 let compare_with obtained filepath =
   let (_ : int) = Sys.command "tree" in
-  let expected = In_channel.read_all ("examples/" ^ filepath) in
-  Format.printf "expected:\n%s\n\n" expected ;
-  Format.printf "obtained:\n%s\n" obtained ;
-  assert (String.(trim obtained = trim expected))
+  let filepath = "examples/" ^ filepath in
+  let expected = In_channel.read_all filepath in
+  if String.(trim obtained <> trim expected) then (
+    Format.printf "mismatch for %s detected\n" filepath ;
+    Format.printf "expected:\n%s\n\n" expected ;
+    Format.printf "obtained:\n%s\n" obtained ;
+    failwith "circuit compilation has changed" )
 
 let check_json ~input_typ ~return_typ ~circuit filename () =
   let cs : Impl.R1CS_constraint_system.t =
     Impl.constraint_system ~input_typ ~return_typ circuit
   in
-  let asm =
+  let serialized_json =
     Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.to_json cs
   in
-  compare_with asm filename
+  compare_with serialized_json filename
 
 (* monadic API tests *)
 
