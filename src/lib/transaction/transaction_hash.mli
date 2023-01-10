@@ -20,6 +20,8 @@ val to_base58_check : t -> string
 
 val hash_signed_command : Signed_command.t -> t
 
+val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
+
 val hash_command : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
