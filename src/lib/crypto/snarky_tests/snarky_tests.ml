@@ -19,12 +19,12 @@ let compare_with obtained filepath =
   Format.printf "obtained:\n%s\n" obtained ;
   assert (String.(trim obtained = trim expected))
 
-let check_asm ~input_typ ~return_typ ~circuit filename () =
+let check_json ~input_typ ~return_typ ~circuit filename () =
   let cs : Impl.R1CS_constraint_system.t =
     Impl.constraint_system ~input_typ ~return_typ circuit
   in
   let asm =
-    Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.get_asm cs
+    Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.to_json cs
   in
   compare_with asm filename
 
@@ -155,44 +155,44 @@ end
 let circuit_tests =
   [ ( "boolean circuit"
     , `Quick
-    , check_asm ~input_typ:BooleanCircuit.input_typ
+    , check_json ~input_typ:BooleanCircuit.input_typ
         ~return_typ:BooleanCircuit.return_typ ~circuit:BooleanCircuit.main
-        "simple.asm" )
+        "simple.json" )
   ; ( "circuit with field arithmetic"
     , `Quick
-    , check_asm ~input_typ:FieldCircuit.input_typ
+    , check_json ~input_typ:FieldCircuit.input_typ
         ~return_typ:FieldCircuit.return_typ ~circuit:FieldCircuit.main
-        "field.asm" )
+        "field.json" )
   ; ( "circuit with range check (less than equal)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lte
-        "range_lte.asm" )
+        "range_lte.json" )
   ; ( "circuit with range check (greater than equal)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gte
-        "range_gte.asm" )
+        "range_gte.json" )
   ; ( "circuit with range check (less than)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lt
-        "range_lt.asm" )
+        "range_lt.json" )
   ; ( "circuit with range check (greater than)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
-        "range_gt.asm" )
+        "range_gt.json" )
   ; ( "circuit with ternary operator"
     , `Quick
-    , check_asm ~input_typ:TernaryCircuit.input_typ
+    , check_json ~input_typ:TernaryCircuit.input_typ
         ~return_typ:TernaryCircuit.return_typ ~circuit:TernaryCircuit.main
-        "ternary.asm" )
+        "ternary.json" )
   ; ( "circuit with public output"
     , `Quick
-    , check_asm ~input_typ:PublicOutput.input_typ
+    , check_json ~input_typ:PublicOutput.input_typ
         ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
-        "output.asm" )
+        "output.json" )
   ]
 
 (* API tests *)
