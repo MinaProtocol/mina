@@ -32,10 +32,6 @@ type Structured_log_events.t += Ledger_catchup
 type Structured_log_events.t += Synced
   [@@deriving register_event { msg = "Mina daemon is synced" }]
 
-type Structured_log_events.t +=
-  | Rebroadcast_transition of { state_hash : State_hash.t }
-  [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
-
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -1864,7 +1860,7 @@ let create ?wallets (config : Config.t) =
                 config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
-            Transition_handler.Block_sink.create
+            Network_pool.Block_sink.create
               { logger = config.logger
               ; slot_duration_ms =
                   config.precomputed_values.consensus_constants.slot_duration_ms
@@ -2075,18 +2071,8 @@ let create ?wallets (config : Config.t) =
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ~on_bitswap_update_ref ()
           in
-          let ( valid_transitions_for_network
-              , valid_transitions_for_api
-              , new_blocks ) =
-            let network_pipe, downstream_pipe =
-              Strict_pipe.Reader.Fork.two valid_transitions
-            in
-            let api_pipe, new_blocks_pipe =
-              Strict_pipe.Reader.(
-                Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
-            in
-            (network_pipe, api_pipe, new_blocks_pipe)
+          let valid_transitions_for_api, new_blocks =
+            Strict_pipe.Reader.Fork.two valid_transitions
           in
           O1trace.background_thread "broadcast_transaction_pool_diffs"
             (fun () ->
@@ -2108,82 +2094,6 @@ let create ?wallets (config : Config.t) =
                   in
                   Mina_networking.broadcast_transaction_pool_diff ~nonce net
                     message ) ) ;
-          O1trace.background_thread "broadcast_blocks" (fun () ->
-              Strict_pipe.Reader.iter_without_pushback
-                valid_transitions_for_network
-                ~f:(fun
-                     (`Transition transition, `Source source, `Valid_cb valid_cb)
-                   ->
-                  let hash =
-                    Mina_block.Validated.forget transition
-                    |> State_hash.With_state_hashes.state_hash
-                  in
-                  let consensus_state =
-                    transition |> Mina_block.Validated.header
-                    |> Header.protocol_state
-                    |> Mina_state.Protocol_state.consensus_state
-                  in
-                  let now =
-                    let open Block_time in
-                    now config.time_controller |> to_span_since_epoch
-                    |> Span.to_ms
-                  in
-                  match
-                    Consensus.Hooks.received_at_valid_time
-                      ~constants:consensus_constants ~time_received:now
-                      consensus_state
-                  with
-                  | Ok () ->
-                      ( match source with
-                      | `Gossip ->
-                          [%str_log' info config.logger]
-                            ~metadata:
-                              [ ( "external_transition"
-                                , Mina_block.Validated.to_yojson transition )
-                              ]
-                            (Rebroadcast_transition { state_hash = hash })
-                          (*send callback to libp2p to forward the gossiped transition*)
-                      | `Internal | `Catchup ->
-                          (*Noop for directly downloaded and internal transitions *)
-                          () ) ;
-                      Option.iter
-                        ~f:
-                          (Fn.flip
-                             Mina_net2.Validation_callback
-                             .fire_if_not_already_fired `Accept )
-                        valid_cb
-                  | Error reason -> (
-                      let timing_error_json =
-                        match reason with
-                        | `Too_early ->
-                            `String "too early"
-                        | `Too_late slots ->
-                            `String (sprintf "%Lu slots too late" slots)
-                      in
-                      let metadata =
-                        [ ("state_hash", State_hash.to_yojson hash)
-                        ; ("block", Mina_block.Validated.to_yojson transition)
-                        ; ("timing", timing_error_json)
-                        ]
-                      in
-                      Option.iter
-                        ~f:
-                          (Fn.flip
-                             Mina_net2.Validation_callback
-                             .fire_if_not_already_fired `Reject )
-                        valid_cb ;
-                      match source with
-                      | `Catchup ->
-                          ()
-                      | `Internal ->
-                          [%log' error config.logger] ~metadata
-                            "Internally generated block $state_hash cannot be \
-                             rebroadcast because it's not a valid time to do \
-                             so ($timing)"
-                      | `Gossip ->
-                          [%log' warn config.logger] ~metadata
-                            "Not rebroadcasting block $state_hash because it \
-                             was received $timing" ) ) ) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Mina_networking.ban_notification_reader net)

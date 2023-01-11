@@ -16,15 +16,11 @@ val run :
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> collected_transitions:Bootstrap_controller.Transition_cache.element list
-  -> network_transition_reader:Produced_transition.t Strict_pipe.Reader.t
+  -> collected_transitions:Transition_frontier.Gossip.element list
+  -> network_transition_reader:
+       Transition_frontier.Gossip.element Strict_pipe.Reader.t
   -> producer_transition_reader:Frontier_base.Breadcrumb.t Strict_pipe.Reader.t
   -> clear_reader:'a Strict_pipe.Reader.t
   -> verified_transition_writer:
-       ( [> `Transition of Mina_block.Validated.t ]
-         * [> `Source of [ `Catchup | `Gossip | `Internal ] ]
-         * [> `Valid_cb of 'b option ]
-       , 'c
-       , unit )
-       Strict_pipe.Writer.t
+       (Mina_block.Validated.t, 'c, unit) Strict_pipe.Writer.t
   -> unit

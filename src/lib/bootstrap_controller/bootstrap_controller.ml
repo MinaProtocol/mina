@@ -186,31 +186,16 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader ~f:(fun (b_or_h, `Valid_cb vc) ->
-      let header_with_hash, sender, transition_cache_element =
+  Reader.iter sync_ledger_reader ~f:(fun (b_or_h, `Gossip_map gm) ->
+      Transition_cache.add transition_graph b_or_h gm ;
+      let header_with_hash =
         match b_or_h with
-        | `Block b_env ->
-            ( Envelope.Incoming.data b_env
-              |> Mina_block.Validation.block_with_hash
-              |> With_hash.map ~f:Mina_block.header
-            , Envelope.Incoming.remote_sender_exn b_env
-            , Envelope.Incoming.map ~f:(fun x -> Transition_cache.Block x) b_env
-            )
-        | `Header h_env ->
-            ( Envelope.Incoming.data h_env
-              |> Mina_block.Validation.header_with_hash
-            , Envelope.Incoming.remote_sender_exn h_env
-            , Envelope.Incoming.map
-                ~f:(fun x -> Transition_cache.Header x)
-                h_env )
+        | `Header h ->
+            Mina_block.Validation.header_with_hash h
+        | `Block b ->
+            With_hash.map ~f:Mina_block.header
+              (Mina_block.Validation.block_with_hash b)
       in
-      let previous_state_hash =
-        With_hash.data header_with_hash
-        |> Mina_block.Header.protocol_state
-        |> Protocol_state.previous_state_hash
-      in
-      Transition_cache.add transition_graph ~parent:previous_state_hash
-        (transition_cache_element, vc) ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if
         worth_getting_root t
@@ -224,10 +209,13 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
             ; ( "header"
               , Mina_block.Header.to_yojson (With_hash.data header_with_hash) )
             ] ;
-
-        Deferred.ignore_m
-        @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
-             header_with_hash )
+        match String.Map.min_elt gm with
+        | Some (_, { Transition_frontier.Gossip.sender = Remote sender; _ }) ->
+            Deferred.ignore_m
+            @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
+                 header_with_hash
+        | _ ->
+            Deferred.unit )
       else Deferred.unit )
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
@@ -269,22 +257,23 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                ( `Capacity 50
                , `Overflow
                    (Drop_head
-                      (fun (b_or_h, `Valid_cb valid_cb) ->
+                      (fun (b_or_h, `Gossip_map gd_map) ->
                         Mina_metrics.(
                           Counter.inc_one
                             Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
                         let hash =
                           match b_or_h with
-                          | `Block b_env ->
-                              Envelope.Incoming.data b_env
-                              |> Mina_block.Validation.block_with_hash
-                              |> With_hash.hash
-                          | `Header h_env ->
-                              Envelope.Incoming.data h_env
-                              |> Mina_block.Validation.header_with_hash
-                              |> With_hash.hash
+                          | `Block b ->
+                              b |> Mina_block.Validation.block_with_hash
+                              |> State_hash.With_state_hashes.state_hash
+                          | `Header h ->
+                              h |> Mina_block.Validation.header_with_hash
+                              |> State_hash.With_state_hashes.state_hash
                         in
-                        Mina_block.handle_dropped_transition ?valid_cb hash
+                        let valid_cbs =
+                          Transition_frontier.Gossip.valid_cbs gd_map
+                        in
+                        Mina_block.handle_dropped_transition ~valid_cbs hash
                           ~pipe_name:sync_ledger_pipe ~logger ) ) ) )
         in
         don't_wait_for
@@ -633,8 +622,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   List.filter collected_transitions
                     ~f:(fun (incoming_transition, _) ->
                       let transition =
-                        Envelope.Incoming.data incoming_transition
-                        |> Transition_cache.header_with_hash
+                        Transition_frontier.Gossip.header_with_hash
+                          incoming_transition
                       in
                       Consensus.Hooks.equal_select_status `Take
                       @@ Consensus.Hooks.select
@@ -650,15 +639,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 [%log debug] "Sorting filtered transitions by consensus state"
                   ~metadata:[] ;
                 let sorted_filtered_collected_transitions =
-                  O1trace.sync_thread "sorting_collected_transitions" (fun () ->
-                      List.sort filtered_collected_transitions
-                        ~compare:
-                          (Comparable.lift
-                             ~f:(fun (x, _) ->
-                               Transition_cache.header_with_hash
-                               @@ Envelope.Incoming.data x )
-                             (external_transition_compare
-                                ~context:(module Context) ) ) )
+                  O1trace.sync_thread "sorting_collected_transitions"
+                  @@ fun () ->
+                  List.sort filtered_collected_transitions
+                    ~compare:
+                      (Comparable.lift
+                         ~f:(fun (x, _) ->
+                           Transition_frontier.Gossip.header_with_hash x )
+                         (external_transition_compare ~context:(module Context)) )
                 in
                 let this_cycle =
                   { cycle_result = "success"
@@ -737,17 +725,13 @@ let%test_module "Bootstrap_controller tests" =
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
-    let downcast_transition ~sender transition =
-      let transition =
-        transition |> Mina_block.Validated.remember
-        |> Mina_block.Validation.reset_frontier_dependencies_validation
-        |> Mina_block.Validation.reset_staged_ledger_diff_validation
-      in
-      Envelope.Incoming.wrap ~data:transition
-        ~sender:(Envelope.Sender.Remote sender)
+    let downcast_transition transition =
+      transition |> Mina_block.Validated.remember
+      |> Mina_block.Validation.reset_frontier_dependencies_validation
+      |> Mina_block.Validation.reset_staged_ledger_diff_validation
 
-    let downcast_breadcrumb ~sender breadcrumb =
-      downcast_transition ~sender
+    let downcast_breadcrumb breadcrumb =
+      downcast_transition
         (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
 
     let make_non_running_bootstrap ~context ~genesis_root ~network =
@@ -816,9 +800,17 @@ let%test_module "Bootstrap_controller tests" =
             in
             let%bind () =
               Deferred.List.iter branch ~f:(fun breadcrumb ->
+                  let gd =
+                    Transition_frontier.Gossip.
+                      { sender = Envelope.Sender.Remote other.peer
+                      ; received_at = Time.now ()
+                      ; valid_cb = None
+                      ; type_ = `Block
+                      }
+                  in
                   Strict_pipe.Writer.write sync_ledger_writer
-                    ( `Block (downcast_breadcrumb ~sender:other.peer breadcrumb)
-                    , `Valid_cb None ) )
+                    ( `Block (downcast_breadcrumb breadcrumb)
+                    , `Gossip_map (String.Map.singleton "some_topic" gd) ) )
             in
             Strict_pipe.Writer.close sync_ledger_writer ;
             let%map () = sync_deferred in
@@ -834,8 +826,7 @@ let%test_module "Bootstrap_controller tests" =
             let saved_transitions =
               Transition_cache.data transition_graph
               |> List.map ~f:(fun (x, _) ->
-                     Transition_cache.header_with_hash
-                     @@ Envelope.Incoming.data x )
+                     Transition_frontier.Gossip.header_with_hash x )
             in
             let module E = struct
               module T = struct
@@ -881,7 +872,7 @@ let%test_module "Bootstrap_controller tests" =
                ~catchup_mode:`Normal ~initial_root_transition ) )
 
     let assert_transitions_increasingly_sorted ~root
-        (incoming_transitions : Transition_cache.element list) =
+        (incoming_transitions : Transition_frontier.Gossip.element list) =
       let root =
         Transition_frontier.Breadcrumb.block root |> Mina_block.header
       in
@@ -889,8 +880,8 @@ let%test_module "Bootstrap_controller tests" =
         ( List.fold_result ~init:root incoming_transitions
             ~f:(fun max_acc incoming_transition ->
               let With_hash.{ data = header; _ } =
-                Transition_cache.header_with_hash
-                  (Envelope.Incoming.data @@ fst incoming_transition)
+                Transition_frontier.Gossip.header_with_hash
+                  (fst incoming_transition)
               in
               let header_len h =
                 Mina_block.Header.protocol_state h
@@ -925,17 +916,22 @@ let%test_module "Bootstrap_controller tests" =
               (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
           in
           let block =
-            Envelope.Incoming.wrap
-              ~data:
-                ( Transition_frontier.best_tip peer_net.state.frontier
-                |> Transition_frontier.Breadcrumb.validated_transition
-                |> Mina_block.Validated.remember
-                |> Mina_block.Validation.reset_frontier_dependencies_validation
-                |> Mina_block.Validation.reset_staged_ledger_diff_validation )
-              ~sender:(Envelope.Sender.Remote peer_net.peer)
+            Transition_frontier.best_tip peer_net.state.frontier
+            |> Transition_frontier.Breadcrumb.validated_transition
+            |> Mina_block.Validated.remember
+            |> Mina_block.Validation.reset_frontier_dependencies_validation
+            |> Mina_block.Validation.reset_staged_ledger_diff_validation
+          in
+          let gd =
+            Transition_frontier.Gossip.
+              { sender = Envelope.Sender.Remote peer_net.peer
+              ; received_at = Time.now ()
+              ; valid_cb = None
+              ; type_ = `Block
+              }
           in
           Pipe_lib.Strict_pipe.Writer.write transition_writer
-            (`Block block, `Valid_cb None) ;
+            (`Block block, `Gossip_map (String.Map.singleton "some_topic" gd)) ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap

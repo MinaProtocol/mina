@@ -748,20 +748,18 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
     let processed_dsu = Processed_skipping.Dsu.create ()
 
     let record_event = function
-      | `Verified_header_relevance (Ok (), header_with_hash, sender) ->
-          let sender = Network_peer.Envelope.Sender.Remote sender in
+      | `Verified_header_relevance (Ok (), header_with_hash, senders) ->
           (* This action is deferred because it may potentially trigger change of
              ban status of a peer which requires writing to a synchonous pipe. *)
           don't_wait_for
           @@ Transition_handler.Validator.record_transition_is_relevant ~logger
-               ~trust_system ~sender ~time_controller header_with_hash
-      | `Verified_header_relevance (Error error, header_with_hash, sender) ->
-          let sender = Network_peer.Envelope.Sender.Remote sender in
+               ~trust_system ~senders ~time_controller header_with_hash
+      | `Verified_header_relevance (Error error, header_with_hash, senders) ->
           (* This action is deferred because it may potentially trigger change of
              ban status of a peer which requires writing to a synchonous pipe. *)
           don't_wait_for
           @@ Transition_handler.Validator.record_transition_is_irrelevant
-               ~frontier ~outdated_root_cache ~logger ~trust_system ~sender
+               ~frontier ~outdated_root_cache ~logger ~trust_system ~senders
                ~error header_with_hash
       | `Pre_validate_header_invalid (sender, header, e) ->
           let sender = Network_peer.Envelope.Sender.Remote sender in
@@ -791,6 +789,13 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
           Simple_throttle.deallocate throttles.verifier
       | `Download ->
           Simple_throttle.deallocate throttles.download
+
+    let broadcast b =
+      don't_wait_for (Mina_networking.broadcast_transition network b)
+
+    let rebroadcast ~origin_topics b =
+      don't_wait_for
+        (Mina_networking.rebroadcast_transition network ~origin_topics b)
   end in
   (module Context : CONTEXT)
 
@@ -801,10 +806,10 @@ module Transition_states_callbacks (Context : sig
 end) =
 struct
   let on_invalid ?(reason = `Other) ~error ~aux _meta =
-    let f { Transition_state.sender; gossip; _ } =
+    let f { Transition_state.sender; gossip_topic; _ } =
       let action =
         match reason with
-        | `Other when gossip ->
+        | `Other when Option.is_some gossip_topic ->
             Trust_system.Actions.Gossiped_invalid_transition
         | `Other ->
             Sent_invalid_transition
@@ -901,10 +906,8 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   let block_storage =
     Block_storage.open_ ~logger:Context_.logger block_db_path
   in
-  let write_verified_transition (`Transition t, `Source s) : unit =
-    (* TODO remove validation_callback from Transition_router and then remove the `Valid_cb argument *)
-    Pipe_lib.Strict_pipe.Writer.write verified_transition_writer
-      (`Transition t, `Source s, `Valid_cb None)
+  let write_verified_transition (`Transition t, `Source _) : unit =
+    Pipe_lib.Strict_pipe.Writer.write verified_transition_writer t
   in
   let write_breadcrumb source b =
     Queue.enqueue state.breadcrumb_queue (source, b) ;
@@ -929,8 +932,9 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   on_bitswap_update_ref :=
     on_bitswap_update ~context ~actions ~body_reference_to_state_hash
       ~transition_states ;
-  List.iter collected_transitions ~f:(fun transition ->
-      Received.handle_collected_transition ~context ~actions ~state transition
+  List.iter collected_transitions ~f:(fun transition_tuple ->
+      Received.handle_collected_transition ~context ~actions ~state
+        transition_tuple
       |> function
       | `No_body_preserved ->
           ()

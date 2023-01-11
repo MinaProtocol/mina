@@ -44,7 +44,6 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    data_hash_lib
-   transition_handler
    network_pool
    mina_intf
    pipe_lib

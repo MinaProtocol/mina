@@ -243,7 +243,11 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_block_detector.create () in
   O1trace.background_thread "initially_validate_blocks" (fun () ->
       Reader.iter transition_reader
-        ~f:(fun (b_or_h, `Time_received time_received, `Valid_cb valid_cb) ->
+        ~f:(fun
+             ( b_or_h
+             , `Time_received time_received
+             , `Topic_and_vc (topic, valid_cb) )
+           ->
           let header, sender =
             match b_or_h with
             | `Block b_env ->
@@ -315,7 +319,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                                h_env )
                     in
                     Writer.write valid_transition_writer
-                      (b_or_h', `Valid_cb valid_cb) ;
+                      (b_or_h', `Topic_and_vc (topic, valid_cb)) ;
                     Mina_metrics.Transition_frontier
                     .update_max_blocklength_observed blockchain_length ;
                     Queue.enqueue Transition_frontier.validated_blocks

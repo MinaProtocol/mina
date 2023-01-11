@@ -262,26 +262,29 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast_state ?origin_topic t state =
-      ignore origin_topic ;
-      Network.broadcast t.network ~sender:t.me state
+    let broadcast_transition ?origin_topics:_ t b_or_h =
+      Network.broadcast t.network ~sender:t.me b_or_h
         (fun (Any_sinks (sinksM, (sink_block, _, _))) (env, vc) ->
+          let { Envelope.Incoming.sender; received_at; _ } = env in
+          let env' =
+            match Envelope.Incoming.data env with
+            | `Block data ->
+                `Block { Envelope.Incoming.data; sender; received_at }
+            | `Header data ->
+                `Header { Envelope.Incoming.data; sender; received_at }
+          in
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
           M.Block_sink.push sink_block
-            (`Block env, `Time_received time, `Valid_cb vc) )
+            (env', `Time_received time, `Topic_and_vc ("some_topic", vc)) )
 
-    let broadcast_snark_pool_diff ?origin_topic ?nonce t diff =
-      ignore origin_topic ;
-      ignore nonce ;
+    let broadcast_snark_pool_diff ?origin_topics:_ ?nonce:_ t diff =
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work )
 
-    let broadcast_transaction_pool_diff ?origin_topic ?nonce t diff =
-      ignore origin_topic ;
-      ignore nonce ;
+    let broadcast_transaction_pool_diff ?origin_topics:_ ?nonce:_ t diff =
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in

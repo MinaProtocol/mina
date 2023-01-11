@@ -29,9 +29,10 @@ let create_buffered_pipe ?name ~f () =
 let block_or_header_to_header_hashed b_or_h =
   match b_or_h with
   | `Block b ->
-      With_hash.map ~f:Mina_block.header @@ fst @@ Envelope.Incoming.data b
+      With_hash.map ~f:Mina_block.header
+      @@ Mina_block.Validation.block_with_hash b
   | `Header h ->
-      fst @@ Envelope.Incoming.data h
+      Mina_block.Validation.header_with_hash h
 
 let block_or_header_to_header_hashed_with_validation b_or_h =
   match b_or_h with
@@ -41,14 +42,9 @@ let block_or_header_to_header_hashed_with_validation b_or_h =
   | `Header h ->
       Envelope.Incoming.data h
 
-let block_or_header_to_hash
-    (b_or_h :
-      [ `Block of
-        Mina_block.Validation.initial_valid_with_block Envelope.Incoming.t
-      | `Header of
-        Mina_block.Validation.initial_valid_with_header Envelope.Incoming.t ] )
-    =
-  With_hash.hash (block_or_header_to_header_hashed b_or_h)
+let block_or_header_to_hash b_or_h =
+  Mina_base.State_hash.With_state_hashes.state_hash
+    (block_or_header_to_header_hashed b_or_h)
 
 let to_consensus_state h =
   Mina_block.Validation.header_with_hash h
@@ -109,13 +105,14 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       , transition_frontier_controller_writer ) =
     let name = "transition frontier controller pipe" in
     create_buffered_pipe ~name
-      ~f:(fun (b_or_h, `Valid_cb valid_cb) ->
+      ~f:(fun (b_or_h, `Gossip_map gd_map) ->
         Mina_metrics.(
           Counter.inc_one
             Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
+        let valid_cbs = Transition_frontier.Gossip.valid_cbs gd_map in
         Mina_block.handle_dropped_transition
           (block_or_header_to_hash b_or_h)
-          ?valid_cb ~pipe_name:name ~logger )
+          ~valid_cbs ~pipe_name:name ~logger )
       ()
   in
   let transition_writer_ref =
@@ -149,12 +146,13 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT)
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
     create_buffered_pipe ~name
-      ~f:(fun (b_or_h, `Valid_cb valid_cb) ->
+      ~f:(fun (b_or_h, `Gossip_map gd_map) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
+        let valid_cbs = Transition_frontier.Gossip.valid_cbs gd_map in
         Mina_block.handle_dropped_transition
           (block_or_header_to_hash b_or_h)
-          ~pipe_name:name ~logger ?valid_cb )
+          ~pipe_name:name ~logger ~valid_cbs )
       ()
   in
   ( match catchup_mode with
@@ -168,10 +166,18 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT)
   in
   transition_writer_ref := bootstrap_controller_writer ;
   producer_transition_writer_ref := None ;
-  let f block =
+  let f block_env =
+    let gossip_data =
+      Transition_frontier.Gossip.gossip_data_of_transition_envelope block_env
+    in
     Strict_pipe.Writer.write bootstrap_controller_writer
-      (`Block block, `Valid_cb None) ;
-    match Envelope.Incoming.sender block with Remote r -> [ r ] | Local -> []
+      ( `Block (Network_peer.Envelope.Incoming.data block_env)
+      , `Gossip_map (String.Map.singleton "" gossip_data) ) ;
+    match Envelope.Incoming.sender block_env with
+    | Remote r ->
+        [ r ]
+    | Local ->
+        []
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
@@ -440,8 +446,13 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
                $length); syncing local state and starting participation" ;
-            let f x = Bootstrap_controller.Transition_cache.Block x in
-            [ (Envelope.Incoming.map ~f best_tip, None) ]
+            let gossip_data =
+              Transition_frontier.Gossip.gossip_data_of_transition_envelope
+                best_tip
+            in
+            [ ( `Block best_tip.data
+              , `Gossip_map (String.Map.singleton "" gossip_data) )
+            ]
         | None ->
             [%log info]
               "Successfully loaded frontier, but failed downloaded best tip \
@@ -546,14 +557,9 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_buffered_pipe ~name
-      ~f:(fun ( `Transition (head : Mina_block.Validated.t)
-              , _
-              , `Valid_cb valid_cb ) ->
+      ~f:(fun (_head : Mina_block.Validated.t) ->
         Mina_metrics.(
-          Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
-        Mina_block.handle_dropped_transition
-          (Mina_block.Validated.forget head |> With_hash.hash)
-          ~pipe_name:name ~logger ?valid_cb )
+          Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) )
       ()
   in
   (* Ref is None when bootstrap is in progress and Some writer when it's catch-up.query
@@ -574,12 +580,22 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
         let name = "valid transitions" in
         create_buffered_pipe ~name
           ~f:(fun head ->
-            let b_or_h, `Valid_cb valid_cb = head in
+            let b_or_h, `Topic_and_vc (_, valid_cb) = head in
             Mina_metrics.(
               Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
-            Mina_block.handle_dropped_transition
-              (block_or_header_to_hash b_or_h)
-              ~valid_cb ~pipe_name:name ~logger )
+            let state_hash =
+              match b_or_h with
+              | `Block b_env ->
+                  Mina_block.Validation.block_with_hash
+                    b_env.Envelope.Incoming.data
+                  |> Mina_base.State_hash.With_state_hashes.state_hash
+              | `Header h_env ->
+                  Mina_block.Validation.header_with_hash
+                    h_env.Envelope.Incoming.data
+                  |> Mina_base.State_hash.With_state_hashes.state_hash
+            in
+            Mina_block.handle_dropped_transition state_hash
+              ~valid_cbs:[ valid_cb ] ~pipe_name:name ~logger )
           ()
       in
       Initial_validator.run ~logger ~trust_system ~verifier
@@ -629,7 +645,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
              else Deferred.unit ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
-           ~f:(fun (b_or_h, `Valid_cb vc) ->
+           ~f:(fun (b_or_h, `Topic_and_vc (topic, valid_cb)) ->
              don't_wait_for
              @@ let%map () =
                   let header_with_hash =
@@ -672,6 +688,21 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
                   | None ->
                       Deferred.unit
                 in
+                let b_or_h', gm =
+                  match b_or_h with
+                  | `Block b_env ->
+                      ( `Block (Envelope.Incoming.data b_env)
+                      , String.Map.singleton topic
+                          (Transition_frontier.Gossip
+                           .gossip_data_of_transition_envelope ~valid_cb b_env )
+                      )
+                  | `Header h_env ->
+                      ( `Header (Envelope.Incoming.data h_env)
+                      , String.Map.singleton topic
+                          (Transition_frontier.Gossip
+                           .gossip_data_of_transition_envelope ~valid_cb
+                             ~type_:`Header h_env ) )
+                in
                 Strict_pipe.Writer.write !transition_writer_ref
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+                  (b_or_h', `Gossip_map gm) ) ) ;
   (verified_transition_reader, initialization_finish_signal)

@@ -17,7 +17,6 @@ type Structured_log_events.t +=
   | Bootstrapping
   | Ledger_catchup
   | Synced
-  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 module type CONTEXT = sig

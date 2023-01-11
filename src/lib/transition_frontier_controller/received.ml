@@ -255,11 +255,19 @@ let get_canopy ~frontier ~state length =
   :: canopy_from_transitions
   @ best_tip_closest @ best_tip_rest_sparse
 
-let rec pre_validate_and_add ~context ~actions ~sender ~state ?body hh =
+let rec pre_validate_and_add_retrieved ~context ~actions ~sender ~state ?body hh
+    =
   match pre_validate_header ~context hh with
   | Ok vh ->
-      add_received ~context ~actions ~sender ~state ?body
-        (Gossip.Pre_initial_valid vh) ;
+      add_received ~context ~actions ~state ?body ~preferred_peers:[ sender ]
+        (Gossip.Pre_initial_valid vh)
+        ~gossip_data:Gossip_types.No_validation_callback
+        ~received:
+          [ { Transition_state.sender
+            ; received_at = Time.now ()
+            ; gossip_topic = None
+            }
+          ] ;
       Ok
         (Option.value_map
            ~f:(fun b -> `Preserved_body b)
@@ -305,7 +313,7 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
   let extend_aux aux =
     { aux with
       Transition_state.received =
-        { received_at = Time.now (); gossip = false; sender }
+        { received_at = Time.now (); gossip_topic = None; sender }
         :: aux.Transition_state.received
     }
   in
@@ -328,12 +336,13 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
            ~transition_states:state.transition_states ~context hint )
   | None, Some hh -> (
       let relevance_status =
-        Gossip.verify_header_is_relevant ~event_recording:false ~context ~sender
+        Gossip.verify_header_is_relevant ~context
           ~transition_states:state.transition_states hh
       in
       match relevance_status with
       | `Relevant ->
-          pre_validate_and_add ~context ~actions ~sender ~state ?body hh
+          pre_validate_and_add_retrieved ~context ~actions ~sender ~state ?body
+            hh
       | _ ->
           Ok `No_body_preserved )
   | None, None ->
@@ -525,8 +534,8 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
   * transition is neither in frontier nor in catchup state
   * [verify_header_is_relevant] returns [`Relevant] for the gossip
 *)
-and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
-    ?body:body_opt received_header =
+and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
+    ~preferred_peers received_header =
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let header_with_hash =
@@ -563,7 +572,6 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
   State_hash.Table.set state.children ~key:state_hash
     ~data:(`Invalid_children, invalid_children) ;
   State_hash.Table.remove state.parents state_hash ;
-  let received_at = Time.now () in
   (* [invariant] children.processed = children.waiting_for_parent = empty *)
   let children =
     { Substate.empty_children_sets with
@@ -576,17 +584,21 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
     List.filter_map non_invalid_children
       ~f:(mark_done ~logger:Context.logger ~transition_states)
   in
-  let gossip = Option.is_some gossip_type in
   let add_to_state status =
     Transition_states.add_new transition_states
       (Received
          { body_opt
          ; header = received_header
-         ; gossip_data = Gossip.create_gossip_data ?gossip_type vc
+         ; gossip_data
          ; substate = { children; status }
          ; aux =
-             { received_via_gossip = gossip
-             ; received = [ { gossip; sender; received_at } ]
+             { received_via_gossip =
+                 List.find
+                   ~f:(fun { Transition_state.gossip_topic; _ } ->
+                     Option.is_some gossip_topic )
+                   received
+                 |> Option.is_some
+             ; received
              }
          } )
   in
@@ -618,21 +630,22 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
         (state_hash :: non_invalid_children) ;
       restart_failed_ancestor ~state ~actions ~context parent_hash
   | `Not_present ->
+      let now = Time.now () in
       let max_timeout =
         Time.add
-          (List.fold ~init:received_at child_contexts ~f:(fun t (timeout, _) ->
+          (List.fold ~init:now child_contexts ~f:(fun t (timeout, _) ->
                Time.max t timeout ) )
           Context.ancestry_download_timeout
       in
       let timeout =
-        Time.min max_timeout @@ Time.add received_at
+        Time.min max_timeout @@ Time.add now
         @@ Time.Span.scale Context.ancestry_download_timeout 2.
       in
       (* Children sets of parent are not updated because parent is not present *)
       let interrupt_ivar =
         launch_ancestry_retrieval ~actions ~context ~cancel_child_contexts
           ~retrieve_immediately:(List.is_empty child_contexts)
-          ~preferred_peers:[ sender ] ~timeout ~state header_with_hash
+          ~preferred_peers ~timeout ~state header_with_hash
       in
       add_to_state
       @@ Processing
@@ -647,14 +660,14 @@ and add_received ~context ~actions ~sender ~state ?gossip_type ?vc
         ~reason:"parent just added to transition states"
 
 (** Add a gossip to catchup state *)
-let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
-    gossip_header =
+let handle_gossip ~context ~actions ~state ?body ~gd_map gossip_header =
   let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
   let body_from_storage = check_body_storage ~context header_with_hash in
   let body = if is_some body then body else body_from_storage in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =
-    Gossip.verify_header_is_relevant ~context ~sender
+    Gossip.verify_header_is_relevant ~context
+      ~record_event_for_senders:(Transition_frontier.Gossip.senders gd_map)
       ~transition_states:state.transition_states header_with_hash
   in
   let preserved_if_not_in_storage = function
@@ -663,14 +676,38 @@ let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
     | _ ->
         `No_body_preserved
   in
+  let gossip_data =
+    List.fold (String.Map.data gd_map) ~init:Gossip.No_validation_callback
+      ~f:(fun old gd ->
+        Option.value_map ~default:old gd.valid_cb ~f:(fun vc ->
+            let (module Context : CONTEXT) = context in
+            Gossip.update_gossip_data ~logger:Context.logger ~state_hash ~vc
+              ~gossip_type:gd.type_ old ) )
+  in
+  let received =
+    List.filter_map (String.Map.to_alist gd_map) ~f:(function
+      | topic, { received_at; sender = Remote sender; _ } ->
+          Some
+            { Transition_state.received_at; sender; gossip_topic = Some topic }
+      | _ ->
+          None )
+  in
   preserved_if_not_in_storage
   @@
   match relevance_status with
   | `Irrelevant ->
       `No_body_preserved
   | `Relevant ->
-      add_received ~actions ~context ~sender ~state ~gossip_type ?vc ?body
-        (Initial_valid gossip_header) ;
+      let senders =
+        Transition_frontier.Gossip.senders gd_map
+        |> List.filter_map ~f:(function
+             | Network_peer.Envelope.Sender.Local ->
+                 None
+             | Remote p ->
+                 Some p )
+      in
+      add_received ~actions ~context ~state ~gossip_data ~received ?body
+        ~preferred_peers:senders (Initial_valid gossip_header) ;
       Option.value_map
         ~f:(fun b -> `Preserved_body b)
         ~default:`No_body_preserved body
@@ -679,8 +716,7 @@ let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
         Fn.compose
           (handle_preserve_hint ~actions
              ~transition_states:state.transition_states ~context )
-          (Gossip.preserve_relevant_gossip ?body ?vc ~context ~gossip_type
-             ~gossip_header ~sender )
+          (Gossip.preserve_relevant_gossip ?body ~gd_map ~context ~gossip_header)
       in
       Option.value_map ~f
         (Transition_states.find state.transition_states state_hash)
@@ -689,73 +725,36 @@ let handle_gossip ~context ~actions ~state ~sender ?body ~gossip_type ?vc
 (** [handle_collected_transition] adds a transition that was collected during bootstrap
     to the catchup state. *)
 let handle_collected_transition ~context:(module Context : CONTEXT) ~actions
-    ~state (b_or_h_env, vc) =
-  let header_with_validation, body, gossip_type =
-    match Network_peer.Envelope.Incoming.data b_or_h_env with
-    | Bootstrap_controller.Transition_cache.Block block ->
+    ~state (b_or_h, `Gossip_map gd_map) =
+  let header_with_validation, body =
+    match b_or_h with
+    | `Block block ->
         ( Mina_block.Validation.to_header block
-        , Some (Mina_block.body @@ Mina_block.Validation.block block)
-        , `Block )
-    | Bootstrap_controller.Transition_cache.Header header ->
-        (header, None, `Header)
+        , Some (Mina_block.body @@ Mina_block.Validation.block block) )
+    | `Header header ->
+        (header, None)
   in
-  match Network_peer.Envelope.Incoming.sender b_or_h_env with
-  | Local ->
-      [%log' warn Context.logger]
-        "handle_collected_transition: called for a transition with local sender"
-        ~metadata:
-          [ ( "state_hash"
-            , State_hash.to_yojson
-                (state_hash_of_header_with_validation header_with_validation) )
-          ] ;
-      `No_body_preserved
-  | Remote sender ->
-      (* TODO: is it safe to add this as a gossip? Transition was received
-         through gossip, but was potentially sent not within its slot
-         as boostrap controller is not able to verify this part.orphans
-         Hence maybe it's worth leaving it as non-gossip, a dependent transition. *)
-      handle_gossip
-        ~context:(module Context)
-        ~actions ~state ~sender ?vc ?body ~gossip_type header_with_validation
+  handle_gossip
+    ~context:(module Context)
+    ~actions ~state ~gd_map ?body header_with_validation
 
 (** [handle_network_transition] adds a transition that was received through gossip
     to the catchup state. *)
 let handle_network_transition ~context:(module Context : CONTEXT) ~actions
-    ~state (b_or_h, `Valid_cb vc) =
+    ~state (b_or_h, `Gossip_map gd_map) =
   Option.value ~default:`No_body_preserved
-  @@ let%map.Option sender, header_with_validation, body, gossip_type =
-       let log_local_header hh =
-         [%log' warn Context.logger]
-           "handle_network_transition: called for a transition with local \
-            sender"
-           ~metadata:
-             [ ( "state_hash"
-               , State_hash.to_yojson
-                   (State_hash.With_state_hashes.state_hash hh) )
-             ]
-       in
-       let open Network_peer.Envelope.Incoming in
+  @@ let%map.Option header_with_validation, body =
        match b_or_h with
-       | `Block { sender = Remote sender; data = block; _ } ->
+       | `Block block ->
            Some
-             ( sender
-             , Mina_block.Validation.to_header block
-             , Some (Mina_block.body @@ Mina_block.Validation.block block)
-             , `Block )
-       | `Block { data = block; _ } ->
-           log_local_header
-             ( Mina_block.Validation.block_with_hash block
-             |> With_hash.map ~f:Mina_block.header ) ;
-           None
-       | `Header { sender = Remote sender; data = header; _ } ->
-           Some (sender, header, None, `Header)
-       | `Header { data = header; _ } ->
-           log_local_header (Mina_block.Validation.header_with_hash header) ;
-           None
+             ( Mina_block.Validation.to_header block
+             , Some (Mina_block.body @@ Mina_block.Validation.block block) )
+       | `Header header ->
+           Some (header, None)
      in
      handle_gossip
        ~context:(module Context)
-       ~actions ~state ~sender ?body ?vc ~gossip_type header_with_validation
+       ~actions ~state ?body ~gd_map header_with_validation
 
 let handle_downloaded_body ~context ~actions ~body_reference_to_state_hash
     ~transition_states body_ref =

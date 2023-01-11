@@ -353,7 +353,7 @@ module type Transition_router_intf = sig
          ( [ `Block of Mina_block.t Envelope.Incoming.t
            | `Header of Mina_block.Header.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
+         * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:
@@ -367,9 +367,5 @@ module type Transition_router_intf = sig
     -> notify_online:(unit -> unit Deferred.t)
     -> on_bitswap_update_ref:Mina_net2.on_bitswap_update_t ref
     -> unit
-    -> ( [ `Transition of Mina_block.Validated.t ]
-       * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-       Strict_pipe.Reader.t
-       * unit Ivar.t
+    -> Mina_block.Validated.t Strict_pipe.Reader.t * unit Ivar.t
 end

@@ -30,6 +30,10 @@ type Structured_log_events.t +=
   [@@deriving
     register_event { msg = "Broadcasting snark pool diff over gossip net" }]
 
+type Structured_log_events.t +=
+  | Rebroadcast_transition of { state_hash : State_hash.t }
+  [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
+
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
@@ -1526,13 +1530,25 @@ include struct
     lift (set_connection_gating ?clean_added_peers) t config
 end
 
+let rebroadcast_transition ~origin_topics t b_or_h =
+  let state_hash, b_or_h' =
+    match b_or_h with
+    | `Header h ->
+        (State_hash.With_state_hashes.state_hash h, `Header (With_hash.data h))
+    | `Block b ->
+        (State_hash.With_state_hashes.state_hash b, `Block (With_hash.data b))
+  in
+  [%str_log' trace t.logger] (Rebroadcast_transition { state_hash }) ;
+  Gossip_net.Any.broadcast_transition ~origin_topics t.gossip_net b_or_h'
+
 (* TODO: Have better pushback behavior *)
-let broadcast_state t state =
+let broadcast_transition t state =
   [%str_log' trace t.logger]
     (Gossip_new_state
        { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
+  Gossip_net.Any.broadcast_transition t.gossip_net
+    (`Block (With_hash.data state))
 
 let broadcast_transaction_pool_diff ?nonce t diff =
   [%str_log' trace t.logger]
@@ -1540,6 +1556,7 @@ let broadcast_transaction_pool_diff ?nonce t diff =
        { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
     ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
+  (* TODO handle origin topics and avoid unncecessary broadcast *)
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
 let broadcast_snark_pool_diff ?nonce t diff =

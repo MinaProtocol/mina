@@ -877,7 +877,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     Breadcrumb.build ~logger ~precomputed_values ~verifier
                       ~get_completed_work:(Fn.const None) ~trust_system
                       ~parent:crumb ~transition
-                      ~sender:None (* Consider skipping `All here *)
+                      ~senders:[] (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time () )
                 |> Deferred.Result.map_error ~f:(function
@@ -956,7 +956,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     "Generated transition $state_hash was accepted into \
                      transition frontier" ;
                   Deferred.map ~f:Result.return
-                    (Mina_networking.broadcast_state net
+                    (Mina_networking.broadcast_transition net
                        (Breadcrumb.block_with_hash breadcrumb) )
               | `Timed_out ->
                   (* FIXME #3167: this should be fatal, and more
@@ -1350,7 +1350,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
                   ~get_completed_work:(Fn.const None) ~trust_system
-                  ~parent:crumb ~transition ~sender:None
+                  ~parent:crumb ~transition ~senders:[]
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function

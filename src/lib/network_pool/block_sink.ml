@@ -1,6 +1,6 @@
 open Network_peer
 open Core_kernel
-open Async
+open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
@@ -12,7 +12,7 @@ type block_or_header =
 type stream_msg =
   block_or_header
   * [ `Time_received of Block_time.t ]
-  * [ `Valid_cb of Mina_net2.Validation_callback.t ]
+  * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ]
 
 type block_sink_config =
   { logger : Logger.t
@@ -28,7 +28,7 @@ type block_sink_config =
 type t =
   | Sink of
       { writer : (stream_msg, synchronous, unit Deferred.t) Writer.t
-      ; rate_limiter : Network_pool.Rate_limiter.t
+      ; rate_limiter : Rate_limiter.t
       ; logger : Logger.t
       ; on_push : unit -> unit Deferred.t
       ; time_controller : Block_time.Controller.t
@@ -43,7 +43,7 @@ type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
   [@@deriving register_event { msg = "Received a block from $sender" }]
 
-let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
+let push sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
   match sink with
   | Void ->
       Deferred.unit
@@ -139,8 +139,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       Mina_metrics.(Counter.inc_one Network.Block.received) ;
       let%bind () =
         match
-          Network_pool.Rate_limiter.add rate_limiter sender ~now:(Time.now ())
-            ~score:1
+          Rate_limiter.add rate_limiter sender ~now:(Time.now ()) ~score:1
         with
         | `Capacity_exceeded ->
             Internal_tracing.with_state_hash state_hash
@@ -152,7 +151,8 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
             Deferred.unit
         | `Within_capacity ->
-            Writer.write writer (b_or_h, `Time_received tm, `Valid_cb cb)
+            Writer.write writer
+              (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb))
       in
       let exists_well_formedness_errors =
         match b_or_h with
@@ -216,10 +216,10 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       Deferred.unit
 
 let log_rate_limiter_occasionally rl ~logger ~label =
-  let t = Time.Span.of_min 1. in
+  let t = Time_ns.Span.of_min 1. in
   every t (fun () ->
       [%log debug]
-        ~metadata:[ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
+        ~metadata:[ ("rate_limiter", Rate_limiter.summary rl) ]
         !"%s $rate_limiter" label )
 
 let create
@@ -233,7 +233,7 @@ let create
     ; constraint_constants
     } =
   let rate_limiter =
-    Network_pool.Rate_limiter.create
+    Rate_limiter.create
       ~capacity:
         ( (* Max of 20 transitions per slot per peer. *)
           20

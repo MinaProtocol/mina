@@ -14,7 +14,7 @@ include
     with type msg :=
       block_or_header
       * [ `Time_received of Block_time.t ]
-      * [ `Valid_cb of Mina_net2.Validation_callback.t ]
+      * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ]
 
 type block_sink_config =
   { logger : Logger.t
@@ -31,6 +31,6 @@ val create :
      block_sink_config
   -> ( block_or_header
      * [ `Time_received of Block_time.t ]
-     * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
+     * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ] )
      Pipe_lib.Strict_pipe.Reader.t
      * t

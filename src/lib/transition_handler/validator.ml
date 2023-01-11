@@ -3,7 +3,6 @@ open Core_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
-open Cache_lib
 open Network_peer
 open Core_extended_cache
 
@@ -60,21 +59,19 @@ let verify_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
     ~error:`Disconnected
 
 let verify_transition_is_relevant ~context:(module Context : CONTEXT) ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+    ~unprocessed_transition_cache env =
   let open Result.Let_syntax in
-  let transition =
-    Envelope.Incoming.data enveloped_transition
-    |> Mina_block.Validation.block_with_hash
-  in
   let%bind () =
     Option.fold
-      (Unprocessed_transition_cache.final_state unprocessed_transition_cache
-         enveloped_transition )
+      (Unprocessed_transition_cache.final_state unprocessed_transition_cache env)
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
   [%log' internal Context.logger] "Check_transition_can_be_connected" ;
-  let header_with_hash = With_hash.map ~f:Mina_block.header transition in
+  let header_with_hash =
+    With_hash.map ~f:Mina_block.header
+      (Mina_block.Validation.block_with_hash @@ Envelope.Incoming.data env)
+  in
   let%map () =
     verify_header_is_relevant
       ~context:(module Context)
@@ -82,26 +79,33 @@ let verify_transition_is_relevant ~context:(module Context : CONTEXT) ~frontier
   in
   [%log' internal Context.logger] "Register_transition_for_processing" ;
   (* we expect this to be Ok since we just checked the cache *)
-  Unprocessed_transition_cache.register_exn unprocessed_transition_cache
-    enveloped_transition
+  Unprocessed_transition_cache.register_exn unprocessed_transition_cache env
 
 let verify_transition_or_header_is_relevant ~context:(module Context : CONTEXT)
-    ~frontier ~unprocessed_transition_cache b_or_h =
+    ~frontier ~unprocessed_transition_cache ~gd_map b_or_h =
   match b_or_h with
   | `Block b ->
-      Result.map ~f:(fun x -> `Block x)
+      let env =
+        Option.value_map
+          (String.Map.min_elt gd_map)
+          ~f:(fun (_, Transition_frontier.Gossip.{ received_at; sender; _ }) ->
+            { Network_peer.Envelope.Incoming.data = b; received_at; sender } )
+          ~default:(Network_peer.Envelope.Incoming.local b)
+      in
+      Result.map ~f:(fun x ->
+          `Block (Cache_lib.Cached.transform ~f:(const b) x) )
       @@ verify_transition_is_relevant
            ~context:(module Context)
-           ~frontier ~unprocessed_transition_cache b
+           ~frontier ~unprocessed_transition_cache env
   | `Header h ->
-      let header_with_hash, _ = Envelope.Incoming.data h in
       Result.map ~f:(fun _ -> `Header h)
       @@ verify_header_is_relevant
            ~context:(module Context)
-           ~frontier header_with_hash
+           ~frontier
+           (Mina_block.Validation.header_with_hash h)
 
 let record_transition_is_irrelevant ~logger ~trust_system ~frontier
-    ~outdated_root_cache ~sender ~error header_with_hash =
+    ~outdated_root_cache ~senders ~error header_with_hash =
   let transition_hash =
     State_hash.With_state_hashes.state_hash header_with_hash
   in
@@ -112,13 +116,14 @@ let record_transition_is_irrelevant ~logger ~trust_system ~frontier
         ~metadata:[ ("reason", `String "In_frontier or In_process") ] ;
       (* Send_old_gossip isn't necessary true, there is a possibility of race condition when the
          process retrieved the transition via catchup mechanism slightly before the gossip reached *)
-      Trust_system.record_envelope_sender trust_system logger sender
-        ( Trust_system.Actions.Sent_old_gossip
-        , Some
-            ( "external transition with state hash $state_hash"
-            , [ ("state_hash", State_hash.to_yojson transition_hash)
-              ; ("header", Mina_block.Header.to_yojson header)
-              ] ) )
+      Deferred.List.iter senders ~f:(fun sender ->
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( Trust_system.Actions.Sent_old_gossip
+            , Some
+                ( "external transition with state hash $state_hash"
+                , [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("header", Mina_block.Header.to_yojson header)
+                  ] ) ) )
   | `Disconnected ->
       [%log internal] "Failure" ~metadata:[ ("reason", `String "Disconnected") ] ;
       Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
@@ -150,29 +155,31 @@ let record_transition_is_irrelevant ~logger ~trust_system ~frontier
           Sent_useless_gossip )
         else Disconnected_chain
       in
-      Trust_system.record_envelope_sender trust_system logger sender
-        ( action
-        , Some
-            ( "received transition that was not connected to our chain from \
-               $sender"
-            , [ ("sender", Envelope.Sender.to_yojson sender)
-              ; ("header", Mina_block.Header.to_yojson header)
-              ] ) )
+      Deferred.List.iter senders ~f:(fun sender ->
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( action
+            , Some
+                ( "received transition that was not connected to our chain \
+                   from $sender"
+                , [ ("sender", Envelope.Sender.to_yojson sender)
+                  ; ("header", Mina_block.Header.to_yojson header)
+                  ] ) ) )
 
-let record_transition_is_relevant ~logger ~trust_system ~sender ~time_controller
-    header_with_hash =
+let record_transition_is_relevant ~logger ~trust_system ~senders
+    ~time_controller header_with_hash =
   let transition_hash =
     State_hash.With_state_hashes.state_hash header_with_hash
   in
   let header = With_hash.data header_with_hash in
   let%map () =
-    Trust_system.record_envelope_sender trust_system logger sender
-      ( Trust_system.Actions.Sent_useful_gossip
-      , Some
-          ( "external transition $state_hash"
-          , [ ("state_hash", State_hash.to_yojson transition_hash)
-            ; ("header", Mina_block.Header.to_yojson header)
-            ] ) )
+    Deferred.List.iter senders ~f:(fun sender ->
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Sent_useful_gossip
+          , Some
+              ( "external transition $state_hash"
+              , [ ("state_hash", State_hash.to_yojson transition_hash)
+                ; ("header", Mina_block.Header.to_yojson header)
+                ] ) ) )
   in
   let transition_time =
     Mina_block.Header.protocol_state header
@@ -185,30 +192,20 @@ let record_transition_is_relevant ~logger ~trust_system ~sender ~time_controller
        transition_time )
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
-    ~frontier ~transition_reader
-    ~(valid_transition_writer :
-       ( [ `Block of
-           ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
-       , drop_head buffered
-       , unit )
-       Writer.t ) ~unprocessed_transition_cache =
+    ~frontier ~transition_reader ~valid_transition_writer
+    ~unprocessed_transition_cache =
   let open Context in
   let outdated_root_cache = Lru.create ~destruct:None 1000 in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Reader.iter transition_reader ~f:(fun (b_or_h, `Valid_cb vc) ->
-          let header_with_hash, sender =
+      Reader.iter transition_reader ~f:(fun (b_or_h, `Gossip_map gd_map) ->
+          let senders = Transition_frontier.Gossip.senders gd_map in
+          let header_with_hash =
             match b_or_h with
             | `Block b ->
-                let block_with_hash, _ = Envelope.Incoming.data b in
-                ( With_hash.map ~f:Mina_block.header block_with_hash
-                , Envelope.Incoming.sender b )
+                With_hash.map ~f:Mina_block.header
+                  (Mina_block.Validation.block_with_hash b)
             | `Header h ->
-                let header_with_hash, _ = Envelope.Incoming.data h in
-                (header_with_hash, Envelope.Incoming.sender h)
+                Mina_block.Validation.header_with_hash h
           in
           let transition_hash =
             State_hash.With_state_hashes.state_hash header_with_hash
@@ -221,15 +218,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           match
             verify_transition_or_header_is_relevant
               ~context:(module Context)
-              ~frontier ~unprocessed_transition_cache b_or_h
+              ~frontier ~unprocessed_transition_cache ~gd_map b_or_h
           with
           | Ok b_or_h' ->
               let%map () =
-                record_transition_is_relevant ~logger ~trust_system ~sender
+                record_transition_is_relevant ~logger ~trust_system ~senders
                   ~time_controller header_with_hash
               in
               [%log internal] "Validate_transition_done" ;
-              Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
+              Writer.write valid_transition_writer (b_or_h', `Gossip_map gd_map)
           | Error error ->
               record_transition_is_irrelevant ~logger ~trust_system ~frontier
-                ~outdated_root_cache ~sender ~error header_with_hash ) )
+                ~outdated_root_cache ~senders ~error header_with_hash ) )

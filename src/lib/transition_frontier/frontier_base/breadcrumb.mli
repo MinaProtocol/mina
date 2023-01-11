@@ -38,7 +38,7 @@ val build :
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> sender:Envelope.Sender.t option
+  -> senders:Envelope.Sender.t list
   -> transition_receipt_time:Time.t option
   -> unit
   -> ( t
