@@ -1717,6 +1717,15 @@ module Make (Inputs : Inputs_intf) = struct
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
+    (* If this is the last account update, and [will_succeed] is false, then
+       [success] must also be false.
+    *)
+    Bool.(
+      Assert.any ~pos:__POS__
+        [ not is_last_account_update
+        ; local_state.will_succeed
+        ; not local_state.success
+        ]) ;
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger
