@@ -27,6 +27,10 @@ type Structured_log_events.t +=
   [@@deriving
     register_event { msg = "Broadcasting snark pool diff over gossip net" }]
 
+type Structured_log_events.t +=
+  | Rebroadcast_transition of { state_hash : State_hash.t }
+  [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
+
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
@@ -1547,23 +1551,35 @@ end
 
 (* TODO: Have better pushback behavior *)
 let log_gossip logger ~log_msg msg =
-  [%str_log' trace logger]
+  [%str_log trace]
     ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
     log_msg
 
-let broadcast_state t state =
-  let msg = With_hash.data state in
-  log_gossip t.logger (Gossip_net.Message.New_state msg)
+let rebroadcast_transition ~origin_topics t b_or_h =
+  let state_hash, b_or_h' =
+    match b_or_h with
+    | `Header h ->
+        (State_hash.With_state_hashes.state_hash h, `Header (With_hash.data h))
+    | `Block b ->
+        (State_hash.With_state_hashes.state_hash b, `Block (With_hash.data b))
+  in
+  [%str_log' trace t.logger] (Rebroadcast_transition { state_hash }) ;
+  Gossip_net.Any.broadcast_transition ~origin_topics t.gossip_net b_or_h'
+
+let broadcast_transition t transition =
+  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
+  let block = With_hash.data transition in
+  log_gossip t.logger (Gossip_net.Message.New_state block)
     ~log_msg:
       (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
-  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net msg
+         { state_hash = State_hash.With_state_hashes.state_hash transition } ) ;
+  Gossip_net.Any.broadcast_transition t.gossip_net (`Block block)
 
 let broadcast_transaction_pool_diff t diff =
   log_gossip t.logger (Gossip_net.Message.Transaction_pool_diff diff)
     ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
+  (* TODO handle origin topics and avoid unncecessary broadcast *)
   Gossip_net.Any.broadcast_transaction_pool_diff t.gossip_net diff
 
 let broadcast_snark_pool_diff t diff =
@@ -1574,6 +1590,7 @@ let broadcast_snark_pool_diff t diff =
          { work =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
          } ) ;
+  (* TODO handle origin topics and avoid unncecessary broadcast *)
   Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
 
 (* TODO: Don't copy and paste *)

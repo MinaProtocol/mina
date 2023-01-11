@@ -252,6 +252,17 @@ let promote_to ~context ~actions ~transition_states ~substate ~gossip_data
         accept_gossip ~context ~valid_cb:header_vc consensus_state ;
         Some block_vc
   in
+  let origin_topics =
+    List.filter_map received ~f:(fun { gossip_topic; _ } -> gossip_topic)
+  in
+  let (module Context : CONTEXT) = context in
+  let hh = Mina_block.Validation.header_with_hash header in
+  let b_or_h =
+    Option.value_map body_opt ~default:(`Header hh) ~f:(fun body ->
+        `Block
+          (With_hash.map hh ~f:(fun header -> Mina_block.create ~header ~body)) )
+  in
+  Context.rebroadcast ~origin_topics b_or_h ;
   if aux.Transition_state.received_via_gossip then
     pass_the_baton ~transition_states ~context ~actions
       (Mina_state.Protocol_state.previous_state_hash protocol_state) ;

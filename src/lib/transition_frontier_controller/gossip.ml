@@ -11,9 +11,8 @@ include Gossip_types
   
     Depending on relevance status, metrics are updated for the peer who sent the transition.
 *)
-let verify_header_is_relevant ?(event_recording = true)
-    ~context:(module Context : CONTEXT) ~sender ~transition_states
-    header_with_hash =
+let verify_header_is_relevant ?record_event_for_senders
+    ~context:(module Context : CONTEXT) ~transition_states header_with_hash =
   let hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_result =
     let%bind.Result () =
@@ -24,9 +23,10 @@ let verify_header_is_relevant ?(event_recording = true)
       ~context:(module Context)
       ~frontier:Context.frontier header_with_hash
   in
-  if event_recording then
-    Context.record_event
-      (`Verified_header_relevance (relevance_result, header_with_hash, sender)) ;
+  Option.iter record_event_for_senders ~f:(fun senders ->
+      Context.record_event
+        (`Verified_header_relevance
+          (relevance_result, header_with_hash, senders) ) ) ;
   match relevance_result with
   | Ok () ->
       `Relevant
@@ -76,8 +76,7 @@ let preserve_body st body =
     Function returns a pair of a new transition state and a hint of further action to be
     performed in case the gossiped data triggering a change of state.
     *)
-let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
-    ~gossip_header ~sender st =
+let preserve_relevant_gossip ?body:body_opt ~gd_map ~context ~gossip_header st =
   let (module Ctx : CONTEXT) = context in
   let state_hash =
     (Transition_state.State_functions.transition_meta st).state_hash
@@ -86,44 +85,71 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
     Fn.compose Mina_state.Protocol_state.consensus_state
       Mina_block.Header.protocol_state
   in
-  let fire_callback =
-    Option.value_map ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-      ~default:ignore vc_opt
+  let fire_callback verdict =
+    List.iter
+      ~f:
+        (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired verdict)
+      (Transition_frontier.Gossip.valid_cbs gd_map)
   in
-  let update_gossip_data =
-    match vc_opt with
-    | Some _ when Transition_state.is_failed st ->
-        fire_callback `Ignore ;
-        Fn.id
-    | None ->
-        Fn.id
-    | Some vc ->
-        update_gossip_data ~logger:Ctx.logger ~state_hash ~vc ~gossip_type
+  let update_gossip_data init =
+    if Transition_state.is_failed st then (
+      fire_callback `Ignore ;
+      init )
+    else
+      List.fold ~init (String.Map.data gd_map)
+        ~f:
+          (Fn.flip (function
+            | { Transition_frontier.Gossip.type_ = gossip_type
+              ; valid_cb = Some vc
+              ; _
+              } ->
+                update_gossip_data ~logger:Ctx.logger ~state_hash ~vc
+                  ~gossip_type
+            | _ ->
+                Fn.id ) )
   in
   let update_block_vc =
-    match gossip_type with
-    | `Block when Transition_state.is_failed st ->
-        fire_callback `Ignore ;
-        ident
-    | `Block ->
-        Option.first_some vc_opt
-    | _ ->
-        ident
+    let vcs =
+      List.filter_map (String.Map.data gd_map) ~f:(function
+        | { type_ = `Block; valid_cb; _ } ->
+            valid_cb
+        | _ ->
+            None )
+    in
+    if Transition_state.is_failed st then (
+      List.iter vcs
+        ~f:
+          (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
+             `Ignore ) ;
+      ident )
+    else function
+      | None ->
+          List.hd vcs
+      | Some p when List.is_empty vcs ->
+          Some p
+      | Some p ->
+          [%log' warn Ctx.logger] "Duplicate block gossip for $state_hash"
+            ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
+          Some p
   in
   let accept_header consensus_state =
-    match gossip_type with
-    | `Block ->
-        ()
-    | `Header ->
-        Option.iter vc_opt ~f:(fun valid_cb ->
-            Context.accept_gossip ~context ~valid_cb consensus_state )
+    List.iter (String.Map.data gd_map) ~f:(function
+      | { type_ = `Header; valid_cb = Some valid_cb; _ } ->
+          Context.accept_gossip ~context ~valid_cb consensus_state
+      | _ ->
+          () )
+  in
+  let received =
+    List.filter_map (String.Map.to_alist gd_map) ~f:(function
+      | topic, { received_at; sender = Remote sender; _ } ->
+          Some
+            { Transition_state.received_at; sender; gossip_topic = Some topic }
+      | _ ->
+          None )
   in
   let st =
     Transition_state.modify_aux_data st ~f:(fun d ->
-        { received_via_gossip = true
-        ; received =
-            { received_at = Time.now (); gossip = true; sender } :: d.received
-        } )
+        { received_via_gossip = true; received = received @ d.received } )
   in
   let st, pre_decision =
     Option.value_map
@@ -190,8 +216,8 @@ let preserve_relevant_gossip ?body:body_opt ?vc:vc_opt ~context ~gossip_type
         consensus_state
         @@ Mina_block.(header @@ Frontier_base.Breadcrumb.block breadcrumb)
       in
-      Option.iter vc_opt ~f:(fun valid_cb ->
-          accept_gossip ~context ~valid_cb consensus_state ) ;
+      List.iter (Transition_frontier.Gossip.valid_cbs gd_map)
+        ~f:(fun valid_cb -> accept_gossip ~context ~valid_cb consensus_state) ;
       (st, `Nop bp)
   | _, `Mark_downloading_body_processed _ ->
       failwith "Mark_downloading_body_processed: unexpected case"

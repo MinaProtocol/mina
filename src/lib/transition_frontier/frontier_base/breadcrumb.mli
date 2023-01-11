@@ -35,7 +35,7 @@ val build :
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:Mina_block.almost_valid_block
-  -> sender:Envelope.Sender.t option
+  -> senders:Envelope.Sender.t list
   -> transition_receipt_time:Time.t option
   -> unit
   -> ( t

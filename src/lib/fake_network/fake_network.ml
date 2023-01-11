@@ -149,7 +149,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
                 (config peer state.consensus_local_state)
                 ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
                 ~sinks:
-                  ( Transition_handler.Block_sink.void
+                  ( Network_pool.Block_sink.void
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
