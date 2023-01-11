@@ -208,9 +208,11 @@ send_payments &
 
 # Deploy zkApps
 echo "==================== DEPLOYING ZKAPPS ======================"
+deploy_txs=()
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
+  echo "Deploying ${zkapp}..."
 
   zkapp_pk=$(cat ${MINA_KEYS_PATH}/zkapp-${zkapp}.key.pub)
   zkapp_privkey=$(mina-dev advanced dump-keypair --privkey-path "${MINA_KEYS_PATH}/zkapp-${zkapp}.key" | sed -ne "s/Private key: //p")
@@ -232,24 +234,32 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
   }
 }
 EOF
-  curr_dir=$(pwd)
   cd "$zkapp_path"
-  npm install --no-progress ${curr_dir}/src/lib/snarky_js_bindings/snarkyjs
+  npm install --no-progress ${OLDPWD}/src/lib/snarky_js_bindings/snarkyjs
   npm install --no-progress
-  zk deploy sandbox -y
+  txn=$(zk deploy sandbox -y | sed -ne "s/https:\/\/berkeley.minaexplorer.com\/transaction\///p")
+  deploy_txs+=txn
   cd -
+  echo "Done."
 done
 
+# TODO: wait until all zkApps deploy txns are included in a block
+
 # Start calling zkApp methods
+echo "==================== INTERACTING WITH ZKAPPS ======================"
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
+  zkapp=$(basename $zkapp_path)
+  echo "Interacting with ${zkapp}..."
+
   cd "$zkapp_path"
   npm run build
   ./interact.sh http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key
   cd -
+  echo "Done." 
 done
 
-# Wait until X block have been produced
+# TODO: Wait until X block have been produced or all interaction txns are present
 while [ $(mina-dev client status --json | jq .blockchain_length) -lt 5 ]; do
   sleep 15
 done
@@ -259,8 +269,7 @@ echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE}
 rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
-# uncomment after https://github.com/MinaProtocol/mina/pull/12317 is merged
-# rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
 rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
