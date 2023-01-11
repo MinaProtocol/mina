@@ -444,6 +444,7 @@ module type Full = sig
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
         -> Zkapp_statement.Checked.t option
+           * [> `Must_verify of Tick.Boolean.var ]
     end
   end
 

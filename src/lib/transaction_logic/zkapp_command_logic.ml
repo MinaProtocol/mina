@@ -325,7 +325,8 @@ module type Account_update_intf = sig
   val increment_nonce : t -> bool
 
   val check_authorization :
-       commitment:transaction_commitment
+       will_succeed:bool
+    -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
@@ -1180,7 +1181,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization ~commitment
+      Inputs.Account_update.check_authorization
+        ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
     assert_ ~pos:__POS__

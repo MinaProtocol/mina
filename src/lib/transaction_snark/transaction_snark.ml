@@ -993,6 +993,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         val spec : single
 
         val set_zkapp_input : Zkapp_statement.Checked.t -> unit
+
+        val set_must_verify : Boolean.var -> unit
       end
 
       type account_update = Zkapp_call_forest.Checked.account_update =
@@ -1863,7 +1865,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
-            let check_authorization ~commitment
+            let check_authorization ~will_succeed ~commitment
                 ~calls:({ hash = calls; _ } : Call_forest.t)
                 ({ account_update; control; _ } : t) =
               let proof_verifies =
@@ -1873,6 +1875,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       { account_update = (account_update.hash :> Field.t)
                       ; calls = (calls :> Field.t)
                       } ;
+                    set_must_verify will_succeed ;
                     Boolean.true_
                 | Signature | None_given ->
                     Boolean.false_
@@ -2154,6 +2157,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           As_prover.Ref.create (fun () -> !witness.start_zkapp_command)
         in
         let zkapp_input = ref None in
+        let must_verify = ref Boolean.true_ in
         let global, local =
           List.fold_left spec ~init
             ~f:(fun ((_, local) as acc) account_update_spec ->
@@ -2163,6 +2167,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let spec = account_update_spec
 
                 let set_zkapp_input x = zkapp_input := Some x
+
+                let set_must_verify x = must_verify := x
               end) in
               let finish v =
                 let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
@@ -2290,7 +2296,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                  }
                in
                Fee_excess.assert_equal_checked expected got ) ) ;
-        Stdlib.( ! ) zkapp_input
+        (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
 
       (* Horrible hack :( *)
       let witness : Witness.t option ref = ref None
@@ -2326,7 +2332,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[ side_loaded 0 ]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input =
+                  let zkapp_input, `Must_verify must_verify =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   let proof =
@@ -2336,7 +2342,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   { previous_proof_statements =
                       [ { public_input = Option.value_exn zkapp_input
                         ; proof
-                        ; proof_must_verify = b
+                        ; proof_must_verify = Run.Boolean.( &&& ) b must_verify
                         }
                       ]
                   ; public_output = ()
@@ -2349,7 +2355,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input_opt =
+                  let zkapp_input_opt, _ =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
@@ -2364,7 +2370,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input_opt =
+                  let zkapp_input_opt, _ =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
