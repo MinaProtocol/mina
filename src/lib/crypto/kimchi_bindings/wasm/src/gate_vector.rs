@@ -157,6 +157,15 @@ macro_rules! impl_gate_vector {
             ) -> Box<[u8]> {
                 Circuit::new(public_input_size, &(v.0)).digest().to_vec().into_boxed_slice()
             }
+
+            #[wasm_bindgen]
+            pub fn [<caml_pasta_ $name:snake _plonk_circuit_serialize>](
+                public_input_size: usize,
+                v: &WasmGateVector
+            ) -> String {
+                let circuit = Circuit::new(public_input_size, &v.0);
+                serde_json::to_string(&circuit).expect("couldn't serialize constraints")
+            }
         }
     };
 }

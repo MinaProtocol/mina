@@ -7,6 +7,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -68,7 +70,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         Util.fetch_connectivity_data ~logger all_nodes
+         fetch_connectivity_data ~logger all_nodes
        in
-       Util.assert_peers_completely_connected final_connectivity_data )
+       assert_peers_completely_connected final_connectivity_data )
 end

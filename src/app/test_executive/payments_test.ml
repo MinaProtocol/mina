@@ -330,9 +330,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "send a single payment from timed account using available liquid"
         (let amount = Currency.Amount.of_mina_int_exn 1_000 in
          let receiver = untimed_node_a in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = timed_node_c in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind sender_pub_key = pub_key_of_node sender in
          let receiver_account_id =
            Account_id.create receiver_pub_key Token_id.default
          in
@@ -370,9 +370,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "unable to send payment from timed account using illiquid tokens"
         (let amount = Currency.Amount.of_mina_int_exn 25_000 in
          let receiver = untimed_node_b in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = timed_node_c in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind sender_pub_key = pub_key_of_node sender in
          let sender_account_id =
            Account_id.create sender_pub_key Token_id.default
          in
@@ -418,9 +418,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "send out a bunch more txns to fill up the snark ledger, then wait for \
          proofs to be emitted"
         (let receiver = untimed_node_a in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = untimed_node_b in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind sender_pub_key = pub_key_of_node sender in
          let%bind () =
            (*
             To fill up a `small` transaction capacity with work delay of 1,

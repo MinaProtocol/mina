@@ -209,7 +209,7 @@ module Body = struct
 
   module Tag = Transaction_union_tag
 
-  let gen ?source_pk ~max_amount =
+  let gen ?source_pk max_amount =
     let open Quickcheck.Generator in
     let stake_delegation_gen =
       match source_pk with
@@ -220,7 +220,7 @@ module Body = struct
     in
     map
       (variant2
-         (Payment_payload.gen ?source_pk ~max_amount)
+         (Payment_payload.gen ?source_pk max_amount)
          stake_delegation_gen )
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 
@@ -351,12 +351,17 @@ let amount (t : t) =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : t) (status : Transaction_status.t) =
   match status with
   | Applied ->
-      [ fee_payer t; source t; receiver t ]
+      List.map
+        [ fee_payer t; source t; receiver t ]
+        ~f:(fun acct_id -> (acct_id, `Accessed))
   | Failed _ ->
-      [ fee_payer t ]
+      (fee_payer t, `Accessed)
+      :: List.map
+           [ source t; receiver t ]
+           ~f:(fun acct_id -> (acct_id, `Not_accessed))
 
 let dummy : t =
   { common =
@@ -376,7 +381,7 @@ let gen =
     Currency.Amount.(sub max_int (of_fee common.fee))
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
-  let%map body = Body.gen ~source_pk:common.fee_payer_pk ~max_amount in
+  let%map body = Body.gen ~source_pk:common.fee_payer_pk max_amount in
   Poly.{ common; body }
 
 (** This module defines a weight for each payload component *)

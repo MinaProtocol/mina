@@ -14,7 +14,29 @@ type curr_or_next = Curr | Next
 
 module Gate_type = struct
   module T = struct
-    type t = Poseidon | VarBaseMul | EndoMul | CompleteAdd | EndoMulScalar
+    type t = Kimchi_types.gate_type =
+      | Zero
+      | Generic
+      | Poseidon
+      | CompleteAdd
+      | VarBaseMul
+      | EndoMul
+      | EndoMulScalar
+      | ChaCha0
+      | ChaCha1
+      | ChaCha2
+      | ChaChaFinal
+      | Lookup
+      | CairoClaim
+      | CairoInstruction
+      | CairoFlags
+      | CairoTransition
+      | RangeCheck0
+      | RangeCheck1
+      | ForeignFieldAdd
+      | ForeignFieldMul
+      | Xor16
+      | Rot64
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -24,7 +46,7 @@ end
 
 module Lookup_pattern = struct
   module T = struct
-    type t = LookupGate [@@deriving hash, eq, compare, sexp]
+    type t = Lookup [@@deriving hash, eq, compare, sexp]
   end
 
   include Core_kernel.Hashable.Make (T)
@@ -78,6 +100,9 @@ module Env = struct
     ; beta : 'a
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
+    ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
+    ; foreign_field_modulus : int -> 'a
+    ; neg_foreign_field_modulus : int -> 'a
     }
 end
 
@@ -111,6 +136,9 @@ module Tick : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if =_
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -131,7 +159,7 @@ let () =
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow = _
+       ; pow
        ; var
        ; field
        ; cell
@@ -148,6 +176,9 @@ let () =
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if
+       ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -196,6 +227,9 @@ module Tock : S = struct
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -216,7 +250,7 @@ let () =
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow = _
+       ; pow
        ; var
        ; field
        ; cell
@@ -233,6 +267,9 @@ let () =
        ; beta = _
        ; gamma = _
        ; unnormalized_lagrange_basis = _
+       ; enabled_if
+       ; foreign_field_modulus
+       ; neg_foreign_field_modulus
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -279,6 +316,9 @@ module Tick_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -316,6 +356,9 @@ let () =
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -362,6 +405,9 @@ module Tock_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
 |ocaml}
@@ -399,6 +445,9 @@ let () =
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
+       ; enabled_if = _
+       ; foreign_field_modulus = _
+       ; neg_foreign_field_modulus = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn

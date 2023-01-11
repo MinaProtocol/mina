@@ -14,19 +14,57 @@ end)
 
 let compare_with obtained filepath =
   let (_ : int) = Sys.command "tree" in
-  let expected = In_channel.read_all ("examples/" ^ filepath) in
-  Format.printf "expected:\n%s\n\n" expected ;
-  Format.printf "obtained:\n%s\n" obtained ;
-  assert (String.(trim obtained = trim expected))
+  let filepath = "examples/" ^ filepath in
+  let expected = In_channel.read_all filepath in
+  if String.(trim obtained <> trim expected) then (
+    Format.printf "mismatch for %s detected\n" filepath ;
+    Format.printf "expected:\n%s\n\n" expected ;
+    Format.printf "obtained:\n%s\n" obtained ;
+    failwith "circuit compilation has changed" )
 
-let check_asm ~input_typ ~return_typ ~circuit filename () =
+let check_json ~input_typ ~return_typ ~circuit filename () =
   let cs : Impl.R1CS_constraint_system.t =
     Impl.constraint_system ~input_typ ~return_typ circuit
   in
-  let asm =
-    Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.get_asm cs
+  let serialized_json =
+    Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.to_json cs
   in
-  compare_with asm filename
+  compare_with serialized_json filename
+
+(* monadic API tests *)
+
+(** Both the monadic and imperative API will produce the same circuit hash. *)
+let expected = "5357346d161dcccaa547c7999b8148db"
+
+module MonadicAPI = struct
+  module Impl = Snarky_backendless.Snark.Make (struct
+    include Kimchi_backend.Pasta.Vesta_based_plonk
+    module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas
+  end)
+
+  let main ((b1, b2) : Impl.Boolean.var * Impl.Boolean.var) =
+    let open Impl in
+    let%bind x = exists Boolean.typ ~compute:(As_prover.return true) in
+    let%bind y = exists Boolean.typ ~compute:(As_prover.return true) in
+    let%bind z = Boolean.(x &&& y) in
+    let%bind b3 = Boolean.(b1 && b2) in
+
+    let%bind () = Boolean.Assert.is_true z in
+    let%bind () = Boolean.Assert.is_true b3 in
+
+    Checked.return ()
+
+  let get_hash_of_circuit () =
+    let input_typ = Impl.Typ.tuple2 Impl.Boolean.typ Impl.Boolean.typ in
+    let return_typ = Impl.Typ.unit in
+    let cs : Impl.R1CS_constraint_system.t =
+      Impl.constraint_system ~input_typ ~return_typ main
+    in
+    let digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+    Format.printf "expected:\n%s\n\n" expected ;
+    Format.printf "obtained:\n%s\n" digest ;
+    assert (String.(digest = expected))
+end
 
 (* monadic API tests *)
 
@@ -155,44 +193,44 @@ end
 let circuit_tests =
   [ ( "boolean circuit"
     , `Quick
-    , check_asm ~input_typ:BooleanCircuit.input_typ
+    , check_json ~input_typ:BooleanCircuit.input_typ
         ~return_typ:BooleanCircuit.return_typ ~circuit:BooleanCircuit.main
-        "simple.asm" )
+        "simple.json" )
   ; ( "circuit with field arithmetic"
     , `Quick
-    , check_asm ~input_typ:FieldCircuit.input_typ
+    , check_json ~input_typ:FieldCircuit.input_typ
         ~return_typ:FieldCircuit.return_typ ~circuit:FieldCircuit.main
-        "field.asm" )
+        "field.json" )
   ; ( "circuit with range check (less than equal)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lte
-        "range_lte.asm" )
+        "range_lte.json" )
   ; ( "circuit with range check (greater than equal)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gte
-        "range_gte.asm" )
+        "range_gte.json" )
   ; ( "circuit with range check (less than)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lt
-        "range_lt.asm" )
+        "range_lt.json" )
   ; ( "circuit with range check (greater than)"
     , `Quick
-    , check_asm ~input_typ:RangeCircuits.input_typ
+    , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
-        "range_gt.asm" )
+        "range_gt.json" )
   ; ( "circuit with ternary operator"
     , `Quick
-    , check_asm ~input_typ:TernaryCircuit.input_typ
+    , check_json ~input_typ:TernaryCircuit.input_typ
         ~return_typ:TernaryCircuit.return_typ ~circuit:TernaryCircuit.main
-        "ternary.asm" )
+        "ternary.json" )
   ; ( "circuit with public output"
     , `Quick
-    , check_asm ~input_typ:PublicOutput.input_typ
+    , check_json ~input_typ:PublicOutput.input_typ
         ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
-        "output.asm" )
+        "output.json" )
   ]
 
 (* API tests *)
@@ -308,6 +346,7 @@ module As_prover_circuits = struct
     ; ("as_prover makes no constraints", `Quick, Tests.as_prover_does_nothing)
     ]
 end
+
 (****************************
  * outside-of-circuit tests *
  ****************************)

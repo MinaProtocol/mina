@@ -60,8 +60,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender = List.nth_exn nodes 0 in
     let receiver = List.nth_exn nodes 1 in
     let open Malleable_error.Let_syntax in
-    let%bind sender_pub_key = Util.pub_key_of_node sender in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    let%bind sender_pub_key = pub_key_of_node sender in
+    let%bind receiver_pub_key = pub_key_of_node receiver in
     repeat_seq ~n ~f:(fun () ->
         Network.Node.must_send_payment ~logger sender ~sender_pub_key
           ~receiver_pub_key ~amount:Currency.Amount.one ~fee
@@ -205,7 +205,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -277,7 +277,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in
@@ -366,7 +366,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Permissions.Auth_required.None
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
         ; preconditions = None
         }
       in

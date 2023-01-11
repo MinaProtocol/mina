@@ -412,7 +412,6 @@ module type Full = sig
       -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
       -> account:
            ( 'b
-           , 'c
            , 'd
            , 'e
            , Currency.Balance.var
@@ -469,6 +468,7 @@ module type Full = sig
 
     val deploy_snapp :
          ?no_auth:bool
+      -> ?default_permissions:bool
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
@@ -487,7 +487,7 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -558,7 +558,7 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
