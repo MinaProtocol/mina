@@ -206,7 +206,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
 ) -> (
     CamlPastaFpPlonkIndex,
-    CamlFp,
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
@@ -256,7 +255,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let public_input = witness[0][0];
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
         witness,
@@ -268,7 +266,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     .unwrap();
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
-        public_input.into(),
         proof.into(),
     )
 }
