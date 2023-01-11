@@ -45,8 +45,9 @@ export ZKAPP_PATH=$HOME/zkapps
 
 echo "=========================== INSTALLING NPM ==========================="
 curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash &> /dev/null
-source ~/.bashrc
-nvm install --no-progress $NODE_VERSION
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
 export PATH=~/.npm-global/bin:$PATH
