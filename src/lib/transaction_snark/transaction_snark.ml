@@ -2066,15 +2066,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let check_protocol_state ~pending_coinbase_stack_init
           ~pending_coinbase_stack_before ~pending_coinbase_stack_after
-          state_body =
+          ~current_global_slot state_body =
         [%with_label_ "Compute pending coinbase stack"] (fun () ->
             let%bind state_body_hash =
               Mina_state.Protocol_state.Body.hash_checked state_body
             in
-            let global_slot =
-              Mina_state.Protocol_state.Body.consensus_state state_body
-              |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
-            in
+            let global_slot = current_global_slot in
             let%bind computed_pending_coinbase_stack_after =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
                 global_slot pending_coinbase_stack_init
@@ -2127,7 +2124,8 @@ module Make_str (A : Wire_types.Concrete) = struct
              ~pending_coinbase_stack_before:
                statement.source.pending_coinbase_stack
              ~pending_coinbase_stack_after:
-               statement.target.pending_coinbase_stack state_body ) ;
+               statement.target.pending_coinbase_stack ~block_global_slot
+             state_body ) ;
         let init :
             Global_state.t
             * _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
