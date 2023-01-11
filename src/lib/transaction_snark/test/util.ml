@@ -346,7 +346,7 @@ let permissions_from_update (update : Account_update.Update.t) ~auth =
       else auth )
   ; set_timing =
       ( if Zkapp_basic.Set_or_keep.is_keep update.timing then
-        default.set_voting_for
+        default.set_timing
       else auth )
   }
 
