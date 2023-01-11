@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'mina-test-executive')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -84,6 +84,11 @@ mina-daemon)
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
   ;;
+mina-test-executive)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-executive"
+  DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
   ;;
@@ -121,15 +126,19 @@ else
   docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-tag-and-push() {
-  docker tag "${TAG}" "$1"
-  docker push "$1"
-}
-
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
+  
+  # push to GCR
   docker push "${TAG}"
-  tag-and-push "${HASHTAG}"
+
+  # retag and push again to GCR
+  docker tag "${TAG}" "${HASHTAG}"
+  docker push "${HASHTAG}"
+
   if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
-    tag-and-push "minaprotocol/${SERVICE}:${VERSION}"
+
+    # tag and push to dockerhub
+    docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
+    docker push "minaprotocol/${SERVICE}:${VERSION}"
   fi
 fi
