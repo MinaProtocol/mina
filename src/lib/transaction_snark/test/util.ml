@@ -171,17 +171,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
           in
           match applied with
           | Command (Zkapp_command { command; _ }) -> (
-              match command.status with
-              | Applied -> (
-                  match expected_failure with
-                  | Some failure ->
-                      failwith
-                        (sprintf
-                           !"Application did not fail as expected. Expected \
-                             failure: \
-                             %{sexp:Mina_base.Transaction_status.Failure.t}"
-                           failure )
-                  | None ->
+              let run_in_snark () =
                       let%map p =
                         match List.rev witnesses with
                         | [] ->
@@ -217,7 +207,19 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                         in
                         let target_ledger_root = Ledger.merkle_root ledger in
                         [%test_eq: Ledger_hash.t] target_ledger_root
-                          target_ledger_root_snark )
+                          target_ledger_root_snark
+              in
+              match command.status with
+              | Applied -> (
+                  match expected_failure with
+                  | Some failure ->
+                      failwith
+                        (sprintf
+                           !"Application did not fail as expected. Expected \
+                             failure: \
+                             %{sexp:Mina_base.Transaction_status.Failure.t}"
+                           failure )
+                  | None -> run_in_snark () )
               | Failed failure_tbl -> (
                   match expected_failure with
                   | None ->
@@ -245,7 +247,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                Failure statuses: %{sexp: \
                                Mina_base.Transaction_status.Failure.Collection.t}"
                              failure failure_tbl )
-                      else Async.Deferred.unit ) )
+                      else run_in_snark ()) )
           | _ ->
               failwith "zkapp_command expected" ) )
 
