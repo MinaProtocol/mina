@@ -13,7 +13,6 @@ type failure =
       | `Token_symbol
       | `Send
       | `Receive ]
-      Int64.compare
 
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
