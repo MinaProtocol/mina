@@ -129,69 +129,166 @@ module Call_type = struct
       type t = Mina_wire_types.Mina_base.Account_update.Call_type.V1.t =
         | Call
         | Delegate_call
+        | Blind_call
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let gen =
-    Quickcheck.Generator.(map bool) ~f:(function
-      | true ->
-          Call
-      | false ->
-          Delegate_call )
+  let gen = Quickcheck.Generator.of_list [ Call; Delegate_call; Blind_call ]
 
-  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+  let to_string = function
+    | Call ->
+        "call"
+    | Delegate_call ->
+        "delegate_call"
+    | Blind_call ->
+        "blind_call"
 
   let of_string = function
     | "call" ->
         Call
     | "delegate_call" ->
         Delegate_call
+    | "blind_call" ->
+        Blind_call
     | s ->
         failwithf "Invalid call type: %s" s ()
 
-  let is_delegate_call = function Call -> false | Delegate_call -> true
+  let is_delegate_call = function Delegate_call -> true | _ -> false
 
-  let from_delegate_call = function false -> Call | true -> Delegate_call
+  let is_blind_call = function Blind_call -> true | _ -> false
 
-  let quickcheck_generator =
-    Quickcheck.Generator.map ~f:from_delegate_call Bool.quickcheck_generator
+  module As_record : sig
+    type variant = t
+
+    type 'bool t
+
+    val is_delegate_call : 'bool t -> 'bool
+
+    val is_blind_call : 'bool t -> 'bool
+
+    val map : f:('a -> 'b) -> 'a t -> 'b t
+
+    val to_hlist : 'bool t -> (unit, 'bool -> 'bool -> unit) H_list.t
+
+    val of_hlist : (unit, 'bool -> 'bool -> unit) H_list.t -> 'bool t
+
+    val to_input :
+      field_of_bool:('a -> 'b) -> 'a t -> 'b Random_oracle_input.Chunked.t
+
+    val typ : (Snark_params.Tick.Boolean.var t, bool t) Snark_params.Tick.Typ.t
+
+    val equal :
+         and_:('bool -> 'bool -> 'bool)
+      -> equal:('a -> 'a -> 'bool)
+      -> 'a t
+      -> 'a t
+      -> 'bool
+
+    val to_variant : bool t -> variant
+
+    val of_variant : variant -> bool t
+  end = struct
+    type variant = t
+
+    type 'bool t =
+      { (* NB: call is implicit. *)
+        is_delegate_call : 'bool
+      ; is_blind_call : 'bool
+      }
+    [@@deriving hlist, fields]
+
+    let map ~f { is_delegate_call; is_blind_call } =
+      { is_delegate_call = f is_delegate_call; is_blind_call = f is_blind_call }
+
+    let typ : _ Typ.t =
+      let open Snark_params.Tick in
+      let (Typ typ) =
+        Typ.of_hlistable
+          [ Boolean.typ; Boolean.typ ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+          ~value_of_hlist:of_hlist
+      in
+      Typ
+        { typ with
+          check =
+            (fun ({ is_delegate_call; is_blind_call } as x) ->
+              let open Checked in
+              let%bind () = typ.check x in
+              Boolean.Assert.exactly_one [ is_delegate_call; is_blind_call ] )
+        }
+
+    let to_input ~field_of_bool { is_delegate_call; is_blind_call } =
+      Array.reduce_exn ~f:Random_oracle_input.Chunked.append
+        [| Random_oracle_input.Chunked.packed (field_of_bool is_delegate_call, 1)
+         ; Random_oracle_input.Chunked.packed (field_of_bool is_blind_call, 1)
+        |]
+
+    let equal ~and_ ~equal
+        { is_delegate_call = is_delegate_call1; is_blind_call = is_blind_call1 }
+        { is_delegate_call = is_delegate_call2; is_blind_call = is_blind_call2 }
+        =
+      and_
+        (equal is_delegate_call1 is_delegate_call2)
+        (equal is_blind_call1 is_blind_call2)
+
+    let to_variant { is_delegate_call; is_blind_call } =
+      if is_delegate_call then Delegate_call
+      else if is_blind_call then Blind_call
+      else Call
+
+    let of_variant = function
+      | Call ->
+          { is_delegate_call = false; is_blind_call = false }
+      | Delegate_call ->
+          { is_delegate_call = true; is_blind_call = false }
+      | Blind_call ->
+          { is_delegate_call = false; is_blind_call = true }
+  end
+
+  let quickcheck_generator = gen
 
   let deriver obj =
     let open Fields_derivers_zkapps in
     iso_string ~name:"CallType" ~js_type:(Custom "CallType") ~to_string
       ~of_string obj
 
-  let to_input x =
-    Random_oracle_input.Chunked.packed (field_of_bool (is_delegate_call x), 1)
+  let to_input x = As_record.to_input ~field_of_bool (As_record.of_variant x)
 
   module Checked = struct
-    type t = Is_delegate_call of Boolean.var
+    type t = Boolean.var As_record.t
 
-    let is_delegate_call = function Is_delegate_call b -> b
+    let is_delegate_call = As_record.is_delegate_call
 
-    let from_delegate_call b = Is_delegate_call b
+    let is_blind_call = As_record.is_blind_call
 
-    let call = from_delegate_call Boolean.false_
+    let call =
+      As_record.map ~f:Boolean.var_of_value @@ As_record.of_variant Call
 
-    let delegate_call = from_delegate_call Boolean.true_
+    let delegate_call =
+      As_record.map ~f:Boolean.var_of_value
+      @@ As_record.of_variant Delegate_call
 
-    let to_input x =
-      Random_oracle_input.Chunked.packed ((is_delegate_call x :> Field.Var.t), 1)
+    let blind_call =
+      As_record.map ~f:Boolean.var_of_value @@ As_record.of_variant Blind_call
 
-    let equal (Is_delegate_call x) (Is_delegate_call y) = Boolean.equal x y
+    let to_input (x : t) =
+      As_record.to_input
+        ~field_of_bool:(fun (x : Boolean.var) -> (x :> Field.Var.t))
+        x
 
-    let assert_equal (Is_delegate_call x) (Is_delegate_call y) =
-      Boolean.Assert.( = ) x y
+    let equal x y =
+      As_record.equal ~equal:Run.Boolean.equal ~and_:Run.Boolean.( &&& ) x y
+
+    let assert_equal x y =
+      As_record.equal ~equal:Run.Boolean.Assert.( = ) ~and_:(fun _ _ -> ()) x y
   end
 
   let typ : (Checked.t, t) Typ.t =
-    Boolean.typ
-    |> Typ.transport ~there:is_delegate_call ~back:from_delegate_call
-    |> Typ.transport_var ~there:Checked.is_delegate_call
-         ~back:Checked.from_delegate_call
+    As_record.typ
+    |> Typ.transport ~there:As_record.of_variant ~back:As_record.to_variant
 end
 
 module Update = struct

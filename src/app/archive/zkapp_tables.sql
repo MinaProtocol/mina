@@ -244,7 +244,7 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
+CREATE TYPE call_type AS ENUM ('call', 'delegate_call', 'blind_call');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 

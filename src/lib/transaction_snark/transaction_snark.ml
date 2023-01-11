@@ -1857,6 +1857,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               Account_update.Call_type.Checked.is_delegate_call
                 t.account_update.data.call_type
 
+            let is_blind_call (t : t) =
+              Account_update.Call_type.Checked.is_blind_call
+                t.account_update.data.call_type
+
             let account_id (t : t) =
               Account_id.create (public_key t) (token_id t)
 

@@ -6,7 +6,7 @@ end
 
 module Call_type = struct
   module V1 = struct
-    type t = Call | Delegate_call
+    type t = Call | Delegate_call | Blind_call
   end
 end
 

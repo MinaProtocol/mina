@@ -318,6 +318,8 @@ module type Account_update_intf = sig
 
   val is_delegate_call : t -> bool
 
+  val is_blind_call : t -> bool
+
   val use_full_commitment : t -> bool
 
   val increment_nonce : t -> bool
@@ -909,10 +911,13 @@ module Make (Inputs : Inputs_intf) = struct
       Call_forest.pop_exn (Stack_frame.calls current_forest)
     in
     let is_delegate_call = Account_update.is_delegate_call account_update in
+    let is_blind_call = Account_update.is_blind_call account_update in
     let caller_id =
       Token_id.if_ is_delegate_call
         ~then_:(Stack_frame.caller_caller current_forest)
-        ~else_:(Stack_frame.caller current_forest)
+        ~else_:
+          (Token_id.if_ is_blind_call ~then_:Token_id.default
+             ~else_:(Stack_frame.caller current_forest) )
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -961,8 +966,10 @@ module Make (Inputs : Inputs_intf) = struct
              Token_id.if_ is_delegate_call
                ~then_:(Stack_frame.caller current_forest)
                ~else_:
-                 (Account_id.derive_token_id
-                    ~owner:(Account_update.account_id account_update) )
+                 (Token_id.if_ is_blind_call ~then_:Token_id.default
+                    ~else_:
+                      (Account_id.derive_token_id
+                         ~owner:(Account_update.account_id account_update) ) )
            and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )

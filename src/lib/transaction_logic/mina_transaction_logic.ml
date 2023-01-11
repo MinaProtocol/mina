@@ -1468,6 +1468,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
 
+      let is_blind_call (p : t) = Call_type.is_blind_call p.body.call_type
+
       let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
            this point.
