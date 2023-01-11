@@ -385,7 +385,7 @@ let%test "foreign field multiplication finalization" =
     let srs =
       Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
     in
-    let index, public_input, proof =
+    let index, proof =
       Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
     in
     let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
@@ -411,7 +411,7 @@ let%test "foreign field multiplication finalization" =
     in
     let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
       deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-        ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
+        ~prev_challenges:[] ~step_vk:vk ~public_input:[] ~proof
         ~actual_proofs_verified:Nat.N0.n
     in
     let deferred_values_typ =
