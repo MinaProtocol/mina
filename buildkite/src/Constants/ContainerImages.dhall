@@ -5,11 +5,11 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:f84ded6c73fe558b1637cd26cbbfe3d58030698532f0a3a3feae9e50e2fbac66",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:2bd7b9f44d0d908260d8a3b6d91564a864a6c532f643073df65623ce0c52c724",
-  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:885b71746920298210e0514019d1f7ae8af173b52387aeaff5575f3945e2ccce",
-  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:885b71746920298210e0514019d1f7ae8af173b52387aeaff5575f3945e2ccce",
-  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:885b71746920298210e0514019d1f7ae8af173b52387aeaff5575f3945e2ccce",
+  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:6325c9bc9aa5a108765f0bb8697160292373502756cfd37bb94803953c568492",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:a85ae4a9c413626c448349e14962424ad0581e041ceaa0a7b5e960eadee1176a",
+  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
+  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
+  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:51069500c95c518abd2c961740d030d014608c11305ba597fa5619cdcd35b03b",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
