@@ -399,7 +399,7 @@ let%test "foreign field multiplication finalization" =
     ; xor = No
     ; rot = No
     ; lookup = Maybe
-    ; runtime_tables = Maybe
+    ; runtime_tables = No
     }
   in
   let actual_feature_flags =
