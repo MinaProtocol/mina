@@ -2,7 +2,7 @@ open Mina_base
 open Core_kernel
 
 type received_info =
-  { gossip : bool  (** Was it a gossip or a response to an RPC request *)
+  { gossip_topic : string option  (** Topic when received via gossip *)
   ; received_at : Time.t
   ; sender : Network_peer.Peer.t
   }

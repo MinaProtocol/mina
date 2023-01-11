@@ -12,7 +12,7 @@ type event_t =
       | `In_process of Transition_state.t ] )
     Result.t
     * Mina_block.Header.with_hash
-    * Network_peer.Peer.t
+    * Network_peer.Envelope.Sender.t list
   | `Pre_validate_header_invalid of
     Network_peer.Peer.t
     * Mina_block.Header.t
@@ -78,6 +78,14 @@ module type CONTEXT = sig
          | `Verifier_error of Error.t ] )
        Result.t
        Interruptible.t
+
+  val broadcast : Mina_block.with_hash -> unit
+
+  val rebroadcast :
+       origin_topics:string list
+    -> [ `Block of Mina_block.with_hash
+       | `Header of Mina_block.Header.with_hash ]
+    -> unit
 
   (** Retrieve some ancestors of target hash. Function returns a list of elements,
       each either header or block. List is sorted in parent-first order.

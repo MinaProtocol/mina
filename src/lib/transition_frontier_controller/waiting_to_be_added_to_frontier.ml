@@ -6,8 +6,9 @@ open Bit_catchup_state
 (** Promote a transition that is in [Building_breadcrumb] state with
     [Processed] status to [Waiting_to_be_added_to_frontier] state.
 *)
-let promote_to ~context:(module Context : CONTEXT) ~block_vc ~aux
-    ~substate:{ Substate.children; status } : Transition_state.t =
+let promote_to ~context:(module Context : CONTEXT) ~block_vc
+    ~(aux : Transition_state.aux_data) ~substate:{ Substate.children; status } :
+    Transition_state.t =
   let breadcrumb =
     match status with
     | Processed b ->
@@ -22,15 +23,19 @@ let promote_to ~context:(module Context : CONTEXT) ~block_vc ~aux
   in
   Option.iter block_vc ~f:(fun valid_cb ->
       accept_gossip ~context:(module Context) ~valid_cb consensus_state ) ;
-  let source =
-    if aux.Transition_state.received_via_gossip then `Gossip else `Catchup
+  let origin_topics =
+    List.filter_map aux.received ~f:(fun { gossip_topic; _ } -> gossip_topic)
   in
+  Context.rebroadcast ~origin_topics
+    (`Block (Frontier_base.Breadcrumb.block_with_hash breadcrumb)) ;
+  let source = if aux.received_via_gossip then `Gossip else `Catchup in
   Waiting_to_be_added_to_frontier { breadcrumb; source; children }
 
 (** [handle_produced_transition] adds locally produced block to the catchup state *)
 let handle_produced_transition ~context:(module Context : CONTEXT)
     ~transition_states breadcrumb =
   let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
+  Context.broadcast (Frontier_base.Breadcrumb.block_with_hash breadcrumb) ;
   let st_opt =
     match Transition_states.find transition_states state_hash with
     | None ->

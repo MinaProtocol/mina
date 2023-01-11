@@ -11,9 +11,8 @@ include module type of Gossip_types
     Depending on relevance status, metrics are updated for the peer who sent the transition.
 *)
 val verify_header_is_relevant :
-     ?event_recording:bool
+     ?record_event_for_senders:Network_peer.Envelope.Sender.t list
   -> context:(module Context.CONTEXT)
-  -> sender:Network_peer.Peer.t
   -> transition_states:Transition_states.t
   -> Mina_block.Header.with_hash
   -> [ `Irrelevant | `Preserve_gossip_data | `Relevant ]
@@ -46,11 +45,9 @@ val preserve_body :
     *)
 val preserve_relevant_gossip :
      ?body:Mina_block.Body.t
-  -> ?vc:Mina_net2.Validation_callback.t
+  -> gd_map:Transition_frontier.Gossip.gossip_map
   -> context:(module Context.CONTEXT)
-  -> gossip_type:[ `Block | `Header ]
   -> gossip_header:Mina_block.initial_valid_header
-  -> sender:Network_peer.Peer.t
   -> Transition_state.t
   -> Transition_state.t
      * [ `Nop of [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ]
