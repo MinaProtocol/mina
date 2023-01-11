@@ -450,6 +450,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_ffadd => "example_with_ffadd");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_xor => "example_with_xor");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_rot => "example_with_rot");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_chacha => "example_with_chacha");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_verify => "verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_dummy => "dummy");

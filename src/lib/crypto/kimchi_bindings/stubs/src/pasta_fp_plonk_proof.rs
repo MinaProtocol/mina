@@ -501,6 +501,78 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_chacha(
+    srs: CamlFpSrs,
+) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem, gate::CircuitGate, polynomial::COLUMNS, polynomials::chacha,
+        wires::Wire,
+    };
+
+    let num_inputs = 0;
+    let num_chachas = 8;
+
+    // circuit gates
+    let gates = {
+        let mut gates = vec![];
+        for _ in 0..num_chachas {
+            gates.extend(chacha::testing::chacha20_gates())
+        }
+        let gates: Vec<CircuitGate<Fp>> = gates
+            .into_iter()
+            .enumerate()
+            .map(|(i, typ)| CircuitGate::new(typ, Wire::for_row(i), vec![]))
+            .collect();
+        gates
+    };
+
+    // witness
+    let witness = {
+        let s0: Vec<u32> = vec![
+            0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, 0x03020100, 0x07060504, 0x0b0a0908,
+            0x0f0e0d0c, 0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c, 0x00000001, 0x09000000,
+            0x4a000000, 0x00000000,
+        ];
+        let mut rows = vec![];
+        for _ in 0..num_chachas {
+            rows.extend(chacha::testing::chacha20_rows::<Fp>(s0.clone()))
+        }
+        let mut witness: [Vec<Fp>; COLUMNS] = array_init(|_| vec![]);
+        for r in rows.into_iter() {
+            for (col, c) in r.into_iter().enumerate() {
+                witness[col].push(c);
+            }
+        }
+        witness
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
