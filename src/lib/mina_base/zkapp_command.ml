@@ -1429,6 +1429,16 @@ end = struct
     end
   end]
 
+  let ok_if_vk_hash_expected ~got ~expected =
+    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+      Error
+        (Error.create "Expected vk hash doesn't match hash in vk we received"
+           [ ("expected_vk_hash", expected)
+           ; ("got_vk_hash", With_hash.hash got)
+           ]
+           [%sexp_of: (string * Zkapp_basic.F.t) list] )
+    else Ok got
+
   let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
       account_id =
     match
@@ -1439,16 +1449,7 @@ end = struct
       zkapp.verification_key
     with
     | Some vk ->
-        if not @@ Zkapp_basic.F.equal (With_hash.hash vk) expected_vk_hash then
-          Error
-            (Error.create "Expected vk hash doesn't match hash in account"
-               ( [ ("expected_vk_hash", expected_vk_hash)
-                 ; ("got_vk_hash", With_hash.hash vk)
-                 ]
-               , ("account_id", account_id) )
-               [%sexp_of:
-                 (string * Zkapp_basic.F.t) list * (string * Account_id.t)] )
-        else Ok vk
+        ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
     | None ->
         Error
           (Error.create "No verification key found for proved account update"
@@ -1497,8 +1498,14 @@ end = struct
                      * potentially set in this account_update (use the non-'
                      * vks_overrided) . *)
                     match Account_id.Map.find !vks_overridden account_id with
-                    | Some (Some vk) ->
-                        vk
+                    | Some (Some vk) -> (
+                        match
+                          ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
+                        with
+                        | Ok vk ->
+                            vk
+                        | Error err ->
+                            return (Error err) )
                     | Some None ->
                         (* we explicitly have erased the key *)
                         let err =

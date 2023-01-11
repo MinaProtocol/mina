@@ -193,9 +193,7 @@ struct
     (* then unzip the indices *)
     let ixs, zk_cmds = List.unzip izk_cmds in
     (* then we verify the zkapp commands *)
-    let%map vzk_cmds =
-      Zkapp_command.Verifiable.Any.create_all ~find_vk zk_cmds
-    in
+    let%map vzk_cmds = Strategy.create_all ~find_vk zk_cmds in
     (* rezip indices *)
     let ivzk_cmds = List.zip_exn ixs vzk_cmds in
     (* Put them back in with a sort by index (un-partition) *)
