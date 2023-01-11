@@ -1,84 +1,44 @@
-# Running Integration Tests
+# Gauntlet
 
-### Prerequisites Environment Setup
+## Overview
 
-Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
+*Gauntlet* is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
 
-1) Make sure you have the following critical tools installed
-- terraform (https://www.terraform.io/downloads)
-- google cloud SDK (https://cloud.google.com/sdk/docs/install)
-- docker (https://docs.docker.com/get-docker/)
-- kubernetes `kubectl` (https://kubernetes.io/docs/tasks/tools/)
+#### Elevator Pitch
 
-2) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
+Gauntlet was created to tackle is the problem of testing a blockchain in as realistic of a way as possible.  Mina protocol, like all blockchains, require an entire decentralized, distributed network of peers.  Testing a blockchain, therefore, requires somehow creating a test network of nodes which interact with each other.  Creating a mocked peer with hardcoded responses is not sufficient for an integration test.  Simply spinning up a single node on one's local machine is a handy expedient for many development purposes but is also far from sufficient for testing purposes, because so much of a distributed computing network (such as a blockchain) consists in the interactions and consensus between nodes, and so having just one is not realistic.
 
-3) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Note that each individual should have their own unique key.  Download this key as a json file and save it to one's preferred path.  Run `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>` and/or put it in one's .bashrc or .profile. (Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)  the path to the automated-validation service account's keyfile will also be needed in step 4 of this setup.  
+Given this, the solution, therefore, is quite clear: we must spin up from scratch an entire decentralized network of nodes, and then run tests against this network.  In concept this is quite simple, but of course in implementation it is ambitious.
 
-![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
+#### Structure (super high level)
 
-4) In addition to the above mentioned `GCLOUD_API_KEY` and `GOOGLE_CLOUD_KEYFILE_JSON`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
-- `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
-- the following AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
-- vars relating to ocaml compilation
+There are a number of moving parts to gauntlet, and it is also actively being developed and extended.  However in it's current state, Gauntlet tests Mina Protocol by creating a whole entire Mina testnet from scratch with a specified number of nodes of various types, creating a new blockchain from genesis, and then monitoring and interacting with this testnet in accordance to test logic as determined in pre-written tests; tests which are written in an Ocaml DSL which we have developed.  If the testnet seems healthy and behaves as one expects in response to the interactions, then the test passes, if not it fails.  Then the testnet is destroyed.  If one wants, one can prevent the destruction of the testnet with a flag, and then manually interact with the nodes on the testnet.
 
-5) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
+**Broadly speaking, Gauntlet has 2 parts.**  1: the testnet itself, consisting of a number of nodes running the Mina daemon.  2: the test_executive, which configures the testnet, orchestrates the testnet, tracks the state of the testnet, runs test logic against the testnet, and eventually is responsible for tearing down the testnet as well.
 
-```
-gcloud auth login --no-launch-browser <gcloud-acct-login-username>
-gcloud config set project o1labs-192920
-gcloud container clusters get-credentials --region us-west1 mina-integration-west1
-kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path-to-service-account-key-file>
-```
+The exact size and composition of testnets spun up by Gauntlet are custom specified by the test_executive.  Also specified by the test executive is exactly what version/release of the Mina daemon is being run.  A Gauntlet testnet is of course going to be much smaller compared to mainnet, or the official public devnets created by O(1) Labs and Mina Foundation  However asides from scale, and assuming that the same version of the Mina daemon is being run, there is no qualitative or behavioral differences between a Gauntlet testnet and mainnet or public devnets.  A Gauntlet testnet maintains an accounts ledger, produces blocks, has consensus, maintains a blockchain, can carry out transactions, can run zkapps, can run SnarkyJS and implement smart contracts.  Whatever smart contract features you'd expect from the Berkeley Devnet, such as rollups, receiving off chain computation, zk cypto, will all work on a Gauntlet testnet (provided the testnet is using correct version/release of the Mina daemon).  The testnet can be specified with archive nodes and snark worker nodes, as well as the usual block producers and seeds.  Developers can manually interact with Gauntlet testnets, such as connecting other nodes to the testnet, or manually sending transactions and running smart contracts and what not (the workflow for this particular usecase is a bit roundabout at the current moment, but we plan to improve this).
 
-When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
+#### Tests
 
+The usecase which Gauntlet has been designed around (thus far) is the usecase of running automated tests.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, or write new tests.  Each test consists of a testnet spec (which tells Gauntlet how many nodes of each node type to spin up in the testnet, for example a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers), and a sequence of test logic and Mina interactions to be run against the testnet (such as waiting for blocks to be produced, sending transactions, waiting for transactions to reach consensus, running snarkyjs, removing nodes from the network and checking network connectivity, etc).
 
-6) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+#### Infrastructure (super high level)
 
-```
-alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
-alias logproc=./_build/default/src/app/logproc/logproc.exe
-```
+The 2 aforementioned parts (the test_executive, and the testnet) are typically run on different infrastructure.
 
-### Routine Test Run
+At the current moment, the testnet can only be run on Google Cloud, using their Google Kubernetes Engine.  
 
-1) Go to dockerhub [minaprotocol/mina-daemon](https://hub.docker.com/r/minaprotocol/mina-daemon/tags?page=1&ordering=last_updated) and pick an image to run the tests with.  When choosing an image, keep in mind the following tips.
-- Usually, one should choose the most recent image from the branch one is currently working on.  
-- Note that changes to the integration test framework itself do not make it into the daemon image, so one might as well just use the latest image off of the develop or compatible branch.  
-- Generally use "-devnet" instead of "-mainnet" for testing although it usually won't make a difference.  
+The test_executive is run either on a developer's own laptop/desktop, or from our Continuous Integration system (BuildKite).  The machine running the test executive does not need much computing power, only an internet connection and the right credentials to access Google Cloud.
 
-2) Build `test_executive.exe` with the `integration_tests` profile
-
-3) Run `test_executive.exe`, passing in the mina image selected in step 1, and the name of the test one intends to run
-- It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
-- It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
-
-```sh
-alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
-alias logproc=./_build/default/src/app/logproc/logproc.exe
-
-MINA_IMAGE=... # pick a suitable (recent) image from dockerhub or GCR
-TEST=... # name of the test one wants to run
-
-dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
-test_executive cloud $TEST --mina-image=$MINA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
-```
-
-4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
-
-### Notes on GCP namespace name
-- Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
-- the namespace format is: `it-{username}-{gitHash}-{testname}`.  for example: `it-adalo-3a9f8ce-payments`; user is adalovelace, git commit 3a9f8ce, running payments integration test
-- GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
+Eventually, we would like the testnet to be able to run within virtual machines on the local computer.  When that is implemented and the user chooses to run the testnet through this entirely local method, then the user would certainly need a beefy enough computer to run all the virtual machines each with a full mina node running inside it.
 
 
-# Architecture
+## Architecture
 
-![Integration Test Framework General Architecture](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
-*Integration Test Framework General Architecture.  edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing*
+![Gauntlet General Architecture](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
+*Gauntlet General Architecture.  edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing*
 
-Any Integration test first creates a whole new testnet from scratch, and then runs test logic using that testnet in order to confirm and measure the performance of connectivity, functionality, or correct interactions between nodes
+Any Gauntlet test first creates a whole new testnet from scratch, and then runs test logic using that testnet in order to confirm and measure the performance of connectivity, functionality, or correct interactions between nodes
 
 - control flow / data flow:
     - The integration test is kicked off by running the test_executive process, which is typically done from one's local machine but can really be run from anywhere (including from CI). the test_executive receives, as arguments, the test to run and the execution engine to run them on.
@@ -95,7 +55,184 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
     - local engine: using the local engine will spin up nodes as VMs or containers on one's local machine.  this is not yet implemented
     
 
-# Code Structure
+
+## Using Gauntlet
+
+### Prerequisites Softwares
+
+Make sure you have the following critical tools installed:
+
+- terraform (https://www.terraform.io/downloads)
+- google cloud SDK (https://cloud.google.com/sdk/docs/install)
+- docker (https://docs.docker.com/get-docker/)
+- kubernetes `kubectl` (https://kubernetes.io/docs/tasks/tools/)
+
+
+### GCP credentials
+
+Gauntlet at the current moment runs the testnet on GCP, and therefore you'll need the right credentials to run.  There is also a small dependency on AWS which we hope to eliminate in future but for now, you'll also need AWS credentials.
+
+Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
+
+
+2) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
+
+3) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Note that each individual should have their own unique key.  Download this key as a json file and save it to one's preferred path.  Run `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>` and/or put it in one's .bashrc or .profile. (Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)  the path to the automated-validation service account's keyfile will also be needed in step 4 of this setup.  
+
+![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
+
+4) In addition to the above mentioned `GCLOUD_API_KEY` and `GOOGLE_CLOUD_KEYFILE_JSON`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
+- `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
+- the following AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
+- vars relating to ocaml compilation
+
+### Run Gauntlet in dockerized form
+
+If you don't need to write your own tests and simply wish to run existing tests, the recommended way to run gauntlet is to use docker.  
+
+docker pull from GCR.  Generally you just want the latest version of Gauntlet.
+
+Run:
+
+```
+docker run \
+--env TEST_NAME=<name of test> \
+--env MINA_IMAGE=minaprotocol/mina-daemon:1.3.2beta2-compatible-b8ce9fb-bullseye-devnet \
+--env ARCHIVE_IMAGE=minaprotocol/mina-archive:1.3.2beta2-compatible-b8ce9fb-bullseye \
+--env DEBUG_BOOL=false \
+--mount "type=bind,source=/<path to service account keyfile>/o1labs-gcp-192920-cd2c1759278d.json,dst=/keys/o1labs-gcp-192920-cd2c1759278d.json,readonly" \
+--env GOOGLE_APPLICATION_CREDENTIALS=/keys/o1labs-gcp-192920-cd2c1759278d.json \
+--env GCLOUD_API_KEY \
+--env AWS_ACCESS_KEY_ID \
+--env AWS_SECRET_ACCESS_KEY \
+--env AWS_DEFAULT_REGION=us-west-2 \
+9205e3affb14
+
+```
+
+Alternatively you can run it manually from inside the docker container:
+
+```
+docker run -it --entrypoint /bin/bash \
+--env TEST_NAME=delegation \
+--env MINA_IMAGE=minaprotocol/mina-daemon:1.3.2beta2-compatible-b8ce9fb-bullseye-devnet \
+--env ARCHIVE_IMAGE=minaprotocol/mina-archive:1.3.2beta2-compatible-b8ce9fb-bullseye \
+--env DEBUG_BOOL=false \
+--mount "type=bind,source=/<path to service account keyfile>/o1labs-gcp-192920-cd2c1759278d.json,dst=/keys/o1labs-gcp-192920-cd2c1759278d.json,readonly" \
+--env GOOGLE_APPLICATION_CREDENTIALS=/keys/o1labs-gcp-192920-cd2c1759278d.json \
+--env GCLOUD_API_KEY \
+--env AWS_ACCESS_KEY_ID \
+--env AWS_SECRET_ACCESS_KEY \
+--env AWS_DEFAULT_REGION=us-west-2 \
+9205e3affb14
+```
+
+and then within the container run:
+
+```
+/run_test_executive.sh
+```
+
+the bash script `/run_test_executive.sh` exists on all the images and it's a very simple script, you could run the individual commands manually if you like.  More information in the section "run_test_executive"
+
+### Compile Gauntlet from source
+
+If you wish to modify or extend existing tests, or write a whole new test, you will need to compile Gauntlet from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
+
+Gauntlet is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  
+
+I will assume the user who wishes to compile Gauntlet is familiar with not just Ocaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
+
+```
+LIBP2P_NIXLESS=1 make build
+
+dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+```
+
+### run_test_executive
+
+The script /run_test_executive.sh is baked into the test_executive docker image and it's quite simple, it can be found at `mina/dockerfiles/scripts/run_test_executive.sh`.  here it is in it's entirety:
+
+```
+#!/bin/bash
+
+# these commands configure your environment for accessing GCP correctly
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+gcloud config set project o1labs-192920
+gcloud container clusters get-credentials --region us-west1 mina-integration-west1
+kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
+
+# this is the command which runs the actual test_executive.  
+# mina-logproc is simply a tool which makes the log output prettier and human parsable, and is technically optional, although if you're trying to read the logs at all, you're gonna want it.
+mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE $( if [[ $DEBUG_BOOL ]] ; then echo --debug ; fi ) | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
+
+```
+
+### Accessing GCP
+
+```
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+gcloud config set project o1labs-192920
+gcloud container clusters get-credentials --region us-west1 mina-integration-west1
+kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
+```
+
+If you compiled the Gauntlet test_executive from scratch, run all the commands which access GCP.
+
+When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
+
+### manually running mina-test-executive in the command line
+
+Once you've got GCP all setup, you can run the mina test executive. 
+
+```
+mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug
+```
+
+
+If you've compiled from scratch, you of course won't have the built in package `mina-test-executive`.  The compiled executable will be at 
+
+```
+./_build/default/src/app/test_executive/test_executive.exe
+```
+
+Optionally, you can set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+
+```
+alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
+alias logproc=./_build/default/src/app/logproc/logproc.exe
+```
+
+It's worth breaking down the parts of the command line.
+
+- `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
+- `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run
+- `--mina-image`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to dockerhub [minaprotocol/mina-daemon](https://hub.docker.com/r/minaprotocol/mina-daemon/tags?page=1&ordering=last_updated) and pick an image to run the tests with.  When choosing an image, keep in mind the following tips.  1) Usually, one should choose the most recent image from the branch one is currently working on.  2) Note that changes to the integration test framework itself do not make it into the daemon image, so one might as well just use the latest image off of the develop or compatible branch.  3) Generally use "-devnet" instead of "-mainnet" for testing although it usually won't make a difference.  
+- `--archive-image`: this must be a url to a docker image which is the mina-archive.  This is required even if you're not using archive nodes, in which case any image will do.
+- `--debug`: if this flag is not present, then Gauntlet will automatically destroy the testnet and delete the auto generated terraform test configuration files when the test is over.  If it is present, it will wait for your to manually prompt it before destroying the testnet.
+
+- It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
+
+```sh
+alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
+alias logproc=./_build/default/src/app/logproc/logproc.exe
+
+MINA_IMAGE=... # pick a suitable (recent) image from dockerhub or GCR
+TEST=... # name of the test one wants to run
+
+dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+test_executive cloud $TEST --mina-image=$MINA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+```
+
+- In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
+
+### Notes on GCP namespace name
+- Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
+- the namespace format is: `it-{username}-{gitHash}-{testname}`.  for example: `it-adalo-3a9f8ce-payments`; user is adalovelace, git commit 3a9f8ce, running payments integration test
+- GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
+
+
+## Code Structure
 
 ### Integration Test general purpose directories
 
@@ -112,7 +249,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 ![Integration Test Testnet creation process in GCP](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
 *Integration Test Testnet creation process in GCP.  edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing*
 
-# Writing Tests
+## Writing Tests
 
 - To write a new integration test, create a new file in `src/app/test_executive/` and, conventionally, call it something like `*_test.ml`.  (Feel free to check out other tests in that directory for examples.)
 - The new test must implement the `Test` interface found in `integration_test_lib/intf.ml` .  The two most important things to implement are the `config` struct and the `run` function.
@@ -129,7 +266,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
             - Note that each call to `network_state t` returns a fresh and full struct whose value is computed eagerly, it is NOT lazy and does NOT return a pointer.  For example, if one calls `let ns = network_state t in ...`  , the value of `ns` is guaranteed to remain the same for the rest of the program (unless explicitly reassigned) EVEN if the actual network state changes in the meantime.  To obtain a fresh network state, one must make another explicit call to `network_state t`.
 
 
-# Debugging Tests
+## Debugging Tests
 
 <!-- - how to process test executive logs
     - logproc examples -->
@@ -148,7 +285,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
     - The structured log events that matter to the integration test are in `src/lib/integration_test_lib/event_type.ml`.  The events integration-test-side will trigger based on logic defined in each event type's `parse` function, which parses messages from the logs, often trying to match for exact strings
 - Please bear in mind that the nodes on GCP run the image that you link in your argument, it does NOT run whatever code you have locally.  Only that which relates to the test executive is run from local.  If you make a change in the protocol code, first this needs to be pushed to CI, where CI will bake a fresh image, and that image can be obtained to run on one's nodes.
 
-# Exit codes
+## Exit codes
 
 - Exit code `4` will be returned if not all pods were assigned to nodes and ready in time.
 - Exit code `5` will be returned if some pods could not be found.
