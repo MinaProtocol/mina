@@ -43,7 +43,8 @@ let sample_block_sexp =
             0x0000000000000000000000000000000000000000000000000000000000000001)
            (excess ((magnitude 0) (sgn Pos)))
            (supply_increase ((magnitude 0) (sgn Pos))) (ledger 0)
-           (success true) (account_update_index 0) (failure_status_tbl ())))))
+           (success true) (account_update_index 0) (failure_status_tbl ())
+           (will_succeed true)))))
        (timestamp 1668291220375)
        (body_reference
         "\255\242\2436c:`\178\"\194:/\242\132g\199\205r\251\197%\133\\\028\190\163#\236\221\247\178\157")))
@@ -490,7 +491,8 @@ let sample_block_json =
               "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
               "success": true,
               "account_update_index": "0",
-              "failure_status_tbl": []
+              "failure_status_tbl": [],
+              "will_succeed": true
             }
           },
           "timestamp": "1668291220375",
