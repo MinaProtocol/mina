@@ -1211,7 +1211,7 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.(equal default) account_update_token
     in
     let account_is_untimed = Bool.not (Account.is_timed a) in
-    (* Set account timing for new accounts, if specified. *)
+    (* Set account timing. *)
     let a, local_state =
       let timing = Account_update.Update.timing account_update in
       let has_permission =
