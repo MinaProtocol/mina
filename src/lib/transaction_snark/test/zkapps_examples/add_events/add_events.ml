@@ -59,6 +59,7 @@ let%test_module "Add events test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true

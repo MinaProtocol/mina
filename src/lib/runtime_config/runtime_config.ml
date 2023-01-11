@@ -115,6 +115,7 @@ module Json_layout = struct
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
           ; set_voting_for : Auth_required.t [@default None]
+          ; set_timing : Auth_required.t [@default None]
           }
         [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
 

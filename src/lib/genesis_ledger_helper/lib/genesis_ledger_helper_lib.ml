@@ -61,6 +61,7 @@ module Accounts = struct
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
+            ; set_timing
             } ->
             let auth_required a =
               match a with
@@ -86,6 +87,7 @@ module Accounts = struct
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
             ; set_voting_for = auth_required set_voting_for
+            ; set_timing = auth_required set_timing
             }
       in
       let%bind token_symbol =
@@ -228,6 +230,7 @@ module Accounts = struct
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
+            ; set_timing
             } =
           account.permissions
         in
@@ -244,6 +247,7 @@ module Accounts = struct
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
           ; set_voting_for = auth_required set_voting_for
+          ; set_timing = auth_required set_timing
           }
       in
       let zkapp =

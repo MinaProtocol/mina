@@ -18,6 +18,7 @@ module Poly = struct
       ; set_token_symbol : 'controller
       ; increment_nonce : 'controller
       ; set_voting_for : 'controller
+      ; set_timing : 'controller
       }
   end
 end

@@ -30,6 +30,7 @@ let mockedZkappCommand = {
             setTokenSymbol: "Signature",
             incrementNonce: "Signature",
             setVotingFor: "Signature",
+            setTiming: "Signature",
           },
           zkappUri: null,
           tokenSymbol: null,
