@@ -128,18 +128,21 @@ let trivial_zkapp =
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
 let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?(state_body = genesis_state_body) ledger zkapp_commands =
+    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple zkApp transactions*)
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let global_slot =
+    Option.value global_slot ~default:state_view.global_slot_since_genesis
+  in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
       match
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-              ~global_slot:state_view.global_slot_since_genesis ~state_body
-              ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              ~global_slot ~state_body ~fee_excess:Amount.Signed.zero
+              (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
                     (pending_coinbase_state_stack ~state_body_hash
@@ -170,8 +173,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    ; new_accounts = []
                    } )
             else
-              ( Ledger.apply_transaction ~constraint_constants
-                  ~global_slot:state_view.global_slot_since_genesis
+              ( Ledger.apply_transaction ~constraint_constants ~global_slot
                   ~txn_state_view:state_view ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )

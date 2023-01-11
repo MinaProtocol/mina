@@ -20,14 +20,16 @@ type failure =
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
-let gen_account_precondition_from_account ?failure ~first_use_of_account account
-    =
+let gen_account_precondition_from_account ?failure
+    ?(is_nonce_precondition = false) ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
     account
   in
   (* choose constructor *)
-  let%bind b = Quickcheck.Generator.bool in
+  let%bind b =
+    if is_nonce_precondition then return false else Quickcheck.Generator.bool
+  in
   if b then
     (* Full *)
     let open Zkapp_basic in

@@ -56,6 +56,7 @@ val dummy_rule :
 val check_zkapp_command_with_merges_exn :
      ?expected_failure:Mina_base.Transaction_status.Failure.t
   -> ?ignore_outside_snark:bool
+  -> ?global_slot:Mina_numbers.Global_slot.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> Ledger.t
   -> Zkapp_command.t list
