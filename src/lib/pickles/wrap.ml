@@ -376,42 +376,103 @@ let%test "lookup finalization" =
       Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
   |> Or_error.ok_exn
 
-(* Helper function to convert actual feature flags composed of booleans into
-   feature flags composed of Yes/No/Maybe options *)
-let compute_feature_flags (actual_feature_flags : bool Plonk_types.Features.t) :
-    Plonk_types.Opt.Flag.t Plonk_types.Features.t =
-  Plonk_types.Features.map actual_feature_flags ~f:(function
-    | true ->
-        Plonk_types.Opt.Flag.Yes
-    | false ->
-        Plonk_types.Opt.Flag.No )
+(* Helper function to convert actual feature flags into 3 test configurations of feature flags
+     Inputs: actual_feature_flags := The actual feature flags in terms of true/false
+     Outputs: Array of corresponding feature flags configs composed of Yes/No/Maybe options
+                * Array where true is mapped to Yes and false is mapped to No
+                * Array where true is mapped to Maybe and false is mapped to No
+                * Array where true and false are both mapped to Maybe *)
+let generate_test_feature_flag_configs
+    (actual_feature_flags : bool Plonk_types.Features.t) :
+    Plonk_types.Opt.Flag.t Plonk_types.Features.t Array.t =
+  (* Set up a helper to convert actual feature flags composed of booleans into
+     feature flags composed of Yes/No/Maybe options.
+       Inputs:
+          actual_feature_flags := The actual feature flags in terms of true/false
+          true_opt             := The Plonk_types.Opt type to use for true/enabled features
+          false_opt            := The Plonk_types.Opt type to use for false/disabled features
+       Outputs: Corresponding feature flags composed of Yes/No/Maybe options *)
+  let compute_feature_flags (actual_feature_flags : bool Plonk_types.Features.t)
+      (true_opt : Plonk_types.Opt.Flag.t) (false_opt : Plonk_types.Opt.Flag.t) :
+      Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+    Plonk_types.Features.map actual_feature_flags ~f:(function
+      | true ->
+          true_opt
+      | false ->
+          false_opt )
+  in
+
+  (* Generate the 3 configurations of the actual feature flags using helper *)
+  [| compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Yes
+       Plonk_types.Opt.Flag.No
+   ; compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Maybe
+       Plonk_types.Opt.Flag.No
+   ; compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Maybe
+       Plonk_types.Opt.Flag.Maybe
+  |]
 
 (* Run the recursive proof tests on the supplied inputs.
      Inputs:
-       * actual_feature_flags := user-specified feature flags, matching
+       * actual_feature_flags := User-specified feature flags, matching
                                  those required by the backend circuit
        * vk                   := Verifier index for backend circuit
-       * proof                := backend proof
+       * proof                := Backend proof
 
      Outputs:
-       * Ok or throws and exception
-*)
+       * true or throws and exception *)
 let run_recursive_proof_test
     (actual_feature_flags : bool Plonk_types.Features.t)
+    (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
     (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-    (proof : Backend.Tick.Proof.t) =
-  (* Constants helper *)
+    (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
+  (* Constants helper - takes an OCaml value and converts it to a snarky value, where
+                        all values here are constant literals.  N.b. this should be
+                        encapsulated as Snarky internals, but it never got merged. *)
   let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
   in
-  (* Compute feature flags from actual feature flags *)
-  let feature_flags = compute_feature_flags actual_feature_flags in
+
+  (* Compute deferred values - in the Pickles recursive proof system, deferred values
+     are values from 2 proofs earlier in the recursion hierarchy.  Every recursion
+     goes through a two-phase process of step and wrap, like so
+
+       step <- wrap <- step <- ... <- wrap <- step,
+          `<-----------'
+             deferred
+
+     where there may be multiple children at each level (but let's ignore that!).
+     Deferred values are values (part of the public input) that must be passed between
+     the two phases in order to be verified correctly-- it works like this.
+
+       * The wrap proof is passed the deferred values for its step proof as part of its public input.
+       * The wrap proof starts verifying the step proof.  As part of this verification it must
+         perform all of the group element checks (since it's over the Vesta base field); however,
+         at this stage it just assumes that the deferred values of its public input are correct
+         (i.e. it defers checking them).
+       * The next step proof verifies the wrap proof with a similar process, but using the other
+         curve (e.g. Pallas).  There are two important things to note.
+           * Since it is using the other curve, it can compute the commitments to the public inputs
+             of the previous wrap circuit that were passed into it.  In other words, the next step
+             proof receives data from the previous wrap proof about the previous step proof.  Yeah,
+             from two proofs back! (e.g. the deferred values)
+           * The next step proof also computes the deferred values inside the circuit and verifies
+             that they match those used by the previous wrap proof.
+
+      The code below generates the deferred values so that we can verifiy that we can actually
+      compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
+      explaining this in detail. *)
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
       ~prev_challenges:[] ~step_vk:vk ~public_input:[] ~proof
       ~actual_proofs_verified:Nat.N0.n
   in
+
+  (* Define Typ.t for Deferred_values.t -- A Type.t defines how to convert a value of some type
+                                          in OCaml into a var in circuit/Snarky.
+
+     This complex function is called with two sets of inputs: once for the step circuit and
+     once for the wrap circuit.  It was decided not to use a functor for this. *)
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_main_inputs in
@@ -428,6 +489,10 @@ let run_recursive_proof_test
          (module Impl)
          ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
   in
+
+  (* Use deferred_values_typ and the constant helper to prepare deferred_values
+     for use in the circuit.  We change some Opt.t to Option.t because that is
+     what Type.t is configured to accept. *)
   let deferred_values =
     constant deferred_values_typ
       { deferred_values with
@@ -442,7 +507,8 @@ let run_recursive_proof_test
                 deferred_values.plonk.optional_column_scalars
           }
       }
-  (* Compute proof evaluations *)
+  (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
+     for use in the circuit *)
   and evals =
     constant
       (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
@@ -450,8 +516,17 @@ let run_recursive_proof_test
       ; ft_eval1 = proof.openings.ft_eval1
       }
   in
-  (* Run prover to create recursive proof and then verify it *)
+
+  (* Run the circuit without generating a proof using run_and_check *)
   Impls.Step.run_and_check (fun () ->
+      (* Set up the step sponge from the wrap sponge -- we cannot use the same poseidon
+         sponge in both step and wrap because they have different fields.
+
+         In order to continue the Fiat-Shamir heuristic across field boundaries we use
+         the wrap sponge for everything in the wrap proof, squeeze it one final time and
+         expose the squoze value in the public input to the step proof, which absorbs
+         said squoze value into the step sponge. :-) This means the step sponge has absorbed
+         everything from the proof so far by proxy and that is also over the native field! *)
       let res, _chals =
         let sponge =
           let open Step_main_inputs in
@@ -460,6 +535,8 @@ let run_recursive_proof_test
             (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
           sponge
         in
+
+        (* Call finalisation with all of the required details *)
         Step_verifier.finalize_other_proof
           (module Nat.N0)
           ~feature_flags
@@ -467,8 +544,32 @@ let run_recursive_proof_test
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
           ~sponge ~prev_challenges:[] deferred_values evals
       in
+
+      (* Actually do the above as the prover *)
       Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
   |> Or_error.ok_exn
+
+(* Run the custom gate tests on the supplied inputs.
+     Inputs:
+       * actual_feature_flags := User-specified feature flags, matching
+                                 those required by the backend circuit
+       * vk                   := Verifier index for backend circuit
+       * proof                := Backend proof
+
+     Outputs:
+       * true or throws and exception
+*)
+let run_custom_gate_tests (actual_feature_flags : bool Plonk_types.Features.t)
+    (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
+    (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
+  (* Compute the test feature flag configurations from the actual feature flags *)
+  let test_feature_flag_configs =
+    generate_test_feature_flag_configs actual_feature_flags
+  in
+
+  (* Run the recursive proof generation tests on each feature flags configuration *)
+  Array.for_all test_feature_flag_configs ~f:(fun feature_flags ->
+      run_recursive_proof_test actual_feature_flags feature_flags vk proof )
 
 let%test "foreign field multiplication finalization" =
   try
@@ -499,8 +600,9 @@ let%test "foreign field multiplication finalization" =
       ; runtime_tables = false
       }
     in
+
     (* Run the recursive proof test with supplied feature flags *)
-    run_recursive_proof_test actual_feature_flags vk proof
+    run_custom_gate_tests actual_feature_flags vk proof
   with _e ->
     Printexc.print_backtrace stdout ;
     Out_channel.flush stdout ;
