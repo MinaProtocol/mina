@@ -283,192 +283,297 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   ; sponge_digest_before_evaluations = O.digest_before_evaluations o
   }
 
-let%test "lookup finalization" =
-  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
-    let xs, aux = typ.value_to_fields x in
-    typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
-  in
-  let srs =
-    Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
-  in
-  let index, public_input, proof =
-    Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true
-  in
-  let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-  let proof = Backend.Tick.Proof.of_backend proof in
-  let feature_flags =
-    let open Plonk_types.Opt.Flag in
-    { Plonk_types.Features.chacha = No
-    ; range_check = No
-    ; foreign_field_add = No
-    ; foreign_field_mul = No
-    ; xor = No
-    ; rot = No
-    ; lookup = Maybe
-    ; runtime_tables = Maybe
-    }
-  in
-  let actual_feature_flags =
-    Plonk_types.Features.map feature_flags ~f:(function
-      | Plonk_types.Opt.Flag.Yes | Maybe ->
-          true
-      | No ->
-          false )
-  in
-  let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-    deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-      ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
-      ~actual_proofs_verified:Nat.N0.n
-  in
-  let deferred_values_typ =
-    let open Impls.Step in
-    let open Step_main_inputs in
-    let open Step_verifier in
-    Wrap.Proof_state.Deferred_values.In_circuit.typ
-      (module Impls.Step)
-      ~feature_flags ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
-      ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
-      ~dummy_scalar_challenge:
-        (Kimchi_backend_common.Scalar_challenge.create
-           Limb_vector.Challenge.Constant.zero )
-      (Shifted_value.Type1.typ Field.typ)
-      (Branch_data.typ
-         (module Impl)
-         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-  in
-  let deferred_values =
-    constant deferred_values_typ
-      { deferred_values with
-        plonk =
-          { deferred_values.plonk with
-            lookup = Opt.to_option deferred_values.plonk.lookup
-          ; optional_column_scalars =
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Optional_column_scalars
-              .map ~f:Opt.to_option
-                deferred_values.plonk.optional_column_scalars
-          }
-      }
-  and evals =
-    constant
-      (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
-      { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-      ; ft_eval1 = proof.openings.ft_eval1
-      }
-  in
-  Impls.Step.run_and_check (fun () ->
-      let res, _chals =
-        let sponge =
-          let open Step_main_inputs in
-          let sponge = Sponge.create sponge_params in
-          Sponge.absorb sponge
-            (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
-          sponge
-        in
-        Step_verifier.finalize_other_proof
-          (module Nat.N0)
-          ~feature_flags
-          ~step_domains:
-            (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
-          ~sponge ~prev_challenges:[] deferred_values evals
-      in
-      Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
-  |> Or_error.ok_exn
+let%test_module "gate finalization" =
+  ( module struct
+    let activate_flag ~flag_value feature_flags flag =
+      let open Plonk_types.Features in
+      match flag with
+      | `Chacha ->
+          { feature_flags with chacha = flag_value }
+      | `Range_check ->
+          { feature_flags with range_check = flag_value }
+      | `Foreign_field_add ->
+          { feature_flags with foreign_field_add = flag_value }
+      | `Foreign_field_mul ->
+          { feature_flags with foreign_field_mul = flag_value }
+      | `Xor ->
+          { feature_flags with xor = flag_value }
+      | `Rot ->
+          { feature_flags with rot = flag_value }
+      | `Lookup ->
+          { feature_flags with lookup = flag_value }
+      | `Runtime_tables ->
+          { feature_flags with runtime_tables = flag_value }
 
-let%test "foreign field multiplication finalization" =
-  printf "FFMUL TESTS\n" ;
-  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
-    let xs, aux = typ.value_to_fields x in
-    typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
-  in
-  let srs =
-    Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
-  in
-  let index, public_input, proof =
-    Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
-  in
-  let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-  let proof = Backend.Tick.Proof.of_backend proof in
-  let feature_flags =
-    let open Plonk_types.Opt.Flag in
-    { Plonk_types.Features.chacha = No
-    ; range_check = Maybe
-    ; foreign_field_add = No
-    ; foreign_field_mul = Yes
-    ; xor = No
-    ; rot = No
-    ; lookup = Maybe
-    ; runtime_tables = No
-    }
-  in
-  let actual_feature_flags =
-    Plonk_types.Features.map feature_flags ~f:(function
-      | Plonk_types.Opt.Flag.Yes | Maybe ->
-          true
-      | No ->
-          false )
-  in
-  let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-    deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-      ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
-      ~actual_proofs_verified:Nat.N0.n
-  in
-  let deferred_values_typ =
-    let open Impls.Step in
-    let open Step_main_inputs in
-    let open Step_verifier in
-    Wrap.Proof_state.Deferred_values.In_circuit.typ
-      (module Impls.Step)
-      ~feature_flags ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
-      ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
-      ~dummy_scalar_challenge:
-        (Kimchi_backend_common.Scalar_challenge.create
-           Limb_vector.Challenge.Constant.zero )
-      (Shifted_value.Type1.typ Field.typ)
-      (Branch_data.typ
-         (module Impl)
-         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-  in
-  let deferred_values =
-    constant deferred_values_typ
-      { deferred_values with
-        plonk =
-          { deferred_values.plonk with
-            lookup = Opt.to_option deferred_values.plonk.lookup
-          ; optional_column_scalars =
-              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .In_circuit
-              .Optional_column_scalars
-              .map ~f:Opt.to_option
-                deferred_values.plonk.optional_column_scalars
-          }
-      }
-  and evals =
-    constant
-      (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
-      { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-      ; ft_eval1 = proof.openings.ft_eval1
-      }
-  in
-  Impls.Step.run_and_check (fun () ->
-      let res, _chals =
-        let sponge =
-          let open Step_main_inputs in
-          let sponge = Sponge.create sponge_params in
-          Sponge.absorb sponge
-            (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
-          sponge
-        in
-        Step_verifier.finalize_other_proof
-          (module Nat.N0)
-          ~feature_flags
-          ~step_domains:
-            (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
-          ~sponge ~prev_challenges:[] deferred_values evals
+    let set_flags ?(init = Plonk_types.Features.none) flag_value flags =
+      List.fold_left ~f:(activate_flag ~flag_value) ~init flags
+
+    let activate_flags = set_flags Plonk_types.Opt.Flag.Yes
+
+    let maybe_flags = set_flags Plonk_types.Opt.Flag.Maybe
+
+    let%test "lookup finalization" =
+      let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+        let xs, aux = typ.value_to_fields x in
+        typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
       in
-      Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
-  |> Or_error.ok_exn
+      let srs =
+        Kimchi_bindings.Protocol.SRS.Fp.create
+          (1 lsl Common.Max_degree.step_log2)
+      in
+      let index, public_input, proof =
+        Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true
+      in
+      let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
+      let proof = Backend.Tick.Proof.of_backend proof in
+      let feature_flags = maybe_flags [ `Lookup; `Runtime_tables ] in
+      let actual_feature_flags =
+        Plonk_types.Features.map feature_flags ~f:(function
+          | Plonk_types.Opt.Flag.Yes | Maybe ->
+              true
+          | No ->
+              false )
+      in
+      let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
+        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
+          ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
+          ~actual_proofs_verified:Nat.N0.n
+      in
+      let deferred_values_typ =
+        let open Impls.Step in
+        let open Step_main_inputs in
+        let open Step_verifier in
+        Wrap.Proof_state.Deferred_values.In_circuit.typ
+          (module Impls.Step)
+          ~feature_flags ~challenge:Challenge.typ
+          ~scalar_challenge:Challenge.typ
+          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+          ~dummy_scalar_challenge:
+            (Kimchi_backend_common.Scalar_challenge.create
+               Limb_vector.Challenge.Constant.zero )
+          (Shifted_value.Type1.typ Field.typ)
+          (Branch_data.typ
+             (module Impl)
+             ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+      in
+      let deferred_values =
+        constant deferred_values_typ
+          { deferred_values with
+            plonk =
+              { deferred_values.plonk with
+                lookup = Opt.to_option deferred_values.plonk.lookup
+              ; optional_column_scalars =
+                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                  .In_circuit
+                  .Optional_column_scalars
+                  .map ~f:Opt.to_option
+                    deferred_values.plonk.optional_column_scalars
+              }
+          }
+      and evals =
+        constant
+          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
+          ; ft_eval1 = proof.openings.ft_eval1
+          }
+      in
+      Impls.Step.run_and_check (fun () ->
+          let res, _chals =
+            let sponge =
+              let open Step_main_inputs in
+              let sponge = Sponge.create sponge_params in
+              Sponge.absorb sponge
+                (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
+              sponge
+            in
+            Step_verifier.finalize_other_proof
+              (module Nat.N0)
+              ~feature_flags
+              ~step_domains:
+                (`Known
+                  [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
+                  )
+              ~sponge ~prev_challenges:[] deferred_values evals
+          in
+          Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
+      |> Or_error.ok_exn
+
+    let%test "foreign field multiplication finalization" =
+      let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+        let xs, aux = typ.value_to_fields x in
+        typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
+      in
+      let srs =
+        Kimchi_bindings.Protocol.SRS.Fp.create
+          (1 lsl Common.Max_degree.step_log2)
+      in
+      let index, public_input, proof =
+        Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
+      in
+      let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
+      let proof = Backend.Tick.Proof.of_backend proof in
+      let feature_flags =
+        activate_flags [ `Range_check; `Foreign_field_mul; `Lookup ]
+      in
+      let actual_feature_flags =
+        Plonk_types.Features.map feature_flags ~f:(function
+          | Plonk_types.Opt.Flag.Yes | Maybe ->
+              true
+          | No ->
+              false )
+      in
+      let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
+        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
+          ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
+          ~actual_proofs_verified:Nat.N0.n
+      in
+      let deferred_values_typ =
+        let open Impls.Step in
+        let open Step_main_inputs in
+        let open Step_verifier in
+        Wrap.Proof_state.Deferred_values.In_circuit.typ
+          (module Impls.Step)
+          ~feature_flags ~challenge:Challenge.typ
+          ~scalar_challenge:Challenge.typ
+          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+          ~dummy_scalar_challenge:
+            (Kimchi_backend_common.Scalar_challenge.create
+               Limb_vector.Challenge.Constant.zero )
+          (Shifted_value.Type1.typ Field.typ)
+          (Branch_data.typ
+             (module Impl)
+             ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+      in
+      let deferred_values =
+        constant deferred_values_typ
+          { deferred_values with
+            plonk =
+              { deferred_values.plonk with
+                lookup = Opt.to_option deferred_values.plonk.lookup
+              ; optional_column_scalars =
+                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                  .In_circuit
+                  .Optional_column_scalars
+                  .map ~f:Opt.to_option
+                    deferred_values.plonk.optional_column_scalars
+              }
+          }
+      and evals =
+        constant
+          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
+          ; ft_eval1 = proof.openings.ft_eval1
+          }
+      in
+      Impls.Step.run_and_check (fun () ->
+          let res, _chals =
+            let sponge =
+              let open Step_main_inputs in
+              let sponge = Sponge.create sponge_params in
+              Sponge.absorb sponge
+                (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
+              sponge
+            in
+            Step_verifier.finalize_other_proof
+              (module Nat.N0)
+              ~feature_flags
+              ~step_domains:
+                (`Known
+                  [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
+                  )
+              ~sponge ~prev_challenges:[] deferred_values evals
+          in
+          Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
+      |> Or_error.ok_exn
+
+    let%test "foreign field multiplication finalization maybe" =
+      let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+        let xs, aux = typ.value_to_fields x in
+        typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
+      in
+      let srs =
+        Kimchi_bindings.Protocol.SRS.Fp.create
+          (1 lsl Common.Max_degree.step_log2)
+      in
+      let index, public_input, proof =
+        Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
+      in
+      let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
+      let proof = Backend.Tick.Proof.of_backend proof in
+      let feature_flags =
+        maybe_flags [ `Lookup; `Range_check; `Foreign_field_mul ]
+      in
+      let actual_feature_flags =
+        Plonk_types.Features.map feature_flags ~f:(function
+          | Plonk_types.Opt.Flag.Yes | Maybe ->
+              true
+          | No ->
+              false )
+      in
+      let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
+        deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
+          ~prev_challenges:[] ~step_vk:vk ~public_input:[ public_input ] ~proof
+          ~actual_proofs_verified:Nat.N0.n
+      in
+      let deferred_values_typ =
+        let open Impls.Step in
+        let open Step_main_inputs in
+        let open Step_verifier in
+        Wrap.Proof_state.Deferred_values.In_circuit.typ
+          (module Impls.Step)
+          ~feature_flags ~challenge:Challenge.typ
+          ~scalar_challenge:Challenge.typ
+          ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+          ~dummy_scalar_challenge:
+            (Kimchi_backend_common.Scalar_challenge.create
+               Limb_vector.Challenge.Constant.zero )
+          (Shifted_value.Type1.typ Field.typ)
+          (Branch_data.typ
+             (module Impl)
+             ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+      in
+      let deferred_values =
+        constant deferred_values_typ
+          { deferred_values with
+            plonk =
+              { deferred_values.plonk with
+                lookup = Opt.to_option deferred_values.plonk.lookup
+              ; optional_column_scalars =
+                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                  .In_circuit
+                  .Optional_column_scalars
+                  .map ~f:Opt.to_option
+                    deferred_values.plonk.optional_column_scalars
+              }
+          }
+      and evals =
+        constant
+          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
+          ; ft_eval1 = proof.openings.ft_eval1
+          }
+      in
+      Impls.Step.run_and_check (fun () ->
+          let res, _chals =
+            let sponge =
+              let open Step_main_inputs in
+              let sponge = Sponge.create sponge_params in
+              Sponge.absorb sponge
+                (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
+              sponge
+            in
+            Step_verifier.finalize_other_proof
+              (module Nat.N0)
+              ~feature_flags
+              ~step_domains:
+                (`Known
+                  [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
+                  )
+              ~sponge ~prev_challenges:[] deferred_values evals
+          in
+          Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
+      |> Or_error.ok_exn
+  end )
 
 module Step_acc = Tock.Inner_curve.Affine
 
