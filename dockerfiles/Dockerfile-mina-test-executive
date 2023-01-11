@@ -43,7 +43,6 @@ RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /
     && apt-get install --quiet --yes terraform \
     && rm -rf /var/lib/apt/lists/*
 
-
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
@@ -86,13 +85,12 @@ RUN git clone https://github.com/MinaProtocol/mina.git --branch $MINA_BRANCH --d
 WORKDIR /root/mina
 
 # these env vars need to be overriden when the image is `docker run`.  listed here for documentation sake if nothing else
-# test vars
+# test configuration vars
 ENV TEST_NAME=""
 ENV MINA_IMAGE=""
 ENV ARCHIVE_IMAGE=""
 ENV DEBUG_BOOL=False
-
-# environment configuration vars, these need to be overriden
+# testnet infra related vars
 ENV GOOGLE_CLOUD_KEYFILE_JSON_PATH=""
 ENV AWS_ACCESS_KEY_ID=""
 ENV AWS_SECRET_ACCESS_KEY=""
