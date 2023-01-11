@@ -376,100 +376,131 @@ let%test "lookup finalization" =
       Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
   |> Or_error.ok_exn
 
+(* Helper function to convert actual feature flags composed of booleans into
+   feature flags composed of Yes/No/Maybe options *)
+let compute_feature_flags (actual_feature_flags : bool Plonk_types.Features.t) :
+    Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+  Plonk_types.Features.map actual_feature_flags ~f:(function
+    | true ->
+        Plonk_types.Opt.Flag.Yes
+    | false ->
+        Plonk_types.Opt.Flag.No )
+
+(* Run the recursive proof tests on the supplied inputs.
+     Inputs:
+       * actual_feature_flags := user-specified feature flags, matching
+                                 those required by the backend circuit
+       * vk                   := Verifier index for backend circuit
+       * proof                := backend proof
+
+     Outputs:
+       * Ok or throws and exception
+*)
+let run_recursive_proof_test
+    (actual_feature_flags : bool Plonk_types.Features.t)
+    (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
+    (proof : Backend.Tick.Proof.t) =
+  (* Constants helper *)
+  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+    let xs, aux = typ.value_to_fields x in
+    typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
+  in
+  (* Compute feature flags from actual feature flags *)
+  let feature_flags = compute_feature_flags actual_feature_flags in
+  let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
+    deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
+      ~prev_challenges:[] ~step_vk:vk ~public_input:[] ~proof
+      ~actual_proofs_verified:Nat.N0.n
+  in
+  let deferred_values_typ =
+    let open Impls.Step in
+    let open Step_main_inputs in
+    let open Step_verifier in
+    Wrap.Proof_state.Deferred_values.In_circuit.typ
+      (module Impls.Step)
+      ~feature_flags ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
+      ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+      ~dummy_scalar_challenge:
+        (Kimchi_backend_common.Scalar_challenge.create
+           Limb_vector.Challenge.Constant.zero )
+      (Shifted_value.Type1.typ Field.typ)
+      (Branch_data.typ
+         (module Impl)
+         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+  in
+  let deferred_values =
+    constant deferred_values_typ
+      { deferred_values with
+        plonk =
+          { deferred_values.plonk with
+            lookup = Opt.to_option deferred_values.plonk.lookup
+          ; optional_column_scalars =
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Optional_column_scalars
+              .map ~f:Opt.to_option
+                deferred_values.plonk.optional_column_scalars
+          }
+      }
+  (* Compute proof evaluations *)
+  and evals =
+    constant
+      (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+      { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
+      ; ft_eval1 = proof.openings.ft_eval1
+      }
+  in
+  (* Run prover to create recursive proof and then verify it *)
+  Impls.Step.run_and_check (fun () ->
+      let res, _chals =
+        let sponge =
+          let open Step_main_inputs in
+          let sponge = Sponge.create sponge_params in
+          Sponge.absorb sponge
+            (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
+          sponge
+        in
+        Step_verifier.finalize_other_proof
+          (module Nat.N0)
+          ~feature_flags
+          ~step_domains:
+            (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
+          ~sponge ~prev_challenges:[] deferred_values evals
+      in
+      Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
+  |> Or_error.ok_exn
+
 let%test "foreign field multiplication finalization" =
   try
-    let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
-      let xs, aux = typ.value_to_fields x in
-      typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
-    in
+    (* Generate foreign field multiplication test backend proof using Kimchi,
+       obtaining the proof and corresponding prover index. Note: we only
+       want to pay the cost of generating this proof once and then reuse
+       it many times for the different recursive proof tests. *)
     let srs =
       Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
     in
     let index, proof =
       Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
     in
+
+    (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
     let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
     let proof = Backend.Tick.Proof.of_backend proof in
-    let feature_flags =
-      let open Plonk_types.Opt.Flag in
-      { Plonk_types.Features.chacha = No
-      ; range_check = Maybe
-      ; foreign_field_add = No
-      ; foreign_field_mul = Yes
-      ; xor = No
-      ; rot = No
-      ; lookup = Maybe
-      ; runtime_tables = No
+
+    (* Specify feature flags that were used for backend proof *)
+    let actual_feature_flags =
+      { Plonk_types.Features.chacha = false
+      ; range_check = false
+      ; foreign_field_add = false
+      ; foreign_field_mul = true
+      ; xor = false
+      ; rot = false
+      ; lookup = true
+      ; runtime_tables = false
       }
     in
-    let actual_feature_flags =
-      Plonk_types.Features.map feature_flags ~f:(function
-        | Plonk_types.Opt.Flag.Yes | Maybe ->
-            true
-        | No ->
-            false )
-    in
-    let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
-      deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-        ~prev_challenges:[] ~step_vk:vk ~public_input:[] ~proof
-        ~actual_proofs_verified:Nat.N0.n
-    in
-    let deferred_values_typ =
-      let open Impls.Step in
-      let open Step_main_inputs in
-      let open Step_verifier in
-      Wrap.Proof_state.Deferred_values.In_circuit.typ
-        (module Impls.Step)
-        ~feature_flags ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ
-        ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
-        ~dummy_scalar_challenge:
-          (Kimchi_backend_common.Scalar_challenge.create
-             Limb_vector.Challenge.Constant.zero )
-        (Shifted_value.Type1.typ Field.typ)
-        (Branch_data.typ
-           (module Impl)
-           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-    in
-    let deferred_values =
-      constant deferred_values_typ
-        { deferred_values with
-          plonk =
-            { deferred_values.plonk with
-              lookup = Opt.to_option deferred_values.plonk.lookup
-            ; optional_column_scalars =
-                Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                .In_circuit
-                .Optional_column_scalars
-                .map ~f:Opt.to_option
-                  deferred_values.plonk.optional_column_scalars
-            }
-        }
-    and evals =
-      constant
-        (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
-        { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
-        ; ft_eval1 = proof.openings.ft_eval1
-        }
-    in
-    Impls.Step.run_and_check (fun () ->
-        let res, _chals =
-          let sponge =
-            let open Step_main_inputs in
-            let sponge = Sponge.create sponge_params in
-            Sponge.absorb sponge
-              (`Field (Impl.Field.constant sponge_digest_before_evaluations)) ;
-            sponge
-          in
-          Step_verifier.finalize_other_proof
-            (module Nat.N0)
-            ~feature_flags
-            ~step_domains:
-              (`Known
-                [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ] )
-            ~sponge ~prev_challenges:[] deferred_values evals
-        in
-        Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
-    |> Or_error.ok_exn
+    (* Run the recursive proof test with supplied feature flags *)
+    run_recursive_proof_test actual_feature_flags vk proof
   with _e ->
     Printexc.print_backtrace stdout ;
     Out_channel.flush stdout ;
