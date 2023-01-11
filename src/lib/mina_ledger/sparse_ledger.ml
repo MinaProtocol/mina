@@ -96,22 +96,40 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
   |> Result.map ~f:(fun (account_update_applied, rev_states) ->
          let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
          in
-         let will_succeed =
+         let module Applied = Transaction_applied.Zkapp_command_applied in
+         let states =
            match rev_states with
            | [] ->
-               false
-           | (_, local_state) :: _ ->
-               not local_state.LS.success
-         in
-         let states =
-           (* We perform a [List.rev] here to ensure that the states are in order
-              wrt. the zkapp_command that generated the states.
-           *)
-           List.rev_map rev_states ~f:(fun (global_state, local_state) ->
-               (* Override the local state's [will_succeed] value using our
-                  knowledge of the final state of the transaction.
+               []
+           | final_state :: rev_states ->
+               (* Update the [will_succeed] of all *intermediate* states.
+                  Note that the first and final states will always have
+                  [will_succeed = true], so we must leave them unchanged.
                *)
-               (global_state, { local_state with LS.will_succeed }) )
+               let will_succeed =
+                 match account_update_applied.Applied.command.status with
+                 | Applied ->
+                     true
+                 | Failed _ ->
+                     false
+               in
+               (* We perform a manual [List.rev] here to ensure that the states
+                  are in order wrt. the zkapp_command that generated the states.
+               *)
+               let rec go states rev_states =
+                 match rev_states with
+                 | [] ->
+                     states
+                 | [ initial_state ] ->
+                     (* Skip the initial state *)
+                     initial_state :: states
+                 | (global_state, local_state) :: rev_states ->
+                     go
+                       ( (global_state, { local_state with LS.will_succeed })
+                       :: states )
+                       rev_states
+               in
+               go [ final_state ] rev_states
          in
          (account_update_applied, states) )
 

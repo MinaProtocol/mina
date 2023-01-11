@@ -1763,6 +1763,9 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.if_ is_last_account_update
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.supply_increase
+      ; will_succeed =
+          Bool.if_ is_last_account_update ~then_:Bool.true_
+            ~else_:local_state.will_succeed
       }
     in
     (global_state, local_state)

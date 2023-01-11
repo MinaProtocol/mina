@@ -3736,15 +3736,22 @@ module Make_str (A : Wire_types.Concrete) = struct
              , statess_rev )
              (_, _, zkapp_command)
            ->
-          let _, states =
+          let txn_applied, states =
             Sparse_ledger.apply_zkapp_command_unchecked_with_states
               sparse_ledger ~constraint_constants ~state_view ~fee_excess
               ~supply_increase zkapp_command
             |> Or_error.ok_exn
           in
-          let final_state, will_succeed =
-            let global_state, local_state = List.last_exn states in
-            (global_state, local_state.success)
+          let will_succeed =
+            match txn_applied.command.status with
+            | Applied ->
+                true
+            | Failed _ ->
+                false
+          in
+          let final_state =
+            let global_state, _local_state = List.last_exn states in
+            global_state
           in
           ( final_state.fee_excess
           , final_state.supply_increase
