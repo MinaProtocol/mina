@@ -2066,12 +2066,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let check_protocol_state ~pending_coinbase_stack_init
           ~pending_coinbase_stack_before ~pending_coinbase_stack_after
-          ~current_global_slot state_body =
+          ~block_global_slot state_body =
         [%with_label_ "Compute pending coinbase stack"] (fun () ->
             let%bind state_body_hash =
               Mina_state.Protocol_state.Body.hash_checked state_body
             in
-            let global_slot = current_global_slot in
+            let global_slot = block_global_slot in
             let%bind computed_pending_coinbase_stack_after =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
                 global_slot pending_coinbase_stack_init
