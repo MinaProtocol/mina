@@ -1169,7 +1169,10 @@ module Make (Inputs : Inputs_intf) = struct
               (Account.verification_key_hash a)
               (Account_update.verification_key_hash account_update))
     in
-    assert_ ~pos:__POS__ matching_verification_key_hashes ;
+    let local_state =
+      Local_state.add_check local_state Unexpected_verification_key_hash
+        matching_verification_key_hashes
+    in
     let local_state =
       h.perform
         (Check_account_precondition
