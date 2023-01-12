@@ -1429,6 +1429,16 @@ end = struct
     end
   end]
 
+  let ok_if_vk_hash_expected ~got ~expected =
+    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+      Error
+        (Error.create "Expected vk hash doesn't match hash in vk we received"
+           [ ("expected_vk_hash", expected)
+           ; ("got_vk_hash", With_hash.hash got)
+           ]
+           [%sexp_of: (string * Zkapp_basic.F.t) list] )
+    else Ok got
+
   let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
       account_id =
     match
@@ -1439,16 +1449,7 @@ end = struct
       zkapp.verification_key
     with
     | Some vk ->
-        if not @@ Zkapp_basic.F.equal (With_hash.hash vk) expected_vk_hash then
-          Error
-            (Error.create "Expected vk hash doesn't match hash in account"
-               ( [ ("expected_vk_hash", expected_vk_hash)
-                 ; ("got_vk_hash", With_hash.hash vk)
-                 ]
-               , ("account_id", account_id) )
-               [%sexp_of:
-                 (string * Zkapp_basic.F.t) list * (string * Account_id.t)] )
-        else Ok vk
+        ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
     | None ->
         Error
           (Error.create "No verification key found for proved account update"
@@ -1497,8 +1498,14 @@ end = struct
                      * potentially set in this account_update (use the non-'
                      * vks_overrided) . *)
                     match Account_id.Map.find !vks_overridden account_id with
-                    | Some (Some vk) ->
-                        vk
+                    | Some (Some vk) -> (
+                        match
+                          ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
+                        with
+                        | Ok vk ->
+                            vk
+                        | Error err ->
+                            return (Error err) )
                     | Some None ->
                         (* we explicitly have erased the key *)
                         let err =
@@ -1671,24 +1678,10 @@ let weight (zkapp_command : t) : int =
     ]
 
 module type Valid_intf = sig
-  module Verification_key_hash : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
-      end
-    end]
-  end
-
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = private
-        { zkapp_command : T.Stable.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+      type t = private { zkapp_command : T.Stable.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -1704,15 +1697,9 @@ module type Valid_intf = sig
           -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t Or_error.t
+  val of_verifiable : Verifiable.t -> t
 
   val forget : t -> T.t
-
-  module For_tests : sig
-    val verification_keys : t -> (Account_id.t * Verification_key_hash.t) list
-
-    val replace_zkapp_command : t -> T.t -> t
-  end
 end
 
 module Valid :
@@ -1737,60 +1724,25 @@ struct
   module Stable = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+        { zkapp_command : S.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let create ~verification_keys zkapp_command : t =
-    { zkapp_command; verification_keys }
+  let create zkapp_command : t = { zkapp_command }
 
-  let of_verifiable (t : Verifiable.t) : t Or_error.t =
-    let open Or_error.Let_syntax in
-    let tbl = Account_id.Table.create () in
-    let%map () =
-      Call_forest.fold t.account_updates ~init:(Ok ())
-        ~f:(fun acc (p, vk_opt) ->
-          let%bind _ok = acc in
-          let account_id = Account_update.account_id p in
-          let%bind () = check_authorization p in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } =
-              match vk_opt with
-              | Some vk ->
-                  Ok vk
-              | None ->
-                  Or_error.errorf
-                    "Verification key required for proof, but was not given"
-            in
-            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
-          else acc )
-    in
-    { zkapp_command = of_verifiable t
-    ; verification_keys = Account_id.Table.to_alist tbl
-    }
+  let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
 
   let to_valid_unsafe (t : T.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
-    `If_this_is_used_it_should_have_a_comment_justifying_it
-      (create t ~verification_keys:[])
+    `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
 
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~find_vk : t Or_error.t =
-    Verifiable.create t ~find_vk |> Or_error.bind ~f:of_verifiable
-
-  module For_tests = struct
-    let replace_zkapp_command (t : t) (zkapp_command : T.t) =
-      { t with zkapp_command }
-
-    let verification_keys (t : t) = t.verification_keys
-  end
+    Verifiable.create t ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

@@ -1675,33 +1675,42 @@ let%test_module _ =
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
-      Deferred.List.map
-        (valid_cmds : User_command.Valid.t list)
-        ~f:(function
-          | Zkapp_command zkapp_command_dummy_auths ->
-              let%map zkapp_command =
-                Zkapp_command_builder.replace_authorizations ~keymap ~prover
-                  (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
-              in
-              let valid_zkapp_command =
-                let open Mina_ledger.Ledger in
-                match
-                  Zkapp_command.Valid.to_valid
-                    ~find_vk:
-                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get
-                         ~location_of_account )
-                    zkapp_command
-                with
-                | Ok ps ->
-                    ps
-                | Error err ->
-                    Error.raise
-                    @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t"
-                         err
-              in
-              User_command.Zkapp_command valid_zkapp_command
-          | Signed_command _ ->
-              failwith "Expected Zkapp_command valid user command" )
+      let sequence_or_error (xs : 'a Or_error.t list) : 'a list Or_error.t =
+        List.fold xs ~init:(Ok []) ~f:(fun acc x ->
+            let open Or_error.Let_syntax in
+            let%bind acc = acc in
+            let%map x = x in
+            x :: acc )
+        |> Or_error.map ~f:List.rev
+      in
+      let open Deferred.Let_syntax in
+      let%map zkapp_commands_fixed =
+        Deferred.List.map
+          (valid_cmds : User_command.Valid.t list)
+          ~f:(function
+            | Zkapp_command zkapp_command_dummy_auths ->
+                let%map cmd =
+                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                    (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
+                in
+                User_command.Zkapp_command cmd
+            | Signed_command _ ->
+                failwith "Expected Zkapp_command valid user command" )
+      in
+      match
+        User_command.Any.to_all_verifiable zkapp_commands_fixed
+          ~find_vk:
+            (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+               ~get:Mina_ledger.Ledger.get
+               ~location_of_account:Mina_ledger.Ledger.location_of_account )
+        |> Or_error.bind ~f:(fun xs ->
+               List.map xs ~f:User_command.check_verifiable |> sequence_or_error )
+      with
+      | Ok cmds ->
+          cmds
+      | Error err ->
+          Error.raise
+          @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t" err
 
     (** Assert the invariants of the locally generated command tracking system. *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
