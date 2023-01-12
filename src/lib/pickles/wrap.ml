@@ -608,6 +608,43 @@ let%test "foreign field multiplication finalization" =
     Out_channel.flush stdout ;
     exit 2
 
+let%test "range check finalization" =
+  try
+    (* Generate range check test backend proof using Kimchi, obtaining
+       the proof and corresponding prover index. Note: we only
+       want to pay the cost of generating this proof once and then reuse
+       it many times for the different recursive proof tests. *)
+    let srs =
+      Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
+    in
+    let index, proof =
+      Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check srs
+    in
+
+    (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
+    let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
+    let proof = Backend.Tick.Proof.of_backend proof in
+
+    (* Specify feature flags that were used for backend proof *)
+    let actual_feature_flags =
+      { Plonk_types.Features.chacha = false
+      ; range_check = true
+      ; foreign_field_add = false
+      ; foreign_field_mul = false
+      ; xor = false
+      ; rot = false
+      ; lookup = true
+      ; runtime_tables = false
+      }
+    in
+
+    (* Run the custom gate tests with supplied feature flags *)
+    run_custom_gate_tests actual_feature_flags vk proof
+  with _e ->
+    Printexc.print_backtrace stdout ;
+    Out_channel.flush stdout ;
+    exit 2
+
 module Step_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)

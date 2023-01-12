@@ -312,7 +312,70 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
         &group_map,
         witness,
-        &vec![],
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
+    srs: CamlFpSrs,
+) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem, gate::CircuitGate, polynomials::range_check, wires::Wire,
+    };
+    use num_bigint::BigUint;
+    use num_bigint::RandBigInt;
+    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, BigUintFieldHelpers};
+    use rand::{rngs::StdRng, SeedableRng};
+
+    let rng = &mut StdRng::from_seed([255u8; 32]);
+
+    // Create range-check gadget
+    let (mut next_row, mut gates) = CircuitGate::<Fp>::create_multi_range_check(0);
+
+    // Create witness
+    let witness = range_check::witness::create_multi::<Fp>(
+        rng.gen_biguint_range(&BigUint::zero(), &BigUint::two_to_limb())
+            .to_field()
+            .expect("failed to convert to field"),
+        rng.gen_biguint_range(&BigUint::zero(), &BigUint::two_to_limb())
+            .to_field()
+            .expect("failed to convert to field"),
+        rng.gen_biguint_range(&BigUint::zero(), &BigUint::two_to_limb())
+            .to_field()
+            .expect("failed to convert to field"),
+    );
+
+    // Temporary workaround for lookup-table/domain-size issue
+    for _ in 0..(1 << 13) {
+        gates.push(CircuitGate::zero(Wire::for_row(next_row)));
+        next_row += 1;
+    }
+
+    // Create constraint system
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .lookup(vec![range_check::gadget::lookup_table()])
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
         &index,
         vec![],
         None,
@@ -333,7 +396,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
-    >(&group_map, &[(&index.into(), &proof.into())].to_vec())
+    >(&group_map, [(&index.into(), &proof.into())].as_ref())
     .is_ok()
 }
 
@@ -374,7 +437,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         chals: vec![Fp::one(), Fp::one()],
         comm: comm(),
     };
-    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
     let g = Vesta::prime_subgroup_generator();
     let proof = OpeningProof {
