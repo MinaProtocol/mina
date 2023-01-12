@@ -587,7 +587,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
-    >(&group_map, &[(&index.into(), &proof.into())].to_vec())
+    >(&group_map, &[(&index.into(), &proof.into())].as_ref())
     .is_ok()
 }
 
@@ -628,7 +628,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         chals: vec![Fp::one(), Fp::one()],
         comm: comm(),
     };
-    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
     let g = Vesta::prime_subgroup_generator();
     let proof = OpeningProof {
