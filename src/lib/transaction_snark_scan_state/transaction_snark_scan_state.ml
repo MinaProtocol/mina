@@ -575,12 +575,7 @@ struct
 
   let check_invariants t ~constraint_constants ~statement_check ~verifier
       ~error_prefix
-      ~(registers_begin :
-         ( Frozen_ledger_hash.t
-         , Pending_coinbase.Stack.t
-         , Mina_state.Local_state.t )
-         Mina_state.Registers.t
-         option )
+      ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
@@ -622,19 +617,18 @@ struct
     | Error (`Error e) ->
         Error e
     | Error `Empty ->
-        Option.value_map ~default:(Ok ()) registers_begin
-          ~f:(fun registers_begin ->
-            check_registers registers_begin registers_end )
+        Option.value_map ~default:(Ok ()) last_proof_statement
+          ~f:(fun statement -> check_registers statement.target registers_end)
     | Ok
-        { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
-        ; source
-        ; target
-        ; connecting_ledger_left = _
-        ; connecting_ledger_right = _
-        ; supply_increase = _
-        ; sok_digest = ()
-        ; zkapp_updates_applied = _
-        } ->
+        ( { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+          ; source = _
+          ; target
+          ; connecting_ledger_left = _
+          ; connecting_ledger_right = _
+          ; supply_increase = _
+          ; sok_digest = ()
+          ; zkapp_updates_applied = _
+          } as t ) ->
         let open Or_error.Let_syntax in
         (* TODO TODO TODO
            let _connecting_ledger_left = failwith "TODO check connecting ledger" in
@@ -643,8 +637,9 @@ struct
            in
         *)
         let%map () =
-          Option.value_map ~default:(Ok ()) registers_begin
-            ~f:(fun registers_begin -> check_registers registers_begin source)
+          Option.value_map ~default:(Ok ()) last_proof_statement
+            ~f:(fun statement ->
+              Transaction_snark.Statement.merge statement t |> Or_error.ignore_m )
         and () = check_registers registers_end target
         and () =
           clarify_error
@@ -1096,29 +1091,41 @@ let fill_work_and_enqueue_transactions t transactions work =
       ~default:(Ok (None, t.previous_incomplete_zkapp_updates))
       proof_opt
       ~f:(fun ((proof, _), txns_with_witnesses) ->
-        let curr_source = (Ledger_proof.statement proof).source in
+        let curr_stmt = Ledger_proof.statement proof in
         (*TODO: get genesis ledger hash if the old_proof is none*)
-        let prev_target, incomplete_zkapp_updates_from_old_proof =
-          Option.value_map ~default:(curr_source, [])
+        let prev_stmt, incomplete_zkapp_updates_from_old_proof =
+          Option.value_map ~default:(curr_stmt, [])
             old_proof_and_incomplete_zkapp_updates
             ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
-              ( (Ledger_proof.statement p').target
+              ( Ledger_proof.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is
           important here*)
-        if Mina_state.Registers.Value.connected prev_target curr_source then
-          let txns =
-            Transactions_ordered.first_and_second_pass_transactions_per_tree
-              txns_with_witnesses
-              ~previous_incomplete:incomplete_zkapp_updates_from_old_proof
-          in
-          Ok
-            ( Some
-                ( proof
-                , List.map txns ~f:(Transactions_ordered.map ~f:extract_txn) )
-            , incomplete_zkapp_updates_from_old_proof )
-        else Or_error.error_string "Unexpected ledger proof emitted" )
+        let stmts_connect =
+          if Transaction_snark.Statement.equal prev_stmt curr_stmt then Ok ()
+          else
+            Transaction_snark.Statement.merge prev_stmt curr_stmt
+            |> Or_error.ignore_m
+        in
+        match stmts_connect with
+        | Ok () ->
+            let txns =
+              Transactions_ordered.first_and_second_pass_transactions_per_tree
+                txns_with_witnesses
+                ~previous_incomplete:incomplete_zkapp_updates_from_old_proof
+            in
+            Ok
+              ( Some
+                  ( proof
+                  , List.map txns ~f:(Transactions_ordered.map ~f:extract_txn)
+                  )
+              , incomplete_zkapp_updates_from_old_proof )
+        | Error e ->
+            Or_error.errorf
+              "The new final statement does not connect to the previous \
+               proof's statement: %s"
+              (Error.to_string_hum e) )
   in
   ( result_opt
   , { scan_state = updated_scan_state; previous_incomplete_zkapp_updates } )

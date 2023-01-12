@@ -131,7 +131,7 @@ val of_scan_state_and_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
-  -> snarked_registers:Mina_state.Registers.Value.t
+  -> last_proof_statement:Transaction_snark.Statement.t option
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -140,7 +140,7 @@ val of_scan_state_and_ledger :
 
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> snarked_registers:Mina_state.Registers.Value.t
+  -> last_proof_statement:Transaction_snark.Statement.t option
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t

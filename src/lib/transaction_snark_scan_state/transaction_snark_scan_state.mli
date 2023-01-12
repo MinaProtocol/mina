@@ -69,7 +69,7 @@ end) : sig
          | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
-    -> registers_begin:Mina_state.Registers.Value.t option
+    -> last_proof_statement:Transaction_snark.Statement.t option
     -> registers_end:Mina_state.Registers.Value.t
     -> (unit, Error.t) Deferred.Result.t
 end
