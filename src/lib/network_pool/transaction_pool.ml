@@ -1981,8 +1981,18 @@ let%test_module _ =
                       { p with
                         body =
                           { p.body with
-                            authorization_kind =
-                              (* replace dummy vk hashes *)
+                            update =
+                              { p.body.update with
+                                verification_key =
+                                  (* replace dummy vks in vk Setting *)
+                                  ( match p.body.update.verification_key with
+                                  | Set _vk ->
+                                      Set vk
+                                  | Keep ->
+                                      Keep )
+                              }
+                          ; authorization_kind =
+                              (* replace dummy vk hashes in authorization kind *)
                               ( match p.body.authorization_kind with
                               | Proof _vk_hash ->
                                   let account_id =
