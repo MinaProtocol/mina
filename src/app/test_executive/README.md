@@ -74,7 +74,7 @@ Gauntlet at the current moment runs the testnet on GCP, and therefore you'll nee
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Gauntlet: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `KUBE_CONFIG_PATH`.  each of these environment variables needs to be `export`'ed before running Gauntlet.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
+You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Gauntlet: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `KUBE_CONFIG_PATH`.  Each of these environment variables needs to be `export`'ed before running Gauntlet.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
 
 - `GOOGLE_APPLICATION_CREDENTIALS` is the path to the json-formatted keyfile of the GCP service account that you will be using.  The service account is most likely going to be the `automated-validation` service account, although other service accounts may work as well.  
 	1. First, you'll need to create, and then download the keyfile itself.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Each individual user should ideally have their own unique key.  Download this key as a json file and save it to your computer in whatever directory is most convenient.  It doesn't matter where on your filesystem the key is downloaded to, it could be your Downloads folder for all it matters, as long as you can access it.
@@ -85,9 +85,9 @@ You will need the following environment variables to be set correctly on the mac
 
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` are all the AWS access credential env vars.  Just talk to the O(1) Labs Velocity Team to obtain these creds
 
-- `AWS_DEFAULT_REGION=us-west-2` is the region env var for AWS.  it's always going to be `us-west-2` so just set that and don't worry about it.
+- `AWS_DEFAULT_REGION=us-west-2` is the region env var for AWS.  It's always going to be `us-west-2` so just set that and don't worry about it.
 
-- `KUBE_CONFIG_PATH` should usually be `~/.kube/config`.  if you're doing something unorthodox with kubernetes then it may be different, in which case you probably know what you're doing.
+- `KUBE_CONFIG_PATH` should usually be `~/.kube/config`.  If you're doing something unorthodox with kubernetes then it may be different, in which case you probably know what you're doing.
 
 ### Running the Gauntlet test_executive from your local machine
 
@@ -95,9 +95,9 @@ There are several ways to run Gauntlet, the most recommended method is to run it
 
 #### Run mina-test-executive directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Gauntlet in dockerized form]
 
-First, to download, you can run the following commands:
+First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
 ```
 echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" > /etc/apt/sources.list.d/o1.list \
@@ -135,7 +135,7 @@ mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $A
 
 #### `mina-test-executive` command line breakdown
 
-It's worth breaking down the command line arguments and options for `mina-test-executive`.
+Before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
 
 - `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
 - `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
@@ -181,26 +181,26 @@ gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2
 
 ```
 
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.
+As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal (see [`mina-test-executive command line breakdown`].
 
 The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [### GCP credentials and infrastructure related env vars].  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine (if you don't mess with other parts of the idiomatic expression, then you don't need to modify this `--env` flag).
 
 
 #### Compile Gauntlet from source
 
-If you wish to modify or extend existing tests, or write a whole new test, you will need to compile Gauntlet from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
+If you wish to modify or extend existing tests, or write a whole new test, you will need to compile the Gauntlet test_executive from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
 
 Gauntlet is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  
 
 I will assume the user who wishes to compile Gauntlet is familiar with not just Ocaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
 
 ```
-LIBP2P_NIXLESS=1 make build
+make build
 
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
-Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [#### Run mina-test-executive directly in command line].  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course if you've compiled from scratch, you won't have debian package `mina-test-executive`.  The compiled executable will be at:
+Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [#### Run mina-test-executive directly in command line].  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
 
 ```
 ./_build/default/src/app/test_executive/test_executive.exe
