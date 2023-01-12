@@ -499,9 +499,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node zkapp_command_transfer_from_third_timed_account)
     in
     let%bind () =
-      section "Waiting for zkApp with transfer from timed account that succeeds"
+      section
+        "Waiting for zkApp with transfer from timed account at current global \
+         slot that succeeds"
         (wait_for_zkapp ~has_failures:false
-           zkapp_command_transfer_from_timed_account )
+           zkapp_command_transfer_from_third_timed_account )
     in
     let%bind () =
       section

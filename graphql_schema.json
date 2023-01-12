@@ -2588,7 +2588,7 @@
               "deprecationReason": null
             },
             {
-              "name": "validUntil",
+              "name": "validWhile",
               "description": null,
               "args": [],
               "type": {
@@ -2630,7 +2630,7 @@
               "defaultValue": null
             },
             {
-              "name": "validUntil",
+              "name": "validWhile",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
@@ -7129,7 +7129,7 @@
               "deprecationReason": null
             },
             {
-              "name": "validUntil",
+              "name": "validWhile",
               "description": null,
               "args": [],
               "type": {

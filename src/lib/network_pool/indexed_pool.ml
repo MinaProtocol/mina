@@ -1821,7 +1821,7 @@ let%test_module _ =
                         ; account =
                             Account_update.Account_precondition.Nonce
                               (Account.Nonce.succ nonce)
-                        ; valid_until = Ignore
+                        ; valid_while = Ignore
                         }
                     ; caller = Call
                     ; use_full_commitment = not double_increment_sender
@@ -1842,7 +1842,7 @@ let%test_module _ =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
-                        ; valid_until = Ignore
+                        ; valid_while = Ignore
                         }
                     ; caller = Call
                     ; use_full_commitment = not increment_receiver
