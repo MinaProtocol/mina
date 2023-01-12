@@ -51,5 +51,6 @@
    quickcheck_lib
    snarky.backendless
    unsigned_extended
+   with_hash
    ppx_version.runtime
 ))

@@ -133,6 +133,14 @@ module type Global_slot_intf = sig
   val equal : t -> t -> bool
 end
 
+module type Verification_key_hash_intf = sig
+  type t
+
+  type bool
+
+  val equal : t -> t -> bool
+end
+
 module type Timing_intf = sig
   include Iffable
 
@@ -304,6 +312,8 @@ module type Account_update_intf = sig
 
   type nonce
 
+  type verification_key_hash
+
   type _ or_ignore
 
   val balance_change : t -> signed_amount
@@ -331,6 +341,8 @@ module type Account_update_intf = sig
   val is_signed : t -> bool
 
   val is_proved : t -> bool
+
+  val verification_key_hash : t -> verification_key_hash
 
   module Update : sig
     type _ set_or_keep
@@ -543,10 +555,10 @@ module type Account_intf = sig
 
   val set_receipt_chain_hash : t -> receipt_chain_hash -> t
 
-  (** Fill the snapp field of the account if it's currently [None] *)
+  (** Fill the zkapp field of the account if it's currently [None] *)
   val make_zkapp : t -> t
 
-  (** If the current account has no snapp fields set, reset its snapp field to
+  (** If the current account has no zkApp fields set, reset its zkapp field to
       [None].
   *)
   val unmake_zkapp : t -> t
@@ -568,6 +580,10 @@ module type Account_intf = sig
   val verification_key : t -> verification_key
 
   val set_verification_key : verification_key -> t -> t
+
+  type verification_key_hash
+
+  val verification_key_hash : t -> verification_key_hash
 
   val last_sequence_slot : t -> global_slot
 
@@ -690,8 +706,6 @@ module type Inputs_intf = sig
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
-  module Verification_key : Iffable with type bool := Bool.t
-
   module Zkapp_uri : Iffable with type bool := Bool.t
 
   module Token_symbol : Iffable with type bool := Bool.t
@@ -704,6 +718,10 @@ module type Inputs_intf = sig
        and type transaction_commitment := Transaction_commitment.t
        and type index := Index.t)
 
+  and Verification_key : (Iffable with type bool := Bool.t)
+  and Verification_key_hash :
+    (Verification_key_hash_intf with type bool := Bool.t)
+
   and Account :
     (Account_intf
       with type Permissions.controller := Controller.t
@@ -714,6 +732,7 @@ module type Inputs_intf = sig
        and type global_slot := Global_slot.t
        and type field := Field.t
        and type verification_key := Verification_key.t
+       and type verification_key_hash := Verification_key_hash.t
        and type zkapp_uri := Zkapp_uri.t
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
@@ -735,6 +754,7 @@ module type Inputs_intf = sig
        and type public_key := Public_key.t
        and type nonce := Nonce.t
        and type account_id := Account_id.t
+       and type verification_key_hash := Verification_key_hash.t
        and type Update.timing := Timing.t
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
@@ -884,7 +904,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let get_next_account_update (current_forest : Stack_frame.t)
-      (* The stack for the most recent snapp *)
+      (* The stack for the most recent zkApp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
       : get_next_account_update_result =
     (* If the current stack is complete, 'return' to the previous
@@ -1142,6 +1162,17 @@ module Make (Inputs : Inputs_intf) = struct
         (Account_update.token_id account_update)
         (a, inclusion_proof)
     in
+    let matching_verification_key_hashes =
+      Inputs.Bool.(
+        (not (Account_update.is_proved account_update))
+        ||| Verification_key_hash.equal
+              (Account.verification_key_hash a)
+              (Account_update.verification_key_hash account_update))
+    in
+    let local_state =
+      Local_state.add_check local_state Unexpected_verification_key_hash
+        matching_verification_key_hashes
+    in
     let local_state =
       h.perform
         (Check_account_precondition
@@ -1334,11 +1365,11 @@ module Make (Inputs : Inputs_intf) = struct
         (* The [proved_state] tracks whether the app state has been entirely
            determined by proofs ([true] if so), to allow zkApp authors to be
            confident that their initialization logic has been run, rather than
-           some malicious deployer instantiating the snapp in an account with
+           some malicious deployer instantiating the zkApp in an account with
            some fake non-initial state.
            The logic here is:
            * if the state is unchanged, keep the previous value;
-           * if the state has been entriely replaced, and the authentication
+           * if the state has been entirely replaced, and the authentication
              was a proof, the state has been 'proved' and [proved_state] is set
              to [true];
            * if the state has been partially updated by a proof, the
