@@ -292,6 +292,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_inputs)
+        .lookup(vec![range_check::gadget::lookup_table()])
         .build()
         .unwrap();
 
@@ -380,6 +381,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_inputs)
+        .lookup(vec![xor::lookup_table()])
         .build()
         .unwrap();
 
@@ -423,6 +425,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         polynomial::COLUMNS,
         polynomials::{
             generic::GenericGateSpec,
+            range_check,
             rot::{self, RotMode},
         },
         wires::Wire,
@@ -473,6 +476,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_inputs)
+        .lookup(vec![rot::lookup_table()])
         .build()
         .unwrap();
 
