@@ -386,6 +386,381 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
+    srs: CamlFpSrs,
+) -> (
+    CamlPastaFpPlonkIndex,
+    CamlFp,
+    CamlProverProof<CamlGVesta, CamlFp>,
+) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{
+            foreign_field_add::witness::{create_chain, FFOps},
+            generic::GenericGateSpec,
+            range_check,
+        },
+        wires::Wire,
+    };
+    use num_bigint::BigUint;
+
+    // Includes a row to store value 1
+    let num_inputs = 1;
+    let operation = &[FFOps::Add];
+    let modulus = BigUint::from_bytes_be(&[
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF,
+        0xFC, 0x2F,
+    ]);
+
+    // circuit
+    let gates = {
+        // Public input row
+        let mut gates = vec![CircuitGate::<Fp>::create_generic_gadget(
+            Wire::for_row(0),
+            GenericGateSpec::Pub,
+            None,
+        )];
+
+        let mut curr_row = num_inputs;
+        // Foreign field addition and bound check
+        CircuitGate::<Fp>::extend_chain_ffadd(&mut gates, 0, &mut curr_row, operation, &modulus);
+
+        // Extend rangechecks of left input, right input, result, and bound
+        for _ in 0..4 {
+            CircuitGate::extend_multi_range_check(&mut gates, &mut curr_row);
+        }
+        // Connect the witnesses of the addition to the corresponding range checks
+        gates.connect_ffadd_range_checks(1, Some(4), Some(8), 12);
+        // Connect the bound check range checks
+        gates.connect_ffadd_range_checks(2, None, None, 16);
+
+        // Temporary workaround for lookup-table/domain-size issue
+        for _ in 0..(1 << 13) {
+            gates.push(CircuitGate::zero(Wire::for_row(curr_row)));
+            curr_row += 1;
+        }
+
+        gates
+    };
+
+    // witness
+    let witness = {
+        // create row for the public value 1
+        let mut witness: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
+        witness[0][0] = Fp::one();
+        // create inputs to the addition
+        let left = modulus.clone() - BigUint::from_bytes_be(&[1]);
+        let right = modulus.clone() - BigUint::from_bytes_be(&[1]);
+        // create a chain of 1 addition
+        let add_witness = create_chain::<Fp>(&vec![left, right], operation, modulus);
+        for col in 0..COLUMNS {
+            witness[col].extend(add_witness[col].iter());
+        }
+        // extend range checks for all of left, right, output, and bound
+        let left = (witness[0][1], witness[1][1], witness[2][1]);
+        range_check::witness::extend_multi(&mut witness, left.0, left.1, left.2);
+        let right = (witness[3][1], witness[4][1], witness[5][1]);
+        range_check::witness::extend_multi(&mut witness, right.0, right.1, right.2);
+        let output = (witness[0][2], witness[1][2], witness[2][2]);
+        range_check::witness::extend_multi(&mut witness, output.0, output.1, output.2);
+        let bound = (witness[0][3], witness[1][3], witness[2][3]);
+        range_check::witness::extend_multi(&mut witness, bound.0, bound.1, bound.2);
+        witness
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .lookup(vec![range_check::gadget::lookup_table()])
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let public_input = witness[0][0];
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        public_input.into(),
+        proof.into(),
+    )
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_xor(
+    srs: CamlFpSrs,
+) -> (
+    CamlPastaFpPlonkIndex,
+    (CamlFp, CamlFp),
+    CamlProverProof<CamlGVesta, CamlFp>,
+) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{generic::GenericGateSpec, xor},
+        wires::Wire,
+    };
+
+    let num_inputs = 2;
+
+    // circuit
+    let gates = {
+        // public inputs
+        let mut gates = vec![];
+        for row in 0..num_inputs {
+            gates.push(CircuitGate::<Fp>::create_generic_gadget(
+                Wire::for_row(row),
+                GenericGateSpec::Pub,
+                None,
+            ));
+        }
+        // 1 XOR of 128 bits. This will create 8 Xor16 gates and a Generic final gate with all zeros.
+        CircuitGate::<Fp>::extend_xor_gadget(&mut gates, 128);
+        // connect public inputs to the inputs of the XOR
+        gates.connect_cell_pair((0, 0), (2, 0));
+        gates.connect_cell_pair((1, 0), (2, 1));
+
+        // Temporary workaround for lookup-table/domain-size issue
+        for _ in 0..(1 << 13) {
+            gates.push(CircuitGate::zero(Wire::for_row(gates.len())));
+        }
+        gates
+    };
+
+    // witness
+    let witness = {
+        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); num_inputs]);
+
+        // initialize the 2 inputs
+        let input1 = 0xDC811727DAF22EC15927D6AA275F406Bu128;
+        let input2 = 0xA4F4417AF072DF9016A1EAB458DA80D1u128;
+        cols[0][0] = input1.into();
+        cols[0][1] = input2.into();
+
+        xor::extend_xor_witness::<Fp>(&mut cols, input1.into(), input2.into(), 128);
+        cols
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .lookup(vec![xor::lookup_table()])
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let public_input = (witness[0][0], witness[0][1]);
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (public_input.0.into(), public_input.1.into()),
+        proof.into(),
+    )
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_rot(
+    srs: CamlFpSrs,
+) -> (
+    CamlPastaFpPlonkIndex,
+    (CamlFp, CamlFp),
+    CamlProverProof<CamlGVesta, CamlFp>,
+) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{
+            generic::GenericGateSpec,
+            range_check,
+            rot::{self, RotMode},
+        },
+        wires::Wire,
+    };
+
+    // Includes the actual input of the rotation and a row with the zero value
+    let num_inputs = 2;
+    // 1 ROT of 32 to the left
+    let rot = 32;
+    let mode = RotMode::Left;
+
+    // circuit
+    let gates = {
+        let mut gates = vec![];
+        // public inputs
+        for row in 0..num_inputs {
+            gates.push(CircuitGate::<Fp>::create_generic_gadget(
+                Wire::for_row(row),
+                GenericGateSpec::Pub,
+                None,
+            ));
+        }
+        CircuitGate::<Fp>::extend_rot(&mut gates, rot, mode, 1);
+        // connect first public input to the word of the ROT
+        gates.connect_cell_pair((0, 0), (2, 0));
+
+        // Temporary workaround for lookup-table/domain-size issue
+        for _ in 0..(1 << 13) {
+            gates.push(CircuitGate::zero(Wire::for_row(gates.len())));
+        }
+
+        gates
+    };
+
+    // witness
+    let witness = {
+        // create one row for the public word
+        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 2]);
+
+        // initialize the public input containing the word to be rotated
+        let input = 0xDC811727DAF22EC1u64;
+        cols[0][0] = input.into();
+        rot::extend_rot::<Fp>(&mut cols, input, rot, mode);
+
+        cols
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .lookup(vec![rot::lookup_table()])
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let public_input = (witness[0][0], witness[0][1]);
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (
+        CamlPastaFpPlonkIndex(Box::new(index)),
+        (public_input.0.into(), public_input.1.into()),
+        proof.into(),
+    )
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_chacha(
+    srs: CamlFpSrs,
+) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem, gate::CircuitGate, polynomial::COLUMNS, polynomials::chacha,
+        wires::Wire,
+    };
+
+    let num_inputs = 0;
+    let num_chachas = 8;
+
+    // circuit gates
+    let gates = {
+        let mut gates = vec![];
+        for _ in 0..num_chachas {
+            gates.extend(chacha::testing::chacha20_gates())
+        }
+        let gates: Vec<CircuitGate<Fp>> = gates
+            .into_iter()
+            .enumerate()
+            .map(|(i, typ)| CircuitGate::new(typ, Wire::for_row(i), vec![]))
+            .collect();
+        gates
+    };
+
+    // witness
+    let witness = {
+        let s0: Vec<u32> = vec![
+            0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, 0x03020100, 0x07060504, 0x0b0a0908,
+            0x0f0e0d0c, 0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c, 0x00000001, 0x09000000,
+            0x4a000000, 0x00000000,
+        ];
+        let mut rows = vec![];
+        for _ in 0..num_chachas {
+            rows.extend(chacha::testing::chacha20_rows::<Fp>(s0.clone()))
+        }
+        let mut witness: [Vec<Fp>; COLUMNS] = array_init(|_| vec![]);
+        for r in rows.into_iter() {
+            for (col, c) in r.into_iter().enumerate() {
+                witness[col].push(c);
+            }
+        }
+        witness
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .public(num_inputs)
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
