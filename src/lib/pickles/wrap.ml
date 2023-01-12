@@ -591,8 +591,8 @@ let%test "foreign field multiplication finalization" =
     (* Specify feature flags that were used for backend proof *)
     let actual_feature_flags =
       { Plonk_types.Features.chacha = false
-      ; range_check = false
-      ; foreign_field_add = false
+      ; range_check = true
+      ; foreign_field_add = true
       ; foreign_field_mul = true
       ; xor = false
       ; rot = false
@@ -601,7 +601,7 @@ let%test "foreign field multiplication finalization" =
       }
     in
 
-    (* Run the recursive proof test with supplied feature flags *)
+    (* Run the custom gate tests with supplied feature flags *)
     run_custom_gate_tests actual_feature_flags vk proof
   with _e ->
     Printexc.print_backtrace stdout ;

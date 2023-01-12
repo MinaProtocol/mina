@@ -204,26 +204,30 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
-) -> (
-    CamlPastaFpPlonkIndex,
-    CamlProverProof<CamlGVesta, CamlFp>,
-) {
+) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
     use ark_ff::Zero;
     use commitment_dlog::srs::{endos, SRS};
     use kimchi::circuits::{
-        constraints::ConstraintSystem, gate::CircuitGate, polynomials::foreign_field_mul,
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomials::{foreign_field_add::witness::FFOps, foreign_field_mul, range_check},
         wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::FieldHelpers;
+    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, FieldHelpers};
     use rand::{rngs::StdRng, SeedableRng};
 
     let foreign_field_modulus = Fq::modulus_biguint();
 
     // Layout
-    //      0    ForeignFieldMul (foreign field multiplication gadget)
-    //      1    Zero (foreign field multiplication gadget)
+    //      0    ForeignFieldMul   (foreign field multiplication gadget)
+    //      1    Zero              (foreign field multiplication gadget)
+    //      4-7  multi-range-check (left multiplicand)
+    //      8-11 multi-range-check (right multiplicand)
+    //     12-15 multi-range-check (product1_lo, product1_hi_0, carry1_lo)
+    //     16-19 multi-range-check (result range check)
+    //     20-23 multi-range-check (quotient range check)
 
     // Create foreign field multiplication gates
     let (mut next_row, mut gates) =
@@ -236,6 +240,56 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     // Compute multiplication witness
     let (mut witness, external_checks) =
         foreign_field_mul::witness::create(&left_input, &right_input, &foreign_field_modulus);
+
+    // Bound addition for multiplication result
+    CircuitGate::extend_single_ffadd(
+        &mut gates,
+        &mut next_row,
+        FFOps::Add,
+        &foreign_field_modulus,
+    );
+    gates.connect_cell_pair((1, 0), (2, 0));
+    gates.connect_cell_pair((1, 1), (2, 1));
+    gates.connect_cell_pair((1, 2), (2, 2));
+    external_checks
+        .extend_witness_bound_addition(&mut witness, &foreign_field_modulus.to_field_limbs());
+
+    // Left input multi-range-check
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((0, 0), (4, 0));
+    gates.connect_cell_pair((0, 1), (5, 0));
+    gates.connect_cell_pair((0, 2), (6, 0));
+    range_check::witness::extend_multi_limbs(&mut witness, &left_input.to_field_limbs());
+
+    // Right input multi-range-check
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((0, 3), (8, 0));
+    gates.connect_cell_pair((0, 4), (9, 0));
+    gates.connect_cell_pair((0, 5), (10, 0));
+    range_check::witness::extend_multi_limbs(&mut witness, &right_input.to_field_limbs());
+
+    // Multiplication witness value product1_lo, product1_hi_0, carry1_lo multi-range-check
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((0, 6), (12, 0)); // carry1_lo
+    gates.connect_cell_pair((1, 5), (13, 0)); // product1_lo
+    gates.connect_cell_pair((1, 6), (14, 0)); // product1_hi_0
+                                              // Witness updated below
+
+    // Result/remainder bound multi-range-check
+    CircuitGate::extend_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((3, 0), (16, 0));
+    gates.connect_cell_pair((3, 1), (17, 0));
+    gates.connect_cell_pair((3, 2), (18, 0));
+    // Witness updated below
+
+    // Add witness for external multi-range checks (product1_lo, product1_hi_0, carry1_lo and result)
+    external_checks.extend_witness_multi_range_checks(&mut witness);
+
+    // Quotient bound multi-range-check
+    CircuitGate::extend_compact_multi_range_check(&mut gates, &mut next_row);
+    gates.connect_cell_pair((1, 3), (22, 1));
+    gates.connect_cell_pair((1, 4), (20, 0));
+    external_checks.extend_witness_compact_multi_range_checks(&mut witness);
 
     // Temporary workaround for lookup-table/domain-size issue
     for _ in 0..(1 << 13) {
@@ -264,10 +318,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
         None,
     )
     .unwrap();
-    (
-        CamlPastaFpPlonkIndex(Box::new(index)),
-        proof.into(),
-    )
+    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
 }
 
 #[ocaml_gen::func]
