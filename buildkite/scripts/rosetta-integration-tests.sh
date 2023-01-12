@@ -178,7 +178,7 @@ mina-dev daemon \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
-  --demo-mode  
+  --demo-mode
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
@@ -245,8 +245,15 @@ done
 
 # TODO: wait until all zkApps deploy txns are included in a block
 
+next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+curr_time=$(date +%s%N | cut -b1-13)
+sleep_time=$((($next_block_time - $curr_time) / 1000))
+echo "Sleeping for ${sleep_time}s until next block is created..."
+sleep ${sleep_time}
+
 # Start calling zkApp methods
 echo "==================== INTERACTING WITH ZKAPPS ======================"
+RECEIVER_PK=$BLOCK_PRODUCER_PK
 for zkapp_path in ${ZKAPP_PATH}/*/; do
   zkapp_path=${zkapp_path%/}
   zkapp=$(basename $zkapp_path)
@@ -254,15 +261,16 @@ for zkapp_path in ${ZKAPP_PATH}/*/; do
 
   cd "$zkapp_path"
   npm run build
-  ./interact.sh http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql $zkapp_key
+  ./interact.sh sandbox
   cd -
   echo "Done." 
 done
 
-# TODO: Wait until X block have been produced or all interaction txns are present
-while [ $(mina-dev client status --json | jq .blockchain_length) -lt 5 ]; do
-  sleep 15
-done
+next_block_time=$(mina-dev client status --json | jq '.next_block_production.timing[1].time' | tr -d '"')
+curr_time=$(date +%s%N | cut -b1-13)
+sleep_time=$((($next_block_time - $curr_time) / 1000))
+echo "Sleeping for ${sleep_time}s until next block is created..."
+sleep ${sleep_time}
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
