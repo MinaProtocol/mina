@@ -529,9 +529,8 @@ let%test_unit "tokens test" =
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_account_update_body
-               (Proof (Zkapp_account.dummy_vk_hash ()))
-               Call token_owner Token_id.default (3 * account_creation_fee) )
+            (mk_account_update_body Signature Call token_owner Token_id.default
+               (3 * account_creation_fee) )
             []
         ]
     in
