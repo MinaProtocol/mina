@@ -183,81 +183,80 @@ let%test_module "Sequence events test" =
       let last_seq_slot = zkapp.last_sequence_slot in
       (Pickles_types.Vector.Vector_5.to_list seq_state, last_seq_slot)
 
-    (* let%test_unit "Initialize" =
-         let zkapp_command, account =
-           let ledger = create_ledger () in
-           []
-           |> Zkapp_command.Call_forest.cons_tree
-                Initialize_account_update.account_update
-           |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-           |> test_zkapp_command ~ledger
-         in
-         assert (Option.is_some account) ;
-         let account_updates =
-           Zkapp_command.Call_forest.to_list zkapp_command.account_updates
-         in
-         (* we haven't added any sequence events *)
-         List.iter account_updates ~f:(fun account_update ->
-             assert (List.is_empty account_update.body.actions) )
+    let%test_unit "Initialize" =
+      let zkapp_command, account =
+        let ledger = create_ledger () in
+        []
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
+      in
+      assert (Option.is_some account) ;
+      let account_updates =
+        Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+      in
+      (* we haven't added any sequence events *)
+      List.iter account_updates ~f:(fun account_update ->
+          assert (List.is_empty account_update.body.actions) )
 
-       let%test_unit "Initialize and add sequence events" =
-         let zkapp_command0, account0 =
-           let ledger = create_ledger () in
-           []
-           |> Zkapp_command.Call_forest.cons_tree
-                Initialize_account_update.account_update
-           |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-           |> test_zkapp_command ~ledger
-         in
-         let account_updates0 =
-           Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
-         in
-         List.iter account_updates0 ~f:(fun account_update ->
-             assert (List.is_empty account_update.body.actions) ) ;
-         assert (Option.is_some account0) ;
-         (* sequence state unmodified *)
-         let seq_state_elts0, last_seq_slot0 =
-           seq_state_elts_of_account account0
-         in
-         List.iter seq_state_elts0 ~f:(fun elt ->
-             assert (
-               Impl.Field.Constant.equal elt
-                 Zkapp_account.Actions.empty_state_element ) ) ;
-         (* last seq slot is 0 *)
-         assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
-         let zkapp_command1, account1 =
-           let ledger = create_ledger () in
-           []
-           |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
-           |> Zkapp_command.Call_forest.cons_tree
-                Initialize_account_update.account_update
-           |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-           |> test_zkapp_command ~ledger
-         in
-         assert (Option.is_some account1) ;
-         let account_updates1 =
-           Zkapp_command.Call_forest.to_list zkapp_command1.account_updates
-         in
-         List.iteri account_updates1 ~f:(fun i account_update ->
-             if i > 1 then assert (not @@ List.is_empty account_update.body.actions)
-             else assert (List.is_empty account_update.body.actions) ) ;
-         let seq_state_elts1, last_seq_slot1 =
-           seq_state_elts_of_account account1
-         in
-         (* we changed the 0th sequence state element *)
-         List.iteri seq_state_elts1 ~f:(fun i elt ->
-             if i = 0 then
-               assert (
-                 not
-                 @@ Impl.Field.Constant.equal elt
-                      Zkapp_account.Actions.empty_state_element )
-             else
-               assert (
-                 Impl.Field.Constant.equal elt
-                   Zkapp_account.Actions.empty_state_element ) ) ;
-         (* last seq slot still 0 *)
-         assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
-    *)
+    let%test_unit "Initialize and add sequence events" =
+      let zkapp_command0, account0 =
+        let ledger = create_ledger () in
+        []
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
+      in
+      let account_updates0 =
+        Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
+      in
+      List.iter account_updates0 ~f:(fun account_update ->
+          assert (List.is_empty account_update.body.actions) ) ;
+      assert (Option.is_some account0) ;
+      (* sequence state unmodified *)
+      let seq_state_elts0, last_seq_slot0 =
+        seq_state_elts_of_account account0
+      in
+      List.iter seq_state_elts0 ~f:(fun elt ->
+          assert (
+            Impl.Field.Constant.equal elt
+              Zkapp_account.Actions.empty_state_element ) ) ;
+      (* last seq slot is 0 *)
+      assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
+      let zkapp_command1, account1 =
+        let ledger = create_ledger () in
+        []
+        |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
+        |> Zkapp_command.Call_forest.cons_tree
+             Initialize_account_update.account_update
+        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> test_zkapp_command ~ledger
+      in
+      assert (Option.is_some account1) ;
+      let account_updates1 =
+        Zkapp_command.Call_forest.to_list zkapp_command1.account_updates
+      in
+      List.iteri account_updates1 ~f:(fun i account_update ->
+          if i > 1 then assert (not @@ List.is_empty account_update.body.actions)
+          else assert (List.is_empty account_update.body.actions) ) ;
+      let seq_state_elts1, last_seq_slot1 =
+        seq_state_elts_of_account account1
+      in
+      (* we changed the 0th sequence state element *)
+      List.iteri seq_state_elts1 ~f:(fun i elt ->
+          if i = 0 then
+            assert (
+              not
+              @@ Impl.Field.Constant.equal elt
+                   Zkapp_account.Actions.empty_state_element )
+          else
+            assert (
+              Impl.Field.Constant.equal elt
+                Zkapp_account.Actions.empty_state_element ) ) ;
+      (* last seq slot still 0 *)
+      assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
 
     let%test_unit "Add sequence events in different slots" =
       let make_state_body slot =
