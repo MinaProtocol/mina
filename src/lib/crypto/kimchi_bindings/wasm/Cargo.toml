@@ -48,6 +48,7 @@ rmp-serde = "1.0.0"
 sprs = { version = "0.11.0" }
 serde = "1.0.130"
 serde_json = "1.0"
+serde_with = "2.0.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.0"

@@ -550,10 +550,10 @@ module Update = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
-    let string_with_hash =
+    let zkapp_uri =
       with_checked
         ~checked:(Data_as_hash.deriver string)
-        ~name:"StringWithHash" string
+        ~name:"ZkappUri" string
     in
     let token_symbol =
       with_checked
@@ -566,7 +566,7 @@ module Update = struct
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
+         ~zkapp_uri:!.(Set_or_keep.deriver zkapp_uri)
          ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
@@ -1115,7 +1115,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:`Or_undefined @@ uint32 @@ o ())
+              option ~js_type:Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
 
