@@ -29,7 +29,7 @@ let mk_account_update_body authorization_kind caller kp token_id balance_change
   ; preconditions =
       { network = Zkapp_precondition.Protocol_state.accept
       ; account = Account_update.Account_precondition.Accept
-      ; valid_until = Ignore
+      ; valid_while = Ignore
       }
   ; use_full_commitment = true
   ; caller

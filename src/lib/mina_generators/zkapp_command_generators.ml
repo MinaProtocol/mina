@@ -552,7 +552,7 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
-       , 'valid_until_precondition
+       , 'valid_while_precondition
        , 'caller
        , 'authorization_kind )
        t =
@@ -567,7 +567,7 @@ module Account_update_body_components = struct
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
-    ; valid_until_precondition : 'valid_until_precondition
+    ; valid_while_precondition : 'valid_while_precondition
     ; use_full_commitment : 'bool
     ; caller : 'caller
     ; authorization_kind : 'authorization_kind
@@ -602,7 +602,7 @@ module Account_update_body_components = struct
     ; preconditions =
         { Account_update.Preconditions.network = t.protocol_state_precondition
         ; account = t.account_precondition
-        ; valid_until = t.valid_until_precondition
+        ; valid_while = t.valid_while_precondition
         }
     ; use_full_commitment = t.use_full_commitment
     ; caller = t.caller
@@ -807,7 +807,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
         | _ ->
             gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
-  and valid_until_precondition =
+  and valid_while_precondition =
     match protocol_state_view with
     | None ->
         return Zkapp_basic.Or_ignore.Ignore
@@ -964,7 +964,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; call_depth
   ; protocol_state_precondition
   ; account_precondition
-  ; valid_until_precondition
+  ; valid_while_precondition
   ; use_full_commitment
   ; caller
   ; authorization_kind

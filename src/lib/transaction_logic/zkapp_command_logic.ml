@@ -165,7 +165,7 @@ module type Protocol_state_precondition_intf = sig
   type t
 end
 
-module type Valid_until_precondition_intf = sig
+module type Valid_while_precondition_intf = sig
   type t
 end
 
@@ -298,7 +298,7 @@ module type Account_update_intf = sig
 
   type protocol_state_precondition
 
-  type valid_until_precondition
+  type valid_while_precondition
 
   type public_key
 
@@ -316,7 +316,7 @@ module type Account_update_intf = sig
 
   val protocol_state_precondition : t -> protocol_state_precondition
 
-  val valid_until_precondition : t -> valid_until_precondition
+  val valid_while_precondition : t -> valid_while_precondition
 
   val public_key : t -> public_key
 
@@ -624,11 +624,11 @@ end
 
 module Eff = struct
   type (_, _) t =
-    | Check_valid_until_precondition :
-        'valid_until_precondition * 'global_state
+    | Check_valid_while_precondition :
+        'valid_while_precondition * 'global_state
         -> ( 'bool
            , < bool : 'bool
-             ; valid_until_precondition : 'valid_until_precondition
+             ; valid_while_precondition : 'valid_while_precondition
              ; global_state : 'global_state
              ; .. > )
            t
@@ -691,7 +691,7 @@ module type Inputs_intf = sig
 
   module Protocol_state_precondition : Protocol_state_precondition_intf
 
-  module Valid_until_precondition : Valid_until_precondition_intf
+  module Valid_while_precondition : Valid_while_precondition_intf
 
   module Controller : Controller_intf with type bool := Bool.t
 
@@ -747,7 +747,7 @@ module type Inputs_intf = sig
     (Account_update_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_precondition := Protocol_state_precondition.t
-       and type valid_until_precondition := Valid_until_precondition.t
+       and type valid_while_precondition := Valid_while_precondition.t
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
@@ -1172,10 +1172,10 @@ module Make (Inputs : Inputs_intf) = struct
            ( Account_update.protocol_state_precondition account_update
            , global_state ) )
     in
-    let valid_until_satisfied =
+    let valid_while_satisfied =
       h.perform
-        (Check_valid_until_precondition
-           (Account_update.valid_until_precondition account_update, global_state)
+        (Check_valid_while_precondition
+           (Account_update.valid_while_precondition account_update, global_state)
         )
     in
     let local_state =
@@ -1183,8 +1183,8 @@ module Make (Inputs : Inputs_intf) = struct
         protocol_state_predicate_satisfied
     in
     let local_state =
-      Local_state.add_check local_state Valid_until_precondition_unsatisfied
-        valid_until_satisfied
+      Local_state.add_check local_state Valid_while_precondition_unsatisfied
+        valid_while_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =

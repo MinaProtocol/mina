@@ -46,7 +46,7 @@ module Failure = struct
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
-        | Valid_until_precondition_unsatisfied
+        | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
         | Cancelled
@@ -129,7 +129,7 @@ module Failure = struct
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
-      ~valid_until_precondition_unsatisfied:add ~incorrect_nonce:add
+      ~valid_while_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
@@ -213,8 +213,8 @@ module Failure = struct
         "Account_is_new_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
-    | Valid_until_precondition_unsatisfied ->
-        "Valid_until_precondition_unsatisfied"
+    | Valid_while_precondition_unsatisfied ->
+        "Valid_while_precondition_unsatisfied"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -299,8 +299,8 @@ module Failure = struct
         Ok Account_is_new_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
-    | "Valid_until_precondition_unsatisfied" ->
-        Ok Valid_until_precondition_unsatisfied
+    | "Valid_while_precondition_unsatisfied" ->
+        Ok Valid_while_precondition_unsatisfied
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -442,7 +442,7 @@ module Failure = struct
         "The account update's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The account update's protocol state precondition unsatisfied"
-    | Valid_until_precondition_unsatisfied ->
+    | Valid_while_precondition_unsatisfied ->
         "The account update's valid-until precondition was unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"

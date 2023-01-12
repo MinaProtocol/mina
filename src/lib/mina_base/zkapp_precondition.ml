@@ -1357,7 +1357,7 @@ module Protocol_state = struct
     ()
 end
 
-module Valid_until = struct
+module Valid_while = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1374,20 +1374,20 @@ module Valid_until = struct
 
   let typ = Numeric.(typ Tc.global_slot)
 
-  let to_input valid_until = Numeric.(to_input Tc.global_slot valid_until)
+  let to_input valid_while = Numeric.(to_input Tc.global_slot valid_while)
 
-  let check (valid_until : t) global_slot =
-    Numeric.(check ~label:"valid_until_precondition" Tc.global_slot)
-      valid_until global_slot
+  let check (valid_while : t) global_slot =
+    Numeric.(check ~label:"valid_while_precondition" Tc.global_slot)
+      valid_while global_slot
 
   module Checked = struct
     type t = Global_slot.Checked.t Numeric.Checked.t
 
-    let check (valid_until : t) global_slot =
-      Numeric.(Checked.check Tc.global_slot) valid_until global_slot
+    let check (valid_while : t) global_slot =
+      Numeric.(Checked.check Tc.global_slot) valid_while global_slot
 
-    let to_input valid_until =
-      Numeric.(Checked.to_input Tc.global_slot valid_until)
+    let to_input valid_while =
+      Numeric.(Checked.to_input Tc.global_slot valid_while)
   end
 end
 

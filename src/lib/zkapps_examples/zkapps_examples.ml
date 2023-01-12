@@ -257,7 +257,7 @@ module Account_update_under_construction = struct
                       }
                   }
             ; account = Account_condition.to_predicate t.account_condition
-            ; valid_until = var_of_t Zkapp_precondition.Valid_until.typ Ignore
+            ; valid_while = var_of_t Zkapp_precondition.Valid_while.typ Ignore
             }
         ; use_full_commitment = Boolean.false_
         ; caller = t.caller

@@ -66,7 +66,7 @@ let%test_module "Sequence events test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
-            ; valid_until = Ignore
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }

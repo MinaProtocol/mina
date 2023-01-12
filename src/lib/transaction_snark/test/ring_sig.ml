@@ -201,7 +201,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
-                    ; valid_until = Ignore
+                    ; valid_while = Ignore
                     }
                 ; caller = Call
                 ; use_full_commitment = false
@@ -225,7 +225,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Full Zkapp_precondition.Account.accept
-                    ; valid_until = Ignore
+                    ; valid_while = Ignore
                     }
                 ; use_full_commitment = false
                 ; caller = Call

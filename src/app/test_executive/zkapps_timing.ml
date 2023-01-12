@@ -480,7 +480,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Some
               { network = Zkapp_precondition.Protocol_state.accept
               ; account = Account_update.Account_precondition.Accept
-              ; valid_until =
+              ; valid_while =
                   Check
                     Zkapp_precondition.Closed_interval.
                       { lower = global_slot; upper = global_slot }

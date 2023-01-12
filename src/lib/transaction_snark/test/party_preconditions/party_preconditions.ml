@@ -5,7 +5,7 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
-let%test_module "Valid_until precondition tests" =
+let%test_module "Valid_while precondition tests" =
   ( module struct
     let constraint_constants = U.constraint_constants
 
@@ -30,7 +30,7 @@ let%test_module "Valid_until precondition tests" =
       ; receivers = []
       ; amount = Amount.zero
       ; zkapp_account_keypairs = [ new_kp ]
-      ; memo = Signed_command_memo.create_from_string_exn "valid_until precond"
+      ; memo = Signed_command_memo.create_from_string_exn "valid_while precond"
       ; new_zkapp_account = false
       ; snapp_update
       ; current_auth = Permissions.Auth_required.Signature
@@ -42,11 +42,11 @@ let%test_module "Valid_until precondition tests" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Account_update.Account_precondition.Accept
-            ; valid_until = Check { lower = global_slot; upper = global_slot }
+            ; valid_while = Check { lower = global_slot; upper = global_slot }
             }
       }
 
-    let%test_unit "exact valid_until precondition" =
+    let%test_unit "exact valid_while precondition" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -67,7 +67,7 @@ let%test_module "Valid_until precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~global_slot ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "invalid valid_until precondition" =
+    let%test_unit "invalid valid_while precondition" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -86,7 +86,7 @@ let%test_module "Valid_until precondition tests" =
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:Valid_until_precondition_unsatisfied
+                    ~expected_failure:Valid_while_precondition_unsatisfied
                     ~global_slot:Mina_numbers.Global_slot.zero ledger
                     [ zkapp_command ] ) ) )
   end )
@@ -166,7 +166,7 @@ let%test_module "Protocol state precondition tests" =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
                   ; account = Account_update.Account_precondition.Accept
-                  ; valid_until = Ignore
+                  ; valid_while = Ignore
                   }
             }
           in
@@ -208,7 +208,7 @@ let%test_module "Protocol state precondition tests" =
                 Some
                   { Account_update.Preconditions.network = network_precondition
                   ; account = Account_update.Account_precondition.Accept
-                  ; valid_until = Ignore
+                  ; valid_while = Ignore
                   }
             }
           in
@@ -281,7 +281,7 @@ let%test_module "Protocol state precondition tests" =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
                             ; account = Nonce (Account.Nonce.succ sender_nonce)
-                            ; valid_until = Ignore
+                            ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
                         ; caller = Call
@@ -314,7 +314,7 @@ let%test_module "Protocol state precondition tests" =
                                 invalid_network_precondition
                             ; account =
                                 Account_update.Account_precondition.Accept
-                            ; valid_until = Ignore
+                            ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
                         ; caller = Call
@@ -507,7 +507,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = precondition_exact snapp_account
-                          ; valid_until = Ignore
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -576,7 +576,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
-                          ; valid_until = Ignore
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -630,7 +630,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
-                          ; valid_until = Ignore
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -697,7 +697,7 @@ let%test_module "Account precondition tests" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
-                        ; valid_until = Ignore
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
                     ; caller = Call
@@ -727,7 +727,7 @@ let%test_module "Account precondition tests" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
-                        ; valid_until = Ignore
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = true
                     ; caller = Call

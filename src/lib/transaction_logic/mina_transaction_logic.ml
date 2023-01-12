@@ -1455,8 +1455,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Zkapp_precondition.Protocol_state
     end
 
-    module Valid_until_precondition = struct
-      include Zkapp_precondition.Valid_until
+    module Valid_while_precondition = struct
+      include Zkapp_precondition.Valid_while
     end
 
     module Account_update = struct
@@ -1662,7 +1662,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_status.Failure.Collection.t )
           Zkapp_command_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
-      ; valid_until_precondition : Zkapp_precondition.Valid_until.t
+      ; valid_while_precondition : Zkapp_precondition.Valid_while.t
       ; transaction_commitment : Transaction_commitment.t
       ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
@@ -1671,8 +1671,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
-      | Check_valid_until_precondition (valid_until, global_state) -> (
-          Zkapp_precondition.Valid_until.check valid_until
+      | Check_valid_while_precondition (valid_while, global_state) -> (
+          Zkapp_precondition.Valid_while.check valid_while
             global_state.block_global_slot
           |> fun or_error ->
           match or_error with Ok () -> true | Error _ -> false )
@@ -2403,7 +2403,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
-                    ; valid_until = Ignore
+                    ; valid_while = Ignore
                     }
                 ; caller = Call
                 ; use_full_commitment
@@ -2432,7 +2432,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
-                    ; valid_until = Ignore
+                    ; valid_while = Ignore
                     }
                 ; caller = Call
                 ; use_full_commitment = false

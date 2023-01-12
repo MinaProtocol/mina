@@ -1658,8 +1658,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Zkapp_precondition.Protocol_state.Checked.t
         end
 
-        module Valid_until_precondition = struct
-          type t = Zkapp_precondition.Valid_until.Checked.t
+        module Valid_while_precondition = struct
+          type t = Zkapp_precondition.Valid_while.Checked.t
         end
 
         module Field = Impl.Field
@@ -1854,8 +1854,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let protocol_state_precondition (t : t) =
               t.account_update.data.preconditions.network
 
-            let valid_until_precondition (t : t) =
-              t.account_update.data.preconditions.valid_until
+            let valid_while_precondition (t : t) =
+              t.account_update.data.preconditions.valid_while
 
             let token_id (t : t) = t.account_update.data.token_id
 
@@ -2023,8 +2023,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Mina_transaction_logic.Zkapp_command_logic.Local_state.t
             ; protocol_state_precondition :
                 Zkapp_precondition.Protocol_state.Checked.t
-            ; valid_until_precondition :
-                Zkapp_precondition.Valid_until.Checked.t
+            ; valid_while_precondition :
+                Zkapp_precondition.Valid_while.Checked.t
             ; transaction_commitment : Transaction_commitment.t
             ; full_transaction_commitment : Transaction_commitment.t
             ; field : Field.t
@@ -2037,8 +2037,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             (eff : (r, Env.t) Mina_transaction_logic.Zkapp_command_logic.Eff.t)
             : r =
           match eff with
-          | Check_valid_until_precondition (valid_until, global_state) ->
-              Zkapp_precondition.Valid_until.Checked.check valid_until
+          | Check_valid_while_precondition (valid_while, global_state) ->
+              Zkapp_precondition.Valid_while.Checked.check valid_while
                 global_state.block_global_slot
           | Check_protocol_state_precondition
               (protocol_state_predicate, global_state) ->
@@ -4355,9 +4355,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ( if Option.is_none fee_payer_opt then
                   Nonce (Account.Nonce.succ sender_nonce)
                 else Nonce sender_nonce )
-            ; valid_until =
+            ; valid_while =
                 Option.value_map preconditions
-                  ~f:(fun { valid_until; _ } -> valid_until)
+                  ~f:(fun { valid_while; _ } -> valid_while)
                   ~default:Zkapp_basic.Or_ignore.Ignore
             }
       in
@@ -5023,7 +5023,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
-                ; valid_until = Ignore
+                ; valid_while = Ignore
                 }
             ; use_full_commitment = false
             ; caller = Call
@@ -5046,7 +5046,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Full Zkapp_precondition.Account.accept
-                ; valid_until = Ignore
+                ; valid_while = Ignore
                 }
             ; use_full_commitment = false
             ; caller = Call
