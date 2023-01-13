@@ -74,7 +74,9 @@
   "pruning_balance_disabled": false,
   "initial_balance_fetch_disabled": false,
   "end_conditions": {
-    "index": 3
+    "reconciliation_coverage": {
+      "tip": true
+    }
   }
  },
  "perf": null
