@@ -20,7 +20,13 @@ The exact size and composition of testnets spun up by Gauntlet are custom specif
 
 #### Tests
 
-The usecase which Gauntlet has been designed around (thus far) is the usecase of running automated tests.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, or write new tests.  Each test consists of a testnet spec (which tells Gauntlet how many nodes of each node type to spin up in the testnet, for example a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers), and a sequence of test logic and Mina interactions to be run against the testnet (such as waiting for blocks to be produced, sending transactions, waiting for transactions to reach consensus, running snarkyjs, removing nodes from the network and checking network connectivity, etc).
+The usecase which Gauntlet has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, and/or write new tests.
+
+Gauntlet is set up such that the test to be run is selected at the invocation of Gauntlet, in the terminal command to run Gauntlet.  A single invocation of Gauntlet runs exactly 1 test and creates exactly 1 testnet.
+
+Each test consists of the following two elements:
+- a testnet spec which tells Gauntlet how many nodes of each node type to spin up in the testnet.  For example, a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers.
+- a sequence of test logic and Mina interactions to be run against the testnet.  For example, waiting for blocks to be produced, sending transactions, waiting for transactions to reach consensus, running snarkyjs, removing nodes from the network and checking network connectivity, and so on.  
 
 #### Infrastructure (super high level)
 
@@ -30,7 +36,7 @@ At the current moment, the testnet can only be run on Google Cloud, using their 
 
 The test_executive is run either on a developer's own laptop/desktop, or from our Continuous Integration system (BuildKite).  The machine running the test executive does not need much computing power, only an internet connection and the right credentials to access Google Cloud.
 
-Eventually, we would like the testnet to be able to run within virtual machines on the local computer.  When that is implemented and the user chooses to run the testnet through this entirely local method, then the user would certainly need a beefy enough computer to run all the virtual machines each with a full mina node running inside it.
+Eventually, we would like the testnet to be able to run within virtual machines on the local computer.  Doing so would require the user to have a beefy enough computer to run all the virtual machines each with a full mina node running inside it, however there are certainly many users who would desire this usecase.
 
 
 ## Architecture
@@ -53,7 +59,6 @@ Any Gauntlet test first creates a whole new testnet from scratch, and then runs 
         - graphql ingress
         - stackdriver log subscriptions
     - local engine: using the local engine will spin up nodes as VMs or containers on one's local machine.  this is not yet implemented
-    
 
 
 ## Using Gauntlet
@@ -95,7 +100,7 @@ There are several ways to run Gauntlet, the most recommended method is to run it
 
 #### Run mina-test-executive directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Gauntlet in dockerized form]
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [#Run Gauntlet in dockerized form](#Run Gauntlet in dockerized form)
 
 First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
@@ -122,7 +127,7 @@ If you've already set the environment variables as laid out in the last section,
 
 In the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
 
-Once you've configured GCP, the idiomatic command to run Gauntlet is as follows (you don't need to export the env vars, you can just manually edit the last line):
+Once you've configured GCP, the idiomatic command to run Gauntlet is as follows (you don't need to export the env vars, you can just manually edit and execute the last line):
 
 ```
 export $TEST_NAME=<test>
@@ -161,7 +166,7 @@ pull the image with:
 docker pull gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2a91811928ce751b65f943811c0c84463
 ```
 
-Replace the url with the url of your choice.
+(Replace the GCR url with the url of your choice.)
 
 Once the image is downloaded, you can run it with the following idiomatic command (from any directory):
 
@@ -181,14 +186,14 @@ gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2
 
 ```
 
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal (see [`mina-test-executive command line breakdown`].
+As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal, as described in the prior section [`mina-test-executive` command line breakdown](#`mina-test-executive` command line breakdown)
 
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [### GCP credentials and infrastructure related env vars].  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine (if you don't mess with other parts of the idiomatic expression, then you don't need to modify this `--env` flag).
+The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [ GCP credentials and infrastructure related env vars](# GCP credentials and infrastructure related env vars).  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine (if you don't mess with other parts of the idiomatic expression, then you don't need to modify this `--env` flag).
 
 
 #### Compile Gauntlet from source
 
-If you wish to modify or extend existing tests, or write a whole new test, you will need to compile the Gauntlet test_executive from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
+If you wish to modify or extend existing tests, and/or write a whole new test, or modify the Gauntlet test executive itself, you will need to compile the Gauntlet test_executive from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
 
 Gauntlet is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  
 
@@ -200,13 +205,13 @@ make build
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
-Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [#### Run mina-test-executive directly in command line].  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
+Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Run mina-test-executive directly in command line](#Run mina-test-executive directly in command line).  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
 
 ```
 ./_build/default/src/app/test_executive/test_executive.exe
 ```
 
-Optionally, you can set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+Optionally, you can set the following aliases in one's .bashrc or .bash_aliases (protip: aliases don't work if set in .profile):
 
 ```
 alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
@@ -229,10 +234,10 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ### GCP Cloud Engine implementation specific directories
 
-- `src/lib/integration_test_cloud_engine/` — This library is the current implementation of the GCP cloud based execution engine, which deploys testnets in Gcloud's GKE environment.  As with any engine, it implements the interface defined in `Integration_test_lib`.  This execution engine leverages a good deal of our existing coda automation system.
-- `automation/terraform/testnets` — During runtime, when using the GCP cloud engine, a directory of the same name as your testnet name will be created within this directory.  the terraform file which is `terraform apply`'d (ie main.tf.json) lives in here.
-- `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories
-- `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here
+- `src/lib/integration_test_cloud_engine/` — This library is the current implementation of the GCP cloud based execution engine, which deploys testnets in Gcloud's GKE environment.  As with any engine, it implements the interface defined in `Integration_test_lib`.  This execution engine leverages a good deal of our existing coda automation system.  These files are Ocaml.
+- `automation/terraform/testnets` — During runtime, when using the GCP cloud engine, Gauntlet will automatically create in this directory a subdirectory with the same name as your testnet name, and also generate a terraform file called `main.tf.json`.  When the testnet is deployed, `terraform apply` is called within this subdirectory, and terraform will use the specs in `main.tf.json` to reach out to GCP and deploy the testnet.
+- `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
+- `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
 ![Integration Test Testnet creation process in GCP](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
 *Integration Test Testnet creation process in GCP.  edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing*
