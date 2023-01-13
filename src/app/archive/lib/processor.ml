@@ -514,6 +514,7 @@ module Zkapp_permissions = struct
     { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
+    ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
@@ -538,6 +539,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
+      ; auth_required_typ
       ]
 
   let table_name = "zkapp_permissions"
@@ -547,6 +549,7 @@ module Zkapp_permissions = struct
       { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
+      ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key

@@ -1200,6 +1200,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let receive : t -> controller = fun a -> a.data.permissions.receive
 
+            let access : t -> controller = fun a -> a.data.permissions.access
+
             let set_delegate : t -> controller =
              fun a -> a.data.permissions.set_delegate
 
@@ -2642,11 +2644,20 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                     ~else_:current
                 in
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:is_user_command ~to_:`Access account
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
                 let permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
+                in
+                let%bind () =
+                  [%with_label_
+                    "Fee payer access should be permitted for all commands"]
+                    (fun () -> Boolean.Assert.is_true permitted_to_access)
                 in
                 let%bind () =
                   [%with_label_
@@ -2803,8 +2814,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the receiver for a coinbase
                    - the first receiver for a fee transfer
                 *)
-                let permitted_to_receive =
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:Boolean.false_ ~to_:`Access account
+                in
+                let%bind permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
+                  |> Boolean.( &&& ) permitted_to_access
                 in
                 (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
                 let%bind payment_or_internal_command =
@@ -2815,6 +2831,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     [ Boolean.not payment_or_internal_command
                     ; permitted_to_receive
                     ]
+                  >>= Boolean.( &&& ) permitted_to_access
                 in
                 receiver_balance_update_permitted := permitted_to_receive ;
                 let%bind is_empty_failure =
@@ -3026,6 +3043,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                           assert_r1cs not_fee_payer_is_source num_failures
                             num_failures ) )
                 in
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:is_user_command ~to_:`Access account
+                in
                 let permitted_to_update_delegate =
                   Account.Checked.has_permission ~to_:`Set_delegate account
                 in
@@ -3039,6 +3060,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%bind payment_permitted =
                   Boolean.all
                     [ is_payment
+                    ; permitted_to_access
                     ; permitted_to_send
                     ; !receiver_balance_update_permitted
                     ]
@@ -3057,6 +3079,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; delegation_permitted
                     ; fee_receiver_update_permitted
                     ]
+                  >>= Boolean.( &&& ) permitted_to_access
                 in
                 let%bind amount =
                   (* Only payments should affect the balance at this stage. *)
