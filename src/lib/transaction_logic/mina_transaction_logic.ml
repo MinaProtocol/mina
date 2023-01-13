@@ -773,7 +773,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if Account.has_permission ~to_:`Send fee_payer_account then Ok ()
+      if
+        Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+          fee_payer_account
+        && Account.has_permission ~control:Control.Tag.Signature ~to_:`Send
+             fee_payer_account
+      then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
@@ -804,8 +809,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger source |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Set_delegate source_account then
-              Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Set_delegate source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
@@ -840,7 +849,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Receive receiver_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.None_given
+                ~to_:`Access receiver_account
+              && Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_account =
@@ -898,7 +912,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             else ret
           in
           let%bind () =
-            if Account.has_permission ~to_:`Send source_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Send source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
@@ -1238,6 +1257,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Account
 
       module Permissions = struct
+        let access : t -> Controller.t = fun a -> a.permissions.access
+
         let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
 
         let send : t -> Controller.t = fun a -> a.permissions.send
@@ -1859,7 +1880,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ( init_account
         , `Added
         , `Has_permission_to_receive
-            (Account.has_permission ~to_:`Receive init_account) )
+            (Account.has_permission ~control:Control.Tag.None_given
+               ~to_:`Receive init_account ) )
     | Some loc -> (
         match get ledger loc with
         | None ->
@@ -1868,7 +1890,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ( receiver_account
             , `Existed
             , `Has_permission_to_receive
-                (Account.has_permission ~to_:`Receive receiver_account) ) )
+                (Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account ) ) )
 
   let no_failure = []
 
