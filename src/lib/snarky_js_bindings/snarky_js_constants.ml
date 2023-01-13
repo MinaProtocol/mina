@@ -30,6 +30,8 @@ let version_bytes =
     ; ("userCommandMemo", `Int (Char.to_int user_command_memo))
     ; ("privateKey", `Int (Char.to_int private_key))
     ; ("signature", `Int (Char.to_int signature))
+    ; ("transactionHash", `Int (Char.to_int transaction_hash))
+    ; ("signedCommandV1", `Int (Char.to_int signed_command_v1))
     ]
 
 let poseidon_params_kimchi =
