@@ -429,14 +429,16 @@ let%test_module "gate finalization" =
 
        @param actual_feature_flags User-specified feature flags, matching those
        required by the backend circuit
+       @param public_input list of public inputs (can be empty)
        @param vk Verifier index for backend circuit
        @param proof Backend proof
 
        @return true or throws and exception
     *)
-    let run_recursive_proof_test ?(public_input = [])
+    let run_recursive_proof_test
         (actual_feature_flags : bool Plonk_types.Features.t)
         (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+        (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
         (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
       (* Constants helper - takes an OCaml value and converts it to a snarky value, where
@@ -572,6 +574,7 @@ let%test_module "gate finalization" =
     type example =
          Kimchi_bindings.Protocol.SRS.Fp.t
       -> Kimchi_bindings.Protocol.Index.Fp.t
+         * Pasta_bindings.Fp.t list
          * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
            Kimchi_types.prover_proof
@@ -593,7 +596,7 @@ let%test_module "gate finalization" =
 
          Note: we only want to pay the cost of generating this proof once and
          then reuse it many times for the different recursive proof tests. *)
-      let index, proof = S.example srs
+      let index, public_input, proof = S.example srs
 
       (* Obtain verifier key from prover index and convert backend proof to
          snarky proof *)
@@ -605,7 +608,8 @@ let%test_module "gate finalization" =
         generate_test_feature_flag_configs S.actual_feature_flags
 
       let runtest feature_flags =
-        run_recursive_proof_test S.actual_feature_flags feature_flags vk proof
+        run_recursive_proof_test S.actual_feature_flags feature_flags
+          public_input vk proof
 
       let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
 
@@ -615,10 +619,24 @@ let%test_module "gate finalization" =
       let%test "all maybes" = runtest test_feature_flags_configs.all_maybes
     end
 
+    (* Small combinators to lift gate example signatures to the expected
+       signatures for the tests. This amounts to generating the list of public
+       inputs from either no public inputs, a single one or a pair of inputs
+       returned by the gate example. *)
+
+    let no_public_input gate_example srs =
+      let index, proof = gate_example srs in
+      (index, [], proof)
+
+    let public_input_2 gate_example srs =
+      let index, (public_input1, public_input2), proof = gate_example srs in
+      (index, [ public_input1; public_input2 ], proof)
+
     let%test_module "foreign field multiplication" =
       ( module Make (struct
         let example =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul
+          no_public_input
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul
 
         let actual_feature_flags =
           { Plonk_types.Features.chacha = false
@@ -634,7 +652,9 @@ let%test_module "gate finalization" =
 
     let%test_module "range check" =
       ( module Make (struct
-        let example = Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
+        let example =
+          no_public_input
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
 
         let actual_feature_flags =
           { Plonk_types.Features.chacha = false
@@ -650,7 +670,8 @@ let%test_module "gate finalization" =
 
     let%test_module "chacha" =
       ( module Make (struct
-        let example = Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha
+        let example =
+          no_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha
 
         let actual_feature_flags =
           { Plonk_types.Features.chacha = true
@@ -666,11 +687,8 @@ let%test_module "gate finalization" =
 
     let%test_module "xor" =
       ( module Make (struct
-        let example srs =
-          let index, (_public_input_1, _public_input_2), proof =
-            Kimchi_bindings.Protocol.Proof.Fp.example_with_xor srs
-          in
-          (index, proof)
+        let example =
+          public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
 
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
@@ -687,11 +705,8 @@ let%test_module "gate finalization" =
 
     let%test_module "rot" =
       ( module Make (struct
-        let example srs =
-          let index, (_public_input_1, _public_input_2), proof =
-            Kimchi_bindings.Protocol.Proof.Fp.example_with_rot srs
-          in
-          (index, proof)
+        let example =
+          public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_rot
 
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
@@ -709,10 +724,10 @@ let%test_module "gate finalization" =
     let%test_module "foreign field addition" =
       ( module Make (struct
         let example srs =
-          let index, _public_input, proof =
+          let index, public_input, proof =
             Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs
           in
-          (index, proof)
+          (index, [ public_input ], proof)
 
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
