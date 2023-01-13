@@ -73,7 +73,7 @@ let apply_zkapp_command ledger zkapp_command =
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
                  ~state_body_hash:genesis_state_body_hash
-                 ~global_slot:Mina_numbers.Global_slot.zero )
+                 ~global_slot:Mina_numbers.Global_slot.(succ zero) )
           , ps )
         ]
     | ps1 :: ps2 :: rest ->
@@ -82,12 +82,12 @@ let apply_zkapp_command ledger zkapp_command =
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
                  ~state_body_hash:genesis_state_body_hash
-                 ~global_slot:Mina_numbers.Global_slot.zero )
+                 ~global_slot:Mina_numbers.Global_slot.(succ zero) )
           , ps1 )
         in
         let pending_coinbase_state_stack =
           pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
-            ~global_slot:Mina_numbers.Global_slot.zero
+            ~global_slot:Mina_numbers.Global_slot.(succ zero)
         in
         let unchanged_stack_state ps =
           ( `Pending_coinbase_init_stack init_stack
@@ -101,7 +101,9 @@ let apply_zkapp_command ledger zkapp_command =
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
   let state_view = Mina_state.Protocol_state.Body.view genesis_state_body in
-  let global_slot = state_view.global_slot_since_genesis in
+  let global_slot =
+    Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis
+  in
   let witnesses, final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
       ~global_slot ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero

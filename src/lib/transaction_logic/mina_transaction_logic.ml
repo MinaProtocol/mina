@@ -335,6 +335,7 @@ module type S = sig
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Mina_numbers.Global_slot.t
+            (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
 

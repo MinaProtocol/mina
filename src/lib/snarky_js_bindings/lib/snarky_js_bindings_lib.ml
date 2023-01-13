@@ -3105,7 +3105,8 @@ module Ledger = struct
     let ledger = l##.value in
     let application_result =
       T.apply_zkapp_command_unchecked
-        ~global_slot:network_state.global_slot_since_genesis
+        ~global_slot:
+          (Mina_numbers.Global_slot.succ network_state.global_slot_since_genesis)
         ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with

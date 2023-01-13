@@ -139,7 +139,7 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let zkapp_command =
                 account_update_send ~constraint_constants (List.hd_exn specs)

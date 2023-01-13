@@ -1089,7 +1089,7 @@ module T = struct
           , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time)
           )
         ]
-      "Staged_ledger.apply_difff take $time_elapsed" ;
+      "Staged_ledger.apply_diff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
@@ -2112,11 +2112,13 @@ let%test_module "staged ledger tests" =
         ~(current_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~state_and_body_hash sl txns stmt_to_work =
       let open Deferred.Let_syntax in
-      let supercharge_coinbase =
-        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner
-          ~global_slot:current_state_view.global_slot_since_genesis
+      let global_slot =
+        Mina_numbers.Global_slot.succ
+          current_state_view.global_slot_since_genesis
       in
-      let global_slot = current_state_view.global_slot_since_genesis in
+      let supercharge_coinbase =
+        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner ~global_slot
+      in
       let diff =
         Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
           ~current_state_view ~transactions_by_fee:txns

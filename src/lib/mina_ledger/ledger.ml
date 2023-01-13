@@ -482,7 +482,9 @@ let%test_unit "tokens test" =
       in
       match
         apply_zkapp_command_unchecked ~constraint_constants
-          ~global_slot:view.global_slot_since_genesis ~state_view:view ledger
+          ~global_slot:
+            (Mina_numbers.Global_slot.succ view.global_slot_since_genesis)
+          ~state_view:view ledger
           (mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
              zkapp_command )
       with

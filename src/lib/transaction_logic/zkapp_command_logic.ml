@@ -1172,17 +1172,17 @@ module Make (Inputs : Inputs_intf) = struct
            ( Account_update.protocol_state_precondition account_update
            , global_state ) )
     in
-    let valid_while_satisfied =
-      h.perform
-        (Check_valid_while_precondition
-           (Account_update.valid_while_precondition account_update, global_state)
-        )
-    in
     let local_state =
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
     in
     let local_state =
+      let valid_while_satisfied =
+        h.perform
+          (Check_valid_while_precondition
+             ( Account_update.valid_while_precondition account_update
+             , global_state ) )
+      in
       Local_state.add_check local_state Valid_while_precondition_unsatisfied
         valid_while_satisfied
     in
