@@ -649,11 +649,8 @@ let%test_module "gate finalization" =
 
     let%test_module "foreign field addition" =
       ( module Make (struct
-        let example srs =
-          let index, public_input, proof =
-            Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs
-          in
-          (index, [ public_input ], proof)
+        let example =
+          public_input_1 Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd
 
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
