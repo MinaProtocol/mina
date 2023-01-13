@@ -135,7 +135,9 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let global_slot =
-    Option.value global_slot ~default:state_view.global_slot_since_genesis
+    Option.value global_slot
+      ~default:
+        (Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis)
   in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
       match
@@ -145,8 +147,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
               (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
-                    (pending_coinbase_state_stack ~state_body_hash
-                       ~global_slot:state_view.global_slot_since_genesis )
+                    (pending_coinbase_state_stack ~state_body_hash ~global_slot)
                 , zkapp_command )
               ] )
       with
