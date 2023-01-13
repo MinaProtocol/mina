@@ -382,6 +382,14 @@ let%test_module "gate finalization" =
           Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
       |> Or_error.ok_exn
 
+    type feature_flags = Plonk_types.Opt.Flag.t Plonk_types.Features.t
+
+    type test_feature_flags =
+      { true_is_yes : feature_flags
+      ; true_is_maybe : feature_flags
+      ; all_maybes : feature_flags
+      }
+
     (* Helper function to convert actual feature flags into 3 test configurations of feature flags
          @param actual_feature_flags The actual feature flags in terms of true/false
 
@@ -391,18 +399,17 @@ let%test_module "gate finalization" =
          - one where true and false are both mapped to Maybe *)
     let generate_test_feature_flag_configs
         (actual_feature_flags : bool Plonk_types.Features.t) :
-        Plonk_types.Opt.Flag.t Plonk_types.Features.t Array.t =
+        test_feature_flags =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
-         @param true_opt  The Plonk_types.Opt type to use for true/enabled features
+         @param true_opt  Plonk_types.Opt type to use for true/enabled features
          @param false_opt Plonk_types.Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
           (actual_feature_flags : bool Plonk_types.Features.t)
           (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) :
-          Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          (false_opt : Plonk_types.Opt.Flag.t) : feature_flags =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -410,14 +417,13 @@ let%test_module "gate finalization" =
               false_opt )
       in
 
-      (* Generate the 3 configurations of the actual feature flags using helper *)
-      [| compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Yes
-           Plonk_types.Opt.Flag.No
-       ; compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Maybe
-           Plonk_types.Opt.Flag.No
-       ; compute_feature_flags actual_feature_flags Plonk_types.Opt.Flag.Maybe
-           Plonk_types.Opt.Flag.Maybe
-      |]
+      (* Generate the 3 configurations of the actual feature flags using
+         helper *)
+      let open Plonk_types.Opt.Flag in
+      { true_is_yes = compute_feature_flags actual_feature_flags Yes No
+      ; true_is_maybe = compute_feature_flags actual_feature_flags Maybe No
+      ; all_maybes = compute_feature_flags actual_feature_flags Maybe Maybe
+      }
 
     (* Run the recursive proof tests on the supplied inputs.
 
@@ -428,7 +434,7 @@ let%test_module "gate finalization" =
 
        @return true or throws and exception
     *)
-    let run_recursive_proof_test
+    let run_recursive_proof_test ?(public_input = [])
         (actual_feature_flags : bool Plonk_types.Features.t)
         (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
@@ -472,7 +478,7 @@ let%test_module "gate finalization" =
           explaining this in detail. *)
       let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
         deferred_values ~feature_flags ~actual_feature_flags ~sgs:[]
-          ~prev_challenges:[] ~step_vk:vk ~public_input:[] ~proof
+          ~prev_challenges:[] ~step_vk:vk ~public_input ~proof
           ~actual_proofs_verified:Nat.N0.n
       in
 
@@ -560,47 +566,60 @@ let%test_module "gate finalization" =
           Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
       |> Or_error.ok_exn
 
-    (* Run the custom gate tests on the supplied inputs.
+    let srs =
+      Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl Common.Max_degree.step_log2)
 
-       @param actual_feature_flags User-specified feature flags, matching those
-       required by the backend circuit
-       @param vk Index for backend circuit
-       @param proof Backend proof
+    type example =
+         Kimchi_bindings.Protocol.SRS.Fp.t
+      -> Kimchi_bindings.Protocol.Index.Fp.t
+         * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+           , Pasta_bindings.Fp.t )
+           Kimchi_types.prover_proof
 
-       @return true or throws and exception
-    *)
-    let run_custom_gate_tests
-        (actual_feature_flags : bool Plonk_types.Features.t)
-        (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
-        (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
-      (* Compute the test feature flag configurations from the actual feature flags *)
-      let test_feature_flag_configs =
-        generate_test_feature_flag_configs actual_feature_flags
-      in
+    module type SETUP = sig
+      val example : example
 
-      (* Run the recursive proof generation tests on each feature flags configuration *)
-      Array.for_all test_feature_flag_configs ~f:(fun feature_flags ->
-          run_recursive_proof_test actual_feature_flags feature_flags vk proof )
+      (* Feature flags tused for backend proof *)
+      val actual_feature_flags : bool Plonk_types.Features.t
+    end
 
-    let%test "foreign field multiplication finalization" =
-      try
-        (* Generate foreign field multiplication test backend proof using Kimchi,
-           obtaining the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul srs
-        in
+    (* [Make] is the test functor.
 
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
+       Given a test setup, compute different test configurations and define 3
+       test for said configurations. *)
+    module Make (S : SETUP) = struct
+      (* Generate foreign field multiplication test backend proof using Kimchi,
+         obtaining the proof and corresponding prover index.
 
-        (* Specify feature flags that were used for backend proof *)
+         Note: we only want to pay the cost of generating this proof once and
+         then reuse it many times for the different recursive proof tests. *)
+      let index, proof = S.example srs
+
+      (* Obtain verifier key from prover index and convert backend proof to
+         snarky proof *)
+      let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index
+
+      let proof = Backend.Tick.Proof.of_backend proof
+
+      let test_feature_flags_configs =
+        generate_test_feature_flag_configs S.actual_feature_flags
+
+      let runtest feature_flags =
+        run_recursive_proof_test S.actual_feature_flags feature_flags vk proof
+
+      let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
+
+      let%test "true -> maybe" =
+        runtest test_feature_flags_configs.true_is_maybe
+
+      let%test "all maybes" = runtest test_feature_flags_configs.all_maybes
+    end
+
+    let%test_module "foreign field multiplication" =
+      ( module Make (struct
+        let example =
+          Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul
+
         let actual_feature_flags =
           { Plonk_types.Features.chacha = false
           ; range_check = true
@@ -611,34 +630,12 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
+      end) )
 
-        (* Run the custom gate tests with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+    let%test_module "range check" =
+      ( module Make (struct
+        let example = Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
 
-    let%test "range check finalization" =
-      try
-        (* Generate range check test backend proof using Kimchi, obtaining
-           the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check srs
-        in
-
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
-
-        (* Specify feature flags that were used for backend proof *)
         let actual_feature_flags =
           { Plonk_types.Features.chacha = false
           ; range_check = true
@@ -649,36 +646,13 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
+      end) )
 
-        (* Run the custom gate tests with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+    let%test_module "chacha" =
+      ( module Make (struct
+        let example = Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha
 
-    let%test "chacha finalization" =
-      try
-        (* Generate chacha test backend proof using Kimchi,
-           obtaining the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha srs
-        in
-
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
-
-        (* Specify feature flags that were used for backend proof *)
         let actual_feature_flags =
-          let open Plonk_types.Opt.Flag in
           { Plonk_types.Features.chacha = true
           ; range_check = false
           ; foreign_field_add = false
@@ -688,33 +662,16 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
-        (* Run the recursive proof test with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+      end) )
 
-    let%test "xor finalization" =
-      try
-        (* Generate xor test backend proof using Kimchi,
-           obtaining the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, (public_input_1, public_input_2), proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_xor srs
-        in
+    let%test_module "xor" =
+      ( module Make (struct
+        let example srs =
+          let index, (_public_input_1, _public_input_2), proof =
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_xor srs
+          in
+          (index, proof)
 
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
-
-        (* Specify feature flags that were used for backend proof *)
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
           { Plonk_types.Features.chacha = false
@@ -726,34 +683,16 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
+      end) )
 
-        (* Run the recursive proof test with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+    let%test_module "rot" =
+      ( module Make (struct
+        let example srs =
+          let index, (_public_input_1, _public_input_2), proof =
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_rot srs
+          in
+          (index, proof)
 
-    let%test "rot finalization" =
-      try
-        (* Generate rotation (and rangecheck) test backend proof using Kimchi,
-           obtaining the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, (public_input_1, public_input_2), proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_rot srs
-        in
-
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
-
-        (* Specify feature flags that were used for backend proof *)
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
           { Plonk_types.Features.chacha = false
@@ -765,34 +704,16 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
+      end) )
 
-        (* Run the recursive proof test with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+    let%test_module "foreign field addition" =
+      ( module Make (struct
+        let example srs =
+          let index, _public_input, proof =
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs
+          in
+          (index, proof)
 
-    let%test "ffadd finalization" =
-      try
-        (* Generate foreign field addition test backend proof using Kimchi,
-           obtaining the proof and corresponding prover index. Note: we only
-           want to pay the cost of generating this proof once and then reuse
-           it many times for the different recursive proof tests. *)
-        let srs =
-          Kimchi_bindings.Protocol.SRS.Fp.create
-            (1 lsl Common.Max_degree.step_log2)
-        in
-        let index, public_input, proof =
-          Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd srs
-        in
-
-        (* Obtain verifier key from prover index and convert backend proof to snarky proof *)
-        let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index in
-        let proof = Backend.Tick.Proof.of_backend proof in
-
-        (* Specify feature flags that were used for backend proof *)
         let actual_feature_flags =
           let open Plonk_types.Opt.Flag in
           { Plonk_types.Features.chacha = false
@@ -804,14 +725,7 @@ let%test_module "gate finalization" =
           ; lookup = true
           ; runtime_tables = false
           }
-        in
-
-        (* Run the recursive proof test with supplied feature flags *)
-        run_custom_gate_tests actual_feature_flags vk proof
-      with _e ->
-        Printexc.print_backtrace stdout ;
-        Out_channel.flush stdout ;
-        exit 2
+      end) )
   end )
 
 module Step_acc = Tock.Inner_curve.Affine
