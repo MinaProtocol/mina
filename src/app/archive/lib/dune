@@ -21,7 +21,6 @@
    integers
    ppx_inline_test.config
    uri
-   topological_sort
    ;;local libraries
    mina_wire_types
    kimchi_backend
