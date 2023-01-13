@@ -10,10 +10,8 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
 let gen_keys () =
-  let sk = Private_key.create () in
-  let pk = Public_key.of_private_key_exn sk in
-  let pk_compressed = Public_key.compress pk in
-  (pk_compressed, sk)
+  let kp = Keypair.create () in
+  (Public_key.compress kp.public_key, kp.private_key)
 
 let fee_to_create n =
   Genesis_constants.Constraint_constants.compiled.account_creation_fee
