@@ -1373,7 +1373,6 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
     let authorization = Control.Signature Signature.dummy in
     let permissions_auth = Control.Tag.Signature in
-    let call_type = Account_update.Call_type.Call in
     let rec gen_tree acc n =
       if n <= 0 then return (List.rev acc)
       else
@@ -1387,9 +1386,9 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
                         .account_creation_fee ) ))
           in
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
-            ~authorization ~permissions_auth ~available_public_keys ~call_type
-            ~account_state_tbl ~required_balance_change ?protocol_state_view ?vk
-            ()
+            ~authorization ~permissions_auth ~available_public_keys
+            ~call_type:Blind_call ~account_state_tbl ~required_balance_change
+            ?protocol_state_view ?vk ()
         in
         let token_id =
           Account_id.derive_token_id
@@ -1398,7 +1397,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
         in
         let%bind child =
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
-            ~new_account:true ~token_id ~call_type ~authorization
+            ~new_account:true ~token_id ~call_type:Call ~authorization
             ~permissions_auth ~available_public_keys ~account_state_tbl
             ?protocol_state_view ?vk ()
         in

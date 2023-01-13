@@ -341,7 +341,7 @@ let%test_module "multisig_account" =
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; call_type = Blind_call
                     ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
@@ -365,7 +365,7 @@ let%test_module "multisig_account" =
                         ; account = Full Zkapp_precondition.Account.accept
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; call_type = Blind_call
                     ; authorization_kind = Proof
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy

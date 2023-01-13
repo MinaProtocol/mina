@@ -769,7 +769,7 @@ module T = struct
           List.iter t.account_updates ~f:(fun p ->
               assert (
                 Account_update.Call_type.equal
-                  p.elt.account_update.body.call_type Call ) )
+                  p.elt.account_update.body.call_type Blind_call ) )
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer

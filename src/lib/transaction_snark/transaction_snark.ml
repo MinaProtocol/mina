@@ -4347,7 +4347,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; call_depth = 0
           ; preconditions = preconditions'
           ; use_full_commitment = false
-          ; call_type = Call
+          ; call_type = Blind_call
           ; authorization_kind = Signature
           }
         in
@@ -4413,7 +4413,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           |> Option.value ~default:Accept
                       }
                   ; use_full_commitment = true
-                  ; call_type = Call
+                  ; call_type = Blind_call
                   ; authorization_kind
                   }
               ; authorization =
@@ -4455,7 +4455,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; call_depth = 0
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
-                ; call_type = Call
+                ; call_type = Blind_call
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
@@ -4983,7 +4983,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
                 }
             ; use_full_commitment = false
-            ; call_type = Call
+            ; call_type = Blind_call
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
@@ -5005,7 +5005,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; account = Full Zkapp_precondition.Account.accept
                 }
             ; use_full_commitment = false
-            ; call_type = Call
+            ; call_type = Blind_call
             ; authorization_kind = Proof
             }
         ; authorization = Proof Mina_base.Proof.blockchain_dummy

@@ -2383,7 +2383,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
                     }
-                ; call_type = Call
+                ; call_type = Blind_call
                 ; use_full_commitment
                 ; authorization_kind = Signature
                 }
@@ -2411,7 +2411,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
                     }
-                ; call_type = Call
+                ; call_type = Blind_call
                 ; use_full_commitment = false
                 ; authorization_kind = None_given
                 }

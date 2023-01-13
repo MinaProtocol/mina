@@ -1025,7 +1025,7 @@ module Body = struct
       ; call_depth = 0
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
-      ; call_type = Call
+      ; call_type = Blind_call
       ; authorization_kind = None_given
       }
   end
@@ -1230,7 +1230,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
-    ; call_type = Call
+    ; call_type = Blind_call
     ; authorization_kind = Signature
     }
 
@@ -1256,7 +1256,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
-    ; call_type = Call
+    ; call_type = Blind_call
     ; call_depth = 0
     ; authorization_kind = Signature
     }
@@ -1392,7 +1392,7 @@ module Body = struct
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
-    ; call_type = Call
+    ; call_type = Blind_call
     ; authorization_kind = None_given
     }
 

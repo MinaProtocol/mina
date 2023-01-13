@@ -1820,7 +1820,7 @@ let%test_module _ =
                             Account_update.Account_precondition.Nonce
                               (Account.Nonce.succ nonce)
                         }
-                    ; call_type = Call
+                    ; call_type = Blind_call
                     ; use_full_commitment = not double_increment_sender
                     ; authorization_kind = None_given
                     }
@@ -1840,7 +1840,7 @@ let%test_module _ =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
                         }
-                    ; call_type = Call
+                    ; call_type = Blind_call
                     ; use_full_commitment = not increment_receiver
                     ; authorization_kind = None_given
                     }
