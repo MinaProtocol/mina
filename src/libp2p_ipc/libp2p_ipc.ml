@@ -138,7 +138,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
     ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
     ~min_connections ~max_connections ~validation_queue_size ~gating_config
-    ~topic_config =
+    ~topic_config () =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(

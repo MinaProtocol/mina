@@ -229,7 +229,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~peer_exchange ~peer_protection_ratio ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
-      ~topic_config
+      ~topic_config ()
   in
   let%map _ =
     Libp2p_helper.do_rpc t.helper
