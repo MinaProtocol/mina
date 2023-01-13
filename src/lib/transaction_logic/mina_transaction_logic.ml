@@ -1672,11 +1672,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
-      | Check_valid_while_precondition (valid_while, global_state) -> (
+      | Check_valid_while_precondition (valid_while, global_state) ->
           Zkapp_precondition.Valid_while.check valid_while
             global_state.block_global_slot
-          |> fun or_error ->
-          match or_error with Ok () -> true | Error _ -> false )
+          |> Or_error.is_ok
       | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
