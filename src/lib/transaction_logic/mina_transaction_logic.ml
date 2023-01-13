@@ -1009,6 +1009,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       type t = Snark_params.Tick.Field.t
 
       let if_ = value_if
+
+      let equal = Snark_params.Tick.Field.equal
     end
 
     module Bool = struct
@@ -1214,6 +1216,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
+    module Verification_key_hash = struct
+      type t = Field.t option
+
+      let equal vk1 vk2 = Option.equal Field.equal vk1 vk2
+    end
+
     module Actions = struct
       type t = Zkapp_account.Actions.t
 
@@ -1348,6 +1356,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let set_verification_key verification_key (a : t) =
         set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
+
+      let verification_key_hash (a : t) =
+        match a.zkapp with
+        | None ->
+            None
+        | Some zkapp ->
+            Option.map zkapp.verification_key ~f:With_hash.hash
 
       let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
 
@@ -1493,6 +1508,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             true
         | Proof _ | None_given ->
             false
+
+      let verification_key_hash (p : t) =
+        match p.body.authorization_kind with
+        | Proof vk_hash ->
+            Some vk_hash
+        | _ ->
+            None
 
       module Update = struct
         open Zkapp_basic

@@ -95,7 +95,10 @@ let%test_module "Sequence events test" =
     end
 
     let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
-        ~ledger zkapp_command =
+        ~ledger zkapp_command0 =
+      let zkapp_command =
+        Zkapps_examples.patch_verification_key_hashes ~ledger zkapp_command0
+      in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash =

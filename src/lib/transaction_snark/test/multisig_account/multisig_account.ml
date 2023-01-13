@@ -366,8 +366,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; caller = Call
-                    ; authorization_kind =
-                        Proof (Mina_base.Zkapp_account.dummy_vk_hash ())
+                    ; authorization_kind = Proof (With_hash.hash vk)
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }
