@@ -2336,68 +2336,66 @@ module Make (L : Ledger_intf.S) :
   let apply_transaction_phase_1 ~constraint_constants
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) : Transaction_partially_applied.t Or_error.t =
-    O1trace.sync_thread "apply_transaction_phase_1" (fun () ->
-        let open Or_error.Let_syntax in
-        let previous_hash = merkle_root ledger in
-        let txn_global_slot = txn_state_view.global_slot_since_genesis in
-        match t with
-        | Command (Signed_command txn) ->
-            let%map applied =
-              apply_user_command_unchecked ~constraint_constants
-                ~txn_global_slot ledger txn
-            in
-            Transaction_partially_applied.Signed_command
-              { previous_hash; applied }
-        | Command (Zkapp_command txn) ->
-            let%map partially_applied =
-              apply_zkapp_command_phase_1 ~state_view:txn_state_view
-                ~constraint_constants ledger txn
-            in
-            Transaction_partially_applied.Zkapp_command partially_applied
-        | Fee_transfer t ->
-            let%map applied =
-              apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t
-            in
-            Transaction_partially_applied.Fee_transfer
-              { previous_hash; applied }
-        | Coinbase t ->
-            let%map applied =
-              apply_coinbase ~constraint_constants ~txn_global_slot ledger t
-            in
-            Transaction_partially_applied.Coinbase { previous_hash; applied } )
+    (*    O1trace.sync_thread "apply_transaction_phase_1" (fun () -> *)
+    let open Or_error.Let_syntax in
+    let previous_hash = merkle_root ledger in
+    let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    match t with
+    | Command (Signed_command txn) ->
+        let%map applied =
+          apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+            ledger txn
+        in
+        Transaction_partially_applied.Signed_command { previous_hash; applied }
+    | Command (Zkapp_command txn) ->
+        let%map partially_applied =
+          apply_zkapp_command_phase_1 ~state_view:txn_state_view
+            ~constraint_constants ledger txn
+        in
+        Transaction_partially_applied.Zkapp_command partially_applied
+    | Fee_transfer t ->
+        let%map applied =
+          apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t
+        in
+        Transaction_partially_applied.Fee_transfer { previous_hash; applied }
+    | Coinbase t ->
+        let%map applied =
+          apply_coinbase ~constraint_constants ~txn_global_slot ledger t
+        in
+        Transaction_partially_applied.Coinbase { previous_hash; applied }
+  (* ) *)
 
   let apply_transaction_phase_2 ledger (t : Transaction_partially_applied.t) :
       Transaction_applied.t Or_error.t =
-    O1trace.sync_thread "apply_transaction_phase_2" (fun () ->
-        let open Or_error.Let_syntax in
-        let open Transaction_applied in
-        match t with
-        | Signed_command { previous_hash; applied } ->
-            return
-              { previous_hash
-              ; varying = Varying.Command (Signed_command applied)
-              }
-        | Zkapp_command partially_applied ->
-            (* TODO: either here or in second phase of apply, need to update the prior global state statement for the fee payer segment to add the second phase ledger at the end *)
-            let%map applied =
-              apply_zkapp_command_phase_2 ledger partially_applied
-            in
-            { previous_hash = partially_applied.previous_hash
-            ; varying = Varying.Command (Zkapp_command applied)
-            }
-        | Fee_transfer { previous_hash; applied } ->
-            return { previous_hash; varying = Varying.Fee_transfer applied }
-        | Coinbase { previous_hash; applied } ->
-            return { previous_hash; varying = Varying.Coinbase applied } )
+    (*    O1trace.sync_thread "apply_transaction_phase_2" (fun () -> *)
+    let open Or_error.Let_syntax in
+    let open Transaction_applied in
+    match t with
+    | Signed_command { previous_hash; applied } ->
+        return
+          { previous_hash; varying = Varying.Command (Signed_command applied) }
+    | Zkapp_command partially_applied ->
+        (* TODO: either here or in second phase of apply, need to update the prior global state statement for the fee payer segment to add the second phase ledger at the end *)
+        let%map applied =
+          apply_zkapp_command_phase_2 ledger partially_applied
+        in
+        { previous_hash = partially_applied.previous_hash
+        ; varying = Varying.Command (Zkapp_command applied)
+        }
+    | Fee_transfer { previous_hash; applied } ->
+        return { previous_hash; varying = Varying.Fee_transfer applied }
+    | Coinbase { previous_hash; applied } ->
+        return { previous_hash; varying = Varying.Coinbase applied }
+  (* ) *)
 
   let apply_transactions ~constraint_constants ~txn_state_view ledger txns =
     let open Or_error in
-    O1trace.sync_thread "apply_transactions" (fun () ->
-        result_list_map txns
-          ~f:
-            (apply_transaction_phase_1 ~constraint_constants ~txn_state_view
-               ledger )
-        >>= result_list_map ~f:(apply_transaction_phase_2 ledger) )
+    (*    O1trace.sync_thread "apply_transactions" (fun () -> *)
+    result_list_map txns
+      ~f:
+        (apply_transaction_phase_1 ~constraint_constants ~txn_state_view ledger)
+    >>= result_list_map ~f:(apply_transaction_phase_2 ledger)
+  (* ) *)
 
   module For_tests = struct
     let validate_timing_with_min_balance = validate_timing_with_min_balance
