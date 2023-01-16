@@ -1969,7 +1969,9 @@ module Make (L : Ledger_intf.S) :
       List.map c.original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
-    let start = (c.global_state, c.local_state) in
+    (*update local state ledger to second pass ledger*)
+    let local_state = { c.local_state with ledger } in
+    let start = (c.global_state, local_state) in
     match step_all (f init start) start with
     | Error e ->
         Error e

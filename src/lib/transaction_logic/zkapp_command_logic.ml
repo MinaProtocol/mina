@@ -1654,22 +1654,22 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
     in
     let is_start_or_last = Bool.(is_start' ||| is_last_account_update) in
-    let update_global_state = Bool.(is_start_or_last &&& local_state.success) in
-    let global_state, global_excess_update_failed, update_global_state =
+    let update_global_state_fee_excess =
+      Bool.(is_start_or_last &&& local_state.success)
+    in
+    let global_state, global_excess_update_failed =
       let amt = Global_state.fee_excess global_state in
       let res, `Overflow overflow =
         Amount.Signed.add_flagged amt local_state.excess
       in
       let global_excess_update_failed =
-        Bool.(update_global_state &&& overflow)
+        Bool.(update_global_state_fee_excess &&& overflow)
       in
-      let update_global_state = Bool.(update_global_state &&& not overflow) in
       let new_amt =
-        Amount.Signed.if_ update_global_state ~then_:res ~else_:amt
+        Amount.Signed.if_ update_global_state_fee_excess ~then_:res ~else_:amt
       in
       ( Global_state.set_fee_excess global_state new_amt
-      , global_excess_update_failed
-      , update_global_state )
+      , global_excess_update_failed )
     in
     let local_state =
       { local_state with
@@ -1708,10 +1708,20 @@ module Make (Inputs : Inputs_intf) = struct
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
+    (*Update both the ledgers*)
+    let update_first_pass_ledger = Bool.(is_start' &&& local_state.success) in
+    let update_second_pass_ledger =
+      Bool.(is_last_account_update &&& local_state.success)
+    in
     let global_state =
-      (* TODO *)
-      Global_state.set_first_pass_ledger ~should_update:update_global_state
-        global_state local_state.ledger
+      let gs_first_pass_updated =
+        Global_state.set_first_pass_ledger
+          ~should_update:update_first_pass_ledger global_state
+          local_state.ledger
+      in
+      Global_state.set_second_pass_ledger
+        ~should_update:update_second_pass_ledger gs_first_pass_updated
+        local_state.ledger
     in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
