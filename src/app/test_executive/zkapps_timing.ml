@@ -483,7 +483,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ; valid_while =
                   Check
                     Zkapp_precondition.Closed_interval.
-                      { lower = global_slot; upper = global_slot }
+                      { lower = global_slot
+                      ; upper = Mina_numbers.Global_slot.max_value
+                      }
               }
         }
       in

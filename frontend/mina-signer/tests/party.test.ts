@@ -81,7 +81,7 @@ let mockedZkappCommand = {
             provedState: null,
             isNew: null,
           },
-          validUntil : null
+          validWhile : null
         },
 
         useFullCommitment: true,

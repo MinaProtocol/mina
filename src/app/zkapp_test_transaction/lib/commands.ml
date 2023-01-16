@@ -77,6 +77,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let global_slot =
     Mina_state.Protocol_state.Body.consensus_state state_body
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
+    |> Mina_numbers.Global_slot.succ
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
