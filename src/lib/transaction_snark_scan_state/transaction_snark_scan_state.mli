@@ -131,10 +131,9 @@ val apply_last_proof_transactions :
         -> Ledger.Transaction_partially_applied.t
         -> Ledger.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
-       (   txn_state_view:
-             Mina_base.Zkapp_precondition.Protocol_state.View.Stable.Latest.t
-        -> Mina_ledger.Sparse_ledger.Stable.Latest.t
-        -> Mina_transaction.Transaction.Stable.Latest.t
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
   -> t
@@ -161,10 +160,9 @@ val apply_staged_transactions :
         -> Ledger.Transaction_partially_applied.t
         -> Ledger.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
-       (   txn_state_view:
-             Mina_base.Zkapp_precondition.Protocol_state.View.Stable.Latest.t
-        -> Mina_ledger.Sparse_ledger.Stable.Latest.t
-        -> Mina_transaction.Transaction.Stable.Latest.t
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
   -> t

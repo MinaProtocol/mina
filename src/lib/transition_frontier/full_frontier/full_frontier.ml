@@ -475,11 +475,19 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       in
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
-      (*TODO: get appropriate functions*)
-      let apply_first_pass ~txn_state_view:_ _ _ = failwith "TODO" in
-      let apply_second_pass _ _ = failwith "TODO" in
-      let apply_first_pass_sparse_ledger ~txn_state_view:_ _ _ =
-        failwith "TODO"
+      let apply_first_pass =
+        Ledger.apply_transaction_phase_1
+          ~constraint_constants:Context.constraint_constants
+      in
+      let apply_second_pass = Ledger.apply_transaction_phase_2 in
+      let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger txn =
+        let open Or_error.Let_syntax in
+        let%map _ledger, partial_txn =
+          Mina_ledger.Sparse_ledger.apply_transaction_phase_1
+            ~constraint_constants:Context.constraint_constants ~txn_state_view
+            sparse_ledger txn
+        in
+        partial_txn
       in
       let get_protocol_state state_hash =
         match find_protocol_state t state_hash with

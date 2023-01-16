@@ -362,10 +362,17 @@ module T = struct
       ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
     (*TODO: get appropriate functions*)
-    let apply_first_pass ~txn_state_view:_ _ _ = failwith "TODO" in
-    let apply_second_pass _ _ = failwith "TODO" in
-    let apply_first_pass_sparse_ledger ~txn_state_view:_ _ _ =
-      failwith "TODO"
+    let apply_first_pass =
+      Ledger.apply_transaction_phase_1 ~constraint_constants
+    in
+    let apply_second_pass = Ledger.apply_transaction_phase_2 in
+    let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger txn =
+      let open Or_error.Let_syntax in
+      let%map _ledger, partial_txn =
+        Mina_ledger.Sparse_ledger.apply_transaction_phase_1
+          ~constraint_constants ~txn_state_view sparse_ledger txn
+      in
+      partial_txn
     in
     let%bind () =
       Scan_state.apply_staged_transactions ~ledger:snarked_ledger
@@ -376,7 +383,6 @@ module T = struct
     (*TODO: Reviewer : Before I fully replace the code below
        1. do we want to yield after every transaction especially when the first pass has only fee payer updates
        2. Do we need to check the transaction status if we are checking the ledger hash below*)
-    if true then failwith "TODO" ;
     (*let%bind _ =
         Deferred.Or_error.List.iter txs_with_protocol_state
           ~f:(fun (tx, protocol_state) ->

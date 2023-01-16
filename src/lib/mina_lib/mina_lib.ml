@@ -625,8 +625,6 @@ let get_snarked_ledger t state_hash_opt =
         Transition_frontier.root_snarked_ledger frontier
       in
       let ledger = Ledger.of_database root_snarked_ledger in
-      if true then failwith "TODO" ;
-      (*
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind _ =
         List.fold_until ~init:(Ok ()) path
@@ -643,20 +641,27 @@ let get_snarked_ledger t state_hash_opt =
                     Or_error.errorf "Failed to find protocol state for hash %s"
                       (State_hash.to_base58_check state_hash)
               in
-              (*TODO: get appropriate functions*)
               let apply_first_pass =
-                Ledger.apply_transaction
+                Ledger.apply_transaction_phase_1
                   ~constraint_constants:
                     t.config.precomputed_values.constraint_constants
               in
-              let apply_second_pass =
-                Ledger.apply_transaction
-                  ~constraint_constants:
-                    t.config.precomputed_values.constraint_constants
+              let apply_second_pass = Ledger.apply_transaction_phase_2 in
+              let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger
+                  txn =
+                let open Or_error.Let_syntax in
+                let%map _ledger, partial_txn =
+                  Mina_ledger.Sparse_ledger.apply_transaction_phase_1
+                    ~constraint_constants:
+                      t.config.precomputed_values.constraint_constants
+                    ~txn_state_view sparse_ledger txn
+                in
+                partial_txn
               in
               match
                 Staged_ledger.Scan_state.apply_last_proof_transactions ~ledger
                   ~get_protocol_state ~apply_first_pass ~apply_second_pass
+                  ~apply_first_pass_sparse_ledger
                   (Staged_ledger.scan_state
                      (Transition_frontier.Breadcrumb.staged_ledger b) )
               with
@@ -673,7 +678,6 @@ let get_snarked_ledger t state_hash_opt =
             else Continue (Ok ()) )
           ~finish:Fn.id
       in
-      *)
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
         |> Mina_block.header |> Header.protocol_state
