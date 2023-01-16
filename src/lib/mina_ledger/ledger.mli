@@ -101,7 +101,8 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
-include Mina_transaction_logic.S with type ledger := t
+include
+  Mina_transaction_logic.S with type ledger := t and type location := Location.t
 
 (** Raises if the ledger is full, or if an account already exists for the given
     [Account_id.t].

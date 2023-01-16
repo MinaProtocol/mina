@@ -477,7 +477,10 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       (*Validate transactions against the protocol state associated with the transaction*)
       (*TODO: get appropriate functions*)
       let apply_first_pass ~txn_state_view:_ _ _ = failwith "TODO" in
-      let apply_second_pass ~txn_state_view:_ _ _ = failwith "TODO" in
+      let apply_second_pass _ _ = failwith "TODO" in
+      let apply_first_pass_sparse_ledger ~txn_state_view:_ _ _ =
+        failwith "TODO"
+      in
       let get_protocol_state state_hash =
         match find_protocol_state t state_hash with
         | Some s ->
@@ -489,6 +492,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       Or_error.ok_exn
         ( Staged_ledger.Scan_state.apply_last_proof_transactions ~ledger:mt
             ~get_protocol_state ~apply_first_pass ~apply_second_pass
+            ~apply_first_pass_sparse_ledger
             (Staged_ledger.scan_state
                (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
           : unit Or_error.t ) ;

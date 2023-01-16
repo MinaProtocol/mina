@@ -29,6 +29,7 @@
    snark_work_lib
    one_or_two
    mina_ledger
+   merkle_ledger
    currency
    logger
    transaction_snark_work

@@ -363,11 +363,14 @@ module T = struct
     let open Deferred.Or_error.Let_syntax in
     (*TODO: get appropriate functions*)
     let apply_first_pass ~txn_state_view:_ _ _ = failwith "TODO" in
-    let apply_second_pass ~txn_state_view:_ _ _ = failwith "TODO" in
+    let apply_second_pass _ _ = failwith "TODO" in
+    let apply_first_pass_sparse_ledger ~txn_state_view:_ _ _ =
+      failwith "TODO"
+    in
     let%bind () =
       Scan_state.apply_staged_transactions ~ledger:snarked_ledger
         ~get_protocol_state:get_state ~apply_first_pass ~apply_second_pass
-        scan_state
+        ~apply_first_pass_sparse_ledger scan_state
       |> Deferred.return
     in
     (*TODO: Reviewer : Before I fully replace the code below

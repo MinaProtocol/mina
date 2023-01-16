@@ -75,19 +75,25 @@ module Scan_state : sig
     to get the snarked ledger corresponding to a proof.
     *)
   val apply_last_proof_transactions :
-       ledger:'a
+       ledger:Ledger.t
     -> get_protocol_state:
          (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
     -> apply_first_pass:
          (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> 'a
+          -> Ledger.t
           -> Transaction.t
-          -> 'd Or_error.t )
+          -> Ledger.Transaction_partially_applied.t Or_error.t )
     -> apply_second_pass:
-         (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> 'a
-          -> Transaction.t
-          -> 'd Or_error.t )
+         (   Ledger.t
+          -> Ledger.Transaction_partially_applied.t
+          -> Ledger.Transaction_applied.t Or_error.t )
+    -> apply_first_pass_sparse_ledger:
+         (   txn_state_view:
+               Mina_base.Zkapp_precondition.Protocol_state.View.Stable.Latest.t
+          -> Mina_ledger.Sparse_ledger.Stable.Latest.t
+          -> Mina_transaction.Transaction.Stable.Latest.t
+          -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+             Or_error.t )
     -> t
     -> unit Or_error.t
 end

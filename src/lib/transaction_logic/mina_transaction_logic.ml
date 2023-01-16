@@ -409,6 +409,8 @@ module type S = sig
       | Zkapp_command of Zkapp_command_partially_applied.t
       | Fee_transfer of Transaction_applied.Fee_transfer_applied.t fully_applied
       | Coinbase of Transaction_applied.Coinbase_applied.t fully_applied
+
+    val command : t -> Transaction.t
   end
 
   val apply_user_command :
@@ -1128,6 +1130,18 @@ module Make (L : Ledger_intf.S) :
       | Zkapp_command of Zkapp_command_partially_applied.t
       | Fee_transfer of Transaction_applied.Fee_transfer_applied.t fully_applied
       | Coinbase of Transaction_applied.Coinbase_applied.t fully_applied
+
+    let command (t : t) : Transaction.t =
+      match t with
+      | Signed_command s ->
+          Transaction.Command
+            (User_command.Signed_command s.applied.common.user_command.data)
+      | Zkapp_command z ->
+          Command (User_command.Zkapp_command z.command)
+      | Fee_transfer f ->
+          Fee_transfer f.applied.fee_transfer.data
+      | Coinbase c ->
+          Coinbase c.applied.coinbase.data
   end
 
   module Inputs = struct
