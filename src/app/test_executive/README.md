@@ -1,31 +1,41 @@
-# Gauntlet
+# Lucy
 
 ## Overview
 
-*Gauntlet* is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
+![Mina and Lucy](https://img.over-blog-kiwi.com/0/90/35/76/20140305/ob_a7d401_dracula-011-mina-lucy.jpg)
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more. ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY" *
+
+**Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
 
 #### Elevator Pitch
 
-Gauntlet was created to tackle is the problem of testing a blockchain in as realistic of a way as possible.  Mina protocol, like all blockchains, require an entire decentralized, distributed network of peers.  Testing a blockchain, therefore, requires somehow creating a test network of nodes which interact with each other.  Creating a mocked peer with hardcoded responses is not sufficient for an integration test.  Simply spinning up a single node on one's local machine is a handy expedient for many development purposes but is also far from sufficient for testing purposes, because so much of a distributed computing network (such as a blockchain) consists in the interactions and consensus between nodes, and so having just one is not realistic.
+Lucy was created to tackle is the problem of testing a Mina blockchain in as realistic of a way as possible.  Mina protocol, like all blockchains, require an entire decentralized, distributed network of peers.  Testing a blockchain in a fully integrated manner therefore requires somehow creating a test network of nodes which interact with each other.  Creating a mocked peer with hardcoded responses is not sufficient for an integration test.  Simply spinning up a single node on one's local machine is a handy expedient for many development purposes but is also far from sufficient for true integration testing purposes, because so much of a distributed computing network (such as a blockchain) consists in the interactions and consensus between nodes, and so having just one is not realistic.
 
 Given this, the solution, therefore, is quite clear: we must spin up from scratch an entire decentralized network of nodes, and then run tests against this network.  In concept this is quite simple, but of course in implementation it is ambitious.
 
+#### Name
+
+![we are all good christian victorian women here](https://images.squarespace-cdn.com/content/v1/586eb29f37c58133c1374783/1605645239517-98IRUW74J2NKA1BMP5G5/draculas-greatest-triumph-the-vampire-as-a-queer-liberator.jpg?format=2500w)
+*"Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!" ~from Dracula, by Bram Stoker, Chapter XVI, DR SEWARD’S DIARY*
+
+Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dracula.  Lucy is Mina Harker née Murray's ["best friend"](https://www.youtube.com/watch?v=VbbRQj8Oi2k), who sapphically and figuratively [tests Mina's virtue](https://archiveofourown.org/tags/Mina%20Murray%20Harker*s*Lucy%20Westenra/works) (and the virtues of the other characters in the novel but no one cares about that), so naturally we thought this would be an appropriate name for an integration testing framework for Mina Protocol.
+
 #### Structure (super high level)
 
-There are a number of moving parts to gauntlet, and it is also actively being developed and extended.  However in it's current state, Gauntlet tests Mina Protocol by creating a whole entire Mina testnet from scratch with a specified number of nodes of various types, creating a new blockchain from genesis, and then monitoring and interacting with this testnet in accordance to test logic as determined in pre-written tests; tests which are written in an Ocaml DSL which we have developed.  If the testnet seems healthy and behaves as one expects in response to the interactions, then the test passes, if not it fails.  Then the testnet is destroyed.  If one wants, one can prevent the destruction of the testnet with a flag, and then manually interact with the nodes on the testnet.
+There are a number of moving parts to Lucy, and it is also actively being developed and extended.  However in it's current state, Lucy tests Mina Protocol by creating a whole entire Mina testnet from scratch with a specified number of nodes of various types, creating a new blockchain from genesis, and then monitoring and interacting with this testnet in accordance to test logic as determined in pre-written tests; tests which are written in an Ocaml DSL which we have developed.  If the testnet seems healthy and behaves as one expects in response to the interactions, then the test passes, if not it fails.  Then the testnet is destroyed.  If one wants, one can prevent the destruction of the testnet with a flag, and then manually interact with the nodes on the testnet.
 
-**Broadly speaking, Gauntlet has 2 parts.**  1: the testnet itself, consisting of a number of nodes running the Mina daemon.  2: the test_executive, which configures the testnet, orchestrates the testnet, tracks the state of the testnet, runs test logic against the testnet, and eventually is responsible for tearing down the testnet as well.
+**Broadly speaking, Lucy has 2 parts.**  1: the testnet itself, consisting of a number of nodes running the Mina daemon.  2: the test_executive, which configures the testnet, orchestrates the testnet, tracks the state of the testnet, runs test logic against the testnet, and eventually is responsible for tearing down the testnet as well.
 
-The exact size and composition of testnets spun up by Gauntlet are custom specified by the test_executive.  Also specified by the test executive is exactly what version/release of the Mina daemon is being run.  A Gauntlet testnet is of course going to be much smaller compared to mainnet, or the official public devnets created by O(1) Labs and Mina Foundation  However asides from scale, and assuming that the same version of the Mina daemon is being run, there is no qualitative or behavioral differences between a Gauntlet testnet and mainnet or public devnets.  A Gauntlet testnet maintains an accounts ledger, produces blocks, has consensus, maintains a blockchain, can carry out transactions, can run zkapps, can run SnarkyJS and implement smart contracts.  Whatever smart contract features you'd expect from the Berkeley Devnet, such as rollups, receiving off chain computation, zk cypto, will all work on a Gauntlet testnet (provided the testnet is using correct version/release of the Mina daemon).  The testnet can be specified with archive nodes and snark worker nodes, as well as the usual block producers and seeds.  Developers can manually interact with Gauntlet testnets, such as connecting other nodes to the testnet, or manually sending transactions and running smart contracts and what not (the workflow for this particular usecase is a bit roundabout at the current moment, but we plan to improve this).
+The exact size and composition of testnets spun up by Lucy are custom specified by the test_executive.  Also specified by the test executive is exactly what version/release of the Mina daemon is being run.  A Lucy testnet is of course going to be much smaller compared to mainnet, or the official public devnets created by O(1) Labs and Mina Foundation  However asides from scale, and assuming that the same version of the Mina daemon is being run, there is no qualitative or behavioral differences between a Lucy testnet and mainnet or public devnets.  A Lucy testnet maintains an accounts ledger, produces blocks, has consensus, maintains a blockchain, can carry out transactions, can run zkapps, can run SnarkyJS and implement smart contracts.  Whatever smart contract features you'd expect from the Berkeley Devnet, such as rollups, receiving off chain computation, zk cypto, will all work on a Lucy testnet (provided the testnet is using correct version/release of the Mina daemon).  The testnet can be specified with archive nodes and snark worker nodes, as well as the usual block producers and seeds.  Developers can manually interact with Lucy testnets, such as connecting other nodes to the testnet, or manually sending transactions and running smart contracts and what not (the workflow for this particular usecase is a bit roundabout at the current moment, but we plan to improve this).
 
 #### Tests
 
-The usecase which Gauntlet has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, and/or write new tests.
+The usecase which Lucy has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, and/or write new tests.
 
-Gauntlet is set up such that the test to be run is selected at the invocation of Gauntlet, in the terminal command to run Gauntlet.  A single invocation of Gauntlet runs exactly 1 test and creates exactly 1 testnet.
+Lucy is set up such that the test to be run is selected at the invocation of Lucy, in the terminal command to run Lucy.  A single invocation of Lucy runs exactly 1 test and creates exactly 1 testnet.
 
 Each test consists of the following two elements:
-- a testnet spec which tells Gauntlet how many nodes of each node type to spin up in the testnet.  For example, a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers.
+- a testnet spec which tells Lucy how many nodes of each node type to spin up in the testnet.  For example, a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers.
 - a sequence of test logic and Mina interactions to be run against the testnet.  For example, waiting for blocks to be produced, sending transactions, waiting for transactions to reach consensus, running snarkyjs, removing nodes from the network and checking network connectivity, and so on.  
 
 #### Infrastructure (super high level)
@@ -41,31 +51,31 @@ Eventually, we would like the testnet to be able to run within virtual machines 
 
 ## Architecture
 
-![Gauntlet General Architecture](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
-*Gauntlet General Architecture.  edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing*
+![Lucy General Architecture](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
+*Lucy General Architecture.  edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing*
 
-Any Gauntlet test first creates a whole new testnet from scratch, and then runs test logic using that testnet in order to confirm and measure the performance of connectivity, functionality, or correct interactions between nodes
+Any Lucy test first creates a whole new testnet from scratch, and then runs test logic using that testnet in order to confirm and measure the performance of connectivity, functionality, or correct interactions between nodes.  The testnet is destroyed after the test is complete (unless the user wishes it not to be destroyed)
 
 - control flow / data flow:
-    - The integration test is kicked off by running the test_executive process, which is typically done from one's local machine but can really be run from anywhere (including from CI). the test_executive receives, as arguments, the test to run and the execution engine to run them on.
-    - the test_executive process loads an integration test (specified by command argument), then uses the specified execution engine to spin up a testnet (whether it be on the cloud, a local network of VMs, or otherwise) in accordance with configurations specified within the integration test itself.
-    - Once the testnet is fully established, the test_executive process can interact with nodes on the network and wait for various events to take place. It is able to send graphql queries to any of the nodes on the network, or further control the network (such as by stopping or starting nodes) through the use of the execution engine.
-    - Wait conditions are the bread and butter of how tests are constructed in the test_executive. They can be written either as predicates on streams of structured log events received from the network, or as predicates on the global network state (which is automatically maintained by the framework).
-        - The infrastructure engine streams logs from the nodes on the network back to the test_executive.  The test_executive will parse the logs to look for "structured log events", which are then internally routed within the test_executive process, and are consumed over subscriptions in order to implement wait conditions and update a network-wide view of the network's state.
-    
+    - The test is kicked off by running the test_executive process, which is typically done from one's local machine or from CI. The test_executive receives, as arguments, the test to run and the infrastructure engine to run them on.  (As noted elsewhere, the only infrastructure engine available at the moment is the GCP cloud engine)
+    - Each test has an ocaml data structure which defines specifications of the testnet to be spun up.  This data structure will stipulate things such as the number of mina nodes in the testnet, the number of archive nodes, the number of snark workers, the balances of the accounts on the blockchain, and other variables.  Then Lucy will use the given infrastructure engine (as specified in the original terminal command) to spin up a testnet as specified.  The infrastructure level details are abstracted within the infrastructure engine
+    - Once the testnet is fully established, the test_executive process can interact with nodes on the network and wait for various events to take place. It is able to send graphql queries to any of the nodes on the network, or further control the network through the use of the infrastructure engine (such as by stopping or starting nodes).
+	- The infrastructure engine streams logs from the individual nodes in the testnet network back to the test_executive.  The test_executive will parse the logs to look for "structured log events".  Lucy maintains internal data structures representing the network state, which are updated based on the structured event logs which it receives.
+    - Wait conditions are the bread and butter of how tests are constructed in the test_executive.  A wait_condition, simply put, waits for a certain condition to be satisfied on the testnet or on the blockchain.  A wait condition can be predicated on either the network state, or directly based on the streams of structured log events.
+
 - infrastructure engines: the writing of the test itself is abstracted away from the infrastructure that the test is running on.  one must pass in an initial argument specifying what infrastructure is to be used.  so far, the only implemented option is "cloud"
-    - GCP cloud engine: using the cloud engine will spin up nodes on o(1)labs's GCP account.  this is currently the only implemented option
-        - k8s
-        - graphql ingress
-        - stackdriver log subscriptions
-    - local engine: using the local engine will spin up nodes as VMs or containers on one's local machine.  this is not yet implemented
+    - GCP cloud engine: using the cloud engine will spin up nodes on o(1)labs's GCP account, within the mina-integration-west cluster.  this is currently the only implemented option
+        - we use kubeternetes to run all the mina nodes.
+        - we have an nginx graphql ingress node within the cluster which routes all our graphql queries and commands.
+        - the GCP Log Engine provides us with log subscriptions, which is what the test_executive uses to stream logs to itself.
+    - local engine: this is not yet implemented.  The goal of the local engine is to be able to spin up a the nodes of a testnet as VMs or containers on one's local machine.
 
 
-## Using Gauntlet
+## Using Lucy
 
 ### Prerequisites Softwares
 
-Make sure you have the following critical tools installed on the machine which you will run Gauntlet's test_executive upon:
+Make sure you have the following critical tools installed on the machine which you will run Lucy's test_executive upon:
 
 - terraform (https://www.terraform.io/downloads)
 - google cloud SDK (https://cloud.google.com/sdk/docs/install)
@@ -75,16 +85,17 @@ Make sure you have the following critical tools installed on the machine which y
 
 ### GCP credentials and infrastructure related env vars
 
-Gauntlet at the current moment runs the testnet on GCP, and therefore you'll need the right credentials to run.  There is also a small dependency on AWS which we hope to eliminate in future but for now, you'll also need AWS credentials.
+Lucy at the current moment runs the testnet on GCP, and therefore you'll need the right credentials to run.  There is also a small dependency on AWS which we hope to eliminate in future but for now, you'll also need AWS credentials.
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Gauntlet: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `KUBE_CONFIG_PATH`.  Each of these environment variables needs to be `export`'ed before running Gauntlet.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
+You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Lucy: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `KUBE_CONFIG_PATH`.  Each of these environment variables needs to be `export`'ed before running Lucy.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
 
 - `GOOGLE_APPLICATION_CREDENTIALS` is the path to the json-formatted keyfile of the GCP service account that you will be using.  The service account is most likely going to be the `automated-validation` service account, although other service accounts may work as well.  
-	1. First, you'll need to create, and then download the keyfile itself.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Each individual user should ideally have their own unique key.  Download this key as a json file and save it to your computer in whatever directory is most convenient.  It doesn't matter where on your filesystem the key is downloaded to, it could be your Downloads folder for all it matters, as long as you can access it.
-![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)  Note: if you are unable to create a new key for the service account, you can talk to any O(1) Labs Velocity Team member and they can probably just give you an existing keyfile, which though not ideal would still certainly work fine.
-	2. `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>`.  (Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)
+	1. First, you'll need to obtain the keyfile itself.  Ideally, this means creating a new one just for yourself.  To do so, go to the [GCP IAM Service Accounts page](https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Each individual user should ideally have their own unique key.  Download this key as a json file and save it to your computer in whatever directory is most convenient.
+![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)  Note: if you are unable to create a new key for the service account, you can talk to any O(1) Labs Velocity Team member and they can probably just give you an existing keyfile.  This is not ideal but would still certainly work fine.
+	2. `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>`
+	(Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)	
 
 - `GCLOUD_API_KEY` is a string which is your access key to the gcloud api.  To obtain this key, go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find the key called "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put the export command into your .bashrc or .profile.  This API key is shared by everyone, there is no need to create your own.
 
@@ -94,13 +105,13 @@ You will need the following environment variables to be set correctly on the mac
 
 - `KUBE_CONFIG_PATH` should usually be `~/.kube/config`.  If you're doing something unorthodox with kubernetes then it may be different, in which case you probably know what you're doing.
 
-### Running the Gauntlet test_executive from your local machine
+### Running the Lucy test_executive from your local machine
 
-There are several ways to run Gauntlet, the most recommended method is to run it from a docker container.  However if you want to modify or extend existing tests, or write new tests, then you will need to compile the Gauntlet test_executive from source.
+There are several ways to run Lucy: 1. Running the mina-test-executive package directly from command line, 2. running from the pre-built docker container, and 3. compiling from scratch then running what you compiled.  The most recommended method is to run it from the docker container.  However if you want to modify or extend existing tests, or write new tests, then you will need to compile the Lucy test_executive from source.  We will go over each method in turn.
 
-#### Run mina-test-executive directly in command line
+#### Installing the mina-test-executive package and running directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [#Run Gauntlet in dockerized form](#Run Gauntlet in dockerized form)
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form]()
 
 First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
@@ -112,9 +123,9 @@ echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" > 
 
 This will put the `mina-test-executive` executable binary in your terminal path.
 
-However, this binary won't work by itself, it actually requires a bunch of terraform files in order to work.  Those terraform files are not compiled and pre-baked into the binary itself and need to be on your machine.  The terraform files are in the `mina` git repository.  If you haven't already, you first must have `git clone`'d https://github.com/MinaProtocol/mina onto your machine.  `cd` into the top level directory of the repository, and from that directory you can run `mina-test-executive`.  If you are curious, the actual terraform files are in `./automation/terraform` (the executable binary will know where they are). You will not need to modify the terraform files unless you are actively developing Gauntlet.  Note: it's possible that the terraform files will have some version mismatch with the test executive you've downloaded, make sure you're on the correct mina branch which matches the branch the test-executive was originally compiled off of.
+However, this binary won't work by itself, it actually requires a bunch of terraform files in order to work.  Those terraform files are not compiled and pre-baked into the binary itself and need to be on your machine.  The terraform files are in the `mina` git repository.  If you haven't already, you first must have `git clone`'d https://github.com/MinaProtocol/mina onto your machine.  `cd` into the top level directory of the repository, and from that directory you can run `mina-test-executive`.  If you are curious, the actual terraform files are in `./automation/terraform` (the executable binary will know where they are). You will not need to modify the terraform files unless you are actively developing Lucy.  Note: it's possible that the terraform files will have some version mismatch with the test executive you've downloaded, make sure you're on the correct mina branch which matches the branch the test-executive was originally compiled off of.
 
-Once you're in the right directory, now you're ready to run Gauntlet.  First you'll need to activate your access to GCP
+Once you're in the right directory, now you're ready to run Lucy.  First you'll need to activate your access to GCP
 
 ```
 gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
@@ -127,7 +138,7 @@ If you've already set the environment variables as laid out in the last section,
 
 In the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
 
-Once you've configured GCP, the idiomatic command to run Gauntlet is as follows (you don't need to export the env vars, you can just manually edit and execute the last line):
+Once you've configured GCP, the idiomatic command to run Lucy is as follows:
 
 ```
 export $TEST_NAME=<test>
@@ -137,6 +148,7 @@ export $ARCHIVE_IMAGE="<url to mina archiver image>"
 mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
+If you prefer, it is also idiomatic to just manually edit and execute the `mina-test-executive` line instead of exporting the env vars.
 
 #### `mina-test-executive` command line breakdown
 
@@ -145,22 +157,22 @@ Before moving on, it's worth breaking down the command line arguments and option
 - `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
 - `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
 	+ In the current state of development, the following pre-written tests are available on all major branches: `peers-reliability`, `chain-reliability`, `payments`, `delegation`, `archive-node`, `gossip-consis`, `medium-bootstrap`, `opt-block-prod`
-	+ The following pre-written tests are available only on versions of Gauntlet based off the `develop` branch: `zkapps`, `zkapps-timing`, `snarkyjs`
-	+ The following pre-written tests are available only on version of Gauntlet based off the `compatible` branch: `archive-node` (the test logic for the archive-node test was rolled into other tests in develop based branches)
-- `--mina-image $MINA_IMAGE`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to dockerhub [minaprotocol/mina-daemon](https://hub.docker.com/r/minaprotocol/mina-daemon/tags?page=1&ordering=last_updated) or GCR and pick a suitable, preferably recent, image to run the tests with.  When choosing an image, keep in mind the following tips.  1: Usually, one should choose the most recent image from the branch one is currently working on.  2: Note that changes to the integration test framework itself do not make it into the daemon image, so one might as well just use the latest image off of the develop or compatible branch.  3: Generally use "-devnet" images instead of "-mainnet" images for testing, although it usually won't make a difference.  
-- `--archive-image $ARCHIVE_IMAGE`: this must be a url to a docker image which is the mina-archive.  This is required even if you're not using archive nodes, in which case any image will do.
-- `--debug`: if this flag is not present, then Gauntlet will automatically destroy the testnet and delete the auto generated terraform test configuration files when the test is over.  If it is present, it will wait for your to manually prompt it before destroying the testnet.
-	+ In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
-- `mina-logproc` is simply an auxiliary program that makes the large quantity of log output from the Gauntlet test_executive be prettier and more human readable.  It can also filter log lines based on the severity level, usually we filter out `Debug` and `Spam` logs (those log levels are very verbose and are intended for debugging test framework internals).  In the idiomatic command line expression, the bit with `tee test.log` is used to store the raw output into the file `test.log` so that it can be saved and later inspected.
+	+ The following pre-written tests are available only on versions of Lucy based off the `develop` branch: `zkapps`, `zkapps-timing`, `snarkyjs`
+	+ The following pre-written tests are available only on version of Lucy based off the `compatible` branch: `archive-node` (the test logic for the archive-node test was rolled into other tests in develop based branches)
+- `--mina-image $MINA_IMAGE`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to the [mina-daemon dockerhub page](https://hub.docker.com/r/minaprotocol/mina-daemon/tags) or the [mina-daemon GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-daemon) and pick a suitable, preferably recent, image to run the tests with.  When choosing an image, keep in mind the following tips.  1. Usually, you should choose the most recent image from the branch one is currently working on.  2. Generally use "-devnet" images instead of "-mainnet" images for testing, although it usually won't make a difference.  Also, please keep in mind that changes to Lucy itself do not make it into the daemon image, ie they are compiled separately and built into separate images.  This means that if you make changes to Lucy in a branch, the changes will not be reflected in the latest mina image off of the same branch.
+- `--archive-image $ARCHIVE_IMAGE`: this must be a url to a docker image which is the mina-archive.  These can be found in the [mina-archive dockerhub page](https://hub.docker.com/r/minaprotocol/mina-archive/tags) or in the [mina-archive GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-archive).  An archive-image is required even if you're not using archive nodes, in which case any image will do.
+- `--debug`: if this flag is not present, then Lucy will automatically destroy the testnet and delete the auto generated terraform test configuration files when the test is over.  If it is present, it will wait for your to manually prompt it before destroying the testnet.
+	+ In the event that the automatic cleanup doesn't work properly, you need to do it manually (and if you don't you'll be wasting money).  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
+- `mina-logproc` is simply an auxiliary program that makes the large quantity of log output from the Lucy test_executive be prettier and more human readable.  It can also filter log lines based on the severity level, usually we filter out `Debug` and `Spam` logs (those log levels are very verbose and are intended for debugging test framework internals).  In the idiomatic command line expression, the bit with `tee test.log` is used to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 
-#### Run Gauntlet in dockerized form
+#### Run Lucy in dockerized form
 
-If you don't need to write your own tests and simply wish to run existing tests, the recommended way to run gauntlet is to use docker.  It's more encapsulated than downloading the `mina-test-executive` package with `apt`.  All necessary infrastructure and terraform files are baked directly into the image, so it won't matter where you run the docker image from.
+If you don't need to write your own tests and simply wish to run existing tests, the recommended way to run Lucy is to use docker.  It's more encapsulated than downloading the `mina-test-executive` package with `apt`.  All necessary infrastructure and terraform files are baked directly into the image, so it won't matter where you run the docker image from.
 
-All docker images are in the O(1) Labs Google Container Repository, aka GCR (https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-test-executive).  Click the link and pick a version of the test_executive image.  The short-hash in the tag refers to the git hash that the test executive is compiled off of.  the debian version doesn't really matter, it's simply the debian version of the image (it doesn't need to match your machine).
+All docker images for Lucy are in the [mina-test-executive GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-test-executive).  Click the link and pick a version of the test_executive image.  The short-hash in the tag refers to the git hash that the test executive is compiled off of.  The debian version doesn't really matter, it's simply the debian version of the image (it doesn't need to match your machine).
 
-pull the image with:
+Once you've picked an image, pull it with:
 
 ```
 docker pull gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2a91811928ce751b65f943811c0c84463
@@ -186,18 +198,18 @@ gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2
 
 ```
 
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal, as described in the prior section [`mina-test-executive` command line breakdown](#`mina-test-executive` command line breakdown)
+As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown]() for a detailed explaination of the arguments and flags.
 
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [ GCP credentials and infrastructure related env vars](# GCP credentials and infrastructure related env vars).  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine (if you don't mess with other parts of the idiomatic expression, then you don't need to modify this `--env` flag).
+The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars]().  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
 
 
-#### Compile Gauntlet from source
+#### Compile Lucy from source
 
-If you wish to modify or extend existing tests, and/or write a whole new test, or modify the Gauntlet test executive itself, you will need to compile the Gauntlet test_executive from source.  Gauntlet is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
+If you wish to modify or extend existing tests, and/or write a whole new test, or modify the Lucy test executive itself, you will need to compile the Lucy test_executive from source.  Lucy is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
 
-Gauntlet is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  
+Lucy is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  Lucy and Mina need to live together because other than being [goth sapphic girlfriends](https://64.media.tumblr.com/3ad7878b174be3b61c2e1ab1cf8a91aa/tumblr_n1osgph7yb1t5no8yo2_500.gifv), Lucy and Mina also share a number of ocaml libraries.
 
-I will assume the user who wishes to compile Gauntlet is familiar with not just Ocaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
+I will assume the user who wishes to compile Lucy is familiar with not just Ocaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
 
 ```
 make build
@@ -205,7 +217,7 @@ make build
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
-Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Run mina-test-executive directly in command line](#Run mina-test-executive directly in command line).  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
+Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Run mina-test-executive directly in command line]().  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
 
 ```
 ./_build/default/src/app/test_executive/test_executive.exe
@@ -227,15 +239,15 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ## Code Structure
 
-### Gauntlet general purpose directories
+### Lucy general purpose directories
 
-- `src/app/test_executive/` — The pre-written Gauntlet tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
-- `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Gauntlet Ocaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
+- `src/app/test_executive/` — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
+- `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Lucy Ocaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
 
 ### GCP Cloud Engine implementation specific directories
 
 - `src/lib/integration_test_cloud_engine/` — This library is the current implementation of the GCP cloud based execution engine, which deploys testnets in Gcloud's GKE environment.  As with any engine, it implements the interface defined in `Integration_test_lib`.  This execution engine leverages a good deal of our existing coda automation system.  These files are Ocaml.
-- `automation/terraform/testnets` — During runtime, when using the GCP cloud engine, Gauntlet will automatically create in this directory a subdirectory with the same name as your testnet name, and also generate a terraform file called `main.tf.json`.  When the testnet is deployed, `terraform apply` is called within this subdirectory, and terraform will use the specs in `main.tf.json` to reach out to GCP and deploy the testnet.
+- `automation/terraform/testnets` — During runtime, when using the GCP cloud engine, Lucy will automatically create in this directory a subdirectory with the same name as your testnet name, and also generate a terraform file called `main.tf.json`.  When the testnet is deployed, `terraform apply` is called within this subdirectory, and terraform will use the specs in `main.tf.json` to reach out to GCP and deploy the testnet.
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
@@ -244,7 +256,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ## Writing Tests
 
-- To write a new Gauntlet integration test, create a new file in `src/app/test_executive/` and by convention name it something like `*_test.ml`.  (Feel free to check out other tests in that directory for examples.)
+- To write a new Lucy integration test, create a new file in `src/app/test_executive/` and by convention name it something like `*_test.ml`.  (Feel free to check out other tests in that directory for examples.)
 - The new test must implement the `Test` interface found in `integration_test_lib/intf.ml` .  The two most important things to implement are the `config` struct and the `run` function.
     - `config` .  Most integration tests will use all the default values of `config` except for the number of block producers, the mina balance of each block producer, and the timing details of each block producer.  The integration test framework will create the testnet based on the highish level specifications laid out in this struct.
     - the `run` function contains all the test logic.  this function receives as an argument a struct `t` of type *dsl*, and a `network` struct of type *network*, both of which have their uses within the test.  There are a number of things that can be done in this function
@@ -289,3 +301,6 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container
 - Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
+
+![](https://images2.fanpop.com/image/photos/13400000/Mina-Lucy-bram-stokers-dracula-13437011-300-439.jpg)
+**
