@@ -39,6 +39,7 @@
    mina_state
    mina_ledger
    mina_base
+   mina_transaction_logic
    mina_caqti
    genesis_constants
    coda_runtime_config
