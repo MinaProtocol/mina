@@ -3,7 +3,10 @@
 ## Overview
 
 ![Mina and Lucy](https://img.over-blog-kiwi.com/0/90/35/76/20140305/ob_a7d401_dracula-011-mina-lucy.jpg)
-*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more. ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY"*
+| :--: | 
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY"
+
+
 
 **Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
 
@@ -16,7 +19,8 @@ Given this, the solution, therefore, is quite clear: we must spin up from scratc
 #### Name
 
 ![we are all good christian victorian women here](https://images.squarespace-cdn.com/content/v1/586eb29f37c58133c1374783/1605645239517-98IRUW74J2NKA1BMP5G5/draculas-greatest-triumph-the-vampire-as-a-queer-liberator.jpg?format=2500w)
-*"Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!" ~from Dracula, by Bram Stoker, Chapter XVI, DR SEWARD’S DIARY*
+|:--:|
+*"Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!"* ~from Dracula, by Bram Stoker, Chapter XVI, DR SEWARD’S DIARY
 
 Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dracula.  Lucy is Mina Harker née Murray's ["best friend"](https://www.youtube.com/watch?v=VbbRQj8Oi2k), who sapphically and figuratively [tests Mina's virtue](https://archiveofourown.org/tags/Mina%20Murray%20Harker*s*Lucy%20Westenra/works) (and the virtues of the other characters in the novel but no one cares about that), so naturally we thought this would be an appropriate name for an integration testing framework for Mina Protocol.
 
@@ -51,8 +55,9 @@ Eventually, we would like the testnet to be able to run within virtual machines 
 
 ## Architecture
 
-![Lucy General Architecture](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
-*Lucy General Architecture.  edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing*
+![edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
+|:--:|
+*Lucy General Architecture*
 
 Any Lucy test first creates a whole new testnet from scratch, and then runs test logic using that testnet in order to confirm and measure the performance of connectivity, functionality, or correct interactions between nodes.  The testnet is destroyed after the test is complete (unless the user wishes it not to be destroyed)
 
@@ -111,7 +116,7 @@ There are several ways to run Lucy: 1. Running the mina-test-executive package d
 
 #### Installing the mina-test-executive package and running directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form]()
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form](README.md#run-lucy-in-dockerized-form)
 
 First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
@@ -198,9 +203,9 @@ gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2
 
 ```
 
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown]() for a detailed explaination of the arguments and flags.
+As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown](README.md#mina-test-executive-command-line-breakdown) for a detailed explaination of the arguments and flags.
 
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars]().  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
+The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars](README.md#gcp-credentials-and-infrastructure-related-env-vars).  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
 
 
 #### Compile Lucy from source
@@ -217,7 +222,7 @@ make build
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
-Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Run mina-test-executive directly in command line]().  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
+Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Installing the mina-test-executive package and running directly in command-line](README.md#installing-the-mina-test-executive-package-and-running-directly-in-command-line).  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
 
 ```
 ./_build/default/src/app/test_executive/test_executive.exe
@@ -237,11 +242,11 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
 
 
-## Code Structure
+## Relevant Source Code Directories
 
 ### Lucy general purpose directories
 
-- `src/app/test_executive/` — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
+- [`src/app/test_executive/`](test_executive.ml) — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
 - `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Lucy Ocaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
 
 ### GCP Cloud Engine implementation specific directories
@@ -251,8 +256,9 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
-![Integration Test Testnet creation process in GCP](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
-*Integration Test Testnet creation process in GCP.  edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing*
+![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
+|:--:|
+*Lucy Testnet creation process in GCP*
 
 ## Writing Tests
 
@@ -303,4 +309,4 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 
 ![](https://images2.fanpop.com/image/photos/13400000/Mina-Lucy-bram-stokers-dracula-13437011-300-439.jpg)
-**
+|:--:|
