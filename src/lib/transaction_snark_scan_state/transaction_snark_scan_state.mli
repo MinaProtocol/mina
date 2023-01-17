@@ -145,6 +145,8 @@ val apply_last_proof_transactions :
     ignore the account updates that were not completed in a single scan state
     tree corresponding to a proof. Set this to true when applying transactions
     to get the snarked ledger corresponding to a proof.
+    Returns the target first pass ledger after all the transactions have been
+    applied
     *)
 val apply_staged_transactions :
      ledger:Ledger.t
@@ -166,7 +168,7 @@ val apply_staged_transactions :
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
   -> t
-  -> unit Or_error.t
+  -> Ledger_hash.t Or_error.t
 
 val free_space : t -> int
 

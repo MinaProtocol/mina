@@ -1012,23 +1012,27 @@ let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
     in
     apply_second_pass partial_txns_ledger
   in
-  List.fold_until ordered_txns ~init:(Ok [])
-    ~f:(fun acc (txns_per_block : _ Transactions_ordered.Poly.t) ->
-      match
-        let%bind previous_incomplete = acc in
-        let%bind partially_applied_txns =
-          apply_first_pass txns_per_block.first_pass
-        in
-        let%bind () = apply_previous_incomplete_txns previous_incomplete in
-        let%map () = apply_second_pass partially_applied_txns in
-        txns_per_block.current_incomplete
-      with
-      | Ok current_incomplete ->
-          Continue (Ok current_incomplete)
-      | Error e ->
-          Stop (Error e) )
-    ~finish:Fn.id
-  |> Or_error.ignore_m
+  let%map _, first_pass_ledger_target =
+    List.fold_until ordered_txns
+      ~init:(Ok ([], Ledger.merkle_root ledger))
+      ~f:(fun acc (txns_per_block : _ Transactions_ordered.Poly.t) ->
+        match
+          let%bind previous_incomplete, _ = acc in
+          let%bind partially_applied_txns =
+            apply_first_pass txns_per_block.first_pass
+          in
+          let first_pass_end = Ledger.merkle_root ledger in
+          let%bind () = apply_previous_incomplete_txns previous_incomplete in
+          let%map () = apply_second_pass partially_applied_txns in
+          (txns_per_block.current_incomplete, first_pass_end)
+        with
+        | Ok (current_incomplete, first_pass_end) ->
+            Continue (Ok (current_incomplete, first_pass_end))
+        | Error e ->
+            Stop (Error e) )
+      ~finish:Fn.id
+  in
+  first_pass_ledger_target
 
 let apply_last_proof_transactions ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger t =
@@ -1038,6 +1042,7 @@ let apply_last_proof_transactions ~ledger ~get_protocol_state ~apply_first_pass
   | Some (_, txns_per_block) ->
       apply_ordered_txns txns_per_block ~ledger ~get_protocol_state
         ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+      |> Or_error.ignore_m
 
 let apply_staged_transactions ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger t =

@@ -132,25 +132,6 @@ val create_exn :
   -> ledger:Ledger.t
   -> t
 
-val of_scan_state_and_ledger :
-     logger:Logger.t
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> verifier:Verifier.t
-  -> last_proof_statement:Transaction_snark.Statement.t option
-  -> ledger:Ledger.t
-  -> scan_state:Scan_state.t
-  -> pending_coinbase_collection:Pending_coinbase.t
-  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> t Deferred.Or_error.t
-
-val of_scan_state_and_ledger_unchecked :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> last_proof_statement:Transaction_snark.Statement.t option
-  -> ledger:Ledger.t
-  -> scan_state:Scan_state.t
-  -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Deferred.Or_error.t
-
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
