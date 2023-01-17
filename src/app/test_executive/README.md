@@ -111,7 +111,7 @@ There are several ways to run Lucy: 1. Running the mina-test-executive package d
 
 #### Installing the mina-test-executive package and running directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form]()
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form](README.md#run-lucy-in-dockerized-form)
 
 First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
