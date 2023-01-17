@@ -177,6 +177,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -193,6 +194,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -716,6 +718,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -730,6 +733,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key
