@@ -692,24 +692,36 @@ module T = struct
           state_and_body_hash pre_stmt )
 
   let update_ledger_and_get_statements ~constraint_constants ledger
-      current_stack ts current_state_view state_and_body_hash =
+      current_stack tss current_state_view state_and_body_hash =
     let open Result.Let_syntax in
     let state_body_hash = snd state_and_body_hash in
-    let current_stack_with_state = push_state current_stack state_body_hash in
-    let init_pending_coinbase_stack_state : Stack_state_with_init_stack.t =
-      { pc = { source = current_stack; target = current_stack_with_state }
-      ; init_stack = current_stack
-      }
-    in
-    let%bind pre_stmts, updated_stack =
+    let ts, ts_opt = tss in
+    let apply_first_pass working_stack ts =
+      let working_stack_with_state = push_state working_stack state_body_hash in
+      let init_pending_coinbase_stack_state : Stack_state_with_init_stack.t =
+        { pc = { source = working_stack; target = working_stack_with_state }
+        ; init_stack = working_stack
+        }
+      in
       apply_transactions_phase_1 ~constraint_constants ledger
         init_pending_coinbase_stack_state ts current_state_view
     in
+    let%bind pre_stmts1, updated_stack1 = apply_first_pass current_stack ts in
+    let%bind pre_stmts2, updated_stack2 =
+      Option.value_map ts_opt
+        ~default:(Ok ([], updated_stack1))
+        ~f:(fun ts ->
+          let current_stack2 =
+            Pending_coinbase.Stack.create_with current_stack
+          in
+          apply_first_pass current_stack2 ts )
+    in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
-      apply_transactions_phase_2 ledger state_and_body_hash pre_stmts
+      apply_transactions_phase_2 ledger state_and_body_hash
+        (pre_stmts1 @ pre_stmts2)
     in
-    (txns_with_witnesses, updated_stack, first_pass_ledger_end)
+    (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -797,9 +809,10 @@ module T = struct
             working_stack pending_coinbase_collection ~is_new_stack
             |> Deferred.return
           in
-          let%map data, updated_stack, first_pass_ledger_end =
+          let%map data, updated_stack, _, first_pass_ledger_end =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack transactions current_state_view state_and_body_hash
+              working_stack (transactions, None) current_state_view
+              state_and_body_hash
             (* TODO: scheduler safety (task throttling) *)
             |> Deferred.return
           in
@@ -824,24 +837,13 @@ module T = struct
             working_stack pending_coinbase_collection ~is_new_stack:false
             |> Deferred.return
           in
-          let%bind data1, updated_stack1, _first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack1 txns_for_partition1 current_state_view
-              state_and_body_hash
-            (* TODO: scheduler safety (task throttling) *)
-            |> Deferred.return
-          in
           let txns_for_partition2 = List.drop transactions slots in
-          (*Push the new state to the state_stack from the previous block even in the second stack*)
-          let working_stack2 =
-            Pending_coinbase.Stack.create_with working_stack1
-          in
-          let%map data2, updated_stack2, first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack2 txns_for_partition2 current_state_view
-              state_and_body_hash
-            (* TODO: scheduler safety (task throttling) *)
-            |> Deferred.return
+          let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+            Deferred.return
+              (update_ledger_and_get_statements ~constraint_constants ledger
+                 working_stack1
+                 (txns_for_partition1, Some txns_for_partition2)
+                 current_state_view state_and_body_hash )
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
           let pending_coinbase_action, stack_update =
@@ -864,7 +866,7 @@ module T = struct
                 (Update_none, `Update_none)
           in
           ( false
-          , data1 @ data2
+          , data
           , pending_coinbase_action
           , stack_update
           , `First_pass_ledger_end first_pass_ledger_end )
