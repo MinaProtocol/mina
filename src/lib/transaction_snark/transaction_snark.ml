@@ -1950,7 +1950,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (Frozen_ledger_hash.assert_equal
                  (fst global.second_pass_ledger)
                  statement.target.second_pass_ledger ) ) ;
-        (*TODO: Deepthi- Check base case connection ledgers*)
+        (*TODO: Confirm base case for connection ledgers*)
         with_label __LOC__ (fun () ->
             run_checked
               (Frozen_ledger_hash.assert_equal

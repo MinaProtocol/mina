@@ -348,6 +348,7 @@ let%test_module "account timing check" =
       in
       (state_body, txn_state_view)
 
+    (*Testing as if [transaction] was the only transaction in a block. See [Sparse_ledger.apply_transactions]*)
     let check_transaction_snark ~(txn_global_slot : Mina_numbers.Global_slot.t)
         (sparse_ledger_before : Mina_ledger.Sparse_ledger.t)
         (transaction : Mina_transaction.Transaction.t) =
@@ -368,11 +369,12 @@ let%test_module "account timing check" =
             failwith "Expected signed user command"
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-      let sparse_ledger_after, txn_applied =
-        Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view sparse_ledger_before transaction
+      let sparse_ledger_after, txns_applied =
+        Mina_ledger.Sparse_ledger.apply_transactions ~constraint_constants
+          ~txn_state_view sparse_ledger_before [ transaction ]
         |> Or_error.ok_exn
       in
+      let txn_applied = List.hd_exn txns_applied in
       let coinbase_stack_target =
         let stack_with_state =
           Pending_coinbase.Stack.(

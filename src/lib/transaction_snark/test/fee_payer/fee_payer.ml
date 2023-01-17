@@ -164,10 +164,10 @@ let%test_module "Fee payer tests" =
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
-                  Ledger.apply_transaction ledger0 ~constraint_constants
+                  Ledger.apply_transactions ledger0 ~constraint_constants
                     ~txn_state_view:
                       (Mina_state.Protocol_state.Body.view U.genesis_state_body)
-                    (Transaction.Command (Zkapp_command zkapp_command))
+                    [ Transaction.Command (Zkapp_command zkapp_command) ]
                 with
               | Error _ ->
                   (*TODO : match on exact error*) ()

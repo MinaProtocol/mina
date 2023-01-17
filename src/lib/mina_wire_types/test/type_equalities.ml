@@ -341,6 +341,12 @@ module Mina_state = struct
       (W.Protocol_state.Body.Value)
   include
     Assert_equal0V2 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
+  include
+    Assert_equal0V2 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
+  include
+    Assert_equal0V2
+      (O.Snarked_ledger_state.With_sok.Stable)
+      (W.Snarked_ledger_state.With_sok)
 end
 
 module Mina_transaction_logic = struct
@@ -359,8 +365,6 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
-  include Assert_equal0V2 (O.Statement.With_sok.Stable) (W.Statement.With_sok)
   include Assert_equal0V2 (O.Stable) (W)
 end
 

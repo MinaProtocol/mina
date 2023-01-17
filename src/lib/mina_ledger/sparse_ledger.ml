@@ -127,3 +127,7 @@ let apply_transaction_phase_1 ~constraint_constants ~txn_state_view =
 
 let apply_transaction_phase_2 =
   apply_transaction_logic T.apply_transaction_phase_2
+
+let apply_transactions ~constraint_constants ~txn_state_view =
+  apply_transaction_logic
+    (T.apply_transactions ~constraint_constants ~txn_state_view)
