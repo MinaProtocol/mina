@@ -2261,6 +2261,8 @@ let%test_module "staged ledger tests" =
       in
       (ledger_proof, diff)
 
+    module Transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger)
+
     (* Run the given function inside of the Deferred monad, with a staged
          ledger and a separate test ledger, after applying the given
          init_state to both. In the below tests we apply the same commands to
@@ -2268,14 +2270,20 @@ let%test_module "staged ledger tests" =
     *)
     let async_with_given_ledger ledger
         (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-      let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
+      let test_ledger =
+        Or_error.ok_exn
+          (Transfer.transfer_accounts ~src:ledger
+             ~dest:(Mina_ledger.Ledger.create ~depth:(Ledger.depth ledger) ()) )
+      in
+      let casted = Ledger.Any_ledger.cast (module Ledger) test_ledger in
       let test_mask =
         Ledger.Maskable.register_mask casted
-          (Ledger.Mask.create ~depth:(Ledger.depth ledger) ())
+          (Ledger.Mask.create ~depth:(Ledger.depth test_ledger) ())
       in
       let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
       Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-      ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask
+      ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask ;
+      Ledger.close test_ledger
 
     (* populate the ledger from an initial state before running the function *)
     let async_with_ledgers ledger_init_state
