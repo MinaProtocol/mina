@@ -3,7 +3,7 @@
 ## Overview
 
 ![Mina and Lucy](https://img.over-blog-kiwi.com/0/90/35/76/20140305/ob_a7d401_dracula-011-mina-lucy.jpg)
-*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more. ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY" *
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more. ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY"*
 
 **Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
 
@@ -111,7 +111,7 @@ There are several ways to run Lucy: 1. Running the mina-test-executive package d
 
 #### Installing the mina-test-executive package and running directly in command line
 
-The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form](README.md#run-lucy-in-dockerized-form)
+The first and most basic way is to use the debian/ubuntu `apt` package manager to download the test_executive, and then run it in the command line directly.  This method isn't recommended for most people-- if you're "most people" then skip ahead to the section [Run Lucy in dockerized form]()
 
 First you must download and install the debian package `mina-test-executive` and you can do that by running the following commands:
 
@@ -123,7 +123,7 @@ echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" > 
 
 This will put the `mina-test-executive` executable binary in your terminal path.
 
-However, this binary won't work by itself, it actually requires a bunch of terraform files in order to work.  Those terraform files are not compiled and pre-baked into the binary itself and need to be on your machine.  The terraform files are in the `mina` git repository.  If you haven't already, you first must have `git clone`'d https://github.com/MinaProtocol/mina onto your machine.  `cd` into the top level directory of the repository, and from that directory you can run `mina-test-executive`.  If you are curious, the actual terraform files are in `./automation/terraform` (the executable binary will know where they are). You will not need to modify the terraform files unless you are actively developing Lucy.  Note: it's possible that the terraform files will have some version mismatch with the test executive you've downloaded, make sure you're on the correct mina branch which matches the branch the test-executive was originally compiled off of.
+However, this binary won't work by itself, it actually requires a bunch of terraform files in order to work.  Those terraform files are not compiled and pre-baked into the binary itself and need to be on your machine.  The terraform files are in the `mina` git repository.  If you haven't already, you first must `git clone` the [base mina repository](https://github.com/MinaProtocol/mina) onto your machine.  `cd` into the top level directory of the repository, and from that directory you can run `mina-test-executive`.  If you are curious, the actual terraform files are in `./automation/terraform` (the executable binary will know where they are). You will not need to modify the terraform files unless you are actively developing Lucy.  Note: it's possible that the terraform files will have some version mismatch with the test executive you've downloaded, make sure you're on the correct mina branch which matches the branch the test-executive was originally compiled off of.
 
 Once you're in the right directory, now you're ready to run Lucy.  First you'll need to activate your access to GCP
 
@@ -198,9 +198,9 @@ gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2
 
 ```
 
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown](README.md#mina-test-executive-command-line-breakdown) for a detailed explaination of the arguments and flags.
+As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown]() for a detailed explaination of the arguments and flags.
 
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars](README.md#gcp-credentials-and-infrastructure-related-env-vars).  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
+The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars]().  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
 
 
 #### Compile Lucy from source
@@ -217,7 +217,7 @@ make build
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
-Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Installing the mina-test-executive package and running directly in command line](README.md#installing-the-mina-test-executive-package-and-running-directly-in-command-line).  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
+Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Run mina-test-executive directly in command line]().  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:
 
 ```
 ./_build/default/src/app/test_executive/test_executive.exe
