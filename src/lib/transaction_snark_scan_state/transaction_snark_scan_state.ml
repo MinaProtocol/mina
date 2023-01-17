@@ -192,11 +192,9 @@ end]
 (**********Helpers*************)
 
 (* TODO *)
-let create_expected_statement ~constraint_constants:_ ~get_state:_ _ =
-  failwith "TODO"
-(*
 let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+    ~connecting_merkle_root
     { Transaction_with_witness.transaction_with_info
     ; state_hash
     ; first_pass_ledger_witness
@@ -205,11 +203,11 @@ let create_expected_statement ~constraint_constants
     ; statement
     } =
   let open Or_error.Let_syntax in
-  let source_fee_payment_merkle_root =
+  let source_first_pass_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root first_pass_ledger_witness
   in
-  let source_parties_merkle_root =
+  let source_second_pass_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
@@ -222,18 +220,32 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
-  let%bind after, applied_transaction =
-    Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view first_pass_ledger_witness transaction )
-    |> Or_error.join
+  let%bind ( target_first_pass_merkle_root
+           , target_second_pass_merkle_root
+           , supply_increase ) =
+    let%bind first_pass_ledger_after_apply, partially_applied_transaction =
+      Sparse_ledger.apply_transaction_phase_1 ~constraint_constants
+        ~txn_state_view:state_view first_pass_ledger_witness transaction
+    in
+    let%bind second_pass_ledger_after_apply, applied_transaction =
+      Sparse_ledger.apply_transaction_phase_2 second_pass_ledger_witness
+        partially_applied_transaction
+    in
+    let target_first_pass_merkle_root =
+      Sparse_ledger.merkle_root first_pass_ledger_after_apply
+      |> Frozen_ledger_hash.of_ledger_hash
+    in
+    let target_second_pass_merkle_root =
+      Sparse_ledger.merkle_root second_pass_ledger_after_apply
+      |> Frozen_ledger_hash.of_ledger_hash
+    in
+    let%map supply_increase =
+      Ledger.Transaction_applied.supply_increase applied_transaction
+    in
+    ( target_first_pass_merkle_root
+    , target_second_pass_merkle_root
+    , supply_increase )
   in
-  let target_fee_payment_merkle_root =
-    Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
-  in
-  let target_parties_merkle_root = failwith "TODO" in
-  let connecting_ledger_left = failwith "TODO" in
-  let connecting_ledger_right = failwith "TODO" in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -254,30 +266,26 @@ let create_expected_statement ~constraint_constants
     | _ ->
         pending_coinbase_with_state
   in
-  let%bind fee_excess = Transaction.fee_excess transaction in
-  let%map supply_increase =
-    Ledger.Transaction_applied.supply_increase applied_transaction
-  in
+  let%map fee_excess = Transaction.fee_excess transaction in
   { Transaction_snark.Statement.Poly.source =
-      { first_pass_ledger = source_fee_payment_merkle_root
-      ; second_pass_ledger = source_parties_merkle_root
+      { first_pass_ledger = source_first_pass_merkle_root
+      ; second_pass_ledger = source_second_pass_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
       }
   ; target =
-      { first_pass_ledger = target_fee_payment_merkle_root
-      ; second_pass_ledger = target_parties_merkle_root
+      { first_pass_ledger = target_first_pass_merkle_root
+      ; second_pass_ledger = target_second_pass_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       }
-  ; connecting_ledger_left
-  ; connecting_ledger_right
+  ; connecting_ledger_left = connecting_merkle_root
+  ; connecting_ledger_right = connecting_merkle_root
   ; fee_excess
   ; supply_increase
   ; sok_digest = ()
   ; zkapp_updates_applied
   }
-*)
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     Ledger_proof_with_sok_message.t Or_error.t =
@@ -493,7 +501,10 @@ struct
                     (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
                       Deferred.return
                         (create_expected_statement ~constraint_constants
-                           ~get_state transaction ) )
+                           ~get_state
+                           ~connecting_merkle_root:
+                             transaction.statement.connecting_ledger_left
+                           transaction ) )
                 in
                 let%map () = yield_always () in
                 result
