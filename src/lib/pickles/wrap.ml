@@ -283,6 +283,13 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   ; sponge_digest_before_evaluations = O.digest_before_evaluations o
   }
 
+(* Testing
+   -------
+
+   Invocation:
+   dune exec src/lib/pickles/.pickles.inline-tests/inline_test_runner_pickles.exe \
+   --profile=dev --display short -- inline-test-runner pickles -only-test wrap.ml
+*)
 let%test_module "gate finalization" =
   ( module struct
     type feature_flags = Plonk_types.Opt.Flag.t Plonk_types.Features.t
