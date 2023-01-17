@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export NODE_OPTIONS="--enable-source-maps --stack-trace-limit=1000"
+
 set -eo pipefail
 source ~/.profile
 
