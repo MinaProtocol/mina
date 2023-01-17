@@ -168,12 +168,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         cols
     };
 
-    let public_inputs = 1;
+    let num_public_inputs = 1;
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .runtime(Some(runtime_tables_setup))
-        .public(public_inputs)
+        .public(num_public_inputs)
         .build()
         .unwrap();
 
@@ -409,7 +409,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     use num_bigint::BigUint;
 
     // Includes a row to store value 1
-    let num_inputs = 1;
+    let num_public_inputs = 1;
     let operation = &[FFOps::Add];
     let modulus = BigUint::from_bytes_be(&[
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -418,6 +418,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     ]);
 
     // circuit
+    // [0]       -> Public input row to store the value 1
+    // [1]       -> 1 ForeignFieldAdd row
+    // [2]       -> 1 ForeignFieldAdd row for final bound
+    // [3]       -> 1 Zero row for bound result
+    // [4..=7]   -> 1 Multi RangeCheck for left input
+    // [8..=11]  -> 1 Multi RangeCheck for right input
+    // [12..=15] -> 1 Multi RangeCheck for result
+    // [16..=19] -> 1 Multi RangeCheck for bound check
     let gates = {
         // Public input row
         let mut gates = vec![CircuitGate::<Fp>::create_generic_gadget(
@@ -426,7 +434,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
             None,
         )];
 
-        let mut curr_row = num_inputs;
+        let mut curr_row = num_public_inputs;
         // Foreign field addition and bound check
         CircuitGate::<Fp>::extend_chain_ffadd(&mut gates, 0, &mut curr_row, operation, &modulus);
 
@@ -475,7 +483,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .public(num_inputs)
+        .public(num_public_inputs)
         .lookup(vec![range_check::gadget::lookup_table()])
         .build()
         .unwrap();
@@ -522,13 +530,13 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         wires::Wire,
     };
 
-    let num_inputs = 2;
+    let num_public_inputs = 2;
 
     // circuit
     let gates = {
         // public inputs
         let mut gates = vec![];
-        for row in 0..num_inputs {
+        for row in 0..num_public_inputs {
             gates.push(CircuitGate::<Fp>::create_generic_gadget(
                 Wire::for_row(row),
                 GenericGateSpec::Pub,
@@ -550,7 +558,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 
     // witness
     let witness = {
-        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); num_inputs]);
+        let mut cols: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); num_public_inputs]);
 
         // initialize the 2 inputs
         let input1 = 0xDC811727DAF22EC15927D6AA275F406Bu128;
@@ -564,7 +572,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .public(num_inputs)
+        .public(num_public_inputs)
         .lookup(vec![xor::lookup_table()])
         .build()
         .unwrap();
@@ -616,7 +624,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     };
 
     // Includes the actual input of the rotation and a row with the zero value
-    let num_inputs = 2;
+    let num_public_inputs = 2;
     // 1 ROT of 32 to the left
     let rot = 32;
     let mode = RotMode::Left;
@@ -625,7 +633,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     let gates = {
         let mut gates = vec![];
         // public inputs
-        for row in 0..num_inputs {
+        for row in 0..num_public_inputs {
             gates.push(CircuitGate::<Fp>::create_generic_gadget(
                 Wire::for_row(row),
                 GenericGateSpec::Pub,
@@ -659,7 +667,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .public(num_inputs)
+        .public(num_public_inputs)
         .lookup(vec![rot::lookup_table()])
         .build()
         .unwrap();
@@ -698,7 +706,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_chacha(
         wires::Wire,
     };
 
-    let num_inputs = 0;
+    let num_public_inputs = 0;
     let num_chachas = 8;
 
     // circuit gates
@@ -737,7 +745,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_chacha(
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .public(num_inputs)
+        .public(num_public_inputs)
         .build()
         .unwrap();
 
