@@ -35,7 +35,7 @@ let () =
       ~choices:(fun ~self:_ ->
         [ Zkapps_big_circuit.rule ~num_constraints pk_compressed ] )
   in
-  match f with
+  match f () with
   | exception Failure err when String.(err = expected_err) ->
       ()
   | _ ->
