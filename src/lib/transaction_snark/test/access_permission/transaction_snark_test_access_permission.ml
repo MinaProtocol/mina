@@ -83,7 +83,7 @@ let%test_module "Access permission tests" =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
             }
-        ; caller = Token_id.default
+        ; call_type = Blind_call
         ; use_full_commitment = true
         ; authorization_kind = Signature
         }

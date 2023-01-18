@@ -2862,7 +2862,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "args": [],
               "type": {
@@ -2870,7 +2870,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "CallType",
                   "ofType": null
                 }
               },
@@ -3078,14 +3078,14 @@
               "defaultValue": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "CallType",
                   "ofType": null
                 }
               },
@@ -6593,6 +6593,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "CallType",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
@@ -7885,7 +7895,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "args": [],
               "type": {
@@ -7893,7 +7903,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "CallType",
                   "ofType": null
                 }
               },

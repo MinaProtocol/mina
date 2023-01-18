@@ -518,12 +518,13 @@ let%test_unit "tokens test" =
         (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_funder Token_id.default
+            (mk_account_update_body Signature Blind_call token_funder
+               Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_account_update_body Proof Call token_owner Token_id.default
-               (3 * account_creation_fee) )
+            (mk_account_update_body Proof Blind_call token_owner
+               Token_id.default (3 * account_creation_fee) )
             []
         ]
     in
@@ -537,10 +538,10 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
-               (-account_creation_fee) )
+            (mk_account_update_body Signature Blind_call token_owner
+               Token_id.default (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body None_given Call token_account1
+                (mk_account_update_body None_given Blind_call token_account1
                    custom_token_id 100 )
                 []
             ]
@@ -549,30 +550,30 @@ let%test_unit "tokens test" =
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
-               (-account_creation_fee) )
+            (mk_account_update_body Signature Blind_call token_owner
+               Token_id.default (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body Signature Call token_account1
+                (mk_account_update_body Signature Blind_call token_account1
                    custom_token_id (-30) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
+                (mk_account_update_body None_given Blind_call token_account2
                    custom_token_id 30 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account1
+                (mk_account_update_body Signature Blind_call token_account1
                    custom_token_id (-10) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
+                (mk_account_update_body None_given Blind_call token_account2
                    custom_token_id 10 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account2
+                (mk_account_update_body Signature Blind_call token_account2
                    custom_token_id (-5) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account1
+                (mk_account_update_body None_given Blind_call token_account1
                    custom_token_id 5 )
                 []
             ]

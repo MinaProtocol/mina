@@ -337,15 +337,27 @@ let%test_module "Composability test" =
     let%test_unit "Initialize and update triple recursive" =
       test_recursive 4 Call
 
-    let%test_unit "Initialize and update nonrecursive" =
+    let%test_unit "Initialize and update nonrecursive delegate" =
       test_recursive 1 Delegate_call
 
-    let%test_unit "Initialize and update single recursive" =
+    let%test_unit "Initialize and update single recursive delegate" =
       test_recursive 2 Delegate_call
 
-    let%test_unit "Initialize and update double recursive" =
+    let%test_unit "Initialize and update double recursive delegate" =
       test_recursive 3 Delegate_call
 
-    let%test_unit "Initialize and update triple recursive" =
+    let%test_unit "Initialize and update triple recursive delegate" =
       test_recursive 4 Delegate_call
+
+    let%test_unit "Initialize and update nonrecursive blind" =
+      test_recursive 1 Blind_call
+
+    let%test_unit "Initialize and update single recursive blind" =
+      test_recursive 2 Blind_call
+
+    let%test_unit "Initialize and update double recursive blind" =
+      test_recursive 3 Blind_call
+
+    let%test_unit "Initialize and update triple recursive blind" =
+      test_recursive 4 Blind_call
   end )
