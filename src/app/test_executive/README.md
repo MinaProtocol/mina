@@ -7,7 +7,6 @@
 *My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V, LETTER, LUCY WESTENRA TO MINA MURRAY
 
 
-
 **Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
 
 #### Elevator Pitch
@@ -26,7 +25,7 @@ Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dra
 
 #### Structure (super high level)
 
-There are a number of moving parts to Lucy, and it is also actively being developed and extended.  However in it's current state, Lucy tests Mina Protocol by creating a whole entire Mina testnet from scratch with a specified number of nodes of various types, creating a new blockchain from genesis, and then monitoring and interacting with this testnet in accordance to test logic as determined in pre-written tests; tests which are written in an Ocaml DSL which we have developed.  If the testnet seems healthy and behaves as one expects in response to the interactions, then the test passes, if not it fails.  Then the testnet is destroyed.  If one wants, one can prevent the destruction of the testnet with a flag, and then manually interact with the nodes on the testnet.
+There are a number of moving parts to Lucy, and it is also actively being developed and extended.  However in it's current state, Lucy tests Mina Protocol by creating a whole entire Mina testnet from scratch with a specified number of nodes of various types, creating a new blockchain from genesis, and then monitoring and interacting with this testnet in accordance to test logic as determined in pre-written tests; tests which are written in an OCaml DSL which we have developed.  If the testnet seems healthy and behaves as one expects in response to the interactions, then the test passes, if not it fails.  Then the testnet is destroyed.  If one wants, one can prevent the destruction of the testnet with a flag, and then manually interact with the nodes on the testnet.
 
 **Broadly speaking, Lucy has 2 parts.**  1: the testnet itself, consisting of a number of nodes running the Mina daemon.  2: the test_executive, which configures the testnet, orchestrates the testnet, tracks the state of the testnet, runs test logic against the testnet, and eventually is responsible for tearing down the testnet as well.
 
@@ -34,7 +33,7 @@ The exact size and composition of testnets spun up by Lucy are custom specified 
 
 #### Tests
 
-The usecase which Lucy has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, and/or write new tests.
+The usecase which Lucy has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with OCaml can learn the DSL and modify or extend these tests, and/or write new tests.
 
 Lucy is set up such that the test to be run is selected at the invocation of Lucy, in the terminal command to run Lucy.  A single invocation of Lucy runs exactly 1 test and creates exactly 1 testnet, which is usually torn down at the end of the test.
 
@@ -63,7 +62,7 @@ Any Lucy test first creates a whole new testnet from scratch, and then runs test
 
 - control flow / data flow:
     - The test is kicked off by running the test_executive process, which is typically done from one's local machine or from CI. The test_executive receives, as arguments, the test to run and the infrastructure engine to run them on.  (As noted elsewhere, the only infrastructure engine available at the moment is the GCP cloud engine)
-    - Each test has an ocaml data structure which defines specifications of the testnet to be spun up.  This data structure will stipulate things such as the number of mina nodes in the testnet, the number of archive nodes, the number of snark workers, the balances of the accounts on the blockchain, and other variables.  Then Lucy will use the given infrastructure engine (as specified in the original terminal command) to spin up a testnet as specified.  The infrastructure level details are abstracted within the infrastructure engine
+    - Each test has an OCaml data structure which defines specifications of the testnet to be spun up.  This data structure will stipulate things such as the number of mina nodes in the testnet, the number of archive nodes, the number of snark workers, the balances of the accounts on the blockchain, and other variables.  Then Lucy will use the given infrastructure engine (as specified in the original terminal command) to spin up a testnet as specified.  The infrastructure level details are abstracted within the infrastructure engine
     - Once the testnet is fully established, the test_executive process can interact with nodes on the network and wait for various events to take place. It is able to send graphql queries to any of the nodes on the network, or further control the network through the use of the infrastructure engine (such as by stopping or starting nodes).
 	- The infrastructure engine streams logs from the individual nodes in the testnet network back to the test_executive.  The test_executive will parse the logs to look for "structured log events".  Lucy maintains internal data structures representing the network state, which are updated based on the structured event logs which it receives.
     - Wait conditions are the bread and butter of how tests are constructed in the test_executive.  A wait_condition, simply put, waits for a certain condition to be satisfied on the testnet or on the blockchain.  A wait condition can be predicated on either the network state, or directly based on the streams of structured log events.
@@ -210,11 +209,11 @@ The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY
 
 #### Compile Lucy from source
 
-If you wish to modify or extend existing tests, and/or write a whole new test, or modify the Lucy test executive itself, you will need to compile the Lucy test_executive from source.  Lucy is a complex piece of software written in Ocaml, it's not some simple python or bash script.  
+If you wish to modify or extend existing tests, and/or write a whole new test, or modify the Lucy test executive itself, you will need to compile the Lucy test_executive from source.  Lucy is a complex piece of software written in OCaml, it's not some simple python or bash script.  
 
-Lucy is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  Lucy and Mina need to live together because other than being [goth sapphic girlfriends](https://64.media.tumblr.com/3ad7878b174be3b61c2e1ab1cf8a91aa/tumblr_n1osgph7yb1t5no8yo2_500.gifv), Lucy and Mina also share a number of ocaml libraries.
+Lucy is in the same git repository as the rest of the Mina Daemon at https://github.com/MinaProtocol/mina.  Lucy and Mina need to live together because other than being [goth sapphic girlfriends](https://64.media.tumblr.com/3ad7878b174be3b61c2e1ab1cf8a91aa/tumblr_n1osgph7yb1t5no8yo2_500.gifv), Lucy and Mina also share a number of OCaml libraries.
 
-I will assume the user who wishes to compile Lucy is familiar with not just Ocaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
+I will assume the user who wishes to compile Lucy is familiar with not just OCaml but also with the normal compilation process of mina.  Compiling the test executive is not that different.
 
 ```
 make build
@@ -246,12 +245,12 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ### Lucy general purpose directories
 
-- `src/app/test_executive/` — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
-- `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Lucy Ocaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
+- `src/app/test_executive/` — The pre-written Lucy tests live here, along with the file `test_executive.ml` which is the entrypoint for executing them.
+- `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Lucy OCaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
 
 ### GCP Cloud Engine implementation specific directories
 
-- `src/lib/integration_test_cloud_engine/` — This library is the current implementation of the GCP cloud based execution engine, which deploys testnets in Gcloud's GKE environment.  As with any engine, it implements the interface defined in `Integration_test_lib`.  This execution engine leverages a good deal of our existing coda automation system.  These files are Ocaml.
+- `src/lib/integration_test_cloud_engine/` — This library is the current implementation of the GCP cloud based execution engine, which deploys testnets in Gcloud's GKE environment.  As with any engine, it implements the interface defined in `Integration_test_lib`.  This execution engine leverages a good deal of our existing coda automation system.  These files are OCaml.
 - `automation/terraform/testnets` — During runtime, when using the GCP cloud engine, Lucy will automatically create in this directory a subdirectory with the same name as your testnet name, and also generate a terraform file called `main.tf.json`.  When the testnet is deployed, `terraform apply` is called within this subdirectory, and terraform will use the specs in `main.tf.json` to reach out to GCP and deploy the testnet.
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
