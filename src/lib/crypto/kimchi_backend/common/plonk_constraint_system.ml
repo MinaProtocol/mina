@@ -18,6 +18,8 @@ module type Gate_vector_intf = sig
 
   val get : t -> int -> field Kimchi_types.circuit_gate
 
+  val len : t -> int
+
   val digest : int -> t -> bytes
 end
 
