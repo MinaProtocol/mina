@@ -136,13 +136,17 @@ module RangeCircuits = struct
 
   (** This function tests all the possible combinations for the range gates. *)
   let range_circuit ~(should_succeed : bool) (a : int) (b : int) =
-    let field_a = Impl.Field.Constant.of_int a in
-    let field_b = Impl.Field.Constant.of_int b in
     let bit_length = Impl.Field.size_in_bits - 2 in
 
     let circuit _ _ =
-      let var_a = Impl.exists Impl.Field.typ ~compute:(fun _ -> field_a) in
-      let var_b = Impl.exists Impl.Field.typ ~compute:(fun _ -> field_b) in
+      let var_a =
+        Impl.exists Impl.Field.typ ~compute:(fun _ ->
+            Impl.Field.Constant.of_int a )
+      in
+      let var_b =
+        Impl.exists Impl.Field.typ ~compute:(fun _ ->
+            Impl.Field.Constant.of_int b )
+      in
 
       match Int.compare a b with
       | 0 when should_succeed ->
