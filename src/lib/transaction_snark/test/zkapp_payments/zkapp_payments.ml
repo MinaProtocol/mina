@@ -136,31 +136,35 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command =
-                account_update_send ~constraint_constants (List.hd_exn specs)
-              in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                ( U.apply_zkapp_command ledger [ zkapp_command ]
-                  : Sparse_ledger.t ) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_command =
+                    account_update_send ~constraint_constants
+                      (List.hd_exn specs)
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_commands =
-                List.map
-                  ~f:(fun s ->
-                    let use_full_commitment =
-                      Quickcheck.random_value Bool.quickcheck_generator
-                    in
-                    account_update_send ~constraint_constants
-                      ~use_full_commitment s )
-                  specs
-              in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                (U.apply_zkapp_command ledger zkapp_commands : Sparse_ledger.t) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_commands =
+                    List.map
+                      ~f:(fun s ->
+                        let use_full_commitment =
+                          Quickcheck.random_value Bool.quickcheck_generator
+                        in
+                        account_update_send ~constraint_constants
+                          ~use_full_commitment s )
+                      specs
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in

@@ -3514,36 +3514,53 @@ module Make_str (A : Wire_types.Concrete) = struct
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
   let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
-      ledger
-      (zkapp_commands :
+      (zkapp_commands_with_context :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+        * [ `Ledger of Mina_ledger.Ledger.t
+          | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+        * [ `Ledger of Mina_ledger.Ledger.t
+          | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
         * Zkapp_command.t )
         list ) =
-    let sparse_ledger =
-      match ledger with
+    let sparse_first_pass_ledger zkapp_command = function
       | `Ledger ledger ->
           Sparse_ledger.of_ledger_subset_exn ledger
-            (List.concat_map
-               ~f:(fun (_, _, zkapp_command) ->
-                 Zkapp_command.accounts_referenced zkapp_command )
-               zkapp_commands )
+            [ Zkapp_command.fee_payer zkapp_command ]
+      | `Sparse_ledger sparse_ledger ->
+          sparse_ledger
+    in
+    let sparse_second_pass_ledger zkapp_command = function
+      | `Ledger ledger ->
+          Sparse_ledger.of_ledger_subset_exn ledger
+            (Zkapp_command.accounts_referenced zkapp_command)
       | `Sparse_ledger sparse_ledger ->
           sparse_ledger
     in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, _, states_rev =
-      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [])
-        zkapp_commands
+    let _, _, states_rev =
+      List.fold_left ~init:(fee_excess, supply_increase, [])
+        zkapp_commands_with_context
         ~f:(fun
-             (fee_excess, supply_increase, sparse_ledger, statess_rev)
-             (_, _, zkapp_command)
+             (fee_excess, supply_increase, statess_rev)
+             (_, _, first_pass_ledger, second_pass_ledger, zkapp_command)
            ->
+          let first_pass_ledger =
+            sparse_first_pass_ledger zkapp_command first_pass_ledger
+          in
+          let second_pass_ledger =
+            sparse_second_pass_ledger zkapp_command second_pass_ledger
+          in
           let applied_txn, states =
-            Sparse_ledger.apply_zkapp_command_unchecked_with_states
-              sparse_ledger ~constraint_constants ~state_view ~fee_excess
-              ~supply_increase zkapp_command
+            let partial_txn, states =
+              Sparse_ledger.apply_zkapp_phase_1_unchecked_with_states
+                first_pass_ledger ~constraint_constants ~state_view ~fee_excess
+                ~supply_increase zkapp_command
+              |> Or_error.ok_exn
+            in
+            Sparse_ledger.apply_zkapp_phase_2_unchecked_with_states ~init:states
+              second_pass_ledger partial_txn
             |> Or_error.ok_exn
           in
           let zkapp_updates_applied =
@@ -3559,15 +3576,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           ( final_state.fee_excess
           , final_state.supply_increase
-          , final_state.second_pass_ledger
           , states :: statess_rev ) )
     in
     let states = List.rev states_rev in
     let states_rev =
       Account_update_group.group_by_zkapp_command_rev
         (List.map
-           ~f:(fun (_, _, zkapp_command) -> zkapp_command)
-           zkapp_commands )
+           ~f:(fun (_, _, _, _, zkapp_command) -> zkapp_command)
+           zkapp_commands_with_context )
         ([ List.hd_exn (List.hd_exn states) ] :: states)
     in
     let commitment = ref (Local_state.dummy ()).transaction_commitment in
@@ -3576,10 +3592,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let remaining_zkapp_command =
       let zkapp_commands =
-        List.map zkapp_commands
+        List.map zkapp_commands_with_context
           ~f:(fun
                ( pending_coinbase_init_stack
                , pending_coinbase_stack_state
+               , _
+               , _
                , account_updates )
              ->
             ( pending_coinbase_init_stack
@@ -3598,267 +3616,248 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; target = Pending_coinbase.Stack.empty
         }
     in
-    let final_ledger =
-      match states_rev with
-      | [] ->
-          sparse_ledger
-      | { Account_update_group.Zkapp_command_intermediate_state.state_after =
-            { global = { second_pass_ledger; _ }; _ }
-        ; _
-        }
-        :: _ ->
-          second_pass_ledger
-    in
-    ( List.fold_right states_rev ~init:[]
-        ~f:(fun
-             ({ kind
-              ; spec
-              ; state_before = { global = source_global; local = source_local }
-              ; state_after = { global = target_global; local = target_local }
-              ; zkapp_updates_applied
-              } :
-               Account_update_group.Zkapp_command_intermediate_state.t )
-             witnesses
-           ->
-          (*Transaction snark says nothing about failure status*)
-          let source_local = { source_local with failure_status_tbl = [] } in
-          let target_local = { target_local with failure_status_tbl = [] } in
-          let current_commitment = !commitment in
-          let current_full_commitment = !full_commitment in
-          let ( start_zkapp_command
+    List.fold_right states_rev ~init:[]
+      ~f:(fun
+           ({ kind
+            ; spec
+            ; state_before = { global = source_global; local = source_local }
+            ; state_after = { global = target_global; local = target_local }
+            ; zkapp_updates_applied
+            } :
+             Account_update_group.Zkapp_command_intermediate_state.t )
+           witnesses
+         ->
+        (*Transaction snark says nothing about failure status*)
+        let source_local = { source_local with failure_status_tbl = [] } in
+        let target_local = { target_local with failure_status_tbl = [] } in
+        let current_commitment = !commitment in
+        let current_full_commitment = !full_commitment in
+        let ( start_zkapp_command
+            , next_commitment
+            , next_full_commitment
+            , pending_coinbase_init_stack
+            , pending_coinbase_stack_state ) =
+          let empty_if_last (mk : unit -> field * field) : field * field =
+            match (target_local.stack_frame.calls, target_local.call_stack) with
+            | [], [] ->
+                (* The commitment will be cleared, because this is the last
+                   account_update.
+                *)
+                Zkapp_command.Transaction_commitment.(empty, empty)
+            | _ ->
+                mk ()
+          in
+          let mk_next_commitments (zkapp_command : Zkapp_command.t) =
+            empty_if_last (fun () ->
+                let next_commitment = Zkapp_command.commitment zkapp_command in
+                let memo_hash = Signed_command_memo.hash zkapp_command.memo in
+                let fee_payer_hash =
+                  Zkapp_command.Digest.Account_update.create
+                    (Account_update.of_fee_payer zkapp_command.fee_payer)
+                in
+                let next_full_commitment =
+                  Zkapp_command.Transaction_commitment.create_complete
+                    next_commitment ~memo_hash ~fee_payer_hash
+                in
+                (next_commitment, next_full_commitment) )
+          in
+          match kind with
+          | `Same ->
+              let next_commitment, next_full_commitment =
+                empty_if_last (fun () ->
+                    (current_commitment, current_full_commitment) )
+              in
+              ( []
               , next_commitment
               , next_full_commitment
-              , pending_coinbase_init_stack
-              , pending_coinbase_stack_state ) =
-            let empty_if_last (mk : unit -> field * field) : field * field =
-              match
-                (target_local.stack_frame.calls, target_local.call_stack)
-              with
-              | [], [] ->
-                  (* The commitment will be cleared, because this is the last
-                     account_update.
-                  *)
-                  Zkapp_command.Transaction_commitment.(empty, empty)
+              , !pending_coinbase_init_stack
+              , !pending_coinbase_stack_state )
+          | `New -> (
+              match !remaining_zkapp_command with
+              | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+                , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+                , zkapp_command )
+                :: rest ->
+                  let commitment', full_commitment' =
+                    mk_next_commitments zkapp_command.account_updates
+                  in
+                  remaining_zkapp_command := rest ;
+                  commitment := commitment' ;
+                  full_commitment := full_commitment' ;
+                  pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                  pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
+                  ( [ zkapp_command ]
+                  , commitment'
+                  , full_commitment'
+                  , !pending_coinbase_init_stack
+                  , !pending_coinbase_stack_state )
               | _ ->
-                  mk ()
-            in
-            let mk_next_commitments (zkapp_command : Zkapp_command.t) =
-              empty_if_last (fun () ->
-                  let next_commitment =
-                    Zkapp_command.commitment zkapp_command
+                  failwith "Not enough remaining zkapp_command" )
+          | `Two_new -> (
+              match !remaining_zkapp_command with
+              | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+                , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+                , zkapp_command1 )
+                :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
+                   , `Pending_coinbase_of_statement
+                       pending_coinbase_stack_state2
+                   , zkapp_command2 )
+                   :: rest ->
+                  let commitment', full_commitment' =
+                    mk_next_commitments zkapp_command2.account_updates
                   in
-                  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
-                  let fee_payer_hash =
-                    Zkapp_command.Digest.Account_update.create
-                      (Account_update.of_fee_payer zkapp_command.fee_payer)
-                  in
-                  let next_full_commitment =
-                    Zkapp_command.Transaction_commitment.create_complete
-                      next_commitment ~memo_hash ~fee_payer_hash
-                  in
-                  (next_commitment, next_full_commitment) )
-            in
-            match kind with
-            | `Same ->
-                let next_commitment, next_full_commitment =
-                  empty_if_last (fun () ->
-                      (current_commitment, current_full_commitment) )
-                in
-                ( []
-                , next_commitment
-                , next_full_commitment
-                , !pending_coinbase_init_stack
-                , !pending_coinbase_stack_state )
-            | `New -> (
-                match !remaining_zkapp_command with
-                | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
-                  , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-                  , zkapp_command )
-                  :: rest ->
-                    let commitment', full_commitment' =
-                      mk_next_commitments zkapp_command.account_updates
-                    in
-                    remaining_zkapp_command := rest ;
-                    commitment := commitment' ;
-                    full_commitment := full_commitment' ;
-                    pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
-                    pending_coinbase_stack_state :=
-                      pending_coinbase_stack_state1 ;
-                    ( [ zkapp_command ]
-                    , commitment'
-                    , full_commitment'
-                    , !pending_coinbase_init_stack
-                    , !pending_coinbase_stack_state )
-                | _ ->
-                    failwith "Not enough remaining zkapp_command" )
-            | `Two_new -> (
-                match !remaining_zkapp_command with
-                | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
-                  , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-                  , zkapp_command1 )
-                  :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
-                     , `Pending_coinbase_of_statement
-                         pending_coinbase_stack_state2
-                     , zkapp_command2 )
-                     :: rest ->
-                    let commitment', full_commitment' =
-                      mk_next_commitments zkapp_command2.account_updates
-                    in
-                    remaining_zkapp_command := rest ;
-                    commitment := commitment' ;
-                    full_commitment := full_commitment' ;
-                    (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for zkapp_command2 if it is in a different scan state tree*)
-                    pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
-                    pending_coinbase_stack_state :=
-                      { pending_coinbase_stack_state1 with
-                        Pending_coinbase_stack_state.target =
-                          pending_coinbase_stack_state2
-                            .Pending_coinbase_stack_state.target
-                      } ;
-                    ( [ zkapp_command1; zkapp_command2 ]
-                    , commitment'
-                    , full_commitment'
-                    , !pending_coinbase_init_stack
-                    , !pending_coinbase_stack_state )
-                | _ ->
-                    failwith "Not enough remaining zkapp_command" )
-          in
-          let hash_local_state
-              (local :
-                ( Stack_frame.value
-                , Stack_frame.value list
-                , _
-                , _
-                , _
-                , _
-                , _
-                , _
-                , _ )
-                Mina_transaction_logic.Zkapp_command_logic.Local_state.t ) =
-            { local with
-              stack_frame = local.stack_frame
-            ; call_stack =
-                List.map local.call_stack
-                  ~f:(With_hash.of_data ~hash_data:Stack_frame.Digest.create)
-                |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
-                       x.With_hash.hash )
-            }
-          in
-          let source_local =
-            { (hash_local_state source_local) with
-              transaction_commitment = current_commitment
-            ; full_transaction_commitment = current_full_commitment
-            }
-          in
-          let target_local =
-            { (hash_local_state target_local) with
-              transaction_commitment = next_commitment
-            ; full_transaction_commitment = next_full_commitment
-            }
-          in
-          let w : Zkapp_command_segment.Witness.t =
-            { global_first_pass_ledger = source_global.first_pass_ledger
-            ; global_second_pass_ledger = source_global.second_pass_ledger
-            ; local_state_init = source_local
-            ; start_zkapp_command
-            ; state_body
-            ; init_stack = pending_coinbase_init_stack
-            }
-          in
+                  remaining_zkapp_command := rest ;
+                  commitment := commitment' ;
+                  full_commitment := full_commitment' ;
+                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for zkapp_command2 if it is in a different scan state tree*)
+                  pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                  pending_coinbase_stack_state :=
+                    { pending_coinbase_stack_state1 with
+                      Pending_coinbase_stack_state.target =
+                        pending_coinbase_stack_state2
+                          .Pending_coinbase_stack_state.target
+                    } ;
+                  ( [ zkapp_command1; zkapp_command2 ]
+                  , commitment'
+                  , full_commitment'
+                  , !pending_coinbase_init_stack
+                  , !pending_coinbase_stack_state )
+              | _ ->
+                  failwith "Not enough remaining zkapp_command" )
+        in
+        let hash_local_state
+            (local :
+              ( Stack_frame.value
+              , Stack_frame.value list
+              , _
+              , _
+              , _
+              , _
+              , _
+              , _
+              , _ )
+              Mina_transaction_logic.Zkapp_command_logic.Local_state.t ) =
+          { local with
+            stack_frame = local.stack_frame
+          ; call_stack =
+              List.map local.call_stack
+                ~f:(With_hash.of_data ~hash_data:Stack_frame.Digest.create)
+              |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
+                     x.With_hash.hash )
+          }
+        in
+        let source_local =
+          { (hash_local_state source_local) with
+            transaction_commitment = current_commitment
+          ; full_transaction_commitment = current_full_commitment
+          }
+        in
+        let target_local =
+          { (hash_local_state target_local) with
+            transaction_commitment = next_commitment
+          ; full_transaction_commitment = next_full_commitment
+          }
+        in
+        let w : Zkapp_command_segment.Witness.t =
+          { global_first_pass_ledger = source_global.first_pass_ledger
+          ; global_second_pass_ledger = source_global.second_pass_ledger
+          ; local_state_init = source_local
+          ; start_zkapp_command
+          ; state_body
+          ; init_stack = pending_coinbase_init_stack
+          }
+        in
+        let fee_excess =
+          (* capture only the difference in the fee excess *)
           let fee_excess =
-            (* capture only the difference in the fee excess *)
-            let fee_excess =
-              match
-                Amount.Signed.(
-                  add target_global.fee_excess (negate source_global.fee_excess))
-              with
-              | None ->
-                  failwith
-                    (sprintf
-                       !"unexpected fee excess. source %{sexp: \
-                         Amount.Signed.t} target %{sexp: Amount.Signed.t}"
-                       target_global.fee_excess source_global.fee_excess )
-              | Some balance_change ->
-                  balance_change
-            in
-            { fee_token_l = Token_id.default
-            ; fee_excess_l = Amount.Signed.to_fee fee_excess
-            ; Mina_base.Fee_excess.fee_token_r = Token_id.default
-            ; fee_excess_r = Fee.Signed.zero
-            }
-          in
-          let supply_increase =
-            (* capture only the difference in supply increase *)
             match
               Amount.Signed.(
-                add target_global.supply_increase
-                  (negate source_global.supply_increase))
+                add target_global.fee_excess (negate source_global.fee_excess))
             with
             | None ->
                 failwith
                   (sprintf
-                     !"unexpected supply increase. source %{sexp: \
-                       Amount.Signed.t} target %{sexp: Amount.Signed.t}"
-                     target_global.supply_increase source_global.supply_increase )
-            | Some supply_increase ->
-                supply_increase
+                     !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
+                       target %{sexp: Amount.Signed.t}"
+                     target_global.fee_excess source_global.fee_excess )
+            | Some balance_change ->
+                balance_change
           in
-          let call_stack_hash s =
-            List.hd s
-            |> Option.value_map ~default:Call_stack_digest.empty
-                 ~f:With_stack_hash.stack_hash
+          { fee_token_l = Token_id.default
+          ; fee_excess_l = Amount.Signed.to_fee fee_excess
+          ; Mina_base.Fee_excess.fee_token_r = Token_id.default
+          ; fee_excess_r = Fee.Signed.zero
+          }
+        in
+        let supply_increase =
+          (* capture only the difference in supply increase *)
+          match
+            Amount.Signed.(
+              add target_global.supply_increase
+                (negate source_global.supply_increase))
+          with
+          | None ->
+              failwith
+                (sprintf
+                   !"unexpected supply increase. source %{sexp: \
+                     Amount.Signed.t} target %{sexp: Amount.Signed.t}"
+                   target_global.supply_increase source_global.supply_increase )
+          | Some supply_increase ->
+              supply_increase
+        in
+        let call_stack_hash s =
+          List.hd s
+          |> Option.value_map ~default:Call_stack_digest.empty
+               ~f:With_stack_hash.stack_hash
+        in
+        let statement : Statement.With_sok.t =
+          (* empty ledger hash in the local state at the beginning of each
+             transaction
+             `zkapp_command` in local state is empty for the first segment*)
+          let source_local_ledger =
+            if Zkapp_command.Call_forest.is_empty source_local.stack_frame.calls
+            then Frozen_ledger_hash.empty_hash
+            else Sparse_ledger.merkle_root source_local.ledger
           in
-          let statement : Statement.With_sok.t =
-            (* empty ledger hash in the local state at the beginning of each
-               transaction
-               `zkapp_command` in local state is empty for the first segment*)
-            let source_local_ledger =
-              if
-                Zkapp_command.Call_forest.is_empty
-                  source_local.stack_frame.calls
-              then Frozen_ledger_hash.empty_hash
-              else Sparse_ledger.merkle_root source_local.ledger
-            in
-            let target_first_pass_ledger_root =
-              Sparse_ledger.merkle_root target_global.first_pass_ledger
-            in
-            { source =
-                { first_pass_ledger =
-                    Sparse_ledger.merkle_root source_global.first_pass_ledger
-                ; second_pass_ledger =
-                    Sparse_ledger.merkle_root source_global.second_pass_ledger
-                ; pending_coinbase_stack = pending_coinbase_stack_state.source
-                ; local_state =
-                    { source_local with
-                      stack_frame =
-                        Stack_frame.Digest.create source_local.stack_frame
-                    ; call_stack = call_stack_hash source_local.call_stack
-                    ; ledger = source_local_ledger
-                    }
-                }
-            ; target =
-                { first_pass_ledger = target_first_pass_ledger_root
-                ; second_pass_ledger =
-                    Sparse_ledger.merkle_root target_global.second_pass_ledger
-                ; pending_coinbase_stack = pending_coinbase_stack_state.target
-                ; local_state =
-                    { target_local with
-                      stack_frame =
-                        Stack_frame.Digest.create target_local.stack_frame
-                    ; call_stack = call_stack_hash target_local.call_stack
-                    ; ledger = Sparse_ledger.merkle_root target_local.ledger
-                    }
-                }
-            ; connecting_ledger_left = target_first_pass_ledger_root
-            ; connecting_ledger_right = target_first_pass_ledger_root
-            ; supply_increase
-            ; fee_excess
-            ; sok_digest = Sok_message.Digest.default
-            ; zkapp_updates_applied
-            }
+          let target_first_pass_ledger_root =
+            Sparse_ledger.merkle_root target_global.first_pass_ledger
           in
-          (w, spec, statement) :: witnesses )
-    , final_ledger )
+          { source =
+              { first_pass_ledger =
+                  Sparse_ledger.merkle_root source_global.first_pass_ledger
+              ; second_pass_ledger =
+                  Sparse_ledger.merkle_root source_global.second_pass_ledger
+              ; pending_coinbase_stack = pending_coinbase_stack_state.source
+              ; local_state =
+                  { source_local with
+                    stack_frame =
+                      Stack_frame.Digest.create source_local.stack_frame
+                  ; call_stack = call_stack_hash source_local.call_stack
+                  ; ledger = source_local_ledger
+                  }
+              }
+          ; target =
+              { first_pass_ledger = target_first_pass_ledger_root
+              ; second_pass_ledger =
+                  Sparse_ledger.merkle_root target_global.second_pass_ledger
+              ; pending_coinbase_stack = pending_coinbase_stack_state.target
+              ; local_state =
+                  { target_local with
+                    stack_frame =
+                      Stack_frame.Digest.create target_local.stack_frame
+                  ; call_stack = call_stack_hash target_local.call_stack
+                  ; ledger = Sparse_ledger.merkle_root target_local.ledger
+                  }
+              }
+          ; connecting_ledger_left = target_first_pass_ledger_root
+          ; connecting_ledger_right = target_first_pass_ledger_root
+          ; supply_increase
+          ; fee_excess
+          ; sok_digest = Sok_message.Digest.default
+          ; zkapp_updates_applied
+          }
+        in
+        (w, spec, statement) :: witnesses )
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t

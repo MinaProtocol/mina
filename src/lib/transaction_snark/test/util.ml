@@ -62,61 +62,6 @@ let pending_coinbase_state_stack ~state_body_hash =
   ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
   }
 
-let apply_zkapp_command ledger zkapp_command =
-  let zkapp_command =
-    match zkapp_command with
-    | [] ->
-        []
-    | [ ps ] ->
-        [ ( `Pending_coinbase_init_stack init_stack
-          , `Pending_coinbase_of_statement
-              (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
-          , ps )
-        ]
-    | ps1 :: ps2 :: rest ->
-        let ps1 =
-          ( `Pending_coinbase_init_stack init_stack
-          , `Pending_coinbase_of_statement
-              (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
-          , ps1 )
-        in
-        let pending_coinbase_state_stack =
-          pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
-        in
-        let unchanged_stack_state ps =
-          ( `Pending_coinbase_init_stack init_stack
-          , `Pending_coinbase_of_statement
-              { pending_coinbase_state_stack with
-                source = pending_coinbase_state_stack.target
-              }
-          , ps )
-        in
-        let ps2 = unchanged_stack_state ps2 in
-        ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
-  in
-  let witnesses, final_ledger =
-    Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      (`Ledger ledger) zkapp_command
-  in
-  let open Impl in
-  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
-      run_and_check (fun () ->
-          let s =
-            exists Statement.With_sok.typ ~compute:(fun () -> statement)
-          in
-          let _opt_snapp_stmt =
-            Transaction_snark.Base.Zkapp_command_snark.main
-              ~constraint_constants
-              (Zkapp_command_segment.Basic.to_single_list spec)
-              s ~witness
-          in
-          fun () -> () )
-      |> Or_error.ok_exn ) ;
-  final_ledger
-
 let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
@@ -129,13 +74,25 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
+      let second_pass_ledger =
+        let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
+        Ledger.register_mask ledger new_mask
+      in
+      let partial_stmt =
+        Ledger.apply_transaction_phase_1 ~constraint_constants
+          ~txn_state_view:state_view second_pass_ledger
+          (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
+        |> Or_error.ok_exn
+      in
       match
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-              ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              ~state_body ~fee_excess:Amount.Signed.zero
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
                     (pending_coinbase_state_stack ~state_body_hash)
+                , `Ledger ledger
+                , `Ledger second_pass_ledger
                 , zkapp_command )
               ] )
       with
@@ -150,7 +107,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
               failwith
                 (sprintf "apply_transaction failed with %s"
                    (Error.to_string_hum e) ) )
-      | Ok (witnesses, _) -> (
+      | Ok witnesses -> (
           let open Async.Deferred.Let_syntax in
           let applied =
             if ignore_outside_snark then
@@ -162,12 +119,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    ; new_accounts = []
                    } )
             else
-              ( Result.( >>= )
-                  (Ledger.apply_transaction_phase_1 ~constraint_constants
-                     ~txn_state_view:state_view ledger
-                     (Mina_transaction.Transaction.Command
-                        (Zkapp_command zkapp_command) ) )
-                  (Ledger.apply_transaction_phase_2 ledger)
+              ( Ledger.apply_transaction_phase_2 second_pass_ledger partial_stmt
               |> Or_error.ok_exn )
                 .varying
           in
@@ -239,6 +191,9 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                             || Mina_base.Transaction_status.Failure.(
                                  equal failure f) )
                       in
+                      ignore
+                      @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
+                           second_pass_ledger ;
                       if not failed_as_expected then
                         failwith
                           (sprintf

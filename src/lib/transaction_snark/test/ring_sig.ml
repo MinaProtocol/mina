@@ -327,4 +327,5 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
-          ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) ) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )

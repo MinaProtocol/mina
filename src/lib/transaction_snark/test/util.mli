@@ -32,8 +32,6 @@ val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
-val apply_zkapp_command : Ledger.t -> Zkapp_command.t list -> Sparse_ledger.t
-
 val dummy_rule :
      (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
   -> ( Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit)

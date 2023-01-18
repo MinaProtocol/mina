@@ -131,3 +131,52 @@ let apply_transaction_phase_2 =
 let apply_transactions ~constraint_constants ~txn_state_view =
   apply_transaction_logic
     (T.apply_transactions ~constraint_constants ~txn_state_view)
+
+let apply_zkapp_phase_1_unchecked_with_states ~constraint_constants ~state_view
+    ~fee_excess ~supply_increase ledger c =
+  T.apply_zkapp_command_phase_1_aux ~constraint_constants ~state_view
+    ~fee_excess ~supply_increase (ref ledger) c ~init:[]
+    ~f:(fun
+         acc
+         ( { first_pass_ledger
+           ; second_pass_ledger
+           ; fee_excess
+           ; supply_increase
+           ; protocol_state
+           }
+         , local_state )
+       ->
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger = !second_pass_ledger
+        ; fee_excess
+        ; supply_increase
+        ; protocol_state
+        }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc )
+
+let apply_zkapp_phase_2_unchecked_with_states ~init ledger c =
+  T.apply_zkapp_command_phase_2_aux (ref ledger) c ~init
+    ~f:(fun
+         acc
+         ( { first_pass_ledger
+           ; second_pass_ledger
+           ; fee_excess
+           ; supply_increase
+           ; protocol_state
+           }
+         , local_state )
+       ->
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger = !second_pass_ledger
+        ; fee_excess
+        ; supply_increase
+        ; protocol_state
+        }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc )
+  |> Result.map ~f:(fun (account_update_applied, states) ->
+         (* We perform a [List.rev] here to ensure that the states are in order
+            wrt. the zkapp_command that generated the states.
+         *)
+         (account_update_applied, List.rev states) )

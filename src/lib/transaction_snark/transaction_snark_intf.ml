@@ -187,17 +187,18 @@ module type Full = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
-    -> [ `Ledger of Mina_ledger.Ledger.t
-       | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
        * Zkapp_command.t )
        list
     -> ( Zkapp_command_segment.Witness.t
        * Zkapp_command_segment.Basic.t
        * Statement.With_sok.t )
        list
-       * Mina_ledger.Sparse_ledger.t
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t

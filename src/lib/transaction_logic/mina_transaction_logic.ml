@@ -491,6 +491,51 @@ module type S = sig
     -> Zkapp_command.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
 
+  val apply_zkapp_command_phase_1_aux :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> state_view:Zkapp_precondition.Protocol_state.View.t
+    -> init:'acc
+    -> f:
+         (   'acc
+          -> Global_state.t
+             * ( Stack_frame.value
+               , Stack_frame.value list
+               , Token_id.t
+               , Amount.Signed.t
+               , ledger
+               , bool
+               , Zkapp_command.Transaction_commitment.t
+               , Mina_numbers.Index.t
+               , Transaction_status.Failure.Collection.t )
+               Zkapp_command_logic.Local_state.t
+          -> 'acc )
+    -> ?fee_excess:Amount.Signed.t
+    -> ?supply_increase:Amount.Signed.t
+    -> ledger
+    -> Zkapp_command.t
+    -> (Transaction_partially_applied.Zkapp_command_partially_applied.t * 'acc)
+       Or_error.t
+
+  val apply_zkapp_command_phase_2_aux :
+       init:'acc
+    -> f:
+         (   'acc
+          -> Global_state.t
+             * ( Stack_frame.value
+               , Stack_frame.value list
+               , Token_id.t
+               , Amount.Signed.t
+               , ledger
+               , bool
+               , Zkapp_command.Transaction_commitment.t
+               , Mina_numbers.Index.t
+               , Transaction_status.Failure.Collection.t )
+               Zkapp_command_logic.Local_state.t
+          -> 'acc )
+    -> ledger
+    -> Transaction_partially_applied.Zkapp_command_partially_applied.t
+    -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
+
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
@@ -1848,11 +1893,12 @@ module Make (L : Ledger_intf.S) :
   (* apply zkapp command fee payer's while stubbing out the second pass ledger *)
   let apply_zkapp_command_phase_1_aux (type user_acc) ~constraint_constants
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
+      ~(init : user_acc) ~f
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
       ?((* TODO: is the right? is it never used for zkapps? *)
         supply_increase = Amount.Signed.zero) (ledger : L.t)
-      (command : Zkapp_command.t) ~(init : user_acc) ~f :
+      (command : Zkapp_command.t) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
       Or_error.t =

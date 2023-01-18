@@ -175,14 +175,32 @@ let%test_module "Fee payer tests" =
                   failwith "Ledger.apply_transaction should have failed" ) ;
               (*Sparse ledger application fails*)
               match
+                let second_pass_ledger =
+                  let new_mask =
+                    Mina_ledger.Ledger.Mask.create
+                      ~depth:(Mina_ledger.Ledger.depth ledger)
+                      ()
+                  in
+                  Mina_ledger.Ledger.register_mask ledger new_mask
+                in
+                let _partial_stmt =
+                  Mina_ledger.Ledger.apply_transaction_phase_1
+                    ~constraint_constants ~txn_state_view:U.genesis_state_view
+                    second_pass_ledger
+                    (Mina_transaction.Transaction.Command
+                       (Zkapp_command zkapp_command) )
+                  |> Or_error.ok_exn
+                in
                 Or_error.try_with (fun () ->
                     Transaction_snark.zkapp_command_witnesses_exn
                       ~constraint_constants ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+                      ~fee_excess:Amount.Signed.zero
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
                             (U.pending_coinbase_state_stack
                                ~state_body_hash:U.genesis_state_body_hash )
+                        , `Ledger ledger
+                        , `Ledger second_pass_ledger
                         , zkapp_command )
                       ] )
               with
