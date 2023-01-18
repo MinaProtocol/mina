@@ -55,7 +55,7 @@ Eventually, we would like the testnet to be able to run within virtual machines 
 
 ## Architecture
 
-![edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
+![edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213098795-6714bcf3-b19a-4e5b-b54f-dc9275f0b2c4.png)
 |:--:|
 *Lucy General Architecture*
 
