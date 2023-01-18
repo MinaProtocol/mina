@@ -479,7 +479,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions =
             Some
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Account_update.Account_precondition.Accept
+              ; account = Nonce (Account.Nonce.succ nonce)
               ; valid_while =
                   Check
                     Zkapp_precondition.Closed_interval.
