@@ -11,6 +11,7 @@
   kimchi_backend_common
   kimchi_pasta
   kimchi_backend.pasta.basic
+  kimchi_backend.pasta.constraint_system
   mina_base
   pickles
   pickles.backend
