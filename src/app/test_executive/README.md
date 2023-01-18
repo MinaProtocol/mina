@@ -25,6 +25,7 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 ```
 gcloud auth login --no-launch-browser <gcloud-acct-login-username>
+gcloud config set project o1labs-192920
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
 gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path-to-service-account-key-file>
