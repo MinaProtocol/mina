@@ -266,7 +266,7 @@ CREATE TABLE zkapp_account_update_body
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , implicit_account_creation_fee            boolean    NOT NULL
-, caller                                call_type  NOT NULL
+, call_type                             call_type  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 

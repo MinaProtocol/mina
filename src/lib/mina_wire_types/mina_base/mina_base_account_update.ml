@@ -4,6 +4,12 @@ module Authorization_kind = struct
   end
 end
 
+module Call_type = struct
+  module V1 = struct
+    type t = Call | Delegate_call
+  end
+end
+
 module Update = struct
   module Timing_info = struct
     module V1 = struct
@@ -90,7 +96,7 @@ module Body = struct
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
       ; implicit_account_creation_fee : bool
-      ; caller : Mina_base_token_id.V2.t
+      ; call_type : Call_type.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }
   end

@@ -318,7 +318,7 @@ module type Account_update_intf = sig
 
   val account_id : t -> account_id
 
-  val caller : t -> token_id
+  val is_delegate_call : t -> bool
 
   val use_full_commitment : t -> bool
 
@@ -884,6 +884,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type get_next_account_update_result =
     { account_update : Account_update.t
+    ; caller_id : Token_id.t
     ; account_update_forest : Call_forest.t
     ; new_call_stack : Call_stack.t
     ; new_frame : Stack_frame.t
@@ -913,18 +914,11 @@ module Make (Inputs : Inputs_intf) = struct
     let (account_update, account_update_forest), remainder_of_current_forest =
       Call_forest.pop_exn (Stack_frame.calls current_forest)
     in
-    let account_update_caller = Account_update.caller account_update in
-    let is_normal_call =
-      Token_id.equal account_update_caller (Stack_frame.caller current_forest)
-    in
-    let () =
-      with_label ~label:"check valid caller" (fun () ->
-          let is_delegate_call =
-            Token_id.equal account_update_caller
-              (Stack_frame.caller_caller current_forest)
-          in
-          (* Check that account_update has a valid caller. *)
-          assert_ ~pos:__POS__ Bool.(is_normal_call ||| is_delegate_call) )
+    let is_delegate_call = Account_update.is_delegate_call account_update in
+    let caller_id =
+      Token_id.if_ is_delegate_call
+        ~then_:(Stack_frame.caller_caller current_forest)
+        ~else_:(Stack_frame.caller current_forest)
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -970,16 +964,21 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
           (let caller =
-             Token_id.if_ is_normal_call
-               ~then_:
+             Token_id.if_ is_delegate_call
+               ~then_:(Stack_frame.caller current_forest)
+               ~else_:
                  (Account_id.derive_token_id
                     ~owner:(Account_update.account_id account_update) )
-               ~else_:(Stack_frame.caller current_forest)
-           and caller_caller = account_update_caller in
+           and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )
     in
-    { account_update; account_update_forest; new_frame; new_call_stack }
+    { account_update
+    ; caller_id
+    ; account_update_forest
+    ; new_frame
+    ; new_call_stack
+    }
 
   let update_sequence_state (sequence_state : _ Pickles_types.Vector.t) actions
       ~txn_global_slot ~last_sequence_slot =
@@ -1064,6 +1063,7 @@ module Make (Inputs : Inputs_intf) = struct
             (local_state.stack_frame, local_state.call_stack)
       in
       let { account_update
+          ; caller_id
           ; account_update_forest
           ; new_frame = remaining
           ; new_call_stack = call_stack
@@ -1082,8 +1082,7 @@ module Make (Inputs : Inputs_intf) = struct
               in
               Bool.( ||| )
                 (Token_id.equal account_update_token_id Token_id.default)
-                (Token_id.equal account_update_token_id
-                   (Account_update.caller account_update) )
+                (Token_id.equal account_update_token_id caller_id)
             in
             Local_state.add_check local_state Token_owner_not_caller
               default_token_or_token_owner_was_caller )

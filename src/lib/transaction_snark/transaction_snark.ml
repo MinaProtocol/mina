@@ -1859,7 +1859,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let public_key (t : t) = t.account_update.data.public_key
 
-            let caller (t : t) = t.account_update.data.caller
+            let is_delegate_call (t : t) =
+              Account_update.Call_type.Checked.is_delegate_call
+                t.account_update.data.call_type
 
             let account_id (t : t) =
               Account_id.create (public_key t) (token_id t)
@@ -4372,7 +4374,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; preconditions = preconditions'
           ; use_full_commitment = false
           ; implicit_account_creation_fee = false
-          ; caller = Call
+          ; call_type = Call
           ; authorization_kind = Signature
           }
         in
@@ -4439,7 +4441,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
-                  ; caller = Call
+                  ; call_type = Call
                   ; authorization_kind
                   }
               ; authorization =
@@ -4482,7 +4484,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
-                ; caller = Call
+                ; call_type = Call
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
@@ -4687,14 +4689,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_command.Call_forest.of_account_updates account_updates
               ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                 p.body.call_depth )
-            |> Zkapp_command.Call_forest.add_callers
-                 ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
-                 ~add_caller:Zkapp_command.add_caller_simple
-                 ~null_id:Token_id.default
-                 ~account_update_id:(fun (p : Account_update.Simple.t) ->
-                   Account_id.(
-                     derive_token_id
-                       ~owner:(create p.body.public_key p.body.token_id)) )
+            |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
             |> Zkapp_command.Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.t) ->
                    Zkapp_command.Digest.Account_update.create p )
@@ -4922,8 +4917,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
-          (Zkapp_command.add_caller_simple sender_account_update
-             Token_id.default )
+          (Account_update.of_simple sender_account_update)
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }
@@ -5018,7 +5012,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; caller = Call
+            ; call_type = Call
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
@@ -5041,7 +5035,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; caller = Call
+            ; call_type = Call
             ; authorization_kind = Proof
             }
         ; authorization = Proof Mina_base.Proof.blockchain_dummy

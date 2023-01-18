@@ -2654,6 +2654,48 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "CallTypeInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "AccountUpdateBodyInput",
           "description": null,
           "fields": [
@@ -2878,15 +2920,15 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallTypeInput",
                   "ofType": null
                 }
               },
@@ -3108,14 +3150,14 @@
               "defaultValue": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallTypeInput",
                   "ofType": null
                 }
               },
@@ -6624,6 +6666,33 @@
         },
         {
           "kind": "OBJECT",
+          "name": "CallType",
+          "description": null,
+          "fields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
           "fields": [
@@ -7931,15 +8000,15 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "callType",
               "description": null,
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
+                  "kind": "OBJECT",
+                  "name": "CallType",
                   "ofType": null
                 }
               },
