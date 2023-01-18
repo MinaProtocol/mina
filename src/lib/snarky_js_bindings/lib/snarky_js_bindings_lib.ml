@@ -366,12 +366,20 @@ let () =
      ; ("lte", fun { less_or_equal; _ } -> less_or_equal)
      ; ("gt", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
      ; ("gte", fun { less; _ } -> Boolean.not less)
+     ; ("lessThan", fun { less; _ } -> less)
+     ; ("lessThanOrEqual", fun { less_or_equal; _ } -> less_or_equal)
+     ; ("greaterThan", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
+     ; ("greaterThanOrEqual", fun { less; _ } -> Boolean.not less)
      ] ;
    List.iter ~f:cmp_method
      [ ("assertLt", Field.Assert.lt)
      ; ("assertLte", Field.Assert.lte)
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
+     ; ("assertLessThan", Field.Assert.lt)
+     ; ("assertLessThanOrEqual", Field.Assert.lte)
+     ; ("assertGreaterThan", Field.Assert.gt)
+     ; ("assertGreaterThanOrEqual", Field.Assert.gte)
      ] ) ;
 
   arg_optdef_arg_method field_class "assertEquals"
@@ -379,6 +387,10 @@ let () =
       try Field.Assert.equal this##.value (As_field.value y)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBool"
     (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Impl.assert_ (Constraint.boolean this##.value)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
