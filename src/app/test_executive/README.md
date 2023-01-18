@@ -256,7 +256,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
-![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213058123-9e46f61d-a503-45cb-9ac0-de13ed24c51b.png)
+![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213068474-21ebaa47-7c4a-40fb-a5cd-820001f2e7c1.png)
 |:--:|
 *Lucy Testnet creation process in GCP*
 
