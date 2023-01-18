@@ -112,13 +112,13 @@ end
 (** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
   | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
-  | Call_type : Account_update.Call_type.t Snarky_backendless.Request.t
+  | Self_call_type : Account_update.Call_type.t Snarky_backendless.Request.t
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
   | (* TODO: Tweak pickles so this can be an explicit input. *)
       Get_call_input :
       Call_data.Input.Constant.t Snarky_backendless.Request.t
   | Increase_amount : Field.Constant.t Snarky_backendless.Request.t
-  | Delegate_call : bool Snarky_backendless.Request.t
+  | Call_type : Account_update.Call_type.t Snarky_backendless.Request.t
   | Execute_call :
       (Account_update.Call_type.t * Call_data.Input.Constant.t)
       -> ( Call_data.Output.Constant.t
@@ -153,9 +153,8 @@ let execute_call ~call_type account_update old_state =
   in
   let () =
     (* Check that the call_type is the one that we specified *)
-    run_checked
-    @@ Account_update.Call_type.Checked.assert_equal call_type
-         called_account_update.account_update.data.call_type
+    Account_update.Call_type.Checked.assert_equal call_type
+      called_account_update.account_update.data.call_type
   in
   account_update#register_call called_account_update sub_calls ;
   call_outputs.new_state
@@ -211,7 +210,7 @@ module Rules = struct
   module Update_state = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
-        (old_state : Field.Constant.t) (call_kind : Account_update.Call_type.t)
+        (old_state : Field.Constant.t) (call_type : Account_update.Call_type.t)
         (execute_call :
              Account_update.Call_type.t
           -> Call_data.Input.Constant.t
@@ -224,11 +223,8 @@ module Rules = struct
           respond (Provide public_key)
       | Old_state ->
           respond (Provide old_state)
-      | Delegate_call ->
-          let delegate_call =
-            match call_kind with Call -> false | Delegate_call -> true
-          in
-          respond (Provide delegate_call)
+      | Call_type ->
+          respond (Provide call_type)
       | Execute_call (call_type, input) ->
           respond (Provide (execute_call call_type input))
       | _ ->
@@ -241,10 +237,7 @@ module Rules = struct
       Zkapps_examples.wrap_main ~public_key
         (fun account_update ->
           let call_type =
-            let delegate_call =
-              exists Boolean.typ ~request:(fun () -> Delegate_call)
-            in
-            Account_update.Call_type.Checked.from_delegate_call delegate_call
+            exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
           in
           let old_state = exists Field.typ ~request:(fun () -> Old_state) in
           let new_state = execute_call ~call_type account_update old_state in
@@ -275,7 +268,7 @@ module Rules = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (call_input : Call_data.Input.Constant.t)
-        (call_type : Account_update.Call_type.t)
+        (self_call_type : Account_update.Call_type.t)
         (increase_amount : Field.Constant.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -285,14 +278,14 @@ module Rules = struct
           respond (Provide call_input)
       | Increase_amount ->
           respond (Provide increase_amount)
-      | Call_type ->
-          respond (Provide call_type)
+      | Self_call_type ->
+          respond (Provide self_call_type)
       | _ ->
           respond Unhandled
 
     let main input =
       let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+        exists Account_update.Call_type.typ ~request:(fun () -> Self_call_type)
       in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
@@ -341,8 +334,8 @@ module Rules = struct
     let handler (public_key : Public_key.Compressed.t)
         (add_and_call_input : Call_data.Input.Constant.t)
         (increase_amount : Field.Constant.t)
+        (self_call_type : Account_update.Call_type.t)
         (call_type : Account_update.Call_type.t)
-        (call_kind : Account_update.Call_type.t)
         (execute_call :
              Account_update.Call_type.t
           -> Call_data.Input.Constant.t
@@ -359,19 +352,16 @@ module Rules = struct
           respond (Provide increase_amount)
       | Execute_call (call_type, input) ->
           respond (Provide (execute_call call_type input))
+      | Self_call_type ->
+          respond (Provide self_call_type)
       | Call_type ->
           respond (Provide call_type)
-      | Delegate_call ->
-          let delegate_call =
-            match call_kind with Call -> false | Delegate_call -> true
-          in
-          respond (Provide delegate_call)
       | _ ->
           respond Unhandled
 
     let main input =
       let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+        exists Account_update.Call_type.typ ~request:(fun () -> Self_call_type)
       in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
@@ -389,10 +379,7 @@ module Rules = struct
           in
           let intermediate_state = Field.add old_state increase_amount in
           let call_type =
-            let delegate_call =
-              exists Boolean.typ ~request:(fun () -> Delegate_call)
-            in
-            Account_update.Call_type.Checked.from_delegate_call delegate_call
+            exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
           in
           let new_state =
             execute_call ~call_type account_update intermediate_state
