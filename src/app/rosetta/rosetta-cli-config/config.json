@@ -46,8 +46,9 @@
    "quiet":                      false,
    "initial_balance_fetch_disabled": false,
    "end_conditions": {
-     "create_account":         10,
-     "transfer":               10
+     "create_account":      10,
+     "transfer_payment":    5,
+     "transfer_delegation": 5
    }
  },
  "data": {

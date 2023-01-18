@@ -23,7 +23,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
-  bullseye)
+  bookworm|jammy)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8"
+    ;;
+  bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   buster)
@@ -31,9 +34,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
-    ;;
-  focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -69,6 +69,7 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
@@ -166,7 +167,7 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+# cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"

@@ -259,6 +259,11 @@ module Account_update_under_construction = struct
             ; account = Account_condition.to_predicate t.account_condition
             }
         ; use_full_commitment = Boolean.false_
+        ; implicit_account_creation_fee =
+            (* Probably shouldn't hard-code this logic, but :shrug:, it's a
+               reasonable test.
+            *)
+            Token_id.(Checked.equal t.token_id (Checked.constant default))
         ; caller = t.caller
         ; authorization_kind =
             { is_signed = Boolean.false_; is_proved = Boolean.true_ }

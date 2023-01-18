@@ -15,6 +15,7 @@ let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; authorization_kind = p.authorization_kind
     }
   in
@@ -33,6 +34,7 @@ let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; caller
     ; authorization_kind = p.authorization_kind
     }
@@ -1161,6 +1163,7 @@ let to_simple (t : t) : Simple.t =
               ; call_data = b.call_data
               ; preconditions = b.preconditions
               ; use_full_commitment = b.use_full_commitment
+              ; implicit_account_creation_fee = b.implicit_account_creation_fee
               ; caller = call_type
               ; call_depth = 0
               ; authorization_kind = b.authorization_kind
@@ -1239,17 +1242,19 @@ let zkapp_command_list (t : t) : Account_update.t list =
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
-  match status with
-  | Applied ->
-      Call_forest.fold t.account_updates
-        ~init:[ fee_payer t ]
-        ~f:(fun acc p -> Account_update.account_id p :: acc)
-      |> List.rev |> List.stable_dedup
-  | Failed _ ->
-      [ fee_payer t ]
+(* always `Accessed` for fee payer *)
+let account_access_statuses (t : t) (status : Transaction_status.t) =
+  let init = [ (fee_payer t, `Accessed) ] in
+  let status_sym =
+    match status with Applied -> `Accessed | Failed _ -> `Not_accessed
+  in
+  Call_forest.fold t.account_updates ~init ~f:(fun acc p ->
+      (Account_update.account_id p, status_sym) :: acc )
+  |> List.rev |> List.stable_dedup
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
+      acct_id )
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 
