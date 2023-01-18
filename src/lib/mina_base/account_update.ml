@@ -128,8 +128,7 @@ module Call_type = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Call_type.V1.t =
         | Call
-            (** A plain call, conveying permission to the child (and
-                potentially it's children, via delegate call) to use the
+            (** A plain call, conveying permission from the parent to use the
                 token_id derived from the caller's account ID.
             *)
         | Delegate_call
