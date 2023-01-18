@@ -399,7 +399,14 @@ module Call_type = struct
             (fun ({ is_delegate_call; is_blind_call } as x) ->
               let open Checked in
               let%bind () = typ.check x in
-              Boolean.Assert.exactly_one [ is_delegate_call; is_blind_call ] )
+              let sum =
+                Field.Var.(add (is_delegate_call :> t) (is_blind_call :> t))
+              in
+              (* Assert boolean; we should really have a helper for this
+                 somewhere.
+              *)
+              let%bind sum_squared = Field.Checked.mul sum sum in
+              Field.Checked.Assert.equal sum sum_squared )
         }
 
     let to_input ~field_of_bool { is_delegate_call; is_blind_call } =
