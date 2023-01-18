@@ -5,6 +5,7 @@ module Partial_reason = struct
   type t =
     | Length_mismatch
     | Fee_payer_and_source_mismatch
+    | Fee_not_negative
     | Amount_not_some
     | Account_not_some
     | Invalid_metadata

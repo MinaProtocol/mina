@@ -15,6 +15,7 @@ let add_caller (p : Account_update.Wire.t) caller : Account_update.t =
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; authorization_kind = p.authorization_kind
     }
   in
@@ -33,6 +34,7 @@ let add_caller_simple (p : Account_update.Simple.t) caller : Account_update.t =
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; caller
     ; authorization_kind = p.authorization_kind
     }
@@ -1161,6 +1163,7 @@ let to_simple (t : t) : Simple.t =
               ; call_data = b.call_data
               ; preconditions = b.preconditions
               ; use_full_commitment = b.use_full_commitment
+              ; implicit_account_creation_fee = b.implicit_account_creation_fee
               ; caller = call_type
               ; call_depth = 0
               ; authorization_kind = b.authorization_kind

@@ -177,6 +177,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -194,6 +195,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -420,6 +422,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
+           ; implicit_account_creation_fee
            ; caller
            ; authorization_kind
            } =
@@ -607,6 +610,7 @@ let get_account_update_body ~pool body_id =
           ; account = account_precondition
           }
       ; use_full_commitment
+      ; implicit_account_creation_fee
       ; caller
       ; authorization_kind
       }
@@ -716,6 +720,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -731,6 +736,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key

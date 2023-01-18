@@ -1,6 +1,6 @@
-terraform {
-  experiments = [module_variable_optional_attrs]
-}
+# terraform {
+#   experiments = [module_variable_optional_attrs]
+# }
 
 # K8s Cluster Vars
 

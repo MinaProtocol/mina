@@ -22,6 +22,7 @@ let mockedZkappCommand = {
             editState: "Proof",
             send: "Signature",
             receive: "Proof",
+            access: "None",
             setDelegate: "Signature",
             setPermissions: "Signature",
             setVerificationKey: "Signature",
@@ -85,6 +86,7 @@ let mockedZkappCommand = {
         },
 
         useFullCommitment: true,
+        implicitAccountCreationFee: false,
         caller: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
         authorizationKind: "Signature",
       },

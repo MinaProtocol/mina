@@ -89,6 +89,7 @@ module Body = struct
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
       ; caller : Mina_base_token_id.V2.t
       ; authorization_kind : Authorization_kind.V1.t
       }

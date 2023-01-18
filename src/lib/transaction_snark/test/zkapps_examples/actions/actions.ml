@@ -51,6 +51,7 @@ let%test_module "Sequence events test" =
                   { edit_state = Proof
                   ; send = Signature
                   ; receive = Signature
+                  ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key = Proof
