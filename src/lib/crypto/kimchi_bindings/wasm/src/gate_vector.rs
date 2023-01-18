@@ -142,6 +142,13 @@ macro_rules! impl_gate_vector {
             }
 
             #[wasm_bindgen]
+            pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_len>](
+                v: &WasmGateVector,
+            ) -> usize {
+                v.0.len()
+            }
+
+            #[wasm_bindgen]
             pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_wrap>](
                 v: &mut WasmGateVector,
                 t: Wire,

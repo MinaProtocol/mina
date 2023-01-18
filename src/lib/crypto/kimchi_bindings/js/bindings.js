@@ -1179,6 +1179,12 @@ var caml_pasta_fp_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(v, i));
 };
 
+// Provides: caml_pasta_fp_plonk_gate_vector_len
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_gate_vector_len = function (v) {
+    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_len(v);
+};
+
 // Provides: caml_pasta_fp_plonk_gate_vector_wrap
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
 var caml_pasta_fp_plonk_gate_vector_wrap = function (v, x, y) {
@@ -1212,6 +1218,12 @@ var caml_pasta_fq_plonk_gate_vector_add = function (v, x) {
 // Requires: plonk_wasm, caml_plonk_gate_of_rust
 var caml_pasta_fq_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(v, i));
+};
+
+// Provides: caml_pasta_fq_plonk_gate_vector_len
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_gate_vector_len = function (v) {
+    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_len(v);
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_wrap
