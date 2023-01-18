@@ -303,7 +303,7 @@ end
 
 let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     (ics : Sql.Internal_command.t list) :
-    Mina_transaction.Transaction.t Deferred.t =
+    Mina_transaction.Transaction.t option Deferred.t =
   [%log info]
     "Converting internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d to transaction"
@@ -321,7 +321,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token
   in
   match ics with
-  | ic2 :: ics2
+  | ic2 :: _
     when Int64.equal ic.global_slot_since_genesis ic2.global_slot_since_genesis
          && Int.equal ic.sequence_no ic2.sequence_no
          && String.equal ic.typ "fee_transfer"
@@ -333,17 +333,54 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
       let%map fee_transfer2 = fee_transfer_of_cmd ic2 in
       match Fee_transfer.create fee_transfer1 (Some fee_transfer2) with
       | Ok ft ->
-          Mina_transaction.Transaction.Fee_transfer ft
+          Some (Mina_transaction.Transaction.Fee_transfer ft)
       | Error err ->
           Error.tag err ~tag:"Could not create combined fee transfer"
           |> Error.raise )
   | _ -> (
-      let%map fee_transfer = fee_transfer_of_cmd ic in
-      match Fee_transfer.create fee_transfer None with
-      | Ok ft ->
-          Mina_transaction.Transaction.Fee_transfer ft
-      | Error err ->
-          Error.tag err ~tag:"Could not create fee transfer" |> Error.raise )
+      match ic.typ with
+      | "fee_transfer" -> (
+          let%map fee_transfer = fee_transfer_of_cmd ic in
+          match Fee_transfer.create fee_transfer None with
+          | Ok ft ->
+              Some (Mina_transaction.Transaction.Fee_transfer ft)
+          | Error err ->
+              Error.tag err ~tag:"Could not create fee transfer" |> Error.raise
+          )
+      | "coinbase" -> (
+          let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 ic.fee) in
+          let amount =
+            Currency.Fee.to_uint64 fee |> Currency.Amount.of_uint64
+          in
+          (* combining situation 1: add cached coinbase fee transfer, if it exists *)
+          let fee_transfer =
+            Hashtbl.find fee_transfer_tbl
+              ( ic.global_slot_since_genesis
+              , ic.sequence_no
+              , ic.secondary_sequence_no )
+          in
+          if Option.is_some fee_transfer then
+            [%log info]
+              "Coinbase transaction at global slot since genesis %Ld, \
+               sequence                                                                                                                                                                              \
+               number %d, and secondary sequence number %d contains a fee \
+               transfer"
+              ic.global_slot_since_genesis ic.sequence_no
+              ic.secondary_sequence_no ;
+          let%map receiver_account_id =
+            Load_data.account_identifier_of_id pool ic.receiver_id
+          in
+          let receiver_pk = Account_id.public_key receiver_account_id in
+          match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
+          | Ok cb ->
+              Some (Mina_transaction.Transaction.Coinbase cb)
+          | Error err ->
+              Error.tag err ~tag:"Could not create coinbase" |> Error.raise )
+      | "fee_transfer_via_coinbase" ->
+          (* handled in the coinbase case *)
+          return None
+      | ty ->
+          failwithf "Unknown internal command type: %s" ty () )
 
 let user_command_to_transaction ~logger ~pool ~ledger (cmd : Sql.User_command.t)
     : Mina_transaction.Transaction.t Deferred.t =
@@ -1030,12 +1067,18 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               , next_seed )
         | ic :: ics, [], [] ->
             (* only internal commands *)
-            let%bind block_txns =
+            let%bind block_txns0 =
               run_transactions_on_slot_change ~block_id:ic.block_id block_txns
                 ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
             in
-            let%bind txn = internal_cmds_to_transaction ~logger ~pool ic ics in
-            apply_commands ~block_txns:(txn :: block_txns)
+            let%bind block_txns =
+              match%map internal_cmds_to_transaction ~logger ~pool ic ics with
+              | Some txn ->
+                  txn :: block_txns0
+              | None ->
+                  block_txns0
+            in
+            apply_commands ~block_txns
               ~last_global_slot_since_genesis:ic.global_slot_since_genesis
               ~last_block_id:ic.block_id ~staking_epoch_ledger
               ~next_epoch_ledger ics user_cmds zkapp_cmds
@@ -1102,15 +1145,21 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
-                let%bind block_txns =
+                let%bind block_txns0 =
                   run_transactions_on_slot_change ~block_id:ic.block_id
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                     block_txns
                 in
-                let%bind txn =
-                  internal_cmds_to_transaction ~logger ~pool ic ics
+                let%bind block_txns =
+                  match%map
+                    internal_cmds_to_transaction ~logger ~pool ic ics
+                  with
+                  | Some txn ->
+                      txn :: block_txns0
+                  | None ->
+                      block_txns0
                 in
-                apply_commands ~block_txns:(txn :: block_txns)
+                apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                   ~last_block_id:ic.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger ics user_cmds zkapp_cmds
@@ -1132,15 +1181,21 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
-                let%bind block_txns =
+                let%bind block_txns0 =
                   run_transactions_on_slot_change ~block_id:ic.block_id
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                     block_txns
                 in
-                let%bind txn =
-                  internal_cmds_to_transaction ~logger ~pool ic ics
+                let%bind block_txns =
+                  match%map
+                    internal_cmds_to_transaction ~logger ~pool ic ics
+                  with
+                  | Some txn ->
+                      txn :: block_txns0
+                  | None ->
+                      block_txns0
                 in
-                apply_commands ~block_txns:(txn :: block_txns)
+                apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                   ~last_block_id:ic.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger ics user_cmds zkapp_cmds
@@ -1167,15 +1222,21 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
-                let%bind block_txns =
+                let%bind block_txns0 =
                   run_transactions_on_slot_change ~block_id:ic.block_id
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                     block_txns
                 in
-                let%bind txn =
-                  internal_cmds_to_transaction ~logger ~pool ic ics
+                let%bind block_txns =
+                  match%map
+                    internal_cmds_to_transaction ~logger ~pool ic ics
+                  with
+                  | Some txn ->
+                      txn :: block_txns0
+                  | None ->
+                      block_txns0
                 in
-                apply_commands ~block_txns:(txn :: block_txns)
+                apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                   ~last_block_id:ic.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger ics user_cmds zkapp_cmds
