@@ -95,6 +95,7 @@ module Body = struct
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
       ; call_type : Call_type.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }

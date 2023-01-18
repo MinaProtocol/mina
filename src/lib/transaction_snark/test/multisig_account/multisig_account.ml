@@ -267,7 +267,6 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
-                  ; receiver_is_new = _
                   } =
                 spec
               in
@@ -331,6 +330,7 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
+                    ; implicit_account_creation_fee = true
                     ; events = []
                     ; actions = []
                     ; call_data = Field.zero
@@ -355,6 +355,7 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.Signed.(of_unsigned amount)
                     ; increment_nonce = false
+                    ; implicit_account_creation_fee = true
                     ; events = []
                     ; actions = []
                     ; call_data = Field.zero

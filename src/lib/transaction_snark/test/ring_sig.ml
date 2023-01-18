@@ -193,6 +193,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
                 ; increment_nonce = true
+                ; implicit_account_creation_fee = true
                 ; events = []
                 ; actions = []
                 ; call_data = Field.zero
@@ -220,6 +221,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
+                ; implicit_account_creation_fee = true
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept

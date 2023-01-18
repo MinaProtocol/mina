@@ -89,6 +89,8 @@ module type Amount_intf = sig
 
     val is_pos : t -> bool
 
+    val is_neg : t -> bool
+
     val negate : t -> t
 
     val add_flagged : t -> t -> t * [ `Overflow of bool ]
@@ -321,6 +323,8 @@ module type Account_update_intf = sig
   val use_full_commitment : t -> bool
 
   val increment_nonce : t -> bool
+
+  val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
        commitment:transaction_commitment
@@ -1229,11 +1233,55 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_timing a timing in
       (a, local_state)
     in
+    let account_creation_fee =
+      Amount.of_constant_fee constraint_constants.account_creation_fee
+    in
+    let implicit_account_creation_fee =
+      Account_update.implicit_account_creation_fee account_update
+    in
+    (* Check the token for implicit account creation fee payment. *)
+    let local_state =
+      Local_state.add_check local_state Cannot_pay_creation_fee_in_token
+        Bool.(
+          (not implicit_account_creation_fee)
+          ||| account_update_token_is_default)
+    in
+    (* Compute the change to the account balance. *)
+    let local_state, actual_balance_change =
+      let balance_change = Account_update.balance_change account_update in
+      let neg_creation_fee =
+        let open Amount.Signed in
+        negate (of_unsigned account_creation_fee)
+      in
+      let balance_change_for_creation, `Overflow creation_overflow =
+        let open Amount.Signed in
+        add_flagged balance_change neg_creation_fee
+      in
+      let pay_creation_fee =
+        Bool.(account_is_new &&& implicit_account_creation_fee)
+      in
+      let creation_overflow = Bool.(pay_creation_fee &&& creation_overflow) in
+      let balance_change =
+        Amount.Signed.if_ pay_creation_fee ~then_:balance_change_for_creation
+          ~else_:balance_change
+      in
+      let local_state =
+        Local_state.add_check local_state Amount_insufficient_to_create_account
+          Bool.(
+            not
+              ( pay_creation_fee
+              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ))
+      in
+      (local_state, balance_change)
+    in
     (* Apply balance change. *)
     let a, local_state =
-      let balance_change = Account_update.balance_change account_update in
+      let pay_creation_fee_from_excess =
+        Bool.(account_is_new &&& not implicit_account_creation_fee)
+      in
       let balance, `Overflow failed1 =
-        Balance.add_signed_amount_flagged (Account.balance a) balance_change
+        Balance.add_signed_amount_flagged (Account.balance a)
+          actual_balance_change
       in
       (* TODO: Should this report 'insufficient balance'? *)
       let local_state =
@@ -1250,12 +1298,12 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let local_state =
           Local_state.add_check local_state Local_excess_overflow
-            Bool.(not (account_is_new &&& excess_update_failed))
+            Bool.(not (pay_creation_fee_from_excess &&& excess_update_failed))
         in
         { local_state with
           excess =
-            Amount.Signed.if_ account_is_new ~then_:excess_minus_creation_fee
-              ~else_:local_state.excess
+            Amount.Signed.if_ pay_creation_fee_from_excess
+              ~then_:excess_minus_creation_fee ~else_:local_state.excess
         }
       in
       let local_state =
@@ -1276,7 +1324,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.supply_increase
         }
       in
-      let is_receiver = Amount.Signed.is_pos balance_change in
+      let is_receiver = Amount.Signed.is_pos actual_balance_change in
       let local_state =
         let controller =
           Controller.if_ is_receiver
@@ -1289,7 +1337,8 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_balance
           Bool.(
             has_permission
-            ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
+            ||| Amount.Signed.(
+                  equal (of_unsigned Amount.zero) actual_balance_change))
       in
       let a = Account.set_balance balance a in
       (a, local_state)
@@ -1584,8 +1633,8 @@ module Make (Inputs : Inputs_intf) = struct
          Indeed, if the account creation fee is paid, using that amount would
          be equivalent to paying it out to the block producer.
          In the case of a failure that prevents any updates from being applied,
-         every other account_update in this transaction will also fail, and the excess
-         will never be promoted to the global excess, so this amount is
+         every other account_update in this transaction will also fail, and the
+         excess will never be promoted to the global excess, so this amount is
          irrelevant.
       *)
       Amount.Signed.negate (Account_update.balance_change account_update)
