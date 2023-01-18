@@ -207,6 +207,33 @@ module PublicOutput = struct
     Impl.Boolean.(x && Impl.Boolean.true_)
 end
 
+module InvalidWitness = struct
+  open Impl
+
+  (** A bit of a contrived circuit. 
+      Here only a single constraint will be generated (due to constant unification),
+      but we still want all [compute] closures to be checked when generating the witness. 
+      Thus, this circuit should fail due to an invalid witness. *)
+  let circuit _ =
+    let one = constant Field.typ Field.Constant.one in
+    for i = 0 to 2 do
+      let b =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int (i + 1))
+      in
+      Field.Assert.equal b one
+    done
+
+  let negative_test_valid_witnesses () =
+    let input_typ = Typ.unit in
+    let return_typ = Typ.unit in
+    let circuit _ _ = circuit () in
+    match generate_witness ~input_typ ~return_typ circuit () with
+    | exception _ ->
+        ()
+    | _ ->
+        failwith "should have failed to generate a valid witness"
+end
+
 let circuit_tests =
   [ ( "boolean circuit"
     , `Quick
@@ -248,6 +275,9 @@ let circuit_tests =
     , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
         "range_gt.json" )
+  ; ( "circuit with invalid witness"
+    , `Quick
+    , InvalidWitness.negative_test_valid_witnesses )
   ]
 
 (* API tests *)
