@@ -6,6 +6,15 @@ open Tick
 open Currency
 open Mina_numbers
 
+(* A timed account is an account, which releases its balance to be spent
+   gradually. The process of releasing frozen funds is defined as follows.
+   Until the cliff_time global slot is reached, the initial_minimum_balance
+   of mina is frozen and cannot be spent. At the cliff slot, cliff_amount
+   is released and initial_minimum_balance is effectively lowered by that
+   amount. Next, every vesting_period number of slots, vesting_increment
+   is released, further decreasing the current minimum balance. At some
+   point minimum balance drops to 0, and after that the account behaves
+   like an untimed one. *)
 module Poly = struct
   [%%versioned
   module Stable = struct

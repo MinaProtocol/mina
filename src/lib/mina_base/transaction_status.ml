@@ -24,6 +24,7 @@ module Failure = struct
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
+        | Update_not_permitted_access
         | Update_not_permitted_timing_existing_account
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
@@ -109,6 +110,7 @@ module Failure = struct
       ~local_excess_overflow:add ~local_supply_increase_overflow:add
       ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
       ~zkapp_account_not_present:add ~update_not_permitted_balance:add
+      ~update_not_permitted_access:add
       ~update_not_permitted_timing_existing_account:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
       ~update_not_permitted_verification_key:add
@@ -167,6 +169,8 @@ module Failure = struct
         "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
+    | Update_not_permitted_access ->
+        "Update_not_permitted_access"
     | Update_not_permitted_timing_existing_account ->
         "Update_not_permitted_timing_existing_account"
     | Update_not_permitted_delegate ->
@@ -253,6 +257,8 @@ module Failure = struct
         Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
+    | "Update_not_permitted_access" ->
+        Ok Update_not_permitted_access
     | "Update_not_permitted_timing_existing_account" ->
         Ok Update_not_permitted_timing_existing_account
     | "update_not_permitted_delegate" ->
@@ -377,6 +383,8 @@ module Failure = struct
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
          to its balance"
+    | Update_not_permitted_access ->
+        "The authentication for an account didn't allow it to be accessed"
     | Update_not_permitted_timing_existing_account ->
         "The timing of an existing account cannot be updated"
     | Update_not_permitted_delegate ->
