@@ -66,4 +66,5 @@
    kimchi_backend.pasta.basic
    error_json
    blake2
+   mina_intf
 ))

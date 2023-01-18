@@ -80,7 +80,8 @@ module F = struct
     in
     ( I.Result.map ~f:(const @@ List.map states ~f:(const ()))
       @@ I.Result.all_unit (List.map batches ~f:verify_batch)
-    , Time.Span.scale Context.transaction_snark_verification_timeout
+    , Time.Span.scale
+        Context.catchup_config.transaction_snark_verification_timeout
         (float_of_int batch_count) )
 
   let data_name = "complete work(s)"

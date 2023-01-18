@@ -472,12 +472,26 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let catchup_config =
+            { Mina_intf.max_download_time_per_block_sec = 1.
+            ; max_download_jobs = 20
+            ; max_verifier_jobs = 1
+            ; max_retrieve_hash_chain_jobs = 5
+            ; building_breadcrumb_timeout = Time.Span.of_min 2.
+            ; bitwap_download_timeout = Time.Span.of_sec 2.
+            ; peer_download_timeout = Time.Span.of_sec 2.
+            ; ancestry_verification_timeout = Time.Span.of_sec 30.
+            ; ancestry_download_timeout = Time.Span.of_sec 3.
+            ; transaction_snark_verification_timeout = Time.Span.of_min 4.
+            ; bitswap_enabled = true
+            }
+          in
           let start_time = Time.now () in
           let coda_deferred () =
             Mina_lib.create
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~disable_node_status:true
-                 ~super_catchup:true ~coinbase_receiver:`Producer ~net_config
+                 ~catchup_mode:`Super ~coinbase_receiver:`Producer ~net_config
                  ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
@@ -503,7 +517,7 @@ module T = struct
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           { name = "dummy"; value = host_and_port } ) )
-                 ~log_precomputed_blocks:false ~stop_time:48 () )
+                 ~log_precomputed_blocks:false ~stop_time:48 ~catchup_config () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Mina_run.handle_shutdown ~monitor ~time_controller ~conf_dir

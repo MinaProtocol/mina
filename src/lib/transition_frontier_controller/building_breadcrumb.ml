@@ -96,7 +96,7 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   (* TODO consider using result of comptation even in case of interruption *)
   let process_f () =
     ( Context.build_breadcrumb ~received_at ~parent ~transition (module I)
-    , Context.building_breadcrumb_timeout )
+    , Context.catchup_config.building_breadcrumb_timeout )
   in
   let upon_f = upon_f ~logger:Context.logger ~transition_states ~state_hash in
   let processing_status =

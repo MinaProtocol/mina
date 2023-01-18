@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller
@@ -662,6 +664,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                           Transition_frontier.(
                             Breadcrumb.validated_transition (root frontier))
                         in
+                        (* TODO Possible race condition: transition_writer_ref should be set to a new
+                           (bootstrap) pipe immediately, not after bind *)
                         let%bind () =
                           Strict_pipe.Writer.write clear_writer `Clear
                         in

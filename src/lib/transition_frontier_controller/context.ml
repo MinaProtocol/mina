@@ -26,6 +26,8 @@ module type MINI_CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 module type CONTEXT = sig
@@ -40,18 +42,6 @@ module type CONTEXT = sig
   (** Check is the body of a transition is present in the block storage, *)
   val check_body_in_storage :
     Consensus.Body_reference.t -> Staged_ledger_diff.Body.t option
-
-  val building_breadcrumb_timeout : Core_kernel.Time.Span.t
-
-  val ancestry_verification_timeout : Core_kernel.Time.Span.t
-
-  val transaction_snark_verification_timeout : Core_kernel.Time.Span.t
-
-  val bitwap_download_timeout : Core_kernel.Time.Span.t
-
-  val peer_download_timeout : Core_kernel.Time.Span.t
-
-  val ancestry_download_timeout : Core_kernel.Time.Span.t
 
   (** Download body for the given header  *)
   val download_body :
@@ -162,20 +152,23 @@ let state_hash_of_block_with_validation block =
     and accepts validation callback if a transition would be deemed relevant when
     received via gossip by another node and rejects the validation callback otherwise.
     *)
-let accept_gossip ~context:(module Context : CONTEXT) ~valid_cb consensus_state
+let accept_gossip ~context:(module Context : CONTEXT) ~valid_cbs consensus_state
     =
   let now =
     let open Block_time in
     now Context.time_controller |> to_span_since_epoch |> Span.to_ms
   in
+  let f = Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired in
   match
     Consensus.Hooks.received_at_valid_time
       ~constants:Context.consensus_constants ~time_received:now consensus_state
   with
   | Ok () ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Accept
+      List.iter valid_cbs ~f:(f `Accept) ;
+      true
   | Error _ ->
-      Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Reject
+      List.iter valid_cbs ~f:(f `Reject) ;
+      false
 
 let interrupt_after_timeout ~timeout interrupt_ivar =
   Async_kernel.upon (Async.at timeout)

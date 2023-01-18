@@ -22,7 +22,7 @@ type t =
   ; monitor : Monitor.t option
   ; is_seed : bool
   ; disable_node_status : bool
-  ; super_catchup : bool
+  ; catchup_mode : [ `Bit | `Super | `Normal ]
   ; block_production_keypairs : Keypair.And_compressed_pk.Set.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t
   ; work_selection_method : (module Work_selector.Selection_method_intf)
@@ -59,5 +59,6 @@ type t =
   ; uptime_url : Uri.t option [@default None]
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; stop_time : int
+  ; catchup_config : Mina_intf.catchup_config
   }
 [@@deriving make]

@@ -117,7 +117,9 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
                ~header:(Mina_block.Validation.header_with_hash header)
                ~preferred_peers
                (module I)
-        , Time.Span.(bitwap_download_timeout + peer_download_timeout) )
+        , Time.Span.(
+            catchup_config.bitwap_download_timeout
+            + catchup_config.peer_download_timeout) )
       in
       let downto_ =
         Mina_block.Validation.header header
@@ -239,18 +241,16 @@ let promote_to ~context ~actions ~transition_states ~substate ~gossip_data
       ~actions ~context
   in
   let substate = { substate with status = Processing ctx } in
-  let block_vc =
+  let header_vc, block_vc =
     match gossip_data with
     | Gossip.No_validation_callback ->
-        None
+        (None, None)
     | Gossiped_header vc ->
-        accept_gossip ~context ~valid_cb:vc consensus_state ;
-        None
+        (Some vc, None)
     | Gossiped_block vc ->
-        Some vc
+        (None, Some vc)
     | Gossiped_both { block_vc; header_vc } ->
-        accept_gossip ~context ~valid_cb:header_vc consensus_state ;
-        Some block_vc
+        (Some header_vc, Some block_vc)
   in
   let origin_topics =
     List.filter_map received ~f:(fun { gossip_topic; _ } -> gossip_topic)
@@ -262,7 +262,9 @@ let promote_to ~context ~actions ~transition_states ~substate ~gossip_data
         `Block
           (With_hash.map hh ~f:(fun header -> Mina_block.create ~header ~body)) )
   in
-  Context.rebroadcast ~origin_topics b_or_h ;
+  if
+    accept_gossip ~context ~valid_cbs:(Option.to_list header_vc) consensus_state
+  then Context.rebroadcast ~origin_topics b_or_h ;
   if aux.Transition_state.received_via_gossip then
     pass_the_baton ~transition_states ~context ~actions
       (Mina_state.Protocol_state.previous_state_hash protocol_state) ;

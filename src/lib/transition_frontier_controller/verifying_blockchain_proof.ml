@@ -48,7 +48,7 @@ module F = struct
                       state_hash_of_header_with_validation ) ) )
         ] ;
     ( Context.verify_blockchain_proofs (module I) header_list
-    , Context.ancestry_verification_timeout )
+    , Context.catchup_config.ancestry_verification_timeout )
 
   let data_name = "blockchain proof"
 

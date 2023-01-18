@@ -400,7 +400,9 @@ and launch_ancestry_retrieval ~context ~actions ~retrieve_immediately
     else
       (* We rely on one of children to retrieve ancestry and
          launch downloading ourselves only in case children timed out *)
-      let%bind.I () = I.lift (after Context.ancestry_download_timeout) in
+      let%bind.I () =
+        I.lift (after Context.catchup_config.ancestry_download_timeout)
+      in
       match lookup_transition parent_hash with
       | `Not_present ->
           retrieve_do ()
@@ -474,7 +476,9 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
   let (module Context : CONTEXT) = context in
   let transition_states = state.transition_states in
   let handle_unprocessed ~preferred_peers header =
-    let timeout = Time.add (Time.now ()) Context.ancestry_download_timeout in
+    let timeout =
+      Time.add (Time.now ()) Context.catchup_config.ancestry_download_timeout
+    in
     let hh = Gossip.header_with_hash_of_received_header header in
     let interrupt_ivar =
       launch_ancestry_retrieval ~actions ~context ~cancel_child_contexts:Fn.id
@@ -635,11 +639,11 @@ and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
         Time.add
           (List.fold ~init:now child_contexts ~f:(fun t (timeout, _) ->
                Time.max t timeout ) )
-          Context.ancestry_download_timeout
+          Context.catchup_config.ancestry_download_timeout
       in
       let timeout =
         Time.min max_timeout @@ Time.add now
-        @@ Time.Span.scale Context.ancestry_download_timeout 2.
+        @@ Time.Span.scale Context.catchup_config.ancestry_download_timeout 2.
       in
       (* Children sets of parent are not updated because parent is not present *)
       let interrupt_ivar =
