@@ -85,7 +85,7 @@ let mockedZkappCommand = {
         },
 
         useFullCommitment: true,
-        callType: { isDelegateCall: false },
+        callType: { isDelegateCall: false, isBlindCall: true },
         authorizationKind: "Signature",
       },
       authorization: {
