@@ -112,16 +112,17 @@ module Lookup_parameters = struct
       }
 
   let tock_zero : _ Composition_types.Zero_values.t =
-    { value =
-        { challenge = Challenge.Constant.zero
-        ; scalar =
-            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-        }
-    ; var =
-        { challenge = Impls.Wrap.Field.zero
-        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
-        }
-    }
+    Composition_types.Zero_values.
+      { value =
+          { challenge = Challenge.Constant.zero
+          ; scalar =
+              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+          }
+      ; var =
+          { challenge = Impls.Wrap.Field.zero
+          ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+          }
+      }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
@@ -226,11 +227,6 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
   List.init
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
-
-let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
-  of_int 5 * (domain_size - of_int 1)
-
-let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
 
 let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
