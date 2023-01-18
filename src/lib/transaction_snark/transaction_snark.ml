@@ -1615,6 +1615,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               Sgn.Checked.is_pos
                 (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
+            let is_neg (t : t) =
+              Sgn.Checked.is_neg
+                (run_checked (Currency.Amount.Signed.Checked.sgn t))
+
             let negate = Amount.Signed.Checked.negate
 
             let of_unsigned = Amount.Signed.Checked.of_unsigned
@@ -1868,6 +1872,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let use_full_commitment (t : t) =
               t.account_update.data.use_full_commitment
+
+            let implicit_account_creation_fee (t : t) =
+              t.account_update.data.implicit_account_creation_fee
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
@@ -4370,6 +4377,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; call_depth = 0
           ; preconditions = preconditions'
           ; use_full_commitment = false
+          ; implicit_account_creation_fee = false
           ; call_type = Blind_call
           ; authorization_kind = Signature
           }
@@ -4436,6 +4444,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           |> Option.value ~default:Accept
                       }
                   ; use_full_commitment = true
+                  ; implicit_account_creation_fee = false
                   ; call_type = Blind_call
                   ; authorization_kind
                   }
@@ -4478,6 +4487,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; call_depth = 0
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
+                ; implicit_account_creation_fee = false
                 ; call_type = Blind_call
                 ; authorization_kind
                 }
@@ -4945,7 +4955,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _
-          ; receiver_is_new = _
           ; amount
           } =
         spec
@@ -5006,6 +5015,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
                 }
             ; use_full_commitment = false
+            ; implicit_account_creation_fee = false
             ; call_type = Blind_call
             ; authorization_kind = Signature
             }
@@ -5028,6 +5038,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; account = Full Zkapp_precondition.Account.accept
                 }
             ; use_full_commitment = false
+            ; implicit_account_creation_fee = false
             ; call_type = Blind_call
             ; authorization_kind = Proof
             }

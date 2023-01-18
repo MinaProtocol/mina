@@ -31,6 +31,7 @@ let mk_account_update_body authorization_kind call_type kp token_id
       ; account = Account_update.Account_precondition.Accept
       }
   ; use_full_commitment = true
+  ; implicit_account_creation_fee = false
   ; call_type
   ; authorization_kind
   }

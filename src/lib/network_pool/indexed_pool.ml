@@ -1822,6 +1822,7 @@ let%test_module _ =
                         }
                     ; call_type = Blind_call
                     ; use_full_commitment = not double_increment_sender
+                    ; implicit_account_creation_fee = false
                     ; authorization_kind = None_given
                     }
                 ; authorization = None_given
@@ -1841,6 +1842,7 @@ let%test_module _ =
                         ; account = Account_update.Account_precondition.Accept
                         }
                     ; call_type = Blind_call
+                    ; implicit_account_creation_fee = false
                     ; use_full_commitment = not increment_receiver
                     ; authorization_kind = None_given
                     }

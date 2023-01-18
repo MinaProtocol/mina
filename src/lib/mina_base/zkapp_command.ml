@@ -898,26 +898,25 @@ let to_simple (t : t) : Simple.t =
       t.account_updates
       |> Call_forest.to_account_updates_map
            ~f:(fun ~depth { Account_update.body = b; authorization } ->
-             let p =
-               { Account_update.Simple.authorization
-               ; body =
-                   { public_key = b.public_key
-                   ; token_id = b.token_id
-                   ; update = b.update
-                   ; balance_change = b.balance_change
-                   ; increment_nonce = b.increment_nonce
-                   ; events = b.events
-                   ; actions = b.actions
-                   ; call_data = b.call_data
-                   ; preconditions = b.preconditions
-                   ; use_full_commitment = b.use_full_commitment
-                   ; call_type = b.call_type
-                   ; call_depth = 0
-                   ; authorization_kind = b.authorization_kind
-                   }
-               }
-             in
-             { p with body = { p.body with call_depth = depth } } )
+             { Account_update.Simple.authorization
+             ; body =
+                 { public_key = b.public_key
+                 ; token_id = b.token_id
+                 ; update = b.update
+                 ; balance_change = b.balance_change
+                 ; increment_nonce = b.increment_nonce
+                 ; events = b.events
+                 ; actions = b.actions
+                 ; call_data = b.call_data
+                 ; preconditions = b.preconditions
+                 ; use_full_commitment = b.use_full_commitment
+                 ; implicit_account_creation_fee =
+                     b.implicit_account_creation_fee
+                 ; call_type = b.call_type
+                 ; call_depth = depth
+                 ; authorization_kind = b.authorization_kind
+                 }
+             } )
   }
 
 let%test_unit "wire embedded in t" =
