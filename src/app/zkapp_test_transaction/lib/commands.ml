@@ -84,11 +84,28 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
           pending_coinbase_init_stack
     }
   in
-  let witnesses, _final_ledger =
+  let witnesses =
+    let second_pass_ledger =
+      let new_mask =
+        Mina_ledger.Ledger.Mask.create
+          ~depth:(Mina_ledger.Ledger.depth ledger)
+          ()
+      in
+      Mina_ledger.Ledger.register_mask ledger new_mask
+    in
+    let _partial_stmt =
+      Mina_ledger.Ledger.apply_transaction_phase_1 ~constraint_constants
+        ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
+        second_pass_ledger
+        (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
+      |> Or_error.ok_exn
+    in
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~state_body ~fee_excess:Currency.Amount.Signed.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , `Ledger ledger
+        , `Ledger second_pass_ledger
         , zkapp_command )
       ]
   in
@@ -176,11 +193,28 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
           pending_coinbase_init_stack
     }
   in
-  let witnesses, _final_ledger =
+  let witnesses =
+    let second_pass_ledger =
+      let new_mask =
+        Mina_ledger.Ledger.Mask.create
+          ~depth:(Mina_ledger.Ledger.depth ledger)
+          ()
+      in
+      Mina_ledger.Ledger.register_mask ledger new_mask
+    in
+    let _partial_stmt =
+      Mina_ledger.Ledger.apply_transaction_phase_1 ~constraint_constants
+        ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
+        second_pass_ledger
+        (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
+      |> Or_error.ok_exn
+    in
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~state_body ~fee_excess:Currency.Amount.Signed.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , `Ledger ledger
+        , `Ledger second_pass_ledger
         , zkapp_command )
       ]
   in
