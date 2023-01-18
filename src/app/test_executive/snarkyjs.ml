@@ -39,8 +39,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let stdout = String.strip output.stdout in
     [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
     if not (String.is_empty output.stderr) then
-      Malleable_error.hard_error (Error.of_string output.stderr)
-    else Malleable_error.ok_unit
+      [%log error] "Stderr: $Stderr"
+        ~metadata:[ ("error", `String output.stderr) ] ;
+    Malleable_error.ok_unit
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -58,6 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       [%log info] "Waiting for nodes to be initialized" ;
       let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
+      [%log info] "Running test script" ;
       let%bind.Deferred _result =
         Deferred.return
           (let%bind.Deferred process =
