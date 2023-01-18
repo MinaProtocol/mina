@@ -2,7 +2,7 @@
 
 ## Overview
 
-![Mina and Lucy](https://img.over-blog-kiwi.com/0/90/35/76/20140305/ob_a7d401_dracula-011-mina-lucy.jpg)
+![Mina and Lucy](https://user-images.githubusercontent.com/3465290/213062809-f4bb13a7-9620-464d-9f8a-708126d37393.png)
 | :--: | 
 *My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V, LETTER, LUCY WESTENRA TO MINA MURRAY
 
@@ -18,7 +18,7 @@ Given this, the solution, therefore, is quite clear: we must spin up from scratc
 
 #### Name
 
-![we are all good christian victorian women here](https://images.squarespace-cdn.com/content/v1/586eb29f37c58133c1374783/1605645239517-98IRUW74J2NKA1BMP5G5/draculas-greatest-triumph-the-vampire-as-a-queer-liberator.jpg?format=2500w)
+![we are all good christian victorian women here](https://user-images.githubusercontent.com/3465290/213062888-6fd82ec4-7e96-4b5a-bbc4-926f8b9cde79.png)
 |:--:|
 *Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from Dracula, by Bram Stoker; Chapter XVI, DR SEWARD’S DIARY
 
@@ -256,7 +256,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
-![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
+![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213068474-21ebaa47-7c4a-40fb-a5cd-820001f2e7c1.png)
 |:--:|
 *Lucy Testnet creation process in GCP*
 
@@ -308,5 +308,5 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 
-![](https://images2.fanpop.com/image/photos/13400000/Mina-Lucy-bram-stokers-dracula-13437011-300-439.jpg)
+![](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)
 |:--:|
