@@ -114,25 +114,57 @@ module FieldCircuit = struct
 end
 
 module RangeCircuits = struct
-  let input_typ = Impl.Field.typ
+  (** This function tests all the possible combinations for the range gates. *)
+  let range_circuit ~(should_succeed : bool) (a : int) (b : int) =
+    let field_a = Impl.Field.Constant.of_int a in
+    let field_b = Impl.Field.Constant.of_int b in
+    let bit_length = Impl.Field.size_in_bits - 2 in
 
-  let return_typ = Impl.Typ.unit
+    let circuit _ _ =
+      let var_a = Impl.exists Impl.Field.typ ~compute:(fun _ -> field_a) in
+      let var_b = Impl.exists Impl.Field.typ ~compute:(fun _ -> field_b) in
 
-  let lte (x : Impl.Field.t) () =
-    Impl.Field.Assert.lte ~bit_length:2 x (Impl.Field.of_int 3) ;
-    ()
+      match Int.compare a b with
+      | 0 when should_succeed ->
+          Impl.Field.Assert.gte ~bit_length var_a var_b ;
+          Impl.Field.Assert.lte ~bit_length var_a var_b
+      | 0 ->
+          Impl.Field.Assert.gt ~bit_length var_a var_b ;
+          Impl.Field.Assert.lt ~bit_length var_a var_b
+      | x when (x > 0 && should_succeed) || (x < 0 && not should_succeed) ->
+          Impl.Field.Assert.gte ~bit_length var_a var_b ;
+          Impl.Field.Assert.gt ~bit_length var_a var_b
+      | _ ->
+          Impl.Field.Assert.lte ~bit_length var_a var_b ;
+          Impl.Field.Assert.lt ~bit_length var_a var_b
+    in
+    (* try to generate witness *)
+    let compiled =
+      Impl.generate_witness ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+        circuit
+    in
+    match compiled () with
+    | exception err when should_succeed ->
+        Format.eprintf "[debug] exception when should_succeed: %s"
+          (Exn.to_string err) ;
+        false
+    | exception _ when not should_succeed ->
+        true
+    | _ when not should_succeed ->
+        false
+    | _ ->
+        true
 
-  let gte (x : Impl.Field.t) () =
-    Impl.Field.Assert.gte ~bit_length:2 x (Impl.Field.of_int 3) ;
-    ()
+  let test_range_gates =
+    QCheck.Test.make ~count:10
+      ~name:"test range gates during witness generation"
+      (* TODO: it'd be nicer to generate actual fields directly, since that domain is most likely smaller *)
+      QCheck.(tup3 bool pos_int pos_int)
+      (fun (should_succeed, a, b) -> range_circuit ~should_succeed a b)
 
-  let gt (x : Impl.Field.t) () =
-    Impl.Field.Assert.gt ~bit_length:2 x (Impl.Field.of_int 3) ;
-    ()
-
-  let lt (x : Impl.Field.t) () =
-    Impl.Field.Assert.lt ~bit_length:2 x (Impl.Field.of_int 3) ;
-    ()
+  let () =
+    let res = range_circuit ~should_succeed:true 0 1 in
+    assert res
 end
 
 module TernaryCircuit = struct
@@ -166,26 +198,6 @@ let circuit_tests =
     , check_json ~input_typ:FieldCircuit.input_typ
         ~return_typ:FieldCircuit.return_typ ~circuit:FieldCircuit.main
         "field.json" )
-  ; ( "circuit with range check (less than equal)"
-    , `Quick
-    , check_json ~input_typ:RangeCircuits.input_typ
-        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lte
-        "range_lte.json" )
-  ; ( "circuit with range check (greater than equal)"
-    , `Quick
-    , check_json ~input_typ:RangeCircuits.input_typ
-        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gte
-        "range_gte.json" )
-  ; ( "circuit with range check (less than)"
-    , `Quick
-    , check_json ~input_typ:RangeCircuits.input_typ
-        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lt
-        "range_lt.json" )
-  ; ( "circuit with range check (greater than)"
-    , `Quick
-    , check_json ~input_typ:RangeCircuits.input_typ
-        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
-        "range_gt.json" )
   ; ( "circuit with ternary operator"
     , `Quick
     , check_json ~input_typ:TernaryCircuit.input_typ
@@ -267,8 +279,12 @@ let api_tests =
 (* run tests *)
 
 let () =
+  let range_checks =
+    List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
+  in
   Alcotest.run "Simple snarky tests"
     [ ("outside of circuit tests", outside_circuit_tests)
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
+    ; ("range checks", range_checks)
     ]

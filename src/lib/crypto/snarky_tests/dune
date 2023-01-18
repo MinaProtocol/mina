@@ -64,4 +64,6 @@
   tuple_lib
   promise
   kimchi_backend.common
-  ppx_version.runtime))
+  ppx_version.runtime
+  qcheck-core
+  qcheck-alcotest))
