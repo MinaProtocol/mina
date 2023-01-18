@@ -55,7 +55,7 @@ Eventually, we would like the testnet to be able to run within virtual machines 
 
 ## Architecture
 
-![edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213061935-4377ef8f-58d0-4aed-83aa-4e0a4c57e5dc.png)
+![edit this picture at: https://drive.google.com/file/d/1fN03qmTzpjibgu6TY4DGxJF9__P8xyK3/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142286520-a73628ec-7604-4bc9-bf4e-f1b88b4d00a9.png)
 |:--:|
 *Lucy General Architecture*
 
@@ -102,7 +102,7 @@ You will need the following environment variables to be set correctly on the mac
 	2. `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>`
 	(Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)	
 
-- `GCLOUD_API_KEY` is a string which is your access key to the gcloud api.  To obtain this key, go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find the key called "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put the export command into your .bashrc or .profile.  This API key is shared by everyone, there is no need to create your own.
+- `GCLOUD_API_KEY` is a string which is your access key to the gcloud api.  To obtain this key, go to the [GCP API Credentials page](https://console.cloud.google.com/apis/credentials), find the key called "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put the export command into your .bashrc or .profile.  This API key is shared by everyone, there is no need to create your own.
 
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` are all the AWS access credential env vars.  Just talk to the O(1) Labs Velocity Team to obtain these creds
 
@@ -256,7 +256,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` — many terraform modules which are referenced by main.tf.json will be found in these directories.  These are of course written in terraform script.
 - `helm` — The helm charts (detailed yaml files) which fully specifies the configuration of all the nodes in GCP live here.  The terraform scripts in `automation/terraform/modules/o1-integration` and `automation/terraform/modules/o1-testnet` will reference these helm charts in the deployment process.
 
-![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/213058123-9e46f61d-a503-45cb-9ac0-de13ed24c51b.png)
+![edit this picture at: https://drive.google.com/file/d/16tcCW14SJyjVOrgdcVnt08pSep6RmRQ6/view?usp=sharing](https://user-images.githubusercontent.com/3465290/142287280-0a194a12-b0d0-4279-9393-f61b3f7053e0.png)
 |:--:|
 *Lucy Testnet creation process in GCP*
 
