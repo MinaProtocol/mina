@@ -14,7 +14,7 @@ let pk = Public_key.of_private_key_exn sk
 let pk_compressed = Public_key.compress pk
 
 (* we want to create a circuit with a domain of size 2^16 *)
-let num_constraints = 1 lsl 16
+let num_constraints = 1 lsl 15
 
 let expected_err =
   "polynomial segment size has to be not smaller than that of the circuit!"
@@ -34,6 +34,6 @@ let () =
   in
   match f () with
   | exception Failure err when String.(err = expected_err) ->
-      ()
+      failwith "Exception occurred"
   | _ ->
-      failwith "Expected exception"
+      failwith "No exception occured"
