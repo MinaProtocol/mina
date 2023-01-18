@@ -44,13 +44,12 @@ declareState(SimpleZkapp, { x: Field });
 declareMethods(SimpleZkapp, { update: [Field] });
 
 // parse command line; for local testing, use random keys as fallback
-let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =
-  process.argv.slice(2);
+let [zkappKeyBase58, feePayerKeyBase58, graphql_uri] = process.argv.slice(2);
 zkappKeyBase58 ||= PrivateKey.random().toBase58();
 feePayerKeyBase58 ||= PrivateKey.random().toBase58();
-feePayerNonce ||= command === "update" ? "1" : "0";
+
 console.log(
-  `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce}`
+  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}`
 );
 
 let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
