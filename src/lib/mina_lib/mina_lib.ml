@@ -1296,6 +1296,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 let context (config : Config.t) =
@@ -1309,6 +1311,8 @@ let context (config : Config.t) =
     let constraint_constants = precomputed_values.constraint_constants
 
     let conf_dir = config.conf_dir
+
+    let catchup_config = config.catchup_config
   end : CONTEXT )
 
 let start t =
@@ -1486,15 +1490,16 @@ end
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode =
-    if config.super_catchup then `Super
-    else
-      `Bit
-        (Transition_frontier_controller.Bit_catchup
-         .create_in_mem_transition_states ~trust_system:config.trust_system
-           ~logger:config.logger )
-    (* Normal catchup is not used anywhere today,
-       so it's fine to just ignore this option *)
-    (* else `Normal *)
+    match config.catchup_mode with
+    | `Super ->
+        `Super
+    | `Normal ->
+        `Normal
+    | `Bit ->
+        `Bit
+          (Transition_frontier_controller.Bit_catchup
+           .create_in_mem_transition_states ~trust_system:config.trust_system
+             ~logger:config.logger )
   in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in

@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]

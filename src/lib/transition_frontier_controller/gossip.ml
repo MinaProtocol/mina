@@ -133,11 +133,14 @@ let preserve_relevant_gossip ?body:body_opt ~gd_map ~context ~gossip_header st =
           Some p
   in
   let accept_header consensus_state =
-    List.iter (String.Map.data gd_map) ~f:(function
-      | { type_ = `Header; valid_cb = Some valid_cb; _ } ->
-          Context.accept_gossip ~context ~valid_cb consensus_state
-      | _ ->
-          () )
+    let valid_cbs =
+      List.filter_map (String.Map.data gd_map) ~f:(function
+        | { type_ = `Header; valid_cb; _ } ->
+            valid_cb
+        | _ ->
+            None )
+    in
+    ignore (Context.accept_gossip ~context ~valid_cbs consensus_state : bool)
   in
   let received =
     List.filter_map (String.Map.to_alist gd_map) ~f:(function
@@ -216,8 +219,10 @@ let preserve_relevant_gossip ?body:body_opt ~gd_map ~context ~gossip_header st =
         consensus_state
         @@ Mina_block.(header @@ Frontier_base.Breadcrumb.block breadcrumb)
       in
-      List.iter (Transition_frontier.Gossip.valid_cbs gd_map)
-        ~f:(fun valid_cb -> accept_gossip ~context ~valid_cb consensus_state) ;
+      ignore
+        ( accept_gossip ~context consensus_state
+            ~valid_cbs:(Transition_frontier.Gossip.valid_cbs gd_map)
+          : bool ) ;
       (st, `Nop bp)
   | _, `Mark_downloading_body_processed _ ->
       failwith "Mark_downloading_body_processed: unexpected case"

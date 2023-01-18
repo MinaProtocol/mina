@@ -48,12 +48,13 @@ module F = struct
                       state_hash_of_header_with_validation ) ) )
         ] ;
     ( Context.verify_blockchain_proofs (module I) header_list
-    , Context.ancestry_verification_timeout )
+    , Context.catchup_config.ancestry_verification_timeout )
 
   let data_name = "blockchain proof"
 
   (* TODO consider limiting amount of proofs per batch *)
-  let split_to_batches = Mina_stdlib.Nonempty_list.singleton
+  let split_to_batches ~context:(module Context : CONTEXT) =
+    Mina_stdlib.Nonempty_list.singleton
 end
 
 include Verifying_generic.Make (F)

@@ -16,6 +16,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 module type Inputs_intf = sig

@@ -3,11 +3,6 @@ open Core_kernel
 open Context
 open Bit_catchup_state
 
-let max_works_per_batch =
-  Option.value_map
-    (Async.Sys.getenv "MINA_MAX_PROOFS_PER_BATCH")
-    ~default:1000 ~f:Int.of_string
-
 (** Extract body from a transition in [Transition_state.Verifying_complete_works] state *)
 let body_exn = function
   | Transition_state.Verifying_complete_works { block; _ } ->
@@ -52,7 +47,9 @@ module F = struct
     let works = List.concat_map states ~f:(Fn.compose works body_exn) in
     let batches =
       let rec mk_batch acc rest =
-        let batch, rest' = List.split_n rest max_works_per_batch in
+        let batch, rest' =
+          List.split_n rest Context.catchup_config.max_proofs_per_batch
+        in
         let acc' = batch :: acc in
         if List.is_empty rest' then acc' else mk_batch acc' rest'
       in
@@ -80,12 +77,13 @@ module F = struct
     in
     ( I.Result.map ~f:(const @@ List.map states ~f:(const ()))
       @@ I.Result.all_unit (List.map batches ~f:verify_batch)
-    , Time.Span.scale Context.transaction_snark_verification_timeout
+    , Time.Span.scale
+        Context.catchup_config.transaction_snark_verification_timeout
         (float_of_int batch_count) )
 
   let data_name = "complete work(s)"
 
-  let split_to_batches =
+  let split_to_batches ~context:(module Context : CONTEXT) =
     let open Mina_stdlib.Nonempty_list in
     let init_f st =
       singleton (body_exn st |> works |> List.length, singleton st)
@@ -94,7 +92,8 @@ module F = struct
       let (n, head), rest = uncons res in
       let works = works (body_exn st) in
       let wn = List.length works in
-      if n + wn > max_works_per_batch then cons (wn, singleton st) res
+      if n + wn > Context.catchup_config.max_proofs_per_batch then
+        cons (wn, singleton st) res
       else init (n + wn, cons st head) rest
     in
     Fn.compose

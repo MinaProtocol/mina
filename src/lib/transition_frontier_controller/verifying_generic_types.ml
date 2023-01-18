@@ -22,7 +22,8 @@ module type F = sig
   val data_name : string
 
   val split_to_batches :
-       Transition_state.t Mina_stdlib.Nonempty_list.t
+       context:(module Context.CONTEXT)
+    -> Transition_state.t Mina_stdlib.Nonempty_list.t
     -> Transition_state.t Mina_stdlib.Nonempty_list.t
        Mina_stdlib.Nonempty_list.t
 

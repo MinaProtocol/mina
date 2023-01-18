@@ -262,6 +262,23 @@ module Generator = struct
                            include Context
 
                            let conf_dir = conf_dir
+
+                           let catchup_config =
+                             { Mina_intf.max_download_time_per_block_sec = 1.
+                             ; max_download_jobs = 20
+                             ; max_verifier_jobs = 1
+                             ; max_proofs_per_batch = 100
+                             ; max_retrieve_hash_chain_jobs = 5
+                             ; building_breadcrumb_timeout = Time.Span.of_min 2.
+                             ; bitwap_download_timeout = Time.Span.of_sec 2.
+                             ; peer_download_timeout = Time.Span.of_sec 2.
+                             ; ancestry_verification_timeout =
+                                 Time.Span.of_sec 30.
+                             ; ancestry_download_timeout = Time.Span.of_sec 3.
+                             ; transaction_snark_verification_timeout =
+                                 Time.Span.of_min 4.
+                             ; bitswap_enabled = true
+                             }
                          end )
                        ~frontier
                        ( Envelope.Incoming.data query_env

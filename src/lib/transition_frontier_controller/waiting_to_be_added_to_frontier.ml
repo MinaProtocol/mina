@@ -21,13 +21,16 @@ let promote_to ~context:(module Context : CONTEXT) ~block_vc
     Frontier_base.Breadcrumb.protocol_state_with_hashes breadcrumb
     |> With_hash.data |> Mina_state.Protocol_state.consensus_state
   in
-  Option.iter block_vc ~f:(fun valid_cb ->
-      accept_gossip ~context:(module Context) ~valid_cb consensus_state ) ;
   let origin_topics =
     List.filter_map aux.received ~f:(fun { gossip_topic; _ } -> gossip_topic)
   in
-  Context.rebroadcast ~origin_topics
-    (`Block (Frontier_base.Breadcrumb.block_with_hash breadcrumb)) ;
+  if
+    accept_gossip
+      ~context:(module Context)
+      ~valid_cbs:(Option.to_list block_vc) consensus_state
+  then
+    Context.rebroadcast ~origin_topics
+      (`Block (Frontier_base.Breadcrumb.block_with_hash breadcrumb)) ;
   let source = if aux.received_via_gossip then `Gossip else `Catchup in
   Waiting_to_be_added_to_frontier { breadcrumb; source; children }
 

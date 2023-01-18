@@ -5,6 +5,21 @@ open Cache_lib
 open Mina_base
 open Network_peer
 
+type catchup_config =
+  { max_download_time_per_block_sec : float
+  ; max_download_jobs : int
+  ; max_verifier_jobs : int
+  ; max_proofs_per_batch : int
+  ; max_retrieve_hash_chain_jobs : int
+  ; building_breadcrumb_timeout : Time.Span.t
+  ; bitwap_download_timeout : Time.Span.t
+  ; peer_download_timeout : Time.Span.t
+  ; ancestry_verification_timeout : Time.Span.t
+  ; ancestry_download_timeout : Time.Span.t
+  ; transaction_snark_verification_timeout : Time.Span.t
+  ; bitswap_enabled : bool
+  }
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -15,6 +30,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : catchup_config
 end
 
 module type Transition_handler_validator_intf = sig

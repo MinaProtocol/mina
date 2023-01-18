@@ -13,23 +13,6 @@ type write_actions =
         (** Callback to write built breadcrumbs so that they can be added to frontier *)
   }
 
-let retrieve_hash_chain_max_jobs = 5
-
-let sec_per_block =
-  Option.value_map
-    (Async.Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
-    ~default:15. ~f:Float.of_string
-
-let max_download_jobs =
-  Option.value_map
-    (Async.Sys.getenv "MINA_DOWNLOAD_MAX_JOBS")
-    ~default:20 ~f:Int.of_string
-
-let max_verifier_jobs =
-  Option.value_map
-    (Async.Sys.getenv "MINA_VERIFIER_MAX_JOBS")
-    ~default:1 ~f:Int.of_string
-
 let convert_breadcrumb_error =
   let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
   let open Staged_ledger.Staged_ledger_error in
@@ -215,7 +198,7 @@ let get_peers ~preferred_peers network =
 
 let retrieve_hash_chain ~network ~trust_system ~logger ~root_length
     ~preferred_peers ~target_hash ~target_length ~lookup_transition ~canopy
-    (module I : Interruptible.F) =
+    ~config (module I : Interruptible.F) =
   let%bind.I.Deferred_let_syntax peers = get_peers ~preferred_peers network in
   let f peer =
     I.map ~f:(result_pair_both peer)
@@ -224,18 +207,18 @@ let retrieve_hash_chain ~network ~trust_system ~logger ~root_length
          (module I)
   in
   let%map.I res =
-    I.Result.find_map ~how:(`Max_concurrent_jobs retrieve_hash_chain_max_jobs)
+    I.Result.find_map
+      ~how:(`Max_concurrent_jobs config.Mina_intf.max_retrieve_hash_chain_jobs)
       peers ~f
   in
   Result.map_error ~f:of_hash_chain_error res
 
-let download_ancestors ~preferred_peers ~lookup_transition ~network metas
-    (module I : Interruptible.F) =
+let download_ancestors ~config ~preferred_peers ~lookup_transition ~network
+    metas (module I : Interruptible.F) =
   let%bind.I.Deferred_let_syntax peers = get_peers ~preferred_peers network in
   let target, rev_metas = Mina_stdlib.Nonempty_list.(uncons @@ rev metas) in
   let target_hash = target.Substate.state_hash in
-  (* let max_ = Transition_frontier.max_catchup_chunk_length in *)
-  let max_ = 5 in
+  let max_ = Transition_frontier.max_catchup_chunk_length in
   let downloaded = State_hash.Table.create () in
   let need_transition state_hash =
     if State_hash.Table.mem downloaded state_hash then false
@@ -281,7 +264,9 @@ let download_ancestors ~preferred_peers ~lookup_transition ~network metas
         ~init:(1, [ target_hash ])
         ~finish:Fn.id ~f:try_peer_iter
     in
-    let timeout = Float.of_int n *. sec_per_block in
+    let timeout =
+      Float.of_int n *. config.Mina_intf.max_download_time_per_block_sec
+    in
     I.lift
     @@ Deferred.map ~f:(map_res ~peer)
     @@ Mina_networking.get_transition_chain
@@ -568,9 +553,8 @@ let actions ~write_actions ~context ~state =
 
 type throttles = { verifier : Simple_throttle.t; download : Simple_throttle.t }
 
-let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
-    ~trust_system ~network ~block_storage ~get_completed_work ~throttles
-    ~body_reference_to_state_hash
+let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
+    ~block_storage ~get_completed_work ~throttles ~body_reference_to_state_hash
     ~context:(module Context_ : Context.MINI_CONTEXT) =
   let outdated_root_cache =
     Transition_handler.Core_extended_cache.Lru.create ~destruct:None 1000
@@ -588,20 +572,6 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
 
     let check_body_in_storage = Block_storage.read_body block_storage
 
-    (* TODO Timeouts are for now set to these values, but we want them in config *)
-
-    let building_breadcrumb_timeout = Time.Span.of_min 2.
-
-    let bitwap_download_timeout = Time.Span.of_min 2.
-
-    let peer_download_timeout = Time.Span.of_min 2.
-
-    let ancestry_verification_timeout = Time.Span.of_sec 30.
-
-    let ancestry_download_timeout = Time.Span.of_sec 300.
-
-    let transaction_snark_verification_timeout = Time.Span.of_min 4.
-
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
       let body_reference =
         With_hash.data header |> Mina_block.Header.protocol_state
@@ -612,17 +582,17 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
       let meta = Substate.transition_meta_of_header_with_hash header in
       let tag = Staged_ledger_diff.Body.Tag.Body in
       let%bind.I.Deferred_let_syntax () =
-        if bitswap_enabled then
+        if catchup_config.bitswap_enabled then
           let%bind () =
             Body_ref_table.set body_reference_to_state_hash ~key:body_reference
               ~data:meta.state_hash ;
             Mina_networking.download_bitswap_resource network ~tag
               ~ids:[ body_reference ]
           in
-          Async.after bitwap_download_timeout
+          Async.after catchup_config.bitwap_download_timeout
         else Deferred.unit
       in
-      if bitswap_enabled then
+      if catchup_config.bitswap_enabled then
         [%log info]
           "Bitswap download of body $body_reference for $state_hash failed"
           ~metadata:
@@ -633,7 +603,7 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
       let%bind.I.Result res =
         download_ancestors ~preferred_peers
           ~lookup_transition:(const `Not_present)
-          ~network
+          ~network ~config:catchup_config
           (Mina_stdlib.Nonempty_list.singleton meta)
           (module I)
       in
@@ -670,7 +640,8 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
       with
       | `Invalid, _ | `Present, _ ->
           I.return (Or_error.error_string "target transition is present")
-      | `Not_present, Some ancestors_and_senders when not bitswap_enabled -> (
+      | `Not_present, Some ancestors_and_senders
+        when not catchup_config.bitswap_enabled -> (
           let ancestors, senders =
             Mina_stdlib.Nonempty_list.unzip ancestors_and_senders
           in
@@ -682,7 +653,7 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
           in
           let%map.I.Result res =
             download_ancestors ~preferred_peers ~lookup_transition ~network
-              metas
+              ~config:catchup_config metas
               (module I)
           in
           (* Invariant: |metas| = |senders| = |res| *)
@@ -703,7 +674,7 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
           let%bind.I.Result peer, (hashes, headers) =
             retrieve_hash_chain ~network ~trust_system ~logger ~root_length
               ~preferred_peers ~target_hash ~target_length ~lookup_transition
-              ~canopy
+              ~canopy ~config:catchup_config
               (module I)
           in
           let hash_metas =
@@ -724,7 +695,7 @@ let make_context ~bitswap_enabled ~frontier ~time_controller ~verifier
           | `Present when List.is_empty headers ->
               let%map.I.Result res =
                 download_ancestors ~preferred_peers:(peer :: preferred_peers)
-                  ~lookup_transition ~network hash_metas
+                  ~lookup_transition ~network ~config:catchup_config hash_metas
                   (module I)
               in
               Mina_stdlib.Nonempty_list.map res
@@ -915,15 +886,17 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   in
   let write_actions = { write_verified_transition; write_breadcrumb } in
   let throttles =
-    { verifier = Simple_throttle.create max_verifier_jobs
-    ; download = Simple_throttle.create max_download_jobs
+    { verifier =
+        Simple_throttle.create Context_.catchup_config.max_verifier_jobs
+    ; download =
+        Simple_throttle.create Context_.catchup_config.max_download_jobs
     }
   in
   let body_reference_to_state_hash = Body_ref_table.create () in
   let context =
-    make_context ~bitswap_enabled:true ~context ~frontier ~time_controller
-      ~verifier ~trust_system ~network ~block_storage ~get_completed_work
-      ~throttles ~body_reference_to_state_hash
+    make_context ~context ~frontier ~time_controller ~verifier ~trust_system
+      ~network ~block_storage ~throttles ~get_completed_work
+      ~body_reference_to_state_hash
   in
   let (module Context : CONTEXT) = context in
   let logger = Context.logger in

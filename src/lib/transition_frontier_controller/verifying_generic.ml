@@ -379,7 +379,7 @@ module Make (F : F) = struct
 
   and start_impl ~context ~actions ~transition_states =
     let f = start_batch ~context ~actions ~transition_states in
-    Fn.compose (Mina_stdlib.Nonempty_list.iter ~f) F.split_to_batches
+    Fn.compose (Mina_stdlib.Nonempty_list.iter ~f) (F.split_to_batches ~context)
 
   and start ~context ~actions ~transition_states =
     Fn.compose

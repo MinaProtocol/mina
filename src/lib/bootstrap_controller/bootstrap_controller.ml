@@ -20,6 +20,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val conf_dir : string
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -713,6 +715,21 @@ let%test_module "Bootstrap_controller tests" =
             let consensus_constants = precomputed_values.consensus_constants
 
             let conf_dir = conf_dir
+
+            let catchup_config =
+              { Mina_intf.max_download_time_per_block_sec = 1.
+              ; max_download_jobs = 20
+              ; max_verifier_jobs = 1
+              ; max_proofs_per_batch = 100
+              ; max_retrieve_hash_chain_jobs = 5
+              ; building_breadcrumb_timeout = Time.Span.of_min 2.
+              ; bitwap_download_timeout = Time.Span.of_sec 2.
+              ; peer_download_timeout = Time.Span.of_sec 2.
+              ; ancestry_verification_timeout = Time.Span.of_sec 30.
+              ; ancestry_download_timeout = Time.Span.of_sec 3.
+              ; transaction_snark_verification_timeout = Time.Span.of_min 4.
+              ; bitswap_enabled = true
+              }
           end in
           f (module Context : CONTEXT) )
 
