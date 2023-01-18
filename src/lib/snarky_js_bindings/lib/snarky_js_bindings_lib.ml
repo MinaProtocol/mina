@@ -390,6 +390,10 @@ let () =
     (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Impl.assert_ (Constraint.boolean this##.value)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBool"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
       new%js bool_constr
         (As_bool.of_boolean (Field.equal this##.value Field.zero)) ) ;
