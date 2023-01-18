@@ -32,7 +32,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; extra_genesis_accounts = [ { balance = "10"; timing = Untimed } ]
     ; num_snark_workers = 0
     }
-  let check_and_print_stout_stderr ~logger process = 
+
+  let check_and_print_stout_stderr ~logger process =
     let open Deferred.Let_syntax in
     let%map output = Async_unix.Process.collect_output_and_wait process in
     let stdout = String.strip output.stdout in
@@ -52,14 +53,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           : Signature_lib.Keypair.t ) =
       Signature_lib.Keypair.create ()
     in
-    let graphql_uri =
-      Network.Node.graphql_uri node
-    in
+    let graphql_uri = Network.Node.graphql_uri node in
 
     let%bind () =
       [%log info] "Waiting for nodes to be initialized" ;
-      let%bind () = wait_for t (Wait_condition.node_to_initialize node) in 
-      let%bind.Deferred result =
+      let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
+      let%bind.Deferred _result =
         Deferred.return
           (let%bind.Deferred process =
              Async_unix.Process.create_exn
