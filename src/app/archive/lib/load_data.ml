@@ -420,6 +420,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
+           ; implicit_account_creation_fee
            ; caller
            ; authorization_kind
            } =
@@ -607,6 +608,7 @@ let get_account_update_body ~pool body_id =
           ; account = account_precondition
           }
       ; use_full_commitment
+      ; implicit_account_creation_fee
       ; caller
       ; authorization_kind
       }

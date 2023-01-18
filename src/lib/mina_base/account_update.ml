@@ -858,6 +858,7 @@ module Body = struct
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; caller : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
@@ -879,6 +880,7 @@ module Body = struct
       and call_data = Field.gen
       and preconditions = Preconditions.gen
       and use_full_commitment = Quickcheck.Generator.bool
+      and implicit_account_creation_fee = Quickcheck.Generator.bool
       and caller = Call_type.gen
       and authorization_kind = Authorization_kind.gen in
       { public_key
@@ -891,6 +893,7 @@ module Body = struct
       ; call_data
       ; preconditions
       ; use_full_commitment
+      ; implicit_account_creation_fee
       ; caller
       ; authorization_kind
       }
@@ -913,6 +916,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; caller : Token_id.Stable.V2.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
@@ -930,7 +934,8 @@ module Body = struct
         ~increment_nonce:!.bool ~events:!.Events.deriver
         ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
-        ~caller:!.Token_id.deriver ~call_depth:!.int
+        ~implicit_account_creation_fee:!.bool ~caller:!.Token_id.deriver
+        ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
@@ -946,6 +951,7 @@ module Body = struct
       ; call_depth = 0
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
+      ; implicit_account_creation_fee = false
       ; caller = Token_id.default
       ; authorization_kind = None_given
       }
@@ -968,6 +974,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; caller : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
@@ -993,6 +1000,7 @@ module Body = struct
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
         ; caller : Token_id.Stable.V2.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
@@ -1013,6 +1021,7 @@ module Body = struct
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; caller
     ; authorization_kind = p.authorization_kind
     }
@@ -1028,6 +1037,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; caller
        ; call_depth = _
        ; authorization_kind
@@ -1043,6 +1053,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; caller
     ; authorization_kind
     }
@@ -1058,6 +1069,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; caller
        ; authorization_kind
        } :
@@ -1072,6 +1084,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; caller
     ; call_depth
     ; authorization_kind
@@ -1151,6 +1164,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
+    ; implicit_account_creation_fee = true
     ; caller = Token_id.default
     ; authorization_kind = Signature
     }
@@ -1177,6 +1191,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
+    ; implicit_account_creation_fee = true
     ; caller = Call
     ; call_depth = 0
     ; authorization_kind = Signature
@@ -1241,6 +1256,7 @@ module Body = struct
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
+      ; implicit_account_creation_fee : Boolean.var
       ; caller : Token_id.Checked.t
       ; authorization_kind : Authorization_kind.Checked.t
       }
@@ -1257,6 +1273,7 @@ module Body = struct
          ; call_data
          ; preconditions
          ; use_full_commitment
+         ; implicit_account_creation_fee
          ; caller
          ; authorization_kind
          } :
@@ -1275,6 +1292,8 @@ module Body = struct
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
+        ; Random_oracle_input.Chunked.packed
+            ((implicit_account_creation_fee :> Field.Var.t), 1)
         ; Token_id.Checked.to_input caller
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
@@ -1296,6 +1315,7 @@ module Body = struct
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
+      ; Impl.Boolean.typ
       ; Token_id.typ
       ; Authorization_kind.typ
       ]
@@ -1313,6 +1333,7 @@ module Body = struct
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
+    ; implicit_account_creation_fee = true
     ; caller = Token_id.default
     ; authorization_kind = None_given
     }
@@ -1335,6 +1356,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; caller
        ; authorization_kind
        } :
@@ -1350,6 +1372,8 @@ module Body = struct
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
+      ; Random_oracle_input.Chunked.packed
+          (field_of_bool implicit_account_creation_fee, 1)
       ; Token_id.to_input caller
       ; Authorization_kind.to_input authorization_kind
       ]
@@ -1377,6 +1401,7 @@ module Body = struct
     and call_data = Field.gen
     and preconditions = Preconditions.gen
     and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
     and authorization_kind = Authorization_kind.gen in
     { public_key
     ; token_id
@@ -1388,6 +1413,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; caller
     ; authorization_kind
     }
@@ -1588,5 +1614,8 @@ let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 let token_id (t : t) : Token_id.t = t.body.token_id
 
 let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+
+let implicit_account_creation_fee (t : t) : bool =
+  t.body.implicit_account_creation_fee
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce

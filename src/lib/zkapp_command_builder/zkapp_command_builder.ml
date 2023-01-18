@@ -31,6 +31,7 @@ let mk_account_update_body authorization_kind caller kp token_id balance_change
       ; account = Account_update.Account_precondition.Accept
       }
   ; use_full_commitment = true
+  ; implicit_account_creation_fee = false
   ; caller
   ; authorization_kind
   }
