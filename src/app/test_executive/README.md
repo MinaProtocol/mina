@@ -4,7 +4,7 @@
 
 ![Mina and Lucy](https://img.over-blog-kiwi.com/0/90/35/76/20140305/ob_a7d401_dracula-011-mina-lucy.jpg)
 | :--: | 
-*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker, Chapter V, "LETTER, LUCY WESTENRA TO MINA MURRAY"
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V, LETTER, LUCY WESTENRA TO MINA MURRAY
 
 
 
@@ -20,7 +20,7 @@ Given this, the solution, therefore, is quite clear: we must spin up from scratc
 
 ![we are all good christian victorian women here](https://images.squarespace-cdn.com/content/v1/586eb29f37c58133c1374783/1605645239517-98IRUW74J2NKA1BMP5G5/draculas-greatest-triumph-the-vampire-as-a-queer-liberator.jpg?format=2500w)
 |:--:|
-*"Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!"* ~from Dracula, by Bram Stoker, Chapter XVI, DR SEWARD’S DIARY
+*Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from Dracula, by Bram Stoker; Chapter XVI, DR SEWARD’S DIARY
 
 Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dracula.  Lucy is Mina Harker née Murray's ["best friend"](https://www.youtube.com/watch?v=VbbRQj8Oi2k), who sapphically and figuratively [tests Mina's virtue](https://archiveofourown.org/tags/Mina%20Murray%20Harker*s*Lucy%20Westenra/works) (and the virtues of the other characters in the novel but no one cares about that), so naturally we thought this would be an appropriate name for an integration testing framework for Mina Protocol.
 
@@ -30,23 +30,23 @@ There are a number of moving parts to Lucy, and it is also actively being develo
 
 **Broadly speaking, Lucy has 2 parts.**  1: the testnet itself, consisting of a number of nodes running the Mina daemon.  2: the test_executive, which configures the testnet, orchestrates the testnet, tracks the state of the testnet, runs test logic against the testnet, and eventually is responsible for tearing down the testnet as well.
 
-The exact size and composition of testnets spun up by Lucy are custom specified by the test_executive.  Also specified by the test executive is exactly what version/release of the Mina daemon is being run.  A Lucy testnet is of course going to be much smaller compared to mainnet, or the official public devnets created by O(1) Labs and Mina Foundation  However asides from scale, and assuming that the same version of the Mina daemon is being run, there is no qualitative or behavioral differences between a Lucy testnet and mainnet or public devnets.  A Lucy testnet maintains an accounts ledger, produces blocks, has consensus, maintains a blockchain, can carry out transactions, can run zkapps, can run SnarkyJS and implement smart contracts.  Whatever smart contract features you'd expect from the Berkeley Devnet, such as rollups, receiving off chain computation, zk cypto, will all work on a Lucy testnet (provided the testnet is using correct version/release of the Mina daemon).  The testnet can be specified with archive nodes and snark worker nodes, as well as the usual block producers and seeds.  Developers can manually interact with Lucy testnets, such as connecting other nodes to the testnet, or manually sending transactions and running smart contracts and what not (the workflow for this particular usecase is a bit roundabout at the current moment, but we plan to improve this).
+The exact size and composition of testnets spun up by Lucy are custom specified by the test_executive.  Also specified by the test executive is exactly what version/release of the Mina daemon is being run.  A Lucy testnet is of course going to be much smaller compared to mainnet, or the official public devnets created by O(1) Labs and Mina Foundation.  However asides from scale, and assuming that the same version of the Mina daemon is being run, there is no qualitative or behavioral differences between a Lucy testnet and mainnet or public devnets.  A Lucy testnet maintains an accounts ledger, produces blocks, has consensus, maintains a blockchain, can carry out transactions, can run zkapps, can run SnarkyJS and implement smart contracts, and son on.  Whatever smart contract features you'd expect from the Berkeley Devnet, such as rollups, receiving off chain computation, zk cypto, will all work on a Lucy testnet (provided the testnet is using correct version/release of the Mina daemon).  The testnet can be specified with archive nodes and snark worker nodes, as well as the usual block producers and seeds.  Developers can manually interact with Lucy testnets, such as connecting other nodes to the testnet, or manually sending transactions and running smart contracts and what not (the workflow for this particular usecase is a bit roundabout at the current moment, but we plan to improve this).
 
 #### Tests
 
 The usecase which Lucy has been designed around (thus far) is the usecase of running automated *tests*.  There are a number of pre-written tests which are compiled into the test_executive (such as the payments_test, zkapps_test, chain_reliability_test, etc).  Those who are familiar with Ocaml can learn the DSL and modify or extend these tests, and/or write new tests.
 
-Lucy is set up such that the test to be run is selected at the invocation of Lucy, in the terminal command to run Lucy.  A single invocation of Lucy runs exactly 1 test and creates exactly 1 testnet.
+Lucy is set up such that the test to be run is selected at the invocation of Lucy, in the terminal command to run Lucy.  A single invocation of Lucy runs exactly 1 test and creates exactly 1 testnet, which is usually torn down at the end of the test.
 
 Each test consists of the following two elements:
-- a testnet spec which tells Lucy how many nodes of each node type to spin up in the testnet.  For example, a typical testnet would look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers.
+- a testnet spec which tells Lucy how many nodes of each node type to spin up in the testnet and what sort of balances the initial genesis accounts have.  For example, a typical testnet might look something like: 1 seed node, 6 block producers, 1 archive node, and 2 snark workers; Account A has 1000 tokens, Account B has 4000 tokens, and so on.  Of course it's more complicated than this, but that's the general idea.
 - a sequence of test logic and Mina interactions to be run against the testnet.  For example, waiting for blocks to be produced, sending transactions, waiting for transactions to reach consensus, running snarkyjs, removing nodes from the network and checking network connectivity, and so on.  
 
 #### Infrastructure (super high level)
 
 The 2 aforementioned parts (the test_executive, and the testnet) are typically run on different infrastructure.
 
-At the current moment, the testnet can only be run on Google Cloud, using their Google Kubernetes Engine.  
+At the current moment, the testnet can only be run on Google Cloud, using their Google Kubernetes Engine.
 
 The test_executive is run either on a developer's own laptop/desktop, or from our Continuous Integration system (BuildKite).  The machine running the test executive does not need much computing power, only an internet connection and the right credentials to access Google Cloud.
 
@@ -246,7 +246,7 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 
 ### Lucy general purpose directories
 
-- [`src/app/test_executive/`](test_executive.ml) — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
+- `src/app/test_executive/` — The pre-written Lucy tests live here, along with the `test_executive.ml` which is the entrypoint for executing them.
 - `src/lib/integration_test_lib/` — Contains the core logic for integration test framework. This is where you will find the implementation of the Lucy Ocaml DSL, the event router, the network state data structure, and wait conditions. This library also contains the definition of the interfaces for execution engines and test definitions.
 
 ### GCP Cloud Engine implementation specific directories
