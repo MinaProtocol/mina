@@ -114,6 +114,26 @@ module FieldCircuit = struct
 end
 
 module RangeCircuits = struct
+  let input_typ = Impl.Field.typ
+
+  let return_typ = Impl.Typ.unit
+
+  let lte (x : Impl.Field.t) () =
+    Impl.Field.Assert.lte ~bit_length:2 x (Impl.Field.of_int 3) ;
+    ()
+
+  let gte (x : Impl.Field.t) () =
+    Impl.Field.Assert.gte ~bit_length:2 x (Impl.Field.of_int 3) ;
+    ()
+
+  let gt (x : Impl.Field.t) () =
+    Impl.Field.Assert.gt ~bit_length:2 x (Impl.Field.of_int 3) ;
+    ()
+
+  let lt (x : Impl.Field.t) () =
+    Impl.Field.Assert.lt ~bit_length:2 x (Impl.Field.of_int 3) ;
+    ()
+
   (** This function tests all the possible combinations for the range gates. *)
   let range_circuit ~(should_succeed : bool) (a : int) (b : int) =
     let field_a = Impl.Field.Constant.of_int a in
@@ -208,6 +228,26 @@ let circuit_tests =
     , check_json ~input_typ:PublicOutput.input_typ
         ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
         "output.json" )
+  ; ( "circuit with range check (less than equal)"
+    , `Quick
+    , check_json ~input_typ:RangeCircuits.input_typ
+        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lte
+        "range_lte.json" )
+  ; ( "circuit with range check (greater than equal)"
+    , `Quick
+    , check_json ~input_typ:RangeCircuits.input_typ
+        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gte
+        "range_gte.json" )
+  ; ( "circuit with range check (less than)"
+    , `Quick
+    , check_json ~input_typ:RangeCircuits.input_typ
+        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.lt
+        "range_lt.json" )
+  ; ( "circuit with range check (greater than)"
+    , `Quick
+    , check_json ~input_typ:RangeCircuits.input_typ
+        ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
+        "range_gt.json" )
   ]
 
 (* API tests *)
