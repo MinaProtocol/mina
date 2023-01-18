@@ -361,6 +361,8 @@ module Make
 
   val finalize_and_get_gates : t -> Gates.t
 
+  val num_constraints : t -> int
+
   val digest : t -> Md5.t
 
   val to_json :
@@ -649,6 +651,8 @@ end = struct
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+
+  let num_constraints (sys : t) = finalize_and_get_gates sys |> Gates.len
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
