@@ -1,6 +1,5 @@
 open Transaction_snark_tests.Util
 open Core_kernel
-open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
 module Inner_curve = Snark_params.Tick.Inner_curve
@@ -13,8 +12,6 @@ let sk = Private_key.create ()
 let pk = Public_key.of_private_key_exn sk
 
 let pk_compressed = Public_key.compress pk
-
-let account_id = Account_id.create pk_compressed Token_id.default
 
 (* we want to create a circuit with a domain of size 2^16 *)
 let num_constraints = 1 lsl 16

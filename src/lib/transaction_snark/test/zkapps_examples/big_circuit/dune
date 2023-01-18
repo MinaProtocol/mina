@@ -1,8 +1,3 @@
-(env
- (dev
-  (flags
-   (:standard -w -32))))
-
 (test
  (name big_circuit)
  (libraries
