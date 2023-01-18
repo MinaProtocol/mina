@@ -259,13 +259,13 @@ module Account_update_under_construction = struct
             ; account = Account_condition.to_predicate t.account_condition
             }
         ; use_full_commitment = Boolean.false_
-        ; caller =
-            t.caller
-            (* the vk hash is a dummy, to be patched with `patch_verification_key_hashes`, below *)
+        ; caller = t.caller
         ; authorization_kind =
             { is_signed = Boolean.false_
             ; is_proved = Boolean.true_
-            ; verification_key_hash = Field.zero
+            ; verification_key_hash =
+                Field.zero
+                (* the vk hash is a dummy, to be patched with `patch_verification_key_hashes`, below *)
             }
         }
       in

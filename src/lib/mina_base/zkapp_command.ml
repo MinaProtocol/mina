@@ -2244,6 +2244,36 @@ let inner_query =
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
+module For_tests = struct
+  let replace_vks t vk =
+    { t with
+      account_updates =
+        Call_forest.map t.account_updates ~f:(fun (p : Account_update.t) ->
+            { p with
+              body =
+                { p.body with
+                  update =
+                    { p.body.update with
+                      verification_key =
+                        (* replace dummy vks in vk Setting *)
+                        ( match p.body.update.verification_key with
+                        | Set _vk ->
+                            Set vk
+                        | Keep ->
+                            Keep )
+                    }
+                ; authorization_kind =
+                    (* replace dummy vk hashes in authorization kind *)
+                    ( match p.body.authorization_kind with
+                    | Proof _vk_hash ->
+                        Proof (With_hash.hash vk)
+                    | ak ->
+                        ak )
+                }
+            } )
+    }
+end
+
 let%test_module "Test" =
   ( module struct
     module Fd = Fields_derivers_zkapps.Derivers
