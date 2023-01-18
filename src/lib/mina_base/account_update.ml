@@ -128,8 +128,18 @@ module Call_type = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Call_type.V1.t =
         | Call
+            (** A plain call, conveying permission to the child (and
+                potentially it's children, via delegate call) to use the
+                token_id derived from the caller's account ID.
+            *)
         | Delegate_call
+            (** A call as if this node was not in the stack, passing permission
+                to use the token_id given to this node down to its child.
+            *)
         | Blind_call
+            (** A call that conveys no permission to its children to use its
+                token_id.
+            *)
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -190,6 +200,178 @@ module Call_type = struct
     val to_variant : bool t -> variant
 
     val of_variant : variant -> bool t
+
+    (* TODO: Create an alias for this type *)
+    val deriver :
+         ( bool t
+         , ( ( ( bool t
+               , ( bool t
+                 , ( bool t
+                   , ( ( bool t
+                       , ( bool t
+                         , ( bool t
+                           , ( (< contramap : (bool t -> bool t) Core_kernel.ref
+                                ; graphql_arg :
+                                    (   unit
+                                     -> bool t
+                                        Fields_derivers_graphql.Schema.Arg
+                                        .arg_typ )
+                                    Core_kernel.ref
+                                ; graphql_arg_accumulator :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql.Args
+                                    .Acc
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; graphql_creator :
+                                    (   ( ( 'a
+                                          , bool t
+                                          , bool t
+                                          , 'b )
+                                          Fields_derivers_zkapps.Derivers
+                                          .Graphql
+                                          .Args
+                                          .Output
+                                          .t
+                                        , bool t
+                                        , bool t
+                                        , 'b )
+                                        Fields_derivers_zkapps.Derivers.Graphql
+                                        .Args
+                                        .Input
+                                        .t
+                                     -> bool t )
+                                    Core_kernel.ref
+                                ; graphql_fields :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Input
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; graphql_fields_accumulator :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Accumulator
+                                    .T
+                                    .t
+                                    list
+                                    Core_kernel.ref
+                                ; graphql_query : string option Core_kernel.ref
+                                ; graphql_query_accumulator :
+                                    (Core_kernel.String.t * string option)
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; js_layout :
+                                    [> `Assoc of (string * Yojson.Safe.t) list ]
+                                    Core_kernel.ref
+                                ; js_layout_accumulator :
+                                    Fields_derivers_zkapps__.Fields_derivers_js
+                                    .Js_layout
+                                    .Accumulator
+                                    .field
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; map : (bool t -> bool t) Core_kernel.ref
+                                ; nullable_graphql_arg :
+                                    (   unit
+                                     -> 'b
+                                        Fields_derivers_graphql.Schema.Arg
+                                        .arg_typ )
+                                    Core_kernel.ref
+                                ; nullable_graphql_fields :
+                                    bool t option
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Input
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; of_json :
+                                    (Yojson.Safe.t -> bool t) Core_kernel.ref
+                                ; of_json_creator :
+                                    Yojson.Safe.t Core_kernel.String.Map.t
+                                    Core_kernel.ref
+                                ; skip : bool Core_kernel.ref
+                                ; to_json :
+                                    (bool t -> Yojson.Safe.t) Core_kernel.ref
+                                ; to_json_accumulator :
+                                    ( Core_kernel.String.t
+                                    * (bool t -> Yojson.Safe.t) )
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; .. >
+                                as
+                                'a )
+                               Fields_derivers_zkapps__.Fields_derivers_js
+                               .Js_layout
+                               .Input
+                               .t
+                               Fields_derivers_graphql.Graphql_query.Input.t
+                             , bool t
+                             , bool t
+                             , 'b )
+                             Fields_derivers_zkapps.Derivers.Graphql.Args.Input
+                             .t
+                           , bool t
+                           , bool t option )
+                           Fields_derivers_zkapps.Derivers.Graphql.Fields.Input
+                           .t
+                         , bool t )
+                         Fields_derivers_json.Of_yojson.Input.t
+                       , bool t )
+                       Fields_derivers_json.To_yojson.Input.t
+                       Fields_derivers_zkapps.Unified_input.t
+                       Fields_derivers_zkapps__.Fields_derivers_js.Js_layout
+                       .Input
+                       .t
+                       Fields_derivers_graphql.Graphql_query.Input.t
+                     , bool t
+                     , bool t
+                     , 'b )
+                     Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+                   , bool t
+                   , bool t option )
+                   Fields_derivers_zkapps.Derivers.Graphql.Fields.Input.t
+                 , bool t )
+                 Fields_derivers_json.Of_yojson.Input.t
+               , bool t )
+               Fields_derivers_json.To_yojson.Input.t
+               Fields_derivers_zkapps.Unified_input.t
+             , bool t
+             , bool t
+             , 'b )
+             Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+           , bool t
+           , bool t
+           , 'b )
+           Fields_derivers_zkapps.Derivers.Graphql.Args.Acc.t
+         , bool t
+         , bool t option )
+         Fields_derivers_zkapps.Derivers.Graphql.Fields.Accumulator.t
+      -> ( bool t
+         , ( bool t
+           , ( bool t
+             , ( 'a Fields_derivers_zkapps__.Fields_derivers_js.Js_layout.Input.t
+                 Fields_derivers_graphql.Graphql_query.Input.t
+               , bool t
+               , bool t
+               , 'b )
+               Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+             , bool t
+             , bool t option )
+             Fields_derivers_zkapps.Derivers.Graphql.Fields.Input.t
+           , bool t )
+           Fields_derivers_json.Of_yojson.Input.t
+         , bool t )
+         Fields_derivers_json.To_yojson.Input.t
+         Fields_derivers_zkapps.Unified_input.t
   end = struct
     type variant = t
 
@@ -198,7 +380,7 @@ module Call_type = struct
         is_delegate_call : 'bool
       ; is_blind_call : 'bool
       }
-    [@@deriving hlist, fields]
+    [@@deriving annot, hlist, fields]
 
     let map ~f { is_delegate_call; is_blind_call } =
       { is_delegate_call = f is_delegate_call; is_blind_call = f is_blind_call }
@@ -246,16 +428,20 @@ module Call_type = struct
           { is_delegate_call = true; is_blind_call = false }
       | Blind_call ->
           { is_delegate_call = false; is_blind_call = true }
+
+    let deriver obj : _ Fields_derivers_zkapps.Unified_input.t =
+      let open Fields_derivers_zkapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots in
+      Fields.make_creator obj ~is_delegate_call:!.bool ~is_blind_call:!.bool
+      |> finish "CallType" ~t_toplevel_annots
   end
 
   let quickcheck_generator = gen
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_string ~name:"CallType" ~js_type:(Custom "CallType") ~to_string
-      ~of_string obj
-
-  let to_input x = As_record.to_input ~field_of_bool (As_record.of_variant x)
+    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+      As_record.deriver obj
 
   module Checked = struct
     type t = Boolean.var As_record.t
@@ -285,6 +471,8 @@ module Call_type = struct
     let assert_equal x y =
       As_record.equal ~equal:Run.Boolean.Assert.( = ) ~and_:(fun _ _ -> ()) x y
   end
+
+  let to_input x = As_record.to_input ~field_of_bool (As_record.of_variant x)
 
   let typ : (Checked.t, t) Typ.t =
     As_record.typ
@@ -992,6 +1180,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; call_type : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
@@ -1009,7 +1198,8 @@ module Body = struct
         ~increment_nonce:!.bool ~events:!.Events.deriver
         ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
-        ~call_type:!.Call_type.deriver ~call_depth:!.int
+        ~implicit_account_creation_fee:!.bool ~call_type:!.Call_type.deriver
+        ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
@@ -1025,6 +1215,7 @@ module Body = struct
       ; call_depth = 0
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
+      ; implicit_account_creation_fee = false
       ; call_type = Blind_call
       ; authorization_kind = None_given
       }
@@ -1047,6 +1238,7 @@ module Body = struct
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; call_type : Call_type.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
@@ -1072,6 +1264,7 @@ module Body = struct
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
         ; call_type : Call_type.Stable.V1.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
@@ -1092,6 +1285,7 @@ module Body = struct
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; call_type = p.call_type
     ; authorization_kind = p.authorization_kind
     }
@@ -1107,6 +1301,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; call_type
        ; call_depth = _
        ; authorization_kind
@@ -1122,6 +1317,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; call_type
     ; authorization_kind
     }
@@ -1137,6 +1333,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; call_type
        ; authorization_kind
        } :
@@ -1151,6 +1348,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; call_type
     ; call_depth
     ; authorization_kind
@@ -1230,6 +1428,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
+    ; implicit_account_creation_fee = true
     ; call_type = Blind_call
     ; authorization_kind = Signature
     }
@@ -1256,6 +1455,7 @@ module Body = struct
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
+    ; implicit_account_creation_fee = true
     ; call_type = Blind_call
     ; call_depth = 0
     ; authorization_kind = Signature
@@ -1320,6 +1520,7 @@ module Body = struct
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
+      ; implicit_account_creation_fee : Boolean.var
       ; call_type : Call_type.Checked.t
       ; authorization_kind : Authorization_kind.Checked.t
       }
@@ -1336,6 +1537,7 @@ module Body = struct
          ; call_data
          ; preconditions
          ; use_full_commitment
+         ; implicit_account_creation_fee
          ; call_type
          ; authorization_kind
          } :
@@ -1354,6 +1556,8 @@ module Body = struct
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
+        ; Random_oracle_input.Chunked.packed
+            ((implicit_account_creation_fee :> Field.Var.t), 1)
         ; Call_type.Checked.to_input call_type
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
@@ -1375,6 +1579,7 @@ module Body = struct
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
+      ; Impl.Boolean.typ
       ; Call_type.typ
       ; Authorization_kind.typ
       ]
@@ -1392,6 +1597,7 @@ module Body = struct
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
+    ; implicit_account_creation_fee = true
     ; call_type = Blind_call
     ; authorization_kind = None_given
     }
@@ -1414,6 +1620,7 @@ module Body = struct
        ; call_data
        ; preconditions
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; call_type
        ; authorization_kind
        } :
@@ -1429,6 +1636,8 @@ module Body = struct
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
+      ; Random_oracle_input.Chunked.packed
+          (field_of_bool implicit_account_creation_fee, 1)
       ; Call_type.to_input call_type
       ; Authorization_kind.to_input authorization_kind
       ]
@@ -1456,6 +1665,7 @@ module Body = struct
     and call_data = Field.gen
     and preconditions = Preconditions.gen
     and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
     and call_type = Call_type.gen
     and authorization_kind = Authorization_kind.gen in
     { public_key
@@ -1468,6 +1678,7 @@ module Body = struct
     ; call_data
     ; preconditions
     ; use_full_commitment
+    ; implicit_account_creation_fee
     ; call_type
     ; authorization_kind
     }
@@ -1648,5 +1859,8 @@ let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 let token_id (t : t) : Token_id.t = t.body.token_id
 
 let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+
+let implicit_account_creation_fee (t : t) : bool =
+  t.body.implicit_account_creation_fee
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce

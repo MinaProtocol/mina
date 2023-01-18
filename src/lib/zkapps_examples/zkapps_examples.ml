@@ -271,6 +271,11 @@ module Account_update_under_construction = struct
             ; account = Account_condition.to_predicate t.account_condition
             }
         ; use_full_commitment = Boolean.false_
+        ; implicit_account_creation_fee =
+            (* Probably shouldn't hard-code this logic, but :shrug:, it's a
+               reasonable test.
+            *)
+            Token_id.(Checked.equal t.token_id (Checked.constant default))
         ; call_type = t.call_type
         ; authorization_kind = t.authorization_kind
         }
@@ -659,7 +664,7 @@ let mk_update_body ?(token_id = Token_id.default)
     ?(use_full_commitment = false)
     ?(call_type = Account_update.Call_type.Blind_call)
     ?(authorization_kind = Account_update.Authorization_kind.Signature)
-    public_key =
+    ?(implicit_account_creation_fee = false) public_key =
   { Account_update.Body.public_key
   ; update
   ; token_id
@@ -672,6 +677,7 @@ let mk_update_body ?(token_id = Token_id.default)
   ; use_full_commitment
   ; call_type
   ; authorization_kind
+  ; implicit_account_creation_fee
   }
 
 module Deploy_account_update = struct
