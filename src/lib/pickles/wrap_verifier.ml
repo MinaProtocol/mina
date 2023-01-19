@@ -504,9 +504,11 @@ struct
       ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
-         array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
+         array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t)
+      ~(advice : _ Import.Types.Step.Bulletproof.Advice.t)
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
-      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
+      ~(options : Plonk_types.Features.options) =
     let T = Max_proofs_verified.eq in
     let sg_old =
       with_label __LOC__ (fun () ->
@@ -659,10 +661,18 @@ struct
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
         let ft_comm =
+          let flags =
+            let open Plonk_types in
+            Features.map options ~f:(function
+              | Opt.Flag.Maybe | Opt.Flag.Yes ->
+                  true
+              | Opt.Flag.No ->
+                  false )
+          in
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~verification_key:m ~plonk ~alpha ~t_comm ~flags )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

@@ -45,14 +45,15 @@ val ft_comm :
   -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
   -> alpha:'c
   -> plonk:
-       ( 'd
-       , 'e
+       ( _
+       , _
        , 'b
-       , 'g
-       , 'f
-       , 'bool )
+       , _
+       , _
+       , _ )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'a array
+  -> flags:Plonk_types.Features.flags
   -> 'a
 
 val dlog_pcs_batch :

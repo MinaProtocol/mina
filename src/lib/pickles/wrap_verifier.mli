@@ -98,6 +98,7 @@ val incrementally_verify_proof :
        , 'd
        , Wrap_main_inputs.Impl.Boolean.var )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+  -> options:Pickles_types.Plonk_types.Features.options
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
        * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t

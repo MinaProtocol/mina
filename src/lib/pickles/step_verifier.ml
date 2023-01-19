@@ -588,7 +588,9 @@ struct
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast2
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~verification_key:m ~plonk ~alpha ~t_comm
+                ~flags:Plonk_types.Features.none_bool
+              (* FIXME: Might not be correct *) )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

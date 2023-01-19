@@ -235,22 +235,31 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
+let maybe_scale ~scale g x l =
+  match x with None -> l | Some fp -> scale g fp :: l
+
 let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
-    ~t_comm =
-  let ( * ) x g = scale g x in
+    ~t_comm ~flags =
+  let _ = flags in
+
+  (* ignore flags for now *)
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
+  (* TODO: Add here scalars for other custom gates throuhg
+     plonk.optional_column_scalars *)
+  let ( * ) x g = scale g x in
+  let _mopt x g = Option.map ~f:(scale g) x in
+  let ( +? ) v vopt = match vopt with None -> v | Some v1 -> v + v1 in
+  let _f_placeholder = ( +? ) in
   let f_comm =
-    List.reduce_exn ~f:( + )
-      [ plonk.perm * sigma_comm_last
-      ; plonk.vbmul * m.mul_comm
-      ; plonk.complete_add * m.complete_add_comm
-      ; plonk.endomul * m.emul_comm
-      ; plonk.endomul_scalar * m.endomul_scalar_comm
-      ]
+    (plonk.perm * sigma_comm_last)
+    + (plonk.vbmul * m.mul_comm)
+    + (plonk.complete_add * m.complete_add_comm)
+    + (plonk.endomul * m.emul_comm)
+    + (plonk.endomul_scalar * m.endomul_scalar_comm)
   in
   let chunked_t_comm =
     let n = Array.length t_comm in

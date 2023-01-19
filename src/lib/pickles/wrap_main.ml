@@ -435,7 +435,8 @@ let wrap_main
                         `Packed_bits (x, n) ) )
                 ~sg_old:prev_step_accs
                 ~advice:{ b; combined_inner_product }
-                ~messages ~which_branch ~openings_proof ~plonk )
+                ~messages ~which_branch ~openings_proof ~plonk
+                ~options:feature_flags )
         in
         with_label __LOC__ (fun () ->
             Boolean.Assert.is_true bulletproof_success ) ;
