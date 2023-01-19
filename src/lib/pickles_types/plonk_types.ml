@@ -185,6 +185,10 @@ module Features = struct
     end
   end]
 
+  type options = Opt.Flag.t t
+
+  type flags = bool t
+
   let to_vector
       { chacha
       ; range_check
