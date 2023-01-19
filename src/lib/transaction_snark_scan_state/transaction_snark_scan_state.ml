@@ -298,39 +298,6 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
   | Merge ((p, _), (p', _)) ->
       let open Or_error.Let_syntax in
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
-      (*let option lab =
-          Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
-        in
-        let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
-        and supply_increase =
-          Amount.Signed.add s.supply_increase s'.supply_increase
-          |> option "Error adding supply_increases"
-        and _valid_pending_coinbase_stack =
-          if
-            Pending_coinbase.Stack.equal s.target.pending_coinbase_stack
-              s'.source.pending_coinbase_stack
-          then Ok ()
-          else Or_error.error_string "Invalid pending coinbase stack state"
-        in
-        (*Ignore [zkapp_updates_applied] in merge statements since we don't care
-          whether or not account updates were applied, just that they were computed correctly.
-          If one of the updates fail, then none are applied*)
-        let zkapp_updates_applied =
-          s.target.local_state.success && s'.target.local_state.success
-        in
-        let connecting_ledger_left = failwith "TODO merge rules" in
-        let connecting_ledger_right = failwith "TODO merge rules" in
-        let statement : Transaction_snark.Statement.t =
-          { source = s.source
-          ; target = s'.target
-          ; connecting_ledger_left
-          ; connecting_ledger_right
-          ; supply_increase
-          ; fee_excess
-          ; sok_digest = ()
-          ; zkapp_updates_applied
-          }
-        in*)
       let%map statement = Transaction_snark.Statement.merge s s' in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )

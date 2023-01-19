@@ -129,7 +129,7 @@ module Transaction_key = struct
       Mina_ledger.Ledger.register_mask ledger new_mask
     in
     let _partial_stmt =
-      Mina_ledger.Ledger.apply_transaction_phase_1 ~constraint_constants
+      Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
         ~txn_state_view:Transaction_snark_tests.Util.genesis_state_view
         second_pass_ledger
         (Mina_transaction.Transaction.Command (Zkapp_command p))

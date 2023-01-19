@@ -657,3 +657,65 @@ let%test_unit "zkapp_command payment test" =
                     } ) ;
               test_eq (module L) accounts l1 l2 ) )
       |> Or_error.ok_exn )
+
+let%test_unit "user_command application on masked ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds = List.map specs ~f:command_send in
+      L.with_ledger ~depth ~f:(fun l ->
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let m =
+            Maskable.register_mask
+              (Any_ledger.cast (module L) l)
+              (Mask.create ~depth:(L.depth l) ())
+          in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot l )
+            |> Or_error.ok_exn
+          in
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+          assert (Ledger_hash.equal init_merkle_root (L.merkle_root m)) ) )
+
+let%test_unit "zkapp_command application on masked ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds =
+        List.map specs ~f:(fun spec ->
+            let use_full_commitment =
+              Quickcheck.random_value Bool.quickcheck_generator
+            in
+            account_update_send ~constraint_constants ~use_full_commitment spec )
+      in
+      L.with_ledger ~depth ~f:(fun l ->
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let m =
+            Maskable.register_mask
+              (Any_ledger.cast (module L) l)
+              (Mask.create ~depth:(L.depth l) ())
+          in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_zkapp_command_unchecked ~constraint_constants
+                   ~state_view:view l )
+            |> Or_error.ok_exn
+          in
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+          assert (Ledger_hash.equal init_merkle_root (L.merkle_root m)) ) )

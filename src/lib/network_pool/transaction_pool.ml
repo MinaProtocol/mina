@@ -1591,10 +1591,24 @@ let%test_module _ =
           List.iter commands ~f:(fun c ->
               Core.Printf.printf !"  %{Sexp}\n" (User_command.sexp_of_t c) )
         in
+        (*
+        let additional1, additional2 =
+          Set.symmetric_diff set1 set2
+          |> Sequence.to_list
+          |> List.partition_map ~f:Fn.id
+        in
+        assert (List.length additional1 + List.length additional2 > 0) ;
+        let report_additional commands a b =
+          Core.Printf.printf "%s user commands not in %s:\n" a b ;
+          List.iter commands ~f:(fun c ->
+              Core.Printf.printf !"  %s\n" (Transaction_hash.to_base58_check c) )
+        in
+        *)
         if List.length additional1 > 0 then
           report_additional additional1 "actual" "expected" ;
         if List.length additional2 > 0 then
-          report_additional additional2 "expected" "actual" ) ;
+          report_additional additional2 "expected" "actual" ;
+        Core.Printf.printf !"HELP ME!!!\n%!" ) ;
       [%test_eq: Transaction_hash.Set.t] set1 set2
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
@@ -1811,12 +1825,123 @@ let%test_module _ =
         (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
            () )
 
-    let mk_zkapp_command_cmds (pool : Test.Resource_pool.t) :
+    (*
+    let init_zkapp_command_generator_state num_cmds ledger = 
+      assert (num_cmds < Array.length test_keys - 1) ;
+      let keymap =
+        Array.fold (Array.append test_keys extra_keys)
+          ~init:Public_key.Compressed.Map.empty
+          ~f:(fun map { public_key; private_key } ->
+            let key = Public_key.compress public_key in
+            Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
+      in
+      let account_state_tbl =
+        List.take (Array.to_list test_keys) num_cmds
+        |> List.map ~f:(fun kp ->
+               let id =
+                 Account_id.create
+                   (Public_key.compress kp.public_key)
+                   Token_id.default
+               in
+               let state =
+                 Option.value_exn
+                   (let%bind.Option loc =
+                      Mina_ledger.Ledger.location_of_account ledger id
+                    in
+                    Mina_ledger.Ledger.get ledger loc )
+               in
+               (id, (state, `Fee_payer)) )
+        |> Account_id.Table.of_alist_exn
+      in
+      (keymap, account_state_tbl)
+
+    let mk_zkapp_commands_single_block' ~keymap ~account_state_tbl start stop ledger :
         User_command.Valid.t list Deferred.t =
-      let num_cmds = 7 in
+      let rec go n cmds =
+        let open Quickcheck.Generator.Let_syntax in
+        if n < stop then
+          let%bind cmd =
+            let fee_payer_keypair = test_keys.(n) in
+            let%map (zkapp_command : Zkapp_command.t) =
+              Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
+                ~failure:Invalid_protocol_state_precondition
+                ~max_token_updates:1 ~keymap ~account_state_tbl
+                ~fee_payer_keypair ~ledger ()
+            in
+            let zkapp_command =
+              { zkapp_command with
+                account_updates =
+                  Zkapp_command.Call_forest.map zkapp_command.account_updates
+                    ~f:(fun (p : Account_update.t) ->
+                      { p with
+                        body =
+                          { p.body with
+                            preconditions =
+                              { p.body.preconditions with
+                                account =
+                                  ( match p.body.preconditions.account with
+                                  | Account_update.Account_precondition.Full
+                                      { nonce =
+                                          Zkapp_basic.Or_ignore.Check n as c
+                                      ; _
+                                      }
+                                    when Zkapp_precondition.Numeric.(
+                                           is_constant Tc.nonce c) ->
+                                      Account_update.Account_precondition.Nonce
+                                        n.lower
+                                  | Account_update.Account_precondition.Full _
+                                    ->
+                                      Account_update.Account_precondition.Accept
+                                  | pre ->
+                                      pre )
+                              }
+                          }
+                      } )
+              }
+            in
+            let zkapp_command =
+              Or_error.ok_exn
+                (Zkapp_command.Valid.to_valid ~ledger
+                   ~get:Mina_ledger.Ledger.get
+                   ~location_of_account:Mina_ledger.Ledger.location_of_account
+                   zkapp_command )
+            in
+            User_command.Zkapp_command zkapp_command
+          in
+          go (n + 1) (cmd :: cmds)
+        else Quickcheck.Generator.return @@ List.rev cmds
+      in
+      let result =
+        Quickcheck.random_value ~seed:(`Deterministic "zkapp_command") (go start [])
+      in
+      replace_valid_zkapp_command_authorizations ~keymap ~ledger
+        result
+
+    let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
+        User_command.Valid.t list Deferred.t =
+      let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
+      let keymap, account_state_tbl = init_zkapp_command_generator_state num_cmds best_tip_ledger in
+      mk_zkapp_commands_single_block' ~keymap ~account_state_tbl 0 num_cmds best_tip_ledger
+
+    let mk_zkapp_commands_multi_block block_sizes (pool : Test.Resource_pool.t) =
+      let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
+      let total_num_cmds = List.sum (module Int) block_sizes ~f:Fn.id in
+      let keymap, account_state_tbl = init_zkapp_command_generator_state total_num_cmds best_tip_ledger in
+      let%map _, cmds =
+        Deferred.List.fold block_sizes ~init:(0, []) ~f:(fun (i, acc) num_cmds ->
+          let%map cmds = mk_zkapp_commands_single_block' ~keymap ~account_state_tbl i (i+num_cmds) best_tip_ledger in
+          (i+num_cmds, cmds :: acc))
+      in
+      List.concat (List.rev cmds)
+    *)
+
+    let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
+        User_command.Valid.t list Deferred.t =
+      (*let num_cmds = 7 in*)
       assert (num_cmds < Array.length test_keys - 1) ;
       let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
       let keymap =
+        (*List.fold ((List.drop (Array.to_list test_keys) num_cmds) @ (Array.to_list extra_keys))*)
         Array.fold (Array.append test_keys extra_keys)
           ~init:Public_key.Compressed.Map.empty
           ~f:(fun map { public_key; private_key } ->
@@ -2017,8 +2142,22 @@ let%test_module _ =
         Ledger.Maskable.register_mask
           (Ledger.Any_ledger.cast (module Mina_ledger.Ledger) ledger)
           (Ledger.Mask.create ~depth:(Ledger.depth ledger) ()) ;
+      (*test.txn_pool.best_tip_ledger <- Some !(test.best_tip_ref) ;*)
       let%map () = reorg test [] [] in
-      commit_commands test cs ; ledger
+      assert (
+        not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
+      assert (
+        phys_equal
+          (Option.value_exn test.txn_pool.best_tip_ledger)
+          !(test.best_tip_ref) ) ;
+      commit_commands test cs ;
+      assert (
+        not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
+      assert (
+        phys_equal
+          (Option.value_exn test.txn_pool.best_tip_ledger)
+          !(test.best_tip_ref) ) ;
+      ledger
 
     let advance_chain test cs = commit_commands test cs ; reorg test cs []
 
@@ -2058,7 +2197,8 @@ let%test_module _ =
     let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_linear_case_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_linear_case_test test )
 
     let mk_remove_and_add_test t cmds =
       assert_pool_txs t [] ;
@@ -2079,7 +2219,8 @@ let%test_module _ =
                    (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_remove_and_add_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_remove_and_add_test test )
 
     let mk_invalid_test t cmds =
       assert_pool_txs t [] ;
@@ -2098,7 +2239,8 @@ let%test_module _ =
     let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_invalid_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_invalid_test test )
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -2132,7 +2274,7 @@ let%test_module _ =
                    changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool
+          mk_zkapp_commands_single_block 7 test.txn_pool
           >>= mk_now_invalid_test test
                 ~mk_command:
                   (mk_transfer_zkapp_command ?valid_period:None
@@ -2189,7 +2331,7 @@ let%test_module _ =
     let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool
+          mk_zkapp_commands_single_block 7 test.txn_pool
           >>= mk_expired_not_accepted_test test ~padding:55 )
 
     let%test_unit "Expired transactions that are already in the pool are \
@@ -2512,22 +2654,110 @@ let%test_module _ =
           assert_user_command_sets_equal a b )
 
     let mk_rebroadcastable_test t cmds =
+      Core.Printf.printf "TRANSACTIONS:\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          Core.Printf.printf
+            !"%{sexp:User_command.t}\n"
+            (User_command.forget_check cmd) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      Core.Printf.printf "FEE PAYER STATES (1):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = !^(t.txn_pool.best_tip_ledger) in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
       assert_pool_txs t [] ;
       assert_rebroadcastable t [] ;
       (* Locally generated transactions are rebroadcastable *)
+      Core.Printf.printf "STEP 1\n" ;
       let%bind () = add_commands' ~local:true t (List.take cmds 2) in
       assert_pool_txs t (List.take cmds 2) ;
       assert_rebroadcastable t (List.take cmds 2) ;
       (* Adding non-locally-generated transactions doesn't affect
          rebroadcastable pool *)
+      Core.Printf.printf "STEP 2\n" ;
       let%bind () = add_commands' ~local:false t (List.slice cmds 2 5) in
       assert_pool_txs t (List.take cmds 5) ;
       assert_rebroadcastable t (List.take cmds 2) ;
       (* When locally generated transactions are committed they are no
          longer rebroadcastable *)
+      Core.Printf.printf "STEP 3\n" ;
       let%bind () = add_commands' ~local:true t (List.slice cmds 5 7) in
+
       let%bind checkpoint_1 = commit_commands' t (List.take cmds 1) in
+
+      Core.Printf.printf "FEE PAYER STATES (checkpoint_1 1):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = checkpoint_1 in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      Core.Printf.printf "FEE PAYER STATES (2):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = !^(t.txn_pool.best_tip_ledger) in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
       let%bind checkpoint_2 = commit_commands' t (List.slice cmds 1 5) in
+
+      Core.Printf.printf "FEE PAYER STATES (checkpoint_1 2):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = checkpoint_1 in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      Core.Printf.printf "FEE PAYER STATES (checkpoint_2 1):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = checkpoint_2 in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
       let%bind () = reorg t (List.take cmds 5) [] in
       assert_pool_txs t (List.slice cmds 5 7) ;
       assert_rebroadcastable t (List.slice cmds 5 7) ;
@@ -2535,20 +2765,72 @@ let%test_module _ =
          rebroadcastable pool, if they were removed and not re-added *)
       (* restore up to after the application of the first command *)
       t.best_tip_ref := checkpoint_2 ;
-      (* reorge both removes and re-adds the first command (which is local) *)
+
+      Core.Printf.printf "FEE PAYER STATES (checkpoint_2 2):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = checkpoint_2 in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      Core.Printf.printf "FEE PAYER STATES (3):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = !^(t.txn_pool.best_tip_ledger) in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      (* reorg both removes and re-adds the first command (which is local) *)
+      Core.Printf.printf "STEP 4\n" ;
       let%bind () = reorg t (List.take cmds 1) (List.take cmds 5) in
+
+      Core.Printf.printf "FEE PAYER STATES (4):\n" ;
+      List.iter cmds ~f:(fun cmd ->
+          let open Mina_ledger in
+          let ( !^ ) = Option.value_exn in
+          let ledger = !^(t.txn_pool.best_tip_ledger) in
+          let fee_payer =
+            User_command.fee_payer @@ User_command.forget_check cmd
+          in
+          Core.Printf.printf !"%{sexp:Account.t}\n"
+            !^(Ledger.get ledger
+                 !^(Ledger.location_of_account
+                      !^(t.txn_pool.best_tip_ledger)
+                      fee_payer ) ) ) ;
+      Core.Printf.printf !"=====\n%!" ;
+
+      Core.Printf.printf "ASSERT 1\n" ;
       assert_pool_txs t (List.slice cmds 1 7) ;
+      Core.Printf.printf "ASSERT 2\n" ;
       assert_rebroadcastable t (List.nth_exn cmds 1 :: List.slice cmds 5 7) ;
       (* Committing them again removes them from the pool again. *)
-      commit_commands t (List.slice cmds 1 7) ;
-      let%bind () = reorg t (List.slice cmds 1 7) [] in
-      assert_pool_txs t [] ;
-      assert_rebroadcastable t [] ;
+      Core.Printf.printf "STEP 5\n" ;
+      commit_commands t (List.slice cmds 1 5) ;
+      let%bind () = reorg t (List.slice cmds 1 5) [] in
+      assert_pool_txs t (List.slice cmds 5 7) ;
+      assert_rebroadcastable t (List.slice cmds 5 7) ;
       (* When transactions expire from rebroadcast pool they are gone. This
          doesn't affect the main pool.
       *)
+      Core.Printf.printf "STEP 6\n" ;
       t.best_tip_ref := checkpoint_1 ;
-      let%bind () = reorg t [] (List.take cmds 7) in
+      let%bind () = reorg t [] (List.take cmds 5) in
       assert_pool_txs t (List.take cmds 7) ;
       assert_rebroadcastable t (List.take cmds 2 @ List.slice cmds 5 7) ;
       ignore
@@ -2556,6 +2838,9 @@ let%test_module _ =
             ~has_timed_out:(Fn.const `Timed_out)
           : User_command.t list list ) ;
       assert_rebroadcastable t [] ;
+      Core.Printf.printf !"\n%!" ;
+      Core.Out_channel.flush Core.Out_channel.stdout ;
+      (* Async.Writer.flushed (Lazy.force Async.Writer.stdout) *)
       Deferred.unit
 
     let%test_unit "rebroadcastable transaction behavior (user cmds)" =
@@ -2566,7 +2851,9 @@ let%test_module _ =
     let%test_unit "rebroadcastable transaction behavior (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_rebroadcastable_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_rebroadcastable_test test )
+    (*mk_zkapp_commands_multi_block [1; 4; 2] test.txn_pool >>= mk_rebroadcastable_test test )*)
 
     let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -2579,7 +2866,7 @@ let%test_module _ =
           *)
           let take_len = num_cmds / 2 in
           let%bind snapp_cmds =
-            let%map cmds = mk_zkapp_command_cmds t.txn_pool in
+            let%map cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
             List.take cmds take_len
           in
           let user_cmds = List.drop independent_cmds take_len in
