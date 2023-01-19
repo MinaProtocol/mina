@@ -122,14 +122,14 @@ let%test_module "Transaction union tests" =
           in
           let sparse_ledger_after, applied_transaction =
             Result.( >>= )
-              (Sparse_ledger.apply_transaction_phase_1
+              (Sparse_ledger.apply_transaction_first_pass
                  ~constraint_constants:U.constraint_constants sparse_ledger
                  ~txn_state_view:
                    ( txn_in_block.block_data
                    |> Mina_state.Protocol_state.Body.view )
                  txn_in_block.transaction )
               (fun (sparse_ledger, partially_applied) ->
-                Sparse_ledger.apply_transaction_phase_2 sparse_ledger
+                Sparse_ledger.apply_transaction_second_pass sparse_ledger
                   partially_applied )
             |> Or_error.ok_exn
           in

@@ -642,16 +642,16 @@ let get_snarked_ledger t state_hash_opt =
                       (State_hash.to_base58_check state_hash)
               in
               let apply_first_pass =
-                Ledger.apply_transaction_phase_1
+                Ledger.apply_transaction_first_pass
                   ~constraint_constants:
                     t.config.precomputed_values.constraint_constants
               in
-              let apply_second_pass = Ledger.apply_transaction_phase_2 in
+              let apply_second_pass = Ledger.apply_transaction_second_pass in
               let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger
                   txn =
                 let open Or_error.Let_syntax in
                 let%map _ledger, partial_txn =
-                  Mina_ledger.Sparse_ledger.apply_transaction_phase_1
+                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants:
                       t.config.precomputed_values.constraint_constants
                     ~txn_state_view sparse_ledger txn

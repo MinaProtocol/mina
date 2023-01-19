@@ -224,11 +224,11 @@ let create_expected_statement ~constraint_constants
            , target_second_pass_merkle_root
            , supply_increase ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
-      Sparse_ledger.apply_transaction_phase_1 ~constraint_constants
+      Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~txn_state_view:state_view first_pass_ledger_witness transaction
     in
     let%bind second_pass_ledger_after_apply, applied_transaction =
-      Sparse_ledger.apply_transaction_phase_2 second_pass_ledger_witness
+      Sparse_ledger.apply_transaction_second_pass second_pass_ledger_witness
         partially_applied_transaction
     in
     let target_first_pass_merkle_root =

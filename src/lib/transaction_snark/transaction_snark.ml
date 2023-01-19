@@ -3554,13 +3554,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let applied_txn, states =
             let partial_txn, states =
-              Sparse_ledger.apply_zkapp_phase_1_unchecked_with_states
+              Sparse_ledger.apply_zkapp_first_pass_unchecked_with_states
                 first_pass_ledger ~constraint_constants ~state_view ~fee_excess
                 ~supply_increase zkapp_command
               |> Or_error.ok_exn
             in
-            Sparse_ledger.apply_zkapp_phase_2_unchecked_with_states ~init:states
-              second_pass_ledger partial_txn
+            Sparse_ledger.apply_zkapp_second_pass_unchecked_with_states
+              ~init:states second_pass_ledger partial_txn
             |> Or_error.ok_exn
           in
           let zkapp_updates_applied =

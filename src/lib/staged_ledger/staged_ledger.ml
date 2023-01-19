@@ -11,23 +11,6 @@ open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
-(* TODO: move me *)
-let result_list_fold ls ~init ~f =
-  let open Result.Let_syntax in
-  List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
-      let%bind acc = acc_or_error in
-      f acc el )
-
-(* TODO: move me *)
-let result_list_map ls ~f =
-  let open Result.Let_syntax in
-  let%map r =
-    result_list_fold ls ~init:[] ~f:(fun t el ->
-        let%map h = f el in
-        h :: t )
-  in
-  List.rev r
-
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
@@ -362,13 +345,13 @@ module T = struct
       ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
     let apply_first_pass =
-      Ledger.apply_transaction_phase_1 ~constraint_constants
+      Ledger.apply_transaction_first_pass ~constraint_constants
     in
-    let apply_second_pass = Ledger.apply_transaction_phase_2 in
+    let apply_second_pass = Ledger.apply_transaction_second_pass in
     let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger txn =
       let open Or_error.Let_syntax in
       let%map _ledger, partial_txn =
-        Mina_ledger.Sparse_ledger.apply_transaction_phase_1
+        Mina_ledger.Sparse_ledger.apply_transaction_first_pass
           ~constraint_constants ~txn_state_view sparse_ledger txn
       in
       partial_txn
@@ -545,7 +528,7 @@ module T = struct
     else Ok constraint_constants.coinbase_amount
 
   (* TODO: put into batch throttle loop *)
-  let apply_single_transaction_phase_1 ~constraint_constants ledger
+  let apply_single_transaction_first_pass ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
       txn_with_status (txn_state_view : Zkapp_precondition.Protocol_state.View.t)
       :
@@ -573,8 +556,8 @@ module T = struct
     in
     let%map partially_applied_transaction =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_phase_1 ~constraint_constants ~txn_state_view
-           ledger txn )
+        (Ledger.apply_transaction_first_pass ~constraint_constants
+           ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
     ( { Pre_statement.partially_applied_transaction
@@ -595,7 +578,7 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
-  let apply_single_transaction_phase_2 ~connecting_ledger ledger
+  let apply_single_transaction_second_pass ~connecting_ledger ledger
       state_and_body_hash (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
@@ -607,7 +590,7 @@ module T = struct
     in
     let%bind applied_txn =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_phase_2 ledger
+        (Ledger.apply_transaction_second_pass ledger
            pre_stmt.partially_applied_transaction )
     in
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
@@ -663,11 +646,11 @@ module T = struct
     ; statement
     }
 
-  let apply_transactions_phase_1 ~constraint_constants ledger
+  let apply_transactions_first_pass ~constraint_constants ledger
       init_pending_coinbase_stack_state ts current_state_view =
     let open Result.Let_syntax in
     let%map res_rev, pending_coinbase_stack_state =
-      result_list_fold ts ~init:([], init_pending_coinbase_stack_state)
+      List.fold_result ts ~init:([], init_pending_coinbase_stack_state)
         ~f:(fun (acc, pending_coinbase_stack_state) t ->
           match
             List.find (Transaction.public_keys t.With_status.data) ~f:(fun pk ->
@@ -677,17 +660,17 @@ module T = struct
               Error (Staged_ledger_error.Invalid_public_key pk)
           | None ->
               let%map pre_witness, pending_coinbase_stack_state' =
-                apply_single_transaction_phase_1 ~constraint_constants ledger
+                apply_single_transaction_first_pass ~constraint_constants ledger
                   pending_coinbase_stack_state t current_state_view
               in
               (pre_witness :: acc, pending_coinbase_stack_state') )
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
-  let apply_transactions_phase_2 ledger state_and_body_hash pre_stmts =
+  let apply_transactions_second_pass ledger state_and_body_hash pre_stmts =
     let connecting_ledger = Ledger.merkle_root ledger in
-    result_list_map pre_stmts ~f:(fun pre_stmt ->
-        apply_single_transaction_phase_2 ~connecting_ledger ledger
+    Mina_stdlib.Result.List.map pre_stmts ~f:(fun pre_stmt ->
+        apply_single_transaction_second_pass ~connecting_ledger ledger
           state_and_body_hash pre_stmt )
 
   let update_ledger_and_get_statements ~constraint_constants ledger
@@ -702,7 +685,7 @@ module T = struct
         ; init_stack = working_stack
         }
       in
-      apply_transactions_phase_1 ~constraint_constants ledger
+      apply_transactions_first_pass ~constraint_constants ledger
         init_pending_coinbase_stack_state ts current_state_view
     in
     let%bind pre_stmts1, updated_stack1 = apply_first_pass current_stack ts in
@@ -717,7 +700,7 @@ module T = struct
     in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
-      apply_transactions_phase_2 ledger state_and_body_hash
+      apply_transactions_second_pass ledger state_and_body_hash
         (pre_stmts1 @ pre_stmts2)
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
@@ -2037,7 +2020,7 @@ module T = struct
                       if valid_proofs then Ok ()
                       else Or_error.errorf "Verification key mismatch"
                     in
-                    Transaction_validator.apply_transaction_phase_1
+                    Transaction_validator.apply_transaction_first_pass
                       ~constraint_constants validating_ledger
                       ~txn_state_view:current_state_view
                       (Command (User_command.forget_check txn)) )

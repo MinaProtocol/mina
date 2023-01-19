@@ -181,7 +181,7 @@ let%test_module "Fee payer tests" =
                        (module Ledger.Mask.Attached)
                        ledger )
                 in
-                Sparse_ledger.apply_transaction_phase_1 ~constraint_constants
+                Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                   ~txn_state_view:U.genesis_state_view sparse_ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )

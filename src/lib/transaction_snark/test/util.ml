@@ -79,7 +79,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
         Ledger.register_mask ledger new_mask
       in
       let partial_stmt =
-        Ledger.apply_transaction_phase_1 ~constraint_constants
+        Ledger.apply_transaction_first_pass ~constraint_constants
           ~txn_state_view:state_view second_pass_ledger
           (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
         |> Or_error.ok_exn
@@ -119,7 +119,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    ; new_accounts = []
                    } )
             else
-              ( Ledger.apply_transaction_phase_2 second_pass_ledger partial_stmt
+              ( Ledger.apply_transaction_second_pass second_pass_ledger
+                  partial_stmt
               |> Or_error.ok_exn )
                 .varying
           in
@@ -473,9 +474,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let expect_snark_failure, applied_transaction =
     match
       Result.( >>= )
-        (Ledger.apply_transaction_phase_1 ledger ~constraint_constants
+        (Ledger.apply_transaction_first_pass ledger ~constraint_constants
            ~txn_state_view txn_unchecked )
-        (Ledger.apply_transaction_phase_2 ledger)
+        (Ledger.apply_transaction_second_pass ledger)
     with
     | Ok res ->
         ( if Option.is_some expected_failure then

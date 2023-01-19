@@ -121,20 +121,20 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
   apply_transaction_logic
     (T.apply_user_command ~constraint_constants ~txn_global_slot)
 
-let apply_transaction_phase_1 ~constraint_constants ~txn_state_view =
+let apply_transaction_first_pass ~constraint_constants ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transaction_phase_1 ~constraint_constants ~txn_state_view)
+    (T.apply_transaction_first_pass ~constraint_constants ~txn_state_view)
 
-let apply_transaction_phase_2 =
-  apply_transaction_logic T.apply_transaction_phase_2
+let apply_transaction_second_pass =
+  apply_transaction_logic T.apply_transaction_second_pass
 
 let apply_transactions ~constraint_constants ~txn_state_view =
   apply_transaction_logic
     (T.apply_transactions ~constraint_constants ~txn_state_view)
 
-let apply_zkapp_phase_1_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase ledger c =
-  T.apply_zkapp_command_phase_1_aux ~constraint_constants ~state_view
+let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
+    ~state_view ~fee_excess ~supply_increase ledger c =
+  T.apply_zkapp_command_first_pass_aux ~constraint_constants ~state_view
     ~fee_excess ~supply_increase (ref ledger) c ~init:[]
     ~f:(fun
          acc
@@ -155,8 +155,8 @@ let apply_zkapp_phase_1_unchecked_with_states ~constraint_constants ~state_view
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
 
-let apply_zkapp_phase_2_unchecked_with_states ~init ledger c =
-  T.apply_zkapp_command_phase_2_aux (ref ledger) c ~init
+let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
+  T.apply_zkapp_command_second_pass_aux (ref ledger) c ~init
     ~f:(fun
          acc
          ( { first_pass_ledger
