@@ -622,7 +622,7 @@ let%test_unit "zkapp_command payment test" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            account_update_send ~constraint_constants ~use_full_commitment s )
+            account_update_send ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
@@ -636,9 +636,18 @@ let%test_unit "zkapp_command payment test" =
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
-                    apply_zkapp_command_unchecked l2 t ~constraint_constants
-                      ~global_slot:view.global_slot_since_genesis
-                      ~state_view:view )
+                    let%bind res, _ =
+                      apply_zkapp_command_unchecked l2 t ~constraint_constants
+                        ~global_slot:txn_global_slot ~state_view:view
+                    in
+                    match res.command.status with
+                    | Transaction_status.Applied ->
+                        Ok ()
+                    | Transaction_status.Failed failure ->
+                        Or_error.error_string
+                          (Yojson.Safe.pretty_to_string
+                             (Transaction_status.Failure.Collection.to_yojson
+                                failure ) ) )
               in
               let accounts =
                 List.concat_map ~f:Zkapp_command.accounts_referenced ts2

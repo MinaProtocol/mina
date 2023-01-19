@@ -519,7 +519,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     | Fee_transfer ft ->
         (Fee_transfer.receivers ft, pending_coinbase_stack)
     | Coinbase cb ->
-        ( Coinbase.accounts_accessed cb
+        ( Coinbase.accounts_referenced cb
         , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
   in
   let sok_signer =

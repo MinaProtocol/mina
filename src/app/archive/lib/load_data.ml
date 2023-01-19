@@ -177,6 +177,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -193,6 +194,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -419,7 +421,8 @@ let get_account_update_body ~pool body_id =
            ; zkapp_account_precondition_id
            ; zkapp_valid_while_precondition_id
            ; use_full_commitment
-           ; caller
+           ; implicit_account_creation_fee
+           ; call_type
            ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
@@ -590,7 +593,7 @@ let get_account_update_body ~pool body_id =
   let%bind valid_while_precondition =
     get_global_slot_bounds pool zkapp_valid_while_precondition_id
   in
-  let caller = Account_update.Call_type.of_string caller in
+  let call_type = Account_update.Call_type.of_string call_type in
   let authorization_kind =
     Account_update.Authorization_kind.of_string_exn authorization_kind
   in
@@ -610,7 +613,8 @@ let get_account_update_body ~pool body_id =
           ; valid_while = valid_while_precondition
           }
       ; use_full_commitment
-      ; caller
+      ; implicit_account_creation_fee
+      ; call_type
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )
@@ -719,6 +723,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -733,6 +738,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key

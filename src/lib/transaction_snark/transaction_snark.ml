@@ -1201,6 +1201,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let receive : t -> controller = fun a -> a.data.permissions.receive
 
+            let access : t -> controller = fun a -> a.data.permissions.access
+
             let set_delegate : t -> controller =
              fun a -> a.data.permissions.set_delegate
 
@@ -1614,6 +1616,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               Sgn.Checked.is_pos
                 (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
+            let is_neg (t : t) =
+              Sgn.Checked.is_neg
+                (run_checked (Currency.Amount.Signed.Checked.sgn t))
+
             let negate = Amount.Signed.Checked.negate
 
             let of_unsigned = Amount.Signed.Checked.of_unsigned
@@ -1861,13 +1867,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let public_key (t : t) = t.account_update.data.public_key
 
-            let caller (t : t) = t.account_update.data.caller
+            let is_delegate_call (t : t) =
+              Account_update.Call_type.Checked.is_delegate_call
+                t.account_update.data.call_type
 
             let account_id (t : t) =
               Account_id.create (public_key t) (token_id t)
 
             let use_full_commitment (t : t) =
               t.account_update.data.use_full_commitment
+
+            let implicit_account_creation_fee (t : t) =
+              t.account_update.data.implicit_account_creation_fee
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
@@ -2659,11 +2670,20 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                     ~else_:current
                 in
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:is_user_command ~to_:`Access account
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
                 let permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
+                in
+                let%bind () =
+                  [%with_label_
+                    "Fee payer access should be permitted for all commands"]
+                    (fun () -> Boolean.Assert.is_true permitted_to_access)
                 in
                 let%bind () =
                   [%with_label_
@@ -2820,8 +2840,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the receiver for a coinbase
                    - the first receiver for a fee transfer
                 *)
-                let permitted_to_receive =
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:Boolean.false_ ~to_:`Access account
+                in
+                let%bind permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
+                  |> Boolean.( &&& ) permitted_to_access
                 in
                 (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
                 let%bind payment_or_internal_command =
@@ -2832,6 +2857,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     [ Boolean.not payment_or_internal_command
                     ; permitted_to_receive
                     ]
+                  >>= Boolean.( &&& ) permitted_to_access
                 in
                 receiver_balance_update_permitted := permitted_to_receive ;
                 let%bind is_empty_failure =
@@ -3043,6 +3069,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                           assert_r1cs not_fee_payer_is_source num_failures
                             num_failures ) )
                 in
+                let permitted_to_access =
+                  Account.Checked.has_permission
+                    ~signature_verifies:is_user_command ~to_:`Access account
+                in
                 let permitted_to_update_delegate =
                   Account.Checked.has_permission ~to_:`Set_delegate account
                 in
@@ -3056,6 +3086,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%bind payment_permitted =
                   Boolean.all
                     [ is_payment
+                    ; permitted_to_access
                     ; permitted_to_send
                     ; !receiver_balance_update_permitted
                     ]
@@ -3074,6 +3105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; delegation_permitted
                     ; fee_receiver_update_permitted
                     ]
+                  >>= Boolean.( &&& ) permitted_to_access
                 in
                 let%bind amount =
                   (* Only payments should affect the balance at this stage. *)
@@ -4381,7 +4413,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; call_depth = 0
           ; preconditions = preconditions'
           ; use_full_commitment = false
-          ; caller = Call
+          ; implicit_account_creation_fee = false
+          ; call_type = Call
           ; authorization_kind = Signature
           }
         in
@@ -4447,7 +4480,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                           |> Option.value ~default:Accept
                       }
                   ; use_full_commitment = true
-                  ; caller = Call
+                  ; implicit_account_creation_fee = false
+                  ; call_type = Call
                   ; authorization_kind
                   }
               ; authorization =
@@ -4489,7 +4523,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; call_depth = 0
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
-                ; caller = Call
+                ; implicit_account_creation_fee = false
+                ; call_type = Call
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
@@ -4694,14 +4729,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_command.Call_forest.of_account_updates account_updates
               ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                 p.body.call_depth )
-            |> Zkapp_command.Call_forest.add_callers
-                 ~call_type:(fun (p : Account_update.Simple.t) -> p.body.caller)
-                 ~add_caller:Zkapp_command.add_caller_simple
-                 ~null_id:Token_id.default
-                 ~account_update_id:(fun (p : Account_update.Simple.t) ->
-                   Account_id.(
-                     derive_token_id
-                       ~owner:(create p.body.public_key p.body.token_id)) )
+            |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
             |> Zkapp_command.Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.t) ->
                    Zkapp_command.Digest.Account_update.create p )
@@ -4929,8 +4957,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
-          (Zkapp_command.add_caller_simple sender_account_update
-             Token_id.default )
+          (Account_update.of_simple sender_account_update)
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }
@@ -4964,7 +4991,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _
-          ; receiver_is_new = _
           ; amount
           } =
         spec
@@ -5026,7 +5052,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false
-            ; caller = Call
+            ; implicit_account_creation_fee = false
+            ; call_type = Call
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
@@ -5049,7 +5076,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; valid_while = Ignore
                 }
             ; use_full_commitment = false
-            ; caller = Call
+            ; implicit_account_creation_fee = false
+            ; call_type = Call
             ; authorization_kind = Proof
             }
         ; authorization = Proof Mina_base.Proof.blockchain_dummy

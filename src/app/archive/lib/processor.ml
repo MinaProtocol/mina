@@ -514,6 +514,7 @@ module Zkapp_permissions = struct
     { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
+    ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
@@ -538,6 +539,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
+      ; auth_required_typ
       ]
 
   let table_name = "zkapp_permissions"
@@ -547,6 +549,7 @@ module Zkapp_permissions = struct
       { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
+      ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key
@@ -1451,7 +1454,8 @@ module Zkapp_account_update_body = struct
     ; zkapp_account_precondition_id : int
     ; zkapp_valid_while_precondition_id : int option
     ; use_full_commitment : bool
-    ; caller : string
+    ; implicit_account_creation_fee : bool
+    ; call_type : string
     ; authorization_kind : string
     }
   [@@deriving fields, hlist]
@@ -1470,6 +1474,7 @@ module Zkapp_account_update_body = struct
         ; int
         ; int
         ; option int
+        ; bool
         ; bool
         ; string
         ; string
@@ -1522,7 +1527,8 @@ module Zkapp_account_update_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
-    let caller = Account_update.Call_type.to_string body.caller in
+    let implicit_account_creation_fee = body.implicit_account_creation_fee in
+    let call_type = Account_update.Call_type.to_string body.call_type in
     let authorization_kind =
       Account_update.Authorization_kind.to_string body.authorization_kind
     in
@@ -1539,7 +1545,8 @@ module Zkapp_account_update_body = struct
       ; zkapp_account_precondition_id
       ; zkapp_valid_while_precondition_id
       ; use_full_commitment
-      ; caller
+      ; implicit_account_creation_fee
+      ; call_type
       ; authorization_kind
       }
     in
@@ -1548,7 +1555,7 @@ module Zkapp_account_update_body = struct
       ~tannot:(function
         | "events_ids" | "actions_ids" ->
             Some "int[]"
-        | "caller" ->
+        | "call_type" ->
             Some "call_type"
         | "authorization_kind" ->
             Some "authorization_kind_type"
@@ -3508,49 +3515,12 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
     [%log info]
       "Populating token owners table for block with state hash $state_hash"
       ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    let module Node = struct
-      type t = Token_id.t * Account_id.t option
-      [@@deriving equal, compare, hash, sexp]
-    end in
-    (* there's an edge from token A to token B if the B's token owner, an account identifier,
-       has A as its token; token A is added before token B
-    *)
-    let token_edges =
-      List.filter_map tokens_used
-        ~f:(fun ((token_id, acct_id_opt) as token_and_owner) ->
-          match acct_id_opt with
-          | None ->
-              assert (Token_id.equal token_id Token_id.default) ;
-              (* no edge to default token *)
-              None
-          | Some acct_id -> (
-              let token_id' = Account_id.token_id acct_id in
-              match
-                List.find tokens_used ~f:(fun (tokid, _) ->
-                    Token_id.equal token_id' tokid )
-              with
-              | Some token_and_owner' ->
-                  Some
-                    ( { from = token_and_owner'; to_ = token_and_owner }
-                      : (Token_id.t * Account_id.t option)
-                        Topological_sort.Edge.t )
-              | None ->
-                  (* no other token refers to this token *)
-                  None ) )
-    in
-    ( match Topological_sort.sort (module Node) tokens_used token_edges with
-    | Ok sorted_tokens ->
-        List.iter sorted_tokens ~f:(fun (token_id, owner) ->
-            match owner with
-            | None ->
-                ()
-            | Some acct_id ->
-                Token_owners.add_if_doesn't_exist token_id acct_id )
-    | Error err ->
-        (* a cycle, should never happen *)
-        [%log fatal] "Fatal error when sorting tokens: $error"
-          ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
-        ignore (exit 1 : int) ) ;
+    List.iter tokens_used ~f:(fun (token_id, owner) ->
+        match owner with
+        | None ->
+            ()
+        | Some acct_id ->
+            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =

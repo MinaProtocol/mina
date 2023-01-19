@@ -89,6 +89,8 @@ module type Amount_intf = sig
 
     val is_pos : t -> bool
 
+    val is_neg : t -> bool
+
     val negate : t -> t
 
     val add_flagged : t -> t -> t * [ `Overflow of bool ]
@@ -324,11 +326,13 @@ module type Account_update_intf = sig
 
   val account_id : t -> account_id
 
-  val caller : t -> token_id
+  val is_delegate_call : t -> bool
 
   val use_full_commitment : t -> bool
 
   val increment_nonce : t -> bool
+
+  val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
        commitment:transaction_commitment
@@ -494,6 +498,8 @@ module type Account_intf = sig
 
   module Permissions : sig
     type controller
+
+    val access : t -> controller
 
     val edit_state : t -> controller
 
@@ -897,6 +903,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type get_next_account_update_result =
     { account_update : Account_update.t
+    ; caller_id : Token_id.t
     ; account_update_forest : Call_forest.t
     ; new_call_stack : Call_stack.t
     ; new_frame : Stack_frame.t
@@ -926,18 +933,11 @@ module Make (Inputs : Inputs_intf) = struct
     let (account_update, account_update_forest), remainder_of_current_forest =
       Call_forest.pop_exn (Stack_frame.calls current_forest)
     in
-    let account_update_caller = Account_update.caller account_update in
-    let is_normal_call =
-      Token_id.equal account_update_caller (Stack_frame.caller current_forest)
-    in
-    let () =
-      with_label ~label:"check valid caller" (fun () ->
-          let is_delegate_call =
-            Token_id.equal account_update_caller
-              (Stack_frame.caller_caller current_forest)
-          in
-          (* Check that account_update has a valid caller. *)
-          assert_ ~pos:__POS__ Bool.(is_normal_call ||| is_delegate_call) )
+    let is_delegate_call = Account_update.is_delegate_call account_update in
+    let caller_id =
+      Token_id.if_ is_delegate_call
+        ~then_:(Stack_frame.caller_caller current_forest)
+        ~else_:(Stack_frame.caller current_forest)
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -983,16 +983,21 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
           (let caller =
-             Token_id.if_ is_normal_call
-               ~then_:
+             Token_id.if_ is_delegate_call
+               ~then_:(Stack_frame.caller current_forest)
+               ~else_:
                  (Account_id.derive_token_id
                     ~owner:(Account_update.account_id account_update) )
-               ~else_:(Stack_frame.caller current_forest)
-           and caller_caller = account_update_caller in
+           and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )
     in
-    { account_update; account_update_forest; new_frame; new_call_stack }
+    { account_update
+    ; caller_id
+    ; account_update_forest
+    ; new_frame
+    ; new_call_stack
+    }
 
   let update_sequence_state (sequence_state : _ Pickles_types.Vector.t) actions
       ~txn_global_slot ~last_sequence_slot =
@@ -1077,6 +1082,7 @@ module Make (Inputs : Inputs_intf) = struct
             (local_state.stack_frame, local_state.call_stack)
       in
       let { account_update
+          ; caller_id
           ; account_update_forest
           ; new_frame = remaining
           ; new_call_stack = call_stack
@@ -1095,8 +1101,7 @@ module Make (Inputs : Inputs_intf) = struct
               in
               Bool.( ||| )
                 (Token_id.equal account_update_token_id Token_id.default)
-                (Token_id.equal account_update_token_id
-                   (Account_update.caller account_update) )
+                (Token_id.equal account_update_token_id caller_id)
             in
             Local_state.add_check local_state Token_owner_not_caller
               default_token_or_token_owner_was_caller )
@@ -1257,11 +1262,55 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_timing a timing in
       (a, local_state)
     in
+    let account_creation_fee =
+      Amount.of_constant_fee constraint_constants.account_creation_fee
+    in
+    let implicit_account_creation_fee =
+      Account_update.implicit_account_creation_fee account_update
+    in
+    (* Check the token for implicit account creation fee payment. *)
+    let local_state =
+      Local_state.add_check local_state Cannot_pay_creation_fee_in_token
+        Bool.(
+          (not implicit_account_creation_fee)
+          ||| account_update_token_is_default)
+    in
+    (* Compute the change to the account balance. *)
+    let local_state, actual_balance_change =
+      let balance_change = Account_update.balance_change account_update in
+      let neg_creation_fee =
+        let open Amount.Signed in
+        negate (of_unsigned account_creation_fee)
+      in
+      let balance_change_for_creation, `Overflow creation_overflow =
+        let open Amount.Signed in
+        add_flagged balance_change neg_creation_fee
+      in
+      let pay_creation_fee =
+        Bool.(account_is_new &&& implicit_account_creation_fee)
+      in
+      let creation_overflow = Bool.(pay_creation_fee &&& creation_overflow) in
+      let balance_change =
+        Amount.Signed.if_ pay_creation_fee ~then_:balance_change_for_creation
+          ~else_:balance_change
+      in
+      let local_state =
+        Local_state.add_check local_state Amount_insufficient_to_create_account
+          Bool.(
+            not
+              ( pay_creation_fee
+              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ))
+      in
+      (local_state, balance_change)
+    in
     (* Apply balance change. *)
     let a, local_state =
-      let balance_change = Account_update.balance_change account_update in
+      let pay_creation_fee_from_excess =
+        Bool.(account_is_new &&& not implicit_account_creation_fee)
+      in
       let balance, `Overflow failed1 =
-        Balance.add_signed_amount_flagged (Account.balance a) balance_change
+        Balance.add_signed_amount_flagged (Account.balance a)
+          actual_balance_change
       in
       (* TODO: Should this report 'insufficient balance'? *)
       let local_state =
@@ -1278,12 +1327,12 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let local_state =
           Local_state.add_check local_state Local_excess_overflow
-            Bool.(not (account_is_new &&& excess_update_failed))
+            Bool.(not (pay_creation_fee_from_excess &&& excess_update_failed))
         in
         { local_state with
           excess =
-            Amount.Signed.if_ account_is_new ~then_:excess_minus_creation_fee
-              ~else_:local_state.excess
+            Amount.Signed.if_ pay_creation_fee_from_excess
+              ~then_:excess_minus_creation_fee ~else_:local_state.excess
         }
       in
       let local_state =
@@ -1304,7 +1353,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.supply_increase
         }
       in
-      let is_receiver = Amount.Signed.is_pos balance_change in
+      let is_receiver = Amount.Signed.is_pos actual_balance_change in
       let local_state =
         let controller =
           Controller.if_ is_receiver
@@ -1317,7 +1366,8 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_balance
           Bool.(
             has_permission
-            ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
+            ||| Amount.Signed.(
+                  equal (of_unsigned Amount.zero) actual_balance_change))
       in
       let a = Account.set_balance balance a in
       (a, local_state)
@@ -1346,6 +1396,15 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    (* Check that the account can be accessed with the given authorization. *)
+    let local_state =
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.access a)
+      in
+      Local_state.add_check local_state Update_not_permitted_access
+        has_permission
+    in
     (* Update app state. *)
     let a, local_state =
       let app_state = Account_update.Update.app_state account_update in
@@ -1603,8 +1662,8 @@ module Make (Inputs : Inputs_intf) = struct
          Indeed, if the account creation fee is paid, using that amount would
          be equivalent to paying it out to the block producer.
          In the case of a failure that prevents any updates from being applied,
-         every other account_update in this transaction will also fail, and the excess
-         will never be promoted to the global excess, so this amount is
+         every other account_update in this transaction will also fail, and the
+         excess will never be promoted to the global excess, so this amount is
          irrelevant.
       *)
       Amount.Signed.negate (Account_update.balance_change account_update)

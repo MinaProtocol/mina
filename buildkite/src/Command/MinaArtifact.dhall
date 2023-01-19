@@ -56,9 +56,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-docker-image"
         }
-
         in
-
         DockerImage.generateStep daemonDevnetSpec,
 
         -- daemon berkeley image
@@ -82,10 +80,18 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
         }
-
         in
-
         DockerImage.generateStep daemonMainnetSpec,
+
+        -- test_executive image
+        let testExecutiveSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-test-executive",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        DockerImage.generateStep testExecutiveSpec,
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
@@ -94,9 +100,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
         }
-
         in
-
         DockerImage.generateStep archiveSpec,
 
         -- rosetta image
@@ -106,7 +110,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
-
         in
 
         DockerImage.generateStep rosettaSpec,
