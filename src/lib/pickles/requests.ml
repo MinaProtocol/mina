@@ -138,7 +138,8 @@ module Step = struct
           , local_branches )
           H3.T(Per_proof_witness.Constant.No_app_state).t
           t
-      | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
+      | Wrap_index :
+          Tock.Curve.Affine.t Plonk_verification_key_evals.out_circuit t
       | App_state : statement t
       | Return_value : return_value -> unit t
       | Auxiliary_value : auxiliary_value -> unit t
@@ -192,7 +193,8 @@ module Step = struct
             , local_branches )
             H3.T(Per_proof_witness.Constant.No_app_state).t
             t
-        | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
+        | Wrap_index :
+            Tock.Curve.Affine.t Plonk_verification_key_evals.out_circuit t
         | App_state : statement t
         | Return_value : return_value -> unit t
         | Auxiliary_value : auxiliary_value -> unit t

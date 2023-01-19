@@ -231,20 +231,58 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
 let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
-    ~t_comm =
-  let ( * ) x g = scale g x in
+    ~t_comm ~options =
+  let _ = options in
+
+  (* ignore flags for now *)
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
-  let f_comm =
-    List.reduce_exn ~f:( + )
-      [ plonk.perm * sigma_comm_last
-      ; plonk.vbmul * m.mul_comm
-      ; plonk.complete_add * m.complete_add_comm
-      ; plonk.endomul * m.emul_comm
-      ; plonk.endomul_scalar * m.endomul_scalar_comm
-      ]
+  let ( * ) x g = scale g x in
+  (* [cond_mul] conditionally scale elements based on the relevant feature
+     flags, and their values.
+
+     Whenever anything is "misaligned" between the 3 arguments, this function
+     returns [None]. *)
+  let cond_mul flag sc comm =
+    match flag with
+    | Opt.Flag.(Yes | Maybe) -> (
+        match (Opt.to_option_unsafe sc, Opt.to_option_unsafe comm) with
+        | None, _ | _, None ->
+            None
+        | Some x, Some g ->
+            Some (x * g) )
+    | Opt.Flag.No ->
+        None
   in
+  (* [x +? xopt ] optionally adds [xopt] to [x]. This function is used in
+     combination with [cond_mul] to keep the same scaling/adding pattern for
+     optional features as for non-optional ones. *)
+  let ( +? ) v = function None -> v | Some v1 -> v + v1 in
+  let f_comm =
+    let opt_comms = m.optional_columns_comm in
+    let opt_scalars = plonk.optional_column_scalars in
+    let open Plonk_types.Features in
+    (plonk.perm * sigma_comm_last)
+    + (plonk.vbmul * m.mul_comm)
+    + (plonk.complete_add * m.complete_add_comm)
+    + (plonk.endomul * m.emul_comm)
+    + (plonk.endomul_scalar * m.endomul_scalar_comm)
+    +? cond_mul options.range_check0 opt_scalars.range_check0
+         opt_comms.range_check0
+    +? cond_mul options.range_check1 opt_scalars.range_check1
+         opt_comms.range_check1
+    +? cond_mul options.foreign_field_add opt_scalars.foreign_field_add
+         opt_comms.foreign_field_add
+    +? cond_mul options.foreign_field_mul opt_scalars.foreign_field_mul
+         opt_comms.foreign_field_mul
+    +? cond_mul options.xor opt_scalars.xor opt_comms.xor
+    +? cond_mul options.rot opt_scalars.rot opt_comms.rot
+    +? cond_mul options.lookup opt_scalars.lookup_gate opt_comms.lookup_gate
+    +? cond_mul options.runtime_tables opt_scalars.runtime_tables
+         opt_comms.runtime_tables
+  in
+
   let chunked_t_comm =
     let n = Array.length t_comm in
     let res = ref t_comm.(n - 1) in
@@ -262,7 +300,7 @@ let combined_evaluation (type f)
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
-      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+      (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
     | None ->
         acc

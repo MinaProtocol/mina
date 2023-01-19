@@ -122,12 +122,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     for table_id in 0..num_tables {
         let cfg = if indexed {
             RuntimeTableCfg::Indexed(RuntimeTableSpec {
-                id: table_id as i32,
+                id: table_id,
                 len: 5,
             })
         } else {
             RuntimeTableCfg::Custom {
-                id: table_id as i32,
+                id: table_id,
                 first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
             }
         };

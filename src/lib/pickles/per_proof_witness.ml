@@ -62,11 +62,11 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Impl.Field.t Shifted_value.Type1.t
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Plonk_types.Opt.t
+        Opt.t
       , ( scalar_challenge
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
         , Impl.Boolean.var )
-        Plonk_types.Opt.t
+        Opt.t
       , Impl.Boolean.var
       , unit
       , Digest.Make(Impl).t

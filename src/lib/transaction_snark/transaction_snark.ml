@@ -604,19 +604,19 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (`Min_balance curr_min_balance, timing)
 
+    let feature_flags =
+      let open Pickles_types.Plonk_types in
+      { Features.range_check0 = Opt.Flag.Maybe
+      ; range_check1 = Opt.Flag.Maybe
+      ; foreign_field_add = Opt.Flag.Maybe
+      ; foreign_field_mul = Opt.Flag.Maybe
+      ; xor = Opt.Flag.Maybe
+      ; rot = Opt.Flag.Maybe
+      ; lookup = Opt.Flag.Maybe
+      ; runtime_tables = Opt.Flag.Maybe
+      }
+
     let side_loaded =
-      let feature_flags =
-        let open Pickles_types.Plonk_types in
-        { Features.range_check0 = Opt.Flag.Maybe
-        ; range_check1 = Opt.Flag.Maybe
-        ; foreign_field_add = Opt.Flag.Maybe
-        ; foreign_field_mul = Opt.Flag.Maybe
-        ; xor = Opt.Flag.Maybe
-        ; rot = Opt.Flag.Maybe
-        ; lookup = Opt.Flag.Maybe
-        ; runtime_tables = Opt.Flag.Maybe
-        }
-      in
       Memo.of_comparable
         (module Int)
         (fun i ->
@@ -1421,7 +1421,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               match spec.auth_type with
               | Proof ->
                   let vk =
-                    exists Side_loaded_verification_key.typ ~compute:(fun () ->
+                    exists (Side_loaded_verification_key.typ feature_flags)
+                      ~compute:(fun () ->
                         Option.value_exn
                           (As_prover.Ref.get
                              (Data_as_hash.ref a.zkapp.verification_key.data) )

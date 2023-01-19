@@ -21,7 +21,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     let constant = constant_term.ocaml_str();
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml_str()))
+        .map(|(col, expr)| (format!("{col:?}"), expr.ocaml_str()))
         .collect();
 
     (constant, other_terms)

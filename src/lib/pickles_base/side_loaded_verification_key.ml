@@ -132,7 +132,7 @@ module Repr = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
         ; actual_wrap_domain_size : Proofs_verified.Stable.V1.t
-        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
+        ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.Stable.V2.t
         }
       [@@deriving sexp, equal, compare, yojson]
     end
@@ -150,7 +150,7 @@ module Poly = struct
             Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
         { max_proofs_verified : 'proofs_verified
         ; actual_wrap_domain_size : 'proofs_verified
-        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
+        ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
       [@@deriving hash]
@@ -158,19 +158,18 @@ module Poly = struct
   end]
 end
 
-let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
-  let Plonk_verification_key_evals.
-        { sigma_comm
-        ; coefficients_comm
-        ; generic_comm
-        ; psm_comm
-        ; complete_add_comm
-        ; mul_comm
-        ; emul_comm
-        ; endomul_scalar_comm
-        } =
-    k
-  in
+let index_to_field_elements
+    Plonk_verification_key_evals.
+      { sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ; optional_columns_comm = _ (* FIXME: Do something with it *)
+      } ~g =
   List.map
     ( Vector.to_list sigma_comm
     @ Vector.to_list coefficients_comm

@@ -209,6 +209,14 @@ module VerifierIndex = struct
     ; mul_comm : 'poly_comm
     ; emul_comm : 'poly_comm
     ; endomul_scalar_comm : 'poly_comm
+    ; xor_comm : 'poly_comm option
+    ; range_check0_comm : 'poly_comm option
+    ; range_check1_comm : 'poly_comm option
+    ; foreign_field_add_comm : 'poly_comm option
+    ; foreign_field_mul_comm : 'poly_comm option
+    ; rot_comm : 'poly_comm option
+    ; lookup_gate_comm : 'poly_comm option
+    ; runtime_tables_comm : 'poly_comm option
     }
 
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =

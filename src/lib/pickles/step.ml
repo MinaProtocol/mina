@@ -599,6 +599,9 @@ struct
                   (d.wrap_vk, d.wrap_key)
               in
               let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
+                let dlog_index =
+                  Plonk_verification_key_evals.out_of_in dlog_index
+                in
                 expand_proof dlog_vk dlog_index app_state p t ~must_verify
               and sgs, us, ss, xs, ws, ps, domains = go ts prev_proof_stmts l in
               ( sg :: sgs
@@ -688,10 +691,13 @@ struct
          ; old_bulletproof_challenges
          } )
     in
+    let dlog_plonk_index =
+      Plonk_verification_key_evals.out_of_in self_dlog_plonk_index
+    in
     let messages_for_next_step_proof_prepared =
       lazy
         (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-           ~dlog_plonk_index:self_dlog_plonk_index
+           ~dlog_plonk_index
            (Lazy.force messages_for_next_step_proof) )
     in
     let messages_for_next_wrap_proof_padded =
@@ -739,7 +745,7 @@ struct
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
-          k self_dlog_plonk_index
+          k dlog_plonk_index
       | Req.App_state ->
           k next_state
       | Req.Return_value res ->

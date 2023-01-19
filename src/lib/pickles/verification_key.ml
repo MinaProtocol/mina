@@ -61,6 +61,14 @@ module Verifier_index_json = struct
     ; mul_comm : 'polyComm
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
+    ; xor_comm : 'polyComm option
+    ; range_check0_comm : 'polyComm option
+    ; range_check1_comm : 'polyComm option
+    ; foreign_field_add_comm : 'polyComm option
+    ; foreign_field_mul_comm : 'polyComm option
+    ; rot_comm : 'polyComm option
+    ; lookup_gate_comm : 'polyComm option
+    ; runtime_tables_comm : 'polyComm option
     }
   [@@deriving yojson]
 
@@ -109,7 +117,8 @@ module Repr = struct
     module V2 = struct
       type t =
         { commitments :
-            Backend.Tock.Curve.Affine.Stable.V1.t
+            ( Backend.Tock.Curve.Affine.Stable.V1.t
+            , Backend.Tock.Curve.Affine.Stable.V1.t option )
             Plonk_verification_key_evals.Stable.V2.t
         ; data : Data.Stable.V1.t
         }
@@ -124,7 +133,10 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+      { commitments :
+          ( Backend.Tock.Curve.Affine.t
+          , Backend.Tock.Curve.Affine.t option )
+          Plonk_verification_key_evals.t
       ; index :
           (Impls.Wrap.Verification_key.t
           [@to_yojson
@@ -153,21 +165,13 @@ module Stable = struct
         ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs
         ; evals =
-            (let g (x, y) =
+            (let f (x, y) =
                { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
                ; shifted = None
                }
              in
-             { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
-             ; coefficients_comm =
-                 Array.map ~f:g (Vector.to_array c.coefficients_comm)
-             ; generic_comm = g c.generic_comm
-             ; mul_comm = g c.mul_comm
-             ; psm_comm = g c.psm_comm
-             ; emul_comm = g c.emul_comm
-             ; complete_add_comm = g c.complete_add_comm
-             ; endomul_scalar_comm = g c.endomul_scalar_comm
-             } )
+             Plonk_verification_key_evals.(
+               out_circuit_map ~f c |> to_kimchi_verification_evals) )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         }
@@ -191,6 +195,7 @@ end]
 let to_yojson = Stable.Latest.to_yojson
 
 let dummy_commitments g =
+  (* passing an extra g_opt argument *)
   let open Plonk_types in
   { Plonk_verification_key_evals.sigma_comm =
       Vector.init Permuts.n ~f:(fun _ -> g)
@@ -201,6 +206,8 @@ let dummy_commitments g =
   ; mul_comm = g
   ; emul_comm = g
   ; endomul_scalar_comm = g
+  ; optional_columns_comm =
+      Plonk_verification_key_evals.Optional_columns.init None
   }
 
 let dummy =

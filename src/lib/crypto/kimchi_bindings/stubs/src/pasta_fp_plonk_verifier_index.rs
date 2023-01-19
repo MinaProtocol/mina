@@ -24,6 +24,12 @@ pub type CamlPastaFpPlonkVerifierIndex =
 
 impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
     fn from(vi: VerifierIndex<Vesta>) -> Self {
+        let runtime_tables_comm = vi.lookup_index.as_ref().map_or(None, |v| {
+            v.runtime_tables_selector.as_ref().map(|v| v.into())
+        });
+        let lookup_gate_comm = vi.lookup_index.as_ref().map_or(None, |v| {
+            v.lookup_selectors.lookup.as_ref().map(|v| v.into())
+        });
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -47,6 +53,14 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
                 endomul_scalar_comm: vi.endomul_scalar_comm.into(),
+                xor_comm: vi.xor_comm.map(|v| v.into()),
+                range_check0_comm: vi.range_check0_comm.map(|v| v.into()),
+                range_check1_comm: vi.range_check1_comm.map(|v| v.into()),
+                foreign_field_add_comm: vi.foreign_field_add_comm.map(|v| v.into()),
+                foreign_field_mul_comm: vi.foreign_field_mul_comm.map(|v| v.into()),
+                rot_comm: vi.rot_comm.map(|v| v.into()),
+                lookup_gate_comm,
+                runtime_tables_comm,
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
@@ -166,7 +180,6 @@ pub fn read_raw(
 //
 // OCaml methods
 //
-
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_read(
@@ -248,6 +261,14 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             mul_comm: comm(),
             emul_comm: comm(),
             endomul_scalar_comm: comm(),
+            xor_comm: None,
+            range_check0_comm: None,
+            range_check1_comm: None,
+            foreign_field_add_comm: None,
+            foreign_field_mul_comm: None,
+            rot_comm: None,
+            lookup_gate_comm: None,
+            runtime_tables_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,

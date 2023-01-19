@@ -40,19 +40,21 @@ val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 val ft_comm :
      add:('a -> 'a -> 'a)
   -> scale:('a -> 'b -> 'a)
-  -> endoscale:('a -> 'c -> 'a)
+  -> endoscale:'c
   -> negate:('a -> 'a)
-  -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
-  -> alpha:'c
+  -> verification_key:
+       ('a, _) Pickles_types.Plonk_verification_key_evals.in_circuit
+  -> alpha:'e
   -> plonk:
-       ( 'd
-       , 'e
+       ( 'f
+       , _
        , 'b
-       , 'g
-       , 'f
-       , 'bool )
+       , ('b, _) Pickles_types.Opt.t
+       , 'i
+       , 'j )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'a array
+  -> options:Plonk_types.Features.options
   -> 'a
 
 val dlog_pcs_batch :
@@ -68,7 +70,7 @@ val combined_evaluation :
   -> xi:'f Snarky_backendless.Cvar.t
   -> ( 'f Snarky_backendless.Cvar.t
      , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
-     Pickles_types.Plonk_types.Opt.t
+     Pickles_types.Opt.t
      array
      list
   -> 'f Snarky_backendless.Cvar.t
@@ -150,6 +152,7 @@ end
 val hash_messages_for_next_step_proof :
      app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
   -> ( Backend.Tock.Curve.Affine.t
+     , Backend.Tock.Curve.Affine.t option
      , 'a
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
          * Kimchi_pasta.Basic.Fp.Stable.Latest.t
@@ -163,7 +166,7 @@ val hash_messages_for_next_step_proof :
 
 val tick_public_input_of_statement :
      max_proofs_verified:'a Pickles_types.Nat.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t

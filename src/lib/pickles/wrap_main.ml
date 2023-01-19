@@ -43,8 +43,7 @@ let pack_statement max_proofs_verified ~lookup ~feature_flags t =
     (Statement.spec
        (module Impl)
        max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map
-       ~to_opt:Plonk_types.Opt.to_option_unsafe )
+    (Statement.to_data t ~option_map:Opt.map ~to_opt:Opt.to_option_unsafe)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
@@ -85,7 +84,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 
 let lookup_config_for_pack =
   { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
-  ; use = Plonk_types.Opt.Flag.No
+  ; use = Opt.Flag.No
   }
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
@@ -219,7 +218,9 @@ let wrap_main
           with_label __LOC__ (fun () ->
               Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
+                   ~f:
+                     (Plonk_verification_key_evals.in_circuit_map
+                        ~f:Inner_curve.constant ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->
@@ -440,6 +441,7 @@ let wrap_main
                   ~sg_old:prev_step_accs
                   ~advice:{ b; combined_inner_product }
                   ~messages ~which_branch ~openings_proof ~plonk
+                  ~options:feature_flags
               in
               [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
               res )

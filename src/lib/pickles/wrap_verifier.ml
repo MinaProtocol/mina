@@ -188,7 +188,9 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type 'a index' = 'a Plonk_verification_key_evals.t
+  type 'a index' =
+    ('a, Impl.Boolean.var) Plonk_verification_key_evals.in_circuit
+  (* in *)
 
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
@@ -197,16 +199,33 @@ struct
       -> (Inner_curve.t index', n) Vector.t
       -> Inner_curve.t index' =
     let open Tuple_lib in
-    let map = Plonk_verification_key_evals.map in
-    let map2 = Plonk_verification_key_evals.map2 in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
-        ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
-      |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+        ~f:(fun b key ->
+          Plonk_verification_key_evals.in_circuit_map key ~f:(fun g ->
+              Double.map g ~f:(( * ) (b :> t)) ) )
+      |> Vector.reduce_exn
+           ~f:
+             (let dadd = Double.map2 ~f:( + ) in
+              let dadd_opt x y =
+                match (x, y) with
+                | Opt.Some x, Opt.Some y ->
+                    Opt.some (dadd x y)
+                | o, Opt.None | Opt.None, o ->
+                    o
+                | Opt.Maybe (b, x1), Opt.Maybe (b2, x2) ->
+                    (* or is the addition on Booleans *)
+                    Opt.maybe (Boolean.( || ) b b2) (dadd x1 x2)
+                | Opt.Some x, Opt.Maybe (_b, y) | Opt.Maybe (_b, y), Opt.Some x
+                  ->
+                    Opt.some (dadd x y)
+              in
+              Plonk_verification_key_evals.map2 ~f:dadd ~f_opt:dadd_opt )
+      |> Plonk_verification_key_evals.in_circuit_map ~f:(fun g ->
+             Double.map ~f:(Util.seal (module Impl)) g )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -510,12 +529,18 @@ struct
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
-      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~verification_key:
+        (m :
+          ( Wrap_main_inputs.Inner_curve.t
+          , Impls.Wrap.Boolean.var )
+          Pickles_types.Plonk_verification_key_evals.in_circuit ) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
-         array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
+         array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t)
+      ~(advice : _ Import.Types.Step.Bulletproof.Advice.t)
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
-      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
+      ~(options : Plonk_types.Features.options) =
     let T = Max_proofs_verified.eq in
     let sg_old =
       with_label __LOC__ (fun () ->
@@ -675,7 +700,7 @@ struct
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast ~negate:Inner_curve.negate
                 ~endoscale:(Scalar_challenge.endo ?num_bits:None)
-                ~verification_key:m ~plonk ~alpha ~t_comm )
+                ~verification_key:m ~plonk ~alpha ~t_comm ~options )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -869,7 +894,7 @@ struct
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
+      Pickles_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
         ~f:(fun () (x1, x2) ->
           let absorb = Array.iter ~f:(Sponge.absorb sponge) in
           absorb x1 ; absorb x2 )
@@ -889,7 +914,7 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
+      Plonk.to_minimal plonk ~to_option:Pickles_types.Opt.to_option_unsafe
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -951,12 +976,13 @@ struct
                      | None ->
                          [||]
                      | Some a ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                         Array.map a ~f:(fun x -> Pickles_types.Opt.Some x)
                      | Maybe (b, a) ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+                         Array.map a ~f:(fun x ->
+                             Pickles_types.Opt.Maybe (b, x) ) )
               in
               let sg_evals =
-                Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
+                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.Some x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with

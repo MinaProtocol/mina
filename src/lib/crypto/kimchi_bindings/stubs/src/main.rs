@@ -48,39 +48,39 @@ fn main() {
 
     if let Some(kimchi_types) = args.get(1) {
         let mut file = File::create(kimchi_types).expect("could not create output file");
-        write!(file, "{}", header).unwrap();
+        write!(file, "{header}").unwrap();
         let _ = env.new_module("Kimchi_types");
         generate_types_bindings(&mut file, env);
         let _ = env.parent();
     } else {
         let mut w = std::io::stdout();
-        write!(w, "{}", header).unwrap();
+        write!(w, "{header}").unwrap();
         decl_module!(w, env, "Kimchi_types", {
             generate_types_bindings(&mut w, env);
         });
     };
     if let Some(pasta_bindings) = args.get(2) {
         let mut file = File::create(pasta_bindings).expect("could not create output file");
-        write!(file, "{}", header).unwrap();
+        write!(file, "{header}").unwrap();
         let _ = env.new_module("Pasta_bindings");
         generate_pasta_bindings(&mut file, env);
         let _ = env.parent();
     } else {
         let mut w = std::io::stdout();
-        write!(w, "{}", header).unwrap();
+        write!(w, "{header}").unwrap();
         decl_module!(w, env, "Pasta_bindings", {
             generate_pasta_bindings(&mut w, env);
         });
     }
     if let Some(kimchi_bindings) = args.get(3) {
         let mut file = File::create(kimchi_bindings).expect("could not create output file");
-        write!(file, "{}", header).unwrap();
+        write!(file, "{header}").unwrap();
         let _ = env.new_module("Kimchi_bindings");
         generate_kimchi_bindings(&mut file, env);
         let _ = env.parent();
     } else {
         let mut w = std::io::stdout();
-        write!(w, "{}", header).unwrap();
+        write!(w, "{header}").unwrap();
         decl_module!(w, env, "Kimchi_bindings", {
             generate_kimchi_bindings(&mut w, env);
         });

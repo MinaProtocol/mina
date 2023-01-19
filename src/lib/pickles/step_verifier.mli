@@ -40,7 +40,7 @@ val assert_n_bits :
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
@@ -78,12 +78,16 @@ val finalize_other_proof :
        , 'c )
        Pickles_types.Vector.t
 
+type step_index :=
+  ( Step_main_inputs.Inner_curve.t
+  , Impls.Step.Boolean.var )
+  Pickles_types.Plonk_verification_key_evals.in_circuit
+
 val hash_messages_for_next_step_proof :
-     index:
-       Step_main_inputs.Inner_curve.t
-       Pickles_types.Plonk_verification_key_evals.t
+     index:step_index
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> (   ( 'a
+         , 'a option
          , 's
          , (Inner_curve.t, 'b) Pickles_types.Vector.t
          , ( (Step_main_inputs.Impl.Field.t, 'c) Pickles_types.Vector.t
@@ -94,12 +98,11 @@ val hash_messages_for_next_step_proof :
      Core_kernel.Staged.t
 
 val hash_messages_for_next_step_proof_opt :
-     index:
-       Step_main_inputs.Inner_curve.t
-       Pickles_types.Plonk_verification_key_evals.t
+     index:step_index
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> Step_main_inputs.Sponge.t
      * (   ( 'a
+           , 'a option
            , 's
            , (Inner_curve.t, 'b) Pickles_types.Vector.t
            , ( (Step_main_inputs.Impl.Field.t, 'c) Pickles_types.Vector.t
@@ -127,7 +130,7 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
@@ -135,16 +138,14 @@ val verify :
        | `Side_loaded of
          Step_main_inputs.Impl.field
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
-  -> wrap_verification_key:
-       Step_main_inputs.Inner_curve.t
-       Pickles_types.Plonk_verification_key_evals.t
+  -> wrap_verification_key:step_index
   -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
          Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
@@ -152,7 +153,7 @@ val verify :
          .t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
-       Pickles_types.Plonk_types.Opt.t
+       Pickles_types.Opt.t
      , Step_main_inputs.Impl.Boolean.var
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -168,7 +169,9 @@ val verify :
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
-     , _
+     , ( Other_field.t Pickles_types.Shifted_value.Type2.t
+       , _ )
+       Pickles_types.Opt.t
      , 'c
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t

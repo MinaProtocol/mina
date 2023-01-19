@@ -208,7 +208,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
         in
         { wrap_vk = Some (Lazy.force d.wrap_vk)
-        ; wrap_index = Lazy.force d.wrap_key
+        ; wrap_index =
+            Lazy.force d.wrap_key |> Plonk_verification_key_evals.out_of_in
         ; max_proofs_verified =
             Pickles_base.Proofs_verified.of_nat
               (Nat.Add.n d.max_proofs_verified)
@@ -1307,10 +1308,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let _, prev_vars_length = b.proofs_verified in
               let step =
                 let wrap_vk = Lazy.force wrap_vk in
+                let self_dlog_plonk_index =
+                  Plonk_verification_key_evals.in_of_out wrap_vk.commitments
+                in
                 S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
                   ~self ~public_input:(Input typ)
                   ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
-                  ~self_dlog_plonk_index:wrap_vk.commitments
+                  ~self_dlog_plonk_index
                   (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
                   wrap_vk.index
               in
@@ -1707,7 +1711,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; lookup = Plonk_types.Opt.None
+                                  ; lookup = Opt.None
                                   }
                               }
                           ; sponge_digest_before_evaluations =
@@ -1789,7 +1793,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ( { proof = next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
-                            ~to_option:Plonk_types.Opt.to_option next_statement
+                            ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
                               { public_input = x_hat
@@ -1829,7 +1833,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
-            ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+            ; wrap_key =
+                Lazy.map wrap_vk ~f:(fun vk ->
+                    Verification_key.commitments vk
+                    |> Plonk_verification_key_evals.in_of_out )
             ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
             ; wrap_domains
             ; step_domains
@@ -2267,8 +2274,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               let vk = As_prover.Ref.get vk in
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
-                            exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                            exists
+                              (Side_loaded_verification_key.typ
+                                 Plonk_types.Features.none ) ~compute:(fun () ->
+                                As_prover.Ref.get vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in
@@ -2569,8 +2578,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               respond Unhandled
 
         let maybe_features =
-          Plonk_types.Features.(
-            map none ~f:(fun _ -> Plonk_types.Opt.Flag.Maybe))
+          Plonk_types.Features.(map none ~f:(fun _ -> Opt.Flag.Maybe))
 
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
@@ -2618,8 +2626,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               let vk = As_prover.Ref.get vk in
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
-                            exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                            exists
+                              (Side_loaded_verification_key.typ
+                                 Plonk_types.Features.none ) ~compute:(fun () ->
+                                As_prover.Ref.get vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in
