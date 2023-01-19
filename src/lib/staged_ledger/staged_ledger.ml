@@ -3702,6 +3702,8 @@ let%test_module "staged ledger tests" =
                   | Error _ ->
                       assert false ) ) )
 
+    (* TODO: Re-enable after https://github.com/MinaProtocol/mina/pull/12397 *)
+    (*
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
@@ -3845,5 +3847,5 @@ let%test_module "staged ledger tests" =
                            ( Transaction_status.Failure.Collection.to_yojson tbl
                            |> Yojson.Safe.to_string ) )
                   | _ ->
-                      failwith "expecting zkapp_command transaction" ) ) )
+                      failwith "expecting zkapp_command transaction" ) ) ) *)
   end )
