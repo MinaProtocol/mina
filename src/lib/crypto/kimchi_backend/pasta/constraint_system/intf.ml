@@ -45,18 +45,5 @@ module type Full = sig
 
   val digest : t -> Md5.t
 
-  val to_json :
-       t
-    -> ([ `Null
-        | `Bool of bool
-        | `Int of int
-        | `Intlit of string
-        | `Float of float
-        | `String of string
-        | `Assoc of (string * 'json) list
-        | `List of 'json list
-        | `Tuple of 'json list
-        | `Variant of string * 'json option ]
-        as
-        'json )
+  val to_json : t -> string
 end
