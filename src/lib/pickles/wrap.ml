@@ -292,12 +292,10 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
 *)
 let%test_module "gate finalization" =
   ( module struct
-    type feature_flags = Plonk_types.Opt.Flag.t Plonk_types.Features.t
-
-    type test_feature_flags =
-      { true_is_yes : feature_flags
-      ; true_is_maybe : feature_flags
-      ; all_maybes : feature_flags
+    type test_options =
+      { true_is_yes : Plonk_types.Features.options
+      ; true_is_maybe : Plonk_types.Features.options
+      ; all_maybes : Plonk_types.Features.options
       }
 
     (* Helper function to convert actual feature flags into 3 test configurations of feature flags
@@ -308,8 +306,7 @@ let%test_module "gate finalization" =
          - one where true is mapped to Maybe and false is mapped to No
          - one where true and false are both mapped to Maybe *)
     let generate_test_feature_flag_configs
-        (actual_feature_flags : bool Plonk_types.Features.t) :
-        test_feature_flags =
+        (actual_feature_flags : Plonk_types.Features.flags) : test_options =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
@@ -317,9 +314,9 @@ let%test_module "gate finalization" =
          @param false_opt Plonk_types.Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
-          (actual_feature_flags : bool Plonk_types.Features.t)
+          (actual_feature_flags : Plonk_types.Features.flags)
           (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : feature_flags =
+          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -346,8 +343,8 @@ let%test_module "gate finalization" =
        @return true or throws and exception
     *)
     let run_recursive_proof_test
-        (actual_feature_flags : bool Plonk_types.Features.t)
-        (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+        (actual_feature_flags : Plonk_types.Features.flags)
+        (feature_flags : Plonk_types.Features.options)
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
         (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =
