@@ -3526,7 +3526,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let sparse_first_pass_ledger zkapp_command = function
       | `Ledger ledger ->
           Sparse_ledger.of_ledger_subset_exn ledger
-            [ Zkapp_command.fee_payer zkapp_command ]
+            (Zkapp_command.accounts_referenced zkapp_command)
       | `Sparse_ledger sparse_ledger ->
           sparse_ledger
     in
