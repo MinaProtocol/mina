@@ -133,13 +133,14 @@ let apply_transactions ~constraint_constants ~txn_state_view =
     (T.apply_transactions ~constraint_constants ~txn_state_view)
 
 let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
-    ~state_view ~fee_excess ~supply_increase ledger c =
+    ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
+    ~second_pass_ledger c =
   T.apply_zkapp_command_first_pass_aux ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase (ref ledger) c ~init:[]
+    ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
     ~f:(fun
          acc
          ( { first_pass_ledger
-           ; second_pass_ledger
+           ; second_pass_ledger = _ (*expected to be empty*)
            ; fee_excess
            ; supply_increase
            ; protocol_state
@@ -147,7 +148,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
          , local_state )
        ->
       ( { GS.first_pass_ledger = !first_pass_ledger
-        ; second_pass_ledger = !second_pass_ledger
+        ; second_pass_ledger
         ; fee_excess
         ; supply_increase
         ; protocol_state
