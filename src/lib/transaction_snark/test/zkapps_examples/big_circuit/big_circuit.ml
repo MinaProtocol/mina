@@ -35,5 +35,7 @@ let () =
   match f () with
   | exception Failure err when String.(err = expected_err) ->
       failwith "Exception occurred"
+  | exception e ->
+      failwith (Exn.to_string e)
   | _ ->
       failwith "No exception occured"
