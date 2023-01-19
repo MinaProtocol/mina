@@ -528,74 +528,110 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 let format_time_span ts =
   sprintf !"Total time was: %{Time.Span.to_string_hum}" ts
 
-(* TODO *)
-(* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
-   unbounded parallelism. *)
-let profile_user_command (module T : Transaction_snark.S) _sparse_ledger0
-    _transitions _ =
-  failwith "TODO"
-(*
-let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let txn_state_view = Lazy.force curr_state_view in
-  let open Async.Deferred.Let_syntax in
-  let%bind (base_proof_time, _, _), base_proofs_rev =
-    Async.Deferred.List.fold transitions
-      ~init:((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
-      ~f:(fun ((max_span, sparse_ledger, coinbase_stack_source), proofs) t ->
-        let sparse_ledger', applied =
-          Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
-            sparse_ledger (Transaction.forget t)
+let apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
+    first_pass_ledger txns =
+  let first_pass_target_ledgers, partially_applied_txns =
+    List.fold_map txns ~init:first_pass_ledger ~f:(fun l txn ->
+        let l', txn' =
+          Transaction.forget txn
+          |> Sparse_ledger.apply_transaction_first_pass ~constraint_constants
+               ~txn_state_view l
           |> Or_error.ok_exn
         in
-        let coinbase_stack_target =
-          pending_coinbase_stack_target (Transaction.forget t)
-            coinbase_stack_source
+        (l', (l', txn')) )
+    |> snd |> List.unzip
+  in
+  let second_pass_target_ledgers, applied_txns =
+    let second_pass_ledger = List.last_exn first_pass_target_ledgers in
+    List.fold_map partially_applied_txns ~init:second_pass_ledger
+      ~f:(fun l txn ->
+        let l', txn' =
+          Sparse_ledger.apply_transaction_second_pass l txn |> Or_error.ok_exn
         in
-        let tm0 = Core.Unix.gettimeofday () in
-        let target_hash = Sparse_ledger.merkle_root sparse_ledger' in
-        let%map proof =
-          T.of_non_zkapp_command_transaction
-            ~statement:
-              { sok_digest = Sok_message.Digest.default
-              ; source =
-                  { first_pass_ledger = Sparse_ledger.merkle_root sparse_ledger
-                  ; second_pass_ledger = target_hash
-                  ; pending_coinbase_stack = coinbase_stack_source
-                  ; local_state = Mina_state.Local_state.empty ()
-                  }
-              ; target =
-                  { first_pass_ledger = target_hash
-                  ; second_pass_ledger = target_hash
-                  ; pending_coinbase_stack = coinbase_stack_target
-                  ; local_state = Mina_state.Local_state.empty ()
-                  }
-              ; connecting_ledger_left = target_hash
-              ; connecting_ledger_right = target_hash
-              ; supply_increase =
-                  (let magnitude =
-                     Transaction.expected_supply_increase t |> Or_error.ok_exn
-                   in
-                   let sgn = Sgn.Pos in
-                   Currency.Amount.Signed.create ~magnitude ~sgn )
-              ; fee_excess =
-                  Transaction.fee_excess (Transaction.forget t)
-                  |> Or_error.ok_exn
-              ; zkapp_updates_applied =
-                  Mina_ledger.Ledger.Transaction_applied.zkapp_updates_applied
-                    applied
-              }
-            ~init_stack:coinbase_stack_source
-            { Transaction_protocol_state.Poly.transaction = t
-            ; block_data = Lazy.force state_body
-            }
-            (unstage (Sparse_ledger.handler sparse_ledger))
-        in
-        let tm1 = Core.Unix.gettimeofday () in
-        let span = Time.Span.of_sec (tm1 -. tm0) in
-        ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
-        , proof :: proofs ) )
+        (l', (l', txn')) )
+    |> snd |> List.unzip
+  in
+  (first_pass_target_ledgers, second_pass_target_ledgers, applied_txns)
+
+(* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
+   unbounded parallelism. *)
+let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
+    (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
+  (* TODO: assert (Ledger_hash.equal (Sparse_ledger.merkle_root l) (Sparse_ledger.merkle_root final_sparse_ledger)) ; *)
+  let txn_state_view = Lazy.force curr_state_view in
+  let open Async.Deferred.Let_syntax in
+  let first_pass_target_ledgers, second_pass_target_ledgers, applied_txns =
+    apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
+      sparse_ledger0 transitions
+  in
+  let final_first_pass_ledger = List.last_exn first_pass_target_ledgers in
+  List.iter second_pass_target_ledgers ~f:(fun l ->
+      assert (
+        Ledger_hash.equal
+          (Sparse_ledger.merkle_root l)
+          (Sparse_ledger.merkle_root final_first_pass_ledger) ) ) ;
+  let%bind (base_proof_time, _, _), base_proofs_rev =
+    List.zip_exn first_pass_target_ledgers applied_txns
+    |> Async.Deferred.List.fold
+         ~init:
+           ((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
+         ~f:(fun ((max_span, source_ledger, coinbase_stack_source), proofs)
+                 (target_ledger, applied) ->
+           let txn =
+             With_status.data
+             @@ Mina_ledger.Ledger.Transaction_applied.transaction applied
+           in
+           (* the txn was already valid before apply, we are just recasting it here after application *)
+           let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                 valid_txn ) =
+             Transaction.to_valid_unsafe txn
+           in
+           let coinbase_stack_target =
+             pending_coinbase_stack_target txn coinbase_stack_source
+           in
+           let tm0 = Core.Unix.gettimeofday () in
+           let target_hash = Sparse_ledger.merkle_root target_ledger in
+           let%map proof =
+             T.of_non_zkapp_command_transaction
+               ~statement:
+                 { sok_digest = Sok_message.Digest.default
+                 ; source =
+                     { first_pass_ledger =
+                         Sparse_ledger.merkle_root source_ledger
+                     ; second_pass_ledger = target_hash
+                     ; pending_coinbase_stack = coinbase_stack_source
+                     ; local_state = Mina_state.Local_state.empty ()
+                     }
+                 ; target =
+                     { first_pass_ledger = target_hash
+                     ; second_pass_ledger = target_hash
+                     ; pending_coinbase_stack = coinbase_stack_target
+                     ; local_state = Mina_state.Local_state.empty ()
+                     }
+                 ; connecting_ledger_left = target_hash
+                 ; connecting_ledger_right = target_hash
+                 ; supply_increase =
+                     (let magnitude =
+                        Transaction.expected_supply_increase txn
+                        |> Or_error.ok_exn
+                      in
+                      let sgn = Sgn.Pos in
+                      Currency.Amount.Signed.create ~magnitude ~sgn )
+                 ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
+                 ; zkapp_updates_applied =
+                     Mina_ledger.Ledger.Transaction_applied
+                     .zkapp_updates_applied applied
+                 }
+               ~init_stack:coinbase_stack_source
+               { Transaction_protocol_state.Poly.transaction = valid_txn
+               ; block_data = Lazy.force state_body
+               }
+               (unstage (Sparse_ledger.handler source_ledger))
+           in
+           let tm1 = Core.Unix.gettimeofday () in
+           let span = Time.Span.of_sec (tm1 -. tm0) in
+           ( (Time.Span.max span max_span, target_ledger, coinbase_stack_target)
+           , proof :: proofs ) )
   in
   let rec merge_all serial_time proofs =
     match proofs with
@@ -625,7 +661,6 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   in
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
-*)
 
 let profile_zkapps ~verifier ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
@@ -732,8 +767,6 @@ let profile_zkapps ~verifier ledger zkapp_commands =
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
 
-let check_base_snarks _ _ _ = failwith "TODO"
-(*
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
@@ -744,47 +777,53 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let txn_state_view = Lazy.force curr_state_view in
-      List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-          let sparse_ledger', applied_transaction =
-            Sparse_ledger.apply_transaction ~constraint_constants
-              ~txn_state_view sparse_ledger (Transaction.forget t)
-            |> Or_error.ok_exn
-          in
-          let coinbase_stack_target =
-            pending_coinbase_stack_target (Transaction.forget t)
-              Pending_coinbase.Stack.empty
-          in
-          let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
-            |> Or_error.ok_exn
-          in
-          let () =
-            Transaction_snark.check_transaction ?preeval ~constraint_constants
-              ~sok_message
-              ~source_first_pass_ledger:
-                (Sparse_ledger.merkle_root sparse_ledger)
-              ~target_first_pass_ledger:
-                (Sparse_ledger.merkle_root sparse_ledger')
-              ~init_stack:Pending_coinbase.Stack.empty
-              ~pending_coinbase_stack_state:
-                { source = Pending_coinbase.Stack.empty
-                ; target = coinbase_stack_target
-                }
-              ~supply_increase
-              { Transaction_protocol_state.Poly.block_data =
-                  Lazy.force state_body
-              ; transaction = t
-              }
-              (unstage (Sparse_ledger.handler sparse_ledger))
-          in
-          sparse_ledger' )
+      let first_pass_target_ledgers, _, applied_txns =
+        apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
+          sparse_ledger0 transitions
+      in
+      List.zip_exn first_pass_target_ledgers applied_txns
+      |> List.fold ~init:sparse_ledger0
+           ~f:(fun source_ledger (target_ledger, applied_txn) ->
+             let txn =
+               With_status.data
+               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+             in
+             (* the txn was already valid before apply, we are just recasting it here after application *)
+             let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                   valid_txn ) =
+               Transaction.to_valid_unsafe txn
+             in
+             let coinbase_stack_target =
+               pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
+             in
+             let supply_increase =
+               Mina_ledger.Ledger.Transaction_applied.supply_increase
+                 applied_txn
+               |> Or_error.ok_exn
+             in
+             let () =
+               Transaction_snark.check_transaction ?preeval
+                 ~constraint_constants ~sok_message
+                 ~source_first_pass_ledger:
+                   (Sparse_ledger.merkle_root source_ledger)
+                 ~target_first_pass_ledger:
+                   (Sparse_ledger.merkle_root target_ledger)
+                 ~init_stack:Pending_coinbase.Stack.empty
+                 ~pending_coinbase_stack_state:
+                   { source = Pending_coinbase.Stack.empty
+                   ; target = coinbase_stack_target
+                   }
+                 ~supply_increase
+                 { Transaction_protocol_state.Poly.block_data =
+                     Lazy.force state_body
+                 ; transaction = valid_txn
+                 }
+                 (unstage (Sparse_ledger.handler source_ledger))
+             in
+             target_ledger )
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
-*)
 
-let generate_base_snarks_witness _ _ _ = failwith "TODO"
-(*
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.Valid.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
@@ -795,44 +834,52 @@ let generate_base_snarks_witness sparse_ledger0
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let txn_state_view = Lazy.force curr_state_view in
-      List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-          let sparse_ledger', applied_transaction =
-            Sparse_ledger.apply_transaction ~constraint_constants
-              ~txn_state_view sparse_ledger (Transaction.forget t)
-            |> Or_error.ok_exn
-          in
-          let coinbase_stack_target =
-            pending_coinbase_stack_target (Transaction.forget t)
-              Pending_coinbase.Stack.empty
-          in
-          let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
-            |> Or_error.ok_exn
-          in
-          let () =
-            Transaction_snark.generate_transaction_witness ?preeval
-              ~constraint_constants ~sok_message
-              ~source_first_pass_ledger:
-                (Sparse_ledger.merkle_root sparse_ledger)
-              ~target_first_pass_ledger:
-                (Sparse_ledger.merkle_root sparse_ledger')
-              ~init_stack:Pending_coinbase.Stack.empty
-              ~pending_coinbase_stack_state:
-                { Transaction_snark.Pending_coinbase_stack_state.source =
-                    Pending_coinbase.Stack.empty
-                ; target = coinbase_stack_target
-                }
-              ~supply_increase
-              { Transaction_protocol_state.Poly.transaction = t
-              ; block_data = Lazy.force state_body
-              }
-              (unstage (Sparse_ledger.handler sparse_ledger))
-          in
-          sparse_ledger' )
+      let first_pass_target_ledgers, _, applied_txns =
+        apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
+          sparse_ledger0 transitions
+      in
+      List.zip_exn first_pass_target_ledgers applied_txns
+      |> List.fold ~init:sparse_ledger0
+           ~f:(fun source_ledger (target_ledger, applied_txn) ->
+             let txn =
+               With_status.data
+               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+             in
+             (* the txn was already valid before apply, we are just recasting it here after application *)
+             let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                   valid_txn ) =
+               Transaction.to_valid_unsafe txn
+             in
+             let coinbase_stack_target =
+               pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
+             in
+             let supply_increase =
+               Mina_ledger.Ledger.Transaction_applied.supply_increase
+                 applied_txn
+               |> Or_error.ok_exn
+             in
+             let () =
+               Transaction_snark.generate_transaction_witness ?preeval
+                 ~constraint_constants ~sok_message
+                 ~source_first_pass_ledger:
+                   (Sparse_ledger.merkle_root source_ledger)
+                 ~target_first_pass_ledger:
+                   (Sparse_ledger.merkle_root target_ledger)
+                 ~init_stack:Pending_coinbase.Stack.empty
+                 ~pending_coinbase_stack_state:
+                   { Transaction_snark.Pending_coinbase_stack_state.source =
+                       Pending_coinbase.Stack.empty
+                   ; target = coinbase_stack_target
+                   }
+                 ~supply_increase
+                 { Transaction_protocol_state.Poly.transaction = valid_txn
+                 ; block_data = Lazy.force state_body
+                 }
+                 (unstage (Sparse_ledger.handler source_ledger))
+             in
+             target_ledger )
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
-*)
 
 let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =

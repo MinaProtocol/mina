@@ -527,7 +527,6 @@ module T = struct
         ~f:(fun x -> Ok x)
     else Ok constraint_constants.coinbase_amount
 
-  (* TODO: put into batch throttle loop *)
   let apply_single_transaction_first_pass ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
       txn_with_status (txn_state_view : Zkapp_precondition.Protocol_state.View.t)
@@ -646,36 +645,48 @@ module T = struct
     ; statement
     }
 
-  let apply_transactions_first_pass ~constraint_constants ledger
+  let apply_transactions_first_pass ~yield ~constraint_constants ledger
       init_pending_coinbase_stack_state ts current_state_view =
-    let open Result.Let_syntax in
+    let open Deferred.Result.Let_syntax in
+    let apply pending_coinbase_stack_state txn =
+      match
+        List.find (Transaction.public_keys txn.With_status.data) ~f:(fun pk ->
+            Option.is_none (Signature_lib.Public_key.decompress pk) )
+      with
+      | Some pk ->
+          Error (Staged_ledger_error.Invalid_public_key pk)
+      | None ->
+          apply_single_transaction_first_pass ~constraint_constants ledger
+            pending_coinbase_stack_state txn current_state_view
+    in
     let%map res_rev, pending_coinbase_stack_state =
-      List.fold_result ts ~init:([], init_pending_coinbase_stack_state)
+      Mina_stdlib.Deferred.Result.List.fold ts
+        ~init:([], init_pending_coinbase_stack_state)
         ~f:(fun (acc, pending_coinbase_stack_state) t ->
-          match
-            List.find (Transaction.public_keys t.With_status.data) ~f:(fun pk ->
-                Option.is_none (Signature_lib.Public_key.decompress pk) )
-          with
-          | Some pk ->
-              Error (Staged_ledger_error.Invalid_public_key pk)
-          | None ->
-              let%map pre_witness, pending_coinbase_stack_state' =
-                apply_single_transaction_first_pass ~constraint_constants ledger
-                  pending_coinbase_stack_state t current_state_view
-              in
-              (pre_witness :: acc, pending_coinbase_stack_state') )
+          let%bind pre_witness, pending_coinbase_stack_state' =
+            Deferred.return (apply pending_coinbase_stack_state t)
+          in
+          let%map () = yield () in
+          (pre_witness :: acc, pending_coinbase_stack_state') )
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
-  let apply_transactions_second_pass ledger state_and_body_hash pre_stmts =
+  let apply_transactions_second_pass ~yield ledger state_and_body_hash pre_stmts
+      =
+    let open Deferred.Result.Let_syntax in
     let connecting_ledger = Ledger.merkle_root ledger in
-    Mina_stdlib.Result.List.map pre_stmts ~f:(fun pre_stmt ->
-        apply_single_transaction_second_pass ~connecting_ledger ledger
-          state_and_body_hash pre_stmt )
+    Mina_stdlib.Deferred.Result.List.map pre_stmts ~f:(fun pre_stmt ->
+        let%bind result =
+          apply_single_transaction_second_pass ~connecting_ledger ledger
+            state_and_body_hash pre_stmt
+          |> Deferred.return
+        in
+        let%map () = yield () in
+        result )
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack tss current_state_view state_and_body_hash =
-    let open Result.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let state_body_hash = snd state_and_body_hash in
     let ts, ts_opt = tss in
     let apply_first_pass working_stack ts =
@@ -688,19 +699,28 @@ module T = struct
       apply_transactions_first_pass ~constraint_constants ledger
         init_pending_coinbase_stack_state ts current_state_view
     in
-    let%bind pre_stmts1, updated_stack1 = apply_first_pass current_stack ts in
+    let yield =
+      (* TODO: measure these operations and tune `n` accordingly *)
+      Fn.compose
+        (Deferred.map ~f:Result.return)
+        (Staged.unstage @@ Scheduler.yield_every ~n:10)
+    in
+    let%bind pre_stmts1, updated_stack1 =
+      apply_first_pass ~yield current_stack ts
+    in
     let%bind pre_stmts2, updated_stack2 =
-      Option.value_map ts_opt
-        ~default:(Ok ([], updated_stack1))
-        ~f:(fun ts ->
+      match ts_opt with
+      | None ->
+          return ([], updated_stack1)
+      | Some ts ->
           let current_stack2 =
             Pending_coinbase.Stack.create_with current_stack
           in
-          apply_first_pass current_stack2 ts )
+          apply_first_pass ~yield current_stack2 ts
     in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
-      apply_transactions_second_pass ledger state_and_body_hash
+      apply_transactions_second_pass ~yield ledger state_and_body_hash
         (pre_stmts1 @ pre_stmts2)
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
@@ -795,8 +815,6 @@ module T = struct
             update_ledger_and_get_statements ~constraint_constants ledger
               working_stack (transactions, None) current_state_view
               state_and_body_hash
-            (* TODO: scheduler safety (task throttling) *)
-            |> Deferred.return
           in
           ( is_new_stack
           , data
@@ -821,11 +839,10 @@ module T = struct
           in
           let txns_for_partition2 = List.drop transactions slots in
           let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
-            Deferred.return
-              (update_ledger_and_get_statements ~constraint_constants ledger
-                 working_stack1
-                 (txns_for_partition1, Some txns_for_partition2)
-                 current_state_view state_and_body_hash )
+            update_ledger_and_get_statements ~constraint_constants ledger
+              working_stack1
+              (txns_for_partition1, Some txns_for_partition2)
+              current_state_view state_and_body_hash
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
           let pending_coinbase_action, stack_update =
