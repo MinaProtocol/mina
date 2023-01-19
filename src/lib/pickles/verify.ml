@@ -85,9 +85,6 @@ let verify_heterogenous (ts : Instance.t list) =
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
         let step_domain = Branch_data.domain branch_data in
-        check
-          ( lazy "domain size is small enough"
-          , Domain.log2_size step_domain <= Nat.to_int Backend.Tick.Rounds.n ) ;
         let w =
           Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
