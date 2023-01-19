@@ -16,6 +16,6 @@ module Result : sig
     val map :
          'a list
       -> f:('a -> ('b, 'e) Deferred.Result.t)
-      -> ('b, 'e) Deferred.Result.t
+      -> ('b list, 'e) Deferred.Result.t
   end
 end
