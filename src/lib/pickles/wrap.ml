@@ -554,13 +554,8 @@ let%test_module "gate finalization" =
               Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true )
 
         let actual_feature_flags =
-          { Plonk_types.Features.chacha = false
-          ; range_check = false
-          ; foreign_field_add = false
-          ; foreign_field_mul = false
-          ; xor = false
-          ; rot = false
-          ; lookup = true
+          { Plonk_types.Features.none_bool with
+            lookup = true
           ; runtime_tables = true
           }
       end) )
@@ -572,14 +567,11 @@ let%test_module "gate finalization" =
             Kimchi_bindings.Protocol.Proof.Fp.example_with_foreign_field_mul
 
         let actual_feature_flags =
-          { Plonk_types.Features.chacha = false
-          ; range_check = true
+          { Plonk_types.Features.none_bool with
+            range_check = true
           ; foreign_field_add = true
           ; foreign_field_mul = true
-          ; xor = false
-          ; rot = false
           ; lookup = true
-          ; runtime_tables = false
           }
       end) )
 
@@ -590,14 +582,9 @@ let%test_module "gate finalization" =
             Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check
 
         let actual_feature_flags =
-          { Plonk_types.Features.chacha = false
-          ; range_check = true
-          ; foreign_field_add = false
-          ; foreign_field_mul = false
-          ; xor = false
-          ; rot = false
+          { Plonk_types.Features.none_bool with
+            range_check = true
           ; lookup = true
-          ; runtime_tables = false
           }
       end) )
 
@@ -607,15 +594,7 @@ let%test_module "gate finalization" =
           no_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha
 
         let actual_feature_flags =
-          { Plonk_types.Features.chacha = true
-          ; range_check = false
-          ; foreign_field_add = false
-          ; foreign_field_mul = false
-          ; xor = false
-          ; rot = false
-          ; lookup = true
-          ; runtime_tables = false
-          }
+          { Plonk_types.Features.none_bool with chacha = true; lookup = true }
       end) )
 
     let%test_module "xor" =
@@ -624,16 +603,7 @@ let%test_module "gate finalization" =
           public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_xor
 
         let actual_feature_flags =
-          let open Plonk_types.Opt.Flag in
-          { Plonk_types.Features.chacha = false
-          ; range_check = false
-          ; foreign_field_add = false
-          ; foreign_field_mul = false
-          ; xor = true
-          ; rot = false
-          ; lookup = true
-          ; runtime_tables = false
-          }
+          { Plonk_types.Features.none_bool with xor = true; lookup = true }
       end) )
 
     let%test_module "rot" =
@@ -642,15 +612,10 @@ let%test_module "gate finalization" =
           public_input_2 Kimchi_bindings.Protocol.Proof.Fp.example_with_rot
 
         let actual_feature_flags =
-          let open Plonk_types.Opt.Flag in
-          { Plonk_types.Features.chacha = false
-          ; range_check = true
-          ; foreign_field_add = false
-          ; foreign_field_mul = false
-          ; xor = false
+          { Plonk_types.Features.none_bool with
+            range_check = true
           ; rot = true
           ; lookup = true
-          ; runtime_tables = false
           }
       end) )
 
@@ -660,15 +625,10 @@ let%test_module "gate finalization" =
           public_input_1 Kimchi_bindings.Protocol.Proof.Fp.example_with_ffadd
 
         let actual_feature_flags =
-          let open Plonk_types.Opt.Flag in
-          { Plonk_types.Features.chacha = false
-          ; range_check = true
+          { Plonk_types.Features.none_bool with
+            range_check = true
           ; foreign_field_add = true
-          ; foreign_field_mul = false
-          ; xor = false
-          ; rot = false
           ; lookup = true
-          ; runtime_tables = false
           }
       end) )
   end )
