@@ -1999,7 +1999,7 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
-    let `VK vk, `Prover _zkapp_prover =
+    let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let verifier =
@@ -3701,4 +3701,149 @@ let%test_module "staged ledger tests" =
                       assert true
                   | Error _ ->
                       assert false ) ) )
+
+    let%test_unit "Mismatched verification keys in zkApp accounts and \
+                   transactions" =
+      let open Transaction_snark.For_tests in
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
+        let pks =
+          Public_key.Compressed.Set.of_list
+            (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+                 Public_key.compress (fst s).public_key ) )
+        in
+        let%map kp =
+          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+              not
+                (Public_key.Compressed.Set.mem pks
+                   (Public_key.compress kp.public_key) ) )
+        in
+        (test_spec, kp)
+      in
+      Quickcheck.test ~trials:1 gen
+        ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
+          let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
+          let snapp_update =
+            { Account_update.Update.dummy with
+              delegate = Zkapp_basic.Set_or_keep.Set snapp_pk
+            }
+          in
+          let memo = Signed_command_memo.dummy in
+          let test_spec : Update_states_spec.t =
+            { sender = (new_kp, Mina_base.Account.Nonce.zero)
+            ; fee
+            ; fee_payer = None
+            ; receivers = []
+            ; amount
+            ; zkapp_account_keypairs = [ new_kp ]
+            ; memo
+            ; new_zkapp_account = false
+            ; snapp_update
+            ; current_auth = Permissions.Auth_required.Proof
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; actions = []
+            ; preconditions = None
+            }
+          in
+          Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  (*create a snapp account*)
+                  let snapp_permissions =
+                    let default = Permissions.user_default in
+                    { default with
+                      set_delegate = Permissions.Auth_required.Proof
+                    }
+                  in
+                  let snapp_account_id =
+                    Account_id.create snapp_pk Token_id.default
+                  in
+                  let dummy_vk =
+                    let data = Pickles.Side_loaded.Verification_key.dummy in
+                    let hash = Zkapp_account.digest_vk data in
+                    ({ data; hash } : _ With_hash.t)
+                  in
+                  let valid_against_ledger =
+                    let new_mask =
+                      Ledger.Mask.create ~depth:(Ledger.depth ledger) ()
+                    in
+                    let l = Ledger.register_mask ledger new_mask in
+                    Transaction_snark.For_tests.create_trivial_zkapp_account
+                      ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
+                    l
+                  in
+                  let%bind zkapp_command =
+                    let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
+                  in
+                  let valid_zkapp_command =
+                    Or_error.ok_exn
+                      (Zkapp_command.Valid.to_valid
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger
+                              ~ledger:valid_against_ledger ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
+                         zkapp_command )
+                  in
+                  ignore
+                    (Ledger.unregister_mask_exn valid_against_ledger
+                       ~loc:__LOC__ ) ;
+                  (*Different key in the staged ledger*)
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:snapp_permissions ~vk:dummy_vk ~ledger snapp_pk ;
+                  let open Async.Deferred.Let_syntax in
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let%bind _proof, diff =
+                    create_and_apply sl
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
+                      stmt_to_work_one_prover
+                  in
+                  let commands = Staged_ledger_diff.commands diff in
+                  (*Zkapp_command with incompatible vk should not be in the diff*)
+                  assert (List.is_empty commands) ;
+                  (*Update the account to have correct vk*)
+                  let loc =
+                    Option.value_exn
+                      (Ledger.location_of_account ledger snapp_account_id)
+                  in
+                  let account = Option.value_exn (Ledger.get ledger loc) in
+                  Ledger.set ledger loc
+                    { account with
+                      zkapp =
+                        Some
+                          { (Option.value_exn account.zkapp) with
+                            verification_key = Some vk
+                          }
+                    } ;
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let%bind _proof, diff =
+                    create_and_apply sl
+                      (Sequence.singleton
+                         (User_command.Zkapp_command valid_zkapp_command) )
+                      stmt_to_work_one_prover
+                  in
+                  let commands = Staged_ledger_diff.commands diff in
+                  assert (List.length commands = 1) ;
+                  match List.hd_exn commands with
+                  | { With_status.data = Zkapp_command _ps; status = Applied }
+                    ->
+                      return ()
+                  | { With_status.data = Zkapp_command _ps
+                    ; status = Failed tbl
+                    } ->
+                      failwith
+                        (sprintf "Zkapp_command application failed %s"
+                           ( Transaction_status.Failure.Collection.to_yojson tbl
+                           |> Yojson.Safe.to_string ) )
+                  | _ ->
+                      failwith "expecting zkapp_command transaction" ) ) )
   end )
