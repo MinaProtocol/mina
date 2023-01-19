@@ -257,7 +257,7 @@ module Zkapp_account_update_info = struct
     ; account : [ `Pk of string ]
     ; balance_change : string
     ; increment_nonce : bool
-    ; caller : string
+    ; call_type : string
     ; call_depth : Unsigned_extended.UInt64.t
     ; use_full_commitment : bool
     ; status : [ `Success | `Failed ]
@@ -270,7 +270,7 @@ module Zkapp_account_update_info = struct
       ; account = `Pk "Eve"
       ; balance_change = "-1000000"
       ; increment_nonce = false
-      ; caller = "caller1"
+      ; call_type = "caller1"
       ; call_depth = Unsigned.UInt64.of_int 10
       ; use_full_commitment = true
       ; status = `Success
@@ -280,7 +280,7 @@ module Zkapp_account_update_info = struct
       ; account = `Pk "Alice"
       ; balance_change = "20000000"
       ; increment_nonce = true
-      ; caller = "caller2"
+      ; call_type = "caller2"
       ; call_depth = Unsigned.UInt64.of_int 20
       ; use_full_commitment = false
       ; status = `Failed
@@ -762,7 +762,7 @@ SELECT zaub.account_identifier_id, zaub.id,
     zaub.balance_change, zaub.increment_nonce, zaub.events_id,
     zaub.sequence_events_id, zaub.call_data_id, zaub.call_depth,
     zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
-    zaub.use_full_commitment, zaub.caller, zaub.authorization_kind,
+    zaub.use_full_commitment, zaub.call_type, zaub.authorization_kind,
     pk.value as account, bzc.status
 FROM zkapp_commands zc
  INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
@@ -957,7 +957,7 @@ WHERE zc.id = ?
                   ; account = Zkapp_account_update.Extras.account extras
                   ; balance_change = upd.balance_change
                   ; increment_nonce = upd.increment_nonce
-                  ; caller = upd.caller
+                  ; call_type = upd.call_type
                   ; call_depth = Unsigned.UInt64.of_int upd.call_depth
                   ; use_full_commitment = upd.use_full_commitment
                   ; status

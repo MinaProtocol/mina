@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export NODE_OPTIONS="--enable-source-maps"
+
 set -eo pipefail
 source ~/.profile
 

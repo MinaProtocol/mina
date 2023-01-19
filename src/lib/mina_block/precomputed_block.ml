@@ -105,20 +105,26 @@ let of_block ~logger
   let account_ids_accessed = Block.account_ids_accessed block in
   let start = Time.now () in
   let accounts_accessed =
-    List.filter_map account_ids_accessed ~f:(fun acct_id ->
-        try
-          let index = Mina_ledger.Ledger.index_of_account_exn ledger acct_id in
-          let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account)
-        with exn ->
-          [%log error]
-            "When computing accounts accessed for precomputed block, exception \
-             when finding account id in staged ledger"
-            ~metadata:
-              [ ("account_id", Account_id.to_yojson acct_id)
-              ; ("exception", `String (Exn.to_string exn))
-              ] ;
-          None )
+    List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
+        match status with
+        | `Not_accessed ->
+            None
+        | `Accessed -> (
+            try
+              let index =
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+              in
+              let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+              Some (index, account)
+            with exn ->
+              [%log error]
+                "When computing accounts accessed for precomputed block, \
+                 exception when finding account id in staged ledger"
+                ~metadata:
+                  [ ("account_id", Account_id.to_yojson acct_id)
+                  ; ("exception", `String (Exn.to_string exn))
+                  ] ;
+              None ) )
   in
   let header = Block.header block in
   let accounts_accessed_time = Time.now () in
@@ -142,7 +148,9 @@ let of_block ~logger
   in
   let tokens_used =
     let unique_tokens =
-      List.map account_ids_accessed ~f:Account_id.token_id
+      (* a token is used regardless of status *)
+      List.map account_ids_accessed ~f:(fun (acct_id, _status) ->
+          Account_id.token_id acct_id )
       |> List.dedup_and_sort ~compare:Token_id.compare
     in
     List.map unique_tokens ~f:(fun token_id ->

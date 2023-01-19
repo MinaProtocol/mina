@@ -58,6 +58,7 @@ module Poly : sig
       type 'controller t =
             'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
+        ; access : 'controller
         ; send : 'controller
         ; receive : 'controller (* TODO: Consider having fee *)
         ; set_delegate : 'controller
