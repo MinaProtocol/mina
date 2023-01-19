@@ -3555,8 +3555,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           let applied_txn, states =
             let partial_txn, states =
               Sparse_ledger.apply_zkapp_first_pass_unchecked_with_states
-                first_pass_ledger ~constraint_constants ~state_view ~fee_excess
-                ~supply_increase zkapp_command
+                ~first_pass_ledger ~second_pass_ledger ~constraint_constants
+                ~state_view ~fee_excess ~supply_increase zkapp_command
               |> Or_error.ok_exn
             in
             Sparse_ledger.apply_zkapp_second_pass_unchecked_with_states

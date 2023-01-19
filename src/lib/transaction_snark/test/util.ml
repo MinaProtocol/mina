@@ -84,129 +84,138 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
           (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
         |> Or_error.ok_exn
       in
-      match
-        Or_error.try_with (fun () ->
-            Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-              ~state_body ~fee_excess:Amount.Signed.zero
-              [ ( `Pending_coinbase_init_stack init_stack
-                , `Pending_coinbase_of_statement
-                    (pending_coinbase_state_stack ~state_body_hash)
-                , `Ledger ledger
-                , `Ledger second_pass_ledger
-                , zkapp_command )
-              ] )
-      with
-      | Error e -> (
-          match expected_failure with
-          | Some failure ->
-              assert (
-                String.is_substring (Error.to_string_hum e)
-                  ~substring:(Transaction_status.Failure.to_string failure) ) ;
-              Async.Deferred.unit
-          | None ->
-              failwith
-                (sprintf "apply_transaction failed with %s"
-                   (Error.to_string_hum e) ) )
-      | Ok witnesses -> (
-          let open Async.Deferred.Let_syntax in
-          let applied =
-            if ignore_outside_snark then
-              Ledger.Transaction_applied.Varying.Command
-                (Zkapp_command
-                   { command =
-                       { With_status.status = Applied; data = zkapp_command }
-                   ; accounts = []
-                   ; new_accounts = []
-                   } )
-            else
-              ( Ledger.apply_transaction_second_pass second_pass_ledger
-                  partial_stmt
-              |> Or_error.ok_exn )
-                .varying
-          in
-          match applied with
-          | Command (Zkapp_command { command; _ }) -> (
-              match command.status with
-              | Applied -> (
-                  match expected_failure with
-                  | Some failure ->
-                      failwith
-                        (sprintf
-                           !"Application did not fail as expected. Expected \
-                             failure: \
-                             %{sexp:Mina_base.Transaction_status.Failure.t}"
-                           failure )
-                  | None ->
-                      let%map p =
-                        match List.rev witnesses with
-                        | [] ->
-                            failwith "no witnesses generated"
-                        | (witness, spec, stmt) :: rest ->
-                            let open Async.Deferred.Or_error.Let_syntax in
-                            let%bind p1 =
-                              Async.Deferred.Or_error.try_with (fun () ->
-                                  T.of_zkapp_command_segment_exn ~statement:stmt
-                                    ~witness ~spec )
-                            in
-                            Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt) ->
-                                let%bind prev = Async.Deferred.return acc in
-                                let%bind curr =
-                                  Async.Deferred.Or_error.try_with (fun () ->
-                                      T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness ~spec )
-                                in
-                                let sok_digest =
-                                  Sok_message.create ~fee:Fee.zero
-                                    ~prover:
-                                      (Quickcheck.random_value
-                                         Public_key.Compressed.gen )
-                                  |> Sok_message.digest
-                                in
-                                T.merge ~sok_digest prev curr )
-                      in
-                      let p = Or_error.ok_exn p in
-                      if not ignore_outside_snark then
-                        let target_ledger_root_snark =
-                          (Transaction_snark.statement p).target
-                            .second_pass_ledger
-                        in
-                        let target_ledger_root = Ledger.merkle_root ledger in
-                        [%test_eq: Ledger_hash.t] target_ledger_root
-                          target_ledger_root_snark )
-              | Failed failure_tbl -> (
-                  match expected_failure with
-                  | None ->
-                      failwith
-                        (sprintf
-                           !"Application failed. Failure statuses: %{sexp: \
-                             Mina_base.Transaction_status.Failure.Collection.t}"
-                           failure_tbl )
-                  | Some failure ->
-                      let failures = List.concat failure_tbl in
-                      assert (not (List.is_empty failures)) ;
-                      let failed_as_expected =
-                        (*Check that there's at least the expected failure*)
-                        List.fold failures ~init:false ~f:(fun acc f ->
-                            acc
-                            || Mina_base.Transaction_status.Failure.(
-                                 equal failure f) )
-                      in
-                      ignore
-                      @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
-                           second_pass_ledger ;
-                      if not failed_as_expected then
+      let%map.Async.Deferred () =
+        match
+          Or_error.try_with (fun () ->
+              Transaction_snark.zkapp_command_witnesses_exn
+                ~constraint_constants ~state_body ~fee_excess:Amount.Signed.zero
+                [ ( `Pending_coinbase_init_stack init_stack
+                  , `Pending_coinbase_of_statement
+                      (pending_coinbase_state_stack ~state_body_hash)
+                  , `Ledger ledger
+                  , `Ledger second_pass_ledger
+                  , zkapp_command )
+                ] )
+        with
+        | Error e -> (
+            match expected_failure with
+            | Some failure ->
+                Core.printf
+                  !"Expected failure %{sexp: Transaction_status.Failure.t} Got \
+                    %s\n\
+                    %!"
+                  failure (Error.to_string_hum e) ;
+                assert (
+                  String.is_substring (Error.to_string_hum e)
+                    ~substring:(Transaction_status.Failure.to_string failure) ) ;
+                Async.Deferred.unit
+            | None ->
+                failwith
+                  (sprintf "apply_transaction failed with %s"
+                     (Error.to_string_hum e) ) )
+        | Ok witnesses -> (
+            let open Async.Deferred.Let_syntax in
+            let applied =
+              if ignore_outside_snark then
+                Ledger.Transaction_applied.Varying.Command
+                  (Zkapp_command
+                     { command =
+                         { With_status.status = Applied; data = zkapp_command }
+                     ; accounts = []
+                     ; new_accounts = []
+                     } )
+              else
+                ( Ledger.apply_transaction_second_pass second_pass_ledger
+                    partial_stmt
+                |> Or_error.ok_exn )
+                  .varying
+            in
+            match applied with
+            | Command (Zkapp_command { command; _ }) -> (
+                match command.status with
+                | Applied -> (
+                    match expected_failure with
+                    | Some failure ->
                         failwith
                           (sprintf
-                             !"Application failed but not as expected. \
-                               Expected failure: \
-                               %{sexp:Mina_base.Transaction_status.Failure.t} \
-                               Failure statuses: %{sexp: \
+                             !"Application did not fail as expected. Expected \
+                               failure: \
+                               %{sexp:Mina_base.Transaction_status.Failure.t}"
+                             failure )
+                    | None ->
+                        let%map p =
+                          match List.rev witnesses with
+                          | [] ->
+                              failwith "no witnesses generated"
+                          | (witness, spec, stmt) :: rest ->
+                              let open Async.Deferred.Or_error.Let_syntax in
+                              let%bind p1 =
+                                Async.Deferred.Or_error.try_with (fun () ->
+                                    T.of_zkapp_command_segment_exn
+                                      ~statement:stmt ~witness ~spec )
+                              in
+                              Async.Deferred.List.fold ~init:(Ok p1) rest
+                                ~f:(fun acc (witness, spec, stmt) ->
+                                  let%bind prev = Async.Deferred.return acc in
+                                  let%bind curr =
+                                    Async.Deferred.Or_error.try_with (fun () ->
+                                        T.of_zkapp_command_segment_exn
+                                          ~statement:stmt ~witness ~spec )
+                                  in
+                                  let sok_digest =
+                                    Sok_message.create ~fee:Fee.zero
+                                      ~prover:
+                                        (Quickcheck.random_value
+                                           Public_key.Compressed.gen )
+                                    |> Sok_message.digest
+                                  in
+                                  T.merge ~sok_digest prev curr )
+                        in
+                        let p = Or_error.ok_exn p in
+                        if not ignore_outside_snark then
+                          let target_ledger_root_snark =
+                            (Transaction_snark.statement p).target
+                              .second_pass_ledger
+                          in
+                          let target_ledger_root =
+                            Ledger.merkle_root second_pass_ledger
+                          in
+                          [%test_eq: Ledger_hash.t] target_ledger_root
+                            target_ledger_root_snark )
+                | Failed failure_tbl -> (
+                    match expected_failure with
+                    | None ->
+                        failwith
+                          (sprintf
+                             !"Application failed. Failure statuses: %{sexp: \
                                Mina_base.Transaction_status.Failure.Collection.t}"
-                             failure failure_tbl )
-                      else Async.Deferred.unit ) )
-          | _ ->
-              failwith "zkapp_command expected" ) )
+                             failure_tbl )
+                    | Some failure ->
+                        let failures = List.concat failure_tbl in
+                        assert (not (List.is_empty failures)) ;
+                        let failed_as_expected =
+                          (*Check that there's at least the expected failure*)
+                          List.fold failures ~init:false ~f:(fun acc f ->
+                              acc
+                              || Mina_base.Transaction_status.Failure.(
+                                   equal failure f) )
+                        in
+                        if not failed_as_expected then
+                          failwith
+                            (sprintf
+                               !"Application failed but not as expected. \
+                                 Expected failure: \
+                                 %{sexp:Mina_base.Transaction_status.Failure.t} \
+                                 Failure statuses: %{sexp: \
+                                 Mina_base.Transaction_status.Failure.Collection.t}"
+                               failure failure_tbl )
+                        else Async.Deferred.unit ) )
+            | _ ->
+                failwith "zkapp_command expected" )
+      in
+      Ledger.Ledger_inner.apply_mask ledger ~masked:second_pass_ledger ;
+      ignore
+      @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ second_pass_ledger )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in
