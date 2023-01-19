@@ -34,6 +34,11 @@ struct
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
+      let dummy_step_keys =
+        Lazy.map
+          ~f:(Vector.map ~f:Plonk_verification_key_evals.in_of_out)
+          dummy_step_keys
+      in
       Wrap_main.wrap_main ~feature_flags ~srs full_signature choices_length
         dummy_step_keys dummy_step_widths dummy_step_domains max_proofs_verified
     in

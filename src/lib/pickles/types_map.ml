@@ -16,9 +16,12 @@ module Basic = struct
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
+    ; wrap_key :
+        ( Tick.Inner_curve.Affine.t
+        , Impls.Step.Boolean.var )
+        Plonk_verification_key_evals.in_circuit
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Features.options
     }
 end
 
@@ -38,7 +41,7 @@ module Side_loaded = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      ; feature_flags : Plonk_types.Features.options
       ; branches : 'n2 Nat.t
       }
   end
@@ -70,7 +73,7 @@ module Side_loaded = struct
     ; public_input
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
-    ; wrap_key
+    ; wrap_key = Plonk_verification_key_evals.in_of_out wrap_key
     ; feature_flags
     }
 end
@@ -82,7 +85,7 @@ module Compiled = struct
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Features.options
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -95,11 +98,15 @@ module Compiled = struct
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
+    ; wrap_key :
+        ( Backend.Tick.Inner_curve.Affine.t
+        , Impls.Step.Boolean.var )
+        Pickles_types.Plonk_verification_key_evals.in_circuit
+        Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Plonk_types.Features.options
     }
 
   type packed =
@@ -134,13 +141,16 @@ module For_step = struct
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
+    ; wrap_key :
+        ( inner_curve_var
+        , Impls.Step.Boolean.var )
+        Plonk_verification_key_evals.in_circuit
     ; wrap_domain :
         [ `Known of Domain.t
         | `Side_loaded of
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.t
     }
 
   let of_side_loaded (type a b c d)
@@ -185,7 +195,7 @@ module For_step = struct
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; public_input
     ; wrap_key =
-        Plonk_verification_key_evals.map (Lazy.force wrap_key)
+        Plonk_verification_key_evals.in_circuit_map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
@@ -251,7 +261,7 @@ let public_input :
 
 let feature_flags :
     type var value.
-    (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+    (var, value, _, _) Tag.t -> Opt.Flag.t Plonk_types.Features.t =
  fun tag ->
   match tag.kind with
   | Compiled ->

@@ -4,7 +4,7 @@ module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
-module Opt = Plonk_types.Opt
+module Opt = Pickles_types.Opt
 open Core_kernel
 
 type 'f impl = 'f Spec.impl
@@ -88,68 +88,7 @@ module Wrap = struct
           end
 
           module Optional_column_scalars = struct
-            type 'fp t =
-              { range_check0 : 'fp
-              ; range_check1 : 'fp
-              ; foreign_field_add : 'fp
-              ; foreign_field_mul : 'fp
-              ; xor : 'fp
-              ; rot : 'fp
-              ; lookup_gate : 'fp
-              ; runtime_tables : 'fp
-              }
-            [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-            let map ~f
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              { range_check0 = f range_check0
-              ; range_check1 = f range_check1
-              ; foreign_field_add = f foreign_field_add
-              ; foreign_field_mul = f foreign_field_mul
-              ; xor = f xor
-              ; rot = f rot
-              ; lookup_gate = f lookup_gate
-              ; runtime_tables = f runtime_tables
-              }
-
-            let map2 ~f t1 t2 =
-              { range_check0 = f t1.range_check0 t2.range_check0
-              ; range_check1 = f t1.range_check1 t2.range_check1
-              ; foreign_field_add = f t1.foreign_field_add t2.foreign_field_add
-              ; foreign_field_mul = f t1.foreign_field_mul t2.foreign_field_mul
-              ; xor = f t1.xor t2.xor
-              ; rot = f t1.rot t2.rot
-              ; lookup_gate = f t1.lookup_gate t2.lookup_gate
-              ; runtime_tables = f t1.runtime_tables t2.runtime_tables
-              }
-
-            let to_list
-                { range_check0
-                ; range_check1
-                ; foreign_field_add
-                ; foreign_field_mul
-                ; xor
-                ; rot
-                ; lookup_gate
-                ; runtime_tables
-                } =
-              [ range_check0
-              ; range_check1
-              ; foreign_field_add
-              ; foreign_field_mul
-              ; xor
-              ; rot
-              ; lookup_gate
-              ; runtime_tables
-              ]
+            include Pickles_types.Plonk_verification_key_evals.Optional_columns
 
             let[@warning "-45"] to_data
                 { range_check0
@@ -207,30 +146,24 @@ module Wrap = struct
             let make_opt feature_flags t =
               let flags = of_feature_flags feature_flags in
               map2 flags t ~f:(fun flag v ->
-                  match v with
-                  | Some v ->
-                      Plonk_types.Opt.Maybe (flag, v)
-                  | None ->
-                      Plonk_types.Opt.None )
+                  match v with Some v -> Opt.maybe flag v | None -> Opt.none )
 
             let[@warning "-45"] refine_opt feature_flags t =
               let flags = of_feature_flags feature_flags in
               map2 flags t ~f:(fun flag v ->
-                  let open Plonk_types.Opt in
                   match (flag, v) with
-                  | Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
-                      Plonk_types.Opt.Some v
-                  | Flag.Yes, (Some _ | None) ->
+                  | Opt.Flag.Yes, Opt.Maybe (_, v) ->
+                      Opt.some v
+                  | Opt.Flag.Yes, (Some _ | None) ->
                       assert false
-                  | Flag.Maybe, v ->
+                  | Opt.Flag.Maybe, v ->
                       v
-                  | Flag.No, (None | Some _ | Maybe _) ->
-                      Plonk_types.Opt.None )
+                  | Opt.Flag.No, (None | Some _ | Maybe _) ->
+                      Opt.none )
 
             let spec (* (type f) *) _
                 (* ((module Impl) : f impl) *) (zero : _ Zero_values.t)
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
+                (feature_flags : Plonk_types.Features.options) =
               let opt_spec flag =
                 let opt_spec =
                   Spec.T.Opt_unflagged
@@ -241,9 +174,9 @@ module Wrap = struct
                     }
                 in
                 match flag with
-                | Plonk_types.Opt.Flag.No ->
+                | Opt.Flag.No ->
                     Spec.T.Constant (None, (fun _ _ -> (* TODO *) ()), opt_spec)
-                | Plonk_types.Opt.Flag.(Yes | Maybe) ->
+                | Opt.Flag.(Yes | Maybe) ->
                     opt_spec
               in
               let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
@@ -259,27 +192,6 @@ module Wrap = struct
                 ; opt_spec f7
                 ; opt_spec f8
                 ]
-
-            let typ (type f fp)
-                (module Impl : Snarky_backendless.Snark_intf.Run
-                  with type field = f ) (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
-              let opt_typ flag =
-                Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
-              in
-              Snarky_backendless.Typ.of_hlistable
-                [ opt_typ feature_flags.range_check0
-                ; opt_typ feature_flags.range_check1
-                ; opt_typ feature_flags.foreign_field_add
-                ; opt_typ feature_flags.foreign_field_mul
-                ; opt_typ feature_flags.xor
-                ; opt_typ feature_flags.rot
-                ; opt_typ feature_flags.lookup
-                ; opt_typ feature_flags.runtime_tables
-                ]
-                ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-                ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
           end
 
           (** All scalar values deferred by a verifier circuit.
@@ -361,13 +273,13 @@ module Wrap = struct
               ; fp
               ; fp
               ; Plonk_types.Features.typ ~feature_flags bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ
+              ; Opt.typ Impl.Boolean.typ
                   feature_flags.Plonk_types.Features.lookup
                   ~dummy:{ joint_combiner = dummy_scalar_challenge }
                   (Lookup.typ (Scalar_challenge.typ scalar_challenge))
               ; Optional_column_scalars.typ
                   (module Impl)
-                  ~dummy_scalar fp feature_flags
+                  ~dummy:dummy_scalar fp feature_flags
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -692,15 +604,21 @@ module Wrap = struct
   (** The component of the proof accumulation state that is only computed on by the
       "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
   module Messages_for_next_step_proof = struct
-    type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
+    type ( 'g
+         , 'g_opt
+         , 's
+         , 'challenge_polynomial_commitments
+         , 'bulletproof_challenges )
+         t =
       { app_state : 's
             (** The actual application-level state (e.g., for Mina, this is the protocol state which contains the
     merkle root of the ledger, state related to consensus, etc.) *)
-      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
-            (** The verification key corresponding to the wrap-circuit for this recursive proof system.
-          It gets threaded through all the circuits so that the step circuits can verify proofs against
-          it.
-      *)
+      ; dlog_plonk_index :
+          ('g, 'g_opt) Pickles_types.Plonk_verification_key_evals.t
+            (** The verification key corresponding to the wrap-circuit for this
+                recursive proof system.  It gets threaded through all the
+                circuits so that the step circuits can verify proofs against
+                it.  *)
       ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
       ; old_bulletproof_challenges : 'bulletproof_challenges
       }
@@ -762,13 +680,9 @@ module Wrap = struct
       ; old_bulletproof_challenges
       }
 
-    let typ comm g s chal proofs_verified =
+    let typ _comm _commopt g s chal proofs_verified =
       Snarky_backendless.Typ.of_hlistable
-        [ s
-        ; Plonk_verification_key_evals.typ comm
-        ; Vector.typ g proofs_verified
-        ; chal
-        ]
+        [ s; assert false; Vector.typ g proofs_verified; chal ]
         (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -910,11 +824,11 @@ module Wrap = struct
           in
           let maybe_constant flag =
             match flag with
-            | Plonk_types.Opt.Flag.Yes ->
+            | Opt.Flag.Yes ->
                 constant true
-            | Plonk_types.Opt.Flag.No ->
+            | Opt.Flag.No ->
                 constant false
-            | Plonk_types.Opt.Flag.Maybe ->
+            | Opt.Flag.Maybe ->
                 Spec.T.B Bool
           in
           Spec.T.Struct
@@ -1279,11 +1193,11 @@ module Step = struct
             in
             let maybe_constant flag =
               match flag with
-              | Plonk_types.Opt.Flag.Yes ->
+              | Opt.Flag.Yes ->
                   constant true
-              | Plonk_types.Opt.Flag.No ->
+              | Opt.Flag.No ->
                   constant false
-              | Plonk_types.Opt.Flag.Maybe ->
+              | Opt.Flag.Maybe ->
                   Spec.T.B Bool
             in
             Spec.T.Struct
@@ -1491,8 +1405,7 @@ module Step = struct
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
-        (proofs_verified :
-          (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
+        (proofs_verified : (Plonk_types.Features.options, n) Vector.t) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )

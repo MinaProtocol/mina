@@ -48,11 +48,11 @@ module Checked : sig
         Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
-        Step_main_inputs.Inner_curve.t
-        Pickles_types.Plonk_verification_key_evals.t
+        ( Step_main_inputs.Inner_curve.t
+        , Impls.Step.Boolean.var )
+        Pickles_types.Plonk_verification_key_evals.in_circuit
           (** The plonk verification key for the 'wrapping' proof that this key
-              is used to verify.
-          *)
+              is used to verify.  *)
     }
   [@@deriving hlist, fields]
 
@@ -92,7 +92,8 @@ include Codable.Base58_check_intf with type t := t
 
 include Codable.Base64_intf with type t := t
 
-val typ : (Checked.t, t) Impls.Step.Typ.t
+val typ :
+  Pickles_types.Plonk_types.Features.options -> (Checked.t, t) Impls.Step.Typ.t
 
 val to_yojson : t -> [> `String of string ]
 

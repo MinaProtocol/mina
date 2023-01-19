@@ -180,9 +180,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let array_to_vector a = Pickles_types.Vector.of_list (Array.to_list a)
 
-  (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
+  (** Convert [backend.verifier_index] to [pickles_types.verifier_index] *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
-      Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t =
+      Inputs.Curve.Affine.t
+      Pickles_types.Plonk_verification_key_evals.out_circuit =
     let g c : Inputs.Curve.Affine.t =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
@@ -202,5 +203,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; mul_comm = g t.evals.mul_comm
     ; emul_comm = g t.evals.emul_comm
     ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
+    ; optional_columns_comm =
+        Pickles_types.(Plonk_verification_key_evals.Optional_columns.init None)
     }
 end

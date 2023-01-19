@@ -118,11 +118,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let feature_flags =
           Plonk_types.Features.map
-            ~f:(function
-              | false ->
-                  Plonk_types.Opt.Flag.No
-              | true ->
-                  Plonk_types.Opt.Flag.Yes )
+            ~f:(function false -> Opt.Flag.No | true -> Opt.Flag.Yes)
             plonk0.feature_flags
         in
         let tick_env =
@@ -172,8 +168,7 @@ let verify_heterogenous (ts : Instance.t list) =
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
           ; lookup =
-              Option.map (Plonk_types.Opt.to_option_unsafe p.lookup)
-                ~f:(fun _l ->
+              Option.map (Opt.to_option_unsafe p.lookup) ~f:(fun _ ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
                     .joint_combiner = Option.value_exn plonk0.joint_combiner
@@ -182,7 +177,7 @@ let verify_heterogenous (ts : Instance.t list) =
               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
               .In_circuit
               .Optional_column_scalars
-              .map ~f:Plonk_types.Opt.to_option p.optional_column_scalars
+              .map ~f:Opt.to_option p.optional_column_scalars
           }
         in
         Timer.clock __LOC__ ;

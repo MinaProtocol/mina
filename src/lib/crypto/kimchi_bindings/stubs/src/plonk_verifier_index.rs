@@ -20,6 +20,14 @@ pub struct CamlPlonkVerificationEvals<PolyComm> {
     pub mul_comm: PolyComm,
     pub emul_comm: PolyComm,
     pub endomul_scalar_comm: PolyComm,
+    pub xor_comm: Option<PolyComm>,
+    pub range_check0_comm: Option<PolyComm>,
+    pub range_check1_comm: Option<PolyComm>,
+    pub foreign_field_add_comm: Option<PolyComm>,
+    pub foreign_field_mul_comm: Option<PolyComm>,
+    pub rot_comm: Option<PolyComm>,
+    pub lookup_gate_comm: Option<PolyComm>,
+    pub runtime_tables_comm: Option<PolyComm>,
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Enum)]

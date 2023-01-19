@@ -159,6 +159,8 @@ module Inner_curve = struct
 
       let zero = Impl.Field.Constant.(zero, zero)
 
+      let one = Params.one
+
       let ( + ) t1 t2 =
         let is_zero (x, _) = Impl.Field.Constant.(equal zero x) in
         if is_zero t1 then t2

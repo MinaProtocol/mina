@@ -304,13 +304,13 @@ let%test_module "gate finalization" =
       (* Set up a helper to convert actual feature flags composed of booleans into
          feature flags composed of Yes/No/Maybe options.
          @param actual_feature_flags The actual feature flags in terms of true/false
-         @param true_opt  Plonk_types.Opt type to use for true/enabled features
-         @param false_opt Plonk_types.Opt type to use for false/disabled features
+         @param true_opt  Opt type to use for true/enabled features
+         @param false_opt Opt type to use for false/disabled features
          @return Corresponding feature flags composed of Yes/No/Maybe values *)
       let compute_feature_flags
           (actual_feature_flags : Plonk_types.Features.flags)
-          (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
+          (true_opt : Opt.Flag.t) (false_opt : Opt.Flag.t) :
+          Plonk_types.Features.options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
@@ -320,7 +320,7 @@ let%test_module "gate finalization" =
 
       (* Generate the 3 configurations of the actual feature flags using
          helper *)
-      let open Plonk_types.Opt.Flag in
+      let open Opt.Flag in
       { true_is_yes = compute_feature_flags actual_feature_flags Yes No
       ; true_is_maybe = compute_feature_flags actual_feature_flags Maybe No
       ; all_maybes = compute_feature_flags actual_feature_flags Maybe Maybe

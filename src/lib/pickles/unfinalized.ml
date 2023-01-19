@@ -14,11 +14,11 @@ type t =
   ( Field.t
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
-  , (Other_field.t Shifted_value.t, Boolean.var) Plonk_types.Opt.t
+  , (Other_field.t Shifted_value.t, Boolean.var) Opt.t
   , ( Field.t Scalar_challenge.t
       Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
     , Boolean.var )
-    Plonk_types.Opt.t
+    Opt.t
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t

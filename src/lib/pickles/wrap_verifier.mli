@@ -4,7 +4,10 @@ val challenge_polynomial :
   -> 'a array
   -> ('a -> 'a) Core_kernel.Staged.t
 
-type 'a index' = 'a Pickles_types.Plonk_verification_key_evals.t
+type 'a index' =
+  ( 'a
+  , Impls.Wrap.Boolean.var )
+  Pickles_types.Plonk_verification_key_evals.in_circuit
 
 module Challenge : module type of Import.Challenge.Make (Impls.Wrap)
 
@@ -61,8 +64,9 @@ val incrementally_verify_proof :
   -> step_domains:(Import.Domains.t, 'a) Pickles_types.Vector.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> verification_key:
-       Wrap_main_inputs.Inner_curve.t
-       Pickles_types.Plonk_verification_key_evals.t
+       ( Wrap_main_inputs.Inner_curve.t
+       , Impls.Wrap.Boolean.var )
+       Pickles_types.Plonk_verification_key_evals.in_circuit
   -> xi:Scalar_challenge.t
   -> sponge:Opt.t
   -> public_input:
@@ -92,10 +96,11 @@ val incrementally_verify_proof :
        , Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , ( Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Plonk_types.Opt.t
+         Pickles_types.Opt.t
        , 'd
        , Wrap_main_inputs.Impl.Boolean.var )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+  -> options:Pickles_types.Plonk_types.Features.options
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
        * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t

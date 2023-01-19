@@ -217,21 +217,16 @@ module Stable = struct
               ; prev_challenges = 2 (* Due to Wrap_hack *)
               ; srs
               ; evals =
-                  (let g (x, y) =
+                  (* TODO: Looks like it's the same code as in
+                     Verification_key.of_repr, thus a candidate for
+                     refactoring. *)
+                  (let f (x, y) =
                      { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
                      ; shifted = None
                      }
                    in
-                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
-                   ; coefficients_comm =
-                       Array.map ~f:g (Vector.to_array c.coefficients_comm)
-                   ; generic_comm = g c.generic_comm
-                   ; mul_comm = g c.mul_comm
-                   ; psm_comm = g c.psm_comm
-                   ; emul_comm = g c.emul_comm
-                   ; complete_add_comm = g c.complete_add_comm
-                   ; endomul_scalar_comm = g c.endomul_scalar_comm
-                   } )
+                   Plonk_verification_key_evals.(
+                     out_circuit_map ~f c |> to_kimchi_verification_evals) )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
               } )
@@ -301,6 +296,8 @@ let dummy : t =
        ; mul_comm = g
        ; emul_comm = g
        ; endomul_scalar_comm = g
+       ; optional_columns_comm =
+           Pickles_types.Plonk_verification_key_evals.Optional_columns.init None
        } )
   ; wrap_vk = None
   }
@@ -316,9 +313,12 @@ module Checked = struct
     ; actual_wrap_domain_size :
         Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
-    ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
+    ; wrap_index :
+        ( Inner_curve.t
+        , Impls.Step.Boolean.var )
+        Plonk_verification_key_evals.in_circuit
           (** The plonk verification key for the 'wrapping' proof that this key
-              is used to verify.
+          is used to verify.
           *)
     }
   [@@deriving hlist, fields]
@@ -343,7 +343,7 @@ module Checked = struct
         ; actual_wrap_domain_size
         ; wrap_index_to_input
             (Fn.compose Array.of_list Inner_curve.to_field_elements)
-            wrap_index
+            (Plonk_verification_key_evals.out_of_in wrap_index)
         ]
 end
 
@@ -361,13 +361,15 @@ let%test_unit "input_size" =
          in
          typ.size_in_field_elements ) )
 
-let typ : (Checked.t, t) Impls.Step.Typ.t =
+let typ options : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
     [ Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
     ; Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
-    ; Plonk_verification_key_evals.typ Inner_curve.typ
+    ; Plonk_verification_key_evals.opt_typ
+        (module Impls.Step)
+        options Inner_curve.typ ~dummy:Inner_curve.Constant.one
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->

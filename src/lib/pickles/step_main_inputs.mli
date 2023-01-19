@@ -94,6 +94,8 @@ module Inner_curve : sig
 
       val zero : Impl.Field.Constant.t * Impl.Field.Constant.t
 
+      val one : Impl.Field.Constant.t * Impl.Field.Constant.t
+
       val ( + ) : t -> t -> t
 
       val negate : t -> t

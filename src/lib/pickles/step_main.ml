@@ -69,7 +69,8 @@ let verify_one ~srs
                     Nat.N2.n ) )
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
-            ; dlog_plonk_index = d.wrap_key
+            ; dlog_plonk_index =
+                Plonk_verification_key_evals.out_of_in d.wrap_key
             ; challenge_polynomial_commitments =
                 prev_challenge_polynomial_commitments
             ; old_bulletproof_challenges = prev_challenges
@@ -197,7 +198,7 @@ let step_main :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
+        -> (Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
      fun ds ld ->
       match[@warning "-4"] (ds, ld) with
       | [], Z ->
@@ -220,7 +221,7 @@ let step_main :
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+        -> (Opt.Flag.t Plonk_types.Features.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
       match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
@@ -336,7 +337,10 @@ let step_main :
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Plonk_verification_key_evals.typ Inner_curve.typ)
+            (Plonk_verification_key_evals.typ
+               (module Impl)
+               basic.feature_flags
+               ~dummy:Step_main_inputs.Inner_curve.Constant.one Inner_curve.typ )
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
@@ -546,7 +550,8 @@ let step_main :
               in
               hash_messages_for_next_step_proof
                 { app_state
-                ; dlog_plonk_index
+                ; dlog_plonk_index =
+                    Plonk_verification_key_evals.out_of_in dlog_plonk_index
                 ; challenge_polynomial_commitments
                 ; old_bulletproof_challenges =
                     (* Note: the bulletproof_challenges here are unpadded! *)

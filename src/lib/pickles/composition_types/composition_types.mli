@@ -1,5 +1,5 @@
 open Pickles_types
-module Opt = Plonk_types.Opt
+module Opt = Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
@@ -98,6 +98,8 @@ module Wrap : sig
 
           module Optional_column_scalars : sig
             type 'fp t =
+                  'fp
+                  Pickles_types.Plonk_verification_key_evals.Optional_columns.t =
               { range_check0 : 'fp
               ; range_check1 : 'fp
               ; foreign_field_add : 'fp
@@ -182,13 +184,13 @@ module Wrap : sig
                  , bool
                  , 'f )
                  Snarky_backendless.Typ.t
-            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> feature_flags:Plonk_types.Features.options
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
-                 , ('fp, 'boolean) Plonk_types.Opt.t
-                 , ('e Scalar_challenge.t Lookup.t, 'boolean) Plonk_types.Opt.t
+                 , ('fp, 'boolean) Opt.t
+                 , ('e Scalar_challenge.t Lookup.t, 'boolean) Opt.t
                  , 'boolean )
                  t
                , ( 'd
@@ -339,7 +341,7 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-          -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> feature_flags:Plonk_types.Features.options
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
@@ -354,11 +356,11 @@ module Wrap : sig
                  , ( 'fp
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( 'e Scalar_challenge.t Plonk.In_circuit.Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , 'f Snarky_backendless.Cvar.t
                    Snarky_backendless__Snark_intf.Boolean0.t )
                  Plonk.In_circuit.t
@@ -569,7 +571,7 @@ module Wrap : sig
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Plonk_types.Features.options
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
@@ -592,11 +594,11 @@ module Wrap : sig
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
-               , ('fp, 'boolean) Plonk_types.Opt.t
+               , ('fp, 'boolean) Opt.t
                , ( 'e Scalar_challenge.t
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'boolean )
-                 Plonk_types.Opt.t
+                 Opt.t
                , ('f Snarky_backendless.Cvar.t
                   Snarky_backendless__Snark_intf.Boolean0.t
                   as
@@ -642,12 +644,17 @@ module Wrap : sig
       the "stepping" proof system, and that can be handled opaquely by any
       "wrap" circuits. *)
   module Messages_for_next_step_proof : sig
-    type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
+    type ( 'g
+         , 'g_opt
+         , 's
+         , 'challenge_polynomial_commitments
+         , 'bulletproof_challenges )
+         t =
       { app_state : 's
             (** The actual application-level state (e.g., for Mina, this is the
                 protocol state which contains the merkle root of the ledger,
                 state related to consensus, etc.) *)
-      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
+      ; dlog_plonk_index : ('g, 'g_opt) Plonk_verification_key_evals.t
             (** The verification key corresponding to the wrap-circuit for this
                 recursive proof system.  It gets threaded through all the
                 circuits so that the step circuits can verify proofs against
@@ -658,36 +665,49 @@ module Wrap : sig
     [@@deriving sexp, hlist]
 
     val to_field_elements :
-         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
+         ( 'a
+         , 'a option
+         , 'b
+         , ('g, 'c) Vector.t
+         , (('f, 'd) Vector.t, 'c) Vector.t )
+         t
       -> app_state:('b -> 'f Core_kernel.Array.t)
       -> comm:('a -> 'f Core_kernel.Array.t)
       -> g:('g -> 'f list)
       -> 'f Core_kernel.Array.t
 
     val to_field_elements_without_index :
-         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
+         ( 'a
+         , 'a option
+         , 'b
+         , ('g, 'c) Vector.t
+         , (('f, 'd) Vector.t, 'c) Vector.t )
+         t
       -> app_state:('b -> 'f Core_kernel.Array.t)
       -> g:('g -> 'f list)
       -> 'f Core_kernel.Array.t
 
     val typ :
          ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ( 'f
-         , 'g
+      -> ( 'd
+         , 'e
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
-         snarky_typ
+         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
+         Snarky_backendless.Types.Typ.typ
+      -> ('f, 'g, 'c) Snarky_backendless.Typ.t
       -> ( 'h
          , 'i
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
-         snarky_typ
-      -> 'j Nat.nat
-      -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
-         , ('b, 'g, ('e, 'j) Vector.vec, 'i) t
+         , (unit, 'c) Snarky_backendless__.Checked_runner.Simple.t )
+         Snarky_backendless__.Types.Typ.t
+      -> ( 'j
+         , 'k
+         , 'c
+         , (unit, 'c) Snarky_backendless__.Checked_runner.Simple.t )
+         Snarky_backendless__.Types.Typ.t
+      -> 'l Pickles_types.Nat.nat
+      -> ( ('a, 'd, 'h, ('f, 'l) Pickles_types.Vector.vec, 'j) t
+         , ('b, 'e, 'i, ('g, 'l) Pickles_types.Vector.vec, 'k) t
          , 'c )
          Snarky_backendless.Typ.t
   end
@@ -695,7 +715,7 @@ module Wrap : sig
   module Lookup_parameters : sig
     type ('chal, 'chal_var, 'fp, 'fp_var) t =
       { zero : ('chal, 'chal_var, 'fp, 'fp_var) Zero_values.t
-      ; use : Plonk_types.Opt.Flag.t
+      ; use : Opt.Flag.t
       }
 
     val opt_spec :
@@ -904,7 +924,7 @@ module Wrap : sig
            , 'field1 Hlist0.Id.t
            , 'field2 Hlist0.Id.t )
            Lookup_parameters.t
-        -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> Plonk_types.Features.options
         -> ( ( 'field1
              , 'challenge1
              , 'challenge1 Scalar_challenge.t
@@ -961,9 +981,7 @@ module Wrap : sig
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
            ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
-        -> feature_flags:
-             Pickles_types.Plonk_types.Opt.Flag.t
-             Pickles_types.Plonk_types.Features.t
+        -> feature_flags:Pickles_types.Plonk_types.Features.options
         -> option_map:
              (   'g Hlist0.Id.t
               -> f:
@@ -971,7 +989,7 @@ module Wrap : sig
                     -> 'h Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                    )
               -> 'j )
-        -> of_opt:(('fp, 'bool) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
+        -> of_opt:(('fp, 'bool) Pickles_types.Opt.t -> 'fp_opt2)
         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
@@ -1160,68 +1178,123 @@ module Step : sig
           ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
           Hlist.HlistId.t
 
-        type ( 'field
-             , 'digest
-             , 'challenge
-             , 'bulletproof_challenge
-             , 'bool
-             , 'optional
-             , 'fp_opt
-             , 'num_bulletproof_challenges )
-             flat_repr :=
-          ( ('field, Nat.N9.n) Vector.t
-          * ( ('digest, Nat.N1.n) Vector.t
-            * ( ('challenge, Nat.N2.n) Vector.t
-              * ( ('challenge Scalar_challenge.t, Nat.N3.n) Vector.t
-                * ( ( 'bulletproof_challenge
-                    , 'num_bulletproof_challenges )
-                    Vector.t
-                  * ( ('bool, Nat.N1.n) Vector.t
-                    * ('bool vec8 * ('optional * ('fp_opt vec8 * unit))) ) ) )
-              ) ) )
-          Hlist.HlistId.t
-
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         val spec :
-             'f Spec.impl
-          -> 'num_bulletproof_challenges Nat.t
-          -> ( 'challenge1
-             , 'challenge2
-             , 'field1 Hlist0.Id.t
-             , 'field2 Hlist0.Id.t )
-             Wrap.Lookup_parameters.t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
-          -> ( ( 'field1
-               , 'digest1
-               , 'challenge1
-               , 'bulletproof_challenge1
-               , bool
-               , ('challenge1 Scalar_challenge.t * unit) Hlist.HlistId.t option
-               , 'field1 option
-               , 'num_bulletproof_challenges )
-               flat_repr
-             , ( 'field2
-               , 'digest2
-               , 'challenge2
-               , 'bulletproof_challenge2
-               , 'field2 Snarky_backendless__Snark_intf.Boolean0.t
-               , ( ('challenge2 Scalar_challenge.t * unit) Hlist.HlistId.t
-                 , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
-                 Plonk_types.Opt.t
-               , 'field2 option
-               , 'num_bulletproof_challenges )
-               flat_repr
-             , < bool1 : bool
-               ; bool2 : 'field2 Snarky_backendless__Snark_intf.Boolean0.t
-               ; bulletproof_challenge1 : 'bulletproof_challenge1
-               ; bulletproof_challenge2 : 'bulletproof_challenge2
-               ; challenge1 : 'challenge1
-               ; challenge2 : 'challenge2
-               ; digest1 : 'digest1
-               ; digest2 : 'digest2
-               ; field1 : 'field1
-               ; field2 : ('f Snarky_backendless.Cvar.t as 'field2)
+             'a Spec.impl
+          -> 'b Pickles_types.Nat.t
+          -> ('c, 'd, 'e, 'f) Wrap.Lookup_parameters.t
+          -> Opt.Flag.t Pickles_types.Plonk_types.Features.t
+          -> ( ( ( 'e
+                 , Pickles_types.Nat.z Pickles_types.Nat.N9.plus_n )
+                 Pickles_types.Vector.t
+               * ( ( 'g
+                   , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                   Pickles_types.Vector.t
+                 * ( ( 'c
+                     , Pickles_types.Nat.z Pickles_types.Nat.N2.plus_n )
+                     Pickles_types.Vector.t
+                   * ( ( 'c Kimchi_backend_common.Scalar_challenge.t
+                       , Pickles_types.Nat.z Pickles_types.Nat.N3.plus_n )
+                       Pickles_types.Vector.t
+                     * ( ('h, 'b) Pickles_types.Vector.t
+                       * ( ( Core_kernel.Bool.t
+                           , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                           Pickles_types.Vector.t
+                         * ( ( Core_kernel.Bool.t
+                             * ( Core_kernel.Bool.t
+                               * ( Core_kernel.Bool.t
+                                 * ( Core_kernel.Bool.t
+                                   * ( Core_kernel.Bool.t
+                                     * ( Core_kernel.Bool.t
+                                       * ( Core_kernel.Bool.t
+                                         * (Core_kernel.Bool.t * unit) ) ) ) )
+                                 ) ) )
+                             Pickles_types.Hlist.HlistId.t
+                           * ( ( 'c Kimchi_backend_common.Scalar_challenge.t
+                               * unit )
+                               Pickles_types.Hlist.HlistId.t
+                               option
+                             * ( ( 'e option
+                                 * ( 'e option
+                                   * ( 'e option
+                                     * ( 'e option
+                                       * ( 'e option
+                                         * ( 'e option
+                                           * ('e option * ('e option * unit)) )
+                                         ) ) ) ) )
+                                 Pickles_types.Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
+               Pickles_types.Hlist.HlistId.t
+             , ( ( 'f
+                 , Pickles_types.Nat.z Pickles_types.Nat.N9.plus_n )
+                 Pickles_types.Vector.t
+               * ( ( 'i
+                   , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                   Pickles_types.Vector.t
+                 * ( ( 'd
+                     , Pickles_types.Nat.z Pickles_types.Nat.N2.plus_n )
+                     Pickles_types.Vector.t
+                   * ( ( 'd Kimchi_backend_common.Scalar_challenge.t
+                       , Pickles_types.Nat.z Pickles_types.Nat.N3.plus_n )
+                       Pickles_types.Vector.t
+                     * ( ('j, 'b) Pickles_types.Vector.t
+                       * ( ( 'a Snarky_backendless__.Cvar.t
+                             Snarky_backendless.Snark_intf.Boolean0.t
+                           , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                           Pickles_types.Vector.t
+                         * ( ( 'a Snarky_backendless__.Cvar.t
+                               Snarky_backendless.Snark_intf.Boolean0.t
+                             * ( 'a Snarky_backendless__.Cvar.t
+                                 Snarky_backendless.Snark_intf.Boolean0.t
+                               * ( 'a Snarky_backendless__.Cvar.t
+                                   Snarky_backendless.Snark_intf.Boolean0.t
+                                 * ( 'a Snarky_backendless__.Cvar.t
+                                     Snarky_backendless.Snark_intf.Boolean0.t
+                                   * ( 'a Snarky_backendless__.Cvar.t
+                                       Snarky_backendless.Snark_intf.Boolean0.t
+                                     * ( 'a Snarky_backendless__.Cvar.t
+                                         Snarky_backendless.Snark_intf.Boolean0
+                                         .t
+                                       * ( 'a Snarky_backendless__.Cvar.t
+                                           Snarky_backendless.Snark_intf
+                                           .Boolean0
+                                           .t
+                                         * ( 'a Snarky_backendless__.Cvar.t
+                                             Snarky_backendless.Snark_intf
+                                             .Boolean0
+                                             .t
+                                           * unit ) ) ) ) ) ) ) )
+                             Pickles_types.Hlist.HlistId.t
+                           * ( ( ( 'd Kimchi_backend_common.Scalar_challenge.t
+                                 * unit )
+                                 Pickles_types.Hlist.HlistId.t
+                               , 'a Snarky_backendless__.Cvar.t
+                                 Snarky_backendless.Snark_intf.Boolean0.t )
+                               Pickles_types.Opt.t
+                             * ( ( 'f option
+                                 * ( 'f option
+                                   * ( 'f option
+                                     * ( 'f option
+                                       * ( 'f option
+                                         * ( 'f option
+                                           * ('f option * ('f option * unit)) )
+                                         ) ) ) ) )
+                                 Pickles_types.Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
+               Pickles_types.Hlist.HlistId.t
+             , < bool1 : Core_kernel.Bool.t
+               ; bool2 :
+                   'a Snarky_backendless__.Cvar.t
+                   Snarky_backendless.Snark_intf.Boolean0.t
+               ; bulletproof_challenge1 : 'h
+               ; bulletproof_challenge2 : 'j
+               ; challenge1 : 'c
+               ; challenge2 : 'd
+               ; digest1 : 'g
+               ; digest2 : 'i
+               ; field1 : 'e
+               ; field2 : 'f
                ; .. > )
              Spec.T.t
 
@@ -1253,16 +1326,14 @@ module Step : sig
                        * ('f vec8 * ('g * ('fp option vec8 * unit))) ) ) ) ) )
              )
              Hlist.HlistId.t
-          -> feature_flags:
-               Pickles_types.Plonk_types.Opt.Flag.t
-               Pickles_types.Plonk_types.Features.t
+          -> feature_flags:Pickles_types.Plonk_types.Features.options
           -> option_map:
                (   'g Hlist0.Id.t
                 -> f:
                      (   ('h * unit) Hlist.HlistId.t
                       -> 'h Deferred_values.Plonk.In_circuit.Lookup.t )
                 -> 'j )
-          -> of_opt:(('fp, 'f) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
+          -> of_opt:(('fp, 'f) Pickles_types.Opt.t -> 'fp_opt2)
           -> ('c, 'd, 'a, 'fp_opt2, 'j, 'e, 'b, 'f) t
 
         val map_lookup :
@@ -1286,7 +1357,7 @@ module Step : sig
              , 'c Hlist0.Id.t
              , 'b Hlist0.Id.t )
              Zero_values.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Plonk_types.Features.options
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
@@ -1353,7 +1424,7 @@ module Step : sig
          , 'b Hlist0.Id.t )
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-      -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
+      -> (Plonk_types.Features.options, 'n) Vector.t
       -> ( 'b
          , 'a
          , 'f
@@ -1472,16 +1543,14 @@ module Step : sig
            Vector.t
          * ('i * ('j * unit)) )
          Hlist.HlistId.t
-      -> feature_flags:
-           Pickles_types.Plonk_types.Opt.Flag.t
-           Pickles_types.Plonk_types.Features.t
+      -> feature_flags:Pickles_types.Plonk_types.Features.options
       -> option_map:
            (   'g Hlist0.Id.t
             -> f:
                  (   ('k * unit) Hlist.HlistId.t
                   -> 'k Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
             -> 'm )
-      -> of_opt:(('fp, 'f) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
+      -> of_opt:(('fp, 'f) Pickles_types.Opt.t -> 'fp_opt2)
       -> ( ( ( 'c
              , 'd
              , 'a
@@ -1499,51 +1568,120 @@ module Step : sig
 
     val spec :
          'a Spec.impl
-      -> 'b Nat.t
-      -> 'c Nat.t
-      -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
-      -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
-      -> ( ( ( ( ('f, Nat.N9.n) Vector.t
-               * ( ('h, Nat.N1.n) Vector.t
-                 * ( ('d, Nat.N2.n) Vector.t
-                   * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
-                     * ( ('i, 'c) Vector.t
-                       * ( (bool, Nat.N1.n) Vector.t
-                         * ( bool vec8
-                           * ( ('d Scalar_challenge.t * unit) Hlist.HlistId.t
+      -> 'b Pickles_types.Nat.t
+      -> 'c Pickles_types.Nat.t
+      -> ('d, 'e, 'f, 'g) Wrap.Lookup_parameters.t
+      -> Opt.Flag.t Pickles_types.Plonk_types.Features.t
+      -> ( ( ( ( ( 'f
+                 , Pickles_types.Nat.z Pickles_types.Nat.N9.plus_n )
+                 Pickles_types.Vector.t
+               * ( ( 'h
+                   , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                   Pickles_types.Vector.t
+                 * ( ( 'd
+                     , Pickles_types.Nat.z Pickles_types.Nat.N2.plus_n )
+                     Pickles_types.Vector.t
+                   * ( ( 'd Kimchi_backend_common.Scalar_challenge.t
+                       , Pickles_types.Nat.z Pickles_types.Nat.N3.plus_n )
+                       Pickles_types.Vector.t
+                     * ( ('i, 'c) Pickles_types.Vector.t
+                       * ( ( Core_kernel.Bool.t
+                           , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                           Pickles_types.Vector.t
+                         * ( ( Core_kernel.Bool.t
+                             * ( Core_kernel.Bool.t
+                               * ( Core_kernel.Bool.t
+                                 * ( Core_kernel.Bool.t
+                                   * ( Core_kernel.Bool.t
+                                     * ( Core_kernel.Bool.t
+                                       * ( Core_kernel.Bool.t
+                                         * (Core_kernel.Bool.t * unit) ) ) ) )
+                                 ) ) )
+                             Pickles_types.Hlist.HlistId.t
+                           * ( ( 'd Kimchi_backend_common.Scalar_challenge.t
+                               * unit )
+                               Pickles_types.Hlist.HlistId.t
                                option
-                             * ('f option vec8 * unit) ) ) ) ) ) ) ) )
-               Hlist.HlistId.t
+                             * ( ( 'f option
+                                 * ( 'f option
+                                   * ( 'f option
+                                     * ( 'f option
+                                       * ( 'f option
+                                         * ( 'f option
+                                           * ('f option * ('f option * unit)) )
+                                         ) ) ) ) )
+                                 Pickles_types.Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
+               Pickles_types.Hlist.HlistId.t
              , 'b )
-             Vector.t
-           * ('h * (('h, 'b) Vector.t * unit)) )
-           Hlist.HlistId.t
-         , ( ( ( ('g, Nat.N9.n) Vector.t
-               * ( ('j, Nat.N1.n) Vector.t
-                 * ( ('e, Nat.N2.n) Vector.t
-                   * ( ('e Scalar_challenge.t, Nat.N3.n) Vector.t
-                     * ( ('k, 'c) Vector.t
-                       * ( ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
-                           , Nat.N1.n )
-                           Vector.t
-                         * ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
-                             vec8
-                           * ( ( ('e Scalar_challenge.t * unit) Hlist.HlistId.t
-                               , 'a Snarky_backendless.Cvar.t
-                                 Snarky_backendless__Snark_intf.Boolean0.t )
-                               Plonk_types.Opt.t
-                             * ('g option vec8 * unit) ) ) ) ) ) ) ) )
-               Hlist.HlistId.t
+             Pickles_types.Vector.t
+           * ('h * (('h, 'b) Pickles_types.Vector.t * unit)) )
+           Pickles_types.Hlist.HlistId.t
+         , ( ( ( ( 'g
+                 , Pickles_types.Nat.z Pickles_types.Nat.N9.plus_n )
+                 Pickles_types.Vector.t
+               * ( ( 'j
+                   , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                   Pickles_types.Vector.t
+                 * ( ( 'e
+                     , Pickles_types.Nat.z Pickles_types.Nat.N2.plus_n )
+                     Pickles_types.Vector.t
+                   * ( ( 'e Kimchi_backend_common.Scalar_challenge.t
+                       , Pickles_types.Nat.z Pickles_types.Nat.N3.plus_n )
+                       Pickles_types.Vector.t
+                     * ( ('k, 'c) Pickles_types.Vector.t
+                       * ( ( 'a Snarky_backendless__.Cvar.t
+                             Snarky_backendless.Snark_intf.Boolean0.t
+                           , Pickles_types.Nat.z Pickles_types.Nat.N1.plus_n )
+                           Pickles_types.Vector.t
+                         * ( ( 'a Snarky_backendless__.Cvar.t
+                               Snarky_backendless.Snark_intf.Boolean0.t
+                             * ( 'a Snarky_backendless__.Cvar.t
+                                 Snarky_backendless.Snark_intf.Boolean0.t
+                               * ( 'a Snarky_backendless__.Cvar.t
+                                   Snarky_backendless.Snark_intf.Boolean0.t
+                                 * ( 'a Snarky_backendless__.Cvar.t
+                                     Snarky_backendless.Snark_intf.Boolean0.t
+                                   * ( 'a Snarky_backendless__.Cvar.t
+                                       Snarky_backendless.Snark_intf.Boolean0.t
+                                     * ( 'a Snarky_backendless__.Cvar.t
+                                         Snarky_backendless.Snark_intf.Boolean0
+                                         .t
+                                       * ( 'a Snarky_backendless__.Cvar.t
+                                           Snarky_backendless.Snark_intf
+                                           .Boolean0
+                                           .t
+                                         * ( 'a Snarky_backendless__.Cvar.t
+                                             Snarky_backendless.Snark_intf
+                                             .Boolean0
+                                             .t
+                                           * unit ) ) ) ) ) ) ) )
+                             Pickles_types.Hlist.HlistId.t
+                           * ( ( ( 'e Kimchi_backend_common.Scalar_challenge.t
+                                 * unit )
+                                 Pickles_types.Hlist.HlistId.t
+                               , 'a Snarky_backendless__.Cvar.t
+                                 Snarky_backendless.Snark_intf.Boolean0.t )
+                               Pickles_types.Opt.t
+                             * ( ( 'g option
+                                 * ( 'g option
+                                   * ( 'g option
+                                     * ( 'g option
+                                       * ( 'g option
+                                         * ( 'g option
+                                           * ('g option * ('g option * unit)) )
+                                         ) ) ) ) )
+                                 Pickles_types.Hlist.HlistId.t
+                               * unit ) ) ) ) ) ) ) ) )
+               Pickles_types.Hlist.HlistId.t
              , 'b )
-             Vector.t
-           * ('j * (('j, 'b) Vector.t * unit)) )
-           Hlist.HlistId.t
-         , < bool1 : bool
+             Pickles_types.Vector.t
+           * ('j * (('j, 'b) Pickles_types.Vector.t * unit)) )
+           Pickles_types.Hlist.HlistId.t
+         , < bool1 : Core_kernel.Bool.t
            ; bool2 :
-               'a Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t
+               'a Snarky_backendless__.Cvar.t
+               Snarky_backendless.Snark_intf.Boolean0.t
            ; bulletproof_challenge1 : 'i
            ; bulletproof_challenge2 : 'k
            ; challenge1 : 'd
@@ -1569,4 +1707,4 @@ end
 (** Alias for
  ** {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)
 val index_to_field_elements :
-  'a Plonk_verification_key_evals.t -> g:('a -> 'b array) -> 'b array
+  ('a, 'c) Plonk_verification_key_evals.t -> g:('a -> 'b array) -> 'b array
