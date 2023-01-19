@@ -16,8 +16,8 @@ let%test_module "Zkapp payments tests" =
     let constraint_constants = U.constraint_constants
 
     let merkle_root_after_zkapp_command_exn t
-        ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) txn =
-      let global_slot = txn_state_view.global_slot_since_genesis in
+        ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
+        ~global_slot txn =
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
           ~constraint_constants:U.constraint_constants ~global_slot
@@ -132,7 +132,11 @@ let%test_module "Zkapp payments tests" =
                     =
                   Zkapp_command.Valid.to_valid_unsafe t1
                 in
-                merkle_root_after_zkapp_command_exn ledger ~txn_state_view t1
+                merkle_root_after_zkapp_command_exn ledger ~txn_state_view
+                  ~global_slot:
+                    Mina_numbers.Global_slot.(
+                      succ txn_state_view.global_slot_since_genesis)
+                  t1
               in
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post ) )
