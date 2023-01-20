@@ -1953,13 +1953,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (*TODO: Confirm base case for connection ledgers*)
         with_label __LOC__ (fun () ->
             run_checked
-              (Frozen_ledger_hash.assert_equal
-                 statement.target.first_pass_ledger
-                 statement.connecting_ledger_left ) ) ;
-        with_label __LOC__ (fun () ->
-            run_checked
-              (Frozen_ledger_hash.assert_equal
-                 statement.target.first_pass_ledger
+              (Frozen_ledger_hash.assert_equal statement.connecting_ledger_left
                  statement.connecting_ledger_right ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
@@ -2091,10 +2085,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         (type shifted)
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-        fee_payment_root parties_root pending_coinbase_stack_init
+        fee_payment_root pending_coinbase_stack_init
         pending_coinbase_stack_before pending_coinbase_after state_body
         ({ signer; signature; payload } as txn : Transaction_union.var) =
-      let _TODO = parties_root in
       let tag = payload.body.tag in
       let is_user_command =
         Transaction_union.Tag.Unpacked.is_user_command tag
@@ -3001,12 +2994,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind fee_payment_root_after, fee_excess, supply_increase =
         apply_tagged_transaction ~constraint_constants
           (module Shifted)
-          statement.source.first_pass_ledger statement.source.second_pass_ledger
-          pending_coinbase_init statement.source.pending_coinbase_stack
+          statement.source.first_pass_ledger pending_coinbase_init
+          statement.source.pending_coinbase_stack
           statement.target.pending_coinbase_stack state_body t
-      in
-      let parties_root_after =
-        (* TODO: return from apply_tagged_transaction *) fee_payment_root_after
       in
       let%bind fee_excess =
         (* Use the default token for the fee excess if it is zero.
@@ -3043,14 +3033,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         [ [%with_label_ "equal fee payment roots"] (fun () ->
               Frozen_ledger_hash.assert_equal fee_payment_root_after
                 statement.target.first_pass_ledger )
-        ; [%with_label_ "equal parties roots"] (fun () ->
-              Frozen_ledger_hash.assert_equal parties_root_after
+        ; [%with_label_ "Second pass ledger doesn't change"] (fun () ->
+              Frozen_ledger_hash.assert_equal
+                statement.source.second_pass_ledger
                 statement.target.second_pass_ledger )
-        ; [%with_label_ "valid connecting ledger left"] (fun () ->
-              Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
-                statement.connecting_ledger_left )
-        ; [%with_label_ "valid connecting ledger right"] (fun () ->
-              Frozen_ledger_hash.assert_equal statement.target.first_pass_ledger
+        ; [%with_label_ "valid connecting ledgers"] (fun () ->
+              Frozen_ledger_hash.assert_equal statement.connecting_ledger_left
                 statement.connecting_ledger_right )
         ; [%with_label_ "equal supply_increases"] (fun () ->
               Currency.Amount.Signed.Checked.assert_equal supply_increase
