@@ -14,7 +14,7 @@ if [[ -n "${MINA_BRANCH:=}" ]]; then
   BUILDKITE_BRANCH="${MINA_BRANCH}"
 fi
 # Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+source "${SCRIPTPATH}/../../buildkite/scripts/export-git-env-vars.sh"
 set +x
 # Allow overriding the script env variables with docker build arguments
 if [[ -n "${deb_codename:=}" ]]; then
