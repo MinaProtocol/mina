@@ -7,7 +7,7 @@ BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../_build"
+cd "${SCRIPTPATH}/../../_build"
 
 # Alternative to BUILDKITE_BRANCH
 if [[ -n "${MINA_BRANCH:=}" ]]; then
