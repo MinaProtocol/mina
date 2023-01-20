@@ -39,7 +39,5 @@ echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for mainnet and devnet"
 make deb
 
-make test_executive_deb
-
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs

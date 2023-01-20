@@ -63,6 +63,7 @@ RUN echo "--- Build all major tagets required for packaging from Commit SHA: ${M
     src/app/rosetta/rosetta_testnet_signatures.exe \
     src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/ocaml-signer/signer.exe \
+    src/app/test_executive/test_executive.exe \
    && echo "Packaging debs from Commit SHA: ${MINA_COMMIT_SHA1} and moving them to /tmp/artifacts/" \
    && make deb \
    && rm -rf _build
