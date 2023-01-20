@@ -25,7 +25,7 @@ if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 else
     export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+    export MINA_DOCKER_TAG="$(echo "${GITHASH}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 fi
 
 
