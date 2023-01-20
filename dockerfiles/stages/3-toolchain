@@ -56,9 +56,8 @@ RUN apt-get update --yes \
     zlib1g-dev \
     python3-sexpdata
 
-# --- Google Cloud tools
-# --- Helm tools
-# Get yarn + nodejs
+# --- Install anything with a ppa for ubuntu/debian
+# --- Google Cloud SDK, Helm, Kubectl, Nodejs, Yarn
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
     && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
@@ -66,8 +65,13 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
     && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && echo "deb https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
+    && curl https://apt.releases.hashicorp.com/gpg | apt-key add - \
     && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl helm nodejs yarn
+    && apt-get install --yes google-cloud-sdk kubectl helm nodejs yarn terraform
+
+# --- Instruct gcloud to use the new auth plugin
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
@@ -80,12 +84,6 @@ RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOC
     && tar -xz -C /tmp -f /tmp/docker.tgz \
     && mv /tmp/docker/* /usr/bin \
     && rm -f /tmp/docker.tgz
-
-# --- Terraform tools
-RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o /tmp/terraform.zip \
-    && unzip /tmp/terraform.zip -d /usr/bin \
-    && ln -s /usr/bin/terraform /usr/local/bin/terraform \
-    && rm /tmp/terraform.zip
 
 # Dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \

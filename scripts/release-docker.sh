@@ -51,7 +51,7 @@ trap cleanup EXIT
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'mina-builder' 'mina-opam-deps' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'mina-builder' 'mina-opam-deps' 'delegation-backend' 'delegation-backend-toolchain' 'mina-test-executive')
 
 ROOT="$(cd -- "$(dirname "$( dirname -- "${BASH_SOURCE[0]}" )")" &> /dev/null && pwd )"
 
@@ -137,7 +137,7 @@ fi
 
 case "${SERVICE}" in
   # pulled from debian package repo, no need for commit or branch
-  mina-daemon|mina-archive|mina-generate-keypair)
+  mina-daemon|mina-archive|mina-generate-keypair|mina-test-executive)
     COMMIT=", commit = None Text"
     BRANCH=", branch = None Text"
     ;;

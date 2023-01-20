@@ -350,6 +350,13 @@ let services =
           [ "dockerfiles/stages/3-toolchain" ]
         , dockerContext = Some "dockerfiles"
         }
+      , mina-test-executive = DockerfileDescription::{
+        , service = "mina-test-executive"
+        , targetStage = Some "test-executive"
+        , dockerfilePaths =
+          [ "dockerfiles/Dockerfile-mina-test-executive" ]
+        , dockerContext = Some "dockerfiles"
+        }
       , mina-builder = DockerfileDescription::{
         , service = "mina-builder"
         , targetStage = Some "builder"
