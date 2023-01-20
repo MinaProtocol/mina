@@ -82,19 +82,6 @@ let non_pc_registers_equal_var t1 t2 =
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
       |> Impl.Boolean.all )
 
-let registers_equal_var t1 t2 =
-  Impl.make_checked (fun () ->
-      let module F = Core_kernel.Field in
-      let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
-      let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
-      Registers.Fields.fold ~init:[]
-        ~first_pass_ledger:(f !Frozen_ledger_hash.equal_var)
-        ~second_pass_ledger:(f !Frozen_ledger_hash.equal_var)
-        ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
-        ~local_state:(fun acc f ->
-          Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
-      |> Impl.Boolean.all )
-
 let txn_statement_ledger_hashes_equal
     (s1 : Transaction_snark.Statement.With_sok.Checked.t)
     (s2 : Transaction_snark.Statement.With_sok.Checked.t) =
@@ -277,9 +264,6 @@ let%snarkydef_ step ~(logger : Logger.t)
       Pending_coinbase.Stack.Checked.create_with deleted_stack
     in
     let%bind txn_snark_input_correct =
-      let statement (t : Protocol_state.var) =
-        (Protocol_state.blockchain_state t).ledger_proof_statement
-      in
       let open Checked in
       let%bind () =
         Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
@@ -294,9 +278,10 @@ let%snarkydef_ step ~(logger : Logger.t)
                 (Statement_ledgers.of_statement previous_ledger_statement)
                 (Statement_ledgers.of_statement current_ledger_statement)) )
       in
+      (*TODO: Any assertion about the local state and sok digest
+         in the statement required?*)
       all
-        [ registers_equal_var txn_snark.source (statement previous_state).target
-        ; ledger_statement_valid
+        [ ledger_statement_valid
         ; Pending_coinbase.Stack.equal_var
             txn_snark.source.pending_coinbase_stack
             pending_coinbase_source_stack

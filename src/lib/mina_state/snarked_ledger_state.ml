@@ -284,8 +284,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       { source = registers
       ; target = registers
-      ; connecting_ledger_left = Frozen_ledger_hash.empty_hash
-      ; connecting_ledger_right = Frozen_ledger_hash.empty_hash
+      ; connecting_ledger_left = genesis_ledger_hash
+      ; connecting_ledger_right = genesis_ledger_hash
       ; supply_increase = Currency.Amount.Signed.zero
       ; fee_excess = Fee_excess.empty
       ; sok_digest = Sok_message.Digest.default
