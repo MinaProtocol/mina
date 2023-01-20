@@ -47,7 +47,7 @@ let module = \(environment : List Text) ->
       "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
     let sharedDir : Text = "/var/buildkite/shared"
     in
-    { line = "docker run -it --rm --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if docker.privileged then " --privileged" else ""} ${docker.image} /bin/sh -c '${inner.line}'"
+    { line = "source ./buildkite/scripts/export-git-env-vars.sh && docker run -it --rm --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if docker.privileged then " --privileged" else ""} ${docker.image} /bin/sh -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
