@@ -15,6 +15,11 @@ BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 set -u
 
+# Alternative to BUILDKITE_BRANCH
+if [[ -n "${MINA_BRANCH:=}" ]]; then
+  BUILDKITE_BRANCH="${MINA_BRANCH}"
+fi
+
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
