@@ -9,9 +9,9 @@ ARG deb_version=1.3.1.2
 ARG network=mainnet
 
 # Dependencies
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y update && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+RUN DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes update && \
+  DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes --no-install-recommends install \
     apt-transport-https \
     curl \
     dnsutils \
@@ -53,8 +53,8 @@ FROM daemon AS daemon-puppet
 
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-  && DEBIAN_FRONTEND=noninteractive apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
     google-cloud-sdk \
     kubectl \
     apt-transport-https \

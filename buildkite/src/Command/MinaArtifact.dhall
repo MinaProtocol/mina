@@ -65,7 +65,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deps=DebianVersions.dependsOn debVersion,
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="test-executive-${DebianVersions.lowerName debVersion}"
         }
         in
         DockerImage.generateStep testExecutiveSpec,

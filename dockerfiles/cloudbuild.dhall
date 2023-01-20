@@ -354,7 +354,9 @@ let services =
         , service = "mina-test-executive"
         , targetStage = Some "test-executive"
         , dockerfilePaths =
-          [ "dockerfiles/Dockerfile-mina-test-executive" ]
+          [ "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-test-executive"
+          ]
         , dockerContext = Some "dockerfiles"
         }
       , mina-builder = DockerfileDescription::{

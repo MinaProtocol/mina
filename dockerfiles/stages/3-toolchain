@@ -23,8 +23,8 @@ USER root
 
 # OS package dependencies
 # afaict this is the last python dependency of any kind in CI
-RUN apt-get update --yes \
-  && apt-get install --ignore-missing --yes \
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --ignore-missing --yes --no-install-recommends \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -67,8 +67,8 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc
     && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && echo "deb https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
     && curl https://apt.releases.hashicorp.com/gpg | apt-key add - \
-    && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl helm nodejs yarn terraform
+    && apt-get update --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl helm nodejs yarn terraform
 
 # --- Instruct gcloud to use the new auth plugin
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True

@@ -11,7 +11,7 @@ apt-get update
 export DEBIAN_FRONTEND=noninteractive
 
 # time zone = US Pacific
-apt-get install -y tzdata git postgresql apt-transport-https ca-certificates curl
+apt-get install -y tzdata git postgresql apt-transport-https ca-certificates curl sudo
 
 git config --global --add safe.directory /workdir
 
