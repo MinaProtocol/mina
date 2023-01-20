@@ -111,10 +111,36 @@ You will need the following environment variables to be set correctly on the mac
 - `AWS_DEFAULT_REGION=us-west-2` is the region env var for AWS.  It's always going to be `us-west-2` so just set that and don't worry about it.
 
 - `KUBE_CONFIG_PATH` should usually be `~/.kube/config`.  If you're doing something unorthodox with kubernetes then it may be different, in which case you probably know what you're doing.
+ 
+### `mina-test-executive` command line breakdown
+
+If you were to run Lucy's test executive directly in the terminal, the command line would look something like this:
+
+```
+mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
+```
+
+Running it directly in the terminal is not the most recommended method, but it is the simplest and all the other methods are based on it eventually, and so before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
+
+- `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
+- `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
+	+ In the current state of development, the following pre-written tests are available on all major branches: `peers-reliability`, `chain-reliability`, `payments`, `delegation`, `archive-node`, `gossip-consis`, `medium-bootstrap`, `opt-block-prod`
+	+ The following pre-written tests are available only on versions of Lucy based off the `develop` branch: `zkapps`, `zkapps-timing`, `snarkyjs`
+	+ The following pre-written tests are available only on version of Lucy based off the `compatible` branch: `archive-node` (the test logic for the archive-node test was rolled into other tests in develop based branches)
+- `--mina-image $MINA_IMAGE`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to the [mina-daemon dockerhub page](https://hub.docker.com/r/minaprotocol/mina-daemon/tags) or the [mina-daemon GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-daemon) and pick a suitable, preferably recent, image to run the tests with.  When choosing an image, keep in mind the following tips.  1. Usually, you should choose the most recent image from the branch one is currently working on.  2. Generally use "-devnet" images instead of "-mainnet" images for testing, although it usually won't make a difference.  Also, please keep in mind that changes to Lucy itself do not make it into the daemon image, ie they are compiled separately and built into separate images.  This means that if you make changes to Lucy in a branch, the changes will not be reflected in the latest mina image off of the same branch.
+- `--archive-image $ARCHIVE_IMAGE`: this must be a url to a docker image which is the mina-archive.  These can be found in the [mina-archive dockerhub page](https://hub.docker.com/r/minaprotocol/mina-archive/tags) or in the [mina-archive GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-archive).  An archive-image is required even if you're not using archive nodes, in which case any image will do.
+- `--debug`: if this flag is not present, then Lucy will automatically destroy the testnet and delete the auto generated terraform test configuration files when the test is over.  If it is present, it will wait for your to manually prompt it before destroying the testnet.
+	+ In the event that the automatic cleanup doesn't work properly, you need to do it manually (and if you don't you'll be wasting money).  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
+- `mina-logproc` is simply an auxiliary program that makes the large quantity of log output from the Lucy test_executive be prettier and more human readable.  It can also filter log lines based on the severity level, usually we filter out `Debug` and `Spam` logs (those log levels are very verbose and are intended for debugging test framework internals).  In the idiomatic command line expression, the bit with `tee test.log` is used to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 ### Running the Lucy test_executive from your local machine
 
-There are several ways to run Lucy: 1. Running the mina-test-executive package directly from command line, 2. running from the pre-built docker container, and 3. compiling from scratch then running what you compiled.  The most recommended method is to run it from the docker container.  However if you want to modify or extend existing tests, or write new tests, then you will need to compile the Lucy test_executive from source.  We will go over each method in turn.
+There are several ways to run Lucy: 
+1. Running the mina-test-executive package directly from command line.  (not particularly recommended but it'll be fine)
+2. Running from the pre-built docker container.  (most recommended method)
+3. compiling from source code, then running what you compiled.  (if you want to modify or extend existing tests, or write new tests, then you will need to do this)
+
+We will go over each method in turn.
 
 #### Installing the mina-test-executive package and running directly in command line
 
@@ -156,21 +182,6 @@ mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $A
 ```
 
 If you prefer, it is also idiomatic to just manually edit and execute the `mina-test-executive` line instead of exporting the env vars.
-
-#### `mina-test-executive` command line breakdown
-
-Before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
-
-- `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
-- `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
-	+ In the current state of development, the following pre-written tests are available on all major branches: `peers-reliability`, `chain-reliability`, `payments`, `delegation`, `archive-node`, `gossip-consis`, `medium-bootstrap`, `opt-block-prod`
-	+ The following pre-written tests are available only on versions of Lucy based off the `develop` branch: `zkapps`, `zkapps-timing`, `snarkyjs`
-	+ The following pre-written tests are available only on version of Lucy based off the `compatible` branch: `archive-node` (the test logic for the archive-node test was rolled into other tests in develop based branches)
-- `--mina-image $MINA_IMAGE`: this must be a url to a docker image which is the mina-daemon.  This is required.  Go to the [mina-daemon dockerhub page](https://hub.docker.com/r/minaprotocol/mina-daemon/tags) or the [mina-daemon GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-daemon) and pick a suitable, preferably recent, image to run the tests with.  When choosing an image, keep in mind the following tips.  1. Usually, you should choose the most recent image from the branch one is currently working on.  2. Generally use "-devnet" images instead of "-mainnet" images for testing, although it usually won't make a difference.  Also, please keep in mind that changes to Lucy itself do not make it into the daemon image, ie they are compiled separately and built into separate images.  This means that if you make changes to Lucy in a branch, the changes will not be reflected in the latest mina image off of the same branch.
-- `--archive-image $ARCHIVE_IMAGE`: this must be a url to a docker image which is the mina-archive.  These can be found in the [mina-archive dockerhub page](https://hub.docker.com/r/minaprotocol/mina-archive/tags) or in the [mina-archive GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-archive).  An archive-image is required even if you're not using archive nodes, in which case any image will do.
-- `--debug`: if this flag is not present, then Lucy will automatically destroy the testnet and delete the auto generated terraform test configuration files when the test is over.  If it is present, it will wait for your to manually prompt it before destroying the testnet.
-	+ In the event that the automatic cleanup doesn't work properly, you need to do it manually (and if you don't you'll be wasting money).  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, `rm -r` the local testnet directory, which is in `./automation/terraform/testnets/`
-- `mina-logproc` is simply an auxiliary program that makes the large quantity of log output from the Lucy test_executive be prettier and more human readable.  It can also filter log lines based on the severity level, usually we filter out `Debug` and `Spam` logs (those log levels are very verbose and are intended for debugging test framework internals).  In the idiomatic command line expression, the bit with `tee test.log` is used to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 
 #### Run Lucy in dockerized form
