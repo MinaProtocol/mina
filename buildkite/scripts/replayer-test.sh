@@ -11,21 +11,21 @@ apt-get update
 export DEBIAN_FRONTEND=noninteractive
 
 # time zone = US Pacific
-/bin/echo -e "12\n10" | apt-get install -y tzdata
-apt-get install -y git postgresql apt-transport-https ca-certificates curl
+apt-get install -y tzdata git postgresql apt-transport-https ca-certificates curl
 
 git config --global --add safe.directory /workdir
 
 echo "Generating locale for Postgresql"
 locale-gen en_US.UTF-8
+sudo -u postgres locale-gen en_US.UTF-8
 
 echo "Starting Postgresql service"
 service postgresql start
 
 echo "Populating archive database"
 cd ~postgres
-su postgres -c psql < $TEST_DIR/archive_db.sql
-echo "ALTER USER postgres PASSWORD '$PGPASSWORD';" | su postgres -c psql
+sudo -u postgres psql < $TEST_DIR/archive_db.sql
+echo "ALTER USER postgres PASSWORD '$PGPASSWORD';" | sudo -u postgres -c psql
 cd /workdir
 
 echo "Running replayer"
