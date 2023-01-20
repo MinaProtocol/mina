@@ -684,7 +684,8 @@ let%test_unit "user_command application on masked ledger" =
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
-          assert (Ledger_hash.equal init_merkle_root (L.merkle_root m)) ) )
+          (*Parent updates reflected in child masks*)
+          assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
 
 let%test_unit "zkapp_command application on masked ledger" =
   let open Mina_transaction_logic.For_tests in
@@ -718,4 +719,5 @@ let%test_unit "zkapp_command application on masked ledger" =
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
-          assert (Ledger_hash.equal init_merkle_root (L.merkle_root m)) ) )
+          (*Parent updates reflected in child masks*)
+          assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
