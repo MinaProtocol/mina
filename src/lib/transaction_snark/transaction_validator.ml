@@ -117,4 +117,18 @@ end
 
 include Mina_transaction_logic.Make (Hashless_ledger)
 
+let apply_transaction_first_pass ~constraint_constants ~txn_state_view ledger t
+    =
+  O1trace.sync_thread "validator_apply_transaction_first_pass" (fun () ->
+      apply_transaction_first_pass ~constraint_constants ~txn_state_view ledger
+        t )
+
+let apply_transaction_second_pass ledger t =
+  O1trace.sync_thread "validator_apply_transaction_second_pass" (fun () ->
+      apply_transaction_second_pass ledger t )
+
+let apply_transactions ~constraint_constants ~txn_state_view ledger t =
+  O1trace.sync_thread "validator_apply_transactions" (fun () ->
+      apply_transactions ~constraint_constants ~txn_state_view ledger t )
+
 let create = Hashless_ledger.create

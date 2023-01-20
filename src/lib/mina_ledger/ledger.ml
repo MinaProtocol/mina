@@ -370,6 +370,20 @@ end
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
+let apply_transaction_first_pass ~constraint_constants ~txn_state_view ledger t
+    =
+  O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
+      apply_transaction_first_pass ~constraint_constants ~txn_state_view ledger
+        t )
+
+let apply_transaction_second_pass ledger t =
+  O1trace.sync_thread "apply_transaction_second_pass" (fun () ->
+      apply_transaction_second_pass ledger t )
+
+let apply_transactions ~constraint_constants ~txn_state_view ledger t =
+  O1trace.sync_thread "apply_transactions" (fun () ->
+      apply_transactions ~constraint_constants ~txn_state_view ledger t )
+
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~txn_state_view
     ledger zkapp_command =
