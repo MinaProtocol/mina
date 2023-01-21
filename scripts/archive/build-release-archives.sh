@@ -71,8 +71,11 @@ cat "${BUILD_DIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILD_DIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/var/lib/mina/replayer-test"
 pwd
 ls
+cp ../src/app/replayer/test/input.json "${BUILDDIR}/var/lib/mina/replayer-test/input.json"
+cp ../src/app/replayer/test/archive_db.sql "${BUILDDIR}/var/lib/mina/replayer-test/archive_db.sql"
 cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"

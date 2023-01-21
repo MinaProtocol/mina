@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_DIR=/workdir/src/app/replayer/test
+TEST_DIR=/var/lib/mina/replayer-test/
 PGPASSWORD=arbitraryduck
 
 set -eo pipefail
@@ -10,18 +10,13 @@ apt-get update
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-# time zone = US Pacific
-apt-get install -y tzdata git postgresql apt-transport-https ca-certificates curl sudo
-
-git config --global --add safe.directory /workdir
-
 echo "Starting Postgresql service"
 service postgresql start
 
 echo "Populating archive database"
 cd ~postgres
-sudo -u postgres psql < $TEST_DIR/archive_db.sql
-echo "ALTER USER postgres PASSWORD '$PGPASSWORD';" | sudo -u postgres -c psql
+su postgres -c psql < $TEST_DIR/archive_db.sql
+echo "ALTER USER postgres PASSWORD '$PGPASSWORD';" | su postgres -c psql
 cd /workdir
 
 echo "Running replayer"

@@ -7,15 +7,7 @@ if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
   exit 0
 fi
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
 TESTNET_NAME="mainnet"
-
-git config --global --add safe.directory /workdir
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
