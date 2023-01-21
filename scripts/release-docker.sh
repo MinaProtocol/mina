@@ -136,8 +136,13 @@ if [ "${SERVICE}" != "mina-daemon" ]; then
 fi
 
 case "${SERVICE}" in
-  # pulled from debian package repo, no need for commit or branch
-  mina-daemon|mina-archive|mina-generate-keypair|mina-test-executive)
+  # pulled from builder image, but needs to pull a branch as well
+  mina-test-executive)
+  mina-daemon|mina-archive|mina-generate-keypair)
+    COMMIT=", commit = None Text"
+    ;;
+  # pulled from debian builder image, no need for commit or branch
+  mina-daemon|mina-archive|mina-generate-keypair)
     COMMIT=", commit = None Text"
     BRANCH=", branch = None Text"
     ;;
