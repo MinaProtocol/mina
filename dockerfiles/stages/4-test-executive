@@ -36,15 +36,15 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
 
 # --- Install anything with a ppa for ubuntu/debian
 # --- Google Cloud SDK, Helm, Kubectl, Nodejs, Yarn
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && curl https://baltocdn.com/helm/signing.asc | apt-key add - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
-    && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
-    && echo "deb https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
-    && curl https://apt.releases.hashicorp.com/gpg | apt-key add - \
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/baltocdn.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/baltocdn.gpg] https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor | tee /usr/share/keyrings/yarnpkg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/yarnpkg.gpg] https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && curl https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
     && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
     && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl helm nodejs yarn terraform \
     && rm -rf /var/lib/apt/lists/*
