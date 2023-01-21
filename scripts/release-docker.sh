@@ -138,7 +138,6 @@ fi
 case "${SERVICE}" in
   # pulled from builder image, but needs to pull a branch as well
   mina-test-executive)
-  mina-daemon|mina-archive|mina-generate-keypair)
     COMMIT=", commit = None Text"
     ;;
   # pulled from debian builder image, no need for commit or branch
