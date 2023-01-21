@@ -44,12 +44,12 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 PROJECT="mina-archive"
-BUILD_DIR="deb_build"
+BUILDDIR="deb_build"
 
 ###### archiver deb
 
-mkdir -p "${BUILD_DIR}/DEBIAN"
-cat << EOF > "${BUILD_DIR}/DEBIAN/control"
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}
 Version: ${MINA_DEB_VERSION}
 Section: base
@@ -66,30 +66,30 @@ EOF
 
 echo "------------------------------------------------------------"
 echo "Control File:"
-cat "${BUILD_DIR}/DEBIAN/control"
+cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Binaries
-mkdir -p "${BUILD_DIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/var/lib/mina/replayer-test"
 pwd
 ls
 cp ../src/app/replayer/test/input.json "${BUILDDIR}/var/lib/mina/replayer-test/input.json"
 cp ../src/app/replayer/test/archive_db.sql "${BUILDDIR}/var/lib/mina/replayer-test/archive_db.sql"
-cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
-cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
-cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
-cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
-cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
-cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
-chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
+cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
+cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
+cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
+cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
+cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
+cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
+chmod --recursive +rx "${BUILDDIR}/usr/local/bin"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
 echo "Deb Contents:"
-find "${BUILD_DIR}"
+find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
+dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
