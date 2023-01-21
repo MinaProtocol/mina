@@ -81,7 +81,7 @@ ENV AWS_DEFAULT_REGION=us-west-2
 # this var needs to be present but it won't change and doesn't need to be overriden
 ENV KUBE_CONFIG_PATH=/root/.kube/config
 
-COPY --chown=${UID} scripts/run_test_executive.sh /run_test_executive.sh
+COPY scripts/run_test_executive.sh /run_test_executive.sh
 RUN chmod +x /run_test_executive.sh
 
 ENTRYPOINT ["/bin/bash", "-c","/run_test_executive.sh"]
