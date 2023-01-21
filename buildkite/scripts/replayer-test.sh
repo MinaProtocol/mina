@@ -15,10 +15,6 @@ apt-get install -y tzdata git postgresql apt-transport-https ca-certificates cur
 
 git config --global --add safe.directory /workdir
 
-echo "Generating locale for Postgresql"
-locale-gen en_US.UTF-8
-sudo -u postgres locale-gen en_US.UTF-8
-
 echo "Starting Postgresql service"
 service postgresql start
 
