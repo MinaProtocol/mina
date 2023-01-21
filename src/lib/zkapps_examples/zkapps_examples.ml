@@ -261,10 +261,11 @@ module Account_update_under_construction = struct
         ; use_full_commitment = Boolean.false_
         ; caller = t.caller
         ; authorization_kind =
-            (* TODO: is there a valid vk hash available? *)
             { is_signed = Boolean.false_
             ; is_proved = Boolean.true_
-            ; verification_key_hash = Field.zero
+            ; verification_key_hash =
+                Field.zero
+                (* the vk hash is a dummy, to be patched with `patch_verification_key_hashes`, below *)
             }
         }
       in
@@ -597,3 +598,44 @@ let compile :
     go provers
   in
   (tag, cache_handle, proof, provers)
+
+(* replace dummy vk hashes in account updates *)
+let patch_verification_key_hashes ?ledger account_updates =
+  (* update vk hashes if Set in an account update *)
+  let vk_hash_tbl : Impl.field Public_key.Compressed.Table.t =
+    Public_key.Compressed.Table.create ()
+  in
+  (* if ledger provided, add vk hashes from those accounts *)
+  Option.iter ledger ~f:(fun (ledger : Mina_ledger.Ledger.t) ->
+      Mina_ledger.Ledger.iteri ledger ~f:(fun _n acct ->
+          Option.iter acct.zkapp ~f:(fun zkapp ->
+              Option.iter zkapp.verification_key ~f:(fun vk ->
+                  let pk : Public_key.Compressed.t = acct.public_key in
+                  Public_key.Compressed.Table.set vk_hash_tbl ~key:pk
+                    ~data:(With_hash.hash vk) ) ) ) ) ;
+  Zkapp_command.Call_forest.map account_updates
+    ~f:(fun (acct_update : Account_update.t) ->
+      let pk = acct_update.body.public_key in
+      let acct_update' =
+        match Public_key.Compressed.Table.find vk_hash_tbl pk with
+        | None ->
+            acct_update
+        | Some vk_hash -> (
+            match acct_update.body.authorization_kind with
+            | Proof _ ->
+                { acct_update with
+                  body =
+                    { acct_update.body with authorization_kind = Proof vk_hash }
+                }
+            | Signature | None_given ->
+                acct_update )
+      in
+      (* add entry for subsequent updates *)
+      ( match acct_update.body.update.verification_key with
+      | Set vk ->
+          let vk_hash = With_hash.hash vk in
+          Public_key.Compressed.Table.set vk_hash_tbl ~key:pk ~data:vk_hash
+      | Keep ->
+          () ) ;
+      acct_update' )
+  |> Zkapp_command.Call_forest.accumulate_hashes'

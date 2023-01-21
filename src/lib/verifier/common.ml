@@ -128,8 +128,7 @@ let check :
           let v : User_command.Valid.t =
             (* Verification keys should be present if it reaches here *)
             let zkapp_command =
-              Or_error.ok_exn
-                (Zkapp_command.Valid.of_verifiable zkapp_command_with_vk)
+              Zkapp_command.Valid.of_verifiable zkapp_command_with_vk
             in
             User_command.Poly.Zkapp_command zkapp_command
           in

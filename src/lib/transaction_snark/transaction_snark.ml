@@ -1171,6 +1171,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
+        module Verification_key_hash = struct
+          type t = Field.t
+
+          let equal = Field.equal
+        end
+
         module Actions = struct
           type t = Zkapp_account.Actions.var
 
@@ -1310,6 +1316,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             { data = { a with zkapp = { a.zkapp with verification_key } }
             ; hash
             }
+
+          let verification_key_hash (a : t) : Verification_key_hash.t =
+            verification_key a |> Zkapp_basic.Flagged_option.data
+            |> Data_as_hash.hash
 
           let last_sequence_slot (a : t) = a.data.zkapp.last_sequence_slot
 
@@ -1914,6 +1924,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let is_signed ({ account_update; _ } : t) =
               account_update.data.authorization_kind.is_signed
+
+            let verification_key_hash ({ account_update; _ } : t) =
+              account_update.data.authorization_kind.verification_key_hash
 
             module Update = struct
               open Zkapp_basic

@@ -211,8 +211,10 @@ let%test_module "Composability test" =
         |> fst
     end
 
-    let test_zkapp_command ?expected_failure zkapp_command =
-      let memo = Signed_command_memo.empty in
+    let test_zkapp_command ?expected_failure zkapp_command0 =
+      let zkapp_command =
+        Zkapps_examples.patch_verification_key_hashes zkapp_command0
+      in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
         let account_updates_hash =
@@ -229,6 +231,7 @@ let%test_module "Composability test" =
         ; authorization = Signature.dummy
         }
       in
+      let memo = Signed_command_memo.empty in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
         Zkapp_command.Transaction_commitment.create_complete
