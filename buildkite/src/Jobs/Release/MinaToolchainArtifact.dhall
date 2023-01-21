@@ -34,7 +34,7 @@ Pipeline.build
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="bullseye",
-        step_key="toolchain-bullseye-image",
+        step_key="toolchain-bullseye",
         version="bullseye-\\\${BUILDKITE_COMMIT}"
       }
 
@@ -46,7 +46,7 @@ Pipeline.build
       let opamBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="bullseye",
-        step_key="opam-bullseye-image",
+        step_key="opam-bullseye",
         version="bullseye-\\\${BUILDKITE_COMMIT}"
       }
 
@@ -58,7 +58,7 @@ Pipeline.build
       let opamBusterSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="buster",
-        step_key="opam-buster-image",
+        step_key="opam-buster",
         version="buster-\\\${BUILDKITE_COMMIT}"
       }
 
@@ -70,7 +70,7 @@ Pipeline.build
       let opamStretchSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="stretch",
-        step_key="opam-stretch-image",
+        step_key="opam-stretch",
         version="stretch-\\\${BUILDKITE_COMMIT}"
       }
 
@@ -82,7 +82,7 @@ Pipeline.build
       let opamFocalSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="focal",
-        step_key="opam-focal-image",
+        step_key="opam-focal",
         version="focal-\\\${BUILDKITE_COMMIT}"
       }
 
@@ -94,7 +94,7 @@ Pipeline.build
       let opamBionicSpec = DockerImage.ReleaseSpec::{
         service="mina-opam-deps",
         deb_codename="bionic",
-        step_key="opam-bionic-image",
+        step_key="opam-bionic",
         version="bionic-\\\${BUILDKITE_COMMIT}"
       }
 

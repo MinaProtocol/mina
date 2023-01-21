@@ -13,7 +13,7 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let spec = DockerImage.ReleaseSpec::{
     service="leaderboard",
-    step_key="leaderboard-docker-image"
+    step_key="leaderboard"
 }
 
 in

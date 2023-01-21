@@ -13,7 +13,7 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let spec = DockerImage.ReleaseSpec::{
     service="bot",
-    step_key="bot-docker-image"
+    step_key="bot"
 }
 
 in
