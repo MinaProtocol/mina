@@ -84,6 +84,6 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-test-executive-${MINA_DEB_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-test-executive_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
