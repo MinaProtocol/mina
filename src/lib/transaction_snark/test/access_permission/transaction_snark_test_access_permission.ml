@@ -41,7 +41,7 @@ let%test_module "Access permission tests" =
     let run_test ?expected_failure auth_kind access_permission =
       let account_update =
         match auth_kind with
-        | Account_update.Authorization_kind.Proof ->
+        | Account_update.Authorization_kind.Proof _ ->
             account_update
         | Account_update.Authorization_kind.Signature ->
             { body =
