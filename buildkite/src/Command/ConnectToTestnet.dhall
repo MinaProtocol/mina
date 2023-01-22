@@ -12,8 +12,7 @@ let Cmd = ../Lib/Cmds.dhall in
         commands = [
           Cmd.runInDocker
             Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).minaDaemonMainnet,
-              entrypoint=" --entrypoint /bin/sh"
+              image = (../Constants/ContainerImages.dhall).minaDaemonMainnet
             }
             "./buildkite/scripts/connect-to-mainnet-on-compatible.sh"
         ],
