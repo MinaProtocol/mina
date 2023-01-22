@@ -89,6 +89,8 @@ target
 release
 .vscode
 
+cloudbuild.yaml
+
 ### IntelliJ IDEA ###
 **/.idea/
 *.iws

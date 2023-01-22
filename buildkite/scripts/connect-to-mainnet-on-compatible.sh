@@ -7,22 +7,7 @@ if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
   exit 0
 fi
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
 TESTNET_NAME="mainnet"
-
-git config --global --add safe.directory /workdir
-
-source buildkite/scripts/export-git-env-vars.sh
-
-echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net bullseye $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:

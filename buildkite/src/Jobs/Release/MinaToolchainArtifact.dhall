@@ -34,37 +34,73 @@ Pipeline.build
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="bullseye",
-        extra_args="--no-cache",
-        step_key="toolchain-bullseye-docker-image"
+        step_key="toolchain-bullseye",
+        version="bullseye-\\\${BUILDKITE_COMMIT}"
       }
 
       in
 
       DockerImage.generateStep toolchainBullseyeSpec,
 
-      -- mina-toolchain Debian 10 "Buster" Toolchain
-      let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
+      -- mina-opam-deps Debian 11 "Bullseye" Opam Deps
+      let opamBullseyeSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="bullseye",
+        step_key="opam-bullseye",
+        version="bullseye-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamBullseyeSpec,
+
+      -- mina-toolchain Debian 10 "Buster" Opam Deps
+      let opamBusterSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
         deb_codename="buster",
-        extra_args="--no-cache",
-        step_key="toolchain-buster-docker-image"
+        step_key="opam-buster",
+        version="buster-\\\${BUILDKITE_COMMIT}"
       }
 
       in
 
-      DockerImage.generateStep toolchainBusterSpec,
+      DockerImage.generateStep opamBusterSpec,
 
-      -- mina-toolchain Debian 9 "Stretch" Toolchain
-      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
+      -- mina-opam-deps Debian 9 "Stretch" Opam Deps
+      let opamStretchSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
         deb_codename="stretch",
-        extra_args="--no-cache",
-        step_key="toolchain-stretch-docker-image"
+        step_key="opam-stretch",
+        version="stretch-\\\${BUILDKITE_COMMIT}"
       }
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep opamStretchSpec,
+
+      -- mina-toolchain Ubuntu 20.04 LTS "Focal" Fossa Opam Deps
+      let opamFocalSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="focal",
+        step_key="opam-focal",
+        version="focal-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamFocalSpec,
+
+      -- mina-opam-deps Ubuntu 18.04 LTS "Bionic" Beaver Opam Deps
+      let opamBionicSpec = DockerImage.ReleaseSpec::{
+        service="mina-opam-deps",
+        deb_codename="bionic",
+        step_key="opam-bionic",
+        version="bionic-\\\${BUILDKITE_COMMIT}"
+      }
+
+      in
+
+      DockerImage.generateStep opamBionicSpec
 
     ]
   }

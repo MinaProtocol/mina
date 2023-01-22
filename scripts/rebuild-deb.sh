@@ -2,21 +2,31 @@
 
 # Script collects binaries and keys and builds deb archives.
 
-set -euo pipefail
+BUILD_NUM=${BUILDKITE_BUILD_NUM}
+BUILD_URL=${BUILDKITE_BUILD_URL}
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../_build"
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
-
-set +u
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-set -u
-
+# Alternative to BUILDKITE_BRANCH
+if [[ -n "${MINA_BRANCH:=}" ]]; then
+  BUILDKITE_BRANCH="${MINA_BRANCH}"
+fi
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+set +x
+# Allow overriding the script env variables with docker build arguments
+if [[ -n "${deb_codename:=}" ]]; then
+  MINA_DEB_CODENAME="${deb_codename}"
+fi
+if [[ -n "${deb_version:=}" ]]; then
+  MINA_DEB_VERSION="${deb_version}"
+fi
+
+set -euo pipefail
+
+GITHASH=$(git rev-parse --short=7 HEAD)
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 cd "${SCRIPTPATH}/../_build"
 
@@ -176,7 +186,6 @@ sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/mina-seed-lists/
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
 # Genesis Ledger/proof/epoch ledger Copy
@@ -327,12 +336,13 @@ rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 # NOTE: Moving the keys from /tmp because of storage constraints. This is OK
 # because building deb is the last step and therefore keys, genesis ledger, and
 # proof are not required in /tmp
+
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=("step" "vk-step" "wrap" "vk-wrap")
 for key in ${compile_keys[*]}
 do
-    echo -n "Looking for keys matching: ${key} -- "
+    echo "-- Looking for keys matching: ${key} --"
 
     # Awkward, you can't do a filetest on a wildcard - use loops
     for f in  /tmp/s3_cache_dir/${key}*; do
@@ -363,6 +373,4 @@ done
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
-# Build mina block producer sidecar
-../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb

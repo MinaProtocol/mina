@@ -10,7 +10,7 @@ FROM build-deps AS opam-deps
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 # branch to checkout for opam dependencies
-ARG MINA_BRANCH=compatible
+ARG MINA_BRANCH=develop
 # mina repository to pull from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
 

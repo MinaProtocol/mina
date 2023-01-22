@@ -1,31 +1,9 @@
 #!/bin/bash
 
-TEST_DIR=/workdir/src/app/replayer/test
-PGPASSWORD=arbitraryduck
+TEST_DIR=/var/lib/mina/replayer-test/
+PGPASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 64)
 
 set -eo pipefail
-
-echo "Updating apt, installing packages"
-apt-get update
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-# time zone = US Pacific
-/bin/echo -e "12\n10" | apt-get install -y tzdata
-apt-get install -y git postgresql apt-transport-https ca-certificates curl
-
-git config --global --add safe.directory /workdir
-
-source buildkite/scripts/export-git-env-vars.sh
-
-echo "deb [trusted=yes] http://packages.o1test.net bullseye ${MINA_DEB_RELEASE}" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-
-echo "Installing archive node package: mina-archive=${MINA_DEB_VERSION}"
-apt-get install --allow-downgrades -y mina-archive=${MINA_DEB_VERSION}
-
-echo "Generating locale for Postgresql"
-locale-gen en_US.UTF-8
 
 echo "Starting Postgresql service"
 service postgresql start

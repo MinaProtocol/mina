@@ -1,0 +1,87 @@
+# The container to pull artifacts from, expected to be from stage 3-builder
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_BUILDER_STAGE=builder
+FROM ${MINA_BUILDER_STAGE} as prebuilt-stage
+ARG image=debian:bullseye-slim
+# Mina test executive docker image, built and packaged by the staged dockerfiles directly into a clean production container
+FROM ${image} as test-executive
+ARG deb_version=1.3.1.2
+ARG MINA_BRANCH=develop
+
+# Dependencies
+RUN DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get upgrade --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    jq \
+    libgmp10 \
+    libgomp1 \
+    libssl1.1 \
+    libpq-dev \
+    procps \
+    python3 \
+    tzdata \
+    'libjemalloc.$' \
+    git \
+    wget \
+    sudo \
+    unzip \
+  && rm -rf /var/lib/apt/lists/*
+
+# --- Install anything with a ppa for ubuntu/debian
+# --- Google Cloud SDK, Helm, Kubectl, Nodejs, Yarn
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/baltocdn.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/baltocdn.gpg] https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor | tee /usr/share/keyrings/yarnpkg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/yarnpkg.gpg] https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && curl https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
+    && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends google-cloud-sdk google-cloud-sdk-gke-gcloud-auth-plugin kubectl helm nodejs yarn terraform \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Instruct gcloud to use the new auth plugin
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+WORKDIR /root
+
+# Mina test executive package, copied from the builder container
+COPY --from=prebuilt-stage /tmp/artifacts/mina-test-executive_${deb_version}.deb /root/mina-test-executive-package.deb
+# And then installed
+RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
+  && dpkg -i /root/mina-test-executive-package.deb \
+  && rm -rf /root/mina-test-executive-package.deb
+
+RUN git clone https://github.com/MinaProtocol/mina.git --branch $MINA_BRANCH --depth 1
+
+WORKDIR /root/mina
+
+# these env vars need to be overriden when the image is `docker run`.  listed here for documentation sake if nothing else
+# test configuration vars
+ENV TEST_NAME=""
+ENV MINA_IMAGE=""
+ENV ARCHIVE_IMAGE=""
+ENV DEBUG_BOOL=false
+# testnet infra related vars
+ENV GOOGLE_APPLICATION_CREDENTIALS=""
+ENV GCLOUD_API_KEY=""
+ENV AWS_ACCESS_KEY_ID=""
+ENV AWS_SECRET_ACCESS_KEY=""
+ENV AWS_DEFAULT_REGION=us-west-2
+
+# this var needs to be present but it won't change and doesn't need to be overriden
+ENV KUBE_CONFIG_PATH=/root/.kube/config
+
+COPY scripts/run_test_executive.sh /run_test_executive.sh
+RUN chmod +x /run_test_executive.sh
+
+ENTRYPOINT ["/bin/bash", "-c","/run_test_executive.sh"]

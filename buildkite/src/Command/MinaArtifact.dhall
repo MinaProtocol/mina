@@ -25,28 +25,18 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
       steps = [
-        Libp2p.step debVersion,
-        Command.build
-          Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
-              "DUNE_PROFILE=devnet",
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
-              "MINA_BRANCH=$BUILDKITE_BRANCH",
-              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}",
-              -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
-              "PREPROCESSOR=./scripts/zexe-standardize.sh"
-            ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina for ${DebianVersions.capitalName debVersion}",
-            key = "build-deb-pkg",
-            target = Size.XLarge,
-            retries = [
-              Command.Retry::{
-                exit_status = Command.ExitStatus.Code +2,
-                limit = Some 2
-              } ] -- libp2p error
-          },
+
+        -- builder image
+        let minaBuilderSpec = DockerImage.ReleaseSpec::{
+          service="mina-builder",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="builder-${DebianVersions.lowerName debVersion}",
+          version="${DebianVersions.lowerName debVersion}-\\\${BUILDKITE_COMMIT}"
+        }
+
+        in
+
+        DockerImage.generateStep minaBuilderSpec,
 
         -- daemon devnet image
         let daemonDevnetSpec = DockerImage.ReleaseSpec::{
@@ -54,7 +44,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           service="mina-daemon",
           network="devnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}"
         }
         in
         DockerImage.generateStep daemonDevnetSpec,
@@ -78,7 +68,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           service="mina-daemon",
           network="mainnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}"
         }
         in
         DockerImage.generateStep daemonMainnetSpec,
@@ -88,7 +78,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deps=DebianVersions.dependsOn debVersion,
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="test-executive-${DebianVersions.lowerName debVersion}"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -98,7 +88,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deps=DebianVersions.dependsOn debVersion,
           service="mina-archive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="archive-${DebianVersions.lowerName debVersion}"
         }
         in
         DockerImage.generateStep archiveSpec,
@@ -106,9 +96,8 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
           service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from ${DebianVersions.toolchainImage debVersion}",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="rosetta-${DebianVersions.lowerName debVersion}"
         }
         in
 

@@ -2,9 +2,12 @@
 # The "toolchain" Stage
 # - installs optional tools that are required in our CI/CD but are not required to build mina
 #################################################################################################
-FROM opam-deps AS toolchain
+# The container to pull artifacts from, expected to be from stage 2-opam-deps
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_OPAM_DEPS_STAGE=opam-deps
+FROM ${MINA_OPAM_DEPS_STAGE} AS toolchain
 
-ARG deb_codename=focal
+ARG deb_codename=bullseye
 
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
@@ -13,17 +16,20 @@ ARG DHALL_VERSION=1.41.1
 ARG DHALL_JSON_VERSION=1.7.10
 ARG DHALL_BASH_VERSION=1.0.40
 
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
 USER root
 
 # OS package dependencies
 # afaict this is the last python dependency of any kind in CI
-RUN apt-get update --yes \
-  && apt-get install --yes \
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --ignore-missing --yes --no-install-recommends \
     apt-transport-https \
     apt-utils \
     awscli \
+    ca-certificates \
     cmake \
-    fakeroot \
     gnupg2 \
     jq \
     libboost-dev \
@@ -49,62 +55,34 @@ RUN apt-get update --yes \
     pkg-config \
     rubygems \
     zlib1g-dev \
-  && rm -rf /var/lib/apt/lists/*
+    python3-sexpdata
 
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
-# but debian stretch does not have this package, so only install in bullseye
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get update --yes \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
-      && pip install readchar \
-      || exit 0
+# --- Install anything with a ppa for ubuntu/debian
+# --- Google Cloud SDK, Helm, Kubectl, Nodejs, Yarn
+RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash - \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/baltocdn.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/baltocdn.gpg] https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor | tee /usr/share/keyrings/yarnpkg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/yarnpkg.gpg] https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && curl https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
+    && apt-get update --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk google-cloud-sdk-gke-gcloud-auth-plugin kubectl helm nodejs yarn terraform
+
+# --- Instruct gcloud to use the new auth plugin
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
-RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
-    && gem install deb-s3-${DEBS3_VERSION}.gem \
-    && rm -f deb-s3-${DEBS3_VERSION}.gem
+RUN curl -sL https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem -o /tmp/deb-s3.gem \
+    && gem install /tmp/deb-s3.gem \
+    && rm -f /tmp/deb-s3.gem
 
 # --- Docker Daemon
 RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
-
-# --- Terraform tools
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
-    gpg --dearmor | \
-    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
-    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-    https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-    sudo tee /etc/apt/sources.list.d/hashicorp.list \
-    sudo apt-get update \
-    sudo apt-get install terraform
-
-# --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-# --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && apt-get update --yes \
-    && apt-get install --yes --no-install-recommends helm \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && apt update --yes \
-    && apt install --yes --no-install-recommends nodejs yarn \
-    && rm -rf /var/lib/apt/lists/*
 
 # Dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \

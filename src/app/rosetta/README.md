@@ -204,8 +204,8 @@ Checkout the "master" branch of the mina repository, ensure your Docker configur
 ```
 cat dockerfiles/stages/1-build-deps \
     dockerfiles/stages/2-opam-deps \
-    dockerfiles/stages/3-builder \
-    dockerfiles/stages/4-production \
+    dockerfiles/stages/3-rosetta-builder \
+    dockerfiles/stages/4-rosetta \
     | docker build -t mina-rosetta-ubuntu:v1.3.0 \
         --build-arg "DUNE_PROFILE=mainnet"
         --build-arg "MINA_BRANCH=master" -

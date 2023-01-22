@@ -1,0 +1,70 @@
+# The container to pull artifacts from, expected to be from stage 3-builder
+# but it can also be supplied as a build arg to pull from a specific pre-built image for speed
+ARG MINA_BUILDER_STAGE=builder
+FROM ${MINA_BUILDER_STAGE} as prebuilt-stage
+ARG image=debian:bullseye-slim
+# Mina daemon docker image, built and packaged via the staged dockerfiles directly into a clean production container
+FROM ${image} AS daemon
+ARG deb_version=1.3.1.2
+ARG network=mainnet
+
+# Dependencies
+RUN DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes update && \
+  DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes --no-install-recommends install \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    libgmp10 \
+    libgomp1 \
+    libssl1.1 \
+    libpq-dev \
+    procps \
+    tzdata \
+    'libjemalloc.$' \
+    'libffi.$' \
+    'libprocps.$'
+
+# Mina daemon package, copied from the builder container
+COPY --from=prebuilt-stage /tmp/artifacts/mina-${network}_${deb_version}.deb /root/mina-daemon-package.deb
+# And then installed
+RUN echo "Building image with version $deb_version from compiled debian package for network $network" \
+  && dpkg -i /root/mina-daemon-package.deb \
+  && rm -rf /root/mina-daemon-package.deb
+
+WORKDIR /root/
+USER 0
+
+COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+COPY scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+COPY scripts/daemon-entrypoint.sh /entrypoint.sh
+COPY ./auxiliary_entrypoints /entrypoint.d
+
+ENV MINA_TIME_OFFSET 0
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
+
+# Additional stage daemon-puppet with tools used in minaprotocol/mina CI/CD to test and orchestrate the container, but are not strictly required to run mina
+# Build with --target daemon in docker to skip this stage
+FROM daemon AS daemon-puppet
+
+RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor | tee /usr/share/keyrings/google.gpg \
+  && echo "deb [signed-by=/usr/share/keyrings/google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
+    google-cloud-sdk \
+    google-cloud-sdk-gke-gcloud-auth-plugin \
+    kubectl \
+    apt-transport-https \
+    jq \
+    python3 && \
+  rm -rf /var/lib/apt/lists/*
+
+COPY puppeteer-context/* /
+RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

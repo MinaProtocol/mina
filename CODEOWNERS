@@ -2,7 +2,7 @@
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
-/scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/scripts/ @MinaProtocol/infra-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
@@ -15,12 +15,12 @@
 
 /src/external/ @bkase @psteckler @imeckler @mrmr1993
 
-/src/app/archive @MinaProtocol/product-eng-reviewers
+/src/app/archive @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
-/src/app/reformat/ @MinaProtocol/infra-eng-reviewers
+/src/app/reformat/ @MinaProtocol/protocol-eng-reviewers
 /src/app/trace-tool/ @MinaProtocol/protocol-eng-reviewers
 /src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
@@ -58,5 +58,3 @@
 /src/lib/snarky_js_bindings @MinaProtocol/product-eng-reviewers @imeckler @mrmr1993
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
-
-/src/nonconsensus @MinaProtocol/protocol-eng-reviewers

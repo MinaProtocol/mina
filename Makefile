@@ -261,17 +261,16 @@ publish-macos:
 deb:
 	./scripts/rebuild-deb.sh
 	./scripts/archive/build-release-archives.sh
+	./scripts/rebuild_test_executive_deb.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
 deb_optimized:
 	./scripts/rebuild-deb.sh "optimized"
 	./scripts/archive/build-release-archives.sh
+	./scripts/rebuild_test_executive_deb.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
-
-test_executive_deb:
-	./scripts/rebuild_test_executive_deb.sh
 
 build_pv_keys: ocaml_checks
 	$(info Building keys)

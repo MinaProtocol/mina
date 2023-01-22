@@ -4,12 +4,10 @@
 #################################################################################################
 FROM debian:bullseye-slim AS production
 
-ENV DEBIAN_FRONTEND noninteractive
-
 # Dependencies
-RUN apt-get update --quiet --yes \
-  && apt-get upgrade --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get upgrade --quiet --yes \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     dnsutils \

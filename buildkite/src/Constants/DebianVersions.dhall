@@ -58,13 +58,13 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Bookworm = [{ name = "MinaArtifactBookworm", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
-    , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
-    , Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
-    , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
-    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "MinaArtifactBookworm", key = "builder-bookworm" }]
+    , Bullseye = [{ name = "MinaArtifactBullseye", key = "builder-bullseye" }]
+    , Buster = [{ name = "MinaArtifactBuster", key = "builder-buster" }]
+    , Stretch = [{ name = "MinaArtifactStretch", key = "builder-stretch" }]
+    , Jammy = [{ name = "MinaArtifactJammy", key = "builder-jammy" }]
+    , Focal = [{ name = "MinaArtifactFocal", key = "builder-focal" }]
+    , Bionic = [{ name = "MinaArtifactBionic", key = "builder-bionic" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
@@ -93,15 +93,21 @@ let bullseyeDirtyWhen = [
 
 in
 
+let zeroDirtyWhen = [
+  S.strictlyStart (S.contains "BUILD_ALL")
+]
+
+in
+
 let dirtyWhen = \(debVersion : DebVersion) ->
   merge {
-    Bookworm = minimalDirtyWhen
+    Bookworm = zeroDirtyWhen
     , Bullseye = bullseyeDirtyWhen
-    , Buster = minimalDirtyWhen
-    , Stretch = minimalDirtyWhen
-    , Jammy = minimalDirtyWhen
-    , Focal = minimalDirtyWhen
-    , Bionic = minimalDirtyWhen
+    , Buster = zeroDirtyWhen
+    , Stretch = zeroDirtyWhen
+    , Jammy = zeroDirtyWhen
+    , Focal = zeroDirtyWhen
+    , Bionic = zeroDirtyWhen
   } debVersion
 
 in
