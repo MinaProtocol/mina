@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TEST_DIR=/var/lib/mina/replayer-test/
-PGPASSWORD=arbitraryduck
+PGPASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 64)
 
 set -eo pipefail
 
