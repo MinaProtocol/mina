@@ -12,7 +12,7 @@ let Cmd = ../Lib/Cmds.dhall in
         commands = [
           Cmd.runInDocker
             Cmd.Docker::{
-              image = "gcr.io/o1labs-192920/mina-archive:\\\${MINA_DOCKER_TAG}",
+              image = (../Constants/ContainerImages.dhall).minaArchive,
               entrypoint = " --entrypoint /bin/sh"
             }
             "./buildkite/scripts/replayer-test.sh"

@@ -36,8 +36,8 @@ let ReleaseSpec = {
     deb_codename = "\\\${MINA_DEB_CODENAME}",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
-    opam_deps = "gcr.io/o1labs-192920/mina-opam-deps:\\\${MINA_DEB_CODENAME}-684427fc653c639ab69249465f92380c71ecf8fb",
-    builder = "gcr.io/o1labs-192920/mina-builder:\\\${MINA_DEB_CODENAME}-\\\${BUILDKITE_COMMIT}",
+    opam_deps = (../Constants/ContainerImages.dhall).minaOpamDeps,
+    builder = (../Constants/ContainerImages.dhall).minaBuilder,
     extra_args = [] : List Text,
     step_key = "daemon-devnet-docker-image"
   }
