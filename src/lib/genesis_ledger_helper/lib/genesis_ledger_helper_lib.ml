@@ -53,6 +53,7 @@ module Accounts = struct
             { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -76,6 +77,7 @@ module Accounts = struct
                   Impossible
             in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
+            ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
@@ -87,13 +89,6 @@ module Accounts = struct
             ; increment_nonce = auth_required increment_nonce
             ; set_voting_for = auth_required set_voting_for
             }
-      in
-      let token_permissions =
-        Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
-            if token_owned then
-              Mina_base.Token_permissions.Token_owned { disable_new_accounts }
-            else Not_owned { account_disabled } )
       in
       let%bind token_symbol =
         try
@@ -178,7 +173,6 @@ module Accounts = struct
         ; delegate =
             (if Option.is_some delegate then delegate else account.delegate)
         ; token_id
-        ; token_permissions
         ; nonce = Account.Nonce.of_uint32 t.nonce
         ; receipt_chain_hash =
             Option.value_map t.receipt_chain_hash
@@ -211,22 +205,6 @@ module Accounts = struct
               ; vesting_increment = t.vesting_increment
               }
       in
-      let token_permissions =
-        match account.token_permissions with
-        | Mina_base.Token_permissions.Token_owned { disable_new_accounts } ->
-            Some
-              { Runtime_config.Accounts.Single.Token_permissions.token_owned =
-                  true
-              ; disable_new_accounts
-              ; account_disabled = false
-              }
-        | Not_owned { account_disabled } ->
-            Some
-              { token_owned = false
-              ; disable_new_accounts = false
-              ; account_disabled
-              }
-      in
       let permissions =
         let auth_required a =
           match a with
@@ -244,6 +222,7 @@ module Accounts = struct
         let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -260,6 +239,7 @@ module Accounts = struct
               auth_required edit_state
           ; send = auth_required send
           ; receive = auth_required receive
+          ; access = auth_required access
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
@@ -310,7 +290,6 @@ module Accounts = struct
             account.delegate
       ; timing
       ; token = Some (Mina_base.Token_id.to_string account.token_id)
-      ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =
           Some

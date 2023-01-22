@@ -55,7 +55,6 @@ module Stake_delegation = Stake_delegation
 module State_body_hash = State_body_hash
 module State_hash = State_hash
 module Token_id = Token_id
-module Token_permissions = Token_permissions
 module Transaction_status = Transaction_status
 module Transaction_union_payload = Transaction_union_payload
 module Transaction_union_tag = Transaction_union_tag

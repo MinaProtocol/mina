@@ -253,14 +253,13 @@ let sample_block_sexp =
     ((public_key B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1000000000000) (nonce 1)
      (receipt_chain_hash
       1756052024613657634730554264564165361515062420964192359191855470145283983189)
      (delegate (B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -270,14 +269,13 @@ let sample_block_sexp =
     ((public_key B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 98999999999) (nonce 1)
      (receipt_chain_hash
       14724034866503804719874943167124323851595977937051716261242157735099618131240)
      (delegate (B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -287,14 +285,13 @@ let sample_block_sexp =
     ((public_key B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1001000000001) (nonce 0)
      (receipt_chain_hash
       14564582992068613478915821183083107733064540968050799295374021047658500056219)
      (delegate (B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -304,14 +301,13 @@ let sample_block_sexp =
     ((public_key B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 998999999999) (nonce 1)
      (receipt_chain_hash
       16097722112531256871937176655429045871577436884363597261289761147678877237138)
      (delegate (B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -321,14 +317,13 @@ let sample_block_sexp =
     ((public_key B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1001000000001) (nonce 0)
      (receipt_chain_hash
       14564582992068613478915821183083107733064540968050799295374021047658500056219)
      (delegate (B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -338,14 +333,13 @@ let sample_block_sexp =
     ((public_key B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 998999999999) (nonce 1)
      (receipt_chain_hash
       3789829474818306949906721224783620372752646928473927977428294954344374533872)
      (delegate (B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -355,14 +349,13 @@ let sample_block_sexp =
     ((public_key B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1001000000001) (nonce 0)
      (receipt_chain_hash
       14564582992068613478915821183083107733064540968050799295374021047658500056219)
      (delegate (B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -372,14 +365,13 @@ let sample_block_sexp =
     ((public_key B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 998999999999) (nonce 1)
      (receipt_chain_hash
       8533797999234991471367202436629983958250732378960523831599964589517571228325)
      (delegate (B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -389,14 +381,13 @@ let sample_block_sexp =
     ((public_key B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1001000000001) (nonce 0)
      (receipt_chain_hash
       14564582992068613478915821183083107733064540968050799295374021047658500056219)
      (delegate (B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -406,14 +397,13 @@ let sample_block_sexp =
     ((public_key B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 10000000000000000) (nonce 1)
      (receipt_chain_hash
       23293976437428080852645890265900229412344252883925841424431974907470362218153)
      (delegate (B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -423,14 +413,13 @@ let sample_block_sexp =
     ((public_key B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1000000000000) (nonce 1)
      (receipt_chain_hash
       11341467036951506593129937196842083980413513803534502611689999876031423969561)
      (delegate (B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -440,14 +429,13 @@ let sample_block_sexp =
     ((public_key B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo)
      (token_id
       0x0000000000000000000000000000000000000000000000000000000000000001)
-     (token_permissions (Not_owned (account_disabled false)))
      (token_symbol "") (balance 1040000000000) (nonce 0)
      (receipt_chain_hash
       14564582992068613478915821183083107733064540968050799295374021047658500056219)
      (delegate (B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -792,12 +780,6 @@ let sample_block_json =
         {
           "public_key": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1000000000000",
           "nonce": "1",
@@ -815,6 +797,9 @@ let sample_block_json =
               "Signature"
             ],
             "receive": [
+              "None"
+            ],
+            "access": [
               "None"
             ],
             "set_delegate": [
@@ -850,12 +835,6 @@ let sample_block_json =
         {
           "public_key": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "98999999999",
           "nonce": "1",
@@ -868,6 +847,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -908,12 +890,6 @@ let sample_block_json =
         {
           "public_key": "B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -926,6 +902,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -966,12 +945,6 @@ let sample_block_json =
         {
           "public_key": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -984,6 +957,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1024,12 +1000,6 @@ let sample_block_json =
         {
           "public_key": "B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1042,6 +1012,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1082,12 +1055,6 @@ let sample_block_json =
         {
           "public_key": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -1100,6 +1067,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1140,12 +1110,6 @@ let sample_block_json =
         {
           "public_key": "B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1158,6 +1122,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1198,12 +1165,6 @@ let sample_block_json =
         {
           "public_key": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -1216,6 +1177,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1256,12 +1220,6 @@ let sample_block_json =
         {
           "public_key": "B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1274,6 +1232,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1314,12 +1275,6 @@ let sample_block_json =
         {
           "public_key": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "10000000000000000",
           "nonce": "1",
@@ -1332,6 +1287,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1372,12 +1330,6 @@ let sample_block_json =
         {
           "public_key": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1000000000000",
           "nonce": "1",
@@ -1390,6 +1342,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1430,12 +1385,6 @@ let sample_block_json =
         {
           "public_key": "B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1040000000000",
           "nonce": "0",
@@ -1448,6 +1397,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"

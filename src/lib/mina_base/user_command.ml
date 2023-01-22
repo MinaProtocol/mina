@@ -232,14 +232,17 @@ let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+(* always `Accessed` for fee payer *)
+let accounts_accessed (t : t) (status : Transaction_status.t) :
+    (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x status
+      Signed_command.account_access_statuses x status
   | Zkapp_command ps ->
-      Zkapp_command.accounts_accessed ps status
+      Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
 let fee_payer (t : t) =
   match t with

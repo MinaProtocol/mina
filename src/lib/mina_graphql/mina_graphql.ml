@@ -904,7 +904,6 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -916,7 +915,6 @@ module Types = struct
           ; zkapp
           } =
         let open Option.Let_syntax in
-        let%bind token_permissions = token_permissions in
         let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
@@ -924,7 +922,6 @@ module Types = struct
         let%map permissions = permissions in
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions
         ; token_symbol
         ; nonce
         ; balance = balance.AnnotatedBalance.total
@@ -939,7 +936,6 @@ module Types = struct
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -952,7 +948,6 @@ module Types = struct
           } =
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions = Some token_permissions
         ; token_symbol = Some token_symbol
         ; nonce = Some nonce
         ; balance =
@@ -988,7 +983,6 @@ module Types = struct
             Account.
               { Poly.public_key = Account_id.public_key account_id
               ; token_id = Account_id.token_id account_id
-              ; token_permissions = None
               ; token_symbol = None
               ; nonce = None
               ; delegate = None
@@ -1013,7 +1007,6 @@ module Types = struct
       { account :
           ( Public_key.Compressed.t
           , Token_id.t
-          , Token_permissions.t option
           , Account.Token_symbol.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
@@ -1107,6 +1100,10 @@ module Types = struct
               ~doc:"Authorization required to receive tokens"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "access" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to access the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
           ; field "setDelegate" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the delegate"
               ~args:Arg.[]
@@ -1375,26 +1372,16 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool
+             ; field "isTokenOwner" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       true
-                   | Not_owned _ ->
-                       false )
-             ; field "isDisabled" ~typ:bool
+                 ~resolve:(fun _ _ -> None)
+             ; field "isDisabled" ~typ:bool ~deprecated:(Deprecated None)
                  ~doc:
                    "True if this account has been disabled by the owner of the \
                     associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       false
-                   | Not_owned { account_disabled } ->
-                       account_disabled )
+                 ~resolve:(fun _ _ -> None)
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \

@@ -194,7 +194,7 @@ let%test_module "Block storage tests" =
                   ~peer_protection_ratio:0.2 ~min_connections:20
                   ~max_connections:40 ~validation_queue_size:250
                   ~gating_config:empty_libp2p_ipc_gating_config
-                  ?metrics_port:None ~topic_config:[]
+                  ?metrics_port:None ~topic_config:[] ()
               in
               let%bind _ =
                 Helper.do_rpc helper

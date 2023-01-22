@@ -185,6 +185,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -201,6 +202,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -426,7 +428,8 @@ let get_account_update_body ~pool body_id =
            ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
-           ; caller
+           ; implicit_account_creation_fee
+           ; call_type
            ; authorization_kind
            ; verification_key_hash_id
            } =
@@ -595,7 +598,7 @@ let get_account_update_body ~pool body_id =
              ; is_new
              } )
   in
-  let caller = Account_update.Call_type.of_string caller in
+  let call_type = Account_update.Call_type.of_string call_type in
   let%bind authorization_kind =
     match Control.Tag.of_string_exn authorization_kind with
     | Proof -> (
@@ -633,7 +636,8 @@ let get_account_update_body ~pool body_id =
           ; account = account_precondition
           }
       ; use_full_commitment
-      ; caller
+      ; implicit_account_creation_fee
+      ; call_type
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )
@@ -742,6 +746,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -756,6 +761,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key
@@ -878,8 +884,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let account =
     ( { public_key
       ; token_id
-      ; token_permissions =
-          Token_permissions.Not_owned { account_disabled = false }
       ; token_symbol
       ; balance
       ; nonce
