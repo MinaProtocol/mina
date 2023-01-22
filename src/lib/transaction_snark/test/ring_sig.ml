@@ -227,8 +227,8 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Full Zkapp_precondition.Account.accept
                     }
+                ; call_type = Call
                 ; use_full_commitment = false
-                ; caller = Call
                 ; authorization_kind = Proof (With_hash.hash vk)
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
