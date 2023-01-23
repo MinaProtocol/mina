@@ -558,7 +558,7 @@ let%test_unit "json value" =
         editSequenceState: "Signature",
         setTokenSymbol: "Signature",
         incrementNonce: "Signature",
-        setVotingFor: "Signature"
+        setVotingFor: "Signature",
         setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
