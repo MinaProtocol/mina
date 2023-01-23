@@ -608,12 +608,6 @@ struct
           ; zkapp_updates_applied = _
           } as t ) ->
         let open Or_error.Let_syntax in
-        (* TODO TODO TODO
-           let _connecting_ledger_left = failwith "TODO check connecting ledger" in
-           let _connecting_ledger_right =
-             failwith "TODO check connecting ledger"
-           in
-        *)
         let%map () =
           Option.value_map ~default:(Ok ()) last_proof_statement
             ~f:(fun statement ->
