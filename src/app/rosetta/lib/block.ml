@@ -760,7 +760,7 @@ WHERE bzc.block_id = ?
         {|
 SELECT zaub.account_identifier_id, zaub.id,
     zaub.balance_change, zaub.increment_nonce, zaub.events_id,
-    zaub.sequence_events_id, zaub.call_data_id, zaub.call_depth,
+    zaub.actions_id, zaub.call_data_id, zaub.call_depth,
     zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
     zaub.use_full_commitment, zaub.call_type, zaub.authorization_kind,
     pk.value as account, bzc.status
