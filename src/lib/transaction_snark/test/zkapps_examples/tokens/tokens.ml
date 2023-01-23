@@ -327,7 +327,7 @@ let%test_module "Tokens test" =
              ; body =
                  Zkapps_examples.mk_update_body (fst mint_to_keys)
                    ~use_full_commitment:true ~balance_change:(int_to_amount 1)
-                   ~token_id:owned_token_id ~call_type:Delegate_call
+                   ~token_id:owned_token_id ~call_type:Call
              }
       in
       let account =
