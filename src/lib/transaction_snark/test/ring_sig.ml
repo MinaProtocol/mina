@@ -193,6 +193,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
                 ; increment_nonce = true
+                ; implicit_account_creation_fee = true
                 ; events = []
                 ; actions = []
                 ; call_data = Field.zero
@@ -202,7 +203,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
@@ -220,13 +221,14 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
+                ; implicit_account_creation_fee = true
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Full Zkapp_precondition.Account.accept
                     }
                 ; use_full_commitment = false
-                ; caller = Call
+                ; call_type = Call
                 ; authorization_kind = Proof
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
@@ -246,9 +248,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
           let tx_statement : Zkapp_statement.t =
             { account_update =
                 Account_update.Body.digest
-                  (Zkapp_command.add_caller_simple snapp_account_update_data
-                     Token_id.default )
-                    .body
+                  (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
           in
