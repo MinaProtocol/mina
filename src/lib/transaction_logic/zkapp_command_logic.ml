@@ -969,13 +969,8 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
           (let caller =
-             Token_id.if_ is_delegate_call
-               ~then_:(Stack_frame.caller current_forest)
-               ~else_:
-                 (Token_id.if_ is_blind_call ~then_:Token_id.default
-                    ~else_:
-                      (Account_id.derive_token_id
-                         ~owner:(Account_update.account_id account_update) ) )
+             Account_id.derive_token_id
+               ~owner:(Account_update.account_id account_update)
            and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )
