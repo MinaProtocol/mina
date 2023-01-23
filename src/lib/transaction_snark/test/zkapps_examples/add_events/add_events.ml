@@ -67,6 +67,7 @@ let%test_module "Add events test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }
