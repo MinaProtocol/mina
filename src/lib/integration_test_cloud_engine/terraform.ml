@@ -4,38 +4,6 @@ open Core
 let cons (type a) (key : string) (body : a) (to_yojson : a -> Yojson.Safe.t) =
   `Assoc [ (key, to_yojson body) ]
 
-(* module Backend = struct
-     module S3 = struct
-       type t =
-         { key : string
-         ; encrypt : bool
-         ; region : string
-         ; bucket : string
-         ; acl : string
-         }
-       [@@deriving to_yojson]
-     end
-
-     type t = S3 of S3.t
-
-     let to_yojson = function S3 x -> cons "s3" x S3.to_yojson
-   end *)
-
-(* module Backend = struct
-     module GCS = struct
-       type t =
-         {
-         bucket : string
-         ; prefix  : string
-         }
-       [@@deriving to_yojson]
-     end
-
-     type t = GCS of GCS.t
-
-     let to_yojson = function GCS x -> cons "gcs" x GCS.to_yojson
-   end *)
-
 module Backend = struct
   module Local = struct
     type t = { path : string } [@@deriving to_yojson]
