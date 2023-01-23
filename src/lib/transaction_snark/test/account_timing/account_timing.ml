@@ -821,10 +821,11 @@ let%test_module "account timing check" =
     let apply_zkapp_commands_at_slot ledger slot
         (zkapp_commands : Zkapp_command.t list) =
       let state_body, _state_view = state_body_and_view_at_slot slot in
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
       Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
           Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
             ~state_body ledger [ zkapp_command ] )
-      |> Fn.flip Async.upon (fun () -> ())
 
     let check_zkapp_failure expected_failure = function
       | Ok
