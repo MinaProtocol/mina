@@ -92,13 +92,13 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Blind_call
-                               token_funder Token_id.default
+                            (mk_account_update_body Signature No token_funder
+                               Token_id.default
                                (-(11 * account_creation_fee)) )
                             []
                         ; mk_node
-                            (mk_account_update_body Signature Blind_call
-                               token_owner Token_id.default
+                            (mk_account_update_body Signature No token_owner
+                               Token_id.default
                                (10 * account_creation_fee) )
                             []
                         ]
@@ -122,12 +122,12 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Blind_call
-                               token_owner Token_id.default
-                               (-account_creation_fee) )
+                            (mk_account_update_body Signature No token_owner
+                               Token_id.default (-account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id 100 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id 100 )
                                 []
                             ]
                         ]
@@ -147,15 +147,17 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Blind_call
-                               token_owner Token_id.default
+                            (mk_account_update_body Signature No token_owner
+                               Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_owner custom_token_id 0 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_owner custom_token_id
+                                   0 )
                                 [ mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(2) custom_token_id2 500 )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(2)
+                                       custom_token_id2 500 )
                                     []
                                 ]
                             ]
@@ -176,51 +178,62 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Blind_call
-                               token_owner Token_id.default
+                            (mk_account_update_body Signature No token_owner
+                               Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id (-30) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id (-30) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id 30 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id 30 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   fee_payer_keypair Token_id.default (-50) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token fee_payer_keypair
+                                   Token_id.default (-50) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_funder Token_id.default 50 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_funder
+                                   Token_id.default 50 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id (-10) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id (-10) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id 10 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id 10 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id (-5) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id (-5) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id 5 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id 5 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_owner custom_token_id 0 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_owner custom_token_id
+                                   0 )
                                 [ mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(2) custom_token_id2 (-210) )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(2)
+                                       custom_token_id2 (-210) )
                                     []
                                 ; mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(3) custom_token_id2 210 )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(3)
+                                       custom_token_id2 210 )
                                     []
                                 ]
                             ]

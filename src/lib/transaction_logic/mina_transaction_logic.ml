@@ -1489,9 +1489,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
+      let may_use_parents_own_token (p : t) =
+        May_use_token.parents_own_token p.body.may_use_token
 
-      let is_blind_call (p : t) = Call_type.is_blind_call p.body.call_type
+      let may_use_token_inherited_from_parent (p : t) =
+        May_use_token.inherit_from_parent p.body.may_use_token
 
       let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
@@ -2396,7 +2398,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
                     }
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; use_full_commitment
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = Signature
@@ -2418,7 +2420,7 @@ module For_tests = struct
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
                     }
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given

@@ -203,7 +203,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
                     }
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
@@ -228,7 +228,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     ; account = Full Zkapp_precondition.Account.accept
                     }
                 ; use_full_commitment = false
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; authorization_kind = Proof
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy

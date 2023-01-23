@@ -2658,7 +2658,7 @@
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
               "description": null,
               "args": [],
               "type": {
@@ -2674,7 +2674,7 @@
               "deprecationReason": null
             },
             {
-              "name": "isBlindCall",
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -2692,7 +2692,7 @@
           ],
           "inputFields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2706,7 +2706,7 @@
               "defaultValue": null
             },
             {
-              "name": "isBlindCall",
+              "name": "inheritFromParent",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2950,7 +2950,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -3180,7 +3180,7 @@
               "defaultValue": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -6700,7 +6700,7 @@
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
               "description": null,
               "args": [],
               "type": {
@@ -6716,7 +6716,7 @@
               "deprecationReason": null
             },
             {
-              "name": "isBlindCall",
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -8046,7 +8046,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {

@@ -1454,7 +1454,7 @@ module Zkapp_account_update_body = struct
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; implicit_account_creation_fee : bool
-    ; call_type : string
+    ; may_use_token : string
     ; authorization_kind : string
     }
   [@@deriving fields, hlist]
@@ -1521,7 +1521,9 @@ module Zkapp_account_update_body = struct
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
     let implicit_account_creation_fee = body.implicit_account_creation_fee in
-    let call_type = Account_update.Call_type.to_string body.call_type in
+    let may_use_token =
+      Account_update.May_use_token.to_string body.may_use_token
+    in
     let authorization_kind =
       Account_update.Authorization_kind.to_string body.authorization_kind
     in
@@ -1538,7 +1540,7 @@ module Zkapp_account_update_body = struct
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; implicit_account_creation_fee
-      ; call_type
+      ; may_use_token
       ; authorization_kind
       }
     in
@@ -1547,8 +1549,8 @@ module Zkapp_account_update_body = struct
       ~tannot:(function
         | "events_ids" | "actions_ids" ->
             Some "int[]"
-        | "call_type" ->
-            Some "call_type"
+        | "may_use_token" ->
+            Some "may_use_token"
         | "authorization_kind" ->
             Some "authorization_kind_type"
         | _ ->

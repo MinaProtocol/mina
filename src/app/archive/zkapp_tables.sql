@@ -245,7 +245,7 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TYPE call_type AS ENUM ('call', 'delegate_call', 'blind_call');
+CREATE TYPE may_use_token AS ENUM ('No', 'ParentsOwnToken', 'InheritFromParent');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
@@ -266,7 +266,7 @@ CREATE TABLE zkapp_account_update_body
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , implicit_account_creation_fee            boolean    NOT NULL
-, call_type                             call_type  NOT NULL
+, may_use_token                         may_use_token  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 

@@ -53,7 +53,7 @@ let deploy_account_update_body : Account_update.Body.t =
           Zkapp_precondition.Protocol_state.accept
       ; account = Accept
       }
-  ; call_type = Blind_call
+  ; may_use_token = No
   ; use_full_commitment = true
   ; authorization_kind = Signature
   }

@@ -550,7 +550,7 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
-       , 'call_type
+       , 'may_use_token
        , 'authorization_kind )
        t =
     { public_key : 'pk
@@ -565,7 +565,7 @@ module Account_update_body_components = struct
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
     ; use_full_commitment : 'bool
-    ; call_type : 'call_type
+    ; may_use_token : 'may_use_token
     ; authorization_kind : 'authorization_kind
     }
 
@@ -601,7 +601,7 @@ module Account_update_body_components = struct
         }
     ; use_full_commitment = t.use_full_commitment
     ; implicit_account_creation_fee = false
-    ; call_type = t.call_type
+    ; may_use_token = t.may_use_token
     ; authorization_kind = t.authorization_kind
     }
 end
@@ -616,8 +616,8 @@ end
    a nonce for the fee payer, and `Account_precondition.t` for other zkapp_command
 *)
 let gen_account_update_body_components (type a b c d) ?(update = None)
-    ?account_id ?token_id ?call_type ?account_ids_seen ~account_state_tbl ?vk
-    ?failure ?(new_account = false) ?(zkapp_account = false)
+    ?account_id ?token_id ?may_use_token ?account_ids_seen ~account_state_tbl
+    ?vk ?failure ?(new_account = false) ?(zkapp_account = false)
     ?(is_fee_payer = false) ?available_public_keys ?permissions_auth
     ?(required_balance_change : a option) ?protocol_state_view
     ~zkapp_account_ids
@@ -803,12 +803,12 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
         | _ ->
             gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
-  and call_type =
-    match call_type with
+  and may_use_token =
+    match may_use_token with
     | None ->
-        Account_update.Call_type.quickcheck_generator
-    | Some call_type ->
-        return call_type
+        Account_update.May_use_token.quickcheck_generator
+    | Some may_use_token ->
+        return may_use_token
   in
   let token_id = f_token_id token_id in
   let authorization_kind =
@@ -942,14 +942,15 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; protocol_state_precondition
   ; account_precondition
   ; use_full_commitment
-  ; call_type
+  ; may_use_token
   ; authorization_kind
   }
 
 let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?account_id ?token_id ?call_type ?permissions_auth
-    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
-    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
+    ?(zkapp_account = false) ?account_id ?token_id ?may_use_token
+    ?permissions_auth ?required_balance_change ~zkapp_account_ids ~authorization
+    ~account_ids_seen ~available_public_keys ~account_state_tbl
+    ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -969,9 +970,9 @@ let gen_account_update_from ?(update = None) ?failure ?(new_account = false)
     gen_account_update_body_components ~update ?failure ~new_account
       ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
-      ?permissions_auth ?account_id ?token_id ?call_type ?protocol_state_view
-      ?vk ~zkapp_account_ids ~account_ids_seen ~available_public_keys
-      ?required_balance_change ~account_state_tbl
+      ?permissions_auth ?account_id ?token_id ?may_use_token
+      ?protocol_state_view ?vk ~zkapp_account_ids ~account_ids_seen
+      ~available_public_keys ?required_balance_change ~account_state_tbl
       ~gen_balance_change:
         (gen_balance_change ?permissions_auth ~new_account ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
@@ -1388,7 +1389,7 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
           in
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
             ~authorization ~permissions_auth ~available_public_keys
-            ~call_type:Blind_call ~account_state_tbl ~required_balance_change
+            ~may_use_token:No ~account_state_tbl ~required_balance_change
             ?protocol_state_view ?vk ()
         in
         let token_id =
@@ -1398,9 +1399,9 @@ let gen_zkapp_command_from ?failure ?(max_account_updates = max_account_updates)
         in
         let%bind child =
           gen_account_update_from ~zkapp_account_ids ~account_ids_seen
-            ~new_account:true ~token_id ~call_type:Call ~authorization
-            ~permissions_auth ~available_public_keys ~account_state_tbl
-            ?protocol_state_view ?vk ()
+            ~new_account:true ~token_id ~may_use_token:Parents_own_token
+            ~authorization ~permissions_auth ~available_public_keys
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         gen_tree (mk_node parent [ mk_node child [] ] :: acc) (n - 1)
     in

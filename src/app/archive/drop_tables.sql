@@ -40,7 +40,7 @@ DROP TABLE zkapp_account_update;
 
 DROP TABLE zkapp_account_update_body;
 
-DROP TYPE call_type;
+DROP TYPE may_use_token;
 
 DROP TYPE authorization_kind_type;
 
