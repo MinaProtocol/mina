@@ -652,7 +652,7 @@ end = struct
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
 
-  let num_constraints (sys : t) = finalize_and_get_gates sys |> Gates.len
+  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
